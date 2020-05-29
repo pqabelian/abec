@@ -811,7 +811,7 @@ func (view *UtxoRingViewpoint) disconnectTransactions(db database.DB, block *abe
 			//	At initial development, the strictesct check may help find potential situations
 			loadUtxoRing := stxo.UtxoRing.Clone()
 			loadUtxoRing.packedFlags |= tfModified
-			view.entries[stxo.UtxoRing.outPointRing.Hash()] = loadUtxoRing
+			view.entries[loadUtxoRing.outPointRing.Hash()] = loadUtxoRing
 		}
 	}
 
@@ -826,45 +826,45 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 		return AssertError("newUtxoRingEntriesFromNode is called with nil node or nil block.")
 	}
 
-	if !(node.height%3 == 0 && node.height >= 3) {
-		return AssertError("newUtxoRingEntriesFromNode is called with node where node.height % 3 != 0 or node.height < 3.")
+	if !(node.height%3 == 2) {
+		return AssertError("newUtxoRingEntriesFromNode is called with node where node.height % 3 != 2.")
 	}
 
 	if !view.bestHash.IsEqual(block.Hash()) {
 		return AssertError("newUtxoRingEntriesFromNode is called with block's hash not equal to the view.bestHash")
 	}
 
-	node2 := node.parent
-	node1 := node2.parent
-	if node2 == nil || node1 == nil {
-		return AssertError("a node with height %3 == 0 should have two previous successive nodes.")
+	node1 := node.parent
+	node0 := node1.parent
+	if node1 == nil || node0 == nil {
+		return AssertError("a node with height %2 == 0 should have two previous successive nodes.")
 	}
 
 	if !node.hash.IsEqual(block.Hash()) {
 		return AssertError("newUtxoRingEntries is called with block that has different hash with the node.")
 	}
 
-	block3 := block
-	var block2 *abeutil.BlockAbe
+	block2 := block
 	var block1 *abeutil.BlockAbe
+	var block0 *abeutil.BlockAbe
 	err := db.View(func(dbTx database.Tx) error {
 		var err error
-		block2, err = dbFetchBlockByNodeAbe(dbTx, node2)
+		block1, err = dbFetchBlockByNodeAbe(dbTx, node1)
 		if err != nil {
 			return err
 		}
-		block1, err = dbFetchBlockByNodeAbe(dbTx, node1)
+		block0, err = dbFetchBlockByNodeAbe(dbTx, node0)
 		return err
 	})
 	if err != nil {
 		return err
 	}
 
-	if block1 == nil || block2 == nil {
+	if block0 == nil || block1 == nil {
 		return AssertError("newUtxoRingEntries is called with node that does not have 2 previous successive blocks in database")
 	}
 
-	blocks := []*abeutil.BlockAbe{block1, block2, block3}
+	blocks := []*abeutil.BlockAbe{block0, block1, block2}
 	ringBlockHeight := blocks[2].Height()
 
 	blocksNum := len(blocks)

@@ -1049,6 +1049,136 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *abeutil.Block, view
 	return nil
 }
 
+//	Abe to do
+func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe, view *UtxoRingViewpoint, viewToDel *UtxoRingViewpoint) error {
+	// Make sure the node being disconnected is the end of the best chain.
+	if !node.hash.IsEqual(&b.bestChain.Tip().hash) {
+		return AssertError("disconnectBlock must be called with the " +
+			"block at the end of the main chain")
+	}
+
+	// Load the previous block since some details for it are needed below.
+	prevNode := node.parent
+	var prevBlock *abeutil.Block
+	err := b.db.View(func(dbTx database.Tx) error {
+		var err error
+		prevBlock, err = dbFetchBlockByNode(dbTx, prevNode)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+
+	// Write any block status changes to DB before updating best state.
+	err = b.index.flushToDB()
+	if err != nil {
+		return err
+	}
+
+	// Generate a new best state snapshot that will be used to update the
+	// database and later memory if all database updates are successful.
+	b.stateLock.RLock()
+	curTotalTxns := b.stateSnapshot.TotalTxns
+	b.stateLock.RUnlock()
+	numTxns := uint64(len(prevBlock.MsgBlock().Transactions))
+	blockSize := uint64(prevBlock.MsgBlock().SerializeSize())
+	blockWeight := uint64(GetBlockWeight(prevBlock))
+	newTotalTxns := curTotalTxns - uint64(len(block.MsgBlock().Transactions))
+	state := newBestState(prevNode, blockSize, blockWeight, numTxns,
+		newTotalTxns, prevNode.CalcPastMedianTime())
+
+	err = b.db.Update(func(dbTx database.Tx) error {
+		// Update best block state.
+		err := dbPutBestState(dbTx, state, node.workSum)
+		if err != nil {
+			return err
+		}
+
+		// Remove the block hash and height from the block index which
+		// tracks the main chain.
+		err = dbRemoveBlockIndex(dbTx, block.Hash(), node.height)
+		if err != nil {
+			return err
+		}
+
+		// Update the utxo set using the state of the utxo view.  This
+		// entails restoring all of the utxos spent and removing the new
+		// ones created by the block.
+		//	Abe to do: Update the utxo set using the state of the utxo view.
+		//	This entails restoring all of the utxos spent
+		err = dbPutUtxoRingView(dbTx, view)
+		if err != nil {
+			return err
+		}
+
+		//	Abe to do
+		//	removing the new utxoRings created by the block and its previous successive 2 blocks (only is block.height%3==2)
+		err = dbRemoveUtxoRingView(dbTx, viewToDel)
+		if err != nil {
+			return err
+		}
+
+		// Before we delete the spend journal entry for this back,
+		// we'll fetch it as is so the indexers can utilize if needed.
+		stxos, err := dbFetchSpendJournalEntryAbe(dbTx, block)
+		if err != nil {
+			return err
+		}
+
+		// Update the transaction spend journal by removing the record
+		// that contains all txos spent by the block.
+		err = dbRemoveSpendJournalEntry(dbTx, block.Hash())
+		if err != nil {
+			return err
+		}
+
+		// Allow the index manager to call each of the currently active
+		// optional indexes with the block being disconnected so they
+		// can update themselves accordingly.
+		//	Abe to do
+		//	The indexManager needs to implement multiple interfaces
+		if b.indexManager != nil {
+			_ = len(stxos) // to remove
+			/*			err := b.indexManager.DisconnectBlock(dbTx, block, stxos)
+						if err != nil {
+							return err
+						}*/
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Prune fully spent entries and mark all entries in the view unmodified
+	// now that the modifications have been committed to the database.
+	//	Abe to do: Note that some rings committed to tha database may be deleted in next(previous) block's disconnection.
+	//	The checks can detect abnormal cases. The deleted rings will be removed from view after all blocks are disconnected.
+	view.commit()
+
+	// This node's parent is now the end of the best chain.
+	b.bestChain.SetTip(node.parent)
+
+	// Update the state for the best block.  Notice how this replaces the
+	// entire struct instead of updating the existing one.  This effectively
+	// allows the old version to act as a snapshot which callers can use
+	// freely without needing to hold a lock for the duration.  See the
+	// comments on the state variable for more details.
+	b.stateLock.Lock()
+	b.stateSnapshot = state
+	b.stateLock.Unlock()
+
+	// Notify the caller that the block was disconnected from the main
+	// chain.  The caller would typically want to react with actions such as
+	// updating wallets.
+	b.chainLock.Unlock()
+	b.sendNotification(NTBlockDisconnected, block)
+	b.chainLock.Lock()
+
+	return nil
+}
+
 // countSpentOutputs returns the number of utxos the passed block spends.
 func countSpentOutputs(block *abeutil.Block) int {
 	// Exclude the coinbase transaction since it can't spend anything.
@@ -1377,8 +1507,8 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 	// and remove the utxos created by the blocks.
 	view := NewUtxoRingViewpoint()
 	view.SetBestHash(&oldBest.hash)
-	viewRingsToDel := NewUtxoRingViewpoint()
-	viewRingsToDel.SetBestHash(&oldBest.hash)
+	viewToDelAll := NewUtxoRingViewpoint()
+	viewToDelAll.SetBestHash(&oldBest.hash)
 
 	for e := detachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
@@ -1425,9 +1555,11 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			return err
 		}
 
-		if n.height%3 == 0 && n.height >= 3 {
-			viewRingsToDel.SetBestHash(&n.hash)
-			err = viewRingsToDel.newUtxoRingEntries(b.db, n, block)
+		//	Abe to do new UtxoRings if n.height % 2 == 0
+		//	These utxoRings should will be deleted from database
+		if n.height%3 == 2 {
+			viewToDelAll.SetBestHash(&n.hash)
+			err = viewToDelAll.newUtxoRingEntries(b.db, n, block)
 			if err != nil {
 				return err
 			}
@@ -1436,15 +1568,29 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		newBest = n.parent
 	}
 
+	//	Abe to do
 	//	if a UtxoRing obtained by unspend (from higher blocks) is in the viewRingsToDel (from lower blocks), the UtxoRing should have len(serialNumbers) == 0
 	//	just enhance checks
-	for outPointRingHash, utxoRingEntry := range view.entries {
+	//	and such UtxoRings should be removed from view, since view will be used in the latter attach
+	//	when attach, the utxoRings in view should not be fecthed from database, since the databse is still storing the data for old mainchain
+	//	Note that In general, len(viewRingsToDel.entries) < len(view.entries), we range the viewRingsToDel.entries
+	/*	for outPointRingHash, utxoRingEntry := range view.entries {
 		ringToDel := viewRingsToDel.entries[outPointRingHash]
 		if ringToDel != nil {
 			if len(utxoRingEntry.serialNumbers) > 0 {
 				return AssertError(fmt.Sprintf("detaching utxoRing (ringHeight = %d, outPointHash = %v) fail: the serialNumbers List should be empty, but not",
 					utxoRingEntry.ringBlockHeight, utxoRingEntry.outPointRing.Hash()))
 			}
+		}
+	}*/
+	for ringHash, _ := range viewToDelAll.entries {
+		ringFromStxo := view.entries[ringHash]
+		if ringFromStxo != nil {
+			if len(ringFromStxo.serialNumbers) > 0 {
+				return AssertError(fmt.Sprintf("detaching utxoRing (ringHeight = %d, outPointHash = %v) fail: the serialNumbers List should be empty, but not",
+					ringFromStxo.ringBlockHeight, ringFromStxo.outPointRing.Hash()))
+			}
+			delete(view.entries, ringHash)
 		}
 	}
 
@@ -1508,7 +1654,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			// In the case the block is determined to be invalid due to a
 			// rule violation, mark it as invalid and mark all of its
 			// descendants as having an invalid ancestor.
-			err = b.checkConnectBlock(n, block, view, nil)
+			err = b.checkConnectBlockAbe(n, block, view, nil)
 			if err != nil {
 				if _, ok := err.(RuleError); ok {
 					b.index.SetStatusFlags(n, statusValidateFailed)
@@ -1522,9 +1668,16 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			b.index.SetStatusFlags(n, statusValid)
 		}
 
-		//	Abe to do new UtxoRings if n.height $ 3 == 0 && n.height >= 3
-
 		newBest = n
+
+		//	Abe to do: new UtxoRings if n.height % 3 == 2
+		if n.height%3 == 2 {
+			err = view.newUtxoRingEntries(b.db, n, block)
+			if err != nil {
+				return err
+			}
+		}
+
 	}
 
 	// Reset the view for the actual connection code below.  This is
@@ -1532,7 +1685,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 	// the reorg would be successful and the connection code requires the
 	// view to be valid from the viewpoint of each block being connected or
 	// disconnected.
-	view = NewUtxoViewpoint()
+	view = NewUtxoRingViewpoint()
 	view.SetBestHash(&b.bestChain.Tip().hash)
 
 	// Disconnect blocks from the main chain.
@@ -1540,25 +1693,53 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		n := e.Value.(*blockNode)
 		block := detachBlocks[i]
 
+		viewToDel := NewUtxoRingViewpoint()
+		viewToDel.SetBestHash(block.Hash())
+
+		//	Abe to do: why to read from databse, we can directly use the SpendJournal to obtain the related UtxoRings
 		// Load all of the utxos referenced by the block that aren't
-		// already in the view.
-		err := view.fetchInputUtxos(b.db, block)
-		if err != nil {
-			return err
-		}
+		/*		// already in the view.
+				err := view.fetchInputUtxos(b.db, block)
+				if err != nil {
+					return err
+				}*/
 
 		// Update the view to unspend all of the spent txos and remove
 		// the utxos created by the block.
-		err = view.disconnectTransactions(b.db, block,
+		err := view.disconnectTransactions(b.db, block,
 			detachSpentTxOuts[i])
 		if err != nil {
 			return err
 		}
 
+		//	Abe to do
+		//	view.disconnectTransactions update the view for this block, the following b.disconnectBlock persist the changes for this block to the database
+		//	So, here we need to generate the utxoRings that need to be deleted from database
+
+		if n.height%3 == 2 {
+			err = viewToDel.newUtxoRingEntries(b.db, n, block)
+			if err != nil {
+				return err
+			}
+		}
+
 		// Update the database and chain state.
-		err = b.disconnectBlock(n, block, view)
+		err = b.disconnectBlockAbe(n, block, view, viewToDel)
 		if err != nil {
 			return err
+		}
+	}
+
+	//	Abe to do
+	//	remove rings from the view which restored from stxos, the resuling view will be ready for attach
+	for ringHash, _ := range viewToDelAll.entries {
+		ringFromStxo := view.entries[ringHash]
+		if ringFromStxo != nil {
+			if len(ringFromStxo.serialNumbers) > 0 {
+				return AssertError(fmt.Sprintf("detaching utxoRing (ringHeight = %d, outPointHash = %v) fail: the serialNumbers List should be empty, but not",
+					ringFromStxo.ringBlockHeight, ringFromStxo.outPointRing.Hash()))
+			}
+			delete(view.entries, ringHash)
 		}
 	}
 
@@ -1569,7 +1750,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 
 		// Load all of the utxos referenced by the block that aren't
 		// already in the view.
-		err := view.fetchInputUtxos(b.db, block)
+		err := view.fetchInputUtxoRings(b.db, block)
 		if err != nil {
 			return err
 		}
@@ -1578,14 +1759,22 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		// as spent and add all transactions being created by this block
 		// to it.  Also, provide an stxo slice so the spent txout
 		// details are generated.
-		stxos := make([]SpentTxOut, 0, countSpentOutputs(block))
+		stxos := make([]*SpentTxOutAbe, 0, countSpentOutputsAbe(block))
 		err = view.connectTransactions(block, &stxos)
 		if err != nil {
 			return err
 		}
 
+		//	Abe to do: new UtxoRings if n.height % 3 == 2
+		if n.height%3 == 2 {
+			err = view.newUtxoRingEntries(b.db, n, block)
+			if err != nil {
+				return err
+			}
+		}
+
 		// Update the database and chain state.
-		err = b.connectBlock(n, block, view, stxos)
+		err = b.connectBlockAbe(n, block, view, stxos)
 		if err != nil {
 			return err
 		}
@@ -1812,8 +2001,8 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 			//			}
 		}
 
-		//	Abe to do: generating new UtxoRingEntry if currentblock.height%3 = 0
-		if node.height%3 == 0 && node.height >= 3 {
+		//	Abe to do: generating new UtxoRingEntry if currentblock.height%2 = 0
+		if node.height%2 == 0 {
 			err := view.newUtxoRingEntries(b.db, node, block)
 			if err != nil {
 				return false, err

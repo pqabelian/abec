@@ -1091,6 +1091,27 @@ func dbPutUtxoRingView(dbTx database.Tx, view *UtxoRingViewpoint) error {
 	return nil
 }
 
+//	Abe add
+func dbRemoveUtxoRingView(dbTx database.Tx, view *UtxoRingViewpoint) error {
+	utxoRingBucket := dbTx.Metadata().Bucket(utxoRingSetBucketName)
+
+	if view == nil || len(view.entries) == 0 {
+		return nil
+	}
+
+	for outPointRingHash, _ := range view.entries {
+		key := outPointRingKey(outPointRingHash)
+		err := utxoRingBucket.Delete(*key)
+		recycleOutPointRingKey(key)
+		if err != nil {
+			return err
+		}
+
+	}
+
+	return nil
+}
+
 // -----------------------------------------------------------------------------
 // The block index consists of two buckets with an entry for every block in the
 // main chain.  One bucket is for the hash to height mapping and the other is
