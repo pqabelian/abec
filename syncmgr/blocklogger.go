@@ -70,6 +70,41 @@ func (b *blockProgressLogger) LogBlockHeight(block *abeutil.Block) {
 	b.lastBlockLogTime = now
 }
 
+func (b *blockProgressLogger) LogBlockHeightAbe(block *abeutil.BlockAbe) {
+	b.Lock()
+	defer b.Unlock()
+
+	b.receivedLogBlocks++
+	b.receivedLogTx += int64(len(block.MsgBlock().Transactions))
+
+	now := time.Now()
+	duration := now.Sub(b.lastBlockLogTime)
+	if duration < time.Second*10 {
+		return
+	}
+
+	// Truncate the duration to 10s of milliseconds.
+	durationMillis := int64(duration / time.Millisecond)
+	tDuration := 10 * time.Millisecond * time.Duration(durationMillis/10)
+
+	// Log information about new block height.
+	blockStr := "blocks"
+	if b.receivedLogBlocks == 1 {
+		blockStr = "block"
+	}
+	txStr := "transactions"
+	if b.receivedLogTx == 1 {
+		txStr = "transaction"
+	}
+	b.subsystemLogger.Infof("%s %d %s in the last %s (%d %s, height %d, %s)",
+		b.progressAction, b.receivedLogBlocks, blockStr, tDuration, b.receivedLogTx,
+		txStr, block.Height(), block.MsgBlock().Header.Timestamp)
+
+	b.receivedLogBlocks = 0
+	b.receivedLogTx = 0
+	b.lastBlockLogTime = now
+}
+
 func (b *blockProgressLogger) SetLastLogTime(time time.Time) {
 	b.lastBlockLogTime = time
 }

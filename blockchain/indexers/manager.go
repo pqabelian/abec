@@ -538,7 +538,7 @@ func (m *Manager) ConnectBlock(dbTx database.Tx, block *abeutil.Block,
 
 //	Abe to do
 //	Really Need TO DO
-func (m *Manager) ConnectBlockAbe(dbTx database.Tx, block *abeutil.Block,
+func (m *Manager) ConnectBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe,
 	stxos []*blockchain.SpentTxOutAbe) error {
 
 	// Call each of the currently active optional indexes with the block

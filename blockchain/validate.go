@@ -867,6 +867,48 @@ func ExtractCoinbaseHeight(coinbaseTx *abeutil.Tx) (int32, error) {
 	return int32(serializedHeight), nil
 }
 
+//	Abe to do
+//	To Do: coinbase transaction structure needs to be defined
+func ExtractCoinbaseHeightAbe(coinbaseTx *abeutil.TxAbe) (int32, error) {
+	/*	sigScript := coinbaseTx.MsgTx().TxIn[0].SignatureScript
+		if len(sigScript) < 1 {
+			str := "the coinbase signature script for blocks of " +
+				"version %d or greater must start with the " +
+				"length of the serialized block height"
+			str = fmt.Sprintf(str, serializedHeightVersion)
+			return 0, ruleError(ErrMissingCoinbaseHeight, str)
+		}
+
+		// Detect the case when the block height is a small integer encoded with
+		// as single byte.
+		opcode := int(sigScript[0])
+		if opcode == txscript.OP_0 {
+			return 0, nil
+		}
+		if opcode >= txscript.OP_1 && opcode <= txscript.OP_16 {
+			return int32(opcode - (txscript.OP_1 - 1)), nil
+		}
+
+		// Otherwise, the opcode is the length of the following bytes which
+		// encode in the block height.
+		serializedLen := int(sigScript[0])
+		if len(sigScript[1:]) < serializedLen {
+			str := "the coinbase signature script for blocks of " +
+				"version %d or greater must start with the " +
+				"serialized block height"
+			str = fmt.Sprintf(str, serializedLen)
+			return 0, ruleError(ErrMissingCoinbaseHeight, str)
+		}
+
+		serializedHeightBytes := make([]byte, 8)
+		copy(serializedHeightBytes, sigScript[1:serializedLen+1])
+		serializedHeight := binary.LittleEndian.Uint64(serializedHeightBytes)
+
+		return int32(serializedHeight), nil
+	*/
+	return 0, nil
+}
+
 // checkSerializedHeight checks if the signature script in the passed
 // transaction starts with the serialized block height of wantHeight.
 func checkSerializedHeight(coinbaseTx *abeutil.Tx, wantHeight int32) error {

@@ -99,7 +99,7 @@ func calcInputValueAgeAbe(tx *wire.MsgTxAbe, utxoRingView *blockchain.UtxoRingVi
 			// Their input age should computed as zero since their
 			// parent hasn't made it into a block yet.
 			var inputAge int32
-			originHeight := entry.BlockHeight()
+			originHeight := entry.RingBlockHeight()
 			if originHeight == UnminedHeight {
 				inputAge = 0
 			} else {

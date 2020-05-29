@@ -238,7 +238,8 @@ func ExtractWitnessCommitment(tx *abeutil.Tx) ([]byte, bool) {
 	return nil, false
 }
 
-func ExtractWitnessCommitmentAbe(tx *abeutil.TxAbe) ([]byte, bool) {
+// Abe to do
+/*func ExtractWitnessCommitmentAbe(tx *abeutil.TxAbe) ([]byte, bool) {
 	// The witness commitment *must* be located within one of the coinbase
 	// transaction's outputs.
 	if !tx.IsCoinBase() {
@@ -265,7 +266,7 @@ func ExtractWitnessCommitmentAbe(tx *abeutil.TxAbe) ([]byte, bool) {
 	}
 
 	return nil, false
-}
+}*/
 
 // ValidateWitnessCommitment validates the witness commitment (if any) found
 // within the coinbase transaction of the passed block.

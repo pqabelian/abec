@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
 )
 
 func main1() {
@@ -51,7 +50,7 @@ func main1() {
 	//	fmt.Println(hash)
 }
 
-func main() {
+/*func main() {
 	q := 11 / wire.TxRingSize
 	r := 11 % wire.TxRingSize
 
@@ -61,7 +60,7 @@ func main() {
 	fmt.Println(q)
 	fmt.Println(r)
 }
-
+*/
 /*func main(){
 	type txoFlags uint8
 
