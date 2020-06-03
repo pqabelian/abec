@@ -1048,16 +1048,18 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 	normalRingNum := txoNum / wire.TxRingSize
 	remainderTxoNum := txoNum % wire.TxRingSize
 
-	totalRingNum := normalRingNum
+	//	totalRingNum := normalRingNum
 	if remainderTxoNum != 0 {
-		totalRingNum += 1
+		//	implies 0 < remainderTxoNum < wire.TxRingSize
+		//		totalRingNum += 1
 
-		if remainderTxoNum > 0 && remainderTxoNum < wire.TxRingSizeMin {
-			if normalRingNum > 1 {
-				//	divide (the last normalRing and the remainder Txos) into 2 rings with
-				normalRingNum -= 1
-			}
-		}
+		if normalRingNum >= 1 {
+			//	divide (the last normalRing and the remainder Txos) into 2 rings with ring_1.size = ring_2.size or ring_1.size = ring_2.size + 1
+			normalRingNum -= 1
+		} // else {
+		// implies 	normalRingNum == 0
+		//	the remainder forms the only ring
+		//	}
 	}
 
 	for i := 0; i < normalRingNum; i++ {

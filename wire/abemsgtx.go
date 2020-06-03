@@ -119,7 +119,7 @@ func NewTxOutAbe(valueScript int64, addressScript []byte) *TxOutAbe {
 // Note that the type of index depends on the TxOutPutMaxNum
 type OutPointAbe struct {
 	TxHash chainhash.Hash
-	Index  uint8
+	Index  uint8 //	due to the large size of post-quantum crypto primitives, ABE will limit the number of outputs of each transaction
 }
 
 func (outPoint *OutPointAbe) SerializeSize() int {
@@ -177,8 +177,9 @@ func NewOutPointAbe(txHash *chainhash.Hash, index uint8) *OutPointAbe {
 	}
 }
 
+//	todo: shall the ringBlockHeight be added?
 type OutPointRing struct {
-	BlockHashs []*chainhash.Hash
+	BlockHashs []*chainhash.Hash //	the hashs for the blocks from which the ring was generated, at this moment it is 3 successive blocks
 	OutPoints  []*OutPointAbe
 }
 
@@ -513,8 +514,8 @@ func readTxOutAbe(r io.Reader, pver uint32, version int32, txOut *TxOutAbe) erro
 }
 
 func writeTxWitnessAbe(w io.Writer, pver uint32, version int32, txWitness *TxWitnessAbe) error {
-	err := WriteVarInt(w, pver, uint64(len(txWitness.Witness)))
-	for _, witnessItem := range txWitness.Witness {
+	err := WriteVarInt(w, pver, uint64(len(txWitness.Witnesses)))
+	for _, witnessItem := range txWitness.Witnesses {
 		err = WriteVarBytes(w, pver, witnessItem)
 		if err != nil {
 			return err
@@ -532,21 +533,23 @@ func readTxWitnessAbe(r io.Reader, pver uint32, version int32, txWitness *TxWitn
 		return err
 	}
 	if witItemNum > 0 {
-		txWitness.Witness = make([][]byte, witItemNum)
+		txWitness.Witnesses = make([]Witness, witItemNum)
 		for i := uint64(0); i < witItemNum; i++ {
 			witnessItem, err := ReadVarBytes(r, pver, WitnessItemMaxLen, "WitnessItem")
 			if err != nil {
 				return err
 			}
-			txWitness.Witness[i] = witnessItem
+			txWitness.Witnesses[i] = witnessItem
 		}
 	}
 
 	return nil
 }
 
+//	each transaction has a TxWitness, which consists of multiple Witness([]byte)
+type Witness []byte
 type TxWitnessAbe struct {
-	Witness [][]byte
+	Witnesses []Witness
 }
 
 func (txWitness *TxWitnessAbe) Hash() *chainhash.Hash {
@@ -560,12 +563,12 @@ func (txWitness *TxWitnessAbe) Hash() *chainhash.Hash {
 // transaction input's witness.
 func (txWitness TxWitnessAbe) SerializeSize() int {
 	// A varint to signal the number of elements the witness has.
-	n := VarIntSerializeSize(uint64(len(txWitness.Witness)))
+	n := VarIntSerializeSize(uint64(len(txWitness.Witnesses)))
 
 	// For each element in the witness, we'll need a varint to signal the
 	// size of the element, then finally the number of bytes the element
 	// itself comprises.
-	for _, witItem := range txWitness.Witness {
+	for _, witItem := range txWitness.Witnesses {
 		n += VarIntSerializeSize(uint64(len(witItem)))
 		n += len(witItem)
 	}
@@ -574,12 +577,12 @@ func (txWitness TxWitnessAbe) SerializeSize() int {
 }
 
 func (txWitness TxWitnessAbe) Serialize(w io.Writer) error {
-	err := WriteVarInt(w, 0, uint64(len(txWitness.Witness)))
+	err := WriteVarInt(w, 0, uint64(len(txWitness.Witnesses)))
 	if err != nil {
 		return err
 	}
 
-	for _, witItem := range txWitness.Witness {
+	for _, witItem := range txWitness.Witnesses {
 		err = WriteVarBytes(w, 0, witItem)
 		if err != nil {
 			return err
@@ -594,7 +597,7 @@ func (txWitness TxWitnessAbe) Deserialize(r io.Reader) error {
 		return err
 	}
 
-	txWitness.Witness = make([][]byte, witnessNum)
+	txWitness.Witnesses = make([]Witness, witnessNum)
 	for i := uint64(0); i < witnessNum; i++ {
 		witItemLen, err := ReadVarInt(r, 0)
 		if err != nil {
@@ -607,11 +610,30 @@ func (txWitness TxWitnessAbe) Deserialize(r io.Reader) error {
 			return err
 		}
 
-		txWitness.Witness[i] = witnessItem
+		txWitness.Witnesses[i] = witnessItem
 	}
 
 	return nil
 }
+
+//	Transfer Transaction:
+//	len(TxOuts) > 1; len(TxIns) > 1;
+//	len(TxWitness.Witnesses) = len(TxIns), each TxIn has a linkable ring signature and the serialNumber computed from the signature matches that in the TxIn
+//	The number of Witness depends on the proof for authorizing and authenticating the transaction
+
+//	Coinbase Transaction:
+//	len(TxOuts) > 1; len(TxIns) == 1;
+//	len(TxWitness.Witnesses) == 0
+//	TxIn[0].SerialNumber: 00...00 (ZeroHash), implying that this is a coinbase transaction, without consuming any TxOut,as the serialNumber is determined by the consumed TXO
+//	TxIn[0].OutPointRing.BlockHashs:
+//				blockhashs[0]: the height of the block (as each block has juts one coinbase transaction)
+//				blockhashs[1]: the coinbase nonce
+//				blockhashs[2]: any thing
+//	TxIn[0].OutPointRing.OutPoints:
+//				(TxHash0, index0): any thing
+//				...
+//				limited by TxRingSize
+//	todo: For coinbase transaction, there is an additional function that returns the bytes in [blockhashs[2]] and later OutPoints
 
 type MsgTxAbe struct {
 	Version int32
@@ -642,9 +664,9 @@ func (msg *MsgTxAbe) SetWitness(txWitness *TxWitnessAbe) {
 // HasWitness returns false if none of the inputs within the transaction
 // contain witness data, true false otherwise.
 func (msg *MsgTxAbe) HasWitness() bool {
-	witItemNum := len(msg.TxWitness.Witness)
+	witItemNum := len(msg.TxWitness.Witnesses)
 	if witItemNum > 0 {
-		for _, witItem := range msg.TxWitness.Witness {
+		for _, witItem := range msg.TxWitness.Witnesses {
 			if len(witItem) > 0 {
 				return true
 			}
@@ -960,6 +982,7 @@ func (msg *MsgTxAbe) SerializeSizeFull() int {
 	return n
 }
 
+//	for computing TxId by hash, and for being serialized in block
 func (msg *MsgTxAbe) Serialize(w io.Writer) error {
 	//	version
 	err := binarySerializer.PutUint32(w, littleEndian, uint32(msg.Version))

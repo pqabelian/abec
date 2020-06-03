@@ -189,12 +189,12 @@ type TxPool struct {
 
 	mtx           sync.RWMutex
 	cfg           Config
-	pool          map[chainhash.Hash]*TxDesc
+	pool          map[chainhash.Hash]*TxDesc //	Abe todo: [txHash]TxDsec, the txs in pool, keyed by tx's hash
 	orphans       map[chainhash.Hash]*orphanTx
 	orphansByPrev map[wire.OutPoint]map[chainhash.Hash]*abeutil.Tx
-	outpoints     map[wire.OutPoint]*abeutil.Tx
-	pennyTotal    float64 // exponentially decaying total for penny spends.
-	lastPennyUnix int64   // unix time of last ``penny spend''
+	outpoints     map[wire.OutPoint]*abeutil.Tx //	Abe todo: [outPoint]Tx, outPoint is one of the TxIn of Tx
+	pennyTotal    float64                       // exponentially decaying total for penny spends.
+	lastPennyUnix int64                         // unix time of last ``penny spend''
 
 	// nextExpireScan is the time after which the orphan pool will be
 	// scanned in order to evict orphans.  This is NOT a hard deadline as
@@ -1096,21 +1096,22 @@ func (mp *TxPool) fetchInputUtxoRingsAbe(tx *abeutil.TxAbe) (*blockchain.UtxoRin
 
 	//	At this moment, Abe does not support populate missing inputs from transactions in pool.
 	/*	// Attempt to populate any missing inputs from the transaction pool.
-		for _, txIn := range tx.MsgTx().TxIns {
-			outPointRingHash := txIn.OutPointRingHash()
-			entry := utxoRingView.LookupEntry(outPointRingHash)
+			for _, txIn := range tx.MsgTx().TxIns {
+				outPointRingHash := txIn.OutPointRingHash()
+				entry := utxoRingView.LookupEntry(outPointRingHash)
 
-			if entry != nil && !entry.IsSpent(txIn.SerialNumber) {
-				continue
-			}
+				if entry != nil && !entry.IsSpent(txIn.SerialNumber) {
+					continue
+				}
 
-			if poolTxDesc, exists := mp.poolAbe[prevOut.Hash]; exists {
-				// AddTxOut ignores out of range index values, so it is
-				// safe to call without bounds checking here.
-				utxoView.AddTxOut(poolTxDesc.Tx, prevOut.Index,
-					mining.UnminedHeight)
+		//	Abe to do:
+				if poolTxDesc, exists := mp.poolAbe[prevOut.Hash]; exists {
+					// AddTxOut ignores out of range index values, so it is
+					// safe to call without bounds checking here.
+					utxoView.AddTxOut(poolTxDesc.Tx, prevOut.Index,
+						mining.UnminedHeight)
+				}
 			}
-		}
 	*/
 	return utxoRingView, nil
 }
