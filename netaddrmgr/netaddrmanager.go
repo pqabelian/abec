@@ -1,3 +1,7 @@
+// Copyright (c) 2020 The Abelian Foundation
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
 package netaddrmgr
 
 import (
@@ -768,6 +772,7 @@ func NetAddressKey(na *wire.NetAddress) string {
 // random one from the possible addresses with preference given to ones that
 // have not been used recently and should not pick 'close' addresses
 // consecutively.
+// todo (ABE): done
 func (namgr *NetAddrManager) GetNetAddress() *KnownNetAddress {
 	// Protect concurrent access.
 	namgr.mtx.Lock()
