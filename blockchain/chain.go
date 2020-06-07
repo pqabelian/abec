@@ -2583,6 +2583,7 @@ type Config struct {
 }
 
 // New returns a BlockChain instance using the provided configuration details.
+// todo (ABE):
 func New(config *Config) (*BlockChain, error) {
 	// Enforce required config fields.
 	if config.DB == nil {

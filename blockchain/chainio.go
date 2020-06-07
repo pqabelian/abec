@@ -1305,6 +1305,7 @@ func dbPutBestState(dbTx database.Tx, snapshot *BestState, workSum *big.Int) err
 // createChainState initializes both the database and the chain state to the
 // genesis block.  This includes creating the necessary buckets and inserting
 // the genesis block, so it must only be called on an uninitialized database.
+//	todo (ABE):
 func (b *BlockChain) createChainState() error {
 	// Create a new node from the genesis block and set it as the best node.
 	genesisBlock := abeutil.NewBlock(b.chainParams.GenesisBlock)
@@ -1350,6 +1351,7 @@ func (b *BlockChain) createChainState() error {
 			return err
 		}
 
+		// todo (ABE): bug?
 		// Create the bucket that houses the spend journal data and
 		// store its version.
 		_, err = meta.CreateBucket(spendJournalBucketName)
@@ -1404,6 +1406,7 @@ func (b *BlockChain) createChainState() error {
 // initChainState attempts to load and initialize the chain state from the
 // database.  When the db does not yet contain any chain state, both it and the
 // chain state are initialized to the genesis block.
+// todo (ABE):
 func (b *BlockChain) initChainState() error {
 	// Determine the state of the chain database. We may need to initialize
 	// everything from scratch or upgrade certain buckets.

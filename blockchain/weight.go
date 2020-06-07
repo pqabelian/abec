@@ -58,7 +58,7 @@ func GetBlockWeight(blk *abeutil.Block) int64 {
 	return int64((baseSize * (WitnessScaleFactor - 1)) + totalSize)
 }
 
-//	Abe to do
+//	todo (ABE): Abe to do
 func GetBlockWeightAbe(blk *abeutil.BlockAbe) int64 {
 	msgBlock := blk.MsgBlock()
 
