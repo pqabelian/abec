@@ -2121,6 +2121,7 @@ func (s *server) peerHandler() {
 				s.addrManager.AddAddresses(addrs, addrs[0])
 			})
 	}
+	// todo(ABE): why here is "go s.connManager.Start()" rathter than "s.connManager.Start()"
 	go s.connManager.Start()
 
 out:
@@ -2583,6 +2584,7 @@ func setupRPCListeners() ([]net.Listener, error) {
 // newServer returns a new btcd server configured to listen on addr for the
 // bitcoin network type specified by chainParams.  Use start to begin accepting
 // connections from peers.
+//	todo (ABE): done
 func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	db database.DB, chainParams *chaincfg.Params,
 	interrupt <-chan struct{}) (*server, error) {

@@ -1,3 +1,7 @@
+// Copyright (c) 2020 The Abelian Foundation
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
 package main
 
 import (
@@ -53,7 +57,7 @@ const (
 	blockMaxSizeMax             = blockchain.MaxBlockBaseSize - 1000
 	blockMaxWeightMin           = 4000
 	blockMaxWeightMax           = blockchain.MaxBlockWeight - 4000
-	// abec do:
+	// todo(abe):
 	//defaultGenerate              = false
 	defaultGenerate              = true
 	defaultMaxOrphanTransactions = 100
@@ -171,7 +175,7 @@ type config struct {
 	miningAddrs          []abeutil.Address
 	minRelayTxFee        abeutil.Amount
 	whitelists           []*net.IPNet
-	//	abec to do
+	//	todo(abe): remove after understanding the config
 	forABE bool
 	//	abec to do
 }
@@ -868,7 +872,7 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
-	//	abec to do
+	//	todo(abe):
 	Set4ABE(&cfg)
 	ConfigTest(&cfg)
 	if cfg.forABE {

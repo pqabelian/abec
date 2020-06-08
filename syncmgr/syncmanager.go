@@ -1373,6 +1373,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 
 	// If our chain is current and a peer announces a block we already
 	// know of, then update their current block height.
+	//	todo(ABE): the peer which sends the inVMsg has a LastBlock that is lower than this peer's
 	if lastBlock != -1 && sm.current() {
 		blkHeight, err := sm.chain.BlockHeightByHash(&invVects[lastBlock].Hash)
 		if err == nil {
