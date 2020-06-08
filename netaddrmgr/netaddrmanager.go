@@ -1,7 +1,3 @@
-// Copyright (c) 2020 The Abelian Foundation
-// Use of this source code is governed by an ISC
-// license that can be found in the LICENSE file.
-
 package netaddrmgr
 
 import (
@@ -30,7 +26,7 @@ import (
 // peers on the bitcoin network.
 type NetAddrManager struct {
 	mtx               sync.Mutex
-	peersFile         string
+	peersFile         string       			      // store the peers to quicker build connection when the btcd restart
 	lookupFunc        func(string) ([]net.IP, error)
 	rand              *rand.Rand
 	key               [32]byte
@@ -450,6 +446,7 @@ func (namgr *NetAddrManager) deserializePeers(filePath string) error {
 	}
 	defer r.Close()
 
+	// deserialize the perr.json to snam
 	var snam serializedNetAddrManager
 	dec := json.NewDecoder(r)
 	err = dec.Decode(&snam)
@@ -466,7 +463,8 @@ func (namgr *NetAddrManager) deserializePeers(filePath string) error {
 	}
 
 	copy(namgr.key[:], snam.Key[:])
-
+	
+	// assign values to netAddrIndex
 	for _, v := range snam.NetAddresses {
 		kna := new(KnownNetAddress)
 
@@ -500,6 +498,7 @@ func (namgr *NetAddrManager) deserializePeers(filePath string) error {
 		namgr.netAddrIndex[NetAddressKey(kna.na)] = kna
 	}
 
+	// assign values to netAddrNew
 	for i := range snam.NewBuckets {
 		for _, val := range snam.NewBuckets[i] {
 			ka, ok := namgr.netAddrIndex[val]
@@ -515,6 +514,8 @@ func (namgr *NetAddrManager) deserializePeers(filePath string) error {
 			namgr.netAddrNew[i][val] = ka
 		}
 	}
+
+	// assign values to netAddrTried
 	for i := range snam.TriedBuckets {
 		for _, val := range snam.TriedBuckets[i] {
 			ka, ok := namgr.netAddrIndex[val]
@@ -772,7 +773,6 @@ func NetAddressKey(na *wire.NetAddress) string {
 // random one from the possible addresses with preference given to ones that
 // have not been used recently and should not pick 'close' addresses
 // consecutively.
-// todo (ABE): done
 func (namgr *NetAddrManager) GetNetAddress() *KnownNetAddress {
 	// Protect concurrent access.
 	namgr.mtx.Lock()

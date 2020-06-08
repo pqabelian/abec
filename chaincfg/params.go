@@ -221,7 +221,9 @@ type Params struct {
 var MainNetParams = Params{
 	Name:        "mainnet",
 	Net:         wire.MainNet,
-	DefaultPort: "8333",
+	//DefaultPort: "8333",
+	DefaultPort: "8666",
+	// TODO: this DNSSeed principle will be learned
 	DNSSeeds: []DNSSeed{
 		{"seed.bitcoin.sipa.be", true},
 		{"dnsseed.bluematt.me", true},

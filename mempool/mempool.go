@@ -1358,7 +1358,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *abeutil.Tx, isNew, rateLimit, rejec
 			return nil, nil, txRuleError(wire.RejectNonstandard, str)
 		}
 	}
-
+	 // when the tx exist in mempool or is one orphan but the config is rejecting orphan, this tx will be rejected
 	// Don't accept the transaction if it already exists in the pool.  This
 	// applies to orphan transactions as well when the reject duplicate
 	// orphans flag is set.  This check is intended to be a quick check to
@@ -1457,6 +1457,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *abeutil.Tx, isNew, rateLimit, rejec
 		utxoView.RemoveEntry(prevOut)
 	}
 
+	// the process can be up to here means the tx does not exist in mempool or the config is not rejecting the orphan or it has a father tx in mempool
 	// Transaction is an orphan if any of the referenced transaction outputs
 	// don't exist or are already spent.  Adding orphans to the orphan pool
 	// is not handled by this function, and the caller should use

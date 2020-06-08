@@ -143,7 +143,7 @@ func abecMain(serverChan chan<- *server) error {
 		return nil
 	}
 
-	// Create server and start it.
+	// Create P2P server and start it.
 	server, err := newServer(cfg.Listeners, cfg.AgentBlacklist,
 		cfg.AgentWhitelist, db, activeNetParams.Params, interrupt)
 	if err != nil {
@@ -158,7 +158,7 @@ func abecMain(serverChan chan<- *server) error {
 		server.WaitForShutdown()
 		srvrLog.Infof("Server shutdown complete")
 	}()
-	server.Start()
+	server.Start()      //Start the p2p server
 	if serverChan != nil {
 		serverChan <- server
 	}

@@ -48,6 +48,8 @@ func (b *BlockChain) maybeAcceptBlock(block *abeutil.Block, flags BehaviorFlags)
 	// expensive connection logic.  It also has some other nice properties
 	// such as making blocks that never become part of the main chain or
 	// blocks that fail to connect available for further analysis.
+	// =>if the block is valid, add it to database, but the block is not add
+	// to the hain
 	err = b.db.Update(func(dbTx database.Tx) error {
 		return dbStoreBlock(dbTx, block)
 	})
@@ -71,6 +73,7 @@ func (b *BlockChain) maybeAcceptBlock(block *abeutil.Block, flags BehaviorFlags)
 	// Connect the passed block to the chain while respecting proper chain
 	// selection according to the chain with the most proof of work.  This
 	// also handles validation of the transaction scripts.
+	// =>the block is added to chain
 	isMainChain, err := b.connectBestChain(newNode, block, flags)
 	if err != nil {
 		return false, err
@@ -79,6 +82,8 @@ func (b *BlockChain) maybeAcceptBlock(block *abeutil.Block, flags BehaviorFlags)
 	// Notify the caller that the new block was accepted into the block
 	// chain.  The caller would typically want to react by relaying the
 	// inventory to other peers.
+	// =>send notification to blockManager with NTBlockAccepted, and the
+	// blockManager will notice all peers
 	b.chainLock.Unlock()
 	b.sendNotification(NTBlockAccepted, block)
 	b.chainLock.Lock()
