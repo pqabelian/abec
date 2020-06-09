@@ -117,6 +117,7 @@ func NewTxOutAbe(valueScript int64, addressScript []byte) *TxOutAbe {
 
 // OutPoint defines a ABE data type that is used to track previous transaction outputs.
 // Note that the type of index depends on the TxOutPutMaxNum
+//	todo(ABE): shall index be int8?
 type OutPointAbe struct {
 	TxHash chainhash.Hash
 	Index  uint8 //	due to the large size of post-quantum crypto primitives, ABE will limit the number of outputs of each transaction
@@ -617,12 +618,12 @@ func (txWitness TxWitnessAbe) Deserialize(r io.Reader) error {
 }
 
 //	Transfer Transaction:
-//	len(TxOuts) > 1; len(TxIns) > 1;
+//	len(TxOuts) >= 1; len(TxIns) >= 1;
 //	len(TxWitness.Witnesses) = len(TxIns), each TxIn has a linkable ring signature and the serialNumber computed from the signature matches that in the TxIn
 //	The number of Witness depends on the proof for authorizing and authenticating the transaction
 
 //	Coinbase Transaction:
-//	len(TxOuts) > 1; len(TxIns) == 1;
+//	len(TxOuts) >= 1; len(TxIns) == 1;
 //	len(TxWitness.Witnesses) == 0
 //	TxIn[0].SerialNumber: 00...00 (ZeroHash), implying that this is a coinbase transaction, without consuming any TxOut,as the serialNumber is determined by the consumed TXO
 //	TxIn[0].OutPointRing.BlockHashs:
