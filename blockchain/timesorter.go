@@ -1,5 +1,6 @@
 package blockchain
 
+/* this file is to backbone the ascending sort of timeSorter, actually is []int64*/
 // timeSorter implements sort.Interface to allow a slice of timestamps to
 // be sorted.
 type timeSorter []int64

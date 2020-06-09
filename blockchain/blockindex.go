@@ -1,9 +1,10 @@
-// Copyright (c) 2020 The Abelian Foundation
-// Use of this source code is governed by an ISC
-// license that can be found in the LICENSE file.
-
 package blockchain
 
+/*
+	this file implements the blockIndex to maintain the connection between
+	the block and its hash, and the connection between prev block and
+	next block(s)
+*/
 import (
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"

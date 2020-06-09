@@ -1,5 +1,9 @@
 package blockchain
 
+/*
+	this file implements the BlockChain including the process of new block
+	appending to the blockchain
+ */
 import (
 	"container/list"
 	"fmt"
@@ -93,12 +97,12 @@ type BlockChain struct {
 	// be changed afterwards, so there is no need to protect them with a
 	// separate mutex.
 	checkpoints         []chaincfg.Checkpoint
-	checkpointsByHeight map[int32]*chaincfg.Checkpoint
+	checkpointsByHeight map[int32]*chaincfg.Checkpoint    // initialized by checkpoints
 	db                  database.DB
 	chainParams         *chaincfg.Params
-	timeSource          MedianTimeSource
+	timeSource          MedianTimeSource                  // modified when communicating with peers
 	sigCache            *txscript.SigCache
-	indexManager        IndexManager
+	indexManager        IndexManager                      
 	hashCache           *txscript.HashCache
 
 	// The following fields are calculated based upon the provided chain
@@ -2583,7 +2587,6 @@ type Config struct {
 }
 
 // New returns a BlockChain instance using the provided configuration details.
-// todo (ABE):
 func New(config *Config) (*BlockChain, error) {
 	// Enforce required config fields.
 	if config.DB == nil {

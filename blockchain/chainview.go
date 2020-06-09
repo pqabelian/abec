@@ -1,16 +1,10 @@
-// Copyright (c) 2020 The Abelian Foundation
-// Use of this source code is governed by an ISC
-// license that can be found in the LICENSE file.
-
 package blockchain
 
 import "sync"
 
 // approxNodesPerWeek is an approximation of the number of new blocks there are
 // in a week on average.
-//const approxNodesPerWeek = 6 * 24 * 7
-//	in ABE, 512s/block
-const approxNodesPerWeek = 7 * 24 * 7
+const approxNodesPerWeek = 6 * 24 * 7
 
 // log2FloorMasks defines the masks to use when quickly calculating
 // floor(log2(x)) in a constant log2(32) = 5 steps, where x is a uint32, using
@@ -143,7 +137,6 @@ func (c *chainView) setTip(node *blockNode) {
 		c.nodes[node.height] = node
 		node = node.parent
 	}
-
 }
 
 // SetTip sets the chain view to use the provided block node as the current tip

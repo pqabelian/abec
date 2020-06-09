@@ -1,7 +1,3 @@
-// Copyright (c) 2020 The Abelian Foundation
-// Use of this source code is governed by an ISC
-// license that can be found in the LICENSE file.
-
 package connmgr
 
 import (
@@ -239,15 +235,17 @@ func (cm *ConnManager) connHandler() {
 out:
 	for {
 		select {
-		case req := <-cm.requests:
+		case req := <-cm.requests:       // receive the date from chan and enter into case according the msg type
 			switch msg := req.(type) {
 
-			case registerPending:
+			case registerPending:  //conn state will be updated to pending
 				connReq := msg.c
 				connReq.updateState(ConnPending)
 				pending[msg.c.id] = connReq
 				close(msg.done)
 
+				// conn state update and add this conn into conns then delete from pending
+				// then handle the msg with OnConnection
 			case handleConnected:
 				connReq := msg.c
 
@@ -369,6 +367,8 @@ func (cm *ConnManager) NewConnReq() {
 	c := &ConnReq{}
 	atomic.StoreUint64(&c.id, atomic.AddUint64(&cm.connReqCount, 1))
 
+	// update this connection request into pending to manage this conn
+	// the update process via requests chan, the other endpoint is connHandler
 	// Submit a request of a pending connection attempt to the connection
 	// manager. By registering the id before the connection is even
 	// established, we'll be able to later cancel the connection via the
@@ -387,7 +387,7 @@ func (cm *ConnManager) NewConnReq() {
 	case <-cm.quit:
 		return
 	}
-
+	// get the addr of peer, actually is newAddressFunc
 	addr, err := cm.cfg.GetNewAddress()
 	if err != nil {
 		select {
@@ -398,7 +398,7 @@ func (cm *ConnManager) NewConnReq() {
 	}
 
 	c.Addr = addr
-
+	// finish the actual connection with peer
 	cm.Connect(c)
 }
 
@@ -441,17 +441,17 @@ func (cm *ConnManager) Connect(c *ConnReq) {
 
 	log.Debugf("Attempting to connect to %v", c)
 
-	conn, err := cm.cfg.Dial(c.Addr)
+	conn, err := cm.cfg.Dial(c.Addr)      // connecting with peer, is package by net.Dial
 	if err != nil {
 		select {
-		case cm.requests <- handleFailed{c, err}:
+		case cm.requests <- handleFailed{c, err}:        // if connection is fail 
 		case <-cm.quit:
 		}
 		return
 	}
 
 	select {
-	case cm.requests <- handleConnected{c, conn}:
+	case cm.requests <- handleConnected{c, conn}:     //successful connection
 	case <-cm.quit:
 	}
 }
@@ -491,7 +491,7 @@ func (cm *ConnManager) Remove(id uint64) {
 func (cm *ConnManager) listenHandler(listener net.Listener) {
 	log.Infof("Server listening on %s", listener.Addr())
 	for atomic.LoadInt32(&cm.stop) == 0 {
-		conn, err := listener.Accept()
+		conn, err := listener.Accept()      // is package by net.Accept
 		if err != nil {
 			// Only log the error if not forcibly shutting down.
 			if atomic.LoadInt32(&cm.stop) == 0 {
@@ -499,7 +499,7 @@ func (cm *ConnManager) listenHandler(listener net.Listener) {
 			}
 			continue
 		}
-		go cm.cfg.OnAccept(conn)
+		go cm.cfg.OnAccept(conn)        //convey the request to OnAccept 
 	}
 
 	cm.wg.Done()
@@ -515,19 +515,19 @@ func (cm *ConnManager) Start() {
 
 	log.Trace("Connection manager started")
 	cm.wg.Add(1)
-	go cm.connHandler()
+	go cm.connHandler()     // manager all active connection
 
 	// Start all the listeners so long as the caller requested them and
 	// provided a callback to be invoked when connections are accepted.
 	if cm.cfg.OnAccept != nil {
 		for _, listner := range cm.cfg.Listeners {
 			cm.wg.Add(1)
-			go cm.listenHandler(listner)
+			go cm.listenHandler(listner)     // wait for connection from peers
 		}
 	}
 
 	for i := atomic.LoadUint64(&cm.connReqCount); i < uint64(cm.cfg.TargetOutbound); i++ {
-		go cm.NewConnReq()
+		go cm.NewConnReq()     // postive connect with other peers, if success, the conn will be registed
 	}
 }
 

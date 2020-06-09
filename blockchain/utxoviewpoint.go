@@ -148,6 +148,7 @@ func (view *UtxoViewpoint) addTxOut(outpoint wire.OutPoint, txOut *wire.TxOut, i
 		return
 	}
 
+	// if the tx is not existing in the utxoentry, create a new one. otherwise update the height of view
 	// Update existing entries.  All fields are updated because it's
 	// possible (although extremely unlikely) that the existing entry is
 	// being replaced by a different transaction with the same hash.  This
@@ -231,6 +232,8 @@ func (view *UtxoViewpoint) connectTransaction(tx *abeutil.Tx, blockHeight int32,
 				txIn.PreviousOutPoint))
 		}
 
+		// if necessary, it will assign space for stxos, and sort the utxo if side chain becomes main chain, it can be recovery from stxos
+		// if any utxoentry is empty, it will delete, so if recovery it must know the height of block and other information
 		// Only create the stxo details if requested.
 		if stxos != nil {
 			// Populate the stxo details using the utxo entry.
@@ -242,7 +245,7 @@ func (view *UtxoViewpoint) connectTransaction(tx *abeutil.Tx, blockHeight int32,
 			}
 			*stxos = append(*stxos, stxo)
 		}
-
+		
 		// Mark the entry as spent.  This is not done until after the
 		// relevant details have been accessed since spending it might
 		// clear the fields from memory in the future.
