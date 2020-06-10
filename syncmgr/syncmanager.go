@@ -1426,6 +1426,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 			// peers, as after segwit activation we only want to
 			// download from peers that can provide us full witness
 			// data for blocks.
+			//	todo (ABE): for ABE, when a new peer is syncing blocks before some checkpoint, does this apply?
 			if !peer.IsWitnessEnabled() && iv.Type == wire.InvTypeBlock {
 				continue
 			}
