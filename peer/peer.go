@@ -1894,7 +1894,7 @@ func (p *Peer) readRemoteVersionMsg() error {
 	p.flagsMtx.Lock()
 	p.advertisedProtoVer = uint32(msg.ProtocolVersion)
 	p.protocolVersion = minUint32(p.protocolVersion, p.advertisedProtoVer)
-	p.versionKnown = true
+	p.versionKnown = true    // will be used in peerDoneHandler
 	p.services = msg.Services
 	p.flagsMtx.Unlock()
 	log.Debugf("Negotiated protocol version %d for peer %s",
@@ -1931,7 +1931,7 @@ func (p *Peer) readRemoteVersionMsg() error {
 	}
 
 	// Invoke the callback if specified.
-	if p.cfg.Listeners.OnVersion != nil {
+	if p.cfg.Listeners.OnVersion != nil {     // it is sp.OnVersion
 		rejectMsg := p.cfg.Listeners.OnVersion(p, msg)
 		if rejectMsg != nil {
 			_ = p.writeMessage(rejectMsg, wire.LatestEncoding)
@@ -2118,7 +2118,7 @@ func (p *Peer) negotiateOutboundProtocol() error {
 // start begins processing input and output messages.
 func (p *Peer) start() error {
 	log.Tracef("Starting peer %s", p)
-
+	// neogtiate the version and determine whether it is compatible
 	negotiateErr := make(chan error, 1)
 	go func() {
 		if p.inbound {
@@ -2160,7 +2160,7 @@ func (p *Peer) AssociateConnection(conn net.Conn) {
 		return
 	}
 
-	p.conn = conn
+	p.conn = conn    // bind the conn and the peer
 	p.timeConnected = time.Now()
 
 	if p.inbound {
@@ -2179,7 +2179,7 @@ func (p *Peer) AssociateConnection(conn net.Conn) {
 	}
 
 	go func() {
-		if err := p.start(); err != nil {
+		if err := p.start(); err != nil {   //start() will handle the data transmission in connection
 			log.Debugf("Cannot start peer %v: %v", p, err)
 			p.Disconnect()
 		}

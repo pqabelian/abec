@@ -11,6 +11,7 @@ import (
 // the main network, regression test network, and test network (version 3).
 var genesisCoinbaseTx = wire.MsgTx{
 	Version: 1,
+	//TODO: this TxIn and TxOut will be replaced by new design
 	TxIn: []*wire.TxIn{
 		{
 			PreviousOutPoint: wire.OutPoint{
