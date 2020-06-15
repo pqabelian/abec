@@ -737,6 +737,8 @@ func (sp *serverPeer) OnGetBlocks(_ *peer.Peer, msg *wire.MsgGetBlocks) {
 func (sp *serverPeer) OnGetHeaders(_ *peer.Peer, msg *wire.MsgGetHeaders) {
 	// Ignore getheaders requests if not in sync.
 	if !sp.server.syncManager.IsCurrent() {
+		//	todo (ABE) :check whether we are current, if we are not current, it means that we are busing in syning from other peers,
+		//	todo (ABE) : and will not answer this GetHeader request with data.
 		return
 	}
 
@@ -1462,12 +1464,14 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan cha
 
 	// We only send the channel for this message if we aren't sending
 	// an inv straight after.
+	//	todo(ABE): ?
 	var dc chan<- struct{}
 	continueHash := sp.continueHash
 	sendInv := continueHash != nil && continueHash.IsEqual(hash)
 	if !sendInv {
 		dc = doneChan
 	}
+	//	todo (ABE): as the block is fetched from database, the witness may not be included. If so, regardless of encoding, no witness is provided.
 	sp.QueueMessageWithEncoding(&msgBlock, dc, encoding)
 
 	// When the peer requests the final block that was advertised in
@@ -1647,7 +1651,7 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 
 	// Signal the sync manager this peer is a new sync candidate.
 	s.syncManager.NewPeer(sp.Peer)
-	
+
 	// Update the address manager and request known addresses from the
 	// remote peer for outbound connections. This is skipped when running on
 	// the simulation test network since it is only intended to connect to
@@ -2061,21 +2065,21 @@ func (s *server) outboundPeerConnected(c *connmgr.ConnReq, conn net.Conn) {
 		return
 	}
 	sp.Peer = p
-	sp.connReq = c      // binding the conn and sp
+	sp.connReq = c // binding the conn and sp
 	sp.isWhitelisted = isWhitelisted(conn.RemoteAddr())
 	sp.AssociateConnection(conn)
-	go s.peerDoneHandler(sp)    //send or receive some signs when peer disconnect
+	go s.peerDoneHandler(sp) //send or receive some signs when peer disconnect
 }
 
 // peerDoneHandler handles peer disconnects by notifiying the server that it's
 // done along with other performing other desirable cleanup.
 func (s *server) peerDoneHandler(sp *serverPeer) {
-	sp.WaitForDisconnect()   // wait for signs meaning peer disconnect
-	s.donePeers <- sp        // the other endpoint of this channel is server.peerHandler
+	sp.WaitForDisconnect() // wait for signs meaning peer disconnect
+	s.donePeers <- sp      // the other endpoint of this channel is server.peerHandler
 
 	// Only tell sync manager we are gone if we ever told it we existed.
-	if sp.VersionKnown() {      // utility the "true" of readremoteVersionMsg
-		s.syncManager.DonePeer(sp.Peer)   // send a sign to syncManager to stop the sync process
+	if sp.VersionKnown() { // utility the "true" of readremoteVersionMsg
+		s.syncManager.DonePeer(sp.Peer) // send a sign to syncManager to stop the sync process
 
 		// Evict any remaining orphans that were sent by the peer.
 		numEvicted := s.txMemPool.RemoveOrphansByTag(mempool.Tag(sp.ID()))
@@ -2085,7 +2089,7 @@ func (s *server) peerDoneHandler(sp *serverPeer) {
 					"orphans"), sp, sp.ID())
 		}
 	}
-	close(sp.quit)     // send a sign to server, the other endpoint of this channel is server.peerHandler
+	close(sp.quit) // send a sign to server, the other endpoint of this channel is server.peerHandler
 }
 
 // peerHandler is used to handle peer operations such as adding and removing
@@ -2097,8 +2101,8 @@ func (s *server) peerHandler() {
 	// to this handler and rather than adding more channels to sychronize
 	// things, it's easier and slightly faster to simply start and stop them
 	// in this handler.
-	s.addrManager.Start()      // address manager, not containing transports
-	s.syncManager.Start()      // data sync between peers
+	s.addrManager.Start() // address manager, not containing transports
+	s.syncManager.Start() // data sync between peers
 
 	srvrLog.Tracef("Starting peer handler")
 
@@ -2123,9 +2127,8 @@ func (s *server) peerHandler() {
 			})
 	}
 
-  // todo(ABE): why here is "go s.connManager.Start()" rathter than "s.connManager.Start()"
-	go s.connManager.Start()   // connect manager depending the peeraddress
-
+	// todo(ABE): why here is "go s.connManager.Start()" rathter than "s.connManager.Start()"
+	go s.connManager.Start() // connect manager depending the peeraddress
 
 out:
 	for {
@@ -2337,7 +2340,7 @@ func (s *server) Start() {
 	// Start the peer handler which in turn starts the address and block
 	// managers.
 	s.wg.Add(1)
-	go s.peerHandler()    //about three key start :peer addrManager syncManager connManager
+	go s.peerHandler() //about three key start :peer addrManager syncManager connManager
 
 	if s.nat != nil {
 		s.wg.Add(1)
@@ -2356,7 +2359,7 @@ func (s *server) Start() {
 
 	// Start the CPU miner if generation is enabled.
 	if cfg.Generate {
-		s.cpuMiner.Start()    //if the config contains mining flag, then start mining
+		s.cpuMiner.Start() //if the config contains mining flag, then start mining
 	}
 }
 
@@ -2684,6 +2687,8 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	}
 
 	// Merge given checkpoints with the default ones unless they are disabled.
+	//	todo(ABE): when a node starts, it can disable the checkpoints by config, or specify some checkpoints by config.
+	//	todo (ABE): the checkpoints for the chain will contain those in both the chainParams (hardcoded in sourcecode) and those in configs
 	var checkpoints []chaincfg.Checkpoint
 	if !cfg.DisableCheckpoints {
 		checkpoints = mergeCheckpoints(s.chainParams.Checkpoints, cfg.addCheckpoints)
@@ -2810,7 +2815,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	if !cfg.SimNet && len(cfg.ConnectPeers) == 0 {
 		newAddressFunc = func() (net.Addr, error) {
 			for tries := 0; tries < 100; tries++ {
-				addr := s.addrManager.GetNetAddress()  // to get the address of peer which can be connected
+				addr := s.addrManager.GetNetAddress() // to get the address of peer which can be connected
 				if addr == nil {
 					break
 				}
@@ -2861,7 +2866,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		TargetOutbound: uint32(targetOutbound),
 		Dial:           btcdDial,
 		OnConnection:   s.outboundPeerConnected, //handle with the process of connected
-		GetNewAddress:  newAddressFunc,           // get the address of peer
+		GetNewAddress:  newAddressFunc,          // get the address of peer
 	})
 	if err != nil {
 		return nil, err

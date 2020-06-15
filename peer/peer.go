@@ -454,9 +454,10 @@ type Peer struct {
 
 	// These fields keep track of statistics for the peer and are protected
 	// by the statsMtx mutex.
-	statsMtx           sync.RWMutex
-	timeOffset         int64
-	timeConnected      time.Time
+	statsMtx      sync.RWMutex
+	timeOffset    int64
+	timeConnected time.Time
+	//	todo(ABE): did not understand startHeight well yet
 	startingHeight     int32
 	lastBlock          int32
 	lastAnnouncedBlock *chainhash.Hash
@@ -892,6 +893,7 @@ func (p *Peer) PushGetHeadersMsg(locator blockchain.BlockLocator, stopHash *chai
 	var beginHash *chainhash.Hash
 	if len(locator) > 0 {
 		beginHash = locator[0]
+		//	todo(ABE): locator[0] is higher than locator[1]
 	}
 
 	// Filter duplicate getheaders requests.
@@ -910,6 +912,8 @@ func (p *Peer) PushGetHeadersMsg(locator blockchain.BlockLocator, stopHash *chai
 	// Construct the getheaders request and queue it to be sent.
 	msg := wire.NewMsgGetHeaders()
 	msg.HashStop = *stopHash
+	//	todo(ABE): beginHash (locator[0]), stopHash (nextCheckPoint), msg.BlockLocatorHashes
+	//	todo(ABE): msg.BlockLocatorHashes are those hashes for the blocks before the beginHash, in the locator rules
 	for _, hash := range locator {
 		err := msg.AddBlockLocatorHash(hash)
 		if err != nil {
@@ -917,6 +921,8 @@ func (p *Peer) PushGetHeadersMsg(locator blockchain.BlockLocator, stopHash *chai
 		}
 	}
 	p.QueueMessage(msg, nil)
+	//	todo (ABE): No need to get the reply? if the correspoding peer does not give any reply, what will happen?
+	//	todo (ABE): how to guarantee the corresponding peer think itself to be cureent?
 
 	// Update the previous getheaders request information for filtering
 	// duplicates.
@@ -1448,6 +1454,7 @@ out:
 		case *wire.MsgGetHeaders:
 			if p.cfg.Listeners.OnGetHeaders != nil {
 				p.cfg.Listeners.OnGetHeaders(p, msg)
+				//	todo (ABE): it is possible that this peer does not answer anything about this request
 			}
 
 		case *wire.MsgGetCFilters:
@@ -1894,7 +1901,7 @@ func (p *Peer) readRemoteVersionMsg() error {
 	p.flagsMtx.Lock()
 	p.advertisedProtoVer = uint32(msg.ProtocolVersion)
 	p.protocolVersion = minUint32(p.protocolVersion, p.advertisedProtoVer)
-	p.versionKnown = true    // will be used in peerDoneHandler
+	p.versionKnown = true // will be used in peerDoneHandler
 	p.services = msg.Services
 	p.flagsMtx.Unlock()
 	log.Debugf("Negotiated protocol version %d for peer %s",
@@ -1931,7 +1938,7 @@ func (p *Peer) readRemoteVersionMsg() error {
 	}
 
 	// Invoke the callback if specified.
-	if p.cfg.Listeners.OnVersion != nil {     // it is sp.OnVersion
+	if p.cfg.Listeners.OnVersion != nil { // it is sp.OnVersion
 		rejectMsg := p.cfg.Listeners.OnVersion(p, msg)
 		if rejectMsg != nil {
 			_ = p.writeMessage(rejectMsg, wire.LatestEncoding)
@@ -2160,7 +2167,7 @@ func (p *Peer) AssociateConnection(conn net.Conn) {
 		return
 	}
 
-	p.conn = conn    // bind the conn and the peer
+	p.conn = conn // bind the conn and the peer
 	p.timeConnected = time.Now()
 
 	if p.inbound {
@@ -2179,7 +2186,7 @@ func (p *Peer) AssociateConnection(conn net.Conn) {
 	}
 
 	go func() {
-		if err := p.start(); err != nil {   //start() will handle the data transmission in connection
+		if err := p.start(); err != nil { //start() will handle the data transmission in connection
 			log.Debugf("Cannot start peer %v: %v", p, err)
 			p.Disconnect()
 		}

@@ -290,6 +290,7 @@ func (b *BlockChain) ProcessBlock(block *abeutil.Block, flags BehaviorFlags) (bo
 	}
 
 	// Handle orphan blocks.
+	//	todo (ABE): orphan block means a block without previous block
 	prevHash := &blockHeader.PrevBlock
 	prevHashExists, err := b.blockExists(prevHash)
 	if err != nil {

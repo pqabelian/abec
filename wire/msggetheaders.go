@@ -31,6 +31,9 @@ type MsgGetHeaders struct {
 // AddBlockLocatorHash adds a new block locator hash to the message.
 func (msg *MsgGetHeaders) AddBlockLocatorHash(hash *chainhash.Hash) error {
 	if len(msg.BlockLocatorHashes)+1 > MaxBlockLocatorsPerMsg {
+		//	todo(ABE): as MaxBlockLocatorsPerMsg is set to be 500 in btcd, the sitaution will not happen,
+		//	since it will imply there are more then 2^500 blocks.
+		//	On the other side, if it happened, there must something wrong, it should return err
 		str := fmt.Sprintf("too many block locator hashes for message [max %v]",
 			MaxBlockLocatorsPerMsg)
 		return messageError("MsgGetHeaders.AddBlockLocatorHash", str)

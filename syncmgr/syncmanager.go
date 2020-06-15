@@ -248,6 +248,9 @@ func (sm *SyncManager) startSync() {
 	// Once the segwit soft-fork package has activated, we only
 	// want to sync from peers which are witness enabled to ensure
 	// that we fully validate all blockchain data.
+	//	todo(ABE): for btcd, the segwit enables some nodes to not provide witness.
+	//	todo (ABE): For ABE, it's normal for nodes not to provide witness.
+	//	todo (ABE): for ABE, most nodes do not provide witness. Witness are provided only when the block is announced.
 	segwitActive, err := sm.chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
 	if err != nil {
 		log.Errorf("Unable to query for segwit soft-fork state: %v", err)
@@ -260,7 +263,7 @@ func (sm *SyncManager) startSync() {
 		if !state.syncCandidate {
 			continue
 		}
-
+		// todo(ABE): In ABE, should the peers have this option?
 		if segwitActive && !peer.IsWitnessEnabled() {
 			log.Debugf("peer %v not witness enabled, skipping", peer)
 			continue
@@ -314,6 +317,7 @@ func (sm *SyncManager) startSync() {
 		sm.requestedBlocks = make(map[chainhash.Hash]struct{})
 
 		locator, err := sm.chain.LatestBlockLocator()
+		//	todo(ABE): the locator contains the block hashes for this node
 		if err != nil {
 			log.Errorf("Failed to get block locator for the "+
 				"latest block: %v", err)
@@ -420,6 +424,7 @@ func (sm *SyncManager) handleNewPeerMsg(peer *peerpkg.Peer) {
 	}
 
 	// Start syncing by choosing the best candidate if needed.
+	//	todo(ABE): each time a new syncandidate peer is added, it may trigger the startSync
 	if isSyncCandidate && sm.syncPeer == nil {
 		sm.startSync()
 	}
@@ -847,6 +852,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		blkHashUpdate = &best.Hash
 
 		// Clear the rejected transactions.
+		// todo(ABE): Why ?
 		sm.rejectedTxns = make(map[chainhash.Hash]struct{})
 	}
 
@@ -1159,6 +1165,8 @@ func (sm *SyncManager) fetchHeaderBlocks() {
 			// If we're fetching from a witness enabled peer
 			// post-fork, then ensure that we receive all the
 			// witness data in the blocks.
+			// todo(ABE): for ABE, even for WitnessEnabled peer, we may do not want receive the witness
+			//	todo(ABE): for blocks before checkpoint, we do not need to check the transactions' witness
 			if sm.syncPeer.IsWitnessEnabled() {
 				iv.Type = wire.InvTypeWitnessBlock
 			}
@@ -1190,6 +1198,7 @@ func (sm *SyncManager) handleHeadersMsg(hmsg *headersMsg) {
 	msg := hmsg.headers
 	numHeaders := len(msg.Headers)
 	if !sm.headersFirstMode {
+		//	todo(ABE): when requesting blockds before nectcheckpoint, sm uses HeadersFirstMode (by setting this flag)
 		log.Warnf("Got %d unrequested headers from %s -- "+
 			"disconnecting", numHeaders, peer.Addr())
 		peer.Disconnect()
@@ -1361,6 +1370,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 	// announced block for this peer. We'll use this information later to
 	// update the heights of peers based on blocks we've accepted that they
 	// previously announced.
+	//	todo(ABE): what sm.current() means should be further studied.
 	if lastBlock != -1 && (peer != sm.syncPeer || sm.current()) {
 		peer.UpdateLastAnnouncedBlock(&invVects[lastBlock].Hash)
 	}
@@ -1675,6 +1685,7 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 		// no longer an orphan. Transactions which depend on a confirmed
 		// transaction are NOT removed recursively because they are still
 		// valid.
+		//	todo(ABE): mempool will not contain the transactions that double-spend those in mainchain.
 		for _, tx := range block.Transactions()[1:] {
 			sm.txMemPool.RemoveTransaction(tx, false)
 			sm.txMemPool.RemoveDoubleSpends(tx)

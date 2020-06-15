@@ -3,7 +3,7 @@ package blockchain
 /*
 	this file implements the BlockChain including the process of new block
 	appending to the blockchain
- */
+*/
 import (
 	"container/list"
 	"fmt"
@@ -97,12 +97,12 @@ type BlockChain struct {
 	// be changed afterwards, so there is no need to protect them with a
 	// separate mutex.
 	checkpoints         []chaincfg.Checkpoint
-	checkpointsByHeight map[int32]*chaincfg.Checkpoint    // initialized by checkpoints
+	checkpointsByHeight map[int32]*chaincfg.Checkpoint // initialized by checkpoints
 	db                  database.DB
 	chainParams         *chaincfg.Params
-	timeSource          MedianTimeSource                  // modified when communicating with peers
+	timeSource          MedianTimeSource // modified when communicating with peers
 	sigCache            *txscript.SigCache
-	indexManager        IndexManager                      
+	indexManager        IndexManager
 	hashCache           *txscript.HashCache
 
 	// The following fields are calculated based upon the provided chain
@@ -2379,6 +2379,8 @@ func (b *BlockChain) locateInventory(locator BlockLocator, hashStop *chainhash.H
 	// back to the genesis block.
 	startNode := b.bestChain.Genesis()
 	for _, hash := range locator {
+		//	todo(ABE): if locator[0] does not have corresponging block in b.bestchain,
+		//	todo(ABE): it implies that the peer who sent locator has a fork that is different from b.
 		node := b.index.LookupNode(hash)
 		if node != nil && b.bestChain.Contains(node) {
 			startNode = node
