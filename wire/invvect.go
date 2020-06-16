@@ -32,6 +32,7 @@ const (
 	InvTypeWitnessBlock         InvType = InvTypeBlock | InvWitnessFlag
 	InvTypeWitnessTx            InvType = InvTypeTx | InvWitnessFlag
 	InvTypeFilteredWitnessBlock InvType = InvTypeFilteredBlock | InvWitnessFlag
+	//	todo (ABE): is this bug? InvTypeWitnessTx= 1 | 1 (= 1 = InvTypeTx)
 )
 
 // Map of service flags back to their constant names for pretty printing.

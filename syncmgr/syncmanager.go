@@ -751,6 +751,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		if firstNodeEl != nil {
 			firstNode := firstNodeEl.Value.(*headerNode)
 			if blockHash.IsEqual(firstNode.hash) {
+				//	todo(ABE): for headersFirstMode, the flag behaviorFlags is set to blockchain.BFFastAdd, which implies less validation
 				behaviorFlags |= blockchain.BFFastAdd
 				if firstNode.hash.IsEqual(sm.nextCheckpoint.Hash) {
 					isCheckpointBlock = true
@@ -863,6 +864,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	if blkHashUpdate != nil && heightUpdate != 0 {
 		peer.UpdateLastBlockHeight(heightUpdate)
 		if isOrphan || sm.current() {
+			//		todo (ABE): it seems to have some problem.
 			go sm.peerNotifier.UpdatePeerHeights(blkHashUpdate, heightUpdate,
 				peer)
 		}
@@ -870,6 +872,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 
 	// Nothing more to do if we aren't in headers-first mode.
 	if !sm.headersFirstMode {
+		//	todo(ABE): GetBlockMsg-->, <--InvMsg, GetData with block-inv -->, <--BlockMsg
 		return
 	}
 
@@ -1360,6 +1363,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 	invVects := imsg.inv.InvList
 	for i := len(invVects) - 1; i >= 0; i-- {
 		if invVects[i].Type == wire.InvTypeBlock {
+			//	todo(ABE): for block-invMsg, for block, there is only InvTypeBlock? without InvTypeWitnessTx
 			lastBlock = i
 			break
 		}
@@ -1397,6 +1401,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 	// we already have and request more blocks to prevent them.
 	for i, iv := range invVects {
 		// Ignore unsupported inventory types.
+		//	todo (ABE): InvTypeFilteredBlock is not supported. ?
 		switch iv.Type {
 		case wire.InvTypeBlock:
 		case wire.InvTypeTx:
@@ -1412,6 +1417,8 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 
 		// Ignore inventory when we're in headers-first mode.
 		if sm.headersFirstMode {
+			// todo (ABE): In headersFirstMode, the process is
+			// GetHeaders -->, <-- Headers, GetData with inv -->, <-- Blocks
 			continue
 		}
 
@@ -1437,11 +1444,16 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 			// download from peers that can provide us full witness
 			// data for blocks.
 			//	todo (ABE): for ABE, when a new peer is syncing blocks before some checkpoint, does this apply?
+			//	todo (ABE): there are only two cases for receiving invMsg:
+			//	todo (ABE): (1) as an received reply for GetBlocks request
+			//	todo (ABE): (2) some miner announce its new found block candidate
+			//	todo (ABE): (3) in the pushBlockMsg of getData of the syning peer, the peer may send a invMsg with its latest block
 			if !peer.IsWitnessEnabled() && iv.Type == wire.InvTypeBlock {
 				continue
 			}
 
 			// Add it to the request queue.
+			//	todo (ABE): the above case (3) will trigger here and later GetData by inv.
 			state.requestQueue = append(state.requestQueue, iv)
 			continue
 		}

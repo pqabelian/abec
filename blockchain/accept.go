@@ -49,7 +49,7 @@ func (b *BlockChain) maybeAcceptBlock(block *abeutil.Block, flags BehaviorFlags)
 	// such as making blocks that never become part of the main chain or
 	// blocks that fail to connect available for further analysis.
 	// =>if the block is valid, add it to database, but the block is not add
-	// to the hain
+	// to the chain
 	err = b.db.Update(func(dbTx database.Tx) error {
 		return dbStoreBlock(dbTx, block)
 	})
