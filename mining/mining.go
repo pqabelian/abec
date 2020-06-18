@@ -331,21 +331,29 @@ func createCoinbaseTxAbe(params *chaincfg.Params, coinbaseTxIn *wire.TxInAbe, ne
 	// Create the script to pay to the provided payment address if one was
 	// specified.  Otherwise create a script that allows the coinbase to be
 	// redeemable by anyone.
-
 	var addressScript []byte
 	if addr != nil {
-		switch maddr := addr.(type) {
-		case *abeutil.MasterAddressSalrs:
-			daddr, err := maddr.GenerateDerivedAddressSalrs()
-			if err != nil {
-				return nil, err
-			}
-			addressScript, err = txscript.BuildAddressScript(daddr)
-			if err != nil {
-				return nil, err
-			}
-		default:
+		daddr, err := addr.GenerateDerivedAddress()
+		if err != nil {
+			return nil, err
 		}
+		addressScript, err = txscript.BuildAddressScript(daddr)
+		if err != nil {
+			return nil, err
+		}
+
+		/*		switch maddr := addr.(type) {
+				case *abeutil.MasterAddressSalrs:
+					daddr, err := maddr.GenerateDerivedAddress()
+					if err != nil {
+						return nil, err
+					}
+					addressScript, err = txscript.BuildAddressScript(daddr)
+					if err != nil {
+						return nil, err
+					}
+				default:
+				}*/
 	} else {
 		addressScript = nil
 	}
@@ -354,7 +362,7 @@ func createCoinbaseTxAbe(params *chaincfg.Params, coinbaseTxIn *wire.TxInAbe, ne
 	txOut.AddressScript = addressScript
 	//	todo (ABE): for salrs test, we set fix value 100 ABE
 	//	txOut.ValueScript = blockchain.CalcBlockSubsidy(nextBlockHeight, params)
-	//	for genesis block, this value is 40,000,000
+	//	for genesis block, this value is 1000 * 10000000
 	txOut.ValueScript = 1000 * 10000000
 
 	tx := wire.NewMsgTxAbe(wire.TxVersion)

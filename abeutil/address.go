@@ -106,6 +106,8 @@ type MasterAddress interface {
 	String() string
 
 	MasterAddressCryptoScheme() abecrypto.CryptoScheme // just for being different interface from DerivedAddress
+
+	GenerateDerivedAddress() (DerivedAddress, error)
 }
 
 type DerivedAddress interface {

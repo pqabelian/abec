@@ -56,7 +56,7 @@ func (maddr *MasterAddressSalrs) MasterAddressCryptoScheme() abecrypto.CryptoSch
 	return abecrypto.CryptoSchemeSALRS
 }
 
-func (maddr *MasterAddressSalrs) GenerateDerivedAddressSalrs() (DerivedAddress, error) {
+func (maddr *MasterAddressSalrs) GenerateDerivedAddress() (DerivedAddress, error) {
 	dpk, err := salrs.GenerateDerivedPubKey(maddr.masterPubKey)
 	if err != nil {
 		return nil, err
