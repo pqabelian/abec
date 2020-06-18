@@ -423,13 +423,6 @@ func PayToAddrScript(addr abeutil.Address) ([]byte, error) {
 	const nilAddrErrStr = "unable to generate payment script for nil address"
 
 	switch addr := addr.(type) {
-	//	abec to do	begin
-	case *abeutil.AddressDerivedPubKey:
-		if addr == nil {
-			return nil, scriptError(ErrUnsupportedAddress, nilAddrErrStr)
-		}
-		return payToPubKeyScript(addr.ScriptAddress())
-	//	abec to do	end
 
 	case *abeutil.AddressPubKeyHash:
 		if addr == nil {
@@ -468,6 +461,25 @@ func PayToAddrScript(addr abeutil.Address) ([]byte, error) {
 
 	str := fmt.Sprintf("unable to generate payment script for unsupported "+
 		"address type %T", addr)
+	return nil, scriptError(ErrUnsupportedAddress, str)
+}
+
+//	todo(ABE): with this funciotn, it may allow more ways to generate the AddressScript
+func BuildAddressScript(daddr abeutil.DerivedAddress) ([]byte, error) {
+	const nilAddrErrStr = "unable to generate payment AddressScript for nil address"
+
+	switch daddr := daddr.(type) {
+
+	case *abeutil.DerivedAddressSalrs:
+		if daddr == nil {
+			return nil, scriptError(ErrUnsupportedAddress,
+				nilAddrErrStr)
+		}
+		return daddr.Serialize(), nil
+	}
+
+	str := fmt.Sprintf("unable to generate payment AddressScript for unsupported "+
+		"address type %T", daddr)
 	return nil, scriptError(ErrUnsupportedAddress, str)
 }
 

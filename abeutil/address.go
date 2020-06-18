@@ -2,13 +2,16 @@ package abeutil
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/abesuite/abec/abecrypto"
 	"github.com/abesuite/abec/abeutil/base58"
 	"github.com/abesuite/abec/abeutil/bech32"
 	"github.com/abesuite/abec/btcec"
 	"github.com/abesuite/abec/chaincfg"
+	"github.com/abesuite/abec/chainhash"
 	"golang.org/x/crypto/ripemd160"
 	"strings"
 )
@@ -92,6 +95,31 @@ func encodeSegWitAddress(hrp string, witnessVersion byte, witnessProgram []byte)
 	return bech, nil
 }
 
+//	todo(ABE): ABE uses RCT approach, where steal address is used, i.e. master address is public, but never appears in transactions or blockchain.
+type MasterAddress interface {
+	SerializeSize() int
+
+	Serialize() []byte
+
+	Deserialize(serialized []byte) error
+
+	String() string
+
+	MasterAddressCryptoScheme() abecrypto.CryptoScheme // just for being different interface from DerivedAddress
+}
+
+type DerivedAddress interface {
+	SerializeSize() int
+
+	Serialize() []byte
+
+	Deserialize(serialized []byte) error
+
+	String() string
+
+	DerivedAddressCryptoScheme() abecrypto.CryptoScheme // just for being different interface from MasterAddress
+}
+
 // Address is an interface type for any type of destination a transaction
 // output may spend to.  This includes pay-to-pubkey (P2PK), pay-to-pubkey-hash
 // (P2PKH), and pay-to-script-hash (P2SH).  Address is designed to be generic
@@ -137,22 +165,6 @@ func DecodeAddress(addr string, defaultNet *chaincfg.Params) (Address, error) {
 
 	//	oneIndex := strings.LastIndexByte(addr, '1')
 	oneIndex := strings.IndexByte(addr, '1')
-	//	abec to do
-	if oneIndex > 1 {
-		prefix := addr[:oneIndex+1]
-		addrstr := addr[oneIndex+1:]
-		// The HRP is everything before the found '1'.
-		hrp := prefix[:len(prefix)-1]
-
-		if hrp == Address_MPK_HRP {
-			serializedMasterPubKey, err := hex.DecodeString(addrstr)
-			if err != nil {
-				return nil, err
-			}
-			return NewAddressMasterPubKey(serializedMasterPubKey, defaultNet)
-		}
-	}
-	//	abec to do
 
 	if oneIndex > 1 {
 		prefix := addr[:oneIndex+1]
@@ -220,26 +232,36 @@ func DecodeAddress(addr string, defaultNet *chaincfg.Params) (Address, error) {
 	}
 }
 
-func DecodeAddressAbe(addr string, defaultNet *chaincfg.Params) (Address, error) {
-	oneIndex := strings.IndexByte(addr, '1')
-	//	abec to do
-	if oneIndex > 1 {
-		prefix := addr[:oneIndex+1]
-		addrstr := addr[oneIndex+1:]
-		// The HRP is everything before the found '1'.
-		hrp := prefix[:len(prefix)-1]
-
-		if hrp == Address_MPK_HRP {
-			serializedMasterPubKey, err := hex.DecodeString(addrstr)
-			if err != nil {
-				return nil, err
-			}
-			return NewAddressMasterPubKey(serializedMasterPubKey, defaultNet)
-		}
+func DecodeMasterAddressAbe(addrstr string) (MasterAddress, error) {
+	if len(addrstr) == 0 {
+		return nil, errors.New("decoded address is of zero size")
 	}
-	//	abec to do
 
-	return nil, errors.New("decoded address is of unknown size")
+	serialized, err := hex.DecodeString(addrstr)
+	if err != nil {
+		return nil, err
+	}
+
+	serializedSize := len(serialized)
+	if serializedSize <= 2+chainhash.HashSize {
+		return nil, errors.New("decoded address is of unknown format: bytesize <= 2 + chainhash.HashSize")
+	}
+
+	cryptoScheme := abecrypto.CryptoScheme(binary.BigEndian.Uint16(serialized[:2]))
+
+	checkSum := serialized[serializedSize-chainhash.HashSize:]
+	computedCheckSum := chainhash.DoubleHashB(serialized[:serializedSize-chainhash.HashSize])
+	if !bytes.Equal(checkSum, computedCheckSum) {
+		return nil, errors.New("decoded address is of unknown format: the check sum does not match")
+	}
+
+	//	todo(ABE): we can support multiple crypto schemes in a sophisticated way
+	switch cryptoScheme {
+	case abecrypto.CryptoSchemeSALRS:
+		return ParseMasterAddressSalrs(serialized[:serializedSize-chainhash.HashSize])
+	default:
+		return nil, errors.New("decoded address is of unknown/unsupported crypto scheme")
+	}
 }
 
 // decodeSegWitAddress parses a bech32 encoded segwit address string and

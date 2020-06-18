@@ -149,7 +149,7 @@ type config struct {
 	TrickleInterval      time.Duration `long:"trickleinterval" description:"Minimum time between attempts to send new inventory to a connected peer"`
 	MaxOrphanTxs         int           `long:"maxorphantx" description:"Max number of orphan transactions to keep in memory"`
 	Generate             bool          `long:"generate" description:"Generate (mine) bitcoins using the CPU"`
-	MiningAddrs          []string      `long:"miningaddr" description:"Add the specified payment address to the list of addresses to use for generated blocks -- At least one address is required if the generate option is set"`
+	MiningAddr           string        `long:"miningaddr" description:"Add the specified payment address to the master addresses to use for generated blocks -- Just ONE master address is required if the generate option is set"`
 	BlockMinSize         uint32        `long:"blockminsize" description:"Mininum block size in bytes to be used when creating a block"`
 	BlockMaxSize         uint32        `long:"blockmaxsize" description:"Maximum block size in bytes to be used when creating a block"`
 	BlockMinWeight       uint32        `long:"blockminweight" description:"Mininum block weight to be used when creating a block"`
@@ -172,12 +172,10 @@ type config struct {
 	oniondial            func(string, string, time.Duration) (net.Conn, error)
 	dial                 func(string, string, time.Duration) (net.Conn, error)
 	addCheckpoints       []chaincfg.Checkpoint
-	miningAddrs          []abeutil.Address
+	miningAddr           abeutil.Address //	todo(ABE): once miningMasterAddr ready, this is replaced
+	miningMasterAddr     abeutil.MasterAddress
 	minRelayTxFee        abeutil.Amount
 	whitelists           []*net.IPNet
-	//	todo(abe): remove after understanding the config
-	forABE bool
-	//	abec to do
 }
 
 // serviceOptions defines the configuration options for the daemon as a service on
@@ -872,76 +870,18 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
-	//	todo(abe):
-	Set4ABE(&cfg)
-	ConfigTest(&cfg)
-	if cfg.forABE {
-		cfg.miningAddrs = make([]abeutil.Address, 0, len(cfg.MiningAddrs))
-		for _, strAddr := range cfg.MiningAddrs {
-			addr, err := abeutil.DecodeAddressAbe(strAddr, activeNetParams.Params)
-			if err != nil {
-				str := "%s: mining address '%s' failed to decode: %v"
-				err := fmt.Errorf(str, funcName, strAddr, err)
-				fmt.Fprintln(os.Stderr, err)
-				fmt.Fprintln(os.Stderr, usageMessage)
-				return nil, nil, err
-			}
-			if !addr.IsForNet(activeNetParams.Params) {
-				str := "%s: mining address '%s' is on the wrong network"
-				err := fmt.Errorf(str, funcName, strAddr)
-				fmt.Fprintln(os.Stderr, err)
-				fmt.Fprintln(os.Stderr, usageMessage)
-				return nil, nil, err
-			}
-			cfg.miningAddrs = append(cfg.miningAddrs, addr)
-		}
-
-		// Ensure there is at least one mining address when the generate flag is
-		// set.
-		if cfg.Generate && len(cfg.MiningAddrs) == 0 {
-			str := "%s: the generate flag is set, but there are no mining " +
-				"addresses specified "
-			err := fmt.Errorf(str, funcName)
+	//	mining address
+	if cfg.Generate {
+		maddr, err := abeutil.DecodeMasterAddressAbe(cfg.MiningAddr)
+		if err != nil {
+			str := "%s: the generate flag is set. Mining address '%s' failed to decode: %v"
+			err := fmt.Errorf(str, funcName, cfg.MiningAddr, err)
 			fmt.Fprintln(os.Stderr, err)
 			fmt.Fprintln(os.Stderr, usageMessage)
 			return nil, nil, err
 		}
+		cfg.miningMasterAddr = maddr
 	}
-
-	if !cfg.forABE {
-		// Check mining addresses are valid and saved parsed versions.
-		cfg.miningAddrs = make([]abeutil.Address, 0, len(cfg.MiningAddrs))
-		for _, strAddr := range cfg.MiningAddrs {
-			addr, err := abeutil.DecodeAddress(strAddr, activeNetParams.Params)
-			if err != nil {
-				str := "%s: mining address '%s' failed to decode: %v"
-				err := fmt.Errorf(str, funcName, strAddr, err)
-				fmt.Fprintln(os.Stderr, err)
-				fmt.Fprintln(os.Stderr, usageMessage)
-				return nil, nil, err
-			}
-			if !addr.IsForNet(activeNetParams.Params) {
-				str := "%s: mining address '%s' is on the wrong network"
-				err := fmt.Errorf(str, funcName, strAddr)
-				fmt.Fprintln(os.Stderr, err)
-				fmt.Fprintln(os.Stderr, usageMessage)
-				return nil, nil, err
-			}
-			cfg.miningAddrs = append(cfg.miningAddrs, addr)
-		}
-
-		// Ensure there is at least one mining address when the generate flag is
-		// set.
-		if cfg.Generate && len(cfg.MiningAddrs) == 0 {
-			str := "%s: the generate flag is set, but there are no mining " +
-				"addresses specified "
-			err := fmt.Errorf(str, funcName)
-			fmt.Fprintln(os.Stderr, err)
-			fmt.Fprintln(os.Stderr, usageMessage)
-			return nil, nil, err
-		}
-	}
-	//	abec to do
 
 	// Add default port to all listener addresses if needed and remove
 	// duplicate addresses.

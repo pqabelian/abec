@@ -3,6 +3,7 @@ package mining
 import (
 	"bytes"
 	"container/heap"
+	"encoding/binary"
 	"fmt"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
@@ -25,7 +26,7 @@ const (
 	// CoinbaseFlags is added to the coinbase script of a generated block
 	// and is used to monitor BIP16 support as well as blocks that are
 	// generated via btcd.
-	CoinbaseFlags = "/P2SH/btcd/"      // this is the coinbase message, can write by ourselves
+	CoinbaseFlags = "/P2SH/btcd/" // this is the coinbase message, can write by ourselves
 )
 
 // TxDesc is a descriptor about a transaction in a transaction source along with
@@ -257,6 +258,32 @@ func standardCoinbaseScript(nextBlockHeight int32, extraNonce uint64) ([]byte, e
 		Script()
 }
 
+func standardCoinbaseTxIn(nextBlockHeight int32, extraNonce uint64) (*wire.TxInAbe, error) {
+	txIn := wire.TxInAbe{}
+	txIn.SerialNumber = chainhash.ZeroHash
+
+	previousOutPointRing := wire.OutPointRing{}
+	previousOutPointRing.BlockHashs = make([]*chainhash.Hash, 3)
+	hash0 := chainhash.Hash{}
+	binary.BigEndian.PutUint32(hash0[0:4], uint32(nextBlockHeight))
+	hash1 := chainhash.Hash{}
+	binary.BigEndian.PutUint64(hash1[0:8], extraNonce)
+	hash2 := chainhash.ZeroHash
+	previousOutPointRing.BlockHashs[0] = &hash0
+	previousOutPointRing.BlockHashs[1] = &hash1
+	previousOutPointRing.BlockHashs[2] = &hash2
+
+	previousOutPointRing.OutPoints = make([]*wire.OutPointAbe, 1)
+	outPointAbe := wire.OutPointAbe{}
+	outPointAbe.TxHash = chainhash.ZeroHash
+	outPointAbe.Index = 0
+	previousOutPointRing.OutPoints[0] = &outPointAbe
+
+	txIn.PreviousOutPointRing = &previousOutPointRing
+
+	return &txIn, nil
+}
+
 // createCoinbaseTx returns a coinbase transaction paying an appropriate subsidy
 // based on the passed block height to the provided address.  When the address
 // is nil, the coinbase transaction will instead be redeemable by anyone.
@@ -297,6 +324,45 @@ func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockH
 		PkScript: pkScript,
 	})
 	return abeutil.NewTx(tx), nil
+}
+
+//	todo (ABE):
+func createCoinbaseTxAbe(params *chaincfg.Params, coinbaseTxIn *wire.TxInAbe, nextBlockHeight int32, addr abeutil.MasterAddress) (*abeutil.TxAbe, error) {
+	// Create the script to pay to the provided payment address if one was
+	// specified.  Otherwise create a script that allows the coinbase to be
+	// redeemable by anyone.
+
+	var addressScript []byte
+	if addr != nil {
+		switch maddr := addr.(type) {
+		case *abeutil.MasterAddressSalrs:
+			daddr, err := maddr.GenerateDerivedAddressSalrs()
+			if err != nil {
+				return nil, err
+			}
+			addressScript, err = txscript.BuildAddressScript(daddr)
+			if err != nil {
+				return nil, err
+			}
+		default:
+		}
+	} else {
+		addressScript = nil
+	}
+
+	txOut := wire.TxOutAbe{}
+	txOut.AddressScript = addressScript
+	//	todo (ABE): for salrs test, we set fix value 100 ABE
+	//	txOut.ValueScript = blockchain.CalcBlockSubsidy(nextBlockHeight, params)
+	//	for genesis block, this value is 40,000,000
+	txOut.ValueScript = 1000 * 10000000
+
+	tx := wire.NewMsgTxAbe(wire.TxVersion)
+	tx.AddTxIn(coinbaseTxIn)
+	tx.AddTxOut(&txOut)
+	tx.TxWitness = nil
+
+	return abeutil.NewTxAbe(tx), nil
 }
 
 // spendTransaction updates the passed view by marking the inputs to the passed
@@ -453,7 +519,7 @@ func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
 //  |  transactions (while block size   |   |
 //  |  <= policy.BlockMinSize)          |   |
 //   -----------------------------------  --
-func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress abeutil.Address) (*BlockTemplate, error) {
+func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress abeutil.MasterAddress) (*BlockTemplate, error) {
 	// Extend the most recently known best block.
 	best := g.chain.BestSnapshot()
 	nextBlockHeight := best.Height + 1
@@ -467,15 +533,17 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress abeutil.Address) (*Bloc
 	// same value to the same public key address would otherwise be an
 	// identical transaction for block version 1).
 	extraNonce := uint64(0)
-	coinbaseScript, err := standardCoinbaseScript(nextBlockHeight, extraNonce)
+	//	coinbaseScript, err := standardCoinbaseScript(nextBlockHeight, extraNonce)
+	coinBaseTxIn, err := standardCoinbaseTxIn(nextBlockHeight, extraNonce)
 	if err != nil {
 		return nil, err
 	}
-	coinbaseTx, err := createCoinbaseTx(g.chainParams, coinbaseScript,
+	coinbaseTx, err := createCoinbaseTxAbe(g.chainParams, coinBaseTxIn,
 		nextBlockHeight, payToAddress)
 	if err != nil {
 		return nil, err
 	}
+	//	todo(ABE): need to study the mechanism of CountSigOps
 	coinbaseSigOpCost := int64(blockchain.CountSigOps(coinbaseTx)) * blockchain.WitnessScaleFactor
 
 	// Get the current source transactions and create a priority queue to
@@ -492,7 +560,7 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress abeutil.Address) (*Bloc
 	// generated block with reserved space.  Also create a utxo view to
 	// house all of the input transactions so multiple lookups can be
 	// avoided.
-	blockTxns := make([]*abeutil.Tx, 0, len(sourceTxns))
+	blockTxns := make([]*abeutil.TxAbe, 0, len(sourceTxns))
 	blockTxns = append(blockTxns, coinbaseTx)
 	blockUtxos := blockchain.NewUtxoViewpoint()
 

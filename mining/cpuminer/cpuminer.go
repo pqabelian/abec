@@ -9,7 +9,6 @@ import (
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/mining"
 	"github.com/abesuite/abec/wire"
-	"math/rand"
 	"runtime"
 	"sync"
 	"time"
@@ -54,7 +53,11 @@ type Config struct {
 
 	// MiningAddrs is a list of payment addresses to use for the generated
 	// blocks.  Each generated block will randomly choose one of them.
-	MiningAddrs []abeutil.Address
+	// MiningAddr is a master addresses to use for the generated blocks.
+	// Each generated block will use derived address from the master address.
+	//	todo (ABE): remove one
+	MiningAddr       abeutil.Address
+	MiningMasterAddr abeutil.MasterAddress
 
 	// ProcessBlock defines the function to call with any solved blocks.
 	// It typically must run the provided block through the same set of
@@ -308,7 +311,7 @@ out:
 			// Non-blocking select to fall through
 		}
 
-		//	abec to do	begin
+		//	todo (ABE): when connected with peers, uncomment this part	begin
 		/*
 			// Wait until there is a connection to at least one other peer
 			// since there is no way to relay a found block or receive
@@ -318,7 +321,7 @@ out:
 				continue
 			}
 		*/
-		//	abec to do	end
+		//	todo (ABE): when connected with peers, uncomment this part	end
 
 		// No point in searching for a solution before the chain is
 		// synced.  Also, grab the same lock as used for block
@@ -334,29 +337,12 @@ out:
 		}
 
 		// Choose a payment address at random.
-		rand.Seed(time.Now().UnixNano())
-		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
-
-		//	abec to do	begin
-		switch addr := payToAddr.(type) {
-		case *abeutil.AddressMasterPubKey:
-			addrdpk, err := addr.GenerateAddressDerivedPubKey()
-			if err != nil {
-				errStr := fmt.Sprintf("Failed to geneate derived address from master address"+
-					": %v", err)
-				log.Errorf(errStr)
-				continue
-			}
-			payToAddr = addrdpk
-		default:
-			// do nothing
-		}
-		//	abec to do	end
+		masterAddr := m.cfg.MiningMasterAddr
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		template, err := m.g.NewBlockTemplate(payToAddr)
+		template, err := m.g.NewBlockTemplate(masterAddr)
 		m.submitBlockLock.Unlock()
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+
@@ -604,13 +590,14 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 		curHeight := m.g.BestSnapshot().Height
 
 		// Choose a payment address at random.
-		rand.Seed(time.Now().UnixNano())
-		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
+		//		rand.Seed(time.Now().UnixNano())
+		//		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
+		masterAddr := m.cfg.MiningMasterAddr
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		template, err := m.g.NewBlockTemplate(payToAddr)
+		template, err := m.g.NewBlockTemplate(masterAddr)
 		m.submitBlockLock.Unlock()
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+

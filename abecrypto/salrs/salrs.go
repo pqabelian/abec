@@ -1,12 +1,12 @@
-package abecrypto
+package salrs
 
 import (
 	"errors"
 	"github.com/cryptosuite/salrs-go/salrs"
 )
 
-const MpkByteLen = salrs.MpkByteLen
-const DpkByteLen = salrs.DpkByteLen
+var MpkByteLen = salrs.MpkByteLen
+var DpkByteLen = salrs.DpkByteLen
 
 type MasterPubKey salrs.MasterPubKey
 type DerivedPubKey salrs.DerivedPubKey

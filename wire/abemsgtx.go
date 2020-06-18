@@ -3,27 +3,26 @@ package wire
 import (
 	"bytes"
 	"fmt"
+	"github.com/abesuite/abec/abecrypto/salrs"
 	"github.com/abesuite/abec/chainhash"
-	"github.com/cryptosuite/salrs-go/salrs"
 	"io"
 	"strconv"
 )
 
+// todo: the AddressScriptMaxLen may depend on the length of derived address and the rules that txscript builds an AddressScript from a derived address
+var AddressScriptMaxLen = uint32(salrs.DpkByteLen + 10)
+
 const (
-	TxRingSize    = 7
-	TxRingSizeMin = 4
+	TxRingSize = 7
 
 	TxInputMaxNum = 5
 
 	TxOutputMaxNum = 5
 
-	defaultTxInputAlloc = 2
+	defaultTxInputAlloc = 3
 
-	defaultTxOutputAlloc = 2
+	defaultTxOutputAlloc = 3
 
-	// currently it is a fixed length, as the address is a DPK
-	AddressScriptMaxLen = salrs.DpkByteLen
-	// to do
 	WitnessItemMaxLen = 2000000
 
 	// minTxPayload is the minimum payload size for a (transfer) transaction.  Note
@@ -642,7 +641,7 @@ type MsgTxAbe struct {
 	//	TxOutHashs []*chainhash.Hash
 	TxOuts []*TxOutAbe
 	//	txWitnessHash chainhash.Hash
-	TxWitness TxWitnessAbe // Each Tx has one witness, consisting all necessary information, for example, signatures for inputs, range proofs for outputs, balance between inputs and outputs
+	TxWitness *TxWitnessAbe // Each Tx has one witness, consisting all necessary information, for example, signatures for inputs, range proofs for outputs, balance between inputs and outputs
 }
 
 // AddTxIn adds a transaction input to the message.
@@ -753,7 +752,7 @@ func (msg *MsgTxAbe) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) er
 	}
 
 	// witness details
-	err = writeTxWitnessAbe(w, 0, msg.Version, &msg.TxWitness)
+	err = writeTxWitnessAbe(w, 0, msg.Version, msg.TxWitness)
 	if err != nil {
 		return err
 	}
@@ -842,7 +841,7 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 	if err != nil {
 		return err
 	}
-	msg.TxWitness = txWitness
+	msg.TxWitness = &txWitness
 
 	return nil
 }
@@ -1171,6 +1170,19 @@ func (msg *MsgTxAbe) Deserialize(r io.Reader) error {
 		msg.txWitness = txWitness*/
 
 	return nil
+}
+
+// NewMsgTx returns a new bitcoin tx message that conforms to the Message
+// interface.  The return instance has a default version of TxVersion and there
+// are no transaction inputs or outputs.  Also, the lock time is set to zero
+// to indicate the transaction is valid immediately as opposed to some time in
+// future.
+func NewMsgTxAbe(version int32) *MsgTxAbe {
+	return &MsgTxAbe{
+		Version: version,
+		TxIns:   make([]*TxInAbe, 0, defaultTxInputAlloc),
+		TxOuts:  make([]*TxOutAbe, 0, defaultTxInOutAlloc),
+	}
 }
 
 // In summary, contains multiple hash-pointers for its TXOS, each for one TXO.

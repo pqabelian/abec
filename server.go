@@ -2587,8 +2587,8 @@ func setupRPCListeners() ([]net.Listener, error) {
 	return listeners, nil
 }
 
-// newServer returns a new btcd server configured to listen on addr for the
-// bitcoin network type specified by chainParams.  Use start to begin accepting
+// newServer returns a new abec server configured to listen on addr for the
+// abe network type specified by chainParams.  Use start to begin accepting
 // connections from peers.
 //	todo (ABE): done
 func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
@@ -2799,7 +2799,8 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	s.cpuMiner = cpuminer.New(&cpuminer.Config{
 		ChainParams:            chainParams,
 		BlockTemplateGenerator: blockTemplateGenerator,
-		MiningAddrs:            cfg.miningAddrs,
+		MiningAddr:             cfg.miningAddr,
+		MiningMasterAddr:       cfg.miningMasterAddr,
 		ProcessBlock:           s.syncManager.ProcessBlock,
 		ConnectedCount:         s.ConnectedCount,
 		IsCurrent:              s.syncManager.IsCurrent,

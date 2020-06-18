@@ -1,12 +1,6 @@
 package abeutil
 
-import (
-	"encoding/hex"
-	"github.com/abesuite/abec/abecrypto"
-	"github.com/abesuite/abec/chaincfg"
-)
-
-//	abec to do	begin
+/*//	abec to do	begin
 // AddressDerivedPublicKey is an Address for a pay-to-derivedpublickey transaction.
 type AddressDerivedPubKey struct {
 	derivedPubKey *abecrypto.DerivedPubKey
@@ -53,3 +47,4 @@ func (addrdpk *AddressDerivedPubKey) serialize() []byte {
 }
 
 //	abec to do	end
+*/
