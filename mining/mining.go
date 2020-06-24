@@ -1,7 +1,6 @@
 package mining
 
 import (
-	"bytes"
 	"container/heap"
 	"encoding/binary"
 	"fmt"
@@ -80,6 +79,8 @@ type TxSource interface {
 	// MiningDescs returns a slice of mining descriptors for all the
 	// transactions in the source pool.
 	MiningDescs() []*TxDesc
+
+	MiningDescsAbe() []*TxDescAbe
 
 	// HaveTransaction returns whether or not the passed transaction hash
 	// exists in the source pool.
@@ -193,6 +194,111 @@ func newTxPriorityQueue(reserve int, sortByFee bool) *txPriorityQueue {
 		pq.SetLessFunc(txPQByFee)
 	} else {
 		pq.SetLessFunc(txPQByPriority)
+	}
+	return pq
+}
+
+// txPrioItem houses a transaction along with extra information that allows the
+// transaction to be prioritized and track dependencies on other transactions
+// which have not been mined into a block yet.
+type txPrioItemAbe struct {
+	tx       *abeutil.TxAbe
+	fee      int64
+	priority float64
+	feePerKB int64
+}
+
+// txPriorityQueueLessFunc describes a function that can be used as a compare
+// function for a transaction priority queue (txPriorityQueue).
+type txPriorityQueueLessFuncAbe func(*txPriorityQueueAbe, int, int) bool
+
+// txPriorityQueue implements a priority queue of txPrioItem elements that
+// supports an arbitrary compare function as defined by txPriorityQueueLessFunc.
+type txPriorityQueueAbe struct {
+	lessFunc txPriorityQueueLessFuncAbe
+	items    []*txPrioItemAbe
+}
+
+// Len returns the number of items in the priority queue.  It is part of the
+// heap.Interface implementation.
+func (pq *txPriorityQueueAbe) Len() int {
+	return len(pq.items)
+}
+
+// Less returns whether the item in the priority queue with index i should sort
+// before the item with index j by deferring to the assigned less function.  It
+// is part of the heap.Interface implementation.
+func (pq *txPriorityQueueAbe) Less(i, j int) bool {
+	return pq.lessFunc(pq, i, j)
+}
+
+// Swap swaps the items at the passed indices in the priority queue.  It is
+// part of the heap.Interface implementation.
+func (pq *txPriorityQueueAbe) Swap(i, j int) {
+	pq.items[i], pq.items[j] = pq.items[j], pq.items[i]
+}
+
+// Push pushes the passed item onto the priority queue.  It is part of the
+// heap.Interface implementation.
+func (pq *txPriorityQueueAbe) Push(x interface{}) {
+	pq.items = append(pq.items, x.(*txPrioItemAbe))
+}
+
+// Pop removes the highest priority item (according to Less) from the priority
+// queue and returns it.  It is part of the heap.Interface implementation.
+func (pq *txPriorityQueueAbe) Pop() interface{} {
+	n := len(pq.items)
+	item := pq.items[n-1]
+	pq.items[n-1] = nil
+	pq.items = pq.items[0 : n-1]
+	return item
+}
+
+// SetLessFunc sets the compare function for the priority queue to the provided
+// function.  It also invokes heap.Init on the priority queue using the new
+// function so it can immediately be used with heap.Push/Pop.
+func (pq *txPriorityQueueAbe) SetLessFunc(lessFunc txPriorityQueueLessFuncAbe) {
+	pq.lessFunc = lessFunc
+	heap.Init(pq)
+}
+
+// txPQByPriority sorts a txPriorityQueue by transaction priority and then fees
+// per kilobyte.
+func txPQByPriorityAbe(pq *txPriorityQueueAbe, i, j int) bool {
+	// Using > here so that pop gives the highest priority item as opposed
+	// to the lowest.  Sort by priority first, then fee.
+	if pq.items[i].priority == pq.items[j].priority {
+		return pq.items[i].feePerKB > pq.items[j].feePerKB
+	}
+	return pq.items[i].priority > pq.items[j].priority
+
+}
+
+// txPQByFee sorts a txPriorityQueue by fees per kilobyte and then transaction
+// priority.
+func txPQByFeeAbe(pq *txPriorityQueueAbe, i, j int) bool {
+	// Using > here so that pop gives the highest fee item as opposed
+	// to the lowest.  Sort by fee first, then priority.
+	if pq.items[i].feePerKB == pq.items[j].feePerKB {
+		return pq.items[i].priority > pq.items[j].priority
+	}
+	return pq.items[i].feePerKB > pq.items[j].feePerKB
+}
+
+// newTxPriorityQueue returns a new transaction priority queue that reserves the
+// passed amount of space for the elements.  The new priority queue uses either
+// the txPQByPriority or the txPQByFee compare function depending on the
+// sortByFee parameter and is already initialized for use with heap.Push/Pop.
+// The priority queue can grow larger than the reserved space, but extra copies
+// of the underlying array can be avoided by reserving a sane value.
+func newTxPriorityQueueAbe(reserve int, sortByFee bool) *txPriorityQueueAbe {
+	pq := &txPriorityQueueAbe{
+		items: make([]*txPrioItemAbe, 0, reserve),
+	}
+	if sortByFee {
+		pq.SetLessFunc(txPQByFeeAbe)
+	} else {
+		pq.SetLessFunc(txPQByPriorityAbe)
 	}
 	return pq
 }
@@ -551,8 +657,9 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress abeutil.MasterAddress) 
 	if err != nil {
 		return nil, err
 	}
-	//	todo(ABE): need to study the mechanism of CountSigOps
-	coinbaseSigOpCost := int64(blockchain.CountSigOps(coinbaseTx)) * blockchain.WitnessScaleFactor
+
+	//	todo(ABE): to remove
+	//	coinbaseSigOpCost := int64(blockchain.CountSigOps(coinbaseTx)) * blockchain.WitnessScaleFactor
 
 	// Get the current source transactions and create a priority queue to
 	// hold the transactions which are ready for inclusion into a block
@@ -560,7 +667,7 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress abeutil.MasterAddress) 
 	// number of items that are available for the priority queue.  Also,
 	// choose the initial sort order for the priority queue based on whether
 	// or not there is an area allocated for high-priority transactions.
-	sourceTxns := g.txSource.MiningDescs()
+	sourceTxns := g.txSource.MiningDescsAbe()
 	sortedByFee := g.policy.BlockPrioritySize == 0
 	priorityQueue := newTxPriorityQueue(len(sourceTxns), sortedByFee)
 
@@ -570,14 +677,15 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress abeutil.MasterAddress) 
 	// avoided.
 	blockTxns := make([]*abeutil.TxAbe, 0, len(sourceTxns))
 	blockTxns = append(blockTxns, coinbaseTx)
-	blockUtxos := blockchain.NewUtxoViewpoint()
+	blockUtxoRings := blockchain.NewUtxoRingViewpoint()
 
 	// dependers is used to track transactions which depend on another
 	// transaction in the source pool.  This, in conjunction with the
 	// dependsOn map kept with each dependent transaction helps quickly
 	// determine which dependent transactions are now eligible for inclusion
 	// in the block once each transaction has been included.
-	dependers := make(map[chainhash.Hash]map[chainhash.Hash]*txPrioItem)
+	//	todo(ABE): ABE does not suppoer such a case, to remove
+	//	dependers := make(map[chainhash.Hash]map[chainhash.Hash]*txPrioItem)
 
 	// Create slices to hold the fees and number of signature operations
 	// for each of the selected transactions and add an entry for the
@@ -586,9 +694,9 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress abeutil.MasterAddress) 
 	// However, since the total fees aren't known yet, use a dummy value for
 	// the coinbase fee which will be updated later.
 	txFees := make([]int64, 0, len(sourceTxns))
-	txSigOpCosts := make([]int64, 0, len(sourceTxns))
+	//	txSigOpCosts := make([]int64, 0, len(sourceTxns))	//	todo(ABE): remove
 	txFees = append(txFees, -1) // Updated once known
-	txSigOpCosts = append(txSigOpCosts, coinbaseSigOpCost)
+	//	txSigOpCosts = append(txSigOpCosts, coinbaseSigOpCost)	//	todo(ABE): remove
 
 	log.Debugf("Considering %d transactions for inclusion to new block",
 		len(sourceTxns))
@@ -598,25 +706,26 @@ mempoolLoop:
 		// A block can't have more than one coinbase or contain
 		// non-finalized transactions.
 		tx := txDesc.Tx
-		if blockchain.IsCoinBase(tx) {
+		if blockchain.IsCoinBaseAbe(tx) {
 			log.Tracef("Skipping coinbase tx %s", tx.Hash())
 			continue
 		}
-		if !blockchain.IsFinalizedTransaction(tx, nextBlockHeight,
-			g.timeSource.AdjustedTime()) {
+		//	todo(ABE): ABE does not support locktime at this mooment, remove
+		/*		if !blockchain.IsFinalizedTransaction(tx, nextBlockHeight,
+				g.timeSource.AdjustedTime()) {
 
-			log.Tracef("Skipping non-finalized tx %s", tx.Hash())
-			continue
-		}
+				log.Tracef("Skipping non-finalized tx %s", tx.Hash())
+				continue
+			}*/
 
 		// Fetch all of the utxos referenced by the this transaction.
 		// NOTE: This intentionally does not fetch inputs from the
 		// mempool since a transaction which depends on other
 		// transactions in the mempool must come after those
 		// dependencies in the final generated block.
-		utxos, err := g.chain.FetchUtxoView(tx)
+		utxoRings, err := g.chain.FetchUtxoRingView(tx)
 		if err != nil {
-			log.Warnf("Unable to fetch utxo view for tx %s: %v",
+			log.Warnf("Unable to fetch utxoRing view for tx %s: %v",
 				tx.Hash(), err)
 			continue
 		}
@@ -624,45 +733,22 @@ mempoolLoop:
 		// Setup dependencies for any transactions which reference
 		// other transactions in the mempool so they can be properly
 		// ordered below.
-		prioItem := &txPrioItem{tx: tx}
-		for _, txIn := range tx.MsgTx().TxIn {
-			originHash := &txIn.PreviousOutPoint.Hash
-			entry := utxos.LookupEntry(txIn.PreviousOutPoint)
-			if entry == nil || entry.IsSpent() {
-				if !g.txSource.HaveTransaction(originHash) {
-					log.Tracef("Skipping tx %s because it "+
-						"references unspent output %s "+
-						"which is not available",
-						tx.Hash(), txIn.PreviousOutPoint)
-					continue mempoolLoop
-				}
-
-				// The transaction is referencing another
-				// transaction in the source pool, so setup an
-				// ordering dependency.
-				deps, exists := dependers[*originHash]
-				if !exists {
-					deps = make(map[chainhash.Hash]*txPrioItem)
-					dependers[*originHash] = deps
-				}
-				deps[*prioItem.tx.Hash()] = prioItem
-				if prioItem.dependsOn == nil {
-					prioItem.dependsOn = make(
-						map[chainhash.Hash]struct{})
-				}
-				prioItem.dependsOn[*originHash] = struct{}{}
-
-				// Skip the check below. We already know the
-				// referenced transaction is available.
-				continue
+		prioItem := &txPrioItemAbe{tx: tx}
+		for _, txIn := range tx.MsgTx().TxIns {
+			entry := utxoRings.LookupEntry(txIn.PreviousOutPointRing.Hash())
+			if entry == nil || entry.IsSpent(txIn.SerialNumber) {
+				log.Tracef("Skipping tx %s because it "+
+					"references unspent output %s "+
+					"which is not available",
+					tx.Hash(), txIn.String())
+				continue mempoolLoop
 			}
 		}
 
 		// Calculate the final transaction priority using the input
 		// value age sum as well as the adjusted transaction size.  The
 		// formula is: sum(inputValue * inputAge) / adjustedTxSize
-		prioItem.priority = CalcPriority(tx.MsgTx(), utxos,
-			nextBlockHeight)
+		prioItem.priority = CalcPriorityAbe(tx.MsgTx(), utxoRings, nextBlockHeight)
 
 		// Calculate the fee in Satoshi/kB.
 		prioItem.feePerKB = txDesc.FeePerKB
@@ -670,117 +756,78 @@ mempoolLoop:
 
 		// Add the transaction to the priority queue to mark it ready
 		// for inclusion in the block unless it has dependencies.
-		if prioItem.dependsOn == nil {
-			heap.Push(priorityQueue, prioItem)
-		}
+		/*		if prioItem.dependsOn == nil {
+				heap.Push(priorityQueue, prioItem)
+			}*/
+		heap.Push(priorityQueue, prioItem)
 
 		// Merge the referenced outputs from the input transactions to
 		// this transaction into the block utxo view.  This allows the
 		// code below to avoid a second lookup.
+		//	todo(ABE): how to prevent double spending
 		mergeUtxoView(blockUtxos, utxos)
 	}
 
-	log.Tracef("Priority queue len %d, dependers len %d",
-		priorityQueue.Len(), len(dependers))
+	/*	log.Tracef("Priority queue len %d, dependers len %d",
+		priorityQueue.Len(), len(dependers))*/
+	log.Tracef("Priority queue len %d", priorityQueue.Len())
 
 	// The starting block size is the size of the block header plus the max
 	// possible transaction count size, plus the size of the coinbase
 	// transaction.
 	blockWeight := uint32((blockHeaderOverhead * blockchain.WitnessScaleFactor) +
-		blockchain.GetTransactionWeight(coinbaseTx))
-	blockSigOpCost := coinbaseSigOpCost
+		blockchain.GetTransactionWeightAbe(coinbaseTx))
+	//	blockSigOpCost := coinbaseSigOpCost
 	totalFees := int64(0)
 
 	// Query the version bits state to see if segwit has been activated, if
 	// so then this means that we'll include any transactions with witness
 	// data in the mempool, and also add the witness commitment as an
 	// OP_RETURN output in the coinbase transaction.
-	segwitState, err := g.chain.ThresholdState(chaincfg.DeploymentSegwit)
-	if err != nil {
-		return nil, err
-	}
-	segwitActive := segwitState == blockchain.ThresholdActive
-
+	/*	segwitState, err := g.chain.ThresholdState(chaincfg.DeploymentSegwit)
+		if err != nil {
+			return nil, err
+		}
+		segwitActive := segwitState == blockchain.ThresholdActive
+	*/
 	witnessIncluded := false
 
 	// Choose which transactions make it into the block.
 	for priorityQueue.Len() > 0 {
 		// Grab the highest priority (or highest fee per kilobyte
 		// depending on the sort order) transaction.
-		prioItem := heap.Pop(priorityQueue).(*txPrioItem)
+		prioItem := heap.Pop(priorityQueue).(*txPrioItemAbe)
 		tx := prioItem.tx
 
-		switch {
-		// If segregated witness has not been activated yet, then we
-		// shouldn't include any witness transactions in the block.
-		case !segwitActive && tx.HasWitness():
-			continue
-
-		// Otherwise, Keep track of if we've included a transaction
-		// with witness data or not. If so, then we'll need to include
-		// the witness commitment as the last output in the coinbase
-		// transaction.
-		case segwitActive && !witnessIncluded && tx.HasWitness():
-			// If we're about to include a transaction bearing
-			// witness data, then we'll also need to include a
-			// witness commitment in the coinbase transaction.
-			// Therefore, we account for the additional weight
-			// within the block with a model coinbase tx with a
-			// witness commitment.
-			coinbaseCopy := abeutil.NewTx(coinbaseTx.MsgTx().Copy())
-			coinbaseCopy.MsgTx().TxIn[0].Witness = [][]byte{
-				bytes.Repeat([]byte("a"),
-					blockchain.CoinbaseWitnessDataLen),
-			}
-			coinbaseCopy.MsgTx().AddTxOut(&wire.TxOut{
-				PkScript: bytes.Repeat([]byte("a"),
-					blockchain.CoinbaseWitnessPkScriptLength),
-			})
-
-			// In order to accurately account for the weight
-			// addition due to this coinbase transaction, we'll add
-			// the difference of the transaction before and after
-			// the addition of the commitment to the block weight.
-			weightDiff := blockchain.GetTransactionWeight(coinbaseCopy) -
-				blockchain.GetTransactionWeight(coinbaseTx)
-
-			blockWeight += uint32(weightDiff)
-
-			witnessIncluded = true
-		}
-
-		// Grab any transactions which depend on this one.
-		deps := dependers[*tx.Hash()]
-
 		// Enforce maximum block size.  Also check for overflow.
-		txWeight := uint32(blockchain.GetTransactionWeight(tx))
+		txWeight := uint32(blockchain.GetTransactionWeightAbe(tx))
 		blockPlusTxWeight := blockWeight + txWeight
 		if blockPlusTxWeight < blockWeight ||
 			blockPlusTxWeight >= g.policy.BlockMaxWeight {
-
+			//	todo(ABE): for the setting of blockmaxweight and blockmaxsize
 			log.Tracef("Skipping tx %s because it would exceed "+
 				"the max block weight", tx.Hash())
-			logSkippedDeps(tx, deps)
+			//			logSkippedDeps(tx, deps)
 			continue
 		}
 
 		// Enforce maximum signature operation cost per block.  Also
 		// check for overflow.
-		sigOpCost, err := blockchain.GetSigOpCost(tx, false,
-			blockUtxos, true, segwitActive)
-		if err != nil {
-			log.Tracef("Skipping tx %s due to error in "+
-				"GetSigOpCost: %v", tx.Hash(), err)
-			logSkippedDeps(tx, deps)
-			continue
-		}
-		if blockSigOpCost+int64(sigOpCost) < blockSigOpCost ||
-			blockSigOpCost+int64(sigOpCost) > blockchain.MaxBlockSigOpsCost {
-			log.Tracef("Skipping tx %s because it would "+
-				"exceed the maximum sigops per block", tx.Hash())
-			logSkippedDeps(tx, deps)
-			continue
-		}
+		/*		sigOpCost, err := blockchain.GetSigOpCost(tx, false,
+					blockUtxos, true, segwitActive)
+				if err != nil {
+					log.Tracef("Skipping tx %s due to error in "+
+						"GetSigOpCost: %v", tx.Hash(), err)
+					logSkippedDeps(tx, deps)
+					continue
+				}*/
+		/*		if blockSigOpCost+int64(sigOpCost) < blockSigOpCost ||
+				blockSigOpCost+int64(sigOpCost) > blockchain.MaxBlockSigOpsCost {
+				log.Tracef("Skipping tx %s because it would "+
+					"exceed the maximum sigops per block", tx.Hash())
+				logSkippedDeps(tx, deps)
+				continue
+			}*/
 
 		// Skip free transactions once the block is larger than the
 		// minimum block size.
@@ -793,7 +840,7 @@ mempoolLoop:
 				"minBlockWeight %d", tx.Hash(), prioItem.feePerKB,
 				g.policy.TxMinFreeFee, blockPlusTxWeight,
 				g.policy.BlockMinWeight)
-			logSkippedDeps(tx, deps)
+			//			logSkippedDeps(tx, deps)
 			continue
 		}
 
@@ -833,7 +880,7 @@ mempoolLoop:
 		if err != nil {
 			log.Tracef("Skipping tx %s due to error in "+
 				"CheckTransactionInputs: %v", tx.Hash(), err)
-			logSkippedDeps(tx, deps)
+			//			logSkippedDeps(tx, deps)
 			continue
 		}
 		err = blockchain.ValidateTransactionScripts(tx, blockUtxos,

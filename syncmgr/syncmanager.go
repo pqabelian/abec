@@ -559,6 +559,12 @@ func (sm *SyncManager) handleTxMsg(tmsg *txMsg) {
 		return
 	}
 
+	//	todo(ABE): what will happen, if this peer is still synchronizing from other peers,
+	//	todo(ABE): and the height is much lower than 'the best height' of the synchronized peer?
+	//	todo(ABE): Only if the peer update's its best height accoring to other peers height, rather than local mainchain
+	//	todo(ABE): but it seems that it does not, the besthright is set according to local mainchain.
+	//	todo(ABE): it does not matter.
+
 	// NOTE:  BitcoinJ, and possibly other wallets, don't follow the spec of
 	// sending an inventory message and allowing the remote peer to decide
 	// whether or not they want to request the transaction via a getdata

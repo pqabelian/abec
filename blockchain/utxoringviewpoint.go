@@ -658,6 +658,38 @@ func NewUtxoRingViewpoint() *UtxoRingViewpoint {
 	}
 }
 
+// FetchUtxoRingView loads unspent transaction outputs for the inputs referenced by
+// the passed transaction from the point of view of the end of the main chain.
+//	todo(ABE): ABE does not fetch the utxos for the outputs, as it is impossible to have duplicate transactions
+// It also attempts to fetch the utxos for the outputs of the transaction itself
+// so the returned view can be examined for duplicate transactions.
+//
+// This function is safe for concurrent access however the returned view is NOT.
+func (b *BlockChain) FetchUtxoRingView(tx *abeutil.TxAbe) (*UtxoRingViewpoint, error) {
+	// Create a set of needed outputs based on those referenced by the
+	// inputs of the passed transaction and the outputs of the transaction
+	// itself.
+	neededSet := make(map[chainhash.Hash]struct{})
+
+	if tx.IsCoinBase() {
+		return nil, nil
+	}
+
+	if !tx.IsCoinBase() {
+		for _, txIn := range tx.MsgTx().TxIns {
+			neededSet[txIn.PreviousOutPointRing.Hash()] = struct{}{}
+		}
+	}
+
+	// Request the utxos from the point of view of the end of the main
+	// chain.
+	view := NewUtxoRingViewpoint()
+	b.chainLock.RLock()
+	err := view.fetchUtxoRingsMain(b.db, neededSet)
+	b.chainLock.RUnlock()
+	return view, err
+}
+
 // connectTransaction updates the view by adding all new utxos created by the
 // passed transaction and marking all utxos that the transactions spend as
 // spent.  In addition, when the 'stxos' argument is not nil, it will be updated

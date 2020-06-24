@@ -172,8 +172,7 @@ type config struct {
 	oniondial            func(string, string, time.Duration) (net.Conn, error)
 	dial                 func(string, string, time.Duration) (net.Conn, error)
 	addCheckpoints       []chaincfg.Checkpoint
-	miningAddr           abeutil.Address //	todo(ABE): once miningMasterAddr ready, this is replaced
-	miningMasterAddr     abeutil.MasterAddress
+	miningAddr           abeutil.MasterAddress
 	minRelayTxFee        abeutil.Amount
 	whitelists           []*net.IPNet
 }

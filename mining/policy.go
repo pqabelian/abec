@@ -177,17 +177,23 @@ func CalcPriorityAbe(tx *wire.MsgTxAbe, utxoRingView *blockchain.UtxoRingViewpoi
 	// <33 byte compresed pubkey> + OP_CHECKSIG}]
 	//
 	// Thus 1 + 73 + 1 + 1 + 33 + 1 = 110
-	overhead := 0
-	for _, txIn := range tx.TxIns {
-		// Max inputs + size can't possibly overflow here.
-		overhead += txIn.SerializeSize()
-	}
 
-	serializedTxSize := tx.SerializeSizeContent()
-	if overhead >= serializedTxSize {
-		return 0.0
-	}
+	//	todo(ABE, remove): we do not think the number of UtxoRings is a good incenive.
+	/*	overhead := 0
+		for _, txIn := range tx.TxIns {
+			// Max inputs + size can't possibly overflow here.
+			overhead += txIn.SerializeSize()
+		}
+
+		serializedTxSize := tx.SerializeSizeContent()
+		if overhead >= serializedTxSize {
+			return 0.0
+		}
+
+		inputValueAge := calcInputValueAgeAbe(tx, utxoRingView, nextBlockHeight)
+		return inputValueAge / float64(serializedTxSize-overhead)*/
 
 	inputValueAge := calcInputValueAgeAbe(tx, utxoRingView, nextBlockHeight)
-	return inputValueAge / float64(serializedTxSize-overhead)
+
+	return inputValueAge
 }

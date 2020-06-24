@@ -51,13 +51,9 @@ type Config struct {
 	// generate block templates that the miner will attempt to solve.
 	BlockTemplateGenerator *mining.BlkTmplGenerator
 
-	// MiningAddrs is a list of payment addresses to use for the generated
-	// blocks.  Each generated block will randomly choose one of them.
 	// MiningAddr is a master addresses to use for the generated blocks.
 	// Each generated block will use derived address from the master address.
-	//	todo (ABE): remove one
-	MiningAddr       abeutil.Address
-	MiningMasterAddr abeutil.MasterAddress
+	MiningAddr abeutil.MasterAddress
 
 	// ProcessBlock defines the function to call with any solved blocks.
 	// It typically must run the provided block through the same set of
@@ -337,7 +333,7 @@ out:
 		}
 
 		// Choose a payment address at random.
-		masterAddr := m.cfg.MiningMasterAddr
+		masterAddr := m.cfg.MiningAddr
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially

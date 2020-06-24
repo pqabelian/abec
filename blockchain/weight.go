@@ -23,7 +23,8 @@ const (
 
 	// MaxBlockBaseSize is the maximum number of bytes within a block
 	// which can be allocated to non-witness data.
-	MaxBlockBaseSize = 1000000
+	//	MaxBlockBaseSize = 1000000
+	MaxBlockBaseSize = 8000000
 
 	// MaxBlockSigOpsCost is the maximum number of signature operations
 	// allowed for a block. It is calculated via a weighted algorithm which
@@ -84,6 +85,7 @@ func GetTransactionWeight(tx *abeutil.Tx) int64 {
 	return int64((baseSize * (WitnessScaleFactor - 1)) + totalSize)
 }
 
+//	todo(ABE): the caller mya convert the result to int32, why not return 'int32' directly?
 func GetTransactionWeightAbe(tx *abeutil.TxAbe) int64 {
 	msgTx := tx.MsgTx()
 

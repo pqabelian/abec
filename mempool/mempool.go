@@ -729,6 +729,7 @@ func (mp *TxPool) checkPoolDoubleSpend(tx *abeutil.Tx) (bool, error) {
 func (mp *TxPool) checkPoolDoubleSpendAbe(tx *abeutil.TxAbe) (bool, error) {
 	var isReplacement bool
 	for _, txIn := range tx.MsgTx().TxIns {
+		//	todo(ABE): not accurate, should use ring + sn
 		conflict, ok := mp.txIns[txIn.Hash()]
 		if !ok {
 			continue
@@ -1076,7 +1077,7 @@ func (mp *TxPool) fetchInputUtxos(tx *abeutil.Tx) (*blockchain.UtxoViewpoint, er
 		if entry != nil && !entry.IsSpent() {
 			continue
 		}
-
+		//	todo(by ABE): the above checks the utxo from datbase/mainchain, while the above collects from mempool
 		if poolTxDesc, exists := mp.pool[prevOut.Hash]; exists {
 			// AddTxOut ignores out of range index values, so it is
 			// safe to call without bounds checking here.
@@ -1358,7 +1359,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *abeutil.Tx, isNew, rateLimit, rejec
 			return nil, nil, txRuleError(wire.RejectNonstandard, str)
 		}
 	}
-	 // when the tx exist in mempool or is one orphan but the config is rejecting orphan, this tx will be rejected
+	// when the tx exist in mempool or is one orphan but the config is rejecting orphan, this tx will be rejected
 	// Don't accept the transaction if it already exists in the pool.  This
 	// applies to orphan transactions as well when the reject duplicate
 	// orphans flag is set.  This check is intended to be a quick check to
@@ -1444,8 +1445,9 @@ func (mp *TxPool) maybeAcceptTransaction(tx *abeutil.Tx, isNew, rateLimit, rejec
 
 	// Don't allow the transaction if it exists in the main chain and is not
 	// not already fully spent.
-	// Abe to do: check the txouts of this transaction, it is weird
+	// todo(Abe): check the txouts of this transaction, to prevent duplicate transaction overwrite the existing txos
 	//	because there are duplicate hash of transactions?
+	//	in ABE, even there are duplicate hash of transactions, it does not matter, as the UtxoRings depends not only transactions
 	prevOut := wire.OutPoint{Hash: *txHash}
 	for txOutIdx := range tx.MsgTx().TxOut {
 		prevOut.Index = uint32(txOutIdx)
@@ -2349,6 +2351,20 @@ func (mp *TxPool) MiningDescs() []*mining.TxDesc {
 	i := 0
 	for _, desc := range mp.pool {
 		descs[i] = &desc.TxDesc
+		i++
+	}
+	mp.mtx.RUnlock()
+
+	return descs
+}
+
+//	todo(ABE):
+func (mp *TxPool) MiningDescsAbe() []*mining.TxDescAbe {
+	mp.mtx.RLock()
+	descs := make([]*mining.TxDescAbe, len(mp.poolAbe))
+	i := 0
+	for _, desc := range mp.poolAbe {
+		descs[i] = &desc.TxDescAbe
 		i++
 	}
 	mp.mtx.RUnlock()
