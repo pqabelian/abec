@@ -38,22 +38,6 @@ const (
 	minTxPayloadAbe = 4 + 1 + TxRingSize*(chainhash.HashSize+1) + 1 + chainhash.HashSize + chainhash.HashSize
 )
 
-// MessageEncoding represents the wire message encoding format to be used.
-type TxSerializeType uint8
-
-const (
-	// BaseEncoding encodes all messages in the default format specified
-	// for the Bitcoin wire protocol.
-	TxSeralizeContent TxSerializeType = 1 << iota
-
-	// WitnessEncoding encodes all messages other than transaction messages
-	// using the default Bitcoin wire protocol specification. For transaction
-	// messages, the new encoding format detailed in BIP0144 will be used.
-	/*	TxSeralizePersistent
-		TxSeralizeWithTxo*/
-	TxSeralizeFull
-)
-
 type TxOutAbe struct {
 	//	Version 		int16	//	the version could be used in ABE protocol update
 	ValueScript   int64
@@ -416,7 +400,7 @@ func writeTxInAbe(w io.Writer, pver uint32, version int32, txIn *TxInAbe) error 
 		}
 	}
 
-	err = WriteVarInt(w, pver, uint64(len(txIn.PreviousOutPointRing.OutPoints)))
+	err = WriteVarInt(w, 0, uint64(len(txIn.PreviousOutPointRing.OutPoints)))
 	for _, outPoint := range txIn.PreviousOutPointRing.OutPoints {
 		_, err = w.Write(outPoint.TxHash[:])
 		if err != nil {
@@ -633,6 +617,7 @@ func (txWitness TxWitnessAbe) Deserialize(r io.Reader) error {
 //				(TxHash0, index0): any thing
 //				...
 //				limited by TxRingSize
+//	TxFee = 0
 //	todo: For coinbase transaction, there is an additional function that returns the bytes in [blockhashs[2]] and later OutPoints
 
 type MsgTxAbe struct {
@@ -641,6 +626,7 @@ type MsgTxAbe struct {
 	//	TxOutHashs []*chainhash.Hash
 	TxOuts []*TxOutAbe
 	//	txWitnessHash chainhash.Hash
+	TxFee     int64
 	TxWitness *TxWitnessAbe // Each Tx has one witness, consisting all necessary information, for example, signatures for inputs, range proofs for outputs, balance between inputs and outputs
 }
 
@@ -751,6 +737,12 @@ func (msg *MsgTxAbe) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) er
 		}
 	}
 
+	//	TxFee
+	err = WriteVarInt(w, 0, uint64(msg.TxFee))
+	if err != nil {
+		return err
+	}
+
 	// witness details
 	err = writeTxWitnessAbe(w, 0, msg.Version, msg.TxWitness)
 	if err != nil {
@@ -835,6 +827,13 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 		}
 	}
 
+	//	TxFee
+	txFee, err := ReadVarInt(r, pver)
+	if err != nil {
+		return err
+	}
+	msg.TxFee = int64(txFee)
+
 	//	witness details
 	txWitness := TxWitnessAbe{}
 	err = readTxWitnessAbe(r, pver, msg.Version, &txWitness)
@@ -865,7 +864,7 @@ func (msg *MsgTxAbe) TxHash() chainhash.Hash {
 	// Ignore the error returns since the only way the encode could fail
 	// is being out of memory or due to nil pointers, both of which would
 	// cause a run-time panic.
-	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSizeContent()))
+	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSize()))
 	_ = msg.Serialize(buf)
 	return chainhash.DoubleHashH(buf.Bytes())
 }
@@ -891,7 +890,7 @@ func (msg *MsgTxAbe) TxHashFull() chainhash.Hash {
 // encoded transaction is the same in both instances, but there is a distinct
 // difference and separating the two allows the API to be flexible enough to
 // deal with changes.
-func (msg *MsgTxAbe) SerializeSizeContent() int {
+func (msg *MsgTxAbe) SerializeSize() int {
 	//	Version 4 bytes
 	n := 4
 
@@ -934,6 +933,9 @@ func (msg *MsgTxAbe) SerializeSizeContent() int {
 		n = n + txOut.SerializeSize()
 	}
 
+	//	TxFee
+	n = n + VarIntSerializeSize(uint64(msg.TxFee))
+
 	return n
 }
 
@@ -974,7 +976,7 @@ func (msg *MsgTxAbe) SerializeSizeFull() int {
 			}
 		}*/
 
-	n := msg.SerializeSizeContent()
+	n := msg.SerializeSize()
 
 	//	Witness Details
 	n = n + msg.TxWitness.SerializeSize()
@@ -1026,6 +1028,12 @@ func (msg *MsgTxAbe) Serialize(w io.Writer) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	//	TxFee
+	err = WriteVarInt(w, 0, uint64(msg.TxFee))
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -1160,6 +1168,13 @@ func (msg *MsgTxAbe) Deserialize(r io.Reader) error {
 		}
 		msg.TxOuts[i] = &txOut
 	}
+
+	//	TxFee
+	txFee, err := ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	msg.TxFee = int64(txFee)
 
 	/*	// witness details
 		txWitness := TxWitnessAbe{}
