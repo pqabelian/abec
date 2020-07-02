@@ -18,6 +18,9 @@ const (
 	// according to the current default policy.
 	maxStandardTxWeight = 400000
 
+	// todo(ABE):
+	maxStandardTxSizeFull = 200000 // This is for salrs, and will change for PQRCT
+
 	// maxStandardSigScriptSize is the maximum size allowed for a
 	// transaction input signature script to be considered standard.  This
 	// value allows for a 15-of-15 CHECKMULTISIG pay-to-script-hash with
@@ -419,9 +422,7 @@ func checkTransactionStandard(tx *abeutil.Tx, height int32,
 	return nil
 }
 
-func checkTransactionStandardAbe(tx *abeutil.TxAbe, height int32,
-	medianTimePast time.Time, minRelayTxFee abeutil.Amount,
-	maxTxVersion int32) error {
+func checkTransactionStandardAbe(tx *abeutil.TxAbe, maxTxVersion int32) error {
 
 	// The transaction must be a currently supported version.
 	msgTx := tx.MsgTx()
@@ -432,87 +433,17 @@ func checkTransactionStandardAbe(tx *abeutil.TxAbe, height int32,
 		return txRuleError(wire.RejectNonstandard, str)
 	}
 
-	// The transaction must be finalized to be standard and therefore
-	// considered for inclusion in a block.
-	if !blockchain.IsFinalizedTransactionAbe(tx, height, medianTimePast) {
-		return txRuleError(wire.RejectNonstandard,
-			"transaction is not finalized")
+	//	The witness data will not be stored in block,
+	//	but will be stored in local database before the transaction is confirmed safely by the consensus chain.
+	//	Also propagating and storing extremely large transactions are also resource-consuming.
+	//	In ABE, as the TxSizeWithWitness is roughly proportional to the TxSize,
+	//	ABE does not use the concept of TxWeight or BlockWeight, instead, directly use TxSize and BlockSize.
+	txSizeFull := tx.MsgTx().SerializeSizeFull()
+	if txSizeFull > maxStandardTxSizeFull {
+		str := fmt.Sprintf("full size of transaction %v is larger than max "+
+			"allowed size of %v", txSizeFull, maxStandardTxSizeFull)
+		return txRuleError(wire.RejectNonstandard, str)
 	}
-
-	//  At this moment, ABE does not check the transactionweight
-	//  As we will limit the max number of inputs and outputs
-	/*	// Since extremely large transactions with a lot of inputs can cost
-		// almost as much to process as the sender fees, limit the maximum
-		// size of a transaction.  This also helps mitigate CPU exhaustion
-		// attacks.
-		txWeight := blockchain.GetTransactionWeightAbe(tx)
-		if txWeight > maxStandardTxWeight {
-			str := fmt.Sprintf("weight of transaction %v is larger than max "+
-				"allowed weight of %v", txWeight, maxStandardTxWeight)
-			return txRuleError(wire.RejectNonstandard, str)
-		}
-	*/
-
-	// At this moment, ABE does not support script, just fixed rules
-	/*	for i, txIn := range msgTx.TxIn {
-		// Each transaction input signature script must not exceed the
-		// maximum size allowed for a standard transaction.  See
-		// the comment on maxStandardSigScriptSize for more details.
-		sigScriptLen := len(txIn.SignatureScript)
-		if sigScriptLen > maxStandardSigScriptSize {
-			str := fmt.Sprintf("transaction input %d: signature "+
-				"script size of %d bytes is large than max "+
-				"allowed size of %d bytes", i, sigScriptLen,
-				maxStandardSigScriptSize)
-			return txRuleError(wire.RejectNonstandard, str)
-		}
-
-		// Each transaction input signature script must only contain
-		// opcodes which push data onto the stack.
-		if !txscript.IsPushOnlyScript(txIn.SignatureScript) {
-			str := fmt.Sprintf("transaction input %d: signature "+
-				"script is not push only", i)
-			return txRuleError(wire.RejectNonstandard, str)
-		}
-	}*/
-
-	// For ABE, the value is hidden in commitment, cannot find whether it is dust txo
-	// None of the output public key scripts can be a non-standard script or
-	// be "dust" (except when the script is a null data script).
-	/*	numNullDataOutputs := 0
-		for i, txOut := range msgTx.TxOut {
-			scriptClass := txscript.GetScriptClass(txOut.PkScript)
-			err := checkPkScriptStandard(txOut.PkScript, scriptClass)
-			if err != nil {
-				// Attempt to extract a reject code from the error so
-				// it can be retained.  When not possible, fall back to
-				// a non standard error.
-				rejectCode := wire.RejectNonstandard
-				if rejCode, found := extractRejectCode(err); found {
-					rejectCode = rejCode
-				}
-				str := fmt.Sprintf("transaction output %d: %v", i, err)
-				return txRuleError(rejectCode, str)
-			}
-
-			// Accumulate the number of outputs which only carry data.  For
-			// all other script types, ensure the output value is not
-			// "dust".
-			if scriptClass == txscript.NullDataTy {
-				numNullDataOutputs++
-			} else if isDust(txOut, minRelayTxFee) {
-				str := fmt.Sprintf("transaction output %d: payment "+
-					"of %d is dust", i, txOut.Value)
-				return txRuleError(wire.RejectDust, str)
-			}
-		}
-
-		// A standard transaction must not have more than one output script that
-		// only carries data.
-		if numNullDataOutputs > 1 {
-			str := "more than one transaction output in a nulldata script"
-			return txRuleError(wire.RejectNonstandard, str)
-		}*/
 
 	return nil
 }

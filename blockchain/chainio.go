@@ -63,9 +63,9 @@ var (
 	// unspent transaction output set.
 	utxoSetBucketName = []byte("utxosetv2")
 
-	// utxoSetBucketName is the name of the db bucket used to house the
-	// unspent transaction output set.
-	//	Abe to do
+	// utxoRIngSetBucketName is the name of the db bucket used to house the
+	// unspent transaction output ring set.
+	//	todo(ABE):
 	utxoRingSetBucketName = []byte("utxoringset")
 
 	// byteOrder is the preferred byte order used for serializing numeric
@@ -879,7 +879,7 @@ func deserializeUtxoEntry(serialized []byte) (*UtxoEntry, error) {
 	return entry, nil
 }
 
-//	Abe to do
+//	todo(ABE):
 func deserializeUtxoRingEntry(serialized []byte) (*UtxoRingEntry, error) {
 
 	entry := UtxoRingEntry{}
@@ -969,7 +969,7 @@ func dbFetchUtxoEntry(dbTx database.Tx, outpoint wire.OutPoint) (*UtxoEntry, err
 	return entry, nil
 }
 
-//	Abe to do
+//	todo(ABE):
 func dbFetchUtxoRingEntry(dbTx database.Tx, outPointRingHash chainhash.Hash) (*UtxoRingEntry, error) {
 	// Fetch the unspent transaction output information for the passed
 	// transaction output.  Return now when there is no entry.

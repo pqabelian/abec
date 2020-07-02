@@ -214,6 +214,30 @@ func (ef *FeeEstimator) ObserveTransaction(t *TxDesc) {
 	}
 }
 
+// ObserveTransaction is called when a new transaction is observed in the mempool.
+func (ef *FeeEstimator) ObserveTransactionAbe(t *TxDescAbe) {
+	ef.mtx.Lock()
+	defer ef.mtx.Unlock()
+
+	// If we haven't seen a block yet we don't know when this one arrived,
+	// so we ignore it.
+	if ef.lastKnownHeight == mining.UnminedHeight {
+		return
+	}
+
+	hash := *t.Tx.Hash()
+	if _, ok := ef.observed[hash]; !ok {
+		size := uint32(GetTxVirtualSizeAbe(t.Tx))
+
+		ef.observed[hash] = &observedTransaction{
+			hash:     hash,
+			feeRate:  NewSatoshiPerByte(abeutil.Amount(t.Fee), size),
+			observed: t.Height,
+			mined:    mining.UnminedHeight,
+		}
+	}
+}
+
 // RegisterBlock informs the fee estimator of a new block to take into account.
 func (ef *FeeEstimator) RegisterBlock(block *abeutil.Block) error {
 	ef.mtx.Lock()

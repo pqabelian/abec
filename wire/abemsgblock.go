@@ -23,7 +23,7 @@ const MaxBlockPayloadAbe = 8000000
 
 // maxTxPerBlock is the maximum number of transactions that could
 // possibly fit into a block.
-const maxTxPerBlockAbe = (MaxBlockPayloadAbe / minTxPayloadAbe) + 1
+const maxTxPerBlockAbe = (MaxBlockPayloadAbe / TxPayloadMinSize) + 1
 
 // TxLoc holds locator data for the offset and length of where a transaction is
 // located within a MsgBlock data buffer.
@@ -245,7 +245,7 @@ func (msg *MsgBlockAbe) SerializeSize() int {
 	n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
 
 	for _, tx := range msg.Transactions {
-		n += tx.SerializeSizeContent() // to do, may remove the serializeType
+		n += tx.SerializeSize() // to do, may remove the serializeType
 	}
 
 	return n

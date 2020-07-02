@@ -101,15 +101,15 @@ const (
 	// valid transaction must have at least one output.
 	ErrNoTxOutputs
 
-	// Abe does
-	// ErrNoTxInputs indicates a transaction does not have any inputs.  A
-	// valid transaction must have at least one input.
+	// todo(Abe)
+	// ErrTooManyTxInputs indicates a transaction has more inputs than allowed.
 	ErrTooManyTxInputs
 
-	// ErrNoTxOutputs indicates a transaction does not have any outputs.  A
-	// valid transaction must have at least one output.
+	// ErrTooManyTxInputs indicates a transaction has more outputs than allowed.
 	ErrTooManyTxOutputs
-	// Abe does
+
+	// ErrBadTxFee indicates a transaction's fee is invalid in some way such as being out of range.
+	ErrBadTxFeeValue
 
 	// ErrTxTooBig indicates a transaction exceeds the maximum allowed size
 	// when serialized.

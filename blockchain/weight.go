@@ -89,7 +89,7 @@ func GetTransactionWeight(tx *abeutil.Tx) int64 {
 func GetTransactionWeightAbe(tx *abeutil.TxAbe) int64 {
 	msgTx := tx.MsgTx()
 
-	baseSize := msgTx.SerializeSizeContent()
+	baseSize := msgTx.SerializeSize()
 
 	return int64(baseSize)
 

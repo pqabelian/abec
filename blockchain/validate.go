@@ -110,7 +110,7 @@ func IsCoinBase(tx *abeutil.Tx) bool {
 }
 
 func IsCoinBaseAbe(tx *abeutil.TxAbe) bool {
-	return tx.MsgTx().IsCoinBaseTx()
+	return tx.MsgTx().IsCoinBase()
 }
 
 // SequenceLockActive determines if a transaction's sequence locks have been
@@ -333,6 +333,7 @@ func CheckTransactionSanity(tx *abeutil.Tx) error {
 	return nil
 }
 
+//	todo(ABE): done
 // CheckTransactionSanity performs some preliminary checks on a transaction to
 // ensure it is sane.  These checks are context free.
 func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
@@ -358,86 +359,77 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		return ruleError(ErrTooManyTxOutputs, str)
 	}
 
-	/*	// A transaction must not exceed the maximum allowed block payload when
-		// serialized.
-		serializedTxSize := tx.MsgTx().SerializeSize(wire.TxSeralizeContent)
-		if serializedTxSize > MaxBlockBaseSize {
-			str := fmt.Sprintf("serialized transaction is too big - got "+
-				"%d, max %d", serializedTxSize, MaxBlockBaseSize)
-			return ruleError(ErrTxTooBig, str)
-		}*/
+	if msgTx.TxFee < 0 {
+		str := fmt.Sprintf("transaction output has negative value of %v", msgTx.TxFee)
+		return ruleError(ErrBadTxFeeValue, str)
+	}
+	if msgTx.TxFee > abeutil.MaxNeutrino {
+		str := fmt.Sprintf("transaction fee of %v is higher than max allowed value of %v", msgTx.TxFee, abeutil.MaxSatoshi)
+		return ruleError(ErrBadTxFeeValue, str)
+	}
 
-	//	Abe to do
-	// Ensure the transaction amounts are in range.  Each transaction
-	// output must not be negative or more than the max allowed per
-	// transaction.  Also, the total of all outputs must abide by the same
-	// restrictions.  All amounts in a transaction are in a unit value known
-	// as a satoshi.  One bitcoin is a quantity of satoshi as defined by the
-	// SatoshiPerBitcoin constant.
-	/*	var totalSatoshi int64
-		for _, txOut := range msgTx.TxOut {
-			satoshi := txOut.Value
-			if satoshi < 0 {
-				str := fmt.Sprintf("transaction output has negative "+
-					"value of %v", satoshi)
-				return ruleError(ErrBadTxOutValue, str)
-			}
-			if satoshi > abeutil.MaxSatoshi {
-				str := fmt.Sprintf("transaction output value of %v is "+
-					"higher than max allowed value of %v", satoshi,
-					abeutil.MaxSatoshi)
-				return ruleError(ErrBadTxOutValue, str)
-			}
+	// A transaction must not exceed the maximum allowed block payload when serialized.
+	serializedTxSize := tx.MsgTx().SerializeSize()
+	if serializedTxSize > MaxBlockBaseSize {
+		str := fmt.Sprintf("serialized transaction is too big - got "+
+			"%d, max %d", serializedTxSize, MaxBlockBaseSize)
+		return ruleError(ErrTxTooBig, str)
+	}
 
-			// Two's complement int64 overflow guarantees that any overflow
-			// is detected and reported.  This is impossible for Bitcoin, but
-			// perhaps possible if an alt increases the total money supply.
-			totalSatoshi += satoshi
-			if totalSatoshi < 0 {
-				str := fmt.Sprintf("total value of all transaction "+
-					"outputs exceeds max allowed value of %v",
-					abeutil.MaxSatoshi)
-				return ruleError(ErrBadTxOutValue, str)
-			}
-			if totalSatoshi > abeutil.MaxSatoshi {
-				str := fmt.Sprintf("total value of all transaction "+
-					"outputs is %v which is higher than max "+
-					"allowed value of %v", totalSatoshi,
-					abeutil.MaxSatoshi)
-				return ruleError(ErrBadTxOutValue, str)
-			}
-		}*/
-
-	/*	// Check for duplicate transaction inputs.
-		existingTxOut := make(map[wire.OutPoint]struct{})
-		for _, txIn := range msgTx.TxIn {
-			if _, exists := existingTxOut[txIn.PreviousOutPoint]; exists {
-				return ruleError(ErrDuplicateTxInputs, "transaction "+
-					"contains duplicate inputs")
-			}
-			existingTxOut[txIn.PreviousOutPoint] = struct{}{}
+	if IsCoinBaseAbe(tx) {
+		previousOutPointRing := msgTx.TxIns[0].PreviousOutPointRing
+		if previousOutPointRing == nil {
+			return ruleError(ErrBadTxInput, "Coinbase Transaction refers to an OutPointRing that is null")
 		}
-	*/
-	// Coinbase script length must be between min and max length.
-	/*	if IsCoinBase(tx) {
-			slen := len(msgTx.TxIn[0].SignatureScript)
-			if slen < MinCoinbaseScriptLen || slen > MaxCoinbaseScriptLen {
-				str := fmt.Sprintf("coinbase transaction script length "+
-					"of %d is out of range (min: %d, max: %d)",
-					slen, MinCoinbaseScriptLen, MaxCoinbaseScriptLen)
-				return ruleError(ErrBadCoinbaseScriptLen, str)
-			}
-		} else {
-			// Previous transaction outputs referenced by the inputs to this
-			// transaction must not be null.
-			for _, txIn := range msgTx.TxIn {
-				if isNullOutpoint(&txIn.PreviousOutPoint) {
-					return ruleError(ErrBadTxInput, "transaction "+
-						"input refers to previous output that "+
-						"is null")
-				}
-			}
-		}*/
+		blkHashNum := len(previousOutPointRing.BlockHashs)
+		if blkHashNum != wire.BlockNumPerRingGroup {
+			str := fmt.Sprintf("Coinbase Transaction refers to an OutPointRing with block-hash-number "+
+				"%d, should be %d", blkHashNum, wire.BlockNumPerRingGroup)
+			return ruleError(ErrBadTxInput, str)
+		}
+
+		ringSize := len(previousOutPointRing.OutPoints)
+		if ringSize > wire.TxRingSize {
+			str := fmt.Sprintf("Coinbase Transaction refers to an OutPointRing with ring-size too big: "+
+				"%d, max %d", ringSize, wire.TxRingSize)
+			return ruleError(ErrBadTxInput, str)
+		}
+
+		return nil
+	}
+
+	// Check for duplicate transaction inputs.
+	consumedOutPoints := make(map[chainhash.Hash]map[chainhash.Hash]struct{})
+	for i, txIn := range msgTx.TxIns {
+		if txIn.SerialNumber == chainhash.ZeroHash {
+			return ruleError(ErrBadTxInput, "transaction input refers to a serial number that is null")
+		}
+
+		blkHashNum := len(txIn.PreviousOutPointRing.BlockHashs)
+		if blkHashNum != wire.BlockNumPerRingGroup {
+			str := fmt.Sprintf("transaction's %d -th input refers to an OutPointRing with block-hash-number "+
+				"%d, should be %d", i, blkHashNum, wire.BlockNumPerRingGroup)
+			return ruleError(ErrBadTxInput, str)
+		}
+
+		ringSize := len(txIn.PreviousOutPointRing.OutPoints)
+		if ringSize > wire.TxRingSize {
+			str := fmt.Sprintf("transaction's %d -th input refers to an OutPointRing with ring-size too big: "+
+				"%d, max %d", i, ringSize, wire.TxRingSize)
+			return ruleError(ErrBadTxInput, str)
+		}
+
+		ringHash := txIn.PreviousOutPointRing.Hash()
+		if _, ringExists := consumedOutPoints[ringHash]; !ringExists {
+			consumedOutPoints[ringHash] = make(map[chainhash.Hash]struct{})
+		}
+		if _, snExists := consumedOutPoints[ringHash][txIn.SerialNumber]; snExists {
+			return ruleError(ErrDuplicateTxInputs, "transaction "+
+				"contains duplicate inputs")
+		}
+
+		consumedOutPoints[ringHash][txIn.SerialNumber] = struct{}{}
+	}
 
 	return nil
 }
@@ -1459,33 +1451,22 @@ func CheckTransactionInputs(tx *abeutil.Tx, txHeight int32, utxoView *UtxoViewpo
 }
 
 //	Abe to do
-func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *UtxoRingViewpoint, chainParams *chaincfg.Params) (int64, error) {
+func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
 	// Coinbase transactions have no inputs.
 	if IsCoinBaseAbe(tx) {
-		return 0, nil
+		return nil
 	}
 
-	txHash := tx.Hash()
-	//	var totalSatoshiIn int64
-	totalSatoshiIn := int64(0)
 	for txInIndex, txIn := range tx.MsgTx().TxIns {
 		// Ensure the referenced input transaction is available.
 		utxoRing := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())
-		if utxoRing == nil {
+		if utxoRing == nil || utxoRing.IsSpent(txIn.SerialNumber) {
 			str := fmt.Sprintf("TXO Ring %s referenced from "+
 				"transaction %s:%d either does not exist or "+
 				"has already been spent", txIn.String(),
 				tx.Hash(), txInIndex)
-			return 0, ruleError(ErrMissingTxOut, str)
+			return ruleError(ErrMissingTxOut, str)
 			// Abe to do: update the ErrMissingTxOut to ErrMissingTxOutRing
-		}
-
-		if utxoRing.IsSpent(txIn.SerialNumber) {
-			str := fmt.Sprintf("TXO Ring %s referenced from "+
-				"transaction %s:%d with serialnumber %s"+
-				"has already been spent", txIn.String(),
-				tx.Hash(), txInIndex, txIn.SerialNumber)
-			return 0, ruleError(ErrMissingTxOut, str)
 		}
 
 		// Ensure the transaction is not spending coins which have not
@@ -1501,66 +1482,12 @@ func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *
 					"of %v blocks", txIn.String(),
 					originHeight, txHeight,
 					coinbaseMaturity)
-				return 0, ruleError(ErrImmatureSpend, str)
+				return ruleError(ErrImmatureSpend, str)
 			}
 		}
-
-		// Ensure the transaction amounts are in range.  Each of the
-		// output values of the input transactions must not be negative
-		// or more than the max allowed per transaction.  All amounts in
-		// a transaction are in a unit value known as a satoshi.  One
-		// bitcoin is a quantity of satoshi as defined by the
-		// SatoshiPerBitcoin constant.
-		originTxSatoshi := utxoRing.Amount()
-		if originTxSatoshi < 0 {
-			str := fmt.Sprintf("transaction output has negative "+
-				"value of %v", abeutil.Amount(originTxSatoshi))
-			return 0, ruleError(ErrBadTxOutValue, str)
-		}
-		if originTxSatoshi > abeutil.MaxSatoshi {
-			str := fmt.Sprintf("transaction output value of %v is "+
-				"higher than max allowed value of %v",
-				abeutil.Amount(originTxSatoshi),
-				abeutil.MaxSatoshi)
-			return 0, ruleError(ErrBadTxOutValue, str)
-		}
-
-		// The total of all outputs must not be more than the max
-		// allowed per transaction.  Also, we could potentially overflow
-		// the accumulator so check for overflow.
-		lastSatoshiIn := totalSatoshiIn
-		totalSatoshiIn += originTxSatoshi
-		if totalSatoshiIn < lastSatoshiIn ||
-			totalSatoshiIn > abeutil.MaxSatoshi {
-			str := fmt.Sprintf("total value of all transaction "+
-				"inputs is %v which is higher than max "+
-				"allowed value of %v", totalSatoshiIn,
-				abeutil.MaxSatoshi)
-			return 0, ruleError(ErrBadTxOutValue, str)
-		}
 	}
 
-	// Calculate the total output amount for this transaction.  It is safe
-	// to ignore overflow and out of range errors here because those error
-	// conditions would have already been caught by checkTransactionSanity.
-	var totalSatoshiOut int64
-	for _, txOut := range tx.MsgTx().TxOuts {
-		totalSatoshiOut += txOut.ValueScript
-	}
-
-	// Ensure the transaction does not spend more than its inputs.
-	if totalSatoshiIn < totalSatoshiOut {
-		str := fmt.Sprintf("total value of all transaction inputs for "+
-			"transaction %v is %v which is less than the amount "+
-			"spent of %v", txHash, totalSatoshiIn, totalSatoshiOut)
-		return 0, ruleError(ErrSpendTooHigh, str)
-	}
-
-	// NOTE: bitcoind checks if the transaction fees are < 0 here, but that
-	// is an impossible condition because of the check above that ensures
-	// the inputs are >= the outputs.
-	txFeeInSatoshi := totalSatoshiIn - totalSatoshiOut
-	return txFeeInSatoshi, nil
+	return nil
 }
 
 // checkConnectBlock performs several checks to confirm connecting the passed

@@ -11,8 +11,11 @@ import (
 
 // todo: the AddressScriptMaxLen may depend on the length of derived address and the rules that txscript builds an AddressScript from a derived address
 var AddressScriptMaxLen = uint32(salrs.DpkByteLen + 10)
+var ValueScriptMaxLen = uint32(10) //	todo (ABE): in salrs, it is just a int64; but for latter full version, it will be a commitment
 
 const (
+	BlockNumPerRingGroup = 3
+
 	TxRingSize = 7
 
 	TxInputMaxNum = 5
@@ -35,12 +38,14 @@ const (
 	// + Varint number of transaction outputs 1 byte
 	// + chainhash.HashSize for one output
 	// + commitment hash
-	minTxPayloadAbe = 4 + 1 + TxRingSize*(chainhash.HashSize+1) + 1 + chainhash.HashSize + chainhash.HashSize
+	//	todo(ABE): could be more accurate
+	TxPayloadMaxSize = 30000
+	TxPayloadMinSize = 100
 )
 
 type TxOutAbe struct {
 	//	Version 		int16	//	the version could be used in ABE protocol update
-	ValueScript   int64
+	ValueScript   []byte
 	AddressScript []byte
 }
 
@@ -48,12 +53,11 @@ type TxOutAbe struct {
 // the transaction output.
 func (txOut *TxOutAbe) SerializeSize() int {
 	// Value 8 bytes + serialized varint size for the length of AddressScript + AddressScript bytes.
-	return 8 + VarIntSerializeSize(uint64(len(txOut.AddressScript))) + len(txOut.AddressScript)
+	return VarIntSerializeSize(uint64(len(txOut.ValueScript))) + len(txOut.ValueScript) + VarIntSerializeSize(uint64(len(txOut.AddressScript))) + len(txOut.AddressScript)
 }
 
 func (txOut *TxOutAbe) Serialize(w io.Writer) error {
-
-	err := binarySerializer.PutUint64(w, littleEndian, uint64(txOut.ValueScript))
+	err := WriteVarBytes(w, 0, txOut.ValueScript)
 	if err != nil {
 		return err
 	}
@@ -67,10 +71,11 @@ func (txOut *TxOutAbe) Serialize(w io.Writer) error {
 }
 
 func (txOut *TxOutAbe) Deserialize(r io.Reader) error {
-	err := readElement(r, &txOut.ValueScript)
+	valueScript, err := ReadVarBytes(r, 0, ValueScriptMaxLen, "ValueScript")
 	if err != nil {
 		return err
 	}
+	txOut.ValueScript = valueScript
 
 	addressScript, err := ReadVarBytes(r, 0, AddressScriptMaxLen, "AddressScript")
 	if err != nil {
@@ -91,7 +96,7 @@ func (txOut *TxOutAbe) Deserialize(r io.Reader) error {
 
 // NewTxOut returns a new bitcoin transaction output with the provided
 // transaction value and public key script.
-func NewTxOutAbe(valueScript int64, addressScript []byte) *TxOutAbe {
+func NewTxOutAbe(valueScript []byte, addressScript []byte) *TxOutAbe {
 	return &TxOutAbe{
 		ValueScript:   valueScript,
 		AddressScript: addressScript,
@@ -202,7 +207,7 @@ func (outPointRing *OutPointRing) Deserialize(r io.Reader) error {
 		return err
 	}
 
-	if blockNum != 3 {
+	if blockNum != BlockNumPerRingGroup {
 		return messageError("OutPointRing.Deserialize", "the ring must generated from transactions from 3 blocks")
 	}
 
@@ -467,7 +472,7 @@ func readTxInAbe(r io.Reader, pver uint32, version int32, txIn *TxInAbe) error {
 // writeTxOut encodes ti to the bitcoin protocol encoding for a transaction
 // input (TxIn) to w.
 func writeTxOutAbe(w io.Writer, pver uint32, version int32, txOut *TxOutAbe) error {
-	err := binarySerializer.PutUint64(w, littleEndian, uint64(txOut.ValueScript))
+	err := WriteVarBytes(w, pver, txOut.ValueScript)
 	if err != nil {
 		return err
 	}
@@ -664,7 +669,7 @@ func (msg *MsgTxAbe) HasWitness() bool {
 
 // HasWitness returns false if none of the inputs within the transaction
 // contain witness data, true false otherwise.
-func (msg *MsgTxAbe) IsCoinBaseTx() bool {
+func (msg *MsgTxAbe) IsCoinBase() bool {
 	if len(msg.TxIns) != 1 {
 		return false
 	}

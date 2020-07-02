@@ -32,7 +32,7 @@ func (tx *TxAbe) MsgTx() *wire.MsgTxAbe {
 }
 
 func (tx *TxAbe) IsCoinBase() bool {
-	return tx.msgTx.IsCoinBaseTx()
+	return tx.msgTx.IsCoinBase()
 }
 
 /*// Hash returns the hash of the transaction.  This is equivalent to
