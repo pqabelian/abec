@@ -1883,7 +1883,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// bounds.
 	var totalFees int64
 	for _, tx := range transactions {
-		txFee, err := CheckTransactionInputsAbe(tx, node.height, view,
+		err := CheckTransactionInputsAbe(tx, node.height, view,
 			b.chainParams)
 		if err != nil {
 			return err
@@ -1892,7 +1892,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 		// Sum the total fees and ensure we don't overflow the
 		// accumulator.
 		lastTotalFees := totalFees
-		totalFees += txFee
+		totalFees += tx.MsgTx().TxFee
 		if totalFees < lastTotalFees {
 			return ruleError(ErrBadFees, "total fees for block "+
 				"overflows accumulator")
