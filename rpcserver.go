@@ -875,7 +875,7 @@ func handleEstimateFee(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 func handleGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	// Respond with an error if there are no addresses to pay the
 	// created blocks to.
-	if len(cfg.miningAddrs) == 0 {
+	if cfg.miningAddr == nil {
 		return nil, &abejson.RPCError{
 			Code: abejson.ErrRPCInternal.Code,
 			Message: "No payment addresses specified " +
@@ -1557,7 +1557,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 	// changed or the transactions in the memory pool have been updated and
 	// it has been at least gbtRegenerateSecond since the last template was
 	// generated.
-	var msgBlock *wire.MsgBlock
+	var msgBlock *wire.MsgBlockAbe
 	var targetDifficulty string
 	latestHash := &s.cfg.Chain.BestSnapshot().Hash
 	template := state.template
@@ -1577,7 +1577,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// to create their own coinbase.
 		var payAddr abeutil.MasterAddress
 		if !useCoinbaseValue {
-			payAddr = cfg.miningMasterAddr
+			payAddr = cfg.miningAddr
 		}
 
 		// Create a new block template that has a coinbase which anyone
@@ -1591,7 +1591,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 				"template: "+err.Error(), "")
 		}
 		template = blkTemplate
-		msgBlock = template.Block
+		msgBlock = template.BlockAbe
 		targetDifficulty = fmt.Sprintf("%064x",
 			blockchain.CompactToBig(msgBlock.Header.Bits))
 
@@ -1632,16 +1632,25 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// returned if none have been specified.
 		if !useCoinbaseValue && !template.ValidPayAddress {
 			// Choose a payment address at random.
-			payToAddr := cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))]
+			payToAddr := cfg.miningAddr
 
 			// Update the block coinbase output of the template to
 			// pay to the randomly selected payment address.
-			pkScript, err := txscript.PayToAddrScript(payToAddr)
+			//	todo(ABE): remove
+			/*			pkScript, err := txscript.PayToAddrScript(payToAddr)
+						if err != nil {
+							context := "Failed to create pay-to-addr script"
+							return internalRPCError(err.Error(), context)
+						}
+						template.Block.Transactions[0].TxOut[0].PkScript = pkScript
+						template.ValidPayAddress = true*/
+
+			addressScript, err := txscript.PayToAddrScriptAbe(payToAddr)
 			if err != nil {
-				context := "Failed to create pay-to-addr script"
+				context := "Failed to create addressScript"
 				return internalRPCError(err.Error(), context)
 			}
-			template.Block.Transactions[0].TxOut[0].PkScript = pkScript
+			template.BlockAbe.Transactions[0].TxOuts[0].AddressScript = addressScript
 			template.ValidPayAddress = true
 
 			// Update the merkle root.
@@ -1651,14 +1660,14 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		}
 
 		// Set locals for convenience.
-		msgBlock = template.Block
+		msgBlock = template.BlockAbe
 		targetDifficulty = fmt.Sprintf("%064x",
 			blockchain.CompactToBig(msgBlock.Header.Bits))
 
 		// Update the time of the block template to the current time
 		// while accounting for the median time of the past several
 		// blocks per the chain consensus rules.
-		generator.UpdateBlockTime(msgBlock)
+		generator.UpdateBlockTimeAbe(msgBlock)
 		msgBlock.Header.Nonce = 0
 
 		rpcsLog.Debugf("Updated block template (timestamp %v, "+
@@ -1940,7 +1949,7 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 
 	// When a coinbase transaction has been requested, respond with an error
 	// if there are no addresses to pay the created block template to.
-	if !useCoinbaseValue && len(cfg.miningAddrs) == 0 {
+	if !useCoinbaseValue && cfg.miningAddr == nil {
 		return nil, &abejson.RPCError{
 			Code: abejson.ErrRPCInternal.Code,
 			Message: "A coinbase transaction has been requested, " +
@@ -3434,7 +3443,7 @@ func handleSetGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	} else {
 		// Respond with an error if there are no addresses to pay the
 		// created blocks to.
-		if len(cfg.miningAddrs) == 0 {
+		if cfg.miningAddr == nil {
 			return nil, &abejson.RPCError{
 				Code: abejson.ErrRPCInternal.Code,
 				Message: "No payment addresses specified " +
@@ -3758,16 +3767,15 @@ func (s *rpcServer) NotifyNewTransactions(txns []*mempool.TxDesc) {
 	}
 }
 
-//	Abe to do
-func (s *rpcServer) NotifyNewTransactionsAbe(txns []*mempool.TxDescAbe) {
-	for _, txD := range txns {
-		// Notify websocket clients about mempool transactions.
-		s.ntfnMgr.NotifyMempoolTxAbe(txD.Tx, true)
+//	todo(ABE):
+func (s *rpcServer) NotifyNewTransactionsAbe(txn *mempool.TxDescAbe) {
+	// Notify websocket clients about mempool transactions.
+	s.ntfnMgr.NotifyMempoolTxAbe(txn.Tx, true)
 
-		// Potentially notify any getblocktemplate long poll clients
-		// about stale block templates due to the new transaction.
-		s.gbtWorkState.NotifyMempoolTx(s.cfg.TxMemPool.LastUpdated())
-	}
+	// Potentially notify any getblocktemplate long poll clients
+	// about stale block templates due to the new transaction.
+	s.gbtWorkState.NotifyMempoolTx(s.cfg.TxMemPool.LastUpdated())
+
 }
 
 // limitConnections responds with a 503 service unavailable and returns true if

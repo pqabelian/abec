@@ -16,6 +16,8 @@ import (
 type PeerNotifier interface {
 	AnnounceNewTransactions(newTxs []*mempool.TxDesc)
 
+	AnnounceNewTransactionAbe(newTx *mempool.TxDescAbe)
+
 	UpdatePeerHeights(latestBlkHash *chainhash.Hash, latestHeight int32, updateSource *peer.Peer)
 
 	RelayInventory(invVect *wire.InvVect, data interface{})

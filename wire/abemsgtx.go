@@ -2,6 +2,7 @@ package wire
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"github.com/abesuite/abec/abecrypto/salrs"
 	"github.com/abesuite/abec/chainhash"
@@ -1220,6 +1221,39 @@ func NewMsgTxAbe(version int32) *MsgTxAbe {
 		TxIns:   make([]*TxInAbe, 0, defaultTxInputAlloc),
 		TxOuts:  make([]*TxOutAbe, 0, defaultTxInOutAlloc),
 	}
+}
+
+func NewStandardCoinbaseTxIn(nextBlockHeight int32, extraNonce uint64) *TxInAbe {
+	txIn := TxInAbe{}
+	txIn.SerialNumber = chainhash.ZeroHash
+
+	previousOutPointRing := OutPointRing{}
+	previousOutPointRing.BlockHashs = make([]*chainhash.Hash, 3)
+	hash0 := chainhash.Hash{}
+	binary.BigEndian.PutUint32(hash0[0:4], uint32(nextBlockHeight))
+	hash1 := chainhash.Hash{}
+	binary.BigEndian.PutUint64(hash1[0:8], extraNonce)
+	hash2 := chainhash.ZeroHash
+	previousOutPointRing.BlockHashs[0] = &hash0
+	previousOutPointRing.BlockHashs[1] = &hash1
+	previousOutPointRing.BlockHashs[2] = &hash2
+
+	previousOutPointRing.OutPoints = make([]*OutPointAbe, 1)
+	outPointAbe := OutPointAbe{}
+	outPointAbe.TxHash = chainhash.ZeroHash
+	outPointAbe.Index = 0
+	previousOutPointRing.OutPoints[0] = &outPointAbe
+
+	txIn.PreviousOutPointRing = &previousOutPointRing
+
+	return &txIn
+}
+
+//	the caller must have checked the format of the coinbaseTxMsg
+func ExtractCoinbaseHeight(coinbaseTx *MsgTxAbe) int32 {
+	blockhash0 := coinbaseTx.TxIns[0].PreviousOutPointRing.BlockHashs[0]
+	blockHeight := int32(binary.BigEndian.Uint32(blockhash0[0:4]))
+	return blockHeight
 }
 
 // In summary, contains multiple hash-pointers for its TXOS, each for one TXO.

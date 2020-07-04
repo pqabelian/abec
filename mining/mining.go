@@ -2,7 +2,6 @@ package mining
 
 import (
 	"container/heap"
-	"encoding/binary"
 	"fmt"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
@@ -310,7 +309,8 @@ type BlockTemplate struct {
 	// Block is a block that is ready to be solved by miners.  Thus, it is
 	// completely valid with the exception of satisfying the proof-of-work
 	// requirement.
-	Block *wire.MsgBlock
+	Block    *wire.MsgBlock
+	BlockAbe *wire.MsgBlockAbe
 
 	// Fees contains the amount of fees each transaction in the generated
 	// template pays in base units.  Since the first transaction is the
@@ -364,32 +364,6 @@ func standardCoinbaseScript(nextBlockHeight int32, extraNonce uint64) ([]byte, e
 		Script()
 }
 
-func standardCoinbaseTxIn(nextBlockHeight int32, extraNonce uint64) (*wire.TxInAbe, error) {
-	txIn := wire.TxInAbe{}
-	txIn.SerialNumber = chainhash.ZeroHash
-
-	previousOutPointRing := wire.OutPointRing{}
-	previousOutPointRing.BlockHashs = make([]*chainhash.Hash, 3)
-	hash0 := chainhash.Hash{}
-	binary.BigEndian.PutUint32(hash0[0:4], uint32(nextBlockHeight))
-	hash1 := chainhash.Hash{}
-	binary.BigEndian.PutUint64(hash1[0:8], extraNonce)
-	hash2 := chainhash.ZeroHash
-	previousOutPointRing.BlockHashs[0] = &hash0
-	previousOutPointRing.BlockHashs[1] = &hash1
-	previousOutPointRing.BlockHashs[2] = &hash2
-
-	previousOutPointRing.OutPoints = make([]*wire.OutPointAbe, 1)
-	outPointAbe := wire.OutPointAbe{}
-	outPointAbe.TxHash = chainhash.ZeroHash
-	outPointAbe.Index = 0
-	previousOutPointRing.OutPoints[0] = &outPointAbe
-
-	txIn.PreviousOutPointRing = &previousOutPointRing
-
-	return &txIn, nil
-}
-
 // createCoinbaseTx returns a coinbase transaction paying an appropriate subsidy
 // based on the passed block height to the provided address.  When the address
 // is nil, the coinbase transaction will instead be redeemable by anyone.
@@ -433,43 +407,20 @@ func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockH
 }
 
 //	todo (ABE):
-func createCoinbaseTxAbe(params *chaincfg.Params, coinbaseTxIn *wire.TxInAbe, nextBlockHeight int32, addr abeutil.MasterAddress) (*abeutil.TxAbe, error) {
-	// Create the script to pay to the provided payment address if one was
-	// specified.  Otherwise create a script that allows the coinbase to be
-	// redeemable by anyone.
-	var addressScript []byte
-	if addr != nil {
-		daddr, err := addr.GenerateDerivedAddress()
-		if err != nil {
-			return nil, err
-		}
-		addressScript, err = txscript.BuildAddressScript(daddr)
-		if err != nil {
-			return nil, err
-		}
+func createCoinbaseTxAbe(params *chaincfg.Params, extraNonce uint64, nextBlockHeight int32, addr abeutil.MasterAddress) (*abeutil.TxAbe, error) {
 
-		/*		switch maddr := addr.(type) {
-				case *abeutil.MasterAddressSalrs:
-					daddr, err := maddr.GenerateDerivedAddress()
-					if err != nil {
-						return nil, err
-					}
-					addressScript, err = txscript.BuildAddressScript(daddr)
-					if err != nil {
-						return nil, err
-					}
-				default:
-				}*/
-	} else {
-		addressScript = nil
+	coinbaseTxIn := wire.NewStandardCoinbaseTxIn(nextBlockHeight, extraNonce)
+
+	addressScript, err := txscript.PayToAddrScriptAbe(addr)
+	if err != nil {
+		return nil, err
 	}
-
 	txOut := wire.TxOutAbe{}
 	txOut.AddressScript = addressScript
 	//	todo (ABE): for salrs test, we set fix value 100 ABE
 	//	txOut.ValueScript = blockchain.CalcBlockSubsidy(nextBlockHeight, params)
 	//	for genesis block, this value is 1000 * 10000000
-	txOut.ValueScript = 1000 * 10000000
+	txOut.ValueScript = 500 * abeutil.NeutrinoPerAbe
 
 	tx := wire.NewMsgTxAbe(wire.TxVersion)
 	tx.AddTxIn(coinbaseTxIn)
@@ -491,6 +442,17 @@ func spendTransaction(utxoView *blockchain.UtxoViewpoint, tx *abeutil.Tx, height
 	}
 
 	utxoView.AddTxOuts(tx, height)
+	return nil
+}
+
+//	todo(ABE): the block is unknown yet, use hainhash.ZeroHash as the block hash consuming the serialNumber
+func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, tx *abeutil.TxAbe) error {
+	for _, txIn := range tx.MsgTx().TxIns {
+		entry := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())
+		if entry != nil {
+			entry.Spend(&txIn.SerialNumber, &chainhash.ZeroHash)
+		}
+	}
 	return nil
 }
 
@@ -648,12 +610,8 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress abeutil.MasterAddress) 
 	// identical transaction for block version 1).
 	extraNonce := uint64(0)
 	//	coinbaseScript, err := standardCoinbaseScript(nextBlockHeight, extraNonce)
-	coinBaseTxIn, err := standardCoinbaseTxIn(nextBlockHeight, extraNonce)
-	if err != nil {
-		return nil, err
-	}
-	coinbaseTx, err := createCoinbaseTxAbe(g.chainParams, coinBaseTxIn,
-		nextBlockHeight, payToAddress)
+
+	coinbaseTx, err := createCoinbaseTxAbe(g.chainParams, extraNonce, nextBlockHeight, payToAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -684,7 +642,7 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress abeutil.MasterAddress) 
 	// dependsOn map kept with each dependent transaction helps quickly
 	// determine which dependent transactions are now eligible for inclusion
 	// in the block once each transaction has been included.
-	//	todo(ABE): ABE does not suppoer such a case, to remove
+	//	todo(ABE): ABE does not support such a case, to remove
 	//	dependers := make(map[chainhash.Hash]map[chainhash.Hash]*txPrioItem)
 
 	// Create slices to hold the fees and number of signature operations
@@ -710,7 +668,9 @@ mempoolLoop:
 			log.Tracef("Skipping coinbase tx %s", tx.Hash())
 			continue
 		}
-		//	todo(ABE): ABE does not support locktime at this mooment, remove
+
+		//	todo(ABE): ABE does not support locktime at this moment, remove
+
 		/*		if !blockchain.IsFinalizedTransaction(tx, nextBlockHeight,
 				g.timeSource.AdjustedTime()) {
 
@@ -733,7 +693,6 @@ mempoolLoop:
 		// Setup dependencies for any transactions which reference
 		// other transactions in the mempool so they can be properly
 		// ordered below.
-		prioItem := &txPrioItemAbe{tx: tx}
 		for _, txIn := range tx.MsgTx().TxIns {
 			entry := utxoRings.LookupEntry(txIn.PreviousOutPointRing.Hash())
 			if entry == nil || entry.IsSpent(txIn.SerialNumber) {
@@ -743,8 +702,28 @@ mempoolLoop:
 					tx.Hash(), txIn.String())
 				continue mempoolLoop
 			}
+
+			/*			// The transaction is referencing another
+						// transaction in the source pool, so setup an
+						// ordering dependency.
+						deps, exists := dependers[*originHash]
+						if !exists {
+							deps = make(map[chainhash.Hash]*txPrioItem)
+							dependers[*originHash] = deps
+						}
+						deps[*prioItem.tx.Hash()] = prioItem
+						if prioItem.dependsOn == nil {
+							prioItem.dependsOn = make(
+								map[chainhash.Hash]struct{})
+						}
+						prioItem.dependsOn[*originHash] = struct{}{}
+
+						// Skip the check below. We already know the
+						// referenced transaction is available.
+						continue*/
 		}
 
+		prioItem := &txPrioItemAbe{tx: tx}
 		// Calculate the final transaction priority using the input
 		// value age sum as well as the adjusted transaction size.  The
 		// formula is: sum(inputValue * inputAge) / adjustedTxSize
@@ -765,7 +744,11 @@ mempoolLoop:
 		// this transaction into the block utxo view.  This allows the
 		// code below to avoid a second lookup.
 		//	todo(ABE): how to prevent double spending
-		mergeUtxoView(blockUtxos, utxos)
+		//mergeUtxoView(blockUtxos, utxos)
+		//	if blockUtxoRings.Entries() has the same utxoRing, just replace, as the utxoRing in utxoRings is queried from the latest database
+		for ringHash, utxoRing := range utxoRings.Entries() {
+			blockUtxoRings.Entries()[ringHash] = utxoRing
+		}
 	}
 
 	/*	log.Tracef("Priority queue len %d, dependers len %d",
@@ -790,7 +773,7 @@ mempoolLoop:
 		}
 		segwitActive := segwitState == blockchain.ThresholdActive
 	*/
-	witnessIncluded := false
+	//	witnessIncluded := false
 
 	// Choose which transactions make it into the block.
 	for priorityQueue.Len() > 0 {
@@ -831,6 +814,7 @@ mempoolLoop:
 
 		// Skip free transactions once the block is larger than the
 		// minimum block size.
+		//	todo(ABE): as the size exceeds the minimum block size, it is unnecessary to include the free transactions
 		if sortedByFee &&
 			prioItem.feePerKB < int64(g.policy.TxMinFreeFee) &&
 			blockPlusTxWeight >= g.policy.BlockMinWeight {
@@ -847,8 +831,8 @@ mempoolLoop:
 		// Prioritize by fee per kilobyte once the block is larger than
 		// the priority size or there are no more high-priority
 		// transactions.
-		if !sortedByFee && (blockPlusTxWeight >= g.policy.BlockPrioritySize ||
-			prioItem.priority <= MinHighPriority) {
+		if !sortedByFee &&
+			(blockPlusTxWeight >= g.policy.BlockPrioritySize || prioItem.priority <= MinHighPriority) {
 
 			log.Tracef("Switching to sort by fees per "+
 				"kilobyte blockSize %d >= BlockPrioritySize "+
@@ -865,9 +849,7 @@ mempoolLoop:
 			// is too low.  Otherwise this transaction will be the
 			// final one in the high-priority section, so just fall
 			// though to the code below so it is added now.
-			if blockPlusTxWeight > g.policy.BlockPrioritySize ||
-				prioItem.priority < MinHighPriority {
-
+			if blockPlusTxWeight > g.policy.BlockPrioritySize || prioItem.priority < MinHighPriority {
 				heap.Push(priorityQueue, prioItem)
 				continue
 			}
@@ -875,21 +857,24 @@ mempoolLoop:
 
 		// Ensure the transaction inputs pass all of the necessary
 		// preconditions before allowing it to be added to the block.
-		_, err = blockchain.CheckTransactionInputs(tx, nextBlockHeight,
-			blockUtxos, g.chainParams)
+		//	todo(ABE): check double spending
+		err = blockchain.CheckTransactionInputsAbe(tx, nextBlockHeight, blockUtxoRings, g.chainParams)
 		if err != nil {
 			log.Tracef("Skipping tx %s due to error in "+
 				"CheckTransactionInputs: %v", tx.Hash(), err)
 			//			logSkippedDeps(tx, deps)
 			continue
 		}
-		err = blockchain.ValidateTransactionScripts(tx, blockUtxos,
-			txscript.StandardVerifyFlags, g.sigCache,
-			g.hashCache)
+
+		/*	todo(ABE): for ABE, the witness verification is the most expensive, we can optimize this part.
+			In particular, for each tx in mp.pool, there is an additional filed, to identify whether the tx's witness has been verified.
+			Other information, e.g., the inputs's double-spending may change, but as long as the txhash does not change, the witness does not need to verify again
+		*/
+		err = blockchain.ValidateTransactionScriptsAbe(tx, blockUtxoRings)
 		if err != nil {
 			log.Tracef("Skipping tx %s due to error in "+
 				"ValidateTransactionScripts: %v", tx.Hash(), err)
-			logSkippedDeps(tx, deps)
+			//			logSkippedDeps(tx, deps)
 			continue
 		}
 
@@ -897,17 +882,17 @@ mempoolLoop:
 		// an entry for it to ensure any transactions which reference
 		// this one have it available as an input and can ensure they
 		// aren't double spending.
-		spendTransaction(blockUtxos, tx, nextBlockHeight)
+		spendTransactionAbe(blockUtxoRings, tx)
 
 		// Add the transaction to the block, increment counters, and
 		// save the fees and signature operation counts to the block
 		// template.
 		blockTxns = append(blockTxns, tx)
 		blockWeight += txWeight
-		blockSigOpCost += int64(sigOpCost)
+		//		blockSigOpCost += int64(sigOpCost)
 		totalFees += prioItem.fee
 		txFees = append(txFees, prioItem.fee)
-		txSigOpCosts = append(txSigOpCosts, int64(sigOpCost))
+		//		txSigOpCosts = append(txSigOpCosts, int64(sigOpCost))
 
 		log.Tracef("Adding tx %s (priority %.2f, feePerKB %.2f)",
 			prioItem.tx.Hash(), prioItem.priority, prioItem.feePerKB)
@@ -915,65 +900,65 @@ mempoolLoop:
 		// Add transactions which depend on this one (and also do not
 		// have any other unsatisified dependencies) to the priority
 		// queue.
-		for _, item := range deps {
-			// Add the transaction to the priority queue if there
-			// are no more dependencies after this one.
-			delete(item.dependsOn, *tx.Hash())
-			if len(item.dependsOn) == 0 {
-				heap.Push(priorityQueue, item)
-			}
-		}
+		/*		for _, item := range deps {
+				// Add the transaction to the priority queue if there
+				// are no more dependencies after this one.
+				delete(item.dependsOn, *tx.Hash())
+				if len(item.dependsOn) == 0 {
+					heap.Push(priorityQueue, item)
+				}
+			}*/
 	}
 
 	// Now that the actual transactions have been selected, update the
 	// block weight for the real transaction count and coinbase value with
 	// the total fees accordingly.
-	blockWeight -= wire.MaxVarIntPayload -
-		(uint32(wire.VarIntSerializeSize(uint64(len(blockTxns)))) *
-			blockchain.WitnessScaleFactor)
-	coinbaseTx.MsgTx().TxOut[0].Value += totalFees
+	blockWeight -= wire.MaxVarIntPayload - (uint32(wire.VarIntSerializeSize(uint64(len(blockTxns)))) * blockchain.WitnessScaleFactor)
+	//	todo(ABE): now, each coinbase transaction has only one output, and the value is public
+	coinbaseTx.MsgTx().TxOuts[0].ValueScript += totalFees
 	txFees[0] = -totalFees
 
 	// If segwit is active and we included transactions with witness data,
 	// then we'll need to include a commitment to the witness data in an
 	// OP_RETURN output within the coinbase transaction.
-	var witnessCommitment []byte
-	if witnessIncluded {
-		// The witness of the coinbase transaction MUST be exactly 32-bytes
-		// of all zeroes.
-		var witnessNonce [blockchain.CoinbaseWitnessDataLen]byte
-		coinbaseTx.MsgTx().TxIn[0].Witness = wire.TxWitness{witnessNonce[:]}
+	//	todo(ABE): Does ABE need to store a commitment of the hash for the witnesses of transactions?
+	/*	var witnessCommitment []byte
+		if witnessIncluded {
+			// The witness of the coinbase transaction MUST be exactly 32-bytes
+			// of all zeroes.
+			var witnessNonce [blockchain.CoinbaseWitnessDataLen]byte
+			coinbaseTx.MsgTx().TxIn[0].Witness = wire.TxWitness{witnessNonce[:]}
 
-		// Next, obtain the merkle root of a tree which consists of the
-		// wtxid of all transactions in the block. The coinbase
-		// transaction will have a special wtxid of all zeroes.
-		witnessMerkleTree := blockchain.BuildMerkleTreeStore(blockTxns,
-			true)
-		witnessMerkleRoot := witnessMerkleTree[len(witnessMerkleTree)-1]
+			// Next, obtain the merkle root of a tree which consists of the
+			// wtxid of all transactions in the block. The coinbase
+			// transaction will have a special wtxid of all zeroes.
+			witnessMerkleTree := blockchain.BuildMerkleTreeStore(blockTxns,
+				true)
+			witnessMerkleRoot := witnessMerkleTree[len(witnessMerkleTree)-1]
 
-		// The preimage to the witness commitment is:
-		// witnessRoot || coinbaseWitness
-		var witnessPreimage [64]byte
-		copy(witnessPreimage[:32], witnessMerkleRoot[:])
-		copy(witnessPreimage[32:], witnessNonce[:])
+			// The preimage to the witness commitment is:
+			// witnessRoot || coinbaseWitness
+			var witnessPreimage [64]byte
+			copy(witnessPreimage[:32], witnessMerkleRoot[:])
+			copy(witnessPreimage[32:], witnessNonce[:])
 
-		// The witness commitment itself is the double-sha256 of the
-		// witness preimage generated above. With the commitment
-		// generated, the witness script for the output is: OP_RETURN
-		// OP_DATA_36 {0xaa21a9ed || witnessCommitment}. The leading
-		// prefix is referred to as the "witness magic bytes".
-		witnessCommitment = chainhash.DoubleHashB(witnessPreimage[:])
-		witnessScript := append(blockchain.WitnessMagicBytes, witnessCommitment...)
+			// The witness commitment itself is the double-sha256 of the
+			// witness preimage generated above. With the commitment
+			// generated, the witness script for the output is: OP_RETURN
+			// OP_DATA_36 {0xaa21a9ed || witnessCommitment}. The leading
+			// prefix is referred to as the "witness magic bytes".
+			witnessCommitment = chainhash.DoubleHashB(witnessPreimage[:])
+			witnessScript := append(blockchain.WitnessMagicBytes, witnessCommitment...)
 
-		// Finally, create the OP_RETURN carrying witness commitment
-		// output as an additional output within the coinbase.
-		commitmentOutput := &wire.TxOut{
-			Value:    0,
-			PkScript: witnessScript,
-		}
-		coinbaseTx.MsgTx().TxOut = append(coinbaseTx.MsgTx().TxOut,
-			commitmentOutput)
-	}
+			// Finally, create the OP_RETURN carrying witness commitment
+			// output as an additional output within the coinbase.
+			commitmentOutput := &wire.TxOut{
+				Value:    0,
+				PkScript: witnessScript,
+			}
+			coinbaseTx.MsgTx().TxOut = append(coinbaseTx.MsgTx().TxOut,
+				commitmentOutput)
+		}*/
 
 	// Calculate the required difficulty for the block.  The timestamp
 	// is potentially adjusted to ensure it comes after the median time of
@@ -992,8 +977,8 @@ mempoolLoop:
 	}
 
 	// Create a new block ready to be solved.
-	merkles := blockchain.BuildMerkleTreeStore(blockTxns, false)
-	var msgBlock wire.MsgBlock
+	merkles := blockchain.BuildMerkleTreeStoreAbe(blockTxns, false)
+	var msgBlock wire.MsgBlockAbe
 	msgBlock.Header = wire.BlockHeader{
 		Version:    nextBlockVersion,
 		PrevBlock:  best.Hash,
@@ -1010,24 +995,22 @@ mempoolLoop:
 	// Finally, perform a full check on the created block against the chain
 	// consensus rules to ensure it properly connects to the current best
 	// chain with no issues.
-	block := abeutil.NewBlock(&msgBlock)
+	block := abeutil.NewBlockAbe(&msgBlock)
 	block.SetHeight(nextBlockHeight)
-	if err := g.chain.CheckConnectBlockTemplate(block); err != nil {
+	if err := g.chain.CheckConnectBlockTemplateAbe(block); err != nil {
 		return nil, err
 	}
 
 	log.Debugf("Created new block template (%d transactions, %d in "+
-		"fees, %d signature operations cost, %d weight, target difficulty "+
-		"%064x)", len(msgBlock.Transactions), totalFees, blockSigOpCost,
-		blockWeight, blockchain.CompactToBig(msgBlock.Header.Bits))
+		"fees, %d weight, target difficulty "+"%064x)", len(msgBlock.Transactions), totalFees, blockWeight, blockchain.CompactToBig(msgBlock.Header.Bits))
 
 	return &BlockTemplate{
-		Block:             &msgBlock,
-		Fees:              txFees,
-		SigOpCosts:        txSigOpCosts,
-		Height:            nextBlockHeight,
-		ValidPayAddress:   payToAddress != nil,
-		WitnessCommitment: witnessCommitment,
+		BlockAbe: &msgBlock,
+		Fees:     txFees,
+		//		SigOpCosts:        txSigOpCosts,
+		Height:          nextBlockHeight,
+		ValidPayAddress: payToAddress != nil,
+		//		WitnessCommitment: witnessCommitment,
 	}, nil
 }
 
@@ -1038,6 +1021,25 @@ mempoolLoop:
 // based on the new time for the test networks since their target difficulty can
 // change based upon time.
 func (g *BlkTmplGenerator) UpdateBlockTime(msgBlock *wire.MsgBlock) error {
+	// The new timestamp is potentially adjusted to ensure it comes after
+	// the median time of the last several blocks per the chain consensus
+	// rules.
+	newTime := medianAdjustedTime(g.chain.BestSnapshot(), g.timeSource)
+	msgBlock.Header.Timestamp = newTime
+
+	// Recalculate the difficulty if running on a network that requires it.
+	if g.chainParams.ReduceMinDifficulty {
+		difficulty, err := g.chain.CalcNextRequiredDifficulty(newTime)
+		if err != nil {
+			return err
+		}
+		msgBlock.Header.Bits = difficulty
+	}
+
+	return nil
+}
+
+func (g *BlkTmplGenerator) UpdateBlockTimeAbe(msgBlock *wire.MsgBlockAbe) error {
 	// The new timestamp is potentially adjusted to ensure it comes after
 	// the median time of the last several blocks per the chain consensus
 	// rules.
@@ -1080,6 +1082,22 @@ func (g *BlkTmplGenerator) UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight
 	// Recalculate the merkle root with the updated extra nonce.
 	block := abeutil.NewBlock(msgBlock)
 	merkles := blockchain.BuildMerkleTreeStore(block.Transactions(), false)
+	msgBlock.Header.MerkleRoot = *merkles[len(merkles)-1]
+	return nil
+}
+
+//	todo(ABE):
+func (g *BlkTmplGenerator) UpdateExtraNonceAbe(msgBlock *wire.MsgBlockAbe, blockHeight int32, extraNonce uint64) error {
+	coinbaseTxIn := wire.NewStandardCoinbaseTxIn(blockHeight, extraNonce)
+	msgBlock.Transactions[0].TxIns[0] = coinbaseTxIn
+
+	// TODO(davec): A btcutil.Block should use saved in the state to avoid
+	// recalculating all of the other transaction hashes.
+	// block.Transactions[0].InvalidateCache()
+
+	// Recalculate the merkle root with the updated extra nonce.
+	block := abeutil.NewBlockAbe(msgBlock)
+	merkles := blockchain.BuildMerkleTreeStoreAbe(block.Transactions(), false)
 	msgBlock.Header.MerkleRoot = *merkles[len(merkles)-1]
 	return nil
 }

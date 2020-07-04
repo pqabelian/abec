@@ -194,6 +194,7 @@ func CalcPriorityAbe(tx *wire.MsgTxAbe, utxoRingView *blockchain.UtxoRingViewpoi
 		return inputValueAge / float64(serializedTxSize-overhead)*/
 
 	inputValueAge := calcInputValueAgeAbe(tx, utxoRingView, nextBlockHeight)
+	serializedTxSize := tx.SerializeSize()
 
-	return inputValueAge
+	return inputValueAge / float64(serializedTxSize)
 }

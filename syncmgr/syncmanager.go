@@ -654,7 +654,7 @@ func (sm *SyncManager) handleTxMsgAbe(tmsg *txMsgAbe) {
 
 	// Process the transaction to include validation, insertion in the
 	// memory pool, orphan handling, etc.
-	acceptedTxs, err := sm.txMemPool.ProcessTransactionAbe(tmsg.tx,
+	acceptedTx, err := sm.txMemPool.ProcessTransactionAbe(tmsg.tx,
 		true, true, mempool.Tag(peer.ID()))
 
 	// Remove transaction from request maps. Either the mempool/chain
@@ -689,12 +689,9 @@ func (sm *SyncManager) handleTxMsgAbe(tmsg *txMsgAbe) {
 		return
 	}
 
-	//	Abe to do
-	//	sm.peerNotifier.AnnounceNewTransactions(acceptedTxs)
-	for _, txDesc := range acceptedTxs {
-		fmt.Println(txDesc.Height)
-	}
-
+	//	todo(ABE):
+	sm.peerNotifier.AnnounceNewTransactionAbe(acceptedTx)
+	fmt.Println(acceptedTx.Height)
 }
 
 // current returns true if we believe we are synced with our peers, false if we

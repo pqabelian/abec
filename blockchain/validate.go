@@ -35,7 +35,7 @@ const (
 
 	// baseSubsidy is the starting subsidy amount for mined blocks.  This
 	// value is halved every SubsidyHalvingInterval blocks.
-	baseSubsidy = 50 * abeutil.SatoshiPerBitcoin
+	baseSubsidy = 512 * abeutil.NeutrinoPerAbe
 )
 
 var (
@@ -618,6 +618,7 @@ func checkBlockSanity(block *abeutil.Block, powLimit *big.Int, timeSource Median
 
 	// A block must not have more transactions than the max block payload or
 	// else it is certainly over the weight limit.
+	//	todo(ABE): This seems to be a bug
 	if numTx > MaxBlockBaseSize {
 		str := fmt.Sprintf("block contains too many transactions - "+
 			"got %d, max %d", numTx, MaxBlockBaseSize)
@@ -706,7 +707,7 @@ func checkBlockSanity(block *abeutil.Block, powLimit *big.Int, timeSource Median
 	return nil
 }
 
-//	Abe to do
+//	todo (ABE): Abe to do
 func checkBlockSanityAbe(block *abeutil.BlockAbe, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
 	msgBlock := block.MsgBlock()
 	header := &msgBlock.Header
@@ -793,6 +794,8 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, powLimit *big.Int, timeSource 
 		existingTxHashes[*hash] = struct{}{}
 	}
 
+	//	todo (ABE): check each transaction's witness has been verified as valid.
+
 	// The number of signature operations must be less than the maximum
 	// allowed per block.
 	/*	totalSigOps := 0
@@ -859,45 +862,25 @@ func ExtractCoinbaseHeight(coinbaseTx *abeutil.Tx) (int32, error) {
 	return int32(serializedHeight), nil
 }
 
-//	Abe to do
-//	To Do: coinbase transaction structure needs to be defined
+//	todo(ABE):
 func ExtractCoinbaseHeightAbe(coinbaseTx *abeutil.TxAbe) (int32, error) {
-	/*	sigScript := coinbaseTx.MsgTx().TxIn[0].SignatureScript
-		if len(sigScript) < 1 {
-			str := "the coinbase signature script for blocks of " +
-				"version %d or greater must start with the " +
-				"length of the serialized block height"
-			str = fmt.Sprintf(str, serializedHeightVersion)
-			return 0, ruleError(ErrMissingCoinbaseHeight, str)
-		}
+	if coinbaseTx == nil {
+		str := "Cannot extract blockHeight from a coinbase transaction that is null"
+		return 0, ruleError(ErrMissingCoinbaseHeight, str)
+	}
 
-		// Detect the case when the block height is a small integer encoded with
-		// as single byte.
-		opcode := int(sigScript[0])
-		if opcode == txscript.OP_0 {
-			return 0, nil
-		}
-		if opcode >= txscript.OP_1 && opcode <= txscript.OP_16 {
-			return int32(opcode - (txscript.OP_1 - 1)), nil
-		}
+	if !coinbaseTx.IsCoinBase() {
+		str := "Cannot extract blockHeight from a transaction that is not coinbase"
+		return 0, ruleError(ErrMissingCoinbaseHeight, str)
+	}
 
-		// Otherwise, the opcode is the length of the following bytes which
-		// encode in the block height.
-		serializedLen := int(sigScript[0])
-		if len(sigScript[1:]) < serializedLen {
-			str := "the coinbase signature script for blocks of " +
-				"version %d or greater must start with the " +
-				"serialized block height"
-			str = fmt.Sprintf(str, serializedLen)
-			return 0, ruleError(ErrMissingCoinbaseHeight, str)
-		}
+	if len(coinbaseTx.MsgTx().TxIns[0].PreviousOutPointRing.BlockHashs) < 1 {
+		str := "Cannot extract blockHeight from a coinbase transaction that deos not match the protocol: There are not BlockHashs in PreviousOutPointRing"
+		return 0, ruleError(ErrMissingCoinbaseHeight, str)
+	}
 
-		serializedHeightBytes := make([]byte, 8)
-		copy(serializedHeightBytes, sigScript[1:serializedLen+1])
-		serializedHeight := binary.LittleEndian.Uint64(serializedHeightBytes)
+	return wire.ExtractCoinbaseHeight(coinbaseTx.MsgTx()), nil
 
-		return int32(serializedHeight), nil
-	*/
 	return 0, nil
 }
 
@@ -905,6 +888,21 @@ func ExtractCoinbaseHeightAbe(coinbaseTx *abeutil.TxAbe) (int32, error) {
 // transaction starts with the serialized block height of wantHeight.
 func checkSerializedHeight(coinbaseTx *abeutil.Tx, wantHeight int32) error {
 	serializedHeight, err := ExtractCoinbaseHeight(coinbaseTx)
+	if err != nil {
+		return err
+	}
+
+	if serializedHeight != wantHeight {
+		str := fmt.Sprintf("the coinbase signature script serialized "+
+			"block height is %d when %d was expected",
+			serializedHeight, wantHeight)
+		return ruleError(ErrBadCoinbaseHeight, str)
+	}
+	return nil
+}
+
+func checkSerializedHeightAbe(coinbaseTx *abeutil.TxAbe, wantHeight int32) error {
+	serializedHeight, err := ExtractCoinbaseHeightAbe(coinbaseTx)
 	if err != nil {
 		return err
 	}
@@ -1175,7 +1173,7 @@ func (b *BlockChain) checkBlockContext(block *abeutil.Block, prevNode *blockNode
 	return nil
 }
 
-//	Abe to do
+//	todo(ABE):
 func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blockNode, flags BehaviorFlags) error {
 	// Perform all block header related validation checks.
 	header := &block.MsgBlock().Header
@@ -1202,20 +1200,21 @@ func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blo
 					blockTime = prevNode.CalcPastMedianTime()
 				}*/
 
-		blockTime := prevNode.CalcPastMedianTime()
+		//		blockTime := prevNode.CalcPastMedianTime()
 
 		// The height of this block is one more than the referenced
 		// previous block.
 		blockHeight := prevNode.height + 1
 
 		// Ensure all transactions in the block are finalized.
-		for _, tx := range block.Transactions() {
-			if !IsFinalizedTransactionAbe(tx, blockHeight, blockTime) {
-				str := fmt.Sprintf("block contains unfinalized "+
-					"transaction %v", tx.Hash())
-				return ruleError(ErrUnfinalizedTx, str)
-			}
-		}
+		//	todo(ABE):remove, as ABE does not suppport localtime and sequence
+		/*		for _, tx := range block.Transactions() {
+				if !IsFinalizedTransactionAbe(tx, blockHeight, blockTime) {
+					str := fmt.Sprintf("block contains unfinalized "+
+						"transaction %v", tx.Hash())
+					return ruleError(ErrUnfinalizedTx, str)
+				}
+			}*/
 
 		// Ensure coinbase starts with serialized block heights for
 		// blocks whose version is the serializedHeightVersion or newer
@@ -1231,6 +1230,12 @@ func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blo
 				}
 			}*/
 
+		coinbaseTx := block.Transactions()[0]
+		err := checkSerializedHeightAbe(coinbaseTx, blockHeight)
+		if err != nil {
+			return err
+		}
+
 		// Query for the Version Bits state for the segwit soft-fork
 		// deployment. If segwit is active, we'll switch over to
 		// enforcing all the new rules.
@@ -1242,6 +1247,7 @@ func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blo
 
 		// If segwit is active, then we'll need to fully validate the
 		// new witness commitment for adherence to the rules.
+		//	todo(ABE): if witness commitment is implemented, here needs check?
 		/*		if segwitState == ThresholdActive {
 				// Validate the witness commitment (if any) within the
 				// block.  This involves asserting that if the coinbase
@@ -1313,7 +1319,7 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *abeutil.Block, view *U
 	return nil
 }
 
-//	Abe to do
+//	todo(Abe): remove
 func (b *BlockChain) checkBIP0030Abe(node *blockNode, block *abeutil.BlockAbe, view *UtxoRingViewpoint) error {
 	// Fetch utxos for all of the transaction ouputs in this block.
 	// Typically, there will not be any utxos for any of the outputs.
@@ -1773,11 +1779,11 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 
 	// The coinbase for the Genesis block is not spendable, so just return
 	// an error now.
-	//	Abe to do
-	if node.hash.IsEqual(b.chainParams.GenesisHash) {
+	//	todo(ABE): In ABE, he coinbase for the Genesis block is spendable.
+	/*	if node.hash.IsEqual(b.chainParams.GenesisHash) {
 		str := "the coinbase for the genesis block is not spendable"
 		return ruleError(ErrMissingTxOut, str)
-	}
+	}*/
 
 	// Ensure the view is for the node being checked.
 	parentHash := &block.MsgBlock().Header.PrevBlock
@@ -1809,17 +1815,17 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 			return err
 		}
 	}*/
-	err := b.checkBIP0030Abe(node, block, view)
-	if err != nil {
-		return err
-	}
+	/*	err := b.checkBIP0030Abe(node, block, view)
+		if err != nil {
+			return err
+		}*/
 
 	// Load all of the utxos referenced by the inputs for all transactions
 	// in the block don't already exist in the utxo view from the database.
 	//
 	// These utxo entries are needed for verification of things such as
 	// transaction inputs, counting pay-to-script-hashes, and scripts.
-	err = view.fetchInputUtxoRings(b.db, block)
+	err := view.fetchInputUtxoRings(b.db, block)
 	if err != nil {
 		return err
 	}
@@ -1913,16 +1919,15 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// mining the block.  It is safe to ignore overflow and out of range
 	// errors here because those error conditions would have already been
 	// caught by checkTransactionSanity.
-	var totalSatoshiOut int64
+	var totalNeutrinoOut int64
 	for _, txOut := range transactions[0].MsgTx().TxOuts {
-		totalSatoshiOut += txOut.ValueScript
+		totalNeutrinoOut += txOut.ValueScript
 	}
-	expectedSatoshiOut := CalcBlockSubsidy(node.height, b.chainParams) +
-		totalFees
-	if totalSatoshiOut > expectedSatoshiOut {
+	expectedNeutrinoOut := CalcBlockSubsidy(node.height, b.chainParams) + totalFees
+	if totalNeutrinoOut > expectedNeutrinoOut {
 		str := fmt.Sprintf("coinbase transaction for block pays %v "+
 			"which is more than expected value of %v",
-			totalSatoshiOut, expectedSatoshiOut)
+			totalNeutrinoOut, expectedNeutrinoOut)
 		return ruleError(ErrBadCoinbaseValue, str)
 	}
 
@@ -2009,8 +2014,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// expensive ECDSA signature check scripts.  Doing this last helps
 	// prevent CPU exhaustion attacks.
 	if runScripts {
-		err := checkBlockScriptsAbe(block, view, scriptFlags, b.sigCache,
-			b.hashCache)
+		err := checkBlockScriptsAbe(block, view, scriptFlags, b.sigCache, b.hashCache)
 		if err != nil {
 			return err
 		}
@@ -2061,4 +2065,40 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *abeutil.Block) error {
 	view.SetBestHash(&tip.hash)
 	newNode := newBlockNode(&header, tip)
 	return b.checkConnectBlock(newNode, block, view, nil)
+}
+
+//	todo (ABE):
+func (b *BlockChain) CheckConnectBlockTemplateAbe(block *abeutil.BlockAbe) error {
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+
+	// Skip the proof of work check as this is just a block template.
+	flags := BFNoPoWCheck
+
+	// This only checks whether the block can be connected to the tip of the
+	// current chain.
+	tip := b.bestChain.Tip()
+	header := block.MsgBlock().Header
+	if tip.hash != header.PrevBlock {
+		str := fmt.Sprintf("previous block must be the current chain tip %v, "+
+			"instead got %v", tip.hash, header.PrevBlock)
+		return ruleError(ErrPrevBlockNotBest, str)
+	}
+
+	err := checkBlockSanityAbe(block, b.chainParams.PowLimit, b.timeSource, flags)
+	if err != nil {
+		return err
+	}
+
+	err = b.checkBlockContextAbe(block, tip, flags)
+	if err != nil {
+		return err
+	}
+
+	// Leave the spent txouts entry nil in the state since the information
+	// is not needed and thus extra work can be avoided.
+	view := NewUtxoRingViewpoint()
+	view.SetBestHash(&tip.hash)
+	newNode := newBlockNode(&header, tip)
+	return b.checkConnectBlockAbe(newNode, block, view, nil)
 }

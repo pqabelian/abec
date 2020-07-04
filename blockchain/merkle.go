@@ -149,7 +149,7 @@ func BuildMerkleTreeStore(transactions []*abeutil.Tx, witness bool) []*chainhash
 	return merkles
 }
 
-//	Abe to do
+//	todo(ABE): Abe to do
 func BuildMerkleTreeStoreAbe(transactions []*abeutil.TxAbe, witness bool) []*chainhash.Hash {
 	// Calculate how many entries are required to hold the binary merkle
 	// tree as a linear array and create an array of that size.

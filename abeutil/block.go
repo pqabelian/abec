@@ -324,6 +324,13 @@ func NewBlock(msgBlock *wire.MsgBlock) *Block {
 	}
 }
 
+func NewBlockAbe(msgBlock *wire.MsgBlockAbe) *BlockAbe {
+	return &BlockAbe{
+		msgBlock:    msgBlock,
+		blockHeight: BlockHeightUnknown,
+	}
+}
+
 // NewBlockFromBytes returns a new instance of a bitcoin block given the
 // serialized bytes.  See Block.
 func NewBlockFromBytes(serializedBlock []byte) (*Block, error) {

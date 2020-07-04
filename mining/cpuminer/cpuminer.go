@@ -198,7 +198,7 @@ func (m *CPUMiner) submitBlock(block *abeutil.Block) bool {
 // This function will return early with false when conditions that trigger a
 // stale block such as a new block showing up or periodically when there are
 // new transactions and enough time has elapsed without finding a solution.
-func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
+func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlockAbe, blockHeight int32,
 	ticker *time.Ticker, quit chan struct{}) bool {
 
 	// Choose a random extra nonce offset for this block template and
@@ -226,7 +226,7 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
 		// Update the extra nonce in the block template with the
 		// new value by regenerating the coinbase script and
 		// setting the merkle root to the new value.
-		m.g.UpdateExtraNonce(msgBlock, blockHeight, extraNonce+enOffset)
+		m.g.UpdateExtraNonceAbe(msgBlock, blockHeight, extraNonce+enOffset)
 
 		// Search through the entire nonce range for a solution while
 		// periodically checking for early quit and stale block
@@ -257,7 +257,7 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
 					return false
 				}
 
-				m.g.UpdateBlockTime(msgBlock)
+				m.g.UpdateBlockTimeAbe(msgBlock)
 
 			default:
 				// Non-blocking select to fall through
@@ -351,7 +351,7 @@ out:
 		// with false when conditions that trigger a stale block, so
 		// a new block template can be generated.  When the return is
 		// true a solution was found, so submit the solved block.
-		if m.solveBlock(template.Block, curHeight+1, ticker, quit) {
+		if m.solveBlock(template.BlockAbe, curHeight+1, ticker, quit) {
 			block := abeutil.NewBlock(template.Block)
 			m.submitBlock(block)
 		}
@@ -588,7 +588,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 		// Choose a payment address at random.
 		//		rand.Seed(time.Now().UnixNano())
 		//		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
-		masterAddr := m.cfg.MiningMasterAddr
+		masterAddr := m.cfg.MiningAddr
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
@@ -606,7 +606,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 		// with false when conditions that trigger a stale block, so
 		// a new block template can be generated.  When the return is
 		// true a solution was found, so submit the solved block.
-		if m.solveBlock(template.Block, curHeight+1, ticker, nil) {
+		if m.solveBlock(template.BlockAbe, curHeight+1, ticker, nil) {
 			block := abeutil.NewBlock(template.Block)
 			m.submitBlock(block)
 			blockHashes[i] = block.Hash()

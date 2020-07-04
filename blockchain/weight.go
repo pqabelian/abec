@@ -86,6 +86,8 @@ func GetTransactionWeight(tx *abeutil.Tx) int64 {
 }
 
 //	todo(ABE): the caller mya convert the result to int32, why not return 'int32' directly?
+//	in ABE, we directly use the size, rather than the witness, since the witness size is roughly proportional to the basic size.
+//	If we also use weight, we need to set the factor according to more details.
 func GetTransactionWeightAbe(tx *abeutil.TxAbe) int64 {
 	msgTx := tx.MsgTx()
 

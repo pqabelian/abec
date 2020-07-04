@@ -464,7 +464,29 @@ func PayToAddrScript(addr abeutil.Address) ([]byte, error) {
 	return nil, scriptError(ErrUnsupportedAddress, str)
 }
 
-//	todo(ABE): with this funciotn, it may allow more ways to generate the AddressScript
+//	todo(ABE):
+func PayToAddrScriptAbe(addr abeutil.MasterAddress) ([]byte, error) {
+	// Create the script to pay to the provided payment address if one was
+	// specified.  Otherwise create a script that allows the coinbase to be
+	// redeemable by anyone.
+	var addressScript []byte
+	if addr != nil {
+		daddr, err := addr.GenerateDerivedAddress()
+		if err != nil {
+			return nil, err
+		}
+		addressScript, err = BuildAddressScript(daddr)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		addressScript = nil
+	}
+
+	return addressScript, nil
+}
+
+//	todo(ABE): with this function, it may allow more ways to generate the AddressScript
 func BuildAddressScript(daddr abeutil.DerivedAddress) ([]byte, error) {
 	const nilAddrErrStr = "unable to generate payment AddressScript for nil address"
 
@@ -472,8 +494,7 @@ func BuildAddressScript(daddr abeutil.DerivedAddress) ([]byte, error) {
 
 	case *abeutil.DerivedAddressSalrs:
 		if daddr == nil {
-			return nil, scriptError(ErrUnsupportedAddress,
-				nilAddrErrStr)
+			return nil, scriptError(ErrUnsupportedAddress, nilAddrErrStr)
 		}
 		return daddr.Serialize(), nil
 	}
