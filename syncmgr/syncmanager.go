@@ -550,8 +550,9 @@ func (sm *SyncManager) updateSyncPeer(dcSyncPeer bool) {
 	sm.startSync()
 }
 
+// todo(ABE): Remove BTCD
 // handleTxMsg handles transaction messages from all peers.
-func (sm *SyncManager) handleTxMsg(tmsg *txMsg) {
+func (sm *SyncManager) handleTxMsgBTCD(tmsg *txMsg) {
 	peer := tmsg.peer
 	state, exists := sm.peerStates[peer]
 	if !exists {
@@ -715,8 +716,9 @@ func (sm *SyncManager) current() bool {
 	return true
 }
 
+//	todo(ABE): Remove BTCD
 // handleBlockMsg handles block messages from all peers.
-func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
+func (sm *SyncManager) handleBlockMsgBTCD(bmsg *blockMsg) {
 	peer := bmsg.peer
 	state, exists := sm.peerStates[peer]
 	if !exists {
@@ -926,7 +928,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	}
 }
 
-//	Abe to do
+//	todo(ABE):
 // handleBlockMsg handles block messages from all peers.
 func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 	peer := bmsg.peer
@@ -1598,12 +1600,22 @@ out:
 			case *newPeerMsg:
 				sm.handleNewPeerMsg(msg.peer)
 
-			case *txMsg:
-				sm.handleTxMsg(msg)
+				// todo(ABE):
+				/*			case *txMsg:
+							sm.handleTxMsg(msg)
+							msg.reply <- struct{}{}*/
+
+			case *txMsgAbe:
+				sm.handleTxMsgAbe(msg)
 				msg.reply <- struct{}{}
 
-			case *blockMsg:
-				sm.handleBlockMsg(msg)
+				//	todo(ABE):
+				/*			case *blockMsg:
+							sm.handleBlockMsg(msg)
+							msg.reply <- struct{}{}*/
+
+			case *blockMsgAbe:
+				sm.handleBlockMsgAbe(msg)
 				msg.reply <- struct{}{}
 
 			case *invMsg:

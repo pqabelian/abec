@@ -1575,9 +1575,9 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// Choose a payment address at random if the caller requests a
 		// full coinbase as opposed to only the pertinent details needed
 		// to create their own coinbase.
-		var payAddr abeutil.MasterAddress
+		var masterAddr abeutil.MasterAddress
 		if !useCoinbaseValue {
-			payAddr = cfg.miningAddr
+			masterAddr = cfg.miningAddr
 		}
 
 		// Create a new block template that has a coinbase which anyone
@@ -1585,7 +1585,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// block template doesn't include the coinbase, so the caller
 		// will ultimately create their own coinbase which pays to the
 		// appropriate address(es).
-		blkTemplate, err := generator.NewBlockTemplate(payAddr)
+		blkTemplate, err := generator.NewBlockTemplate(masterAddr)
 		if err != nil {
 			return internalRPCError("Failed to create new block "+
 				"template: "+err.Error(), "")
