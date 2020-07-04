@@ -58,7 +58,8 @@ type Config struct {
 	// ProcessBlock defines the function to call with any solved blocks.
 	// It typically must run the provided block through the same set of
 	// rules and handling as any other block coming from the network.
-	ProcessBlock func(*abeutil.Block, blockchain.BehaviorFlags) (bool, error)
+	ProcessBlock    func(*abeutil.Block, blockchain.BehaviorFlags) (bool, error)
+	ProcessBlockAbe func(*abeutil.BlockAbe, blockchain.BehaviorFlags) (bool, error)
 
 	// ConnectedCount defines the function to use to obtain how many other
 	// peers the server is connected to.  This is used by the automatic
@@ -146,7 +147,7 @@ out:
 
 // submitBlock submits the passed block to network after ensuring it passes all
 // of the consensus validation rules.
-func (m *CPUMiner) submitBlock(block *abeutil.Block) bool {
+func (m *CPUMiner) submitBlock(block *abeutil.BlockAbe) bool {
 	m.submitBlockLock.Lock()
 	defer m.submitBlockLock.Unlock()
 
@@ -164,7 +165,7 @@ func (m *CPUMiner) submitBlock(block *abeutil.Block) bool {
 
 	// Process this block using the same rules as blocks coming from other
 	// nodes.  This will in turn relay it to the network like normal.
-	isOrphan, err := m.cfg.ProcessBlock(block, blockchain.BFNone)
+	isOrphan, err := m.cfg.ProcessBlockAbe(block, blockchain.BFNone)
 	if err != nil {
 		// Anything other than a rule violation is an unexpected error,
 		// so log that error as an internal error.
@@ -183,9 +184,9 @@ func (m *CPUMiner) submitBlock(block *abeutil.Block) bool {
 	}
 
 	// The block was accepted.
-	coinbaseTx := block.MsgBlock().Transactions[0].TxOut[0]
+	coinbaseTx := block.MsgBlock().Transactions[0].TxOuts[0]
 	log.Infof("Block submitted via CPU miner accepted (hash %s, "+
-		"amount %v)", block.Hash(), abeutil.Amount(coinbaseTx.Value))
+		"amount %v)", block.Hash(), abeutil.Amount(coinbaseTx.ValueScript))
 	return true
 }
 
@@ -352,7 +353,7 @@ out:
 		// a new block template can be generated.  When the return is
 		// true a solution was found, so submit the solved block.
 		if m.solveBlock(template.BlockAbe, curHeight+1, ticker, quit) {
-			block := abeutil.NewBlock(template.Block)
+			block := abeutil.NewBlockAbe(template.BlockAbe)
 			m.submitBlock(block)
 		}
 	}
@@ -607,7 +608,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 		// a new block template can be generated.  When the return is
 		// true a solution was found, so submit the solved block.
 		if m.solveBlock(template.BlockAbe, curHeight+1, ticker, nil) {
-			block := abeutil.NewBlock(template.Block)
+			block := abeutil.NewBlockAbe(template.BlockAbe)
 			m.submitBlock(block)
 			blockHashes[i] = block.Hash()
 			i++

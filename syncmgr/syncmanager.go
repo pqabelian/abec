@@ -119,8 +119,15 @@ type processBlockResponse struct {
 // above in that blockMsg is intended for blocks that came from peers and have
 // extra handling whereas this message essentially is just a concurrent safe
 // way to call ProcessBlock on the internal block chain instance.
+//	todo(ABE):
 type processBlockMsg struct {
 	block *abeutil.Block
+	flags blockchain.BehaviorFlags
+	reply chan processBlockResponse
+}
+
+type processBlockMsgAbe struct {
+	block *abeutil.BlockAbe
 	flags blockchain.BehaviorFlags
 	reply chan processBlockResponse
 }
@@ -1634,8 +1641,24 @@ out:
 				}
 				msg.reply <- peerID
 
-			case processBlockMsg:
-				_, isOrphan, err := sm.chain.ProcessBlock(
+				//	todo(ABE):
+				/*			case processBlockMsg:
+							_, isOrphan, err := sm.chain.ProcessBlock(
+								msg.block, msg.flags)
+							if err != nil {
+								msg.reply <- processBlockResponse{
+									isOrphan: false,
+									err:      err,
+								}
+							}
+
+							msg.reply <- processBlockResponse{
+								isOrphan: isOrphan,
+								err:      nil,
+							}*/
+
+			case processBlockMsgAbe:
+				_, isOrphan, err := sm.chain.ProcessBlockAbe(
 					msg.block, msg.flags)
 				if err != nil {
 					msg.reply <- processBlockResponse{
@@ -1868,9 +1891,17 @@ func (sm *SyncManager) SyncPeerID() int32 {
 
 // ProcessBlock makes use of ProcessBlock on an internal instance of a block
 // chain.
+//	todo(ABE):
 func (sm *SyncManager) ProcessBlock(block *abeutil.Block, flags blockchain.BehaviorFlags) (bool, error) {
 	reply := make(chan processBlockResponse, 1)
 	sm.msgChan <- processBlockMsg{block: block, flags: flags, reply: reply}
+	response := <-reply
+	return response.isOrphan, response.err
+}
+
+func (sm *SyncManager) ProcessBlockAbe(block *abeutil.BlockAbe, flags blockchain.BehaviorFlags) (bool, error) {
+	reply := make(chan processBlockResponse, 1)
+	sm.msgChan <- processBlockMsgAbe{block: block, flags: flags, reply: reply}
 	response := <-reply
 	return response.isOrphan, response.err
 }

@@ -2799,9 +2799,11 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		ChainParams:            chainParams,
 		BlockTemplateGenerator: blockTemplateGenerator,
 		MiningAddr:             cfg.miningAddr,
-		ProcessBlock:           s.syncManager.ProcessBlock,
-		ConnectedCount:         s.ConnectedCount,
-		IsCurrent:              s.syncManager.IsCurrent,
+		//	todo(ABE)
+		ProcessBlock:    s.syncManager.ProcessBlock,
+		ProcessBlockAbe: s.syncManager.ProcessBlockAbe,
+		ConnectedCount:  s.ConnectedCount,
+		IsCurrent:       s.syncManager.IsCurrent,
 	})
 
 	// Only setup a function to return new addresses to connect to when
