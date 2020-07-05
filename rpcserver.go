@@ -2151,7 +2151,7 @@ func handleGetBlockTemplateProposal(s *rpcServer, request *abejson.TemplateReque
 		return "bad-prevblk", nil
 	}
 
-	if err := s.cfg.Chain.CheckConnectBlockTemplate(block); err != nil {
+	if err := s.cfg.Chain.CheckConnectBlockTemplateBTCD(block); err != nil {
 		if _, ok := err.(blockchain.RuleError); !ok {
 			errStr := fmt.Sprintf("Failed to process block proposal: %v", err)
 			rpcsLog.Error(errStr)

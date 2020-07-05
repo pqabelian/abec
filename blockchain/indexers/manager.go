@@ -428,7 +428,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 	for height := lowestHeight + 1; height <= bestHeight; height++ {
 		// Load the block for the height since it is required to index
 		// it.
-		block, err := chain.BlockByHeight(height)
+		block, err := chain.BlockByHeightBTCD(height)
 		if err != nil {
 			return err
 		}

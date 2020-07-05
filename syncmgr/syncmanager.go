@@ -726,216 +726,216 @@ func (sm *SyncManager) current() bool {
 }
 
 //	todo(ABE): Remove BTCD
-// handleBlockMsg handles block messages from all peers.
-func (sm *SyncManager) handleBlockMsgBTCD(bmsg *blockMsg) {
-	peer := bmsg.peer
-	state, exists := sm.peerStates[peer]
-	if !exists {
-		log.Warnf("Received block message from unknown peer %s", peer)
-		return
-	}
-
-	// If we didn't ask for this block then the peer is misbehaving.
-	blockHash := bmsg.block.Hash()
-	if _, exists = state.requestedBlocks[*blockHash]; !exists {
-		// The regression test intentionally sends some blocks twice
-		// to test duplicate block insertion fails.  Don't disconnect
-		// the peer or ignore the block when we're in regression test
-		// mode in this case so the chain code is actually fed the
-		// duplicate blocks.
-		if sm.chainParams != &chaincfg.RegressionNetParams {
-			log.Warnf("Got unrequested block %v from %s -- "+
-				"disconnecting", blockHash, peer.Addr())
-			peer.Disconnect()
-			return
-		}
-	}
-
-	// When in headers-first mode, if the block matches the hash of the
-	// first header in the list of headers that are being fetched, it's
-	// eligible for less validation since the headers have already been
-	// verified to link together and are valid up to the next checkpoint.
-	// Also, remove the list entry for all blocks except the checkpoint
-	// since it is needed to verify the next round of headers links
-	// properly.
-	isCheckpointBlock := false
-	behaviorFlags := blockchain.BFNone
-	if sm.headersFirstMode {
-		firstNodeEl := sm.headerList.Front()
-		if firstNodeEl != nil {
-			firstNode := firstNodeEl.Value.(*headerNode)
-			if blockHash.IsEqual(firstNode.hash) {
-				//	todo(ABE): for headersFirstMode, the flag behaviorFlags is set to blockchain.BFFastAdd, which implies less validation
-				behaviorFlags |= blockchain.BFFastAdd
-				if firstNode.hash.IsEqual(sm.nextCheckpoint.Hash) {
-					isCheckpointBlock = true
-				} else {
-					sm.headerList.Remove(firstNodeEl)
-				}
-			}
-		}
-	}
-
-	// Remove block from request maps. Either chain will know about it and
-	// so we shouldn't have any more instances of trying to fetch it, or we
-	// will fail the insert and thus we'll retry next time we get an inv.
-	delete(state.requestedBlocks, *blockHash)
-	delete(sm.requestedBlocks, *blockHash)
-
-	// Process the block to include validation, best chain selection, orphan
-	// handling, etc.
-	_, isOrphan, err := sm.chain.ProcessBlockBTCD(bmsg.block, behaviorFlags)
-	if err != nil {
-		// When the error is a rule error, it means the block was simply
-		// rejected as opposed to something actually going wrong, so log
-		// it as such.  Otherwise, something really did go wrong, so log
-		// it as an actual error.
-		if _, ok := err.(blockchain.RuleError); ok {
-			log.Infof("Rejected block %v from %s: %v", blockHash,
-				peer, err)
-		} else {
-			log.Errorf("Failed to process block %v: %v",
-				blockHash, err)
-		}
-		if dbErr, ok := err.(database.Error); ok && dbErr.ErrorCode ==
-			database.ErrCorruption {
-			panic(dbErr)
-		}
-
-		// Convert the error into an appropriate reject message and
-		// send it.
-		code, reason := mempool.ErrToRejectErr(err)
-		peer.PushRejectMsg(wire.CmdBlock, code, reason, blockHash, false)
-		return
-	}
-
-	// Meta-data about the new block this peer is reporting. We use this
-	// below to update this peer's latest block height and the heights of
-	// other peers based on their last announced block hash. This allows us
-	// to dynamically update the block heights of peers, avoiding stale
-	// heights when looking for a new sync peer. Upon acceptance of a block
-	// or recognition of an orphan, we also use this information to update
-	// the block heights over other peers who's invs may have been ignored
-	// if we are actively syncing while the chain is not yet current or
-	// who may have lost the lock announcement race.
-	var heightUpdate int32
-	var blkHashUpdate *chainhash.Hash
-
-	// Request the parents for the orphan block from the peer that sent it.
-	if isOrphan {
-		// We've just received an orphan block from a peer. In order
-		// to update the height of the peer, we try to extract the
-		// block height from the scriptSig of the coinbase transaction.
-		// Extraction is only attempted if the block's version is
-		// high enough (ver 2+).
-		header := &bmsg.block.MsgBlock().Header
-		if blockchain.ShouldHaveSerializedBlockHeight(header) {
-			coinbaseTx := bmsg.block.Transactions()[0]
-			cbHeight, err := blockchain.ExtractCoinbaseHeight(coinbaseTx)
-			if err != nil {
-				log.Warnf("Unable to extract height from "+
-					"coinbase tx: %v", err)
-			} else {
-				log.Debugf("Extracted height of %v from "+
-					"orphan block", cbHeight)
-				heightUpdate = cbHeight
-				blkHashUpdate = blockHash
-			}
-		}
-
-		orphanRoot := sm.chain.GetOrphanRoot(blockHash)
-		locator, err := sm.chain.LatestBlockLocator()
-		if err != nil {
-			log.Warnf("Failed to get block locator for the "+
-				"latest block: %v", err)
-		} else {
-			peer.PushGetBlocksMsg(locator, orphanRoot)
-		}
-	} else {
-		if peer == sm.syncPeer {
-			sm.lastProgressTime = time.Now()
-		}
-
-		// When the block is not an orphan, log information about it and
-		// update the chain state.
-		sm.progressLogger.LogBlockHeight(bmsg.block)
-
-		// Update this peer's latest block height, for future
-		// potential sync node candidacy.
-		best := sm.chain.BestSnapshot()
-		heightUpdate = best.Height
-		blkHashUpdate = &best.Hash
-
-		// Clear the rejected transactions.
-		// todo(ABE): Why ?
-		sm.rejectedTxns = make(map[chainhash.Hash]struct{})
-	}
-
-	// Update the block height for this peer. But only send a message to
-	// the server for updating peer heights if this is an orphan or our
-	// chain is "current". This avoids sending a spammy amount of messages
-	// if we're syncing the chain from scratch.
-	if blkHashUpdate != nil && heightUpdate != 0 {
-		peer.UpdateLastBlockHeight(heightUpdate)
-		if isOrphan || sm.current() {
-			//		todo (ABE): it seems to have some problem.
-			go sm.peerNotifier.UpdatePeerHeights(blkHashUpdate, heightUpdate,
-				peer)
-		}
-	}
-
-	// Nothing more to do if we aren't in headers-first mode.
-	if !sm.headersFirstMode {
-		//	todo(ABE): GetBlockMsg-->, <--InvMsg, GetData with block-inv -->, <--BlockMsg
-		return
-	}
-
-	// This is headers-first mode, so if the block is not a checkpoint
-	// request more blocks using the header list when the request queue is
-	// getting short.
-	if !isCheckpointBlock {
-		if sm.startHeader != nil &&
-			len(state.requestedBlocks) < minInFlightBlocks {
-			sm.fetchHeaderBlocks()
-		}
-		return
-	}
-
-	// This is headers-first mode and the block is a checkpoint.  When
-	// there is a next checkpoint, get the next round of headers by asking
-	// for headers starting from the block after this one up to the next
-	// checkpoint.
-	prevHeight := sm.nextCheckpoint.Height
-	prevHash := sm.nextCheckpoint.Hash
-	sm.nextCheckpoint = sm.findNextHeaderCheckpoint(prevHeight)
-	if sm.nextCheckpoint != nil {
-		locator := blockchain.BlockLocator([]*chainhash.Hash{prevHash})
-		err := peer.PushGetHeadersMsg(locator, sm.nextCheckpoint.Hash)
-		if err != nil {
-			log.Warnf("Failed to send getheaders message to "+
-				"peer %s: %v", peer.Addr(), err)
-			return
-		}
-		log.Infof("Downloading headers for blocks %d to %d from "+
-			"peer %s", prevHeight+1, sm.nextCheckpoint.Height,
-			sm.syncPeer.Addr())
-		return
-	}
-
-	// This is headers-first mode, the block is a checkpoint, and there are
-	// no more checkpoints, so switch to normal mode by requesting blocks
-	// from the block after this one up to the end of the chain (zero hash).
-	sm.headersFirstMode = false
-	sm.headerList.Init()
-	log.Infof("Reached the final checkpoint -- switching to normal mode")
-	locator := blockchain.BlockLocator([]*chainhash.Hash{blockHash})
-	err = peer.PushGetBlocksMsg(locator, &zeroHash)
-	if err != nil {
-		log.Warnf("Failed to send getblocks message to peer %s: %v",
-			peer.Addr(), err)
-		return
-	}
-}
+//// handleBlockMsg handles block messages from all peers.
+//func (sm *SyncManager) handleBlockMsgBTCD(bmsg *blockMsg) {
+//	peer := bmsg.peer
+//	state, exists := sm.peerStates[peer]
+//	if !exists {
+//		log.Warnf("Received block message from unknown peer %s", peer)
+//		return
+//	}
+//
+//	// If we didn't ask for this block then the peer is misbehaving.
+//	blockHash := bmsg.block.Hash()
+//	if _, exists = state.requestedBlocks[*blockHash]; !exists {
+//		// The regression test intentionally sends some blocks twice
+//		// to test duplicate block insertion fails.  Don't disconnect
+//		// the peer or ignore the block when we're in regression test
+//		// mode in this case so the chain code is actually fed the
+//		// duplicate blocks.
+//		if sm.chainParams != &chaincfg.RegressionNetParams {
+//			log.Warnf("Got unrequested block %v from %s -- "+
+//				"disconnecting", blockHash, peer.Addr())
+//			peer.Disconnect()
+//			return
+//		}
+//	}
+//
+//	// When in headers-first mode, if the block matches the hash of the
+//	// first header in the list of headers that are being fetched, it's
+//	// eligible for less validation since the headers have already been
+//	// verified to link together and are valid up to the next checkpoint.
+//	// Also, remove the list entry for all blocks except the checkpoint
+//	// since it is needed to verify the next round of headers links
+//	// properly.
+//	isCheckpointBlock := false
+//	behaviorFlags := blockchain.BFNone
+//	if sm.headersFirstMode {
+//		firstNodeEl := sm.headerList.Front()
+//		if firstNodeEl != nil {
+//			firstNode := firstNodeEl.Value.(*headerNode)
+//			if blockHash.IsEqual(firstNode.hash) {
+//				//	todo(ABE): for headersFirstMode, the flag behaviorFlags is set to blockchain.BFFastAdd, which implies less validation
+//				behaviorFlags |= blockchain.BFFastAdd
+//				if firstNode.hash.IsEqual(sm.nextCheckpoint.Hash) {
+//					isCheckpointBlock = true
+//				} else {
+//					sm.headerList.Remove(firstNodeEl)
+//				}
+//			}
+//		}
+//	}
+//
+//	// Remove block from request maps. Either chain will know about it and
+//	// so we shouldn't have any more instances of trying to fetch it, or we
+//	// will fail the insert and thus we'll retry next time we get an inv.
+//	delete(state.requestedBlocks, *blockHash)
+//	delete(sm.requestedBlocks, *blockHash)
+//
+//	// Process the block to include validation, best chain selection, orphan
+//	// handling, etc.
+//	_, isOrphan, err := sm.chain.ProcessBlockBTCD(bmsg.block, behaviorFlags)
+//	if err != nil {
+//		// When the error is a rule error, it means the block was simply
+//		// rejected as opposed to something actually going wrong, so log
+//		// it as such.  Otherwise, something really did go wrong, so log
+//		// it as an actual error.
+//		if _, ok := err.(blockchain.RuleError); ok {
+//			log.Infof("Rejected block %v from %s: %v", blockHash,
+//				peer, err)
+//		} else {
+//			log.Errorf("Failed to process block %v: %v",
+//				blockHash, err)
+//		}
+//		if dbErr, ok := err.(database.Error); ok && dbErr.ErrorCode ==
+//			database.ErrCorruption {
+//			panic(dbErr)
+//		}
+//
+//		// Convert the error into an appropriate reject message and
+//		// send it.
+//		code, reason := mempool.ErrToRejectErr(err)
+//		peer.PushRejectMsg(wire.CmdBlock, code, reason, blockHash, false)
+//		return
+//	}
+//
+//	// Meta-data about the new block this peer is reporting. We use this
+//	// below to update this peer's latest block height and the heights of
+//	// other peers based on their last announced block hash. This allows us
+//	// to dynamically update the block heights of peers, avoiding stale
+//	// heights when looking for a new sync peer. Upon acceptance of a block
+//	// or recognition of an orphan, we also use this information to update
+//	// the block heights over other peers who's invs may have been ignored
+//	// if we are actively syncing while the chain is not yet current or
+//	// who may have lost the lock announcement race.
+//	var heightUpdate int32
+//	var blkHashUpdate *chainhash.Hash
+//
+//	// Request the parents for the orphan block from the peer that sent it.
+//	if isOrphan {
+//		// We've just received an orphan block from a peer. In order
+//		// to update the height of the peer, we try to extract the
+//		// block height from the scriptSig of the coinbase transaction.
+//		// Extraction is only attempted if the block's version is
+//		// high enough (ver 2+).
+//		header := &bmsg.block.MsgBlock().Header
+//		if blockchain.ShouldHaveSerializedBlockHeight(header) {
+//			coinbaseTx := bmsg.block.Transactions()[0]
+//			cbHeight, err := blockchain.ExtractCoinbaseHeight(coinbaseTx)
+//			if err != nil {
+//				log.Warnf("Unable to extract height from "+
+//					"coinbase tx: %v", err)
+//			} else {
+//				log.Debugf("Extracted height of %v from "+
+//					"orphan block", cbHeight)
+//				heightUpdate = cbHeight
+//				blkHashUpdate = blockHash
+//			}
+//		}
+//
+//		orphanRoot := sm.chain.GetOrphanRoot(blockHash)
+//		locator, err := sm.chain.LatestBlockLocator()
+//		if err != nil {
+//			log.Warnf("Failed to get block locator for the "+
+//				"latest block: %v", err)
+//		} else {
+//			peer.PushGetBlocksMsg(locator, orphanRoot)
+//		}
+//	} else {
+//		if peer == sm.syncPeer {
+//			sm.lastProgressTime = time.Now()
+//		}
+//
+//		// When the block is not an orphan, log information about it and
+//		// update the chain state.
+//		sm.progressLogger.LogBlockHeight(bmsg.block)
+//
+//		// Update this peer's latest block height, for future
+//		// potential sync node candidacy.
+//		best := sm.chain.BestSnapshot()
+//		heightUpdate = best.Height
+//		blkHashUpdate = &best.Hash
+//
+//		// Clear the rejected transactions.
+//		// todo(ABE): Why ?
+//		sm.rejectedTxns = make(map[chainhash.Hash]struct{})
+//	}
+//
+//	// Update the block height for this peer. But only send a message to
+//	// the server for updating peer heights if this is an orphan or our
+//	// chain is "current". This avoids sending a spammy amount of messages
+//	// if we're syncing the chain from scratch.
+//	if blkHashUpdate != nil && heightUpdate != 0 {
+//		peer.UpdateLastBlockHeight(heightUpdate)
+//		if isOrphan || sm.current() {
+//			//		todo (ABE): it seems to have some problem.
+//			go sm.peerNotifier.UpdatePeerHeights(blkHashUpdate, heightUpdate,
+//				peer)
+//		}
+//	}
+//
+//	// Nothing more to do if we aren't in headers-first mode.
+//	if !sm.headersFirstMode {
+//		//	todo(ABE): GetBlockMsg-->, <--InvMsg, GetData with block-inv -->, <--BlockMsg
+//		return
+//	}
+//
+//	// This is headers-first mode, so if the block is not a checkpoint
+//	// request more blocks using the header list when the request queue is
+//	// getting short.
+//	if !isCheckpointBlock {
+//		if sm.startHeader != nil &&
+//			len(state.requestedBlocks) < minInFlightBlocks {
+//			sm.fetchHeaderBlocks()
+//		}
+//		return
+//	}
+//
+//	// This is headers-first mode and the block is a checkpoint.  When
+//	// there is a next checkpoint, get the next round of headers by asking
+//	// for headers starting from the block after this one up to the next
+//	// checkpoint.
+//	prevHeight := sm.nextCheckpoint.Height
+//	prevHash := sm.nextCheckpoint.Hash
+//	sm.nextCheckpoint = sm.findNextHeaderCheckpoint(prevHeight)
+//	if sm.nextCheckpoint != nil {
+//		locator := blockchain.BlockLocator([]*chainhash.Hash{prevHash})
+//		err := peer.PushGetHeadersMsg(locator, sm.nextCheckpoint.Hash)
+//		if err != nil {
+//			log.Warnf("Failed to send getheaders message to "+
+//				"peer %s: %v", peer.Addr(), err)
+//			return
+//		}
+//		log.Infof("Downloading headers for blocks %d to %d from "+
+//			"peer %s", prevHeight+1, sm.nextCheckpoint.Height,
+//			sm.syncPeer.Addr())
+//		return
+//	}
+//
+//	// This is headers-first mode, the block is a checkpoint, and there are
+//	// no more checkpoints, so switch to normal mode by requesting blocks
+//	// from the block after this one up to the end of the chain (zero hash).
+//	sm.headersFirstMode = false
+//	sm.headerList.Init()
+//	log.Infof("Reached the final checkpoint -- switching to normal mode")
+//	locator := blockchain.BlockLocator([]*chainhash.Hash{blockHash})
+//	err = peer.PushGetBlocksMsg(locator, &zeroHash)
+//	if err != nil {
+//		log.Warnf("Failed to send getblocks message to peer %s: %v",
+//			peer.Addr(), err)
+//		return
+//	}
+//}
 
 //	todo(ABE):
 // handleBlockMsg handles block messages from all peers.

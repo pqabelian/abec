@@ -601,7 +601,8 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, powLimit *big.Int, timeSou
 //
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkBlockHeaderSanity.
-func checkBlockSanity(block *abeutil.Block, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
+//	todo(ABE):
+func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
 	msgBlock := block.MsgBlock()
 	header := &msgBlock.Header
 	err := checkBlockHeaderSanity(header, powLimit, timeSource, flags)
@@ -817,8 +818,12 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, powLimit *big.Int, timeSource 
 
 // CheckBlockSanity performs some preliminary checks on a block to ensure it is
 // sane before continuing with block processing.  These checks are context free.
-func CheckBlockSanity(block *abeutil.Block, powLimit *big.Int, timeSource MedianTimeSource) error {
-	return checkBlockSanity(block, powLimit, timeSource, BFNone)
+func CheckBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource MedianTimeSource) error {
+	return checkBlockSanityBTCD(block, powLimit, timeSource, BFNone)
+}
+
+func CheckBlockSanity(block *abeutil.BlockAbe, powLimit *big.Int, timeSource MedianTimeSource) error {
+	return checkBlockSanityAbe(block, powLimit, timeSource, BFNone)
 }
 
 // ExtractCoinbaseHeight attempts to extract the height of the block from the
@@ -2032,7 +2037,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 // work requirement. The block must connect to the current tip of the main chain.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) CheckConnectBlockTemplate(block *abeutil.Block) error {
+func (b *BlockChain) CheckConnectBlockTemplateBTCD(block *abeutil.Block) error {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
 
@@ -2049,7 +2054,7 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *abeutil.Block) error {
 		return ruleError(ErrPrevBlockNotBest, str)
 	}
 
-	err := checkBlockSanity(block, b.chainParams.PowLimit, b.timeSource, flags)
+	err := checkBlockSanityBTCD(block, b.chainParams.PowLimit, b.timeSource, flags)
 	if err != nil {
 		return err
 	}

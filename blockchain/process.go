@@ -218,112 +218,113 @@ func (b *BlockChain) processOrphansAbe(hash *chainhash.Hash, flags BehaviorFlags
 // whether or not the block is an orphan.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) ProcessBlockBTCD(block *abeutil.Block, flags BehaviorFlags) (bool, bool, error) {
-	b.chainLock.Lock()
-	defer b.chainLock.Unlock()
+//	todo(ABE): Remove
+//func (b *BlockChain) ProcessBlockBTCD(block *abeutil.Block, flags BehaviorFlags) (bool, bool, error) {
+//	b.chainLock.Lock()
+//	defer b.chainLock.Unlock()
+//
+//	fastAdd := flags&BFFastAdd == BFFastAdd
+//
+//	blockHash := block.Hash()
+//	log.Tracef("Processing block %v", blockHash)
+//
+//	// The block must not already exist in the main chain or side chains.
+//	exists, err := b.blockExists(blockHash)
+//	if err != nil {
+//		return false, false, err
+//	}
+//	if exists {
+//		str := fmt.Sprintf("already have block %v", blockHash)
+//		return false, false, ruleError(ErrDuplicateBlock, str)
+//	}
+//
+//	// The block must not already exist as an orphan.
+//	if _, exists := b.orphans[*blockHash]; exists {
+//		str := fmt.Sprintf("already have block (orphan) %v", blockHash)
+//		return false, false, ruleError(ErrDuplicateBlock, str)
+//	}
+//
+//	// Perform preliminary sanity checks on the block and its transactions.
+//	err = checkBlockSanity(block, b.chainParams.PowLimit, b.timeSource, flags)
+//	if err != nil {
+//		return false, false, err
+//	}
+//
+//	// Find the previous checkpoint and perform some additional checks based
+//	// on the checkpoint.  This provides a few nice properties such as
+//	// preventing old side chain blocks before the last checkpoint,
+//	// rejecting easy to mine, but otherwise bogus, blocks that could be
+//	// used to eat memory, and ensuring expected (versus claimed) proof of
+//	// work requirements since the previous checkpoint are met.
+//	blockHeader := &block.MsgBlock().Header
+//	checkpointNode, err := b.findPreviousCheckpoint()
+//	if err != nil {
+//		return false, false, err
+//	}
+//	if checkpointNode != nil {
+//		// Ensure the block timestamp is after the checkpoint timestamp.
+//		checkpointTime := time.Unix(checkpointNode.timestamp, 0)
+//		if blockHeader.Timestamp.Before(checkpointTime) {
+//			str := fmt.Sprintf("block %v has timestamp %v before "+
+//				"last checkpoint timestamp %v", blockHash,
+//				blockHeader.Timestamp, checkpointTime)
+//			return false, false, ruleError(ErrCheckpointTimeTooOld, str)
+//		}
+//		if !fastAdd {
+//			// Even though the checks prior to now have already ensured the
+//			// proof of work exceeds the claimed amount, the claimed amount
+//			// is a field in the block header which could be forged.  This
+//			// check ensures the proof of work is at least the minimum
+//			// expected based on elapsed time since the last checkpoint and
+//			// maximum adjustment allowed by the retarget rules.
+//			duration := blockHeader.Timestamp.Sub(checkpointTime)
+//			requiredTarget := CompactToBig(b.calcEasiestDifficulty(
+//				checkpointNode.bits, duration))
+//			currentTarget := CompactToBig(blockHeader.Bits)
+//			if currentTarget.Cmp(requiredTarget) > 0 {
+//				str := fmt.Sprintf("block target difficulty of %064x "+
+//					"is too low when compared to the previous "+
+//					"checkpoint", currentTarget)
+//				return false, false, ruleError(ErrDifficultyTooLow, str)
+//			}
+//		}
+//	}
+//
+//	// Handle orphan blocks.
+//	//	todo (ABE): orphan block means a block without previous block
+//	prevHash := &blockHeader.PrevBlock
+//	prevHashExists, err := b.blockExists(prevHash)
+//	if err != nil {
+//		return false, false, err
+//	}
+//	if !prevHashExists {
+//		log.Infof("Adding orphan block %v with parent %v", blockHash, prevHash)
+//		b.addOrphanBlock(block)
+//
+//		return false, true, nil
+//	}
+//
+//	// The block has passed all context independent checks and appears sane
+//	// enough to potentially accept it into the block chain.
+//	isMainChain, err := b.maybeAcceptBlock(block, flags)
+//	if err != nil {
+//		return false, false, err
+//	}
+//
+//	// Accept any orphan blocks that depend on this block (they are
+//	// no longer orphans) and repeat for those accepted blocks until
+//	// there are no more.
+//	err = b.processOrphans(blockHash, flags)
+//	if err != nil {
+//		return false, false, err
+//	}
+//
+//	log.Debugf("Accepted block %v", blockHash)
+//
+//	return isMainChain, false, nil
+//}
 
-	fastAdd := flags&BFFastAdd == BFFastAdd
-
-	blockHash := block.Hash()
-	log.Tracef("Processing block %v", blockHash)
-
-	// The block must not already exist in the main chain or side chains.
-	exists, err := b.blockExists(blockHash)
-	if err != nil {
-		return false, false, err
-	}
-	if exists {
-		str := fmt.Sprintf("already have block %v", blockHash)
-		return false, false, ruleError(ErrDuplicateBlock, str)
-	}
-
-	// The block must not already exist as an orphan.
-	if _, exists := b.orphans[*blockHash]; exists {
-		str := fmt.Sprintf("already have block (orphan) %v", blockHash)
-		return false, false, ruleError(ErrDuplicateBlock, str)
-	}
-
-	// Perform preliminary sanity checks on the block and its transactions.
-	err = checkBlockSanity(block, b.chainParams.PowLimit, b.timeSource, flags)
-	if err != nil {
-		return false, false, err
-	}
-
-	// Find the previous checkpoint and perform some additional checks based
-	// on the checkpoint.  This provides a few nice properties such as
-	// preventing old side chain blocks before the last checkpoint,
-	// rejecting easy to mine, but otherwise bogus, blocks that could be
-	// used to eat memory, and ensuring expected (versus claimed) proof of
-	// work requirements since the previous checkpoint are met.
-	blockHeader := &block.MsgBlock().Header
-	checkpointNode, err := b.findPreviousCheckpoint()
-	if err != nil {
-		return false, false, err
-	}
-	if checkpointNode != nil {
-		// Ensure the block timestamp is after the checkpoint timestamp.
-		checkpointTime := time.Unix(checkpointNode.timestamp, 0)
-		if blockHeader.Timestamp.Before(checkpointTime) {
-			str := fmt.Sprintf("block %v has timestamp %v before "+
-				"last checkpoint timestamp %v", blockHash,
-				blockHeader.Timestamp, checkpointTime)
-			return false, false, ruleError(ErrCheckpointTimeTooOld, str)
-		}
-		if !fastAdd {
-			// Even though the checks prior to now have already ensured the
-			// proof of work exceeds the claimed amount, the claimed amount
-			// is a field in the block header which could be forged.  This
-			// check ensures the proof of work is at least the minimum
-			// expected based on elapsed time since the last checkpoint and
-			// maximum adjustment allowed by the retarget rules.
-			duration := blockHeader.Timestamp.Sub(checkpointTime)
-			requiredTarget := CompactToBig(b.calcEasiestDifficulty(
-				checkpointNode.bits, duration))
-			currentTarget := CompactToBig(blockHeader.Bits)
-			if currentTarget.Cmp(requiredTarget) > 0 {
-				str := fmt.Sprintf("block target difficulty of %064x "+
-					"is too low when compared to the previous "+
-					"checkpoint", currentTarget)
-				return false, false, ruleError(ErrDifficultyTooLow, str)
-			}
-		}
-	}
-
-	// Handle orphan blocks.
-	//	todo (ABE): orphan block means a block without previous block
-	prevHash := &blockHeader.PrevBlock
-	prevHashExists, err := b.blockExists(prevHash)
-	if err != nil {
-		return false, false, err
-	}
-	if !prevHashExists {
-		log.Infof("Adding orphan block %v with parent %v", blockHash, prevHash)
-		b.addOrphanBlock(block)
-
-		return false, true, nil
-	}
-
-	// The block has passed all context independent checks and appears sane
-	// enough to potentially accept it into the block chain.
-	isMainChain, err := b.maybeAcceptBlock(block, flags)
-	if err != nil {
-		return false, false, err
-	}
-
-	// Accept any orphan blocks that depend on this block (they are
-	// no longer orphans) and repeat for those accepted blocks until
-	// there are no more.
-	err = b.processOrphans(blockHash, flags)
-	if err != nil {
-		return false, false, err
-	}
-
-	log.Debugf("Accepted block %v", blockHash)
-
-	return isMainChain, false, nil
-}
-
-//	Abe to do
+//	todo(ABE):
 func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, flags BehaviorFlags) (bool, bool, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()

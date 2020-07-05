@@ -1707,7 +1707,8 @@ func blockIndexKey(blockHash *chainhash.Hash, blockHeight uint32) []byte {
 // BlockByHeight returns the block at the given height in the main chain.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) BlockByHeight(blockHeight int32) (*abeutil.Block, error) {
+//	todo(ABE):
+func (b *BlockChain) BlockByHeightBTCD(blockHeight int32) (*abeutil.Block, error) {
 	// Lookup the block height in the best chain.
 	node := b.bestChain.NodeByHeight(blockHeight)
 	if node == nil {
@@ -1720,6 +1721,24 @@ func (b *BlockChain) BlockByHeight(blockHeight int32) (*abeutil.Block, error) {
 	err := b.db.View(func(dbTx database.Tx) error {
 		var err error
 		block, err = dbFetchBlockByNode(dbTx, node)
+		return err
+	})
+	return block, err
+}
+
+func (b *BlockChain) BlockByHeight(blockHeight int32) (*abeutil.BlockAbe, error) {
+	// Lookup the block height in the best chain.
+	node := b.bestChain.NodeByHeight(blockHeight)
+	if node == nil {
+		str := fmt.Sprintf("no block at height %d exists", blockHeight)
+		return nil, errNotInMainChain(str)
+	}
+
+	// Load the block from the database and return it.
+	var block *abeutil.BlockAbe
+	err := b.db.View(func(dbTx database.Tx) error {
+		var err error
+		block, err = dbFetchBlockByNodeAbe(dbTx, node)
 		return err
 	})
 	return block, err
