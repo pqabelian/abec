@@ -58,8 +58,8 @@ type Config struct {
 	// ProcessBlock defines the function to call with any solved blocks.
 	// It typically must run the provided block through the same set of
 	// rules and handling as any other block coming from the network.
-	ProcessBlock    func(*abeutil.Block, blockchain.BehaviorFlags) (bool, error)
-	ProcessBlockAbe func(*abeutil.BlockAbe, blockchain.BehaviorFlags) (bool, error)
+	ProcessBlockBTCD func(*abeutil.Block, blockchain.BehaviorFlags) (bool, error)
+	ProcessBlockAbe  func(*abeutil.BlockAbe, blockchain.BehaviorFlags) (bool, error)
 
 	// ConnectedCount defines the function to use to obtain how many other
 	// peers the server is connected to.  This is used by the automatic

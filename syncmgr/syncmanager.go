@@ -55,11 +55,13 @@ type newPeerMsg struct {
 
 // blockMsg packages a bitcoin block message and the peer it came from together
 // so the block handler has access to that information.
+//	todo(ABE): Remove BTCD
 type blockMsg struct {
 	block *abeutil.Block
 	peer  *peerpkg.Peer
 	reply chan struct{}
 }
+
 type blockMsgAbe struct {
 	block *abeutil.BlockAbe
 	peer  *peerpkg.Peer
@@ -120,7 +122,7 @@ type processBlockResponse struct {
 // extra handling whereas this message essentially is just a concurrent safe
 // way to call ProcessBlock on the internal block chain instance.
 //	todo(ABE):
-type processBlockMsg struct {
+type processBlockMsgBTCD struct {
 	block *abeutil.Block
 	flags blockchain.BehaviorFlags
 	reply chan processBlockResponse
@@ -782,7 +784,7 @@ func (sm *SyncManager) handleBlockMsgBTCD(bmsg *blockMsg) {
 
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
-	_, isOrphan, err := sm.chain.ProcessBlock(bmsg.block, behaviorFlags)
+	_, isOrphan, err := sm.chain.ProcessBlockBTCD(bmsg.block, behaviorFlags)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
@@ -1809,6 +1811,16 @@ func (sm *SyncManager) QueueTx(tx *abeutil.Tx, peer *peerpkg.Peer, done chan str
 	sm.msgChan <- &txMsg{tx: tx, peer: peer, reply: done}
 }
 
+func (sm *SyncManager) QueueTxAbe(tx *abeutil.TxAbe, peer *peerpkg.Peer, done chan struct{}) {
+	// Don't accept more transactions if we're shutting down.
+	if atomic.LoadInt32(&sm.shutdown) != 0 {
+		done <- struct{}{}
+		return
+	}
+
+	sm.msgChan <- &txMsgAbe{tx: tx, peer: peer, reply: done}
+}
+
 // QueueBlock adds the passed block message and peer to the block handling
 // queue. Responds to the done channel argument after the block message is
 // processed.
@@ -1820,6 +1832,16 @@ func (sm *SyncManager) QueueBlock(block *abeutil.Block, peer *peerpkg.Peer, done
 	}
 
 	sm.msgChan <- &blockMsg{block: block, peer: peer, reply: done}
+}
+
+func (sm *SyncManager) QueueBlockAbe(block *abeutil.BlockAbe, peer *peerpkg.Peer, done chan struct{}) {
+	// Don't accept more blocks if we're shutting down.
+	if atomic.LoadInt32(&sm.shutdown) != 0 {
+		done <- struct{}{}
+		return
+	}
+
+	sm.msgChan <- &blockMsgAbe{block: block, peer: peer, reply: done}
 }
 
 // QueueInv adds the passed inv message and peer to the block handling queue.
@@ -1892,9 +1914,9 @@ func (sm *SyncManager) SyncPeerID() int32 {
 // ProcessBlock makes use of ProcessBlock on an internal instance of a block
 // chain.
 //	todo(ABE):
-func (sm *SyncManager) ProcessBlock(block *abeutil.Block, flags blockchain.BehaviorFlags) (bool, error) {
+func (sm *SyncManager) ProcessBlockBTCD(block *abeutil.Block, flags blockchain.BehaviorFlags) (bool, error) {
 	reply := make(chan processBlockResponse, 1)
-	sm.msgChan <- processBlockMsg{block: block, flags: flags, reply: reply}
+	sm.msgChan <- processBlockMsgBTCD{block: block, flags: flags, reply: reply}
 	response := <-reply
 	return response.isOrphan, response.err
 }

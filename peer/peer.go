@@ -113,10 +113,12 @@ type MessageListeners struct {
 	OnMemPool func(p *Peer, msg *wire.MsgMemPool)
 
 	// OnTx is invoked when a peer receives a tx bitcoin message.
-	OnTx func(p *Peer, msg *wire.MsgTx)
+	OnTx    func(p *Peer, msg *wire.MsgTx)
+	OnTxAbe func(p *Peer, msg *wire.MsgTxAbe)
 
 	// OnBlock is invoked when a peer receives a block bitcoin message.
-	OnBlock func(p *Peer, msg *wire.MsgBlock, buf []byte)
+	OnBlock    func(p *Peer, msg *wire.MsgBlock, buf []byte)
+	OnBlockAbe func(p *Peer, msg *wire.MsgBlockAbe, buf []byte)
 
 	// OnCFilter is invoked when a peer receives a cfilter bitcoin message.
 	OnCFilter func(p *Peer, msg *wire.MsgCFilter)
@@ -1415,15 +1417,25 @@ out:
 			if p.cfg.Listeners.OnMemPool != nil {
 				p.cfg.Listeners.OnMemPool(p, msg)
 			}
+		//	todo(ABE): Remove
+		/*		case *wire.MsgTx:
+					if p.cfg.Listeners.OnTx != nil {
+						p.cfg.Listeners.OnTx(p, msg)
+					}
 
-		case *wire.MsgTx:
-			if p.cfg.Listeners.OnTx != nil {
-				p.cfg.Listeners.OnTx(p, msg)
+				case *wire.MsgBlock:
+					if p.cfg.Listeners.OnBlock != nil {
+						p.cfg.Listeners.OnBlock(p, msg, buf)
+					}*/
+
+		case *wire.MsgTxAbe:
+			if p.cfg.Listeners.OnTxAbe != nil {
+				p.cfg.Listeners.OnTxAbe(p, msg)
 			}
 
-		case *wire.MsgBlock:
-			if p.cfg.Listeners.OnBlock != nil {
-				p.cfg.Listeners.OnBlock(p, msg, buf)
+		case *wire.MsgBlockAbe:
+			if p.cfg.Listeners.OnBlockAbe != nil {
+				p.cfg.Listeners.OnBlockAbe(p, msg, buf)
 			}
 
 		case *wire.MsgInv:

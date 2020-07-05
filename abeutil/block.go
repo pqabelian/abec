@@ -395,3 +395,11 @@ func NewBlockFromBlockAndBytes(msgBlock *wire.MsgBlock, serializedBlock []byte) 
 		blockHeight:     BlockHeightUnknown,
 	}
 }
+
+func NewBlockFromBlockAndBytesAbe(msgBlock *wire.MsgBlockAbe, serializedBlock []byte) *BlockAbe {
+	return &BlockAbe{
+		msgBlock:        msgBlock,
+		serializedBlock: serializedBlock,
+		blockHeight:     BlockHeightUnknown,
+	}
+}

@@ -242,8 +242,12 @@ func (b *rpcSyncMgr) IsCurrent() bool {
 //
 // This function is safe for concurrent access and is part of the
 // rpcserverSyncManager interface implementation.
-func (b *rpcSyncMgr) SubmitBlock(block *abeutil.Block, flags blockchain.BehaviorFlags) (bool, error) {
-	return b.syncMgr.ProcessBlock(block, flags)
+func (b *rpcSyncMgr) SubmitBlockBTCD(block *abeutil.Block, flags blockchain.BehaviorFlags) (bool, error) {
+	return b.syncMgr.ProcessBlockBTCD(block, flags)
+}
+
+func (b *rpcSyncMgr) SubmitBlockAbe(block *abeutil.BlockAbe, flags blockchain.BehaviorFlags) (bool, error) {
+	return b.syncMgr.ProcessBlockAbe(block, flags)
 }
 
 // Pause pauses the sync manager until the returned channel is closed.
