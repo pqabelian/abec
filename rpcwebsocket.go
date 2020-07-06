@@ -458,6 +458,7 @@ func (f *wsClientFilter) removeUnspentOutPoint(op *wire.OutPoint) {
 // Notification types
 type notificationBlockConnected abeutil.Block
 type notificationBlockDisconnected abeutil.Block
+
 type notificationTxAcceptedByMempool struct {
 	isNew bool
 	tx    *abeutil.Tx

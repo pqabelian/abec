@@ -146,7 +146,7 @@ func (b *BlockChain) processOrphansBTCD(hash *chainhash.Hash, flags BehaviorFlag
 			i--
 
 			// Potentially accept the block into the block chain.
-			_, err := b.maybeAcceptBlock(orphan.block, flags)
+			_, err := b.maybeAcceptBlockBTCD(orphan.block, flags)
 			if err != nil {
 				return err
 			}

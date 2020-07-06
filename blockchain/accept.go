@@ -16,7 +16,7 @@ import (
 // their documentation for how the flags modify their behavior.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) maybeAcceptBlock(block *abeutil.Block, flags BehaviorFlags) (bool, error) {
+func (b *BlockChain) maybeAcceptBlockBTCD(block *abeutil.Block, flags BehaviorFlags) (bool, error) {
 	// The height of this block is one more than the referenced previous
 	// block.
 	prevHash := &block.MsgBlock().Header.PrevBlock
@@ -74,7 +74,7 @@ func (b *BlockChain) maybeAcceptBlock(block *abeutil.Block, flags BehaviorFlags)
 	// selection according to the chain with the most proof of work.  This
 	// also handles validation of the transaction scripts.
 	// =>the block is added to chain
-	isMainChain, err := b.connectBestChain(newNode, block, flags)
+	isMainChain, err := b.connectBestChainBTCD(newNode, block, flags)
 	if err != nil {
 		return false, err
 	}
