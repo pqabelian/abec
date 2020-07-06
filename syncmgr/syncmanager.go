@@ -601,7 +601,7 @@ func (sm *SyncManager) handleTxMsgBTCD(tmsg *txMsg) {
 
 	// Process the transaction to include validation, insertion in the
 	// memory pool, orphan handling, etc.
-	acceptedTxs, err := sm.txMemPool.ProcessTransaction(tmsg.tx,
+	acceptedTxs, err := sm.txMemPool.ProcessTransactionBTCD(tmsg.tx,
 		true, true, mempool.Tag(peer.ID()))
 
 	// Remove transaction from request maps. Either the mempool/chain
@@ -1709,6 +1709,7 @@ out:
 // handleBlockchainNotification handles notifications from blockchain.  It does
 // things such as request orphan block parents and relay accepted blocks to
 // connected peers.
+//	todo (ABE):
 func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Notification) {
 	switch notification.Type {
 	// A block has been accepted into the block chain.  Relay it to other
@@ -1720,7 +1721,7 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 			return
 		}
 
-		block, ok := notification.Data.(*abeutil.Block)
+		block, ok := notification.Data.(*abeutil.BlockAbe)
 		if !ok {
 			log.Warnf("Chain accepted notification is not a block.")
 			break
@@ -1732,7 +1733,7 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 
 	// A block has been connected to the main block chain.
 	case blockchain.NTBlockConnected:
-		block, ok := notification.Data.(*abeutil.Block)
+		block, ok := notification.Data.(*abeutil.BlockAbe)
 		if !ok {
 			log.Warnf("Chain connected notification is not a block.")
 			break
@@ -1747,17 +1748,19 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 		// valid.
 		//	todo(ABE): mempool will not contain the transactions that double-spend those in mainchain.
 		for _, tx := range block.Transactions()[1:] {
-			sm.txMemPool.RemoveTransaction(tx, false)
-			sm.txMemPool.RemoveDoubleSpends(tx)
-			sm.txMemPool.RemoveOrphan(tx)
-			sm.peerNotifier.TransactionConfirmed(tx)
-			acceptedTxs := sm.txMemPool.ProcessOrphans(tx)
-			sm.peerNotifier.AnnounceNewTransactions(acceptedTxs)
+			sm.txMemPool.RemoveTransactionAbe(tx)
+			sm.txMemPool.RemoveDoubleSpendsAbe(tx)
+			sm.txMemPool.RemoveOrphanAbe(tx)
+			sm.peerNotifier.TransactionConfirmedAbe(tx)
+			sm.txMemPool.ProcessOrphansAbe(tx) //	remove the orphans that double-spend the txIns of tx
+			//sm.peerNotifier.AnnounceNewTransactions(acceptedTxs)
+			//todo(ABE): for ABE, sm does not need to sm.peerNotifier.AnnounceNewTransactions(acceptedTx),
+			// as tx is propagated with blocks, and may be announced when verify the block.
 		}
 
 		// Register block with the fee estimator, if it exists.
 		if sm.feeEstimator != nil {
-			err := sm.feeEstimator.RegisterBlock(block)
+			err := sm.feeEstimator.RegisterBlockAbe(block)
 
 			// If an error is somehow generated then the fee estimator
 			// has entered an invalid state. Since it doesn't know how
@@ -1771,7 +1774,7 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 
 	// A block has been disconnected from the main block chain.
 	case blockchain.NTBlockDisconnected:
-		block, ok := notification.Data.(*abeutil.Block)
+		block, ok := notification.Data.(*abeutil.BlockAbe)
 		if !ok {
 			log.Warnf("Chain disconnected notification is not a block.")
 			break
@@ -1780,13 +1783,13 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 		// Reinsert all of the transactions (except the coinbase) into
 		// the transaction pool.
 		for _, tx := range block.Transactions()[1:] {
-			_, _, err := sm.txMemPool.MaybeAcceptTransaction(tx,
+			_, _, err := sm.txMemPool.MaybeAcceptTransactionAbe(tx,
 				false, false)
 			if err != nil {
 				// Remove the transaction and all transactions
 				// that depend on it if it wasn't accepted into
 				// the transaction pool.
-				sm.txMemPool.RemoveTransaction(tx, true)
+				sm.txMemPool.RemoveTransactionAbe(tx)
 			}
 		}
 

@@ -196,7 +196,7 @@ func (m *wsNotificationManager) queueHandler() {
 // NotifyBlockConnected passes a block newly-connected to the best chain
 // to the notification manager for block and transaction notification
 // processing.
-func (m *wsNotificationManager) NotifyBlockConnected(block *abeutil.Block) {
+func (m *wsNotificationManager) NotifyBlockConnected(block *abeutil.BlockAbe) {
 	// As NotifyBlockConnected will be called by the block manager
 	// and the RPC server may no longer be running, use a select
 	// statement to unblock enqueuing the notification once the RPC
@@ -209,7 +209,7 @@ func (m *wsNotificationManager) NotifyBlockConnected(block *abeutil.Block) {
 
 // NotifyBlockDisconnected passes a block disconnected from the best chain
 // to the notification manager for block notification processing.
-func (m *wsNotificationManager) NotifyBlockDisconnected(block *abeutil.Block) {
+func (m *wsNotificationManager) NotifyBlockDisconnected(block *abeutil.BlockAbe) {
 	// As NotifyBlockDisconnected will be called by the block manager
 	// and the RPC server may no longer be running, use a select
 	// statement to unblock enqueuing the notification once the RPC
@@ -455,9 +455,10 @@ func (f *wsClientFilter) removeUnspentOutPoint(op *wire.OutPoint) {
 	delete(f.unspent, *op)
 }
 
+//	todo(ABE):
 // Notification types
-type notificationBlockConnected abeutil.Block
-type notificationBlockDisconnected abeutil.Block
+type notificationBlockConnected abeutil.BlockAbe
+type notificationBlockDisconnected abeutil.BlockAbe
 
 type notificationTxAcceptedByMempool struct {
 	isNew bool
@@ -520,7 +521,7 @@ out:
 			}
 			switch n := n.(type) {
 			case *notificationBlockConnected:
-				block := (*abeutil.Block)(n)
+				block := (*abeutil.BlockAbe)(n)
 
 				// Skip iterating through all txs if no
 				// tx notification requests exist.

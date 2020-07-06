@@ -1438,6 +1438,16 @@ func (s *server) TransactionConfirmed(tx *abeutil.Tx) {
 	s.RemoveRebroadcastInventory(iv)
 }
 
+func (s *server) TransactionConfirmedAbe(tx *abeutil.TxAbe) {
+	// Rebroadcasting is only necessary when the RPC server is active.
+	if s.rpcServer == nil {
+		return
+	}
+
+	iv := wire.NewInvVect(wire.InvTypeTx, tx.Hash())
+	s.RemoveRebroadcastInventory(iv)
+}
+
 // pushTxMsg sends a tx message for the provided transaction hash to the
 // connected peer.  An error is returned if the transaction hash is not known.
 func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},

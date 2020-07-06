@@ -296,6 +296,12 @@ func (mp *TxPool) RemoveOrphan(tx *abeutil.Tx) {
 	mp.mtx.Unlock()
 }
 
+func (mp *TxPool) RemoveOrphanAbe(tx *abeutil.TxAbe) {
+	mp.mtx.Lock()
+	mp.removeOrphanAbe(tx)
+	mp.mtx.Unlock()
+}
+
 // RemoveOrphansByTag removes all orphan transactions tagged with the provided
 // identifier.
 //
@@ -659,14 +665,14 @@ func (mp *TxPool) HaveTransaction(hash *chainhash.Hash) bool {
 // RemoveTransaction.  See the comment for RemoveTransaction for more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *TxPool) removeTransaction(tx *abeutil.Tx, removeRedeemers bool) {
+func (mp *TxPool) removeTransactionBTCD(tx *abeutil.Tx, removeRedeemers bool) {
 	txHash := tx.Hash()
 	if removeRedeemers {
 		// Remove any transactions which rely on this one.
 		for i := uint32(0); i < uint32(len(tx.MsgTx().TxOut)); i++ {
 			prevOut := wire.OutPoint{Hash: *txHash, Index: i}
 			if txRedeemer, exists := mp.outpoints[prevOut]; exists {
-				mp.removeTransaction(txRedeemer, true)
+				mp.removeTransactionBTCD(txRedeemer, true)
 			}
 		}
 	}
@@ -688,34 +694,39 @@ func (mp *TxPool) removeTransaction(tx *abeutil.Tx, removeRedeemers bool) {
 	}
 }
 
-//	Abe to do
-func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe, removeRedeemers bool) {
-	/*	txHash := tx.Hash()
-		if removeRedeemers {
-			// Remove any transactions which rely on this one.
-			for i := uint32(0); i < uint32(len(tx.MsgTx().TxOuts)); i++ {
-				prevOut := wire.OutPoint{Hash: *txHash, Index: i}
-				if txRedeemer, exists := mp.outpoints[prevOut]; exists {
-					mp.removeTransaction(txRedeemer, true)
-				}
+//	todo(ABE):
+func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
+	txHash := tx.Hash()
+	/*	if removeRedeemers {
+		// Remove any transactions which rely on this one.
+		for i := uint32(0); i < uint32(len(tx.MsgTx().TxOut)); i++ {
+			prevOut := wire.OutPoint{Hash: *txHash, Index: i}
+			if txRedeemer, exists := mp.outpoints[prevOut]; exists {
+				mp.removeTransaction(txRedeemer, true)
+			}
+		}
+	}*/
+
+	// Remove the transaction if needed.
+	if txDesc, exists := mp.poolAbe[*txHash]; exists {
+		// Remove unconfirmed address index entries associated with the
+		// transaction if enabled.
+		if mp.cfg.AddrIndex != nil {
+			//	todo(ABE):
+			mp.cfg.AddrIndex.RemoveUnconfirmedTx(txHash)
+		}
+
+		// Mark the referenced outpoints as unspent by the pool.
+		for _, txIn := range txDesc.Tx.MsgTx().TxIns {
+			ringHash := txIn.PreviousOutPointRing.Hash()
+			if _, ringExists := mp.outpointsAbe[ringHash]; ringExists {
+				delete(mp.outpointsAbe[ringHash], txIn.SerialNumber)
 			}
 		}
 
-		// Remove the transaction if needed.
-		if txDesc, exists := mp.pool[*txHash]; exists {
-			// Remove unconfirmed address index entries associated with the
-			// transaction if enabled.
-			if mp.cfg.AddrIndex != nil {
-				mp.cfg.AddrIndex.RemoveUnconfirmedTx(txHash)
-			}
-
-			// Mark the referenced outpoints as unspent by the pool.
-			for _, txIn := range txDesc.Tx.MsgTx().TxIn {
-				delete(mp.outpoints, txIn.PreviousOutPoint)
-			}
-			delete(mp.pool, *txHash)
-			atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
-		}*/
+		delete(mp.poolAbe, *txHash)
+		atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
+	}
 }
 
 // RemoveTransaction removes the passed transaction from the mempool. When the
@@ -724,10 +735,17 @@ func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe, removeRedeemers bool) 
 // they would otherwise become orphans.
 //
 // This function is safe for concurrent access.
-func (mp *TxPool) RemoveTransaction(tx *abeutil.Tx, removeRedeemers bool) {
+func (mp *TxPool) RemoveTransactionBTCD(tx *abeutil.Tx, removeRedeemers bool) {
 	// Protect concurrent access.
 	mp.mtx.Lock()
-	mp.removeTransaction(tx, removeRedeemers)
+	mp.removeTransactionBTCD(tx, removeRedeemers)
+	mp.mtx.Unlock()
+}
+
+func (mp *TxPool) RemoveTransactionAbe(tx *abeutil.TxAbe) {
+	// Protect concurrent access.
+	mp.mtx.Lock()
+	mp.removeTransactionAbe(tx)
 	mp.mtx.Unlock()
 }
 
@@ -744,7 +762,25 @@ func (mp *TxPool) RemoveDoubleSpends(tx *abeutil.Tx) {
 	for _, txIn := range tx.MsgTx().TxIn {
 		if txRedeemer, ok := mp.outpoints[txIn.PreviousOutPoint]; ok {
 			if !txRedeemer.Hash().IsEqual(tx.Hash()) {
-				mp.removeTransaction(txRedeemer, true)
+				mp.removeTransactionBTCD(txRedeemer, true)
+			}
+		}
+	}
+	mp.mtx.Unlock()
+}
+
+//	todo(ABE):
+func (mp *TxPool) RemoveDoubleSpendsAbe(tx *abeutil.TxAbe) {
+	// Protect concurrent access.
+	mp.mtx.Lock()
+	for _, txIn := range tx.MsgTx().TxIns {
+		ringHash := txIn.PreviousOutPointRing.Hash()
+		if _, exists := mp.outpointsAbe[ringHash]; exists {
+			if txRedeemer, ok := mp.outpointsAbe[txIn.PreviousOutPointRing.Hash()][txIn.SerialNumber]; ok {
+				//	This happens when tx is included in a block received, but not in mempool.
+				if !txRedeemer.Hash().IsEqual(tx.Hash()) {
+					mp.removeTransactionAbe(txRedeemer)
+				}
 			}
 		}
 	}
@@ -1460,7 +1496,7 @@ func (mp *TxPool) validateReplacementAbe(tx *abeutil.TxAbe,
 // more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *TxPool) maybeAcceptTransaction(tx *abeutil.Tx, isNew, rateLimit, rejectDupOrphans bool) ([]*chainhash.Hash, *TxDesc, error) {
+func (mp *TxPool) maybeAcceptTransactionBTCD(tx *abeutil.Tx, isNew, rateLimit, rejectDupOrphans bool) ([]*chainhash.Hash, *TxDesc, error) {
 	txHash := tx.Hash()
 
 	// If a transaction has iwtness data, and segwit isn't active yet, If
@@ -1762,7 +1798,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *abeutil.Tx, isNew, rateLimit, rejec
 		// The conflict set should already include the descendants for
 		// each one, so we don't need to remove the redeemers within
 		// this call as they'll be removed eventually.
-		mp.removeTransaction(conflict, false)
+		mp.removeTransactionBTCD(conflict, false)
 	}
 	txD := mp.addTransaction(utxoView, tx, bestHeight, txFee)
 
@@ -1995,10 +2031,10 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 // be added to the orphan pool.
 //
 // This function is safe for concurrent access.
-func (mp *TxPool) MaybeAcceptTransaction(tx *abeutil.Tx, isNew, rateLimit bool) ([]*chainhash.Hash, *TxDesc, error) {
+func (mp *TxPool) MaybeAcceptTransactionBTCD(tx *abeutil.Tx, isNew, rateLimit bool) ([]*chainhash.Hash, *TxDesc, error) {
 	// Protect concurrent access.
 	mp.mtx.Lock()
-	hashes, txD, err := mp.maybeAcceptTransaction(tx, isNew, rateLimit, true)
+	hashes, txD, err := mp.maybeAcceptTransactionBTCD(tx, isNew, rateLimit, true)
 	mp.mtx.Unlock()
 
 	return hashes, txD, err
@@ -2049,7 +2085,7 @@ func (mp *TxPool) processOrphans(acceptedTx *abeutil.Tx) []*TxDesc {
 
 			// Potentially accept an orphan into the tx pool.
 			for _, tx := range orphans {
-				missing, txD, err := mp.maybeAcceptTransaction(
+				missing, txD, err := mp.maybeAcceptTransactionBTCD(
 					tx, true, true, false)
 				if err != nil {
 					// The orphan is now invalid, so there
@@ -2125,6 +2161,13 @@ func (mp *TxPool) ProcessOrphans(acceptedTx *abeutil.Tx) []*TxDesc {
 	return acceptedTxns
 }
 
+//	todo(ABE):
+func (mp *TxPool) ProcessOrphansAbe(acceptedTx *abeutil.TxAbe) {
+	mp.mtx.Lock()
+	mp.processOrphansAbe(acceptedTx)
+	mp.mtx.Unlock()
+}
+
 // ProcessTransaction is the main workhorse for handling insertion of new
 // free-standing transactions into the memory pool.  It includes functionality
 // such as rejecting duplicate transactions, ensuring transactions follow all
@@ -2136,7 +2179,7 @@ func (mp *TxPool) ProcessOrphans(acceptedTx *abeutil.Tx) []*TxDesc {
 // the passed one being accepted.
 //
 // This function is safe for concurrent access.
-func (mp *TxPool) ProcessTransaction(tx *abeutil.Tx, allowOrphan, rateLimit bool, tag Tag) ([]*TxDesc, error) {
+func (mp *TxPool) ProcessTransactionBTCD(tx *abeutil.Tx, allowOrphan, rateLimit bool, tag Tag) ([]*TxDesc, error) {
 	log.Tracef("Processing transaction %v", tx.Hash())
 
 	// Protect concurrent access.
@@ -2144,7 +2187,7 @@ func (mp *TxPool) ProcessTransaction(tx *abeutil.Tx, allowOrphan, rateLimit bool
 	defer mp.mtx.Unlock()
 
 	// Potentially accept the transaction to the memory pool.
-	missingParents, txD, err := mp.maybeAcceptTransaction(tx, true, rateLimit,
+	missingParents, txD, err := mp.maybeAcceptTransactionBTCD(tx, true, rateLimit,
 		true)
 	if err != nil {
 		return nil, err

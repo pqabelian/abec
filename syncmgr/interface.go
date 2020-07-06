@@ -23,6 +23,8 @@ type PeerNotifier interface {
 	RelayInventory(invVect *wire.InvVect, data interface{})
 
 	TransactionConfirmed(tx *abeutil.Tx)
+
+	TransactionConfirmedAbe(tx *abeutil.TxAbe)
 }
 
 // Config is a configuration struct used to initialize a new SyncManager.

@@ -3343,7 +3343,7 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 
 	// Use 0 for the tag to represent local node.
 	tx := abeutil.NewTx(&msgTx)
-	acceptedTxs, err := s.cfg.TxMemPool.ProcessTransaction(tx, false, false, 0)
+	acceptedTxs, err := s.cfg.TxMemPool.ProcessTransactionBTCD(tx, false, false, 0)
 	if err != nil {
 		// When the error is a rule error, it means the transaction was
 		// simply rejected as opposed to something actually going wrong,
@@ -3397,7 +3397,7 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 	// Also, since an error is being returned to the caller, ensure the
 	// transaction is removed from the memory pool.
 	if len(acceptedTxs) == 0 || !acceptedTxs[0].Tx.Hash().IsEqual(tx.Hash()) {
-		s.cfg.TxMemPool.RemoveTransaction(tx, true)
+		s.cfg.TxMemPool.RemoveTransactionBTCD(tx, true)
 
 		errStr := fmt.Sprintf("transaction %v is not in accepted list",
 			tx.Hash())
@@ -4398,7 +4398,7 @@ func newRPCServer(config *rpcserverConfig) (*rpcServer, error) {
 func (s *rpcServer) handleBlockchainNotification(notification *blockchain.Notification) {
 	switch notification.Type {
 	case blockchain.NTBlockAccepted:
-		block, ok := notification.Data.(*abeutil.Block)
+		block, ok := notification.Data.(*abeutil.BlockAbe)
 		if !ok {
 			rpcsLog.Warnf("Chain accepted notification is not a block.")
 			break
@@ -4407,10 +4407,11 @@ func (s *rpcServer) handleBlockchainNotification(notification *blockchain.Notifi
 		// Allow any clients performing long polling via the
 		// getblocktemplate RPC to be notified when the new block causes
 		// their old block template to become stale.
+		//	TODO(ABE,MUST): Bug? accepted vs. connected
 		s.gbtWorkState.NotifyBlockConnected(block.Hash())
 
 	case blockchain.NTBlockConnected:
-		block, ok := notification.Data.(*abeutil.Block)
+		block, ok := notification.Data.(*abeutil.BlockAbe)
 		if !ok {
 			rpcsLog.Warnf("Chain connected notification is not a block.")
 			break
@@ -4420,7 +4421,7 @@ func (s *rpcServer) handleBlockchainNotification(notification *blockchain.Notifi
 		s.ntfnMgr.NotifyBlockConnected(block)
 
 	case blockchain.NTBlockDisconnected:
-		block, ok := notification.Data.(*abeutil.Block)
+		block, ok := notification.Data.(*abeutil.BlockAbe)
 		if !ok {
 			rpcsLog.Warnf("Chain disconnected notification is not a block.")
 			break

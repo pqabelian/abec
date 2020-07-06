@@ -238,8 +238,9 @@ func (ef *FeeEstimator) ObserveTransactionAbe(t *TxDescAbe) {
 	}
 }
 
+//	todo(ABE):
 // RegisterBlock informs the fee estimator of a new block to take into account.
-func (ef *FeeEstimator) RegisterBlock(block *abeutil.Block) error {
+func (ef *FeeEstimator) RegisterBlockBTCD(block *abeutil.Block) error {
 	ef.mtx.Lock()
 	defer ef.mtx.Unlock()
 
@@ -258,6 +259,112 @@ func (ef *FeeEstimator) RegisterBlock(block *abeutil.Block) error {
 
 	// Randomly order txs in block.
 	transactions := make(map[*abeutil.Tx]struct{})
+	for _, t := range block.Transactions() {
+		transactions[t] = struct{}{}
+	}
+
+	// Count the number of replacements we make per bin so that we don't
+	// replace too many.
+	var replacementCounts [estimateFeeDepth]int
+
+	// Keep track of which txs were dropped in case of an orphan block.
+	dropped := &registeredBlock{
+		hash:         *block.Hash(),
+		transactions: make([]*observedTransaction, 0, 100),
+	}
+
+	// Go through the txs in the block.
+	for t := range transactions {
+		hash := *t.Hash()
+
+		// Have we observed this tx in the mempool?
+		o, ok := ef.observed[hash]
+		if !ok {
+			continue
+		}
+
+		// Put the observed tx in the oppropriate bin.
+		blocksToConfirm := height - o.observed - 1
+
+		// This shouldn't happen if the fee estimator works correctly,
+		// but return an error if it does.
+		if o.mined != mining.UnminedHeight {
+			log.Error("Estimate fee: transaction ", hash.String(), " has already been mined")
+			return errors.New("Transaction has already been mined")
+		}
+
+		// This shouldn't happen but check just in case to avoid
+		// an out-of-bounds array index later.
+		if blocksToConfirm >= estimateFeeDepth {
+			continue
+		}
+
+		// Make sure we do not replace too many transactions per min.
+		if replacementCounts[blocksToConfirm] == int(ef.maxReplacements) {
+			continue
+		}
+
+		o.mined = height
+
+		replacementCounts[blocksToConfirm]++
+
+		bin := ef.bin[blocksToConfirm]
+
+		// Remove a random element and replace it with this new tx.
+		if len(bin) == int(ef.binSize) {
+			// Don't drop transactions we have just added from this same block.
+			l := int(ef.binSize) - replacementCounts[blocksToConfirm]
+			drop := rand.Intn(l)
+			dropped.transactions = append(dropped.transactions, bin[drop])
+
+			bin[drop] = bin[l-1]
+			bin[l-1] = o
+		} else {
+			bin = append(bin, o)
+		}
+		ef.bin[blocksToConfirm] = bin
+	}
+
+	// Go through the mempool for txs that have been in too long.
+	for hash, o := range ef.observed {
+		if o.mined == mining.UnminedHeight && height-o.observed >= estimateFeeDepth {
+			delete(ef.observed, hash)
+		}
+	}
+
+	// Add dropped list to history.
+	if ef.maxRollback == 0 {
+		return nil
+	}
+
+	if uint32(len(ef.dropped)) == ef.maxRollback {
+		ef.dropped = append(ef.dropped[1:], dropped)
+	} else {
+		ef.dropped = append(ef.dropped, dropped)
+	}
+
+	return nil
+}
+
+func (ef *FeeEstimator) RegisterBlockAbe(block *abeutil.BlockAbe) error {
+	ef.mtx.Lock()
+	defer ef.mtx.Unlock()
+
+	// The previous sorted list is invalid, so delete it.
+	ef.cached = nil
+
+	height := block.Height()
+	if height != ef.lastKnownHeight+1 && ef.lastKnownHeight != mining.UnminedHeight {
+		return fmt.Errorf("intermediate block not recorded; current height is %d; new height is %d",
+			ef.lastKnownHeight, height)
+	}
+
+	// Update the last known height.
+	ef.lastKnownHeight = height
+	ef.numBlocksRegistered++
+
+	// Randomly order txs in block.
+	transactions := make(map[*abeutil.TxAbe]struct{})
 	for _, t := range block.Transactions() {
 		transactions[t] = struct{}{}
 	}
