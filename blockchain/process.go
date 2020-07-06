@@ -32,7 +32,8 @@ const (
 // the main chain or any side chains.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) blockExists(hash *chainhash.Hash) (bool, error) {
+//	todo(ABE): Remove
+func (b *BlockChain) blockExistsBTCD(hash *chainhash.Hash) (bool, error) {
 	// Check block index first (could be main chain or side chain blocks).
 	if b.index.HaveBlock(hash) {
 		return true, nil
@@ -66,8 +67,8 @@ func (b *BlockChain) blockExists(hash *chainhash.Hash) (bool, error) {
 	return exists, err
 }
 
-//	Abe to do
-func (b *BlockChain) blockExistsAbe(hash *chainhash.Hash) (bool, error) {
+//	todo(ABE):
+func (b *BlockChain) blockExists(hash *chainhash.Hash) (bool, error) {
 	// Check block index first (could be main chain or side chain blocks).
 	if b.index.HaveBlock(hash) {
 		return true, nil
@@ -110,7 +111,7 @@ func (b *BlockChain) blockExistsAbe(hash *chainhash.Hash) (bool, error) {
 // are needed to pass along to maybeAcceptBlock.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) processOrphans(hash *chainhash.Hash, flags BehaviorFlags) error {
+func (b *BlockChain) processOrphansBTCD(hash *chainhash.Hash, flags BehaviorFlags) error {
 	// Start with processing at least the passed hash.  Leave a little room
 	// for additional orphan blocks that need to be processed without
 	// needing to grow the array in the common case.
@@ -141,7 +142,7 @@ func (b *BlockChain) processOrphans(hash *chainhash.Hash, flags BehaviorFlags) e
 
 			// Remove the orphan from the orphan pool.
 			orphanHash := orphan.block.Hash()
-			b.removeOrphanBlock(orphan)
+			b.removeOrphanBlockBTCD(orphan)
 			i--
 
 			// Potentially accept the block into the block chain.
@@ -345,7 +346,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, flags BehaviorFlag
 	}
 
 	// The block must not already exist as an orphan.
-	if _, exists := b.orphans[*blockHash]; exists {
+	if _, exists := b.orphansAbe[*blockHash]; exists {
 		str := fmt.Sprintf("already have block (orphan) %v", blockHash)
 		return false, false, ruleError(ErrDuplicateBlock, str)
 	}
@@ -419,7 +420,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, flags BehaviorFlag
 	// Accept any orphan blocks that depend on this block (they are
 	// no longer orphans) and repeat for those accepted blocks until
 	// there are no more.
-	err = b.processOrphans(blockHash, flags)
+	err = b.processOrphansAbe(blockHash, flags)
 	if err != nil {
 		return false, false, err
 	}

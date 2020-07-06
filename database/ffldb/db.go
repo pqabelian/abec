@@ -1131,6 +1131,16 @@ func (tx *transaction) hasBlock(hash *chainhash.Hash) bool {
 	return tx.hasKey(bucketizedKey(blockIdxBucketID, hash[:]))
 }
 
+func (tx *transaction) hasBlockAbe(hash *chainhash.Hash) bool {
+	// Return true if the block is pending to be written on commit since
+	// it exists from the viewpoint of this transaction.
+	if _, exists := tx.pendingBlocks[*hash]; exists {
+		return true
+	}
+
+	return tx.hasKey(bucketizedKey(blockIdxBucketID, hash[:]))
+}
+
 // StoreBlock stores the provided block into the database.  There are no checks
 // to ensure the block connects to a previous block, contains double spends, or
 // any additional functionality such as transaction indexing.  It simply stores
@@ -1193,6 +1203,16 @@ func (tx *transaction) StoreBlock(block *abeutil.Block) error {
 //
 // This function is part of the database.Tx interface implementation.
 func (tx *transaction) HasBlock(hash *chainhash.Hash) (bool, error) {
+	// Ensure transaction state is valid.
+	if err := tx.checkClosed(); err != nil {
+		return false, err
+	}
+
+	return tx.hasBlock(hash), nil
+}
+
+//	todo(ABE):
+func (tx *transaction) HasBlockAbe(hash *chainhash.Hash) (bool, error) {
 	// Ensure transaction state is valid.
 	if err := tx.checkClosed(); err != nil {
 		return false, err

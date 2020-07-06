@@ -572,7 +572,7 @@ func (mp *TxPool) removeOrphanDoubleSpendsAbe(tx *abeutil.TxAbe) {
 // exists in the main pool.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *TxPool) isTransactionInPool(hash *chainhash.Hash) bool {
+func (mp *TxPool) isTransactionInPoolBTCD(hash *chainhash.Hash) bool {
 	if _, exists := mp.pool[*hash]; exists {
 		return true
 	}
@@ -595,7 +595,7 @@ func (mp *TxPool) isTransactionInPoolAbe(hash *chainhash.Hash) bool {
 func (mp *TxPool) IsTransactionInPool(hash *chainhash.Hash) bool {
 	// Protect concurrent access.
 	mp.mtx.RLock()
-	inPool := mp.isTransactionInPool(hash)
+	inPool := mp.isTransactionInPoolAbe(hash)
 	mp.mtx.RUnlock()
 
 	return inPool
@@ -605,7 +605,7 @@ func (mp *TxPool) IsTransactionInPool(hash *chainhash.Hash) bool {
 // in the orphan pool.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *TxPool) isOrphanInPool(hash *chainhash.Hash) bool {
+func (mp *TxPool) isOrphanInPoolBTCD(hash *chainhash.Hash) bool {
 	if _, exists := mp.orphans[*hash]; exists {
 		return true
 	}
@@ -628,7 +628,7 @@ func (mp *TxPool) isOrphanInPoolAbe(hash *chainhash.Hash) bool {
 func (mp *TxPool) IsOrphanInPool(hash *chainhash.Hash) bool {
 	// Protect concurrent access.
 	mp.mtx.RLock()
-	inPool := mp.isOrphanInPool(hash)
+	inPool := mp.isOrphanInPoolAbe(hash)
 	mp.mtx.RUnlock()
 
 	return inPool
@@ -639,7 +639,7 @@ func (mp *TxPool) IsOrphanInPool(hash *chainhash.Hash) bool {
 //
 // This function MUST be called with the mempool lock held (for reads).
 func (mp *TxPool) haveTransaction(hash *chainhash.Hash) bool {
-	return mp.isTransactionInPool(hash) || mp.isOrphanInPool(hash)
+	return mp.isTransactionInPoolAbe(hash) || mp.isOrphanInPoolAbe(hash)
 }
 
 // HaveTransaction returns whether or not the passed transaction already exists
@@ -1483,8 +1483,8 @@ func (mp *TxPool) maybeAcceptTransaction(tx *abeutil.Tx, isNew, rateLimit, rejec
 	// applies to orphan transactions as well when the reject duplicate
 	// orphans flag is set.  This check is intended to be a quick check to
 	// weed out duplicates.
-	if mp.isTransactionInPool(txHash) || (rejectDupOrphans &&
-		mp.isOrphanInPool(txHash)) {
+	if mp.isTransactionInPoolBTCD(txHash) || (rejectDupOrphans &&
+		mp.isOrphanInPoolBTCD(txHash)) {
 
 		str := fmt.Sprintf("already have transaction %v", txHash)
 		return nil, nil, txRuleError(wire.RejectDuplicate, str)

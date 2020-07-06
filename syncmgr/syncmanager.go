@@ -260,11 +260,11 @@ func (sm *SyncManager) startSync() {
 	//	todo(ABE): for btcd, the segwit enables some nodes to not provide witness.
 	//	todo (ABE): For ABE, it's normal for nodes not to provide witness.
 	//	todo (ABE): for ABE, most nodes do not provide witness. Witness are provided only when the block is announced.
-	segwitActive, err := sm.chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
-	if err != nil {
-		log.Errorf("Unable to query for segwit soft-fork state: %v", err)
-		return
-	}
+	/*	segwitActive, err := sm.chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
+		if err != nil {
+			log.Errorf("Unable to query for segwit soft-fork state: %v", err)
+			return
+		}*/
 
 	best := sm.chain.BestSnapshot()
 	var higherPeers, equalPeers []*peerpkg.Peer
@@ -273,7 +273,12 @@ func (sm *SyncManager) startSync() {
 			continue
 		}
 		// todo(ABE): In ABE, should the peers have this option?
-		if segwitActive && !peer.IsWitnessEnabled() {
+		/*		if segwitActive && !peer.IsWitnessEnabled() {
+				log.Debugf("peer %v not witness enabled, skipping", peer)
+				continue
+			}*/
+
+		if !peer.IsWitnessEnabled() {
 			log.Debugf("peer %v not witness enabled, skipping", peer)
 			continue
 		}
@@ -1341,17 +1346,20 @@ func (sm *SyncManager) haveInventory(invVect *wire.InvVect) (bool, error) {
 		// checked because the vast majority of transactions consist of
 		// two outputs where one is some form of "pay-to-somebody-else"
 		// and the other is a change output.
-		prevOut := wire.OutPoint{Hash: invVect.Hash}
-		for i := uint32(0); i < 2; i++ {
-			prevOut.Index = i
-			entry, err := sm.chain.FetchUtxoEntry(prevOut)
-			if err != nil {
-				return false, err
-			}
-			if entry != nil && !entry.IsSpent() {
-				return true, nil
-			}
-		}
+		//	TODO(ABE): ABE cannot do such a such check, as the outpoint is not stored, instead,they are orgainized into rings.
+		//	To Address this problem, we can use the peer evaluation or store tha map from outpoint to ringhash.
+		//	Actually, such a check does not function much:an such a transaction will be regarded as a orphan or doubles-spend transaction.
+		/*		prevOut := wire.OutPoint{Hash: invVect.Hash}
+				for i := uint32(0); i < 2; i++ {
+					prevOut.Index = i
+					entry, err := sm.chain.FetchUtxoEntry(prevOut)
+					if err != nil {
+						return false, err
+					}
+					if entry != nil && !entry.IsSpent() {
+						return true, nil
+					}
+				}*/
 
 		return false, nil
 	}
@@ -1824,6 +1832,7 @@ func (sm *SyncManager) QueueTxAbe(tx *abeutil.TxAbe, peer *peerpkg.Peer, done ch
 // QueueBlock adds the passed block message and peer to the block handling
 // queue. Responds to the done channel argument after the block message is
 // processed.
+//	todo(ABE):
 func (sm *SyncManager) QueueBlock(block *abeutil.Block, peer *peerpkg.Peer, done chan struct{}) {
 	// Don't accept more blocks if we're shutting down.
 	if atomic.LoadInt32(&sm.shutdown) != 0 {

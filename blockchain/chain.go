@@ -131,13 +131,13 @@ type BlockChain struct {
 
 	// These fields are related to handling of orphan blocks.  They are
 	// protected by a combination of the chain lock and the orphan lock.
-	orphanLock      sync.RWMutex
-	orphans         map[chainhash.Hash]*orphanBlock
-	orphansAbe      map[chainhash.Hash]*orphanBlockAbe
-	prevOrphans     map[chainhash.Hash][]*orphanBlock
-	prevOrphansAbe  map[chainhash.Hash][]*orphanBlockAbe
-	oldestOrphan    *orphanBlock
-	oldestOrphanAbe *orphanBlockAbe
+	orphanLock       sync.RWMutex
+	orphansBTCD      map[chainhash.Hash]*orphanBlock
+	orphansAbe       map[chainhash.Hash]*orphanBlockAbe
+	prevOrphans      map[chainhash.Hash][]*orphanBlock
+	prevOrphansAbe   map[chainhash.Hash][]*orphanBlockAbe
+	oldestOrphanBTCD *orphanBlock
+	oldestOrphanAbe  *orphanBlockAbe
 
 	// These fields are related to checkpoint handling.  They are protected
 	// by the chain lock.
@@ -219,7 +219,7 @@ func (b *BlockChain) IsKnownOrphan(hash *chainhash.Hash) bool {
 	// Protect concurrent access.  Using a read lock only so multiple
 	// readers can query without blocking each other.
 	b.orphanLock.RLock()
-	_, exists := b.orphans[*hash]
+	_, exists := b.orphansAbe[*hash]
 	b.orphanLock.RUnlock()
 
 	return exists
@@ -240,7 +240,7 @@ func (b *BlockChain) GetOrphanRoot(hash *chainhash.Hash) *chainhash.Hash {
 	orphanRoot := hash
 	prevHash := hash
 	for {
-		orphan, exists := b.orphans[*prevHash]
+		orphan, exists := b.orphansAbe[*prevHash]
 		if !exists {
 			break
 		}
@@ -253,14 +253,14 @@ func (b *BlockChain) GetOrphanRoot(hash *chainhash.Hash) *chainhash.Hash {
 
 // removeOrphanBlock removes the passed orphan block from the orphan pool and
 // previous orphan index.
-func (b *BlockChain) removeOrphanBlock(orphan *orphanBlock) {
+func (b *BlockChain) removeOrphanBlockBTCD(orphan *orphanBlock) {
 	// Protect concurrent access.
 	b.orphanLock.Lock()
 	defer b.orphanLock.Unlock()
 
 	// Remove the orphan block from the orphan pool.
 	orphanHash := orphan.block.Hash()
-	delete(b.orphans, *orphanHash)
+	delete(b.orphansBTCD, *orphanHash)
 
 	// Remove the reference from the previous orphan index too.  An indexing
 	// for loop is intentionally used over a range here as range does not
@@ -326,26 +326,26 @@ func (b *BlockChain) removeOrphanBlockAbe(orphan *orphanBlockAbe) {
 // It also imposes a maximum limit on the number of outstanding orphan
 // blocks and will remove the oldest received orphan block if the limit is
 // exceeded.
-func (b *BlockChain) addOrphanBlock(block *abeutil.Block) {
+func (b *BlockChain) addOrphanBlockBTCD(block *abeutil.Block) {
 	// Remove expired orphan blocks.
-	for _, oBlock := range b.orphans {
+	for _, oBlock := range b.orphansBTCD {
 		if time.Now().After(oBlock.expiration) {
-			b.removeOrphanBlock(oBlock)
+			b.removeOrphanBlockBTCD(oBlock)
 			continue
 		}
 
 		// Update the oldest orphan block pointer so it can be discarded
 		// in case the orphan pool fills up.
-		if b.oldestOrphan == nil || oBlock.expiration.Before(b.oldestOrphan.expiration) {
-			b.oldestOrphan = oBlock
+		if b.oldestOrphanBTCD == nil || oBlock.expiration.Before(b.oldestOrphanBTCD.expiration) {
+			b.oldestOrphanBTCD = oBlock
 		}
 	}
 
 	// Limit orphan blocks to prevent memory exhaustion.
-	if len(b.orphans)+1 > maxOrphanBlocks {
+	if len(b.orphansBTCD)+1 > maxOrphanBlocks {
 		// Remove the oldest orphan to make room for the new one.
-		b.removeOrphanBlock(b.oldestOrphan)
-		b.oldestOrphan = nil
+		b.removeOrphanBlockBTCD(b.oldestOrphanBTCD)
+		b.oldestOrphanBTCD = nil
 	}
 
 	// Protect concurrent access.  This is intentionally done here instead
@@ -361,7 +361,7 @@ func (b *BlockChain) addOrphanBlock(block *abeutil.Block) {
 		block:      block,
 		expiration: expiration,
 	}
-	b.orphans[*block.Hash()] = oBlock
+	b.orphansBTCD[*block.Hash()] = oBlock
 
 	// Add to previous hash lookup index for faster dependency lookups.
 	prevHash := &block.MsgBlock().Header.PrevBlock
@@ -378,16 +378,16 @@ func (b *BlockChain) addOrphanBlockAbe(block *abeutil.BlockAbe) {
 
 		// Update the oldest orphan block pointer so it can be discarded
 		// in case the orphan pool fills up.
-		if b.oldestOrphanAbe == nil || oBlock.expiration.Before(b.oldestOrphan.expiration) {
+		if b.oldestOrphanAbe == nil || oBlock.expiration.Before(b.oldestOrphanAbe.expiration) {
 			b.oldestOrphanAbe = oBlock
 		}
 	}
 
 	// Limit orphan blocks to prevent memory exhaustion.
-	if len(b.orphans)+1 > maxOrphanBlocks {
+	if len(b.orphansAbe)+1 > maxOrphanBlocks {
 		// Remove the oldest orphan to make room for the new one.
-		b.removeOrphanBlock(b.oldestOrphan)
-		b.oldestOrphan = nil
+		b.removeOrphanBlockAbe(b.oldestOrphanAbe)
+		b.oldestOrphanAbe = nil
 	}
 
 	// Protect concurrent access.  This is intentionally done here instead
@@ -2637,7 +2637,8 @@ func New(config *Config) (*BlockChain, error) {
 		index:               newBlockIndex(config.DB, params),
 		hashCache:           config.HashCache,
 		bestChain:           newChainView(nil),
-		orphans:             make(map[chainhash.Hash]*orphanBlock),
+		orphansBTCD:         make(map[chainhash.Hash]*orphanBlock),
+		orphansAbe:          make(map[chainhash.Hash]*orphanBlockAbe),
 		prevOrphans:         make(map[chainhash.Hash][]*orphanBlock),
 		warningCaches:       newThresholdCaches(vbNumBits),
 		deploymentCaches:    newThresholdCaches(chaincfg.DefinedDeployments),

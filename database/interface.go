@@ -234,6 +234,7 @@ type Tx interface {
 	//
 	// Other errors are possible depending on the implementation.
 	HasBlock(hash *chainhash.Hash) (bool, error)
+	HasBlockAbe(hash *chainhash.Hash) (bool, error)
 
 	// HasBlocks returns whether or not the blocks with the provided hashes
 	// exist in the database.
