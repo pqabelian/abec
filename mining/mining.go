@@ -758,8 +758,10 @@ mempoolLoop:
 	// The starting block size is the size of the block header plus the max
 	// possible transaction count size, plus the size of the coinbase
 	// transaction.
-	blockWeight := uint32((blockHeaderOverhead * blockchain.WitnessScaleFactor) +
-		blockchain.GetTransactionWeightAbe(coinbaseTx))
+	//	todo(ABE): ABE does not use weight, while use size only.
+	//	blockWeight := uint32((blockHeaderOverhead * blockchain.WitnessScaleFactor) +
+	//		blockchain.GetTransactionWeightAbe(coinbaseTx))
+	blockSize := uint32((blockHeaderOverhead) + coinbaseTx.MsgTx().SerializeSize())
 	//	blockSigOpCost := coinbaseSigOpCost
 	totalFees := int64(0)
 
@@ -783,13 +785,15 @@ mempoolLoop:
 		tx := prioItem.tx
 
 		// Enforce maximum block size.  Also check for overflow.
-		txWeight := uint32(blockchain.GetTransactionWeightAbe(tx))
-		blockPlusTxWeight := blockWeight + txWeight
-		if blockPlusTxWeight < blockWeight ||
-			blockPlusTxWeight >= g.policy.BlockMaxWeight {
+		//	todo(ABE): ABE does not use weight, while use size only.
+		//		txWeight := uint32(blockchain.GetTransactionWeightAbe(tx))
+		txSize := uint32(tx.MsgTx().SerializeSize())
+		blockPlusTxSize := blockSize + txSize
+		//		if blockPlusTxWeight < blockWeight || blockPlusTxWeight >= g.policy.BlockMaxWeight {
+		if blockPlusTxSize < blockSize || blockPlusTxSize >= g.policy.BlockMaxSize {
 			//	todo(ABE): for the setting of blockmaxweight and blockmaxsize
 			log.Tracef("Skipping tx %s because it would exceed "+
-				"the max block weight", tx.Hash())
+				"the max block size", tx.Hash())
 			//			logSkippedDeps(tx, deps)
 			continue
 		}
@@ -814,16 +818,18 @@ mempoolLoop:
 
 		// Skip free transactions once the block is larger than the
 		// minimum block size.
+		//	todo(ABE): ABE does not use weight, while use size only.
 		//	todo(ABE): as the size exceeds the minimum block size, it is unnecessary to include the free transactions
 		if sortedByFee &&
 			prioItem.feePerKB < int64(g.policy.TxMinFreeFee) &&
-			blockPlusTxWeight >= g.policy.BlockMinWeight {
+			//			blockPlusTxWeight >= g.policy.BlockMinWeight {
+			blockPlusTxSize >= g.policy.BlockMinSize {
 
 			log.Tracef("Skipping tx %s with feePerKB %d "+
 				"< TxMinFreeFee %d and block weight %d >= "+
 				"minBlockWeight %d", tx.Hash(), prioItem.feePerKB,
-				g.policy.TxMinFreeFee, blockPlusTxWeight,
-				g.policy.BlockMinWeight)
+				g.policy.TxMinFreeFee, blockPlusTxSize,
+				g.policy.BlockMinSize)
 			//			logSkippedDeps(tx, deps)
 			continue
 		}
@@ -832,12 +838,12 @@ mempoolLoop:
 		// the priority size or there are no more high-priority
 		// transactions.
 		if !sortedByFee &&
-			(blockPlusTxWeight >= g.policy.BlockPrioritySize || prioItem.priority <= MinHighPriority) {
+			(blockPlusTxSize >= g.policy.BlockPrioritySize || prioItem.priority <= MinHighPriority) {
 
 			log.Tracef("Switching to sort by fees per "+
 				"kilobyte blockSize %d >= BlockPrioritySize "+
 				"%d || priority %.2f <= minHighPriority %.2f",
-				blockPlusTxWeight, g.policy.BlockPrioritySize,
+				blockPlusTxSize, g.policy.BlockPrioritySize,
 				prioItem.priority, MinHighPriority)
 
 			sortedByFee = true
@@ -849,7 +855,7 @@ mempoolLoop:
 			// is too low.  Otherwise this transaction will be the
 			// final one in the high-priority section, so just fall
 			// though to the code below so it is added now.
-			if blockPlusTxWeight > g.policy.BlockPrioritySize || prioItem.priority < MinHighPriority {
+			if blockPlusTxSize > g.policy.BlockPrioritySize || prioItem.priority < MinHighPriority {
 				heap.Push(priorityQueue, prioItem)
 				continue
 			}
@@ -888,7 +894,7 @@ mempoolLoop:
 		// save the fees and signature operation counts to the block
 		// template.
 		blockTxns = append(blockTxns, tx)
-		blockWeight += txWeight
+		blockSize += txSize
 		//		blockSigOpCost += int64(sigOpCost)
 		totalFees += prioItem.fee
 		txFees = append(txFees, prioItem.fee)
@@ -913,7 +919,7 @@ mempoolLoop:
 	// Now that the actual transactions have been selected, update the
 	// block weight for the real transaction count and coinbase value with
 	// the total fees accordingly.
-	blockWeight -= wire.MaxVarIntPayload - (uint32(wire.VarIntSerializeSize(uint64(len(blockTxns)))) * blockchain.WitnessScaleFactor)
+	blockSize -= wire.MaxVarIntPayload - uint32(wire.VarIntSerializeSize(uint64(len(blockTxns))))
 	//	todo(ABE): now, each coinbase transaction has only one output, and the value is public
 	coinbaseTx.MsgTx().TxOuts[0].ValueScript += totalFees
 	txFees[0] = -totalFees
@@ -1002,7 +1008,7 @@ mempoolLoop:
 	}
 
 	log.Debugf("Created new block template (%d transactions, %d in "+
-		"fees, %d weight, target difficulty "+"%064x)", len(msgBlock.Transactions), totalFees, blockWeight, blockchain.CompactToBig(msgBlock.Header.Bits))
+		"fees, %d weight, target difficulty "+"%064x)", len(msgBlock.Transactions), totalFees, blockSize, blockchain.CompactToBig(msgBlock.Header.Bits))
 
 	return &BlockTemplate{
 		BlockAbe: &msgBlock,

@@ -21,6 +21,7 @@ type Policy struct {
 	// generating a block template.
 	BlockMinWeight uint32
 
+	//	todo(ABE): ABE does not use weight, while use size only.
 	// BlockMaxWeight is the maximum block weight to be used when
 	// generating a block template.
 	BlockMaxWeight uint32
