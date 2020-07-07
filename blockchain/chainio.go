@@ -1321,7 +1321,9 @@ func (b *BlockChain) createChainState() error {
 	// genesis block, use its timestamp for the median time.
 	numTxns := uint64(len(genesisBlock.MsgBlock().Transactions))
 	blockSize := uint64(genesisBlock.MsgBlock().SerializeSize())
-	blockWeight := uint64(GetBlockWeight(genesisBlock))
+	//	todo(ABE): ABE does not use weight, while use size only.
+	//	blockWeight := uint64(GetBlockWeight(genesisBlock))
+	blockWeight := blockSize
 	b.stateSnapshot = newBestState(node, blockSize, blockWeight, numTxns,
 		numTxns, time.Unix(node.timestamp, 0))
 
@@ -1545,7 +1547,9 @@ func (b *BlockChain) initChainState() error {
 
 		// Initialize the state related to the best block.
 		blockSize := uint64(len(blockBytes))
-		blockWeight := uint64(GetBlockWeight(abeutil.NewBlock(&block)))
+		//	todo(ABE): ABE does not use weight, while use size only.
+		//		blockWeight := uint64(GetBlockWeight(abeutil.NewBlock(&block)))
+		blockWeight := blockSize
 		numTxns := uint64(len(block.Transactions))
 		b.stateSnapshot = newBestState(tip, blockSize, blockWeight,
 			numTxns, state.totalTxns, tip.CalcPastMedianTime())

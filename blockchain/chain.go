@@ -857,7 +857,9 @@ func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 	b.stateLock.RUnlock()
 	numTxns := uint64(len(block.MsgBlock().Transactions))
 	blockSize := uint64(block.MsgBlock().SerializeSize())
-	blockWeight := uint64(GetBlockWeightAbe(block))
+	//	todo(ABE): ABE does not use weight, while use size only.
+	//	blockWeight := uint64(GetBlockWeightAbe(block))
+	blockWeight := blockSize
 	state := newBestState(node, blockSize, blockWeight, numTxns,
 		curTotalTxns+numTxns, node.CalcPastMedianTime())
 
@@ -1086,7 +1088,9 @@ func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe
 	b.stateLock.RUnlock()
 	numTxns := uint64(len(prevBlock.MsgBlock().Transactions))
 	blockSize := uint64(prevBlock.MsgBlock().SerializeSize())
-	blockWeight := uint64(GetBlockWeight(prevBlock))
+	//	todo(ABE): ABE does not use weight, while use size only.
+	//	blockWeight := uint64(GetBlockWeight(prevBlock))
+	blockWeight := blockSize
 	newTotalTxns := curTotalTxns - uint64(len(block.MsgBlock().Transactions))
 	state := newBestState(prevNode, blockSize, blockWeight, numTxns,
 		newTotalTxns, prevNode.CalcPastMedianTime())

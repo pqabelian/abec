@@ -1953,15 +1953,16 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	// transaction does not exceeed 1000 less than the reserved space for
 	// high-priority transactions, don't require a fee for it.
 	txFee := tx.MsgTx().TxFee
-	serializedSize := GetTxVirtualSizeAbe(tx)
+	//	serializedSize := GetTxVirtualSizeAbe(tx)
+	serializedSize := int64(tx.MsgTx().SerializeSize())
 	minFee := calcMinRequiredTxRelayFeeAbe(serializedSize,
 		mp.cfg.Policy.MinRelayTxFee)
-	/*	if serializedSize >= (DefaultBlockPrioritySize-1000) && txFee < minFee {
+	if serializedSize >= (DefaultBlockPrioritySize-1000) && txFee < minFee {
 		str := fmt.Sprintf("transaction %v has %d fees which is under "+
 			"the required amount of %d", txHash, txFee,
 			minFee)
 		return nil, nil, txRuleError(wire.RejectInsufficientFee, str)
-	}*/
+	}
 
 	// Require that free transactions have sufficient priority to be mined
 	// in the next block.  Transactions which are being added back to the
