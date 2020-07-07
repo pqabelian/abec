@@ -495,6 +495,7 @@ type notificationUnregisterAddr struct {
 
 // notificationHandler reads notifications and control messages from the queue
 // handler and processes one at a time.
+//	TODO(ABE, MUST): this part needs to study and modify. At this moment, we just comment the codes.
 func (m *wsNotificationManager) notificationHandler() {
 	// clients is a map of all currently connected websocket clients.
 	clients := make(map[chan struct{}]*wsClient)
@@ -521,33 +522,34 @@ out:
 			}
 			switch n := n.(type) {
 			case *notificationBlockConnected:
-				block := (*abeutil.BlockAbe)(n)
+				//	TODO(ABE, MUST)
+				/*				block := (*abeutil.BlockAbe)(n)
 
-				// Skip iterating through all txs if no
-				// tx notification requests exist.
-				if len(watchedOutPoints) != 0 || len(watchedAddrs) != 0 {
-					for _, tx := range block.Transactions() {
-						m.notifyForTx(watchedOutPoints,
-							watchedAddrs, tx, block)
-					}
-				}
+								// Skip iterating through all txs if no
+								// tx notification requests exist.
+								if len(watchedOutPoints) != 0 || len(watchedAddrs) != 0 {
+									for _, tx := range block.Transactions() {
+										m.notifyForTx(watchedOutPoints, watchedAddrs, tx, block)
+									}
+								}
 
-				if len(blockNotifications) != 0 {
-					m.notifyBlockConnected(blockNotifications,
-						block)
-					m.notifyFilteredBlockConnected(blockNotifications,
-						block)
-				}
+								if len(blockNotifications) != 0 {
+									m.notifyBlockConnected(blockNotifications,
+										block)
+									m.notifyFilteredBlockConnected(blockNotifications,
+										block)
+								}*/
 
 			case *notificationBlockDisconnected:
-				block := (*abeutil.Block)(n)
+				//	TODO(ABE, MUST)
+				/*				block := (*abeutil.BlockAbe)(n)
 
-				if len(blockNotifications) != 0 {
-					m.notifyBlockDisconnected(blockNotifications,
-						block)
-					m.notifyFilteredBlockDisconnected(blockNotifications,
-						block)
-				}
+								if len(blockNotifications) != 0 {
+									m.notifyBlockDisconnected(blockNotifications,
+										block)
+									m.notifyFilteredBlockDisconnected(blockNotifications,
+										block)
+								}*/
 
 			case *notificationTxAcceptedByMempool:
 				if n.isNew && len(txNotifications) != 0 {
