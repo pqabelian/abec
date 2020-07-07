@@ -1307,7 +1307,7 @@ func dbPutBestState(dbTx database.Tx, snapshot *BestState, workSum *big.Int) err
 // the genesis block, so it must only be called on an uninitialized database.
 func (b *BlockChain) createChainState() error {
 	// Create a new node from the genesis block and set it as the best node.
-	genesisBlock := abeutil.NewBlock(b.chainParams.GenesisBlock)
+	genesisBlock := abeutil.NewBlockAbe(b.chainParams.GenesisBlock)
 	genesisBlock.SetHeight(0)
 	header := &genesisBlock.MsgBlock().Header
 	node := newBlockNode(header, nil)
@@ -1398,7 +1398,7 @@ func (b *BlockChain) createChainState() error {
 		}
 
 		// Store the genesis block into the database.
-		return dbStoreBlock(dbTx, genesisBlock)
+		return dbStoreBlockAbe(dbTx, genesisBlock)
 	})
 	return err
 }
@@ -1520,7 +1520,7 @@ func (b *BlockChain) initChainState() error {
 		if err != nil {
 			return err
 		}
-		var block wire.MsgBlock
+		var block wire.MsgBlockAbe
 		err = block.Deserialize(bytes.NewReader(blockBytes))
 		if err != nil {
 			return err
@@ -1694,8 +1694,7 @@ func dbStoreBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe) error {
 	if hasBlock {
 		return nil
 	}
-	//	return dbTx.StoreBlock(block)
-	return nil
+	return dbTx.StoreBlockAbe(block)
 }
 
 // blockIndexKey generates the binary key for an entry in the block index

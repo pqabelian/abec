@@ -117,7 +117,7 @@ type Params struct {
 	DNSSeeds []DNSSeed
 
 	// GenesisBlock defines the first block of the chain.
-	GenesisBlock *wire.MsgBlock
+	GenesisBlock *wire.MsgBlockAbe
 
 	// GenesisHash is the starting block hash.
 	GenesisHash *chainhash.Hash
@@ -219,8 +219,8 @@ type Params struct {
 
 // MainNetParams defines the network parameters for the main Bitcoin network.
 var MainNetParams = Params{
-	Name:        "mainnet",
-	Net:         wire.MainNet,
+	Name: "mainnet",
+	Net:  wire.MainNet,
 	//DefaultPort: "8333",
 	DefaultPort: "8666",
 	// TODO: this DNSSeed principle will be learned

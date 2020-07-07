@@ -1195,6 +1195,49 @@ func (tx *transaction) StoreBlock(block *abeutil.Block) error {
 	return nil
 }
 
+func (tx *transaction) StoreBlockAbe(block *abeutil.BlockAbe) error {
+	// Ensure transaction state is valid.
+	if err := tx.checkClosed(); err != nil {
+		return err
+	}
+
+	// Ensure the transaction is writable.
+	if !tx.writable {
+		str := "store block requires a writable database transaction"
+		return makeDbErr(database.ErrTxNotWritable, str, nil)
+	}
+
+	// Reject the block if it already exists.
+	blockHash := block.Hash()
+	if tx.hasBlockAbe(blockHash) {
+		str := fmt.Sprintf("block %s already exists", blockHash)
+		return makeDbErr(database.ErrBlockExists, str, nil)
+	}
+
+	blockBytes, err := block.Bytes()
+	if err != nil {
+		str := fmt.Sprintf("failed to get serialized bytes for block %s",
+			blockHash)
+		return makeDbErr(database.ErrDriverSpecific, str, err)
+	}
+
+	// Add the block to be stored to the list of pending blocks to store
+	// when the transaction is committed.  Also, add it to pending blocks
+	// map so it is easy to determine the block is pending based on the
+	// block hash.
+	if tx.pendingBlocks == nil {
+		tx.pendingBlocks = make(map[chainhash.Hash]int)
+	}
+	tx.pendingBlocks[*blockHash] = len(tx.pendingBlockData)
+	tx.pendingBlockData = append(tx.pendingBlockData, pendingBlock{
+		hash:  blockHash,
+		bytes: blockBytes,
+	})
+	log.Tracef("Added block %s to pending blocks", blockHash)
+
+	return nil
+}
+
 // HasBlock returns whether or not a block with the given hash exists in the
 // database.
 //

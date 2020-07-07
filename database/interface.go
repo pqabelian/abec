@@ -224,6 +224,7 @@ type Tx interface {
 	//
 	// Other errors are possible depending on the implementation.
 	StoreBlock(block *abeutil.Block) error
+	StoreBlockAbe(block *abeutil.BlockAbe) error
 
 	// HasBlock returns whether or not a block with the given hash exists
 	// in the database.
