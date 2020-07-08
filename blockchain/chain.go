@@ -829,7 +829,7 @@ func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 
 	// No warnings about unknown rules or versions until the chain is
 	// current.
-	//	Abe to do
+	//	todo(ABE.MUST)
 	/*	if b.isCurrent() {
 		// Warn if any unknown new rules are either about to activate or
 		// have already been activated.
@@ -897,12 +897,12 @@ func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 		// optional indexes with the block being connected so they can
 		// update themselves accordingly.
 		//	Abe to do: indexManager
-		/*		if b.indexManager != nil {
-				err := b.indexManager.ConnectBlock(dbTx, block, stxos)
-				if err != nil {
-					return err
-				}
-			}*/
+		if b.indexManager != nil {
+			err := b.indexManager.ConnectBlockAbe(dbTx, block, stxos)
+			if err != nil {
+				return err
+			}
+		}
 
 		return nil
 	})
@@ -1143,14 +1143,12 @@ func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe
 		// Allow the index manager to call each of the currently active
 		// optional indexes with the block being disconnected so they
 		// can update themselves accordingly.
-		//	Abe to do
-		//	The indexManager needs to implement multiple interfaces
+		//	todo(ABE.MUST)
 		if b.indexManager != nil {
-			_ = len(stxos) // to remove
-			/*			err := b.indexManager.DisconnectBlock(dbTx, block, stxos)
-						if err != nil {
-							return err
-						}*/
+			err := b.indexManager.DisconnectBlockAbe(dbTx, block, stxos)
+			if err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -1506,7 +1504,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 	// then they are needed again when doing the actual database updates.
 	// Rather than doing two loads, cache the loaded data into these slices.
 	detachBlocks := make([]*abeutil.BlockAbe, 0, detachNodes.Len())
-	detachSpentTxOuts := make([][]SpentTxOutAbe, 0, detachNodes.Len())
+	detachSpentTxOuts := make([][]*SpentTxOutAbe, 0, detachNodes.Len())
 	attachBlocks := make([]*abeutil.BlockAbe, 0, attachNodes.Len())
 
 	// Disconnect all of the blocks back to the point of the fork.  This
@@ -1545,7 +1543,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 
 		// Load all of the spent txos for the block from the spend
 		// journal.
-		var stxos []SpentTxOutAbe
+		var stxos []*SpentTxOutAbe
 		err = b.db.View(func(dbTx database.Tx) error {
 			stxos, err = dbFetchSpendJournalEntryAbe(dbTx, block)
 			return err
@@ -2018,7 +2016,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 		}
 
 		// Connect the block to the main chain.
-		//	Abe to do: Here stxos is used as input, all precious are setting stxos
+		//	ToDo(ABE): Here stxos is used as input, all precious are setting stxos
 		err := b.connectBlockAbe(node, block, view, stxos)
 		if err != nil {
 			// If we got hit with a rule error, then we'll mark
@@ -2520,12 +2518,14 @@ type IndexManager interface {
 	// so indexers can access the previous output scripts input spent if
 	// required.
 	ConnectBlock(database.Tx, *abeutil.Block, []SpentTxOut) error
+	ConnectBlockAbe(database.Tx, *abeutil.BlockAbe, []*SpentTxOutAbe) error
 
 	// DisconnectBlock is invoked when a block has been disconnected from
 	// the main chain. The set of outputs scripts that were spent within
 	// this block is also returned so indexers can clean up the prior index
 	// state for this block.
 	DisconnectBlock(database.Tx, *abeutil.Block, []SpentTxOut) error
+	DisconnectBlockAbe(database.Tx, *abeutil.BlockAbe, []*SpentTxOutAbe) error
 }
 
 // Config is a descriptor which specifies the blockchain instance configuration.

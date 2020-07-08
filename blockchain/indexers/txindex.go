@@ -304,6 +304,18 @@ func dbRemoveTxIndexEntries(dbTx database.Tx, block *abeutil.Block) error {
 	return nil
 }
 
+//	ToDo(ABE):
+func dbRemoveTxIndexEntriesAbe(dbTx database.Tx, block *abeutil.BlockAbe) error {
+	for _, tx := range block.Transactions() {
+		err := dbRemoveTxIndexEntry(dbTx, tx.Hash())
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // TxIndex implements a transaction by hash index.  That is to say, it supports
 // querying all transactions by their hash.
 type TxIndex struct {
@@ -433,9 +445,9 @@ func (idx *TxIndex) ConnectBlock(dbTx database.Tx, block *abeutil.Block,
 	return nil
 }
 
-//	Abe to do
-func (idx *TxIndex) ConnectBlockABe(dbTx database.Tx, block *abeutil.BlockAbe,
-	stxos []blockchain.SpentTxOut) error {
+//	todo(ABE.MUST)
+func (idx *TxIndex) ConnectBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe,
+	stxos []*blockchain.SpentTxOutAbe) error {
 
 	// Increment the internal block ID to use for the block being connected
 	// and add all of the transactions in the block to the index.
@@ -464,6 +476,24 @@ func (idx *TxIndex) DisconnectBlock(dbTx database.Tx, block *abeutil.Block,
 
 	// Remove all of the transactions in the block from the index.
 	if err := dbRemoveTxIndexEntries(dbTx, block); err != nil {
+		return err
+	}
+
+	// Remove the block ID index entry for the block being disconnected and
+	// decrement the current internal block ID to account for it.
+	if err := dbRemoveBlockIDIndexEntry(dbTx, block.Hash()); err != nil {
+		return err
+	}
+	idx.curBlockID--
+	return nil
+}
+
+//	ToDo(ABE.MUST):
+func (idx *TxIndex) DisconnectBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe,
+	stxos []*blockchain.SpentTxOutAbe) error {
+
+	// Remove all of the transactions in the block from the index.
+	if err := dbRemoveTxIndexEntriesAbe(dbTx, block); err != nil {
 		return err
 	}
 

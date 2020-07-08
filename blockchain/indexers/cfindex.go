@@ -278,14 +278,14 @@ func (idx *CfIndex) ConnectBlock(dbTx database.Tx, block *abeutil.Block,
 	return storeFilter(dbTx, block, f, wire.GCSFilterRegular)
 }
 
-//	Abe to do
+//	todo(ABE.MUST)
 func (idx *CfIndex) ConnectBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe,
-	stxos []*blockchain.SpentTxOut) error {
+	stxos []*blockchain.SpentTxOutAbe) error {
 
 	prevScripts := make([][]byte, len(stxos))
-	for i, stxo := range stxos {
+	/*	for i, stxo := range stxos {
 		prevScripts[i] = stxo.PkScript
-	}
+	}*/
 
 	f, err := builder.BuildBasicFilterAbe(block.MsgBlock(), prevScripts)
 	if err != nil {
@@ -300,6 +300,34 @@ func (idx *CfIndex) ConnectBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe,
 // mapping for every passed block. This is part of the Indexer interface.
 func (idx *CfIndex) DisconnectBlock(dbTx database.Tx, block *abeutil.Block,
 	_ []blockchain.SpentTxOut) error {
+
+	for _, key := range cfIndexKeys {
+		err := dbDeleteFilterIdxEntry(dbTx, key, block.Hash())
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, key := range cfHeaderKeys {
+		err := dbDeleteFilterIdxEntry(dbTx, key, block.Hash())
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, key := range cfHashKeys {
+		err := dbDeleteFilterIdxEntry(dbTx, key, block.Hash())
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+//	ToDo(ABE.MUST)
+func (idx *CfIndex) DisconnectBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe,
+	_ []*blockchain.SpentTxOutAbe) error {
 
 	for _, key := range cfIndexKeys {
 		err := dbDeleteFilterIdxEntry(dbTx, key, block.Hash())

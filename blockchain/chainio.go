@@ -468,7 +468,7 @@ func deserializeSpendJournalEntry(serialized []byte, txns []*wire.MsgTx) ([]Spen
 }
 
 //	Abe to do
-func deserializeSpendJournalEntryAbe(serialized []byte, txns []*wire.MsgTxAbe) ([]SpentTxOutAbe, error) {
+func deserializeSpendJournalEntryAbe(serialized []byte, txns []*wire.MsgTxAbe) ([]*SpentTxOutAbe, error) {
 	// Calculate the total number of stxos.
 	var numStxos int
 	for _, tx := range txns {
@@ -494,7 +494,7 @@ func deserializeSpendJournalEntryAbe(serialized []byte, txns []*wire.MsgTxAbe) (
 	// Loop backwards through all transactions so everything is read in
 	// reverse order to match the serialization order.
 	stxoIdx := numStxos - 1
-	stxos := make([]SpentTxOutAbe, numStxos)
+	stxos := make([]*SpentTxOutAbe, numStxos)
 	for txIdx := len(txns) - 1; txIdx > -1; txIdx-- {
 		tx := txns[txIdx]
 
@@ -502,7 +502,7 @@ func deserializeSpendJournalEntryAbe(serialized []byte, txns []*wire.MsgTxAbe) (
 		// the associated stxo.
 		for txInIdx := len(tx.TxIns) - 1; txInIdx > -1; txInIdx-- {
 			txIn := tx.TxIns[txInIdx]
-			stxo := &stxos[stxoIdx]
+			stxo := stxos[stxoIdx]
 			stxoIdx--
 
 			err := stxo.Deserialize(br)
@@ -597,7 +597,7 @@ func dbFetchSpendJournalEntry(dbTx database.Tx, block *abeutil.Block) ([]SpentTx
 }
 
 //Abe to do
-func dbFetchSpendJournalEntryAbe(dbTx database.Tx, block *abeutil.BlockAbe) ([]SpentTxOutAbe, error) {
+func dbFetchSpendJournalEntryAbe(dbTx database.Tx, block *abeutil.BlockAbe) ([]*SpentTxOutAbe, error) {
 	// Exclude the coinbase transaction since it can't spend anything.
 	spendBucket := dbTx.Metadata().Bucket(spendJournalBucketName)
 	serialized := spendBucket.Get(block.Hash()[:])

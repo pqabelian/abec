@@ -109,9 +109,9 @@ func dbIndexConnectBlockAbe(dbTx database.Tx, indexer Indexer, block *abeutil.Bl
 
 	// Notify the indexer with the connected block so it can index it.
 	// Abe to do
-	/*	if err := indexer.ConnectBlockAbe(dbTx, block, stxo); err != nil {
+	if err := indexer.ConnectBlockAbe(dbTx, block, stxo); err != nil {
 		return err
-	}*/
+	}
 
 	// Update the current index tip.
 	return dbPutIndexerTip(dbTx, idxKey, block.Hash(), block.Height())
@@ -141,6 +141,34 @@ func dbIndexDisconnectBlock(dbTx database.Tx, indexer Indexer, block *abeutil.Bl
 	// Notify the indexer with the disconnected block so it can remove all
 	// of the appropriate entries.
 	if err := indexer.DisconnectBlock(dbTx, block, stxo); err != nil {
+		return err
+	}
+
+	// Update the current index tip.
+	prevHash := &block.MsgBlock().Header.PrevBlock
+	return dbPutIndexerTip(dbTx, idxKey, prevHash, block.Height()-1)
+}
+
+func dbIndexDisconnectBlockAbe(dbTx database.Tx, indexer Indexer, block *abeutil.BlockAbe,
+	stxo []*blockchain.SpentTxOutAbe) error {
+
+	// Assert that the block being disconnected is the current tip of the
+	// index.
+	idxKey := indexer.Key()
+	curTipHash, _, err := dbFetchIndexerTip(dbTx, idxKey)
+	if err != nil {
+		return err
+	}
+	if !curTipHash.IsEqual(block.Hash()) {
+		return AssertError(fmt.Sprintf("dbIndexDisconnectBlock must "+
+			"be called with the block at the current index tip "+
+			"(%s, tip %s, block %s)", indexer.Name(),
+			curTipHash, block.Hash()))
+	}
+
+	// Notify the indexer with the disconnected block so it can remove all
+	// of the appropriate entries.
+	if err := indexer.DisconnectBlockAbe(dbTx, block, stxo); err != nil {
 		return err
 	}
 
@@ -565,6 +593,21 @@ func (m *Manager) DisconnectBlock(dbTx database.Tx, block *abeutil.Block,
 	// being disconnected so they can update accordingly.
 	for _, index := range m.enabledIndexes {
 		err := dbIndexDisconnectBlock(dbTx, index, block, stxo)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+//	todo(ABE.MUST)
+func (m *Manager) DisconnectBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe,
+	stxo []*blockchain.SpentTxOutAbe) error {
+
+	// Call each of the currently active optional indexes with the block
+	// being disconnected so they can update accordingly.
+	for _, index := range m.enabledIndexes {
+		err := dbIndexDisconnectBlockAbe(dbTx, index, block, stxo)
 		if err != nil {
 			return err
 		}

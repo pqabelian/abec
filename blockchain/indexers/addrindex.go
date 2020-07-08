@@ -716,7 +716,7 @@ func (idx *AddrIndex) indexBlock(data writeIndexData, block *abeutil.Block,
 	}
 }
 
-//	Abe to do
+//	TODO(ABE.MUST)
 func (idx *AddrIndex) indexBlockAbe(data writeIndexData, block *abeutil.BlockAbe,
 	stxos []*blockchain.SpentTxOutAbe) {
 
@@ -832,6 +832,25 @@ func (idx *AddrIndex) DisconnectBlock(dbTx database.Tx, block *abeutil.Block,
 	// Build all of the address to transaction mappings in a local map.
 	addrsToTxns := make(writeIndexData)
 	idx.indexBlock(addrsToTxns, block, stxos)
+
+	// Remove all of the index entries for each address.
+	bucket := dbTx.Metadata().Bucket(addrIndexKey)
+	for addrKey, txIdxs := range addrsToTxns {
+		err := dbRemoveAddrIndexEntries(bucket, addrKey, len(txIdxs))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (idx *AddrIndex) DisconnectBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe,
+	stxos []*blockchain.SpentTxOutAbe) error {
+
+	// Build all of the address to transaction mappings in a local map.
+	addrsToTxns := make(writeIndexData)
+	idx.indexBlockAbe(addrsToTxns, block, stxos)
 
 	// Remove all of the index entries for each address.
 	bucket := dbTx.Metadata().Bucket(addrIndexKey)

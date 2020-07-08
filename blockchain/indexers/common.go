@@ -47,13 +47,16 @@ type Indexer interface {
 	// so indexers can access the pevious output scripts input spent if
 	// required.
 	ConnectBlock(database.Tx, *abeutil.Block, []blockchain.SpentTxOut) error
-	//	Abe to do
+	//	ToDo(ABE)
+	ConnectBlockAbe(database.Tx, *abeutil.BlockAbe, []*blockchain.SpentTxOutAbe) error
 
 	// DisconnectBlock is invoked when a block has been disconnected from
 	// the main chain. The set of outputs scripts that were spent within
 	// this block is also returned so indexers can clean up the prior index
 	// state for this block
 	DisconnectBlock(database.Tx, *abeutil.Block, []blockchain.SpentTxOut) error
+	//	ToDo(ABE)
+	DisconnectBlockAbe(database.Tx, *abeutil.BlockAbe, []*blockchain.SpentTxOutAbe) error
 }
 
 // AssertError identifies an error that indicates an internal code consistency

@@ -810,7 +810,7 @@ func (view *UtxoRingViewpoint) connectTransactions(block *abeutil.BlockAbe, stxo
 // using the provided spent txo information, and setting the best hash for the
 // view to the block before the passed block.
 //	Abe to do: use the spendJournal to collect and update utxoRing
-func (view *UtxoRingViewpoint) disconnectTransactions(db database.DB, block *abeutil.BlockAbe, stxos []SpentTxOutAbe) error {
+func (view *UtxoRingViewpoint) disconnectTransactions(db database.DB, block *abeutil.BlockAbe, stxos []*SpentTxOutAbe) error {
 	// Sanity check the correct number of stxos are provided.
 	if len(stxos) != countSpentOutputsAbe(block) {
 		return AssertError("disconnectTransactions called with bad " +
