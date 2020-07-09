@@ -417,10 +417,12 @@ func createCoinbaseTxAbe(params *chaincfg.Params, extraNonce uint64, nextBlockHe
 	}
 	txOut := wire.TxOutAbe{}
 	txOut.AddressScript = addressScript
-	//	todo (ABE): for salrs test, we set fix value 100 ABE
+	//	TODO (ABE.MUST): for salrs test, we set fix value 100 ABE
 	//	txOut.ValueScript = blockchain.CalcBlockSubsidy(nextBlockHeight, params)
 	//	for genesis block, this value is 1000 * 10000000
-	txOut.ValueScript = 500 * abeutil.NeutrinoPerAbe
+	//	For the test version of salrs, the fix-denotation is 100ABE, that is the fee and the value script must be 100.
+	//	and the valuescript in coinbase transaction is 400. THIS IS JUST FOR TEST.
+	txOut.ValueScript = 400 * abeutil.NeutrinoPerAbe
 
 	tx := wire.NewMsgTxAbe(wire.TxVersion)
 	tx.AddTxIn(coinbaseTxIn)
