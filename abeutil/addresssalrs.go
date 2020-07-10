@@ -40,7 +40,7 @@ func (maddr *MasterAddressSalrs) Deserialize(serialized []byte) error {
 
 	mpk, err := salrs.DeseralizeMasterPubKey(serialized[2:])
 	if err != nil {
-		return nil
+		return err
 	}
 
 	maddr.masterPubKey = mpk
