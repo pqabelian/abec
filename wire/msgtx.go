@@ -1288,7 +1288,7 @@ func (outPointRing *OutPointRing) Hash() chainhash.Hash {
 type TxInAbe struct {
 	SerialNumber chainhash.Hash
 	//	identify the consumed OutPoint
-	PreviousOutPointRing *OutPointRing
+	PreviousOutPointRing OutPointRing
 }
 
 // NewTxIn returns a new bitcoin transaction input with the provided
@@ -1297,7 +1297,7 @@ type TxInAbe struct {
 func NewTxInAbe(serialNumber *chainhash.Hash, previousOutPointRing *OutPointRing) *TxInAbe {
 	return &TxInAbe{
 		SerialNumber:         *serialNumber,
-		PreviousOutPointRing: previousOutPointRing,
+		PreviousOutPointRing: *previousOutPointRing,
 	}
 }
 
@@ -2275,7 +2275,7 @@ func NewStandardCoinbaseTxIn(nextBlockHeight int32, extraNonce uint64) *TxInAbe 
 	outPointAbe.Index = 0
 	previousOutPointRing.OutPoints[0] = &outPointAbe
 
-	txIn.PreviousOutPointRing = &previousOutPointRing
+	txIn.PreviousOutPointRing = previousOutPointRing
 
 	return &txIn
 }

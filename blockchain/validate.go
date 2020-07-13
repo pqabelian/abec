@@ -378,9 +378,9 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 
 	if IsCoinBaseAbe(tx) {
 		previousOutPointRing := msgTx.TxIns[0].PreviousOutPointRing
-		if previousOutPointRing == nil {
-			return ruleError(ErrBadTxInput, "Coinbase Transaction refers to an OutPointRing that is null")
-		}
+		/*		if previousOutPointRing == nil {
+				return ruleError(ErrBadTxInput, "Coinbase Transaction refers to an OutPointRing that is null")
+			}*/
 		blkHashNum := len(previousOutPointRing.BlockHashs)
 		if blkHashNum != wire.BlockNumPerRingGroup {
 			str := fmt.Sprintf("Coinbase Transaction refers to an OutPointRing with block-hash-number "+
