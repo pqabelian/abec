@@ -427,7 +427,7 @@ func createCoinbaseTxAbe(params *chaincfg.Params, extraNonce uint64, nextBlockHe
 	tx := wire.NewMsgTxAbe(wire.TxVersion)
 	tx.AddTxIn(coinbaseTxIn)
 	tx.AddTxOut(&txOut)
-	tx.TxWitness = nil
+	tx.TxWitness = &wire.TxWitnessAbe{}
 
 	return abeutil.NewTxAbe(tx), nil
 }

@@ -1542,6 +1542,8 @@ func writeTxWitnessAbe(w io.Writer, pver uint32, version int32, txWitness *TxWit
 		if err != nil {
 			return err
 		}
+
+		return nil
 	}
 
 	err := WriteVarInt(w, pver, uint64(len(txWitness.Witnesses)))
@@ -1562,8 +1564,8 @@ func readTxWitnessAbe(r io.Reader, pver uint32, version int32, txWitness *TxWitn
 	if err != nil {
 		return err
 	}
+	txWitness.Witnesses = make([]Witness, witItemNum)
 	if witItemNum > 0 {
-		txWitness.Witnesses = make([]Witness, witItemNum)
 		for i := uint64(0); i < witItemNum; i++ {
 			witnessItem, err := ReadVarBytes(r, pver, WitnessItemMaxLen, "WitnessItem")
 			if err != nil {
@@ -2081,6 +2083,12 @@ func (msg *MsgTxAbe) Serialize(w io.Writer) error {
 	if err != nil {
 		return err
 	}
+
+	/*	//	TxWitness
+		err = msg.TxWitness.Serialize(w)
+		if err != nil {
+			return err
+		}*/
 
 	return nil
 
