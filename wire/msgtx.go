@@ -1219,6 +1219,11 @@ func (outPointRing *OutPointRing) Serialize(w io.Writer) error {
 		}
 	}
 
+	err = WriteVarInt(w, 0, uint64(len(outPointRing.OutPoints)))
+	if err != nil {
+		return err
+	}
+
 	for _, outPoint := range outPointRing.OutPoints {
 		err = outPoint.Serialize(w)
 		if err != nil {
