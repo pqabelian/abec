@@ -7,14 +7,9 @@ import (
 
 // activeNetParams is a pointer to the parameters specific to the
 // currently active bitcoin network.
-<<<<<<< HEAD
-//	abec to do
-var activeNetParams = &mainNetParams  
-=======
 //	todo(ABE):
 var activeNetParams = &mainNetParams
 
->>>>>>> origin/master
 //var activeNetParams = &simNetParams
 
 // params is used to group parameters for various networks such as the main
