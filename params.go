@@ -7,8 +7,14 @@ import (
 
 // activeNetParams is a pointer to the parameters specific to the
 // currently active bitcoin network.
+<<<<<<< HEAD
 //	abec to do
 var activeNetParams = &mainNetParams  
+=======
+//	todo(ABE):
+var activeNetParams = &mainNetParams
+
+>>>>>>> origin/master
 //var activeNetParams = &simNetParams
 
 // params is used to group parameters for various networks such as the main
@@ -25,7 +31,7 @@ type params struct {
 // it does not handle on to btcd.  This approach allows the wallet process
 // to emulate the full reference implementation RPC API.
 var mainNetParams = params{
-	Params:  &chaincfg.MainNetParams,
+	Params: &chaincfg.MainNetParams,
 	//rpcPort: "8334",
 	rpcPort: "8667",
 }

@@ -1288,7 +1288,7 @@ func (outPointRing *OutPointRing) Hash() chainhash.Hash {
 type TxInAbe struct {
 	SerialNumber chainhash.Hash
 	//	identify the consumed OutPoint
-	PreviousOutPointRing *OutPointRing
+	PreviousOutPointRing OutPointRing
 }
 
 // NewTxIn returns a new bitcoin transaction input with the provided
@@ -1297,7 +1297,7 @@ type TxInAbe struct {
 func NewTxInAbe(serialNumber *chainhash.Hash, previousOutPointRing *OutPointRing) *TxInAbe {
 	return &TxInAbe{
 		SerialNumber:         *serialNumber,
-		PreviousOutPointRing: previousOutPointRing,
+		PreviousOutPointRing: *previousOutPointRing,
 	}
 }
 
@@ -1406,7 +1406,7 @@ func (txIn *TxInAbe) Deserialize(r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	txIn.PreviousOutPointRing = &OutPointRing{}
+
 	err = txIn.PreviousOutPointRing.Deserialize(r)
 	if err != nil {
 		return err
@@ -1538,7 +1538,7 @@ func readTxOutAbe(r io.Reader, pver uint32, version int32, txOut *TxOutAbe) erro
 
 func writeTxWitnessAbe(w io.Writer, pver uint32, version int32, txWitness *TxWitnessAbe) error {
 	if txWitness == nil {
-		err:=WriteVarInt(w,pver,uint64(0))
+		err := WriteVarInt(w, pver, uint64(0))
 		if err != nil {
 			return err
 		}
@@ -1563,8 +1563,8 @@ func readTxWitnessAbe(r io.Reader, pver uint32, version int32, txWitness *TxWitn
 	if err != nil {
 		return err
 	}
+	txWitness.Witnesses = make([]Witness, witItemNum)
 	if witItemNum > 0 {
-		txWitness.Witnesses = make([]Witness, witItemNum)
 		for i := uint64(0); i < witItemNum; i++ {
 			witnessItem, err := ReadVarBytes(r, pver, WitnessItemMaxLen, "WitnessItem")
 			if err != nil {
@@ -2083,6 +2083,12 @@ func (msg *MsgTxAbe) Serialize(w io.Writer) error {
 		return err
 	}
 
+	/*	//	TxWitness
+		err = msg.TxWitness.Serialize(w)
+		if err != nil {
+			return err
+		}*/
+
 	return nil
 
 }
@@ -2268,7 +2274,7 @@ func NewStandardCoinbaseTxIn(nextBlockHeight int32, extraNonce uint64) *TxInAbe 
 	outPointAbe.Index = 0
 	previousOutPointRing.OutPoints[0] = &outPointAbe
 
-	txIn.PreviousOutPointRing = &previousOutPointRing
+	txIn.PreviousOutPointRing = previousOutPointRing
 
 	return &txIn
 }

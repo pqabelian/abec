@@ -314,7 +314,7 @@ func main() {
 	// Call serviceMain on Windows to handle running as a service.  When
 	// the return isService flag is true, exit now since we ran as a
 	// service.  Otherwise, just fall through to normal operation.
-	//TODO(osy): lack a file named service_windows.go, and this file import btcsuite/winsvc，
+	// TODO(osy): lack a file named service_windows.go, and this file import btcsuite/winsvc，
 	// so it need to include this module as our project.
 	// but now, this detection is disabled.
 	//if runtime.GOOS == "windows" {

@@ -14,7 +14,7 @@ var genesisCoinbaseTx = wire.MsgTxAbe{
 	TxIns: []*wire.TxInAbe{ //len(TxIns)==1
 		{
 			SerialNumber: chainhash.ZeroHash, // imply this is a coinbase transaction
-			PreviousOutPointRing: &wire.OutPointRing{
+			PreviousOutPointRing: wire.OutPointRing{
 				BlockHashs: []*chainhash.Hash{
 					&chainhash.ZeroHash,
 					{

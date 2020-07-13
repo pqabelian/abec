@@ -870,6 +870,7 @@ func loadConfig() (*config, []string, error) {
 
 	//	mining address
 	if cfg.Generate {
+		//				ConfigTest(&cfg)
 		maddr, err := abeutil.DecodeMasterAddressAbe(cfg.MiningAddr)
 		if err != nil {
 			str := "%s: the generate flag is set. Mining address '%s' failed to decode: %v"
