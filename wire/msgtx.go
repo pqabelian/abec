@@ -1537,6 +1537,13 @@ func readTxOutAbe(r io.Reader, pver uint32, version int32, txOut *TxOutAbe) erro
 }
 
 func writeTxWitnessAbe(w io.Writer, pver uint32, version int32, txWitness *TxWitnessAbe) error {
+	if txWitness == nil {
+		err := WriteVarInt(w, pver, uint64(0))
+		if err != nil {
+			return err
+		}
+	}
+
 	err := WriteVarInt(w, pver, uint64(len(txWitness.Witnesses)))
 	for _, witnessItem := range txWitness.Witnesses {
 		err = WriteVarBytes(w, pver, witnessItem)

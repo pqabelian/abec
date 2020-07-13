@@ -6,8 +6,7 @@ require (
 	github.com/abesuite/go-socks v0.0.0-20170105172521-4720035b7bfd
 	github.com/abesuite/go-spew v1.1.1
 	github.com/aead/siphash v1.0.1
-	github.com/cryptosuite/kyber-go v0.0.0-20200701012546-a87ecb4b2ce3 // indirect
-	github.com/cryptosuite/salrs-go v0.0.0-20200701013045-94d38b5b133c
+	github.com/cryptosuite/salrs-go v0.0.0-20200711120347-3da7a58a2621
 	github.com/gorilla/websocket v1.4.2
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/jrick/logrotate v1.0.0
