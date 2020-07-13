@@ -435,9 +435,8 @@ func loadConfig() (*config, []string, error) {
 		TxIndex:              defaultTxIndex,
 		AddrIndex:            defaultAddrIndex,
 	}
-
 	// Service options which are only added on Windows.
-	serviceOpts := serviceOptions{}
+	serviceOpts := serviceOptions{}  //TODO(osy): this set is ingoned, we should detect it!
 
 	// Pre-parse the command line options to see if an alternative config
 	// file or the version flag was specified.  Any errors aside from the
@@ -458,7 +457,7 @@ func loadConfig() (*config, []string, error) {
 	appName = strings.TrimSuffix(appName, filepath.Ext(appName))
 	usageMessage := fmt.Sprintf("Use %s -h to show usage", appName)
 	if preCfg.ShowVersion {
-		fmt.Println(appName, "version", version())
+		fmt.Println(appName, "version", version())   //this process is all in version.go
 		os.Exit(0)
 	}
 
@@ -690,7 +689,7 @@ func loadConfig() (*config, []string, error) {
 		len(cfg.Listeners) == 0 {
 		cfg.DisableListen = true
 	}
-
+	// TODO(osy): 这个地方适合局域网测试
 	// Connect means no DNS seeding.
 	if len(cfg.ConnectPeers) > 0 {
 		cfg.DisableDNSSeed = true

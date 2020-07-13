@@ -245,7 +245,7 @@ func DecodeMasterAddressAbe(addrstr string) (MasterAddress, error) {
 	}
 
 	serializedSize := len(serialized)
-	if serializedSize <= 2+chainhash.HashSize {
+	if serializedSize <= 2+chainhash.HashSize {     //TODO(osy): 2 + chainhash.HashSize consider nil of address?
 		return nil, errors.New("decoded address is of unknown format: bytesize <= 2 + chainhash.HashSize")
 	}
 

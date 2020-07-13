@@ -314,16 +314,19 @@ func main() {
 	// Call serviceMain on Windows to handle running as a service.  When
 	// the return isService flag is true, exit now since we ran as a
 	// service.  Otherwise, just fall through to normal operation.
-	if runtime.GOOS == "windows" {
-		isService, err := winServiceMain()
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-		if isService {
-			os.Exit(0)
-		}
-	}
+	//TODO(osy): lack a file named service_windows.go, and this file import btcsuite/winsvc，
+	// so it need to include this module as our project.
+	// but now, this detection is disabled.
+	//if runtime.GOOS == "windows" {
+	//	isService, err := winServiceMain()
+	//	if err != nil {
+	//		fmt.Println(err)
+	//		os.Exit(1)
+	//	}
+	//	if isService {
+	//		os.Exit(0)
+	//	}
+	//}
 
 	// Work around defer not working after os.Exit()
 	if err := abecMain(nil); err != nil {

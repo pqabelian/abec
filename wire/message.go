@@ -257,7 +257,11 @@ func WriteMessage(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) erro
 // messages.
 func WriteMessageWithEncodingN(w io.Writer, msg Message, pver uint32,
 	btcnet BitcoinNet, encoding MessageEncoding) (int, error) {
-
+	i:=0
+	switch msg.(type) {
+	case *MsgBlockAbe:
+		fmt.Printf("%v\n",i)
+	}
 	totalBytes := 0
 
 	// Enforce max command size.

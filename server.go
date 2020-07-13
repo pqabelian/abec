@@ -2925,7 +2925,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		OnAccept:       s.inboundPeerConnected,
 		RetryDuration:  connectionRetryInterval,
 		TargetOutbound: uint32(targetOutbound),
-		Dial:           btcdDial,
+		Dial:           btcdDial,     //TODO: where need changed
 		OnConnection:   s.outboundPeerConnected, //handle with the process of connected
 		GetNewAddress:  newAddressFunc,          // get the address of peer
 	})
