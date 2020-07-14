@@ -158,7 +158,7 @@ func abecMain(serverChan chan<- *server) error {
 		server.WaitForShutdown()
 		srvrLog.Infof("Server shutdown complete")
 	}()
-	server.Start()      //Start the p2p server
+	server.Start() //Start the p2p server
 	if serverChan != nil {
 		serverChan <- server
 	}
