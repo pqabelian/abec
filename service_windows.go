@@ -1,5 +1,15 @@
 package main
 
+import (
+	"fmt"
+	"golang.org/x/sys/windows/svc"
+	"golang.org/x/sys/windows/svc/eventlog"
+	"golang.org/x/sys/windows/svc/mgr"
+	"os"
+	"path/filepath"
+	"time"
+)
+
 const (
 	// svcName is the name of btcd service.
 	svcName = "abecsvc"
@@ -49,7 +59,7 @@ func (s *abecService) Execute(args []string, r <-chan svc.ChangeRequest, changes
 	doneChan := make(chan error)
 	serverChan := make(chan *server)
 	go func() {
-		err := btcdMain(serverChan)
+		err := abecMain(serverChan)
 		doneChan <- err
 	}()
 
@@ -182,7 +192,7 @@ func startService() error {
 	}
 	defer service.Close()
 
-	err = service.Start(os.Args)
+	err = service.Start(os.Args...)
 	if err != nil {
 		return fmt.Errorf("could not start service: %v", err)
 	}
