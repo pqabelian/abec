@@ -3468,37 +3468,37 @@ func handleStop(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 }
 
 // handleSubmitBlock implements the submitblock command.
-func handleSubmitBlockBTCD(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	c := cmd.(*abejson.SubmitBlockCmd)
-
-	// Deserialize the submitted block.
-	hexStr := c.HexBlock
-	if len(hexStr)%2 != 0 {
-		hexStr = "0" + c.HexBlock
-	}
-	serializedBlock, err := hex.DecodeString(hexStr)
-	if err != nil {
-		return nil, rpcDecodeHexError(hexStr)
-	}
-
-	block, err := abeutil.NewBlockFromBytes(serializedBlock)
-	if err != nil {
-		return nil, &abejson.RPCError{
-			Code:    abejson.ErrRPCDeserialization,
-			Message: "Block decode failed: " + err.Error(),
-		}
-	}
-
-	// Process this block using the same rules as blocks coming from other
-	// nodes.  This will in turn relay it to the network like normal.
-	_, err = s.cfg.SyncMgr.SubmitBlockBTCD(block, blockchain.BFNone)
-	if err != nil {
-		return fmt.Sprintf("rejected: %s", err.Error()), nil
-	}
-
-	rpcsLog.Infof("Accepted block %s via submitblock", block.Hash())
-	return nil, nil
-}
+//func handleSubmitBlockBTCD(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+//	c := cmd.(*abejson.SubmitBlockCmd)
+//
+//	// Deserialize the submitted block.
+//	hexStr := c.HexBlock
+//	if len(hexStr)%2 != 0 {
+//		hexStr = "0" + c.HexBlock
+//	}
+//	serializedBlock, err := hex.DecodeString(hexStr)
+//	if err != nil {
+//		return nil, rpcDecodeHexError(hexStr)
+//	}
+//
+//	block, err := abeutil.NewBlockFromBytes(serializedBlock)
+//	if err != nil {
+//		return nil, &abejson.RPCError{
+//			Code:    abejson.ErrRPCDeserialization,
+//			Message: "Block decode failed: " + err.Error(),
+//		}
+//	}
+//
+//	// Process this block using the same rules as blocks coming from other
+//	// nodes.  This will in turn relay it to the network like normal.
+//	_, err = s.cfg.SyncMgr.SubmitBlockBTCD(block, blockchain.BFNone)
+//	if err != nil {
+//		return fmt.Sprintf("rejected: %s", err.Error()), nil
+//	}
+//
+//	rpcsLog.Infof("Accepted block %s via submitblock", block.Hash())
+//	return nil, nil
+//}
 
 //	todo(ABE):
 func handleSubmitBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
@@ -4300,7 +4300,7 @@ type rpcserverSyncManager interface {
 
 	// SubmitBlock submits the provided block to the network after
 	// processing it locally.
-	SubmitBlockBTCD(block *abeutil.Block, flags blockchain.BehaviorFlags) (bool, error)
+	//	SubmitBlockBTCD(block *abeutil.Block, flags blockchain.BehaviorFlags) (bool, error)
 	SubmitBlockAbe(block *abeutil.BlockAbe, flags blockchain.BehaviorFlags) (bool, error)
 
 	// Pause pauses the sync manager until the returned channel is closed.
