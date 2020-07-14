@@ -158,7 +158,7 @@ func abecMain(serverChan chan<- *server) error {
 		server.WaitForShutdown()
 		srvrLog.Infof("Server shutdown complete")
 	}()
-	server.Start()      //Start the p2p server
+	server.Start() //Start the p2p server
 	if serverChan != nil {
 		serverChan <- server
 	}
@@ -317,16 +317,16 @@ func main() {
 	// TODO(osy): lack a file named service_windows.go, and this file import btcsuite/winsvc，
 	// so it need to include this module as our project.
 	// but now, this detection is disabled.
-	//if runtime.GOOS == "windows" {
-	//	isService, err := winServiceMain()
-	//	if err != nil {
-	//		fmt.Println(err)
-	//		os.Exit(1)
-	//	}
-	//	if isService {
-	//		os.Exit(0)
-	//	}
-	//}
+	if runtime.GOOS == "windows" {
+		isService, err := winServiceMain()
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		if isService {
+			os.Exit(0)
+		}
+	}
 
 	// Work around defer not working after os.Exit()
 	if err := abecMain(nil); err != nil {

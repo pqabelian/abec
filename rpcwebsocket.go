@@ -522,8 +522,8 @@ out:
 			}
 			switch n := n.(type) {
 			case *notificationBlockConnected:
-				//	TODO(ABE, MUST)
-				/*				block := (*abeutil.BlockAbe)(n)
+				/*				//	TODO(ABE, MUST)
+								block := (*abeutil.BlockAbe)(n)
 
 								// Skip iterating through all txs if no
 								// tx notification requests exist.
