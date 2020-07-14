@@ -849,7 +849,7 @@ func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClie
 		amount += txOut.Value
 	}
 
-	ntfn := abejson.NewTxAcceptedNtfn(txHashStr, abeutil.Amount(amount).ToBTC())
+	ntfn := abejson.NewTxAcceptedNtfn(txHashStr, abeutil.Amount(amount).ToABE())
 	marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
 	if err != nil {
 		rpcsLog.Errorf("Failed to marshal tx notification: %s", err.Error())

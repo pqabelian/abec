@@ -720,7 +720,7 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap
 
 		var vout abejson.Vout
 		vout.N = uint32(i)
-		vout.Value = abeutil.Amount(v.Value).ToBTC()
+		vout.Value = abeutil.Amount(v.Value).ToABE()
 		vout.ScriptPubKey.Addresses = encodedAddrs
 		vout.ScriptPubKey.Asm = disbuf
 		vout.ScriptPubKey.Hex = hex.EncodeToString(v.PkScript)
@@ -2335,7 +2335,7 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		Proxy:           cfg.Proxy,
 		Difficulty:      getDifficultyRatio(best.Bits, s.cfg.ChainParams),
 		TestNet:         cfg.TestNet3,
-		RelayFee:        cfg.minRelayTxFee.ToBTC(),
+		RelayFee:        cfg.minRelayTxFee.ToABE(),
 	}
 
 	return ret, nil
@@ -2770,7 +2770,7 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	txOutReply := &abejson.GetTxOutResult{
 		BestBlock:     bestBlockHash,
 		Confirmations: int64(confirmations),
-		Value:         abeutil.Amount(value).ToBTC(),
+		Value:         abeutil.Amount(value).ToABE(),
 		ScriptPubKey: abejson.ScriptPubKeyResult{
 			Asm:       disbuf,
 			Hex:       hex.EncodeToString(pkScript),
@@ -3027,7 +3027,7 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 			vinListEntry := &vinList[len(vinList)-1]
 			vinListEntry.PrevOut = &abejson.PrevOut{
 				Addresses: encodedAddrs,
-				Value:     abeutil.Amount(originTxOut.Value).ToBTC(),
+				Value:     abeutil.Amount(originTxOut.Value).ToABE(),
 			}
 		}
 	}
@@ -3468,37 +3468,37 @@ func handleStop(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 }
 
 // handleSubmitBlock implements the submitblock command.
-func handleSubmitBlockBTCD(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	c := cmd.(*abejson.SubmitBlockCmd)
-
-	// Deserialize the submitted block.
-	hexStr := c.HexBlock
-	if len(hexStr)%2 != 0 {
-		hexStr = "0" + c.HexBlock
-	}
-	serializedBlock, err := hex.DecodeString(hexStr)
-	if err != nil {
-		return nil, rpcDecodeHexError(hexStr)
-	}
-
-	block, err := abeutil.NewBlockFromBytes(serializedBlock)
-	if err != nil {
-		return nil, &abejson.RPCError{
-			Code:    abejson.ErrRPCDeserialization,
-			Message: "Block decode failed: " + err.Error(),
-		}
-	}
-
-	// Process this block using the same rules as blocks coming from other
-	// nodes.  This will in turn relay it to the network like normal.
-	_, err = s.cfg.SyncMgr.SubmitBlockBTCD(block, blockchain.BFNone)
-	if err != nil {
-		return fmt.Sprintf("rejected: %s", err.Error()), nil
-	}
-
-	rpcsLog.Infof("Accepted block %s via submitblock", block.Hash())
-	return nil, nil
-}
+//func handleSubmitBlockBTCD(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+//	c := cmd.(*abejson.SubmitBlockCmd)
+//
+//	// Deserialize the submitted block.
+//	hexStr := c.HexBlock
+//	if len(hexStr)%2 != 0 {
+//		hexStr = "0" + c.HexBlock
+//	}
+//	serializedBlock, err := hex.DecodeString(hexStr)
+//	if err != nil {
+//		return nil, rpcDecodeHexError(hexStr)
+//	}
+//
+//	block, err := abeutil.NewBlockFromBytes(serializedBlock)
+//	if err != nil {
+//		return nil, &abejson.RPCError{
+//			Code:    abejson.ErrRPCDeserialization,
+//			Message: "Block decode failed: " + err.Error(),
+//		}
+//	}
+//
+//	// Process this block using the same rules as blocks coming from other
+//	// nodes.  This will in turn relay it to the network like normal.
+//	_, err = s.cfg.SyncMgr.SubmitBlockBTCD(block, blockchain.BFNone)
+//	if err != nil {
+//		return fmt.Sprintf("rejected: %s", err.Error()), nil
+//	}
+//
+//	rpcsLog.Infof("Accepted block %s via submitblock", block.Hash())
+//	return nil, nil
+//}
 
 //	todo(ABE):
 func handleSubmitBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
@@ -4300,7 +4300,7 @@ type rpcserverSyncManager interface {
 
 	// SubmitBlock submits the provided block to the network after
 	// processing it locally.
-	SubmitBlockBTCD(block *abeutil.Block, flags blockchain.BehaviorFlags) (bool, error)
+	//	SubmitBlockBTCD(block *abeutil.Block, flags blockchain.BehaviorFlags) (bool, error)
 	SubmitBlockAbe(block *abeutil.BlockAbe, flags blockchain.BehaviorFlags) (bool, error)
 
 	// Pause pauses the sync manager until the returned channel is closed.

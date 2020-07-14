@@ -2032,14 +2032,14 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 // be added to the orphan pool.
 //
 // This function is safe for concurrent access.
-func (mp *TxPool) MaybeAcceptTransactionBTCD(tx *abeutil.Tx, isNew, rateLimit bool) ([]*chainhash.Hash, *TxDesc, error) {
-	// Protect concurrent access.
-	mp.mtx.Lock()
-	hashes, txD, err := mp.maybeAcceptTransactionBTCD(tx, isNew, rateLimit, true)
-	mp.mtx.Unlock()
-
-	return hashes, txD, err
-}
+//func (mp *TxPool) MaybeAcceptTransactionBTCD(tx *abeutil.Tx, isNew, rateLimit bool) ([]*chainhash.Hash, *TxDesc, error) {
+//	// Protect concurrent access.
+//	mp.mtx.Lock()
+//	hashes, txD, err := mp.maybeAcceptTransactionBTCD(tx, isNew, rateLimit, true)
+//	mp.mtx.Unlock()
+//
+//	return hashes, txD, err
+//}
 
 func (mp *TxPool) MaybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit bool) ([]*chainhash.Hash, *TxDescAbe, error) {
 	// Protect concurrent access.
@@ -2392,7 +2392,7 @@ func (mp *TxPool) RawMempoolVerbose() map[string]*abejson.GetRawMempoolVerboseRe
 			Size:             int32(tx.MsgTx().SerializeSize()),
 			Vsize:            int32(GetTxVirtualSize(tx)),
 			Weight:           int32(blockchain.GetTransactionWeight(tx)),
-			Fee:              abeutil.Amount(desc.Fee).ToBTC(),
+			Fee:              abeutil.Amount(desc.Fee).ToABE(),
 			Time:             desc.Added.Unix(),
 			Height:           int64(desc.Height),
 			StartingPriority: desc.StartingPriority,

@@ -56,11 +56,11 @@ type newPeerMsg struct {
 // blockMsg packages a bitcoin block message and the peer it came from together
 // so the block handler has access to that information.
 //	todo(ABE): Remove BTCD
-type blockMsg struct {
-	block *abeutil.Block
-	peer  *peerpkg.Peer
-	reply chan struct{}
-}
+//type blockMsg struct {
+//	block *abeutil.Block
+//	peer  *peerpkg.Peer
+//	reply chan struct{}
+//}
 
 type blockMsgAbe struct {
 	block *abeutil.BlockAbe
@@ -89,11 +89,11 @@ type donePeerMsg struct {
 
 // txMsg packages a bitcoin tx message and the peer it came from together
 // so the block handler has access to that information.
-type txMsg struct {
-	tx    *abeutil.Tx
-	peer  *peerpkg.Peer
-	reply chan struct{}
-}
+//type txMsg struct {
+//	tx    *abeutil.Tx
+//	peer  *peerpkg.Peer
+//	reply chan struct{}
+//}
 
 // txMsg packages a bitcoin tx message and the peer it came from together
 // so the block handler has access to that information.
@@ -566,78 +566,78 @@ func (sm *SyncManager) updateSyncPeer(dcSyncPeer bool) {
 
 // todo(ABE): Remove BTCD
 // handleTxMsg handles transaction messages from all peers.
-func (sm *SyncManager) handleTxMsgBTCD(tmsg *txMsg) {
-	peer := tmsg.peer
-	state, exists := sm.peerStates[peer]
-	if !exists {
-		log.Warnf("Received tx message from unknown peer %s", peer)
-		return
-	}
-
-	//	todo(ABE): what will happen, if this peer is still synchronizing from other peers,
-	//	todo(ABE): and the height is much lower than 'the best height' of the synchronized peer?
-	//	todo(ABE): Only if the peer update's its best height accoring to other peers height, rather than local mainchain
-	//	todo(ABE): but it seems that it does not, the besthright is set according to local mainchain.
-	//	todo(ABE): it does not matter.
-
-	// NOTE:  BitcoinJ, and possibly other wallets, don't follow the spec of
-	// sending an inventory message and allowing the remote peer to decide
-	// whether or not they want to request the transaction via a getdata
-	// message.  Unfortunately, the reference implementation permits
-	// unrequested data, so it has allowed wallets that don't follow the
-	// spec to proliferate.  While this is not ideal, there is no check here
-	// to disconnect peers for sending unsolicited transactions to provide
-	// interoperability.
-	txHash := tmsg.tx.Hash()
-
-	// Ignore transactions that we have already rejected.  Do not
-	// send a reject message here because if the transaction was already
-	// rejected, the transaction was unsolicited.
-	if _, exists = sm.rejectedTxns[*txHash]; exists {
-		log.Debugf("Ignoring unsolicited previously rejected "+
-			"transaction %v from %s", txHash, peer)
-		return
-	}
-
-	// Process the transaction to include validation, insertion in the
-	// memory pool, orphan handling, etc.
-	acceptedTxs, err := sm.txMemPool.ProcessTransactionBTCD(tmsg.tx,
-		true, true, mempool.Tag(peer.ID()))
-
-	// Remove transaction from request maps. Either the mempool/chain
-	// already knows about it and as such we shouldn't have any more
-	// instances of trying to fetch it, or we failed to insert and thus
-	// we'll retry next time we get an inv.
-	delete(state.requestedTxns, *txHash)
-	delete(sm.requestedTxns, *txHash)
-
-	if err != nil {
-		// Do not request this transaction again until a new block
-		// has been processed.
-		sm.rejectedTxns[*txHash] = struct{}{}
-		sm.limitMap(sm.rejectedTxns, maxRejectedTxns)
-
-		// When the error is a rule error, it means the transaction was
-		// simply rejected as opposed to something actually going wrong,
-		// so log it as such.  Otherwise, something really did go wrong,
-		// so log it as an actual error.
-		if _, ok := err.(mempool.RuleError); ok {
-			log.Debugf("Rejected transaction %v from %s: %v",
-				txHash, peer, err)
-		} else {
-			log.Errorf("Failed to process transaction %v: %v",
-				txHash, err)
-		}
-
-		// Convert the error into an appropriate reject message and
-		// send it.
-		code, reason := mempool.ErrToRejectErr(err)
-		peer.PushRejectMsg(wire.CmdTx, code, reason, txHash, false)
-		return
-	}
-
-	sm.peerNotifier.AnnounceNewTransactions(acceptedTxs)
-}
+//func (sm *SyncManager) handleTxMsgBTCD(tmsg *txMsg) {
+//	peer := tmsg.peer
+//	state, exists := sm.peerStates[peer]
+//	if !exists {
+//		log.Warnf("Received tx message from unknown peer %s", peer)
+//		return
+//	}
+//
+//	//	todo(ABE): what will happen, if this peer is still synchronizing from other peers,
+//	//	todo(ABE): and the height is much lower than 'the best height' of the synchronized peer?
+//	//	todo(ABE): Only if the peer update's its best height accoring to other peers height, rather than local mainchain
+//	//	todo(ABE): but it seems that it does not, the besthright is set according to local mainchain.
+//	//	todo(ABE): it does not matter.
+//
+//	// NOTE:  BitcoinJ, and possibly other wallets, don't follow the spec of
+//	// sending an inventory message and allowing the remote peer to decide
+//	// whether or not they want to request the transaction via a getdata
+//	// message.  Unfortunately, the reference implementation permits
+//	// unrequested data, so it has allowed wallets that don't follow the
+//	// spec to proliferate.  While this is not ideal, there is no check here
+//	// to disconnect peers for sending unsolicited transactions to provide
+//	// interoperability.
+//	txHash := tmsg.tx.Hash()
+//
+//	// Ignore transactions that we have already rejected.  Do not
+//	// send a reject message here because if the transaction was already
+//	// rejected, the transaction was unsolicited.
+//	if _, exists = sm.rejectedTxns[*txHash]; exists {
+//		log.Debugf("Ignoring unsolicited previously rejected "+
+//			"transaction %v from %s", txHash, peer)
+//		return
+//	}
+//
+//	// Process the transaction to include validation, insertion in the
+//	// memory pool, orphan handling, etc.
+//	acceptedTxs, err := sm.txMemPool.ProcessTransactionBTCD(tmsg.tx,
+//		true, true, mempool.Tag(peer.ID()))
+//
+//	// Remove transaction from request maps. Either the mempool/chain
+//	// already knows about it and as such we shouldn't have any more
+//	// instances of trying to fetch it, or we failed to insert and thus
+//	// we'll retry next time we get an inv.
+//	delete(state.requestedTxns, *txHash)
+//	delete(sm.requestedTxns, *txHash)
+//
+//	if err != nil {
+//		// Do not request this transaction again until a new block
+//		// has been processed.
+//		sm.rejectedTxns[*txHash] = struct{}{}
+//		sm.limitMap(sm.rejectedTxns, maxRejectedTxns)
+//
+//		// When the error is a rule error, it means the transaction was
+//		// simply rejected as opposed to something actually going wrong,
+//		// so log it as such.  Otherwise, something really did go wrong,
+//		// so log it as an actual error.
+//		if _, ok := err.(mempool.RuleError); ok {
+//			log.Debugf("Rejected transaction %v from %s: %v",
+//				txHash, peer, err)
+//		} else {
+//			log.Errorf("Failed to process transaction %v: %v",
+//				txHash, err)
+//		}
+//
+//		// Convert the error into an appropriate reject message and
+//		// send it.
+//		code, reason := mempool.ErrToRejectErr(err)
+//		peer.PushRejectMsg(wire.CmdTx, code, reason, txHash, false)
+//		return
+//	}
+//
+//	sm.peerNotifier.AnnounceNewTransactions(acceptedTxs)
+//}
 
 // handleTxMsg handles transaction messages from all peers.
 func (sm *SyncManager) handleTxMsgAbe(tmsg *txMsgAbe) {
@@ -1812,15 +1812,15 @@ func (sm *SyncManager) NewPeer(peer *peerpkg.Peer) {
 // QueueTx adds the passed transaction message and peer to the block handling
 // queue. Responds to the done channel argument after the tx message is
 // processed.
-func (sm *SyncManager) QueueTx(tx *abeutil.Tx, peer *peerpkg.Peer, done chan struct{}) {
-	// Don't accept more transactions if we're shutting down.
-	if atomic.LoadInt32(&sm.shutdown) != 0 {
-		done <- struct{}{}
-		return
-	}
-
-	sm.msgChan <- &txMsg{tx: tx, peer: peer, reply: done}
-}
+//func (sm *SyncManager) QueueTx(tx *abeutil.Tx, peer *peerpkg.Peer, done chan struct{}) {
+//	// Don't accept more transactions if we're shutting down.
+//	if atomic.LoadInt32(&sm.shutdown) != 0 {
+//		done <- struct{}{}
+//		return
+//	}
+//
+//	sm.msgChan <- &txMsg{tx: tx, peer: peer, reply: done}
+//}
 
 func (sm *SyncManager) QueueTxAbe(tx *abeutil.TxAbe, peer *peerpkg.Peer, done chan struct{}) {
 	// Don't accept more transactions if we're shutting down.
@@ -1836,15 +1836,15 @@ func (sm *SyncManager) QueueTxAbe(tx *abeutil.TxAbe, peer *peerpkg.Peer, done ch
 // queue. Responds to the done channel argument after the block message is
 // processed.
 //	todo(ABE):
-func (sm *SyncManager) QueueBlock(block *abeutil.Block, peer *peerpkg.Peer, done chan struct{}) {
-	// Don't accept more blocks if we're shutting down.
-	if atomic.LoadInt32(&sm.shutdown) != 0 {
-		done <- struct{}{}
-		return
-	}
-
-	sm.msgChan <- &blockMsg{block: block, peer: peer, reply: done}
-}
+//func (sm *SyncManager) QueueBlock(block *abeutil.Block, peer *peerpkg.Peer, done chan struct{}) {
+//	// Don't accept more blocks if we're shutting down.
+//	if atomic.LoadInt32(&sm.shutdown) != 0 {
+//		done <- struct{}{}
+//		return
+//	}
+//
+//	sm.msgChan <- &blockMsg{block: block, peer: peer, reply: done}
+//}
 
 func (sm *SyncManager) QueueBlockAbe(block *abeutil.BlockAbe, peer *peerpkg.Peer, done chan struct{}) {
 	// Don't accept more blocks if we're shutting down.
@@ -1926,12 +1926,12 @@ func (sm *SyncManager) SyncPeerID() int32 {
 // ProcessBlock makes use of ProcessBlock on an internal instance of a block
 // chain.
 //	todo(ABE):
-func (sm *SyncManager) ProcessBlockBTCD(block *abeutil.Block, flags blockchain.BehaviorFlags) (bool, error) {
-	reply := make(chan processBlockResponse, 1)
-	sm.msgChan <- processBlockMsgBTCD{block: block, flags: flags, reply: reply}
-	response := <-reply
-	return response.isOrphan, response.err
-}
+//func (sm *SyncManager) ProcessBlockBTCD(block *abeutil.Block, flags blockchain.BehaviorFlags) (bool, error) {
+//	reply := make(chan processBlockResponse, 1)
+//	sm.msgChan <- processBlockMsgBTCD{block: block, flags: flags, reply: reply}
+//	response := <-reply
+//	return response.isOrphan, response.err
+//}
 
 func (sm *SyncManager) ProcessBlockAbe(block *abeutil.BlockAbe, flags blockchain.BehaviorFlags) (bool, error) {
 	reply := make(chan processBlockResponse, 1)
