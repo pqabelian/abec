@@ -720,7 +720,7 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap
 
 		var vout abejson.Vout
 		vout.N = uint32(i)
-		vout.Value = abeutil.Amount(v.Value).ToBTC()
+		vout.Value = abeutil.Amount(v.Value).ToABE()
 		vout.ScriptPubKey.Addresses = encodedAddrs
 		vout.ScriptPubKey.Asm = disbuf
 		vout.ScriptPubKey.Hex = hex.EncodeToString(v.PkScript)
@@ -2335,7 +2335,7 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		Proxy:           cfg.Proxy,
 		Difficulty:      getDifficultyRatio(best.Bits, s.cfg.ChainParams),
 		TestNet:         cfg.TestNet3,
-		RelayFee:        cfg.minRelayTxFee.ToBTC(),
+		RelayFee:        cfg.minRelayTxFee.ToABE(),
 	}
 
 	return ret, nil
@@ -2770,7 +2770,7 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	txOutReply := &abejson.GetTxOutResult{
 		BestBlock:     bestBlockHash,
 		Confirmations: int64(confirmations),
-		Value:         abeutil.Amount(value).ToBTC(),
+		Value:         abeutil.Amount(value).ToABE(),
 		ScriptPubKey: abejson.ScriptPubKeyResult{
 			Asm:       disbuf,
 			Hex:       hex.EncodeToString(pkScript),
@@ -3027,7 +3027,7 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 			vinListEntry := &vinList[len(vinList)-1]
 			vinListEntry.PrevOut = &abejson.PrevOut{
 				Addresses: encodedAddrs,
-				Value:     abeutil.Amount(originTxOut.Value).ToBTC(),
+				Value:     abeutil.Amount(originTxOut.Value).ToABE(),
 			}
 		}
 	}

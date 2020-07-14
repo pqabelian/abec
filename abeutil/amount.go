@@ -15,12 +15,12 @@ type AmountUnit int
 // These constants define various units used when describing a bitcoin
 // monetary amount.
 const (
-	AmountMegaBTC  AmountUnit = 6
-	AmountKiloBTC  AmountUnit = 3
-	AmountBTC      AmountUnit = 0
-	AmountMilliBTC AmountUnit = -3
-	AmountMicroBTC AmountUnit = -6
-	AmountSatoshi  AmountUnit = -8
+	AmountMegaABE  AmountUnit = 6
+	AmountKiloABE  AmountUnit = 3
+	AmountABE      AmountUnit = 0
+	AmountMilliABE AmountUnit = -3
+	AmountMicroABE AmountUnit = -6
+	AmountNeutrino AmountUnit = -7
 )
 
 // String returns the unit as a string.  For recognized units, the SI
@@ -28,20 +28,20 @@ const (
 // units, "1eN BTC" is returned, where N is the AmountUnit.
 func (u AmountUnit) String() string {
 	switch u {
-	case AmountMegaBTC:
-		return "MBTC"
-	case AmountKiloBTC:
-		return "kBTC"
-	case AmountBTC:
-		return "BTC"
-	case AmountMilliBTC:
-		return "mBTC"
-	case AmountMicroBTC:
-		return "μBTC"
-	case AmountSatoshi:
-		return "Satoshi"
+	case AmountMegaABE:
+		return "MABE"
+	case AmountKiloABE:
+		return "kABE"
+	case AmountABE:
+		return "ABE"
+	case AmountMilliABE:
+		return "mABE"
+	case AmountMicroABE:
+		return "μABE"
+	case AmountNeutrino:
+		return "Neutrino"
 	default:
-		return "1e" + strconv.FormatInt(int64(u), 10) + " BTC"
+		return "1e" + strconv.FormatInt(int64(u), 10) + " ABE"
 	}
 }
 
@@ -87,12 +87,12 @@ func NewAmount(f float64) (Amount, error) {
 // ToUnit converts a monetary amount counted in bitcoin base units to a
 // floating point value representing an amount of bitcoin.
 func (a Amount) ToUnit(u AmountUnit) float64 {
-	return float64(a) / math.Pow10(int(u+8))
+	return float64(a) / math.Pow10(int(u+7))
 }
 
 // ToBTC is the equivalent of calling ToUnit with AmountBTC.
-func (a Amount) ToBTC() float64 {
-	return a.ToUnit(AmountBTC)
+func (a Amount) ToABE() float64 {
+	return a.ToUnit(AmountABE)
 }
 
 // Format formats a monetary amount counted in bitcoin base units as a
@@ -101,12 +101,12 @@ func (a Amount) ToBTC() float64 {
 // the units with SI notation, or "Satoshi" for the base unit.
 func (a Amount) Format(u AmountUnit) string {
 	units := " " + u.String()
-	return strconv.FormatFloat(a.ToUnit(u), 'f', -int(u+8), 64) + units
+	return strconv.FormatFloat(a.ToUnit(u), 'f', -int(u+7), 64) + units
 }
 
 // String is the equivalent of calling Format with AmountBTC.
 func (a Amount) String() string {
-	return a.Format(AmountBTC)
+	return a.Format(AmountABE)
 }
 
 // MulF64 multiplies an Amount by a floating point value.  While this is not

@@ -1,11 +1,11 @@
 package main
 
-import (
-	"fmt"
-	"github.com/abesuite/abec/chainhash"
-)
+/*func main() {
+	ValueScript := 400 * 10000000
+	fmt.Println("Block submitted via CPU miner accepted", abeutil.Amount(ValueScript))
+}*/
 
-func main1() {
+/*func main1() {
 
 	hash1 := new(chainhash.Hash)
 
@@ -19,16 +19,16 @@ func main1() {
 		hash1[i] = uint8(i)
 	}
 
-	/*	for i:=0; i<chainhash.HashSize; i++ {
+	for i:=0; i<chainhash.HashSize; i++ {
 		fmt.Println(hash1[i])
-	}*/
+	}
 
 	for i := 0; i < chainhash.HashSize; i++ {
 		hash2[i] = uint8(i)
 	}
-	/*	for i:=0; i<chainhash.HashSize; i++ {
+		for i:=0; i<chainhash.HashSize; i++ {
 		fmt.Println(hash2[i])
-	}*/
+	}
 
 	hash2[0] = uint8(1)
 	hash1[31] = uint8(33)
@@ -48,7 +48,7 @@ func main1() {
 	}
 
 	//	fmt.Println(hash)
-}
+}*/
 
 /*func main() {
 	q := 11 / wire.TxRingSize

@@ -421,7 +421,7 @@ func loadConfig() (*config, []string, error) {
 		DbType:               defaultDbType,
 		RPCKey:               defaultRPCKeyFile,
 		RPCCert:              defaultRPCCertFile,
-		MinRelayTxFee:        mempool.DefaultMinRelayTxFee.ToBTC(),
+		MinRelayTxFee:        mempool.DefaultMinRelayTxFee.ToABE(),
 		FreeTxRelayLimit:     defaultFreeTxRelayLimit,
 		TrickleInterval:      defaultTrickleInterval,
 		BlockMinSize:         defaultBlockMinSize,
@@ -436,7 +436,7 @@ func loadConfig() (*config, []string, error) {
 		AddrIndex:            defaultAddrIndex,
 	}
 	// Service options which are only added on Windows.
-	serviceOpts := serviceOptions{}  //TODO(osy): this set is ingoned, we should detect it!
+	serviceOpts := serviceOptions{} //TODO(osy): this set is ingoned, we should detect it!
 
 	// Pre-parse the command line options to see if an alternative config
 	// file or the version flag was specified.  Any errors aside from the
@@ -457,7 +457,7 @@ func loadConfig() (*config, []string, error) {
 	appName = strings.TrimSuffix(appName, filepath.Ext(appName))
 	usageMessage := fmt.Sprintf("Use %s -h to show usage", appName)
 	if preCfg.ShowVersion {
-		fmt.Println(appName, "version", version())   //this process is all in version.go
+		fmt.Println(appName, "version", version()) //this process is all in version.go
 		os.Exit(0)
 	}
 
