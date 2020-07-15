@@ -104,7 +104,7 @@ func makeEmptyMessage(command string) (Message, error) {
 		msg = &MsgGetBlocks{}
 
 	case CmdBlock:
-		msg = &MsgBlock{}
+		msg = &MsgBlockAbe{}
 
 	case CmdInv:
 		msg = &MsgInv{}
@@ -116,7 +116,7 @@ func makeEmptyMessage(command string) (Message, error) {
 		msg = &MsgNotFound{}
 
 	case CmdTx:
-		msg = &MsgTx{}
+		msg = &MsgTxAbe{}
 
 	case CmdPing:
 		msg = &MsgPing{}
@@ -257,10 +257,10 @@ func WriteMessage(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) erro
 // messages.
 func WriteMessageWithEncodingN(w io.Writer, msg Message, pver uint32,
 	btcnet BitcoinNet, encoding MessageEncoding) (int, error) {
-	i:=0
+
 	switch msg.(type) {
 	case *MsgBlockAbe:
-		fmt.Printf("%v\n",i)
+		fmt.Println("sending a message to peer")
 	}
 	totalBytes := 0
 
@@ -364,6 +364,7 @@ func ReadMessageWithEncodingN(r io.Reader, pver uint32, btcnet BitcoinNet,
 
 	// Check for malformed commands.
 	command := hdr.command
+	//fmt.Printf("command = %v\n",command)
 	if !utf8.ValidString(command) {
 		discardInput(r, hdr.length)
 		str := fmt.Sprintf("invalid command %v", []byte(command))
