@@ -305,13 +305,14 @@ func readElement(r io.Reader, element interface{}) error {
 		*e = BitcoinNet(rv)
 		return nil
 
-	case *BloomUpdateType:
-		rv, err := binarySerializer.Uint8(r)
-		if err != nil {
-			return err
-		}
-		*e = BloomUpdateType(rv)
-		return nil
+		// TODO(ABE): ABE does not support filter.
+	//case *BloomUpdateType:
+	//	rv, err := binarySerializer.Uint8(r)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	*e = BloomUpdateType(rv)
+	//	return nil
 
 	case *RejectCode:
 		rv, err := binarySerializer.Uint8(r)
@@ -436,12 +437,13 @@ func writeElement(w io.Writer, element interface{}) error {
 		}
 		return nil
 
-	case BloomUpdateType:
-		err := binarySerializer.PutUint8(w, uint8(e))
-		if err != nil {
-			return err
-		}
-		return nil
+		// TODO(ABE): ABE does not support filter.
+	//case BloomUpdateType:
+	//	err := binarySerializer.PutUint8(w, uint8(e))
+	//	if err != nil {
+	//		return err
+	//	}
+	//	return nil
 
 	case RejectCode:
 		err := binarySerializer.PutUint8(w, uint8(e))

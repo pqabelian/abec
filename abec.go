@@ -134,14 +134,15 @@ func abecMain(serverChan chan<- *server) error {
 
 		return nil
 	}
-	if cfg.DropCfIndex {
-		if err := indexers.DropCfIndex(db, interrupt); err != nil {
-			abecLog.Errorf("%v", err)
-			return err
-		}
-
-		return nil
-	}
+	// TODO(ABE): ABE does not support filter.
+	//if cfg.DropCfIndex {
+	//	if err := indexers.DropCfIndex(db, interrupt); err != nil {
+	//		abecLog.Errorf("%v", err)
+	//		return err
+	//	}
+	//
+	//	return nil
+	//}
 
 	// Create P2P server and start it.
 	server, err := newServer(cfg.Listeners, cfg.AgentBlacklist,

@@ -156,25 +156,26 @@ type config struct {
 	BlockMaxWeight       uint32        `long:"blockmaxweight" description:"Maximum block weight to be used when creating a block"`
 	BlockPrioritySize    uint32        `long:"blockprioritysize" description:"Size in bytes for high-priority/low-fee transactions when creating a block"`
 	UserAgentComments    []string      `long:"uacomment" description:"Comment to add to the user agent -- See BIP 14 for more information."`
-	NoPeerBloomFilters   bool          `long:"nopeerbloomfilters" description:"Disable bloom filtering support"`
-	NoCFilters           bool          `long:"nocfilters" description:"Disable committed filtering (CF) support"`
-	DropCfIndex          bool          `long:"dropcfindex" description:"Deletes the index used for committed filtering (CF) support from the database on start up and then exits."`
-	SigCacheMaxSize      uint          `long:"sigcachemaxsize" description:"The maximum number of entries in the signature verification cache"`
-	BlocksOnly           bool          `long:"blocksonly" description:"Do not accept transactions from remote peers."`
-	TxIndex              bool          `long:"txindex" description:"Maintain a full hash-based transaction index which makes all transactions available via the getrawtransaction RPC"`
-	DropTxIndex          bool          `long:"droptxindex" description:"Deletes the hash-based transaction index from the database on start up and then exits."`
-	AddrIndex            bool          `long:"addrindex" description:"Maintain a full address-based transaction index which makes the searchrawtransactions RPC available"`
-	DropAddrIndex        bool          `long:"dropaddrindex" description:"Deletes the address-based transaction index from the database on start up and then exits."`
-	RelayNonStd          bool          `long:"relaynonstd" description:"Relay non-standard transactions regardless of the default settings for the active network."`
-	RejectNonStd         bool          `long:"rejectnonstd" description:"Reject non-standard transactions regardless of the default settings for the active network."`
-	RejectReplacement    bool          `long:"rejectreplacement" description:"Reject transactions that attempt to replace existing transactions within the mempool through the Replace-By-Fee (RBF) signaling policy."`
-	lookup               func(string) ([]net.IP, error)
-	oniondial            func(string, string, time.Duration) (net.Conn, error)
-	dial                 func(string, string, time.Duration) (net.Conn, error)
-	addCheckpoints       []chaincfg.Checkpoint
-	miningAddr           abeutil.MasterAddress
-	minRelayTxFee        abeutil.Amount
-	whitelists           []*net.IPNet
+	// TODO(ABE): ABE does not support filter.
+	//NoPeerBloomFilters   bool          `long:"nopeerbloomfilters" description:"Disable bloom filtering support"`
+	//NoCFilters           bool          `long:"nocfilters" description:"Disable committed filtering (CF) support"`
+	//DropCfIndex          bool          `long:"dropcfindex" description:"Deletes the index used for committed filtering (CF) support from the database on start up and then exits."`
+	SigCacheMaxSize   uint `long:"sigcachemaxsize" description:"The maximum number of entries in the signature verification cache"`
+	BlocksOnly        bool `long:"blocksonly" description:"Do not accept transactions from remote peers."`
+	TxIndex           bool `long:"txindex" description:"Maintain a full hash-based transaction index which makes all transactions available via the getrawtransaction RPC"`
+	DropTxIndex       bool `long:"droptxindex" description:"Deletes the hash-based transaction index from the database on start up and then exits."`
+	AddrIndex         bool `long:"addrindex" description:"Maintain a full address-based transaction index which makes the searchrawtransactions RPC available"`
+	DropAddrIndex     bool `long:"dropaddrindex" description:"Deletes the address-based transaction index from the database on start up and then exits."`
+	RelayNonStd       bool `long:"relaynonstd" description:"Relay non-standard transactions regardless of the default settings for the active network."`
+	RejectNonStd      bool `long:"rejectnonstd" description:"Reject non-standard transactions regardless of the default settings for the active network."`
+	RejectReplacement bool `long:"rejectreplacement" description:"Reject transactions that attempt to replace existing transactions within the mempool through the Replace-By-Fee (RBF) signaling policy."`
+	lookup            func(string) ([]net.IP, error)
+	oniondial         func(string, string, time.Duration) (net.Conn, error)
+	dial              func(string, string, time.Duration) (net.Conn, error)
+	addCheckpoints    []chaincfg.Checkpoint
+	miningAddr        abeutil.MasterAddress
+	minRelayTxFee     abeutil.Amount
+	whitelists        []*net.IPNet
 }
 
 // serviceOptions defines the configuration options for the daemon as a service on

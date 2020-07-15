@@ -60,9 +60,10 @@ const (
 	// getutxos and utxos commands (BIP0064).
 	SFNodeGetUTXO
 
-	// SFNodeBloom is a flag used to indicate a peer supports bloom
-	// filtering.
-	SFNodeBloom
+	// TODO(ABE): ABE does not support filter.
+	//// SFNodeBloom is a flag used to indicate a peer supports bloom
+	//// filtering.
+	//SFNodeBloom
 
 	// SFNodeWitness is a flag used to indicate a peer supports blocks
 	// and transactions including witness data (BIP0144).
@@ -77,7 +78,8 @@ const (
 
 	// SFNodeCF is a flag used to indicate a peer supports committed
 	// filters (CFs).
-	SFNodeCF
+	// TODO(ABE): ABE does not support filter.
+	//SFNodeCF
 
 	// SFNode2X is a flag used to indicate a peer is running the Segwit2X
 	// software.
@@ -88,12 +90,14 @@ const (
 var sfStrings = map[ServiceFlag]string{
 	SFNodeNetwork: "SFNodeNetwork",
 	SFNodeGetUTXO: "SFNodeGetUTXO",
-	SFNodeBloom:   "SFNodeBloom",
+	// TODO(ABE): ABE does not support filter.
+	//SFNodeBloom:   "SFNodeBloom",
 	SFNodeWitness: "SFNodeWitness",
 	SFNodeXthin:   "SFNodeXthin",
 	SFNodeBit5:    "SFNodeBit5",
-	SFNodeCF:      "SFNodeCF",
-	SFNode2X:      "SFNode2X",
+	// TODO(ABE): ABE does not support filter.
+	//SFNodeCF:      "SFNodeCF",
+	SFNode2X: "SFNode2X",
 }
 
 // orderedSFStrings is an ordered list of service flags from highest to
@@ -101,11 +105,13 @@ var sfStrings = map[ServiceFlag]string{
 var orderedSFStrings = []ServiceFlag{
 	SFNodeNetwork,
 	SFNodeGetUTXO,
-	SFNodeBloom,
+	// TODO(ABE): ABE does not support filter.
+	//SFNodeBloom,
 	SFNodeWitness,
 	SFNodeXthin,
 	SFNodeBit5,
-	SFNodeCF,
+	// TODO(ABE): ABE does not support filter.
+	//SFNodeCF,
 	SFNode2X,
 }
 

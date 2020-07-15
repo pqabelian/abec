@@ -6,7 +6,6 @@ package abejson
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/abesuite/abec/wire"
 )
 
 // AddNodeSubCmd defines the type used in the addnode JSON-RPC command for the
@@ -276,7 +275,8 @@ func NewGetBlockTemplateCmd(request *TemplateRequest) *GetBlockTemplateCmd {
 	}
 }
 
-// GetCFilterCmd defines the getcfilter JSON-RPC command.
+// TODO(ABE): ABE does not support filter.
+/*// GetCFilterCmd defines the getcfilter JSON-RPC command.
 type GetCFilterCmd struct {
 	Hash       string
 	FilterType wire.FilterType
@@ -295,17 +295,18 @@ func NewGetCFilterCmd(hash string, filterType wire.FilterType) *GetCFilterCmd {
 type GetCFilterHeaderCmd struct {
 	Hash       string
 	FilterType wire.FilterType
-}
+}*/
 
 // NewGetCFilterHeaderCmd returns a new instance which can be used to issue a
 // getcfilterheader JSON-RPC command.
-func NewGetCFilterHeaderCmd(hash string,
-	filterType wire.FilterType) *GetCFilterHeaderCmd {
-	return &GetCFilterHeaderCmd{
-		Hash:       hash,
-		FilterType: filterType,
-	}
-}
+// TODO(ABE): ABE does not support filter.
+//func NewGetCFilterHeaderCmd(hash string,
+//	filterType wire.FilterType) *GetCFilterHeaderCmd {
+//	return &GetCFilterHeaderCmd{
+//		Hash:       hash,
+//		FilterType: filterType,
+//	}
+//}
 
 // GetChainTipsCmd defines the getchaintips JSON-RPC command.
 type GetChainTipsCmd struct{}
@@ -784,8 +785,9 @@ func init() {
 	MustRegisterCmd("getblockhash", (*GetBlockHashCmd)(nil), flags)
 	MustRegisterCmd("getblockheader", (*GetBlockHeaderCmd)(nil), flags)
 	MustRegisterCmd("getblocktemplate", (*GetBlockTemplateCmd)(nil), flags)
-	MustRegisterCmd("getcfilter", (*GetCFilterCmd)(nil), flags)
-	MustRegisterCmd("getcfilterheader", (*GetCFilterHeaderCmd)(nil), flags)
+	// TODO(ABE): ABE does not support filter.
+	//MustRegisterCmd("getcfilter", (*GetCFilterCmd)(nil), flags)
+	//MustRegisterCmd("getcfilterheader", (*GetCFilterHeaderCmd)(nil), flags)
 	MustRegisterCmd("getchaintips", (*GetChainTipsCmd)(nil), flags)
 	MustRegisterCmd("getconnectioncount", (*GetConnectionCountCmd)(nil), flags)
 	MustRegisterCmd("getdifficulty", (*GetDifficultyCmd)(nil), flags)

@@ -121,24 +121,25 @@ type commandHandler func(*rpcServer, interface{}, <-chan struct{}) (interface{},
 // a dependency loop.
 var rpcHandlers map[string]commandHandler
 var rpcHandlersBeforeInit = map[string]commandHandler{
-	"addnode":               handleAddNode,
-	"createrawtransaction":  handleCreateRawTransaction,
-	"debuglevel":            handleDebugLevel,
-	"decoderawtransaction":  handleDecodeRawTransaction,
-	"decodescript":          handleDecodeScript,
-	"estimatefee":           handleEstimateFee,
-	"generate":              handleGenerate,
-	"getaddednodeinfo":      handleGetAddedNodeInfo,
-	"getbestblock":          handleGetBestBlock,
-	"getbestblockhash":      handleGetBestBlockHash,
-	"getblock":              handleGetBlock,
-	"getblockchaininfo":     handleGetBlockChainInfo,
-	"getblockcount":         handleGetBlockCount,
-	"getblockhash":          handleGetBlockHash,
-	"getblockheader":        handleGetBlockHeader,
-	"getblocktemplate":      handleGetBlockTemplate,
-	"getcfilter":            handleGetCFilter,
-	"getcfilterheader":      handleGetCFilterHeader,
+	"addnode":              handleAddNode,
+	"createrawtransaction": handleCreateRawTransaction,
+	"debuglevel":           handleDebugLevel,
+	"decoderawtransaction": handleDecodeRawTransaction,
+	"decodescript":         handleDecodeScript,
+	"estimatefee":          handleEstimateFee,
+	"generate":             handleGenerate,
+	"getaddednodeinfo":     handleGetAddedNodeInfo,
+	"getbestblock":         handleGetBestBlock,
+	"getbestblockhash":     handleGetBestBlockHash,
+	"getblock":             handleGetBlock,
+	"getblockchaininfo":    handleGetBlockChainInfo,
+	"getblockcount":        handleGetBlockCount,
+	"getblockhash":         handleGetBlockHash,
+	"getblockheader":       handleGetBlockHeader,
+	"getblocktemplate":     handleGetBlockTemplate,
+	// TODO(ABE): ABE does not support filter.
+	//"getcfilter":            handleGetCFilter,
+	//"getcfilterheader":      handleGetCFilterHeader,
 	"getconnectioncount":    handleGetConnectionCount,
 	"getcurrentnet":         handleGetCurrentNet,
 	"getdifficulty":         handleGetDifficulty,
@@ -2195,65 +2196,66 @@ func handleGetBlockTemplate(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	}
 }
 
-// handleGetCFilter implements the getcfilter command.
-func handleGetCFilter(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	if s.cfg.CfIndex == nil {
-		return nil, &abejson.RPCError{
-			Code:    abejson.ErrRPCNoCFIndex,
-			Message: "The CF index must be enabled for this command",
-		}
-	}
-
-	c := cmd.(*abejson.GetCFilterCmd)
-	hash, err := chainhash.NewHashFromStr(c.Hash)
-	if err != nil {
-		return nil, rpcDecodeHexError(c.Hash)
-	}
-
-	filterBytes, err := s.cfg.CfIndex.FilterByBlockHash(hash, c.FilterType)
-	if err != nil {
-		rpcsLog.Debugf("Could not find committed filter for %v: %v",
-			hash, err)
-		return nil, &abejson.RPCError{
-			Code:    abejson.ErrRPCBlockNotFound,
-			Message: "Block not found",
-		}
-	}
-
-	rpcsLog.Debugf("Found committed filter for %v", hash)
-	return hex.EncodeToString(filterBytes), nil
-}
-
-// handleGetCFilterHeader implements the getcfilterheader command.
-func handleGetCFilterHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	if s.cfg.CfIndex == nil {
-		return nil, &abejson.RPCError{
-			Code:    abejson.ErrRPCNoCFIndex,
-			Message: "The CF index must be enabled for this command",
-		}
-	}
-
-	c := cmd.(*abejson.GetCFilterHeaderCmd)
-	hash, err := chainhash.NewHashFromStr(c.Hash)
-	if err != nil {
-		return nil, rpcDecodeHexError(c.Hash)
-	}
-
-	headerBytes, err := s.cfg.CfIndex.FilterHeaderByBlockHash(hash, c.FilterType)
-	if len(headerBytes) > 0 {
-		rpcsLog.Debugf("Found header of committed filter for %v", hash)
-	} else {
-		rpcsLog.Debugf("Could not find header of committed filter for %v: %v",
-			hash, err)
-		return nil, &abejson.RPCError{
-			Code:    abejson.ErrRPCBlockNotFound,
-			Message: "Block not found",
-		}
-	}
-
-	hash.SetBytes(headerBytes)
-	return hash.String(), nil
-}
+// TODO(ABE): ABE does not support filter.
+//// handleGetCFilter implements the getcfilter command.
+//func handleGetCFilter(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+//	if s.cfg.CfIndex == nil {
+//		return nil, &abejson.RPCError{
+//			Code:    abejson.ErrRPCNoCFIndex,
+//			Message: "The CF index must be enabled for this command",
+//		}
+//	}
+//
+//	c := cmd.(*abejson.GetCFilterCmd)
+//	hash, err := chainhash.NewHashFromStr(c.Hash)
+//	if err != nil {
+//		return nil, rpcDecodeHexError(c.Hash)
+//	}
+//
+//	filterBytes, err := s.cfg.CfIndex.FilterByBlockHash(hash, c.FilterType)
+//	if err != nil {
+//		rpcsLog.Debugf("Could not find committed filter for %v: %v",
+//			hash, err)
+//		return nil, &abejson.RPCError{
+//			Code:    abejson.ErrRPCBlockNotFound,
+//			Message: "Block not found",
+//		}
+//	}
+//
+//	rpcsLog.Debugf("Found committed filter for %v", hash)
+//	return hex.EncodeToString(filterBytes), nil
+//}
+//
+//// handleGetCFilterHeader implements the getcfilterheader command.
+//func handleGetCFilterHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+//	if s.cfg.CfIndex == nil {
+//		return nil, &abejson.RPCError{
+//			Code:    abejson.ErrRPCNoCFIndex,
+//			Message: "The CF index must be enabled for this command",
+//		}
+//	}
+//
+//	c := cmd.(*abejson.GetCFilterHeaderCmd)
+//	hash, err := chainhash.NewHashFromStr(c.Hash)
+//	if err != nil {
+//		return nil, rpcDecodeHexError(c.Hash)
+//	}
+//
+//	headerBytes, err := s.cfg.CfIndex.FilterHeaderByBlockHash(hash, c.FilterType)
+//	if len(headerBytes) > 0 {
+//		rpcsLog.Debugf("Found header of committed filter for %v", hash)
+//	} else {
+//		rpcsLog.Debugf("Could not find header of committed filter for %v: %v",
+//			hash, err)
+//		return nil, &abejson.RPCError{
+//			Code:    abejson.ErrRPCBlockNotFound,
+//			Message: "Block not found",
+//		}
+//	}
+//
+//	hash.SetBytes(headerBytes)
+//	return hash.String(), nil
+//}
 
 // handleGetConnectionCount implements the getconnectioncount command.
 func handleGetConnectionCount(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
@@ -4360,7 +4362,8 @@ type rpcserverConfig struct {
 	// of to provide additional data when queried.
 	TxIndex   *indexers.TxIndex
 	AddrIndex *indexers.AddrIndex
-	CfIndex   *indexers.CfIndex
+	// TODO(ABE): ABE does not support filter.
+	//CfIndex   *indexers.CfIndex
 
 	// The fee estimator keeps track of how long transactions are left in
 	// the mempool before they are mined into blocks.

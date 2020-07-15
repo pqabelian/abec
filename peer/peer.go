@@ -120,16 +120,17 @@ type MessageListeners struct {
 	OnBlock    func(p *Peer, msg *wire.MsgBlock, buf []byte)
 	OnBlockAbe func(p *Peer, msg *wire.MsgBlockAbe, buf []byte)
 
-	// OnCFilter is invoked when a peer receives a cfilter bitcoin message.
-	OnCFilter func(p *Peer, msg *wire.MsgCFilter)
-
-	// OnCFHeaders is invoked when a peer receives a cfheaders bitcoin
-	// message.
-	OnCFHeaders func(p *Peer, msg *wire.MsgCFHeaders)
-
-	// OnCFCheckpt is invoked when a peer receives a cfcheckpt bitcoin
-	// message.
-	OnCFCheckpt func(p *Peer, msg *wire.MsgCFCheckpt)
+	// TODO(ABE): ABE does not support filter.
+	//// OnCFilter is invoked when a peer receives a cfilter bitcoin message.
+	//OnCFilter func(p *Peer, msg *wire.MsgCFilter)
+	//
+	//// OnCFHeaders is invoked when a peer receives a cfheaders bitcoin
+	//// message.
+	//OnCFHeaders func(p *Peer, msg *wire.MsgCFHeaders)
+	//
+	//// OnCFCheckpt is invoked when a peer receives a cfcheckpt bitcoin
+	//// message.
+	//OnCFCheckpt func(p *Peer, msg *wire.MsgCFCheckpt)
 
 	// OnInv is invoked when a peer receives an inv bitcoin message.
 	OnInv func(p *Peer, msg *wire.MsgInv)
@@ -152,35 +153,37 @@ type MessageListeners struct {
 	// message.
 	OnGetHeaders func(p *Peer, msg *wire.MsgGetHeaders)
 
-	// OnGetCFilters is invoked when a peer receives a getcfilters bitcoin
-	// message.
-	OnGetCFilters func(p *Peer, msg *wire.MsgGetCFilters)
-
-	// OnGetCFHeaders is invoked when a peer receives a getcfheaders
-	// bitcoin message.
-	OnGetCFHeaders func(p *Peer, msg *wire.MsgGetCFHeaders)
-
-	// OnGetCFCheckpt is invoked when a peer receives a getcfcheckpt
-	// bitcoin message.
-	OnGetCFCheckpt func(p *Peer, msg *wire.MsgGetCFCheckpt)
+	// TODO(ABE): ABE does not support filter.
+	//// OnGetCFilters is invoked when a peer receives a getcfilters bitcoin
+	//// message.
+	//OnGetCFilters func(p *Peer, msg *wire.MsgGetCFilters)
+	//
+	//// OnGetCFHeaders is invoked when a peer receives a getcfheaders
+	//// bitcoin message.
+	//OnGetCFHeaders func(p *Peer, msg *wire.MsgGetCFHeaders)
+	//
+	//// OnGetCFCheckpt is invoked when a peer receives a getcfcheckpt
+	//// bitcoin message.
+	//OnGetCFCheckpt func(p *Peer, msg *wire.MsgGetCFCheckpt)
 
 	// OnFeeFilter is invoked when a peer receives a feefilter bitcoin message.
 	OnFeeFilter func(p *Peer, msg *wire.MsgFeeFilter)
 
-	// OnFilterAdd is invoked when a peer receives a filteradd bitcoin message.
-	OnFilterAdd func(p *Peer, msg *wire.MsgFilterAdd)
-
-	// OnFilterClear is invoked when a peer receives a filterclear bitcoin
-	// message.
-	OnFilterClear func(p *Peer, msg *wire.MsgFilterClear)
-
-	// OnFilterLoad is invoked when a peer receives a filterload bitcoin
-	// message.
-	OnFilterLoad func(p *Peer, msg *wire.MsgFilterLoad)
-
-	// OnMerkleBlock  is invoked when a peer receives a merkleblock bitcoin
-	// message.
-	OnMerkleBlock func(p *Peer, msg *wire.MsgMerkleBlock)
+	// TODO(ABE): ABE does not support filter.
+	//// OnFilterAdd is invoked when a peer receives a filteradd bitcoin message.
+	//OnFilterAdd func(p *Peer, msg *wire.MsgFilterAdd)
+	//
+	//// OnFilterClear is invoked when a peer receives a filterclear bitcoin
+	//// message.
+	//OnFilterClear func(p *Peer, msg *wire.MsgFilterClear)
+	//
+	//// OnFilterLoad is invoked when a peer receives a filterload bitcoin
+	//// message.
+	//OnFilterLoad func(p *Peer, msg *wire.MsgFilterLoad)
+	//
+	//// OnMerkleBlock  is invoked when a peer receives a merkleblock bitcoin
+	//// message.
+	//OnMerkleBlock func(p *Peer, msg *wire.MsgMerkleBlock)
 
 	// OnVersion is invoked when a peer receives a version bitcoin message.
 	// The caller may return a reject message in which case the message will
@@ -1078,7 +1081,7 @@ func (p *Peer) writeMessage(msg wire.Message, enc wire.MessageEncoding) error {
 		p.ProtocolVersion(), p.cfg.ChainParams.Net, enc)
 	atomic.AddUint64(&p.bytesSent, uint64(n))
 	if p.cfg.Listeners.OnWrite != nil {
-		fmt.Printf("msg type = %T\n",msg)
+		fmt.Printf("msg type = %T\n", msg)
 		p.cfg.Listeners.OnWrite(p, n, msg, err)
 	}
 	return err
@@ -1161,7 +1164,8 @@ func (p *Peer) maybeAddDeadline(pendingResponses map[string]time.Time, msgCmd st
 	case wire.CmdGetData:
 		// Expects a block, merkleblock, tx, or notfound message.
 		pendingResponses[wire.CmdBlock] = deadline
-		pendingResponses[wire.CmdMerkleBlock] = deadline
+		// TODO(ABE): ABE does not support filter.
+		//		pendingResponses[wire.CmdMerkleBlock] = deadline
 		pendingResponses[wire.CmdTx] = deadline
 		pendingResponses[wire.CmdNotFound] = deadline
 
@@ -1218,13 +1222,14 @@ out:
 				switch msgCmd := msg.message.Command(); msgCmd {
 				case wire.CmdBlock:
 					fallthrough
-				case wire.CmdMerkleBlock:
-					fallthrough
+					// TODO(ABE): ABE does not support filter.
+				//case wire.CmdMerkleBlock:
+				//	fallthrough
 				case wire.CmdTx:
 					fallthrough
 				case wire.CmdNotFound:
 					delete(pendingResponses, wire.CmdBlock)
-					delete(pendingResponses, wire.CmdMerkleBlock)
+					//delete(pendingResponses, wire.CmdMerkleBlock)
 					delete(pendingResponses, wire.CmdTx)
 					delete(pendingResponses, wire.CmdNotFound)
 
@@ -1473,55 +1478,57 @@ out:
 				//	todo (ABE): it is possible that this peer does not answer anything about this request
 			}
 
-		case *wire.MsgGetCFilters:
-			if p.cfg.Listeners.OnGetCFilters != nil {
-				p.cfg.Listeners.OnGetCFilters(p, msg)
-			}
-
-		case *wire.MsgGetCFHeaders:
-			if p.cfg.Listeners.OnGetCFHeaders != nil {
-				p.cfg.Listeners.OnGetCFHeaders(p, msg)
-			}
-
-		case *wire.MsgGetCFCheckpt:
-			if p.cfg.Listeners.OnGetCFCheckpt != nil {
-				p.cfg.Listeners.OnGetCFCheckpt(p, msg)
-			}
-
-		case *wire.MsgCFilter:
-			if p.cfg.Listeners.OnCFilter != nil {
-				p.cfg.Listeners.OnCFilter(p, msg)
-			}
-
-		case *wire.MsgCFHeaders:
-			if p.cfg.Listeners.OnCFHeaders != nil {
-				p.cfg.Listeners.OnCFHeaders(p, msg)
-			}
+			// TODO(ABE): ABE does not support filter.
+		//case *wire.MsgGetCFilters:
+		//	if p.cfg.Listeners.OnGetCFilters != nil {
+		//		p.cfg.Listeners.OnGetCFilters(p, msg)
+		//	}
+		//
+		//case *wire.MsgGetCFHeaders:
+		//	if p.cfg.Listeners.OnGetCFHeaders != nil {
+		//		p.cfg.Listeners.OnGetCFHeaders(p, msg)
+		//	}
+		//
+		//case *wire.MsgGetCFCheckpt:
+		//	if p.cfg.Listeners.OnGetCFCheckpt != nil {
+		//		p.cfg.Listeners.OnGetCFCheckpt(p, msg)
+		//	}
+		//
+		//case *wire.MsgCFilter:
+		//	if p.cfg.Listeners.OnCFilter != nil {
+		//		p.cfg.Listeners.OnCFilter(p, msg)
+		//	}
+		//
+		//case *wire.MsgCFHeaders:
+		//	if p.cfg.Listeners.OnCFHeaders != nil {
+		//		p.cfg.Listeners.OnCFHeaders(p, msg)
+		//	}
 
 		case *wire.MsgFeeFilter:
 			if p.cfg.Listeners.OnFeeFilter != nil {
 				p.cfg.Listeners.OnFeeFilter(p, msg)
 			}
 
-		case *wire.MsgFilterAdd:
-			if p.cfg.Listeners.OnFilterAdd != nil {
-				p.cfg.Listeners.OnFilterAdd(p, msg)
-			}
-
-		case *wire.MsgFilterClear:
-			if p.cfg.Listeners.OnFilterClear != nil {
-				p.cfg.Listeners.OnFilterClear(p, msg)
-			}
-
-		case *wire.MsgFilterLoad:
-			if p.cfg.Listeners.OnFilterLoad != nil {
-				p.cfg.Listeners.OnFilterLoad(p, msg)
-			}
-
-		case *wire.MsgMerkleBlock:
-			if p.cfg.Listeners.OnMerkleBlock != nil {
-				p.cfg.Listeners.OnMerkleBlock(p, msg)
-			}
+			// TODO(ABE): ABE does not support filter.
+		//case *wire.MsgFilterAdd:
+		//	if p.cfg.Listeners.OnFilterAdd != nil {
+		//		p.cfg.Listeners.OnFilterAdd(p, msg)
+		//	}
+		//
+		//case *wire.MsgFilterClear:
+		//	if p.cfg.Listeners.OnFilterClear != nil {
+		//		p.cfg.Listeners.OnFilterClear(p, msg)
+		//	}
+		//
+		//case *wire.MsgFilterLoad:
+		//	if p.cfg.Listeners.OnFilterLoad != nil {
+		//		p.cfg.Listeners.OnFilterLoad(p, msg)
+		//	}
+		//
+		//case *wire.MsgMerkleBlock:
+		//	if p.cfg.Listeners.OnMerkleBlock != nil {
+		//		p.cfg.Listeners.OnMerkleBlock(p, msg)
+		//	}
 
 		case *wire.MsgReject:
 			if p.cfg.Listeners.OnReject != nil {

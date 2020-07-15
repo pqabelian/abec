@@ -26,7 +26,7 @@ import (
 // peers on the bitcoin network.
 type NetAddrManager struct {
 	mtx               sync.Mutex
-	peersFile         string       			      // store the peers to quicker build connection when the btcd restart
+	peersFile         string // store the peers to quicker build connection when the btcd restart
 	lookupFunc        func(string) ([]net.IP, error)
 	rand              *rand.Rand
 	key               [32]byte
@@ -463,7 +463,7 @@ func (namgr *NetAddrManager) deserializePeers(filePath string) error {
 	}
 
 	copy(namgr.key[:], snam.Key[:])
-	
+
 	// assign values to netAddrIndex
 	for _, v := range snam.NetAddresses {
 		kna := new(KnownNetAddress)
@@ -1128,7 +1128,9 @@ func (namgr *NetAddrManager) GetBestLocalAddress(remoteAddr *wire.NetAddress) *w
 		} else {
 			ip = net.IPv4zero
 		}
-		services := wire.SFNodeNetwork | wire.SFNodeWitness | wire.SFNodeBloom
+		// TODO(ABE): ABE does not support filter.
+		//services := wire.SFNodeNetwork | wire.SFNodeWitness | wire.SFNodeBloom
+		services := wire.SFNodeNetwork | wire.SFNodeWitness
 		bestAddress = wire.NewNetAddressIPPort(ip, 0, services)
 	}
 
