@@ -109,8 +109,9 @@ type MessageListeners struct {
 	// OnAlert is invoked when a peer receives an alert bitcoin message.
 	OnAlert func(p *Peer, msg *wire.MsgAlert)
 
+	// TODO(ABE): ABE does not support filter.
 	// OnMemPool is invoked when a peer receives a mempool bitcoin message.
-	OnMemPool func(p *Peer, msg *wire.MsgMemPool)
+	//OnMemPool func(p *Peer, msg *wire.MsgMemPool)
 
 	// OnTx is invoked when a peer receives a tx bitcoin message.
 	//	OnTx    func(p *Peer, msg *wire.MsgTx)
@@ -1153,9 +1154,10 @@ func (p *Peer) maybeAddDeadline(pendingResponses map[string]time.Time, msgCmd st
 		// Expects a verack message.
 		pendingResponses[wire.CmdVerAck] = deadline
 
-	case wire.CmdMemPool:
-		// Expects an inv message.
-		pendingResponses[wire.CmdInv] = deadline
+		// TODO(ABE): ABE does not support filter.
+	//case wire.CmdMemPool:
+	//	// Expects an inv message.
+	//	pendingResponses[wire.CmdInv] = deadline
 
 	case wire.CmdGetBlocks:
 		// Expects an inv message.
@@ -1422,10 +1424,12 @@ out:
 				p.cfg.Listeners.OnAlert(p, msg)
 			}
 
-		case *wire.MsgMemPool:
-			if p.cfg.Listeners.OnMemPool != nil {
-				p.cfg.Listeners.OnMemPool(p, msg)
-			}
+			// TODO(ABE): ABE does not support filter.
+		//case *wire.MsgMemPool:
+		//	if p.cfg.Listeners.OnMemPool != nil {
+		//		p.cfg.Listeners.OnMemPool(p, msg)
+		//	}
+
 		//	todo(ABE): Remove
 		/*		case *wire.MsgTx:
 					if p.cfg.Listeners.OnTx != nil {

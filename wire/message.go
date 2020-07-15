@@ -38,7 +38,8 @@ const (
 	CmdPing       = "ping"
 	CmdPong       = "pong"
 	CmdAlert      = "alert"
-	CmdMemPool    = "mempool"
+	// TODO(ABE): ABE does not support filter.
+	//CmdMemPool    = "mempool"
 	// TODO(ABE): ABE does not support filter.
 	//CmdFilterAdd    = "filteradd"
 	//CmdFilterClear  = "filterclear"
@@ -134,10 +135,11 @@ func makeEmptyMessage(command string) (Message, error) {
 	case CmdAlert:
 		msg = &MsgAlert{}
 
-	case CmdMemPool:
-		msg = &MsgMemPool{}
-
 		// TODO(ABE): ABE does not support filter.
+	//case CmdMemPool:
+	//	msg = &MsgMemPool{}
+
+	// TODO(ABE): ABE does not support filter.
 	//case CmdFilterAdd:
 	//	msg = &MsgFilterAdd{}
 	//

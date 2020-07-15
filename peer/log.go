@@ -163,8 +163,9 @@ func messageSummary(msg wire.Message) string {
 	case *wire.MsgAlert:
 		// No summary.
 
-	case *wire.MsgMemPool:
-		// No summary.
+		// TODO(ABE): ABE does not support filter.
+	//case *wire.MsgMemPool:
+	//	// No summary.
 
 	case *wire.MsgTx:
 		return fmt.Sprintf("hash %s, %d inputs, %d outputs, lock %s",
