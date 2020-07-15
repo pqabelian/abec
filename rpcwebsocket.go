@@ -509,8 +509,12 @@ func (m *wsNotificationManager) notificationHandler() {
 	// since it is quite a bit more efficient than using the entire struct.
 	blockNotifications := make(map[chan struct{}]*wsClient)
 	txNotifications := make(map[chan struct{}]*wsClient)
+	//	todo(ABE):
 	watchedOutPoints := make(map[wire.OutPoint]map[chan struct{}]*wsClient)
+	watchedOutPointsAbe := make(map[chainhash.Hash]map[chan struct{}]*wsClient)
+
 	watchedAddrs := make(map[string]map[chan struct{}]*wsClient)
+	watchedAddrsAbe := make(map[chainhash.Hash]map[chan struct{}]*wsClient)
 
 out:
 	for {
@@ -522,23 +526,21 @@ out:
 			}
 			switch n := n.(type) {
 			case *notificationBlockConnected:
-				/*				//	TODO(ABE, MUST)
-								block := (*abeutil.BlockAbe)(n)
+				//	TODO(ABE, MUST)
+				block := (*abeutil.BlockAbe)(n)
 
-								// Skip iterating through all txs if no
-								// tx notification requests exist.
-								if len(watchedOutPoints) != 0 || len(watchedAddrs) != 0 {
-									for _, tx := range block.Transactions() {
-										m.notifyForTx(watchedOutPoints, watchedAddrs, tx, block)
-									}
-								}
+				// Skip iterating through all txs if no
+				// tx notification requests exist.
+				if len(watchedOutPoints) != 0 || len(watchedAddrs) != 0 {
+					for _, tx := range block.Transactions() {
+						m.notifyForTxAbe(watchedOutPointsAbe, watchedAddrsAbe, tx, block)
+					}
+				}
 
-								if len(blockNotifications) != 0 {
-									m.notifyBlockConnected(blockNotifications,
-										block)
-									m.notifyFilteredBlockConnected(blockNotifications,
-										block)
-								}*/
+				if len(blockNotifications) != 0 {
+					m.notifyBlockConnectedAbe(blockNotifications, block)
+					m.notifyFilteredBlockConnectedAbe(blockNotifications, block)
+				}
 
 			case *notificationBlockDisconnected:
 				//	TODO(ABE, MUST)
@@ -649,6 +651,7 @@ func (m *wsNotificationManager) UnregisterBlockUpdates(wsc *wsClient) {
 // spending a watched output or outputting to a watched address.  Matching
 // client's filters are updated based on this transaction's outputs and output
 // addresses that may be relevant for a client.
+//	todo(ABE):
 func (m *wsNotificationManager) subscribedClients(tx *abeutil.Tx,
 	clients map[chan struct{}]*wsClient) map[chan struct{}]struct{} {
 
@@ -706,10 +709,86 @@ func (m *wsNotificationManager) subscribedClients(tx *abeutil.Tx,
 	return subscribed
 }
 
+//	todo(ABE.MUTS):
+func (m *wsNotificationManager) subscribedClientsAbe(tx *abeutil.TxAbe,
+	clients map[chan struct{}]*wsClient) map[chan struct{}]struct{} {
+
+	// Use a map of client quit channels as keys to prevent duplicates when
+	// multiple inputs and/or outputs are relevant to the client.
+	subscribed := make(map[chan struct{}]struct{})
+
+	/*	msgTx := tx.MsgTx()
+		for _, input := range msgTx.TxIn {
+			for quitChan, wsc := range clients {
+				wsc.Lock()
+				filter := wsc.filterData
+				wsc.Unlock()
+				if filter == nil {
+					continue
+				}
+				filter.mu.Lock()
+				if filter.existsUnspentOutPoint(&input.PreviousOutPoint) {
+					subscribed[quitChan] = struct{}{}
+				}
+				filter.mu.Unlock()
+			}
+		}
+
+		for i, output := range msgTx.TxOut {
+			_, addrs, _, err := txscript.ExtractPkScriptAddrs(
+				output.PkScript, m.server.cfg.ChainParams)
+			if err != nil {
+				// Clients are not able to subscribe to
+				// nonstandard or non-address outputs.
+				continue
+			}
+			for quitChan, wsc := range clients {
+				wsc.Lock()
+				filter := wsc.filterData
+				wsc.Unlock()
+				if filter == nil {
+					continue
+				}
+				filter.mu.Lock()
+				for _, a := range addrs {
+					if filter.existsAddress(a) {
+						subscribed[quitChan] = struct{}{}
+						op := wire.OutPoint{
+							Hash:  *tx.Hash(),
+							Index: uint32(i),
+						}
+						filter.addUnspentOutPoint(&op)
+					}
+				}
+				filter.mu.Unlock()
+			}
+		}*/
+
+	return subscribed
+}
+
 // notifyBlockConnected notifies websocket clients that have registered for
 // block updates when a block is connected to the main chain.
+//	todo(ABE):
 func (*wsNotificationManager) notifyBlockConnected(clients map[chan struct{}]*wsClient,
 	block *abeutil.Block) {
+
+	// Notify interested websocket clients about the connected block.
+	ntfn := abejson.NewBlockConnectedNtfn(block.Hash().String(), block.Height(),
+		block.MsgBlock().Header.Timestamp.Unix())
+	marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
+	if err != nil {
+		rpcsLog.Errorf("Failed to marshal block connected notification: "+
+			"%v", err)
+		return
+	}
+	for _, wsc := range clients {
+		wsc.QueueNotification(marshalledJSON)
+	}
+}
+
+func (*wsNotificationManager) notifyBlockConnectedAbe(clients map[chan struct{}]*wsClient,
+	block *abeutil.BlockAbe) {
 
 	// Notify interested websocket clients about the connected block.
 	ntfn := abejson.NewBlockConnectedNtfn(block.Hash().String(), block.Height(),
@@ -774,6 +853,50 @@ func (m *wsNotificationManager) notifyFilteredBlockConnected(clients map[chan st
 		for quitChan := range m.subscribedClients(tx, clients) {
 			if txHex == "" {
 				txHex = txHexString(tx.MsgTx())
+			}
+			subscribedTxs[quitChan] = append(subscribedTxs[quitChan], txHex)
+		}
+	}
+	for quitChan, wsc := range clients {
+		// Add all discovered transactions for this client. For clients
+		// that have no new-style filter, add the empty string slice.
+		ntfn.SubscribedTxs = subscribedTxs[quitChan]
+
+		// Marshal and queue notification.
+		marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
+		if err != nil {
+			rpcsLog.Errorf("Failed to marshal filtered block "+
+				"connected notification: %v", err)
+			return
+		}
+		wsc.QueueNotification(marshalledJSON)
+	}
+}
+
+//	todo(ABE.MUST)
+func (m *wsNotificationManager) notifyFilteredBlockConnectedAbe(clients map[chan struct{}]*wsClient,
+	block *abeutil.BlockAbe) {
+
+	// Create the common portion of the notification that is the same for
+	// every client.
+	var w bytes.Buffer
+	err := block.MsgBlock().Header.Serialize(&w)
+	if err != nil {
+		rpcsLog.Errorf("Failed to serialize header for filtered block "+
+			"connected notification: %v", err)
+		return
+	}
+	ntfn := abejson.NewFilteredBlockConnectedNtfn(block.Height(),
+		hex.EncodeToString(w.Bytes()), nil)
+
+	// Search for relevant transactions for each client and save them
+	// serialized in hex encoding for the notification.
+	subscribedTxs := make(map[chan struct{}][]string)
+	for _, tx := range block.Transactions() {
+		var txHex string
+		for quitChan := range m.subscribedClientsAbe(tx, clients) {
+			if txHex == "" {
+				txHex = txHexStringAbe(tx.MsgTx())
 			}
 			subscribedTxs[quitChan] = append(subscribedTxs[quitChan], txHex)
 		}
@@ -972,8 +1095,38 @@ func (*wsNotificationManager) removeSpentRequest(ops map[wire.OutPoint]map[chan 
 	}
 }
 
+func (*wsNotificationManager) removeSpentRequestAbe(ops map[chainhash.Hash]map[chan struct{}]*wsClient,
+	wsc *wsClient, ringMemberHash chainhash.Hash) {
+
+	// Remove the request tracking from the client.
+	delete(wsc.spentRequestsAbe, ringMemberHash)
+
+	// Remove the client from the list to notify.
+	notifyMap, ok := ops[ringMemberHash]
+	if !ok {
+		rpcsLog.Warnf("Attempt to remove nonexistent spent request "+
+			"for websocket client %s", wsc.addr)
+		return
+	}
+	delete(notifyMap, wsc.quit)
+
+	// Remove the map entry altogether if there are
+	// no more clients interested in it.
+	if len(notifyMap) == 0 {
+		delete(ops, ringMemberHash)
+	}
+}
+
 // txHexString returns the serialized transaction encoded in hexadecimal.
+//	todo(ABE)
 func txHexString(tx *wire.MsgTx) string {
+	buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+	// Ignore Serialize's error, as writing to a bytes.buffer cannot fail.
+	tx.Serialize(buf)
+	return hex.EncodeToString(buf.Bytes())
+}
+
+func txHexStringAbe(tx *wire.MsgTxAbe) string {
 	buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
 	// Ignore Serialize's error, as writing to a bytes.buffer cannot fail.
 	tx.Serialize(buf)
@@ -982,7 +1135,20 @@ func txHexString(tx *wire.MsgTx) string {
 
 // blockDetails creates a BlockDetails struct to include in btcws notifications
 // from a block and a transaction's block index.
+//	todo(ABE):
 func blockDetails(block *abeutil.Block, txIndex int) *abejson.BlockDetails {
+	if block == nil {
+		return nil
+	}
+	return &abejson.BlockDetails{
+		Height: block.Height(),
+		Hash:   block.Hash().String(),
+		Index:  txIndex,
+		Time:   block.MsgBlock().Header.Timestamp.Unix(),
+	}
+}
+
+func blockDetailsAbe(block *abeutil.BlockAbe, txIndex int) *abejson.BlockDetails {
 	if block == nil {
 		return nil
 	}
@@ -1002,10 +1168,17 @@ func newRedeemingTxNotification(txHex string, index int, block *abeutil.Block) (
 	return abejson.MarshalCmd(nil, ntfn)
 }
 
+func newRedeemingTxNotificationAbe(txHex string, index int, block *abeutil.BlockAbe) ([]byte, error) {
+	// Create and marshal the notification.
+	ntfn := abejson.NewRedeemingTxNtfn(txHex, blockDetailsAbe(block, index))
+	return abejson.MarshalCmd(nil, ntfn)
+}
+
 // notifyForTxOuts examines each transaction output, notifying interested
 // websocket clients of the transaction if an output spends to a watched
 // address.  A spent notification request is automatically registered for
 // the client for each matching output.
+//	todo(ABE):
 func (m *wsNotificationManager) notifyForTxOuts(ops map[wire.OutPoint]map[chan struct{}]*wsClient,
 	addrs map[string]map[chan struct{}]*wsClient, tx *abeutil.Tx, block *abeutil.Block) {
 
@@ -1054,6 +1227,46 @@ func (m *wsNotificationManager) notifyForTxOuts(ops map[wire.OutPoint]map[chan s
 	}
 }
 
+func (m *wsNotificationManager) notifyForTxOutsAbe(addrs map[chainhash.Hash]map[chan struct{}]*wsClient, tx *abeutil.TxAbe, block *abeutil.BlockAbe) {
+
+	// Nothing to do if nobody is listening for address notifications.
+	if len(addrs) == 0 {
+		return
+	}
+
+	txHex := ""
+	wscNotified := make(map[chan struct{}]struct{})
+	for _, txOut := range tx.MsgTx().TxOuts {
+		addrScriptHash := chainhash.DoubleHashH(txOut.AddressScript)
+
+		cmap, ok := addrs[addrScriptHash]
+		if !ok {
+			continue
+		}
+
+		if txHex == "" {
+			txHex = txHexStringAbe(tx.MsgTx())
+		}
+		ntfn := abejson.NewRecvTxNtfn(txHex, blockDetailsAbe(block, tx.Index()))
+
+		marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
+		if err != nil {
+			rpcsLog.Errorf("Failed to marshal processedtx notification: %v", err)
+			continue
+		}
+
+		//	todo(ABE): In ABE, the client could not watch the OutPoints, instead, the clients can watch the rings or rings with serial number.
+		//		op := []*wire.OutPoint{wire.NewOutPoint(tx.Hash(), uint32(i))}
+		for wscQuit, wsc := range cmap {
+			//			m.addSpentRequests(ops, wsc, op)
+			if _, ok := wscNotified[wscQuit]; !ok {
+				wscNotified[wscQuit] = struct{}{}
+				wsc.QueueNotification(marshalledJSON)
+			}
+		}
+	}
+}
+
 // notifyRelevantTxAccepted examines the inputs and outputs of the passed
 // transaction, notifying websocket clients of outputs spending to a watched
 // address and inputs spending a watched outpoint.  Any outputs paying to a
@@ -1080,6 +1293,7 @@ func (m *wsNotificationManager) notifyRelevantTxAccepted(tx *abeutil.Tx,
 // notifyForTx examines the inputs and outputs of the passed transaction,
 // notifying websocket clients of outputs spending to a watched address
 // and inputs spending a watched outpoint.
+//	todo (ABE):
 func (m *wsNotificationManager) notifyForTx(ops map[wire.OutPoint]map[chan struct{}]*wsClient,
 	addrs map[string]map[chan struct{}]*wsClient, tx *abeutil.Tx, block *abeutil.Block) {
 
@@ -1091,10 +1305,22 @@ func (m *wsNotificationManager) notifyForTx(ops map[wire.OutPoint]map[chan struc
 	}
 }
 
+func (m *wsNotificationManager) notifyForTxAbe(ops map[chainhash.Hash]map[chan struct{}]*wsClient,
+	addrs map[chainhash.Hash]map[chan struct{}]*wsClient, tx *abeutil.TxAbe, block *abeutil.BlockAbe) {
+
+	if len(ops) != 0 {
+		m.notifyForTxInsAbe(ops, tx, block)
+	}
+	if len(addrs) != 0 {
+		m.notifyForTxOutsAbe(addrs, tx, block)
+	}
+}
+
 // notifyForTxIns examines the inputs of the passed transaction and sends
 // interested websocket clients a redeemingtx notification if any inputs
 // spend a watched output.  If block is non-nil, any matching spent
 // requests are removed.
+//	todo (ABE):
 func (m *wsNotificationManager) notifyForTxIns(ops map[wire.OutPoint]map[chan struct{}]*wsClient,
 	tx *abeutil.Tx, block *abeutil.Block) {
 
@@ -1119,6 +1345,41 @@ func (m *wsNotificationManager) notifyForTxIns(ops map[wire.OutPoint]map[chan st
 			for wscQuit, wsc := range cmap {
 				if block != nil {
 					m.removeSpentRequest(ops, wsc, prevOut)
+				}
+
+				if _, ok := wscNotified[wscQuit]; !ok {
+					wscNotified[wscQuit] = struct{}{}
+					wsc.QueueNotification(marshalledJSON)
+				}
+			}
+		}
+	}
+}
+
+func (m *wsNotificationManager) notifyForTxInsAbe(ops map[chainhash.Hash]map[chan struct{}]*wsClient,
+	tx *abeutil.TxAbe, block *abeutil.BlockAbe) {
+
+	// Nothing to do if nobody is watching outpoints.
+	if len(ops) == 0 {
+		return
+	}
+
+	txHex := ""
+	wscNotified := make(map[chan struct{}]struct{})
+	for _, txIn := range tx.MsgTx().TxIns {
+		ringMemberHash := txIn.RingMemberHash()
+		if cmap, ok := ops[ringMemberHash]; ok {
+			if txHex == "" {
+				txHex = txHexStringAbe(tx.MsgTx())
+			}
+			marshalledJSON, err := newRedeemingTxNotificationAbe(txHex, tx.Index(), block)
+			if err != nil {
+				rpcsLog.Warnf("Failed to marshal redeemingtx notification: %v", err)
+				continue
+			}
+			for wscQuit, wsc := range cmap {
+				if block != nil {
+					m.removeSpentRequestAbe(ops, wsc, ringMemberHash)
 				}
 
 				if _, ok := wscNotified[wscQuit]; !ok {
@@ -1304,7 +1565,10 @@ type wsClient struct {
 	// spentRequests is a set of unspent Outpoints a wallet has requested
 	// notifications for when they are spent by a processed transaction.
 	// Owned by the notification manager.
-	spentRequests map[wire.OutPoint]struct{}
+	//	todo(ABE):
+	spentRequests    map[wire.OutPoint]struct{}
+	spentRequestsAbe map[chainhash.Hash]struct{}
+	// use the hash of TxIn, say (OutPointRing || SerialNumber) as the identifier of a consumed OutPoint
 
 	// filterData is the new generation transaction filter backported from
 	// github.com/decred/dcrd for the new backported `loadtxfilter` and

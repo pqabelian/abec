@@ -198,6 +198,13 @@ func NewRedeemingTxNtfn(hexTx string, block *BlockDetails) *RedeemingTxNtfn {
 	}
 }
 
+func NewRedeemingTxNtfnAbe(hexTx string, block *BlockDetails) *RedeemingTxNtfn {
+	return &RedeemingTxNtfn{
+		HexTx: hexTx,
+		Block: block,
+	}
+}
+
 // RescanFinishedNtfn defines the rescanfinished JSON-RPC notification.
 //
 // NOTE: Deprecated. Not used with rescanblocks command.
