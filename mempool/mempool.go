@@ -1389,107 +1389,108 @@ func (mp *TxPool) validateReplacement(tx *abeutil.Tx,
 // valid, no error is returned. Otherwise, an error is returned indicating what
 // went wrong.
 //
+//	todo(ABE): If ABE needs to support Replcement, this method needs to re-develop.
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *TxPool) validateReplacementAbe(tx *abeutil.TxAbe,
-	txFee int64) (map[chainhash.Hash]*abeutil.TxAbe, error) {
-
-	// First, we'll make sure the set of conflicting transactions doesn't
-	// exceed the maximum allowed.
-	conflicts := mp.txConflictsAbe(tx)
-	if len(conflicts) > MaxReplacementEvictions {
-		str := fmt.Sprintf("replacement transaction %v evicts more "+
-			"transactions than permitted: max is %v, evicts %v",
-			tx.Hash(), MaxReplacementEvictions, len(conflicts))
-		return nil, txRuleError(wire.RejectNonstandard, str)
-	}
-
-	// The set of conflicts (transactions we'll replace) and ancestors
-	// should not overlap, otherwise the replacement would be spending an
-	// output that no longer exists.
-	for ancestorHash := range mp.txAncestorsAbe(tx, nil) {
-		if _, ok := conflicts[ancestorHash]; !ok {
-			continue
-		}
-		str := fmt.Sprintf("replacement transaction %v spends parent "+
-			"transaction %v", tx.Hash(), ancestorHash)
-		return nil, txRuleError(wire.RejectInvalid, str)
-	}
-
-	// The replacement should have a higher fee rate than each of the
-	// conflicting transactions and a higher absolute fee than the fee sum
-	// of all the conflicting transactions.
-	//
-	// We usually don't want to accept replacements with lower fee rates
-	// than what they replaced as that would lower the fee rate of the next
-	// block. Requiring that the fee rate always be increased is also an
-	// easy-to-reason about way to prevent DoS attacks via replacements.
-	var (
-		txSize           = GetTxVirtualSizeAbe(tx)
-		txFeeRate        = txFee * 1000 / txSize
-		conflictsFee     int64
-		conflictsParents = make(map[chainhash.Hash]struct{})
-	)
-	for hash, conflict := range conflicts {
-		if txFeeRate <= mp.pool[hash].FeePerKB {
-			str := fmt.Sprintf("replacement transaction %v has an "+
-				"insufficient fee rate: needs more than %v, "+
-				"has %v", tx.Hash(), mp.pool[hash].FeePerKB,
-				txFeeRate)
-			return nil, txRuleError(wire.RejectInsufficientFee, str)
-		}
-
-		conflictsFee += mp.pool[hash].Fee
-
-		// We'll track each conflict's parents to ensure the replacement
-		// isn't spending any new unconfirmed inputs.
-		for _, txIn := range conflict.MsgTx().TxIns {
-			conflictsParents[txIn.Hash()] = struct{}{}
-		}
-	}
-
-	// It should also have an absolute fee greater than all of the
-	// transactions it intends to replace and pay for its own bandwidth,
-	// which is determined by our minimum relay fee.
-	minFee := calcMinRequiredTxRelayFeeAbe(txSize, mp.cfg.Policy.MinRelayTxFee)
-	if txFee < conflictsFee+minFee {
-		str := fmt.Sprintf("replacement transaction %v has an "+
-			"insufficient absolute fee: needs %v, has %v",
-			tx.Hash(), conflictsFee+minFee, txFee)
-		return nil, txRuleError(wire.RejectInsufficientFee, str)
-	}
-
-	// Finally, it should not spend any new unconfirmed outputs, other than
-	// the ones already included in the parents of the conflicting
-	// transactions it'll replace.
-	/*	for _, txIn := range tx.MsgTx().TxIns {
-		if _, ok := conflictsParents[txIn.PreviousOutPoint.Hash]; ok {
-			continue
-		}
-		// Confirmed outputs are valid to spend in the replacement.
-		if _, ok := mp.pool[txIn.PreviousOutPoint.Hash]; !ok {
-			continue
-		}
-		str := fmt.Sprintf("replacement transaction spends new "+
-			"unconfirmed input %v not found in conflicting "+
-			"transactions", txIn.PreviousOutPoint)
-		return nil, txRuleError(wire.RejectInvalid, str)
-	}*/
-	for _, txIn := range tx.MsgTx().TxIns {
-		if _, ok := conflictsParents[txIn.Hash()]; ok {
-			continue
-		}
-		// Confirmed outputs are valid to spend in the replacement.
-		if _, ok := mp.pool[txIn.Hash()]; !ok {
-			continue
-		}
-		str := fmt.Sprintf("replacement transaction spends new "+
-			"unconfirmed input %v not found in conflicting "+
-			"transactions", txIn)
-		return nil, txRuleError(wire.RejectInvalid, str)
-	}
-
-	return conflicts, nil
-}
+//func (mp *TxPool) validateReplacementAbe(tx *abeutil.TxAbe,
+//	txFee int64) (map[chainhash.Hash]*abeutil.TxAbe, error) {
+//
+//	// First, we'll make sure the set of conflicting transactions doesn't
+//	// exceed the maximum allowed.
+//	conflicts := mp.txConflictsAbe(tx)
+//	if len(conflicts) > MaxReplacementEvictions {
+//		str := fmt.Sprintf("replacement transaction %v evicts more "+
+//			"transactions than permitted: max is %v, evicts %v",
+//			tx.Hash(), MaxReplacementEvictions, len(conflicts))
+//		return nil, txRuleError(wire.RejectNonstandard, str)
+//	}
+//
+//	// The set of conflicts (transactions we'll replace) and ancestors
+//	// should not overlap, otherwise the replacement would be spending an
+//	// output that no longer exists.
+//	for ancestorHash := range mp.txAncestorsAbe(tx, nil) {
+//		if _, ok := conflicts[ancestorHash]; !ok {
+//			continue
+//		}
+//		str := fmt.Sprintf("replacement transaction %v spends parent "+
+//			"transaction %v", tx.Hash(), ancestorHash)
+//		return nil, txRuleError(wire.RejectInvalid, str)
+//	}
+//
+//	// The replacement should have a higher fee rate than each of the
+//	// conflicting transactions and a higher absolute fee than the fee sum
+//	// of all the conflicting transactions.
+//	//
+//	// We usually don't want to accept replacements with lower fee rates
+//	// than what they replaced as that would lower the fee rate of the next
+//	// block. Requiring that the fee rate always be increased is also an
+//	// easy-to-reason about way to prevent DoS attacks via replacements.
+//	var (
+//		txSize           = GetTxVirtualSizeAbe(tx)
+//		txFeeRate        = txFee * 1000 / txSize
+//		conflictsFee     int64
+//		conflictsParents = make(map[chainhash.Hash]struct{})
+//	)
+//	for hash, conflict := range conflicts {
+//		if txFeeRate <= mp.pool[hash].FeePerKB {
+//			str := fmt.Sprintf("replacement transaction %v has an "+
+//				"insufficient fee rate: needs more than %v, "+
+//				"has %v", tx.Hash(), mp.pool[hash].FeePerKB,
+//				txFeeRate)
+//			return nil, txRuleError(wire.RejectInsufficientFee, str)
+//		}
+//
+//		conflictsFee += mp.pool[hash].Fee
+//
+//		// We'll track each conflict's parents to ensure the replacement
+//		// isn't spending any new unconfirmed inputs.
+//		for _, txIn := range conflict.MsgTx().TxIns {
+//			conflictsParents[txIn.RingMemberHash()] = struct{}{}
+//		}
+//	}
+//
+//	// It should also have an absolute fee greater than all of the
+//	// transactions it intends to replace and pay for its own bandwidth,
+//	// which is determined by our minimum relay fee.
+//	minFee := calcMinRequiredTxRelayFeeAbe(txSize, mp.cfg.Policy.MinRelayTxFee)
+//	if txFee < conflictsFee+minFee {
+//		str := fmt.Sprintf("replacement transaction %v has an "+
+//			"insufficient absolute fee: needs %v, has %v",
+//			tx.Hash(), conflictsFee+minFee, txFee)
+//		return nil, txRuleError(wire.RejectInsufficientFee, str)
+//	}
+//
+//	// Finally, it should not spend any new unconfirmed outputs, other than
+//	// the ones already included in the parents of the conflicting
+//	// transactions it'll replace.
+//	/*	for _, txIn := range tx.MsgTx().TxIns {
+//		if _, ok := conflictsParents[txIn.PreviousOutPoint.Hash]; ok {
+//			continue
+//		}
+//		// Confirmed outputs are valid to spend in the replacement.
+//		if _, ok := mp.pool[txIn.PreviousOutPoint.Hash]; !ok {
+//			continue
+//		}
+//		str := fmt.Sprintf("replacement transaction spends new "+
+//			"unconfirmed input %v not found in conflicting "+
+//			"transactions", txIn.PreviousOutPoint)
+//		return nil, txRuleError(wire.RejectInvalid, str)
+//	}*/
+//	for _, txIn := range tx.MsgTx().TxIns {
+//		if _, ok := conflictsParents[txIn.RingMemberHash()]; ok {
+//			continue
+//		}
+//		// Confirmed outputs are valid to spend in the replacement.
+//		if _, ok := mp.pool[txIn.RingMemberHash()]; !ok {
+//			continue
+//		}
+//		str := fmt.Sprintf("replacement transaction spends new "+
+//			"unconfirmed input %v not found in conflicting "+
+//			"transactions", txIn)
+//		return nil, txRuleError(wire.RejectInvalid, str)
+//	}
+//
+//	return conflicts, nil
+//}
 
 // maybeAcceptTransaction is the internal function which implements the public
 // MaybeAcceptTransaction.  See the comment for MaybeAcceptTransaction for
@@ -1808,7 +1809,7 @@ func (mp *TxPool) maybeAcceptTransactionBTCD(tx *abeutil.Tx, isNew, rateLimit, r
 	return nil, txD, nil
 }
 
-func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit, rejectDupOrphans bool) ([]*chainhash.Hash, *TxDescAbe, error) {
+func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit, rejectDupOrphans bool) ([]*wire.OutPointRing, *TxDescAbe, error) {
 
 	txHash := tx.Hash()
 
@@ -1896,12 +1897,12 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	// don't exist or are already spent.  Adding orphans to the orphan pool
 	// is not handled by this function, and the caller should use
 	// maybeAddOrphan if this behavior is desired.
-	var missingParents []*chainhash.Hash
+	var missingParents []*wire.OutPointRing
 	for _, txIn := range tx.MsgTx().TxIns {
 		utxoRingEntry := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())
 		if utxoRingEntry == nil || utxoRingEntry.IsSpent(txIn.SerialNumber) {
-			hashCopy := txIn.Hash()
-			missingParents = append(missingParents, &hashCopy)
+			outPointRing := txIn.PreviousOutPointRing
+			missingParents = append(missingParents, &outPointRing)
 		}
 	}
 
@@ -2041,13 +2042,13 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 //	return hashes, txD, err
 //}
 
-func (mp *TxPool) MaybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit bool) ([]*chainhash.Hash, *TxDescAbe, error) {
+func (mp *TxPool) MaybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit bool) ([]*wire.OutPointRing, *TxDescAbe, error) {
 	// Protect concurrent access.
 	mp.mtx.Lock()
-	hashes, txD, err := mp.maybeAcceptTransactionAbe(tx, isNew, rateLimit, true)
+	missingParents, txD, err := mp.maybeAcceptTransactionAbe(tx, isNew, rateLimit, true)
 	mp.mtx.Unlock()
 
-	return hashes, txD, err
+	return missingParents, txD, err
 }
 
 // processOrphans is the internal function which implements the public

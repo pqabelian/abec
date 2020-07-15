@@ -1290,6 +1290,8 @@ func (outPointRing *OutPointRing) Hash() chainhash.Hash {
 	return chainhash.DoubleHashH(buf.Bytes())
 }
 
+//	SerialNumber appears only when some ring member is consumed in TxIn,
+//	i.e. logically, SerialNumber accompanies with TxIn.
 type TxInAbe struct {
 	SerialNumber chainhash.Hash
 	//	identify the consumed OutPoint
@@ -1354,7 +1356,9 @@ func (txIn *TxInAbe) String() string {
 	return string(buf)
 }
 
-func (txIn *TxInAbe) Hash() chainhash.Hash {
+//	At this moment, TxIn is just a ring member (say, identified by (outpointRing, serialNumber)), so that we can use txIn.Serialize
+//	If TxIn includes more information, this needs modification.
+func (txIn *TxInAbe) RingMemberHash() chainhash.Hash {
 	buf := bytes.NewBuffer(make([]byte, 0, txIn.SerializeSize()))
 	_ = txIn.Serialize(buf)
 
