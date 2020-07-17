@@ -23,6 +23,8 @@ const (
 	// latestUtxoSetBucketVersion is the current version of the utxo set
 	// bucket that is used to track all unspent outputs.
 	latestUtxoSetBucketVersion = 2
+	//	todo(ABE)
+	latestUtxoRingSetBucketVersion = 1
 
 	// latestSpendJournalBucketVersion is the current version of the spend
 	// journal bucket that is used to track all spent transactions for use
@@ -62,6 +64,10 @@ var (
 	// utxoSetBucketName is the name of the db bucket used to house the
 	// unspent transaction output set.
 	utxoSetBucketName = []byte("utxosetv2")
+
+	// utxoSetVersionKeyName is the name of the db key used to store the
+	// version of the utxo set currently in the database.
+	utxoRingSetVersionKeyName = []byte("utxoringsetversion")
 
 	// utxoRIngSetBucketName is the name of the db bucket used to house the
 	// unspent transaction output ring set.
@@ -1352,28 +1358,56 @@ func (b *BlockChain) createChainState() error {
 			return err
 		}
 
+		//	todo(ABE): This is a bug for BTCD, utxo and spendjournal use wrong name.
+		/*		// Create the bucket that houses the spend journal data and
+				// store its version.
+				_, err = meta.CreateBucket(spendJournalBucketName)
+				if err != nil {
+					return err
+				}
+				err = dbPutVersion(dbTx, utxoSetVersionKeyName,
+					latestUtxoSetBucketVersion)
+				if err != nil {
+					return err
+				}
+
+				// Create the bucket that houses the utxo set and store its
+				// version.  Note that the genesis block coinbase transaction is
+				// intentionally not inserted here since it is not spendable by
+				// consensus rules.
+				_, err = meta.CreateBucket(utxoSetBucketName)
+				if err != nil {
+					return err
+				}
+				err = dbPutVersion(dbTx, spendJournalVersionKeyName,
+					latestSpendJournalBucketVersion)
+				if err != nil {
+					return err
+				}*/
+
 		// Create the bucket that houses the spend journal data and
 		// store its version.
 		_, err = meta.CreateBucket(spendJournalBucketName)
 		if err != nil {
 			return err
 		}
-		err = dbPutVersion(dbTx, utxoSetVersionKeyName,
-			latestUtxoSetBucketVersion)
+		err = dbPutVersion(dbTx, spendJournalVersionKeyName,
+			latestSpendJournalBucketVersion)
 		if err != nil {
 			return err
 		}
 
-		// Create the bucket that houses the utxo set and store its
+		// Create the bucket that houses the utxoring set and store its
 		// version.  Note that the genesis block coinbase transaction is
 		// intentionally not inserted here since it is not spendable by
 		// consensus rules.
-		_, err = meta.CreateBucket(utxoSetBucketName)
+		//	todo(ABE): in ABE, the outputs of the coinbase transaction are spendable, but it does not matter, since the related utxoring will be generated when later blocks are generated.
+		_, err = meta.CreateBucket(utxoRingSetBucketName)
 		if err != nil {
 			return err
 		}
-		err = dbPutVersion(dbTx, spendJournalVersionKeyName,
-			latestSpendJournalBucketVersion)
+		err = dbPutVersion(dbTx, utxoRingSetVersionKeyName,
+			latestUtxoRingSetBucketVersion)
 		if err != nil {
 			return err
 		}
