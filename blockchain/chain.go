@@ -2007,8 +2007,9 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 			//			}
 		}
 
-		//	Abe to do: generating new UtxoRingEntry if currentblock.height%2 = 0
-		if node.height%2 == 0 {
+		//	TODO: generating new UtxoRingEntry if currentblock.height%2 = 0
+		//if node.height%2 == 0 {
+		if node.height%3 == 2 {
 			err := view.newUtxoRingEntries(b.db, node, block)
 			if err != nil {
 				return false, err

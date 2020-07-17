@@ -1016,7 +1016,7 @@ func (p *Peer) readMessage(encoding wire.MessageEncoding) (wire.Message, []byte,
 		p.ProtocolVersion(), p.cfg.ChainParams.Net, encoding)
 	atomic.AddUint64(&p.bytesReceived, uint64(n))
 	if p.cfg.Listeners.OnRead != nil {
-		//fmt.Printf("msg type = %T\n",msg)
+		//fmt.Printf("read msg type = %T\n",msg)
 		//fmt.Printf("peer former %v\n",p)
 		p.cfg.Listeners.OnRead(p, n, msg, err)
 		//fmt.Printf("peer later %v\n",p)
@@ -1082,7 +1082,7 @@ func (p *Peer) writeMessage(msg wire.Message, enc wire.MessageEncoding) error {
 		p.ProtocolVersion(), p.cfg.ChainParams.Net, enc)
 	atomic.AddUint64(&p.bytesSent, uint64(n))
 	if p.cfg.Listeners.OnWrite != nil {
-		fmt.Printf("msg type = %T\n", msg)
+		//fmt.Printf("msg type = %T\n", msg)
 		p.cfg.Listeners.OnWrite(p, n, msg, err)
 	}
 	return err
