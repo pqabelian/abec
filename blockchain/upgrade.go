@@ -589,11 +589,12 @@ func (b *BlockChain) maybeUpgradeDbBuckets(interrupt <-chan struct{}) error {
 	}
 
 	// Update the utxo set to v2 if needed.
-	if utxoSetVersion < 2 {
-		if err := upgradeUtxoSetToV2(b.db, interrupt); err != nil {
-			return err
-		}
-	}
+	//TODO(abe):we just have one  version
+	//if utxoSetVersion < 2 {
+	//	if err := upgradeUtxoSetToV2(b.db, interrupt); err != nil {
+	//		return err
+	//	}
+	//}
 
 	return nil
 }

@@ -885,8 +885,6 @@ func ExtractCoinbaseHeightAbe(coinbaseTx *abeutil.TxAbe) (int32, error) {
 	}
 
 	return wire.ExtractCoinbaseHeight(coinbaseTx.MsgTx()), nil
-
-	return 0, nil
 }
 
 // checkSerializedHeight checks if the signature script in the passed
