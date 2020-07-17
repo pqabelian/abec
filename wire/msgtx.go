@@ -1925,6 +1925,12 @@ func (msg *MsgTxAbe) TxHash() chainhash.Hash {
 	return chainhash.DoubleHashH(buf.Bytes())
 }
 
+func (msg *MsgTxAbe) TxHashFull() chainhash.Hash {
+	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSizeFull()))
+	_ = msg.SerializeFull(buf)
+	return chainhash.DoubleHashH(buf.Bytes())
+}
+
 /*// WitnessHash generates the hash of the transaction serialized according to
 // the new witness serialization defined in BIP0141 and BIP0144. The final
 // output is used within the Segregated Witness commitment of all the witnesses
@@ -2097,6 +2103,67 @@ func (msg *MsgTxAbe) Serialize(w io.Writer) error {
 		if err != nil {
 			return err
 		}*/
+
+	return nil
+
+}
+
+func (msg *MsgTxAbe) SerializeFull(w io.Writer) error {
+	//	version
+	err := binarySerializer.PutUint32(w, littleEndian, uint32(msg.Version))
+	if err != nil {
+		return err
+	}
+
+	//	inputs
+	err = WriteVarInt(w, 0, uint64(len(msg.TxIns)))
+	if err != nil {
+		return err
+	}
+	for _, txIn := range msg.TxIns {
+		err = txIn.Serialize(w)
+		if err != nil {
+			return err
+		}
+	}
+
+	/*	//	ouputs: txo hash
+		err = WriteVarInt(w, 0, uint64(len(msg.TxOutHashs)))
+		if err != nil {
+			return err
+		}
+		for _, txOutHash := range msg.TxOutHashs {
+			// here the hash of serialzed TXO is added, rather than the serialized TXO
+			_, err = w.Write(txOutHash[:])
+			if err != nil{
+				return err
+			}
+		}*/
+
+	//	Txo Details
+	err = WriteVarInt(w, 0, uint64(len(msg.TxOuts)))
+	if err != nil {
+		return err
+	}
+	for _, txOut := range msg.TxOuts {
+		// here the serialized TXOs are  put
+		err = txOut.Serialize(w)
+		if err != nil {
+			return err
+		}
+	}
+
+	//	TxFee
+	err = WriteVarInt(w, 0, uint64(msg.TxFee))
+	if err != nil {
+		return err
+	}
+
+	//	TxWitness
+	err = msg.TxWitness.Serialize(w)
+	if err != nil {
+		return err
+	}
 
 	return nil
 

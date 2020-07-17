@@ -648,6 +648,7 @@ func witnessToHex(witness wire.TxWitness) []string {
 
 // createVinList returns a slice of JSON objects for the inputs of the passed
 // transaction.
+//	todo(ABE):
 func createVinList(mtx *wire.MsgTx) []abejson.Vin {
 	// Coinbase transactions only have a single txin by definition.
 	vinList := make([]abejson.Vin, len(mtx.TxIn))
@@ -678,6 +679,40 @@ func createVinList(mtx *wire.MsgTx) []abejson.Vin {
 			vinEntry.Witness = witnessToHex(txIn.Witness)
 		}
 	}
+
+	return vinList
+}
+
+func createVinListAbe(mtx *wire.MsgTxAbe) []abejson.Vin {
+	// Coinbase transactions only have a single txin by definition.
+	vinList := make([]abejson.Vin, len(mtx.TxIns))
+	/*	if blockchain.IsCoinBaseTx(mtx) {
+			txIn := mtx.TxIn[0]
+			vinList[0].Coinbase = hex.EncodeToString(txIn.SignatureScript)
+			vinList[0].Sequence = txIn.Sequence
+			vinList[0].Witness = witnessToHex(txIn.Witness)
+			return vinList
+		}
+
+		for i, txIn := range mtx.TxIn {
+			// The disassembled string will contain [error] inline
+			// if the script doesn't fully parse, so ignore the
+			// error here.
+			disbuf, _ := txscript.DisasmString(txIn.SignatureScript)
+
+			vinEntry := &vinList[i]
+			vinEntry.Txid = txIn.PreviousOutPoint.Hash.String()
+			vinEntry.Vout = txIn.PreviousOutPoint.Index
+			vinEntry.Sequence = txIn.Sequence
+			vinEntry.ScriptSig = &abejson.ScriptSig{
+				Asm: disbuf,
+				Hex: hex.EncodeToString(txIn.SignatureScript),
+			}
+
+			if mtx.HasWitness() {
+				vinEntry.Witness = witnessToHex(txIn.Witness)
+			}
+		}*/
 
 	return vinList
 }
@@ -765,6 +800,40 @@ func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 		txReply.BlockHash = blkHash
 		txReply.Confirmations = uint64(1 + chainHeight - blkHeight)
 	}
+
+	return txReply, nil
+}
+
+//	todo(ABE.MUST)
+func createTxRawResultAbe(chainParams *chaincfg.Params, mtx *wire.MsgTxAbe,
+	txHash string, blkHeader *wire.BlockHeader, blkHash string,
+	blkHeight int32, chainHeight int32) (*abejson.TxRawResultAbe, error) {
+
+	/*	mtxHex, err := messageToHex(mtx)
+		if err != nil {
+			return nil, err
+		}
+
+		txReply := &abejson.TxRawResultAbe{
+			Hex:      mtxHex,
+			Txid:     txHash,
+			Hash:     mtx.TxHashFull().String(),
+			Size:     int32(mtx.SerializeSize()),
+			Vsize:    int32(mtx.SerializeSizeFull()),
+			Vin:      createVinList(mtx),
+			Vout:     createVoutList(mtx, chainParams, nil),
+			Version:  mtx.Version,
+		}
+
+		if blkHeader != nil {
+			// This is not a typo, they are identical in bitcoind as well.
+			txReply.Time = blkHeader.Timestamp.Unix()
+			txReply.Blocktime = blkHeader.Timestamp.Unix()
+			txReply.BlockHash = blkHash
+			txReply.Confirmations = uint64(1 + chainHeight - blkHeight)
+		}*/
+
+	txReply := &abejson.TxRawResultAbe{}
 
 	return txReply, nil
 }
@@ -3809,7 +3878,7 @@ func (s *rpcServer) NotifyNewTransactionsAbe(txn *mempool.TxDescAbe) {
 
 	// Potentially notify any getblocktemplate long poll clients
 	// about stale block templates due to the new transaction.
-	s.gbtWorkState.NotifyMempoolTx(s.cfg.TxMemPool.LastUpdated())
+	s.gbtWorkState.NotifyMempoolTxAbe(s.cfg.TxMemPool.LastUpdated())
 
 }
 
@@ -4410,7 +4479,7 @@ func (s *rpcServer) handleBlockchainNotification(notification *blockchain.Notifi
 		// Allow any clients performing long polling via the
 		// getblocktemplate RPC to be notified when the new block causes
 		// their old block template to become stale.
-		//	TODO(ABE,MUST): Bug? accepted vs. connected
+		//	TODO(ABE):
 		s.gbtWorkState.NotifyBlockConnected(block.Hash())
 
 	case blockchain.NTBlockConnected:

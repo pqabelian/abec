@@ -307,6 +307,7 @@ type ScriptSig struct {
 // Vin models parts of the tx data.  It is defined separately since
 // getrawtransaction, decoderawtransaction, and searchrawtransaction use the
 // same structure.
+//	todo(ABE):
 type Vin struct {
 	Coinbase  string     `json:"coinbase"`
 	Txid      string     `json:"txid"`
@@ -314,6 +315,12 @@ type Vin struct {
 	ScriptSig *ScriptSig `json:"scriptSig"`
 	Sequence  uint32     `json:"sequence"`
 	Witness   []string   `json:"txinwitness"`
+}
+
+type VinAbe struct {
+	Coinbase string `json:"coinbase"`
+	Txid     string `json:"txid"`
+	Vout     uint32 `json:"vout"`
 }
 
 // IsCoinBase returns a bool to show if a Vin is a Coinbase one or not.
@@ -496,6 +503,7 @@ type InfoChainResult struct {
 }
 
 // TxRawResult models the data from the getrawtransaction command.
+//	todo(ABE):
 type TxRawResult struct {
 	Hex           string `json:"hex"`
 	Txid          string `json:"txid"`
@@ -505,6 +513,20 @@ type TxRawResult struct {
 	Weight        int32  `json:"weight,omitempty"`
 	Version       int32  `json:"version"`
 	LockTime      uint32 `json:"locktime"`
+	Vin           []Vin  `json:"vin"`
+	Vout          []Vout `json:"vout"`
+	BlockHash     string `json:"blockhash,omitempty"`
+	Confirmations uint64 `json:"confirmations,omitempty"`
+	Time          int64  `json:"time,omitempty"`
+	Blocktime     int64  `json:"blocktime,omitempty"`
+}
+type TxRawResultAbe struct {
+	Hex           string `json:"hex"`
+	Txid          string `json:"txid"`
+	Hash          string `json:"hash,omitempty"`
+	Size          int32  `json:"size,omitempty"`
+	Vsize         int32  `json:"vsize,omitempty"`
+	Version       int32  `json:"version"`
 	Vin           []Vin  `json:"vin"`
 	Vout          []Vout `json:"vout"`
 	BlockHash     string `json:"blockhash,omitempty"`

@@ -208,23 +208,25 @@ func NewRedeemingTxNtfnAbe(hexTx string, block *BlockDetails) *RedeemingTxNtfn {
 // RescanFinishedNtfn defines the rescanfinished JSON-RPC notification.
 //
 // NOTE: Deprecated. Not used with rescanblocks command.
-type RescanFinishedNtfn struct {
-	Hash   string
-	Height int32
-	Time   int64
-}
+//	todo(ABE): handleRescan seems not work well. ABE does not supprt it at this moment.
+//type RescanFinishedNtfn struct {
+//	Hash   string
+//	Height int32
+//	Time   int64
+//}
 
 // NewRescanFinishedNtfn returns a new instance which can be used to issue a
 // rescanfinished JSON-RPC notification.
 //
 // NOTE: Deprecated. Not used with rescanblocks command.
-func NewRescanFinishedNtfn(hash string, height int32, time int64) *RescanFinishedNtfn {
-	return &RescanFinishedNtfn{
-		Hash:   hash,
-		Height: height,
-		Time:   time,
-	}
-}
+//	todo(ABE): handleRescan seems not work well. ABE does not supprt it at this moment.
+//func NewRescanFinishedNtfn(hash string, height int32, time int64) *RescanFinishedNtfn {
+//	return &RescanFinishedNtfn{
+//		Hash:   hash,
+//		Height: height,
+//		Time:   time,
+//	}
+//}
 
 // RescanProgressNtfn defines the rescanprogress JSON-RPC notification.
 //
@@ -263,14 +265,26 @@ func NewTxAcceptedNtfn(txHash string, amount float64) *TxAcceptedNtfn {
 }
 
 // TxAcceptedVerboseNtfn defines the txacceptedverbose JSON-RPC notification.
+//	todo(ABE):
 type TxAcceptedVerboseNtfn struct {
 	RawTx TxRawResult
 }
 
+type TxAcceptedVerboseNtfnAbe struct {
+	RawTx TxRawResultAbe
+}
+
 // NewTxAcceptedVerboseNtfn returns a new instance which can be used to issue a
 // txacceptedverbose JSON-RPC notification.
+//	todo(ABE):
 func NewTxAcceptedVerboseNtfn(rawTx TxRawResult) *TxAcceptedVerboseNtfn {
 	return &TxAcceptedVerboseNtfn{
+		RawTx: rawTx,
+	}
+}
+
+func NewTxAcceptedVerboseNtfnAbe(rawTx TxRawResultAbe) *TxAcceptedVerboseNtfnAbe {
+	return &TxAcceptedVerboseNtfnAbe{
 		RawTx: rawTx,
 	}
 }
@@ -298,8 +312,9 @@ func init() {
 	MustRegisterCmd(FilteredBlockDisconnectedNtfnMethod, (*FilteredBlockDisconnectedNtfn)(nil), flags)
 	MustRegisterCmd(RecvTxNtfnMethod, (*RecvTxNtfn)(nil), flags)
 	MustRegisterCmd(RedeemingTxNtfnMethod, (*RedeemingTxNtfn)(nil), flags)
-	MustRegisterCmd(RescanFinishedNtfnMethod, (*RescanFinishedNtfn)(nil), flags)
-	MustRegisterCmd(RescanProgressNtfnMethod, (*RescanProgressNtfn)(nil), flags)
+	//	todo(ABE): handleRescan seems not work well. ABE does not supprt it at this moment.
+	//MustRegisterCmd(RescanFinishedNtfnMethod, (*RescanFinishedNtfn)(nil), flags)
+	//MustRegisterCmd(RescanProgressNtfnMethod, (*RescanProgressNtfn)(nil), flags)
 	MustRegisterCmd(TxAcceptedNtfnMethod, (*TxAcceptedNtfn)(nil), flags)
 	MustRegisterCmd(TxAcceptedVerboseNtfnMethod, (*TxAcceptedVerboseNtfn)(nil), flags)
 	MustRegisterCmd(RelevantTxAcceptedNtfnMethod, (*RelevantTxAcceptedNtfn)(nil), flags)

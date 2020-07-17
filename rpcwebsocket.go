@@ -9,19 +9,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/blockchain"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/database"
-	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
 	"github.com/gorilla/websocket"
-	"golang.org/x/crypto/ripemd160"
 	"io"
-	"math"
 	"sync"
 	"time"
 )
@@ -57,19 +49,24 @@ type wsCommandHandler func(*wsClient, interface{}) (interface{}, error)
 // causes a dependency loop.
 var wsHandlers map[string]wsCommandHandler
 var wsHandlersBeforeInit = map[string]wsCommandHandler{
-	"loadtxfilter":              handleLoadTxFilter,
-	"help":                      handleWebsocketHelp,
-	"notifyblocks":              handleNotifyBlocks,
-	"notifynewtransactions":     handleNotifyNewTransactions,
-	"notifyreceived":            handleNotifyReceived,
-	"notifyspent":               handleNotifySpent,
+	// TODO(ABE): ABE does not support filter.
+	//"loadtxfilter":              handleLoadTxFilter,
+	"help":                  handleWebsocketHelp,
+	"notifyblocks":          handleNotifyBlocks,          // todo: done
+	"notifynewtransactions": handleNotifyNewTransactions, // todo: done
+	//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+	//"notifyreceived":            handleNotifyReceived,
+	//"notifyspent":               handleNotifySpent,
 	"session":                   handleSession,
-	"stopnotifyblocks":          handleStopNotifyBlocks,
-	"stopnotifynewtransactions": handleStopNotifyNewTransactions,
-	"stopnotifyspent":           handleStopNotifySpent,
-	"stopnotifyreceived":        handleStopNotifyReceived,
-	"rescan":                    handleRescan,
-	"rescanblocks":              handleRescanBlocks,
+	"stopnotifyblocks":          handleStopNotifyBlocks,          // todo: done
+	"stopnotifynewtransactions": handleStopNotifyNewTransactions, // todo: done
+	//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+	//"stopnotifyspent":           handleStopNotifySpent,
+	//"stopnotifyreceived":        handleStopNotifyReceived,
+	//	todo(ABE.MUST): handleRescan seems not work well. ABE does not supprt it at this moment.
+	//"rescan":                    handleRescan,
+	// TODO(ABE): ABE does not support filter. As handleRescanBlocks is related to filter, it is not supported either.
+	//"rescanblocks":              handleRescanBlocks,
 }
 
 // WebsocketHandler handles a new websocket client by creating a new wsClient,
@@ -261,199 +258,209 @@ func (m *wsNotificationManager) NotifyMempoolTxAbe(tx *abeutil.TxAbe, isNew bool
 // the `rescanblocks` extension. It is modified by the `loadtxfilter` command.
 //
 // NOTE: This extension was ported from github.com/decred/dcrd
-type wsClientFilter struct {
-	mu sync.Mutex
-
-	// Implemented fast paths for address lookup.
-	pubKeyHashes        map[[ripemd160.Size]byte]struct{}
-	scriptHashes        map[[ripemd160.Size]byte]struct{}
-	compressedPubKeys   map[[33]byte]struct{}
-	uncompressedPubKeys map[[65]byte]struct{}
-
-	// A fallback address lookup map in case a fast path doesn't exist.
-	// Only exists for completeness.  If using this shows up in a profile,
-	// there's a good chance a fast path should be added.
-	otherAddresses map[string]struct{}
-
-	// Outpoints of unspent outputs.
-	unspent map[wire.OutPoint]struct{}
-}
+// TODO(ABE): ABE does not support filter.
+//type wsClientFilter struct {
+//	mu sync.Mutex
+//
+//	// Implemented fast paths for address lookup.
+//	pubKeyHashes        map[[ripemd160.Size]byte]struct{}
+//	scriptHashes        map[[ripemd160.Size]byte]struct{}
+//	compressedPubKeys   map[[33]byte]struct{}
+//	uncompressedPubKeys map[[65]byte]struct{}
+//
+//	// A fallback address lookup map in case a fast path doesn't exist.
+//	// Only exists for completeness.  If using this shows up in a profile,
+//	// there's a good chance a fast path should be added.
+//	otherAddresses map[string]struct{}
+//
+//	// Outpoints of unspent outputs.
+//	unspent map[wire.OutPoint]struct{}
+//}
 
 // newWSClientFilter creates a new, empty wsClientFilter struct to be used
 // for a websocket client.
 //
 // NOTE: This extension was ported from github.com/decred/dcrd
-func newWSClientFilter(addresses []string, unspentOutPoints []wire.OutPoint, params *chaincfg.Params) *wsClientFilter {
-	filter := &wsClientFilter{
-		pubKeyHashes:        map[[ripemd160.Size]byte]struct{}{},
-		scriptHashes:        map[[ripemd160.Size]byte]struct{}{},
-		compressedPubKeys:   map[[33]byte]struct{}{},
-		uncompressedPubKeys: map[[65]byte]struct{}{},
-		otherAddresses:      map[string]struct{}{},
-		unspent:             make(map[wire.OutPoint]struct{}, len(unspentOutPoints)),
-	}
-
-	for _, s := range addresses {
-		filter.addAddressStr(s, params)
-	}
-	for i := range unspentOutPoints {
-		filter.addUnspentOutPoint(&unspentOutPoints[i])
-	}
-
-	return filter
-}
+// TODO(ABE): ABE does not support filter.
+//func newWSClientFilter(addresses []string, unspentOutPoints []wire.OutPoint, params *chaincfg.Params) *wsClientFilter {
+//	filter := &wsClientFilter{
+//		pubKeyHashes:        map[[ripemd160.Size]byte]struct{}{},
+//		scriptHashes:        map[[ripemd160.Size]byte]struct{}{},
+//		compressedPubKeys:   map[[33]byte]struct{}{},
+//		uncompressedPubKeys: map[[65]byte]struct{}{},
+//		otherAddresses:      map[string]struct{}{},
+//		unspent:             make(map[wire.OutPoint]struct{}, len(unspentOutPoints)),
+//	}
+//
+//	for _, s := range addresses {
+//		filter.addAddressStr(s, params)
+//	}
+//	for i := range unspentOutPoints {
+//		filter.addUnspentOutPoint(&unspentOutPoints[i])
+//	}
+//
+//	return filter
+//}
 
 // addAddress adds an address to a wsClientFilter, treating it correctly based
 // on the type of address passed as an argument.
 //
 // NOTE: This extension was ported from github.com/decred/dcrd
-func (f *wsClientFilter) addAddress(a abeutil.Address) {
-	switch a := a.(type) {
-	case *abeutil.AddressPubKeyHash:
-		f.pubKeyHashes[*a.Hash160()] = struct{}{}
-		return
-	case *abeutil.AddressScriptHash:
-		f.scriptHashes[*a.Hash160()] = struct{}{}
-		return
-	case *abeutil.AddressPubKey:
-		serializedPubKey := a.ScriptAddress()
-		switch len(serializedPubKey) {
-		case 33: // compressed
-			var compressedPubKey [33]byte
-			copy(compressedPubKey[:], serializedPubKey)
-			f.compressedPubKeys[compressedPubKey] = struct{}{}
-			return
-		case 65: // uncompressed
-			var uncompressedPubKey [65]byte
-			copy(uncompressedPubKey[:], serializedPubKey)
-			f.uncompressedPubKeys[uncompressedPubKey] = struct{}{}
-			return
-		}
-	}
-
-	f.otherAddresses[a.EncodeAddress()] = struct{}{}
-}
+// TODO(ABE): ABE does not support filter.
+//func (f *wsClientFilter) addAddress(a abeutil.Address) {
+//	switch a := a.(type) {
+//	case *abeutil.AddressPubKeyHash:
+//		f.pubKeyHashes[*a.Hash160()] = struct{}{}
+//		return
+//	case *abeutil.AddressScriptHash:
+//		f.scriptHashes[*a.Hash160()] = struct{}{}
+//		return
+//	case *abeutil.AddressPubKey:
+//		serializedPubKey := a.ScriptAddress()
+//		switch len(serializedPubKey) {
+//		case 33: // compressed
+//			var compressedPubKey [33]byte
+//			copy(compressedPubKey[:], serializedPubKey)
+//			f.compressedPubKeys[compressedPubKey] = struct{}{}
+//			return
+//		case 65: // uncompressed
+//			var uncompressedPubKey [65]byte
+//			copy(uncompressedPubKey[:], serializedPubKey)
+//			f.uncompressedPubKeys[uncompressedPubKey] = struct{}{}
+//			return
+//		}
+//	}
+//
+//	f.otherAddresses[a.EncodeAddress()] = struct{}{}
+//}
 
 // addAddressStr parses an address from a string and then adds it to the
 // wsClientFilter using addAddress.
 //
 // NOTE: This extension was ported from github.com/decred/dcrd
-func (f *wsClientFilter) addAddressStr(s string, params *chaincfg.Params) {
-	// If address can't be decoded, no point in saving it since it should also
-	// impossible to create the address from an inspected transaction output
-	// script.
-	a, err := abeutil.DecodeAddress(s, params)
-	if err != nil {
-		return
-	}
-	f.addAddress(a)
-}
+// TODO(ABE): ABE does not support filter.
+//func (f *wsClientFilter) addAddressStr(s string, params *chaincfg.Params) {
+//	// If address can't be decoded, no point in saving it since it should also
+//	// impossible to create the address from an inspected transaction output
+//	// script.
+//	a, err := abeutil.DecodeAddress(s, params)
+//	if err != nil {
+//		return
+//	}
+//	f.addAddress(a)
+//}
 
 // existsAddress returns true if the passed address has been added to the
 // wsClientFilter.
 //
 // NOTE: This extension was ported from github.com/decred/dcrd
-func (f *wsClientFilter) existsAddress(a abeutil.Address) bool {
-	switch a := a.(type) {
-	case *abeutil.AddressPubKeyHash:
-		_, ok := f.pubKeyHashes[*a.Hash160()]
-		return ok
-	case *abeutil.AddressScriptHash:
-		_, ok := f.scriptHashes[*a.Hash160()]
-		return ok
-	case *abeutil.AddressPubKey:
-		serializedPubKey := a.ScriptAddress()
-		switch len(serializedPubKey) {
-		case 33: // compressed
-			var compressedPubKey [33]byte
-			copy(compressedPubKey[:], serializedPubKey)
-			_, ok := f.compressedPubKeys[compressedPubKey]
-			if !ok {
-				_, ok = f.pubKeyHashes[*a.AddressPubKeyHash().Hash160()]
-			}
-			return ok
-		case 65: // uncompressed
-			var uncompressedPubKey [65]byte
-			copy(uncompressedPubKey[:], serializedPubKey)
-			_, ok := f.uncompressedPubKeys[uncompressedPubKey]
-			if !ok {
-				_, ok = f.pubKeyHashes[*a.AddressPubKeyHash().Hash160()]
-			}
-			return ok
-		}
-	}
-
-	_, ok := f.otherAddresses[a.EncodeAddress()]
-	return ok
-}
+// TODO(ABE): ABE does not support filter.
+//func (f *wsClientFilter) existsAddress(a abeutil.Address) bool {
+//	switch a := a.(type) {
+//	case *abeutil.AddressPubKeyHash:
+//		_, ok := f.pubKeyHashes[*a.Hash160()]
+//		return ok
+//	case *abeutil.AddressScriptHash:
+//		_, ok := f.scriptHashes[*a.Hash160()]
+//		return ok
+//	case *abeutil.AddressPubKey:
+//		serializedPubKey := a.ScriptAddress()
+//		switch len(serializedPubKey) {
+//		case 33: // compressed
+//			var compressedPubKey [33]byte
+//			copy(compressedPubKey[:], serializedPubKey)
+//			_, ok := f.compressedPubKeys[compressedPubKey]
+//			if !ok {
+//				_, ok = f.pubKeyHashes[*a.AddressPubKeyHash().Hash160()]
+//			}
+//			return ok
+//		case 65: // uncompressed
+//			var uncompressedPubKey [65]byte
+//			copy(uncompressedPubKey[:], serializedPubKey)
+//			_, ok := f.uncompressedPubKeys[uncompressedPubKey]
+//			if !ok {
+//				_, ok = f.pubKeyHashes[*a.AddressPubKeyHash().Hash160()]
+//			}
+//			return ok
+//		}
+//	}
+//
+//	_, ok := f.otherAddresses[a.EncodeAddress()]
+//	return ok
+//}
 
 // removeAddress removes the passed address, if it exists, from the
 // wsClientFilter.
 //
 // NOTE: This extension was ported from github.com/decred/dcrd
-func (f *wsClientFilter) removeAddress(a abeutil.Address) {
-	switch a := a.(type) {
-	case *abeutil.AddressPubKeyHash:
-		delete(f.pubKeyHashes, *a.Hash160())
-		return
-	case *abeutil.AddressScriptHash:
-		delete(f.scriptHashes, *a.Hash160())
-		return
-	case *abeutil.AddressPubKey:
-		serializedPubKey := a.ScriptAddress()
-		switch len(serializedPubKey) {
-		case 33: // compressed
-			var compressedPubKey [33]byte
-			copy(compressedPubKey[:], serializedPubKey)
-			delete(f.compressedPubKeys, compressedPubKey)
-			return
-		case 65: // uncompressed
-			var uncompressedPubKey [65]byte
-			copy(uncompressedPubKey[:], serializedPubKey)
-			delete(f.uncompressedPubKeys, uncompressedPubKey)
-			return
-		}
-	}
-
-	delete(f.otherAddresses, a.EncodeAddress())
-}
+// TODO(ABE): ABE does not support filter.
+//func (f *wsClientFilter) removeAddress(a abeutil.Address) {
+//	switch a := a.(type) {
+//	case *abeutil.AddressPubKeyHash:
+//		delete(f.pubKeyHashes, *a.Hash160())
+//		return
+//	case *abeutil.AddressScriptHash:
+//		delete(f.scriptHashes, *a.Hash160())
+//		return
+//	case *abeutil.AddressPubKey:
+//		serializedPubKey := a.ScriptAddress()
+//		switch len(serializedPubKey) {
+//		case 33: // compressed
+//			var compressedPubKey [33]byte
+//			copy(compressedPubKey[:], serializedPubKey)
+//			delete(f.compressedPubKeys, compressedPubKey)
+//			return
+//		case 65: // uncompressed
+//			var uncompressedPubKey [65]byte
+//			copy(uncompressedPubKey[:], serializedPubKey)
+//			delete(f.uncompressedPubKeys, uncompressedPubKey)
+//			return
+//		}
+//	}
+//
+//	delete(f.otherAddresses, a.EncodeAddress())
+//}
 
 // removeAddressStr parses an address from a string and then removes it from the
 // wsClientFilter using removeAddress.
 //
 // NOTE: This extension was ported from github.com/decred/dcrd
-func (f *wsClientFilter) removeAddressStr(s string, params *chaincfg.Params) {
-	a, err := abeutil.DecodeAddress(s, params)
-	if err == nil {
-		f.removeAddress(a)
-	} else {
-		delete(f.otherAddresses, s)
-	}
-}
+// TODO(ABE): ABE does not support filter.
+//func (f *wsClientFilter) removeAddressStr(s string, params *chaincfg.Params) {
+//	a, err := abeutil.DecodeAddress(s, params)
+//	if err == nil {
+//		f.removeAddress(a)
+//	} else {
+//		delete(f.otherAddresses, s)
+//	}
+//}
 
 // addUnspentOutPoint adds an outpoint to the wsClientFilter.
 //
 // NOTE: This extension was ported from github.com/decred/dcrd
-func (f *wsClientFilter) addUnspentOutPoint(op *wire.OutPoint) {
-	f.unspent[*op] = struct{}{}
-}
+// TODO(ABE): ABE does not support filter.
+//func (f *wsClientFilter) addUnspentOutPoint(op *wire.OutPoint) {
+//	f.unspent[*op] = struct{}{}
+//}
 
 // existsUnspentOutPoint returns true if the passed outpoint has been added to
 // the wsClientFilter.
 //
 // NOTE: This extension was ported from github.com/decred/dcrd
-func (f *wsClientFilter) existsUnspentOutPoint(op *wire.OutPoint) bool {
-	_, ok := f.unspent[*op]
-	return ok
-}
+// TODO(ABE): ABE does not support filter.
+//func (f *wsClientFilter) existsUnspentOutPoint(op *wire.OutPoint) bool {
+//	_, ok := f.unspent[*op]
+//	return ok
+//}
 
 // removeUnspentOutPoint removes the passed outpoint, if it exists, from the
 // wsClientFilter.
 //
 // NOTE: This extension was ported from github.com/decred/dcrd
-func (f *wsClientFilter) removeUnspentOutPoint(op *wire.OutPoint) {
-	delete(f.unspent, *op)
-}
+// TODO(ABE): ABE does not support filter.
+//func (f *wsClientFilter) removeUnspentOutPoint(op *wire.OutPoint) {
+//	delete(f.unspent, *op)
+//}
 
 //	todo(ABE):
 // Notification types
@@ -464,6 +471,8 @@ type notificationTxAcceptedByMempool struct {
 	isNew bool
 	tx    *abeutil.Tx
 }
+
+//	todo (ABE):
 type notificationTxAcceptedByMempoolAbe struct {
 	isNew bool
 	tx    *abeutil.TxAbe
@@ -476,26 +485,28 @@ type notificationRegisterBlocks wsClient
 type notificationUnregisterBlocks wsClient
 type notificationRegisterNewMempoolTxs wsClient
 type notificationUnregisterNewMempoolTxs wsClient
-type notificationRegisterSpent struct {
-	wsc *wsClient
-	ops []*wire.OutPoint
-}
-type notificationUnregisterSpent struct {
-	wsc *wsClient
-	op  *wire.OutPoint
-}
-type notificationRegisterAddr struct {
-	wsc   *wsClient
-	addrs []string
-}
-type notificationUnregisterAddr struct {
-	wsc  *wsClient
-	addr string
-}
+
+//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+//type notificationRegisterSpent struct {
+//	wsc *wsClient
+//	ops []*wire.OutPoint
+//}
+//type notificationUnregisterSpent struct {
+//	wsc *wsClient
+//	op  *wire.OutPoint
+//}
+//type notificationRegisterAddr struct {
+//	wsc   *wsClient
+//	addrs []string
+//}
+//type notificationUnregisterAddr struct {
+//	wsc  *wsClient
+//	addr string
+//}
 
 // notificationHandler reads notifications and control messages from the queue
 // handler and processes one at a time.
-//	TODO(ABE, MUST): this part needs to study and modify. At this moment, we just comment the codes.
+//	TODO(ABE, MUST):
 func (m *wsNotificationManager) notificationHandler() {
 	// clients is a map of all currently connected websocket clients.
 	clients := make(map[chan struct{}]*wsClient)
@@ -509,12 +520,10 @@ func (m *wsNotificationManager) notificationHandler() {
 	// since it is quite a bit more efficient than using the entire struct.
 	blockNotifications := make(map[chan struct{}]*wsClient)
 	txNotifications := make(map[chan struct{}]*wsClient)
-	//	todo(ABE):
-	watchedOutPoints := make(map[wire.OutPoint]map[chan struct{}]*wsClient)
-	watchedOutPointsAbe := make(map[chainhash.Hash]map[chan struct{}]*wsClient)
 
-	watchedAddrs := make(map[string]map[chan struct{}]*wsClient)
-	watchedAddrsAbe := make(map[chainhash.Hash]map[chan struct{}]*wsClient)
+	//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+	//watchedOutPoints := make(map[wire.OutPoint]map[chan struct{}]*wsClient)
+	//watchedAddrs := make(map[string]map[chan struct{}]*wsClient)
 
 out:
 	for {
@@ -527,38 +536,79 @@ out:
 			switch n := n.(type) {
 			case *notificationBlockConnected:
 				//	TODO(ABE, MUST)
+				//block := (*btcutil.Block)(n)
+				//
+				//// Skip iterating through all txs if no
+				//// tx notification requests exist.
+				//if len(watchedOutPoints) != 0 || len(watchedAddrs) != 0 {
+				//	for _, tx := range block.Transactions() {
+				//		m.notifyForTx(watchedOutPoints,
+				//			watchedAddrs, tx, block)
+				//	}
+				//}
+				//
+				//if len(blockNotifications) != 0 {
+				//	m.notifyBlockConnected(blockNotifications,
+				//		block)
+				//	m.notifyFilteredBlockConnected(blockNotifications,
+				//		block)
+				//}
+
 				block := (*abeutil.BlockAbe)(n)
 
 				// Skip iterating through all txs if no
 				// tx notification requests exist.
-				if len(watchedOutPoints) != 0 || len(watchedAddrs) != 0 {
-					for _, tx := range block.Transactions() {
-						m.notifyForTxAbe(watchedOutPointsAbe, watchedAddrsAbe, tx, block)
-					}
-				}
+				//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+				//if len(watchedOutPoints) != 0 || len(watchedAddrs) != 0 {
+				//	for _, tx := range block.Transactions() {
+				//		m.notifyForTx(watchedOutPoints,
+				//			watchedAddrs, tx, block)
+				//	}
+				//}
 
 				if len(blockNotifications) != 0 {
 					m.notifyBlockConnectedAbe(blockNotifications, block)
-					m.notifyFilteredBlockConnectedAbe(blockNotifications, block)
+					// TODO(ABE): ABE does not support filter.
+					//m.notifyFilteredBlockConnected(blockNotifications, block)
 				}
 
 			case *notificationBlockDisconnected:
 				//	TODO(ABE, MUST)
-				/*				block := (*abeutil.BlockAbe)(n)
+				//block := (*btcutil.Block)(n)
+				//
+				//if len(blockNotifications) != 0 {
+				//	m.notifyBlockDisconnected(blockNotifications,
+				//		block)
+				//	m.notifyFilteredBlockDisconnected(blockNotifications,
+				//		block)
+				//}
 
-								if len(blockNotifications) != 0 {
-									m.notifyBlockDisconnected(blockNotifications,
-										block)
-									m.notifyFilteredBlockDisconnected(blockNotifications,
-										block)
-								}*/
+				block := (*abeutil.BlockAbe)(n)
 
-			case *notificationTxAcceptedByMempool:
-				if n.isNew && len(txNotifications) != 0 {
-					m.notifyForNewTx(txNotifications, n.tx)
+				if len(blockNotifications) != 0 {
+					m.notifyBlockDisconnectedAbe(blockNotifications, block)
+					// TODO(ABE): ABE does not support filter.
+					//m.notifyFilteredBlockDisconnected(blockNotifications, block)
 				}
-				m.notifyForTx(watchedOutPoints, watchedAddrs, n.tx, nil)
-				m.notifyRelevantTxAccepted(n.tx, clients)
+
+				//	TODO(ABE, MUST)
+			//case *notificationTxAcceptedByMempool:
+			//if n.isNew && len(txNotifications) != 0 {
+			//	m.notifyForNewTx(txNotifications, n.tx)
+			//}
+			//m.notifyForTx(watchedOutPoints, watchedAddrs, n.tx, nil)
+			//m.notifyRelevantTxAccepted(n.tx, clients)
+
+			case *notificationTxAcceptedByMempoolAbe:
+				if n.isNew && len(txNotifications) != 0 {
+					m.notifyForNewTxAbe(txNotifications, n.tx)
+				}
+
+				//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+				//m.notifyForTx(watchedOutPoints, watchedAddrs, n.tx, nil)
+
+				// TODO(ABE): ABE does not support filter.
+				//m.notifyRelevantTxAccepted(n.tx, clients)
 
 			case *notificationRegisterBlocks:
 				wsc := (*wsClient)(n)
@@ -578,26 +628,30 @@ out:
 				// the client itself.
 				delete(blockNotifications, wsc.quit)
 				delete(txNotifications, wsc.quit)
-				for k := range wsc.spentRequests {
-					op := k
-					m.removeSpentRequest(watchedOutPoints, wsc, &op)
-				}
-				for addr := range wsc.addrRequests {
-					m.removeAddrRequest(watchedAddrs, wsc, addr)
-				}
+
+				//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+				//for k := range wsc.spentRequests {
+				//	op := k
+				//	m.removeSpentRequest(watchedOutPoints, wsc, &op)
+				//}
+				//for addr := range wsc.addrRequests {
+				//	m.removeAddrRequest(watchedAddrs, wsc, addr)
+				//}
+
 				delete(clients, wsc.quit)
 
-			case *notificationRegisterSpent:
-				m.addSpentRequests(watchedOutPoints, n.wsc, n.ops)
-
-			case *notificationUnregisterSpent:
-				m.removeSpentRequest(watchedOutPoints, n.wsc, n.op)
-
-			case *notificationRegisterAddr:
-				m.addAddrRequests(watchedAddrs, n.wsc, n.addrs)
-
-			case *notificationUnregisterAddr:
-				m.removeAddrRequest(watchedAddrs, n.wsc, n.addr)
+				//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+			//case *notificationRegisterSpent:
+			//	m.addSpentRequests(watchedOutPoints, n.wsc, n.ops)
+			//
+			//case *notificationUnregisterSpent:
+			//	m.removeSpentRequest(watchedOutPoints, n.wsc, n.op)
+			//
+			//case *notificationRegisterAddr:
+			//	m.addAddrRequests(watchedAddrs, n.wsc, n.addrs)
+			//
+			//case *notificationUnregisterAddr:
+			//	m.removeAddrRequest(watchedAddrs, n.wsc, n.addr)
 
 			case *notificationRegisterNewMempoolTxs:
 				wsc := (*wsClient)(n)
@@ -651,121 +705,63 @@ func (m *wsNotificationManager) UnregisterBlockUpdates(wsc *wsClient) {
 // spending a watched output or outputting to a watched address.  Matching
 // client's filters are updated based on this transaction's outputs and output
 // addresses that may be relevant for a client.
-//	todo(ABE):
-func (m *wsNotificationManager) subscribedClients(tx *abeutil.Tx,
-	clients map[chan struct{}]*wsClient) map[chan struct{}]struct{} {
-
-	// Use a map of client quit channels as keys to prevent duplicates when
-	// multiple inputs and/or outputs are relevant to the client.
-	subscribed := make(map[chan struct{}]struct{})
-
-	msgTx := tx.MsgTx()
-	for _, input := range msgTx.TxIn {
-		for quitChan, wsc := range clients {
-			wsc.Lock()
-			filter := wsc.filterData
-			wsc.Unlock()
-			if filter == nil {
-				continue
-			}
-			filter.mu.Lock()
-			if filter.existsUnspentOutPoint(&input.PreviousOutPoint) {
-				subscribed[quitChan] = struct{}{}
-			}
-			filter.mu.Unlock()
-		}
-	}
-
-	for i, output := range msgTx.TxOut {
-		_, addrs, _, err := txscript.ExtractPkScriptAddrs(
-			output.PkScript, m.server.cfg.ChainParams)
-		if err != nil {
-			// Clients are not able to subscribe to
-			// nonstandard or non-address outputs.
-			continue
-		}
-		for quitChan, wsc := range clients {
-			wsc.Lock()
-			filter := wsc.filterData
-			wsc.Unlock()
-			if filter == nil {
-				continue
-			}
-			filter.mu.Lock()
-			for _, a := range addrs {
-				if filter.existsAddress(a) {
-					subscribed[quitChan] = struct{}{}
-					op := wire.OutPoint{
-						Hash:  *tx.Hash(),
-						Index: uint32(i),
-					}
-					filter.addUnspentOutPoint(&op)
-				}
-			}
-			filter.mu.Unlock()
-		}
-	}
-
-	return subscribed
-}
-
-//	todo(ABE.MUTS):
-func (m *wsNotificationManager) subscribedClientsAbe(tx *abeutil.TxAbe,
-	clients map[chan struct{}]*wsClient) map[chan struct{}]struct{} {
-
-	// Use a map of client quit channels as keys to prevent duplicates when
-	// multiple inputs and/or outputs are relevant to the client.
-	subscribed := make(map[chan struct{}]struct{})
-
-	/*	msgTx := tx.MsgTx()
-		for _, input := range msgTx.TxIn {
-			for quitChan, wsc := range clients {
-				wsc.Lock()
-				filter := wsc.filterData
-				wsc.Unlock()
-				if filter == nil {
-					continue
-				}
-				filter.mu.Lock()
-				if filter.existsUnspentOutPoint(&input.PreviousOutPoint) {
-					subscribed[quitChan] = struct{}{}
-				}
-				filter.mu.Unlock()
-			}
-		}
-
-		for i, output := range msgTx.TxOut {
-			_, addrs, _, err := txscript.ExtractPkScriptAddrs(
-				output.PkScript, m.server.cfg.ChainParams)
-			if err != nil {
-				// Clients are not able to subscribe to
-				// nonstandard or non-address outputs.
-				continue
-			}
-			for quitChan, wsc := range clients {
-				wsc.Lock()
-				filter := wsc.filterData
-				wsc.Unlock()
-				if filter == nil {
-					continue
-				}
-				filter.mu.Lock()
-				for _, a := range addrs {
-					if filter.existsAddress(a) {
-						subscribed[quitChan] = struct{}{}
-						op := wire.OutPoint{
-							Hash:  *tx.Hash(),
-							Index: uint32(i),
-						}
-						filter.addUnspentOutPoint(&op)
-					}
-				}
-				filter.mu.Unlock()
-			}
-		}*/
-
-	return subscribed
-}
+// TODO(ABE): ABE does not support filter.
+//func (m *wsNotificationManager) subscribedClients(tx *abeutil.Tx,
+//	clients map[chan struct{}]*wsClient) map[chan struct{}]struct{} {
+//
+//	// Use a map of client quit channels as keys to prevent duplicates when
+//	// multiple inputs and/or outputs are relevant to the client.
+//	subscribed := make(map[chan struct{}]struct{})
+//
+//	msgTx := tx.MsgTx()
+//	for _, input := range msgTx.TxIn {
+//		for quitChan, wsc := range clients {
+//			wsc.Lock()
+//			filter := wsc.filterData
+//			wsc.Unlock()
+//			if filter == nil {
+//				continue
+//			}
+//			filter.mu.Lock()
+//			if filter.existsUnspentOutPoint(&input.PreviousOutPoint) {
+//				subscribed[quitChan] = struct{}{}
+//			}
+//			filter.mu.Unlock()
+//		}
+//	}
+//
+//	for i, output := range msgTx.TxOut {
+//		_, addrs, _, err := txscript.ExtractPkScriptAddrs(
+//			output.PkScript, m.server.cfg.ChainParams)
+//		if err != nil {
+//			// Clients are not able to subscribe to
+//			// nonstandard or non-address outputs.
+//			continue
+//		}
+//		for quitChan, wsc := range clients {
+//			wsc.Lock()
+//			filter := wsc.filterData
+//			wsc.Unlock()
+//			if filter == nil {
+//				continue
+//			}
+//			filter.mu.Lock()
+//			for _, a := range addrs {
+//				if filter.existsAddress(a) {
+//					subscribed[quitChan] = struct{}{}
+//					op := wire.OutPoint{
+//						Hash:  *tx.Hash(),
+//						Index: uint32(i),
+//					}
+//					filter.addUnspentOutPoint(&op)
+//				}
+//			}
+//			filter.mu.Unlock()
+//		}
+//	}
+//
+//	return subscribed
+//}
 
 // notifyBlockConnected notifies websocket clients that have registered for
 // block updates when a block is connected to the main chain.
@@ -807,7 +803,29 @@ func (*wsNotificationManager) notifyBlockConnectedAbe(clients map[chan struct{}]
 // notifyBlockDisconnected notifies websocket clients that have registered for
 // block updates when a block is disconnected from the main chain (due to a
 // reorganize).
+//	ToDo(ABE)
 func (*wsNotificationManager) notifyBlockDisconnected(clients map[chan struct{}]*wsClient, block *abeutil.Block) {
+	// Skip notification creation if no clients have requested block
+	// connected/disconnected notifications.
+	if len(clients) == 0 {
+		return
+	}
+
+	// Notify interested websocket clients about the disconnected block.
+	ntfn := abejson.NewBlockDisconnectedNtfn(block.Hash().String(),
+		block.Height(), block.MsgBlock().Header.Timestamp.Unix())
+	marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
+	if err != nil {
+		rpcsLog.Errorf("Failed to marshal block disconnected "+
+			"notification: %v", err)
+		return
+	}
+	for _, wsc := range clients {
+		wsc.QueueNotification(marshalledJSON)
+	}
+}
+
+func (*wsNotificationManager) notifyBlockDisconnectedAbe(clients map[chan struct{}]*wsClient, block *abeutil.BlockAbe) {
 	// Skip notification creation if no clients have requested block
 	// connected/disconnected notifications.
 	if len(clients) == 0 {
@@ -830,124 +848,82 @@ func (*wsNotificationManager) notifyBlockDisconnected(clients map[chan struct{}]
 
 // notifyFilteredBlockConnected notifies websocket clients that have registered for
 // block updates when a block is connected to the main chain.
-func (m *wsNotificationManager) notifyFilteredBlockConnected(clients map[chan struct{}]*wsClient,
-	block *abeutil.Block) {
-
-	// Create the common portion of the notification that is the same for
-	// every client.
-	var w bytes.Buffer
-	err := block.MsgBlock().Header.Serialize(&w)
-	if err != nil {
-		rpcsLog.Errorf("Failed to serialize header for filtered block "+
-			"connected notification: %v", err)
-		return
-	}
-	ntfn := abejson.NewFilteredBlockConnectedNtfn(block.Height(),
-		hex.EncodeToString(w.Bytes()), nil)
-
-	// Search for relevant transactions for each client and save them
-	// serialized in hex encoding for the notification.
-	subscribedTxs := make(map[chan struct{}][]string)
-	for _, tx := range block.Transactions() {
-		var txHex string
-		for quitChan := range m.subscribedClients(tx, clients) {
-			if txHex == "" {
-				txHex = txHexString(tx.MsgTx())
-			}
-			subscribedTxs[quitChan] = append(subscribedTxs[quitChan], txHex)
-		}
-	}
-	for quitChan, wsc := range clients {
-		// Add all discovered transactions for this client. For clients
-		// that have no new-style filter, add the empty string slice.
-		ntfn.SubscribedTxs = subscribedTxs[quitChan]
-
-		// Marshal and queue notification.
-		marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
-		if err != nil {
-			rpcsLog.Errorf("Failed to marshal filtered block "+
-				"connected notification: %v", err)
-			return
-		}
-		wsc.QueueNotification(marshalledJSON)
-	}
-}
-
-//	todo(ABE.MUST)
-func (m *wsNotificationManager) notifyFilteredBlockConnectedAbe(clients map[chan struct{}]*wsClient,
-	block *abeutil.BlockAbe) {
-
-	// Create the common portion of the notification that is the same for
-	// every client.
-	var w bytes.Buffer
-	err := block.MsgBlock().Header.Serialize(&w)
-	if err != nil {
-		rpcsLog.Errorf("Failed to serialize header for filtered block "+
-			"connected notification: %v", err)
-		return
-	}
-	ntfn := abejson.NewFilteredBlockConnectedNtfn(block.Height(),
-		hex.EncodeToString(w.Bytes()), nil)
-
-	// Search for relevant transactions for each client and save them
-	// serialized in hex encoding for the notification.
-	subscribedTxs := make(map[chan struct{}][]string)
-	for _, tx := range block.Transactions() {
-		var txHex string
-		for quitChan := range m.subscribedClientsAbe(tx, clients) {
-			if txHex == "" {
-				txHex = txHexStringAbe(tx.MsgTx())
-			}
-			subscribedTxs[quitChan] = append(subscribedTxs[quitChan], txHex)
-		}
-	}
-	for quitChan, wsc := range clients {
-		// Add all discovered transactions for this client. For clients
-		// that have no new-style filter, add the empty string slice.
-		ntfn.SubscribedTxs = subscribedTxs[quitChan]
-
-		// Marshal and queue notification.
-		marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
-		if err != nil {
-			rpcsLog.Errorf("Failed to marshal filtered block "+
-				"connected notification: %v", err)
-			return
-		}
-		wsc.QueueNotification(marshalledJSON)
-	}
-}
+// TODO(ABE): ABE does not support filter.
+//func (m *wsNotificationManager) notifyFilteredBlockConnected(clients map[chan struct{}]*wsClient,
+//	block *abeutil.Block) {
+//
+//	// Create the common portion of the notification that is the same for
+//	// every client.
+//	var w bytes.Buffer
+//	err := block.MsgBlock().Header.Serialize(&w)
+//	if err != nil {
+//		rpcsLog.Errorf("Failed to serialize header for filtered block "+
+//			"connected notification: %v", err)
+//		return
+//	}
+//	ntfn := abejson.NewFilteredBlockConnectedNtfn(block.Height(),
+//		hex.EncodeToString(w.Bytes()), nil)
+//
+//	// Search for relevant transactions for each client and save them
+//	// serialized in hex encoding for the notification.
+//	subscribedTxs := make(map[chan struct{}][]string)
+//	for _, tx := range block.Transactions() {
+//		var txHex string
+//		for quitChan := range m.subscribedClients(tx, clients) {
+//			if txHex == "" {
+//				txHex = txHexString(tx.MsgTx())
+//			}
+//			subscribedTxs[quitChan] = append(subscribedTxs[quitChan], txHex)
+//		}
+//	}
+//	for quitChan, wsc := range clients {
+//		// Add all discovered transactions for this client. For clients
+//		// that have no new-style filter, add the empty string slice.
+//		ntfn.SubscribedTxs = subscribedTxs[quitChan]
+//
+//		// Marshal and queue notification.
+//		marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
+//		if err != nil {
+//			rpcsLog.Errorf("Failed to marshal filtered block "+
+//				"connected notification: %v", err)
+//			return
+//		}
+//		wsc.QueueNotification(marshalledJSON)
+//	}
+//}
 
 // notifyFilteredBlockDisconnected notifies websocket clients that have registered for
 // block updates when a block is disconnected from the main chain (due to a
 // reorganize).
-func (*wsNotificationManager) notifyFilteredBlockDisconnected(clients map[chan struct{}]*wsClient,
-	block *abeutil.Block) {
-	// Skip notification creation if no clients have requested block
-	// connected/disconnected notifications.
-	if len(clients) == 0 {
-		return
-	}
-
-	// Notify interested websocket clients about the disconnected block.
-	var w bytes.Buffer
-	err := block.MsgBlock().Header.Serialize(&w)
-	if err != nil {
-		rpcsLog.Errorf("Failed to serialize header for filtered block "+
-			"disconnected notification: %v", err)
-		return
-	}
-	ntfn := abejson.NewFilteredBlockDisconnectedNtfn(block.Height(),
-		hex.EncodeToString(w.Bytes()))
-	marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
-	if err != nil {
-		rpcsLog.Errorf("Failed to marshal filtered block disconnected "+
-			"notification: %v", err)
-		return
-	}
-	for _, wsc := range clients {
-		wsc.QueueNotification(marshalledJSON)
-	}
-}
+// TODO(ABE): ABE does not support filter.
+//func (*wsNotificationManager) notifyFilteredBlockDisconnected(clients map[chan struct{}]*wsClient,
+//	block *abeutil.Block) {
+//	// Skip notification creation if no clients have requested block
+//	// connected/disconnected notifications.
+//	if len(clients) == 0 {
+//		return
+//	}
+//
+//	// Notify interested websocket clients about the disconnected block.
+//	var w bytes.Buffer
+//	err := block.MsgBlock().Header.Serialize(&w)
+//	if err != nil {
+//		rpcsLog.Errorf("Failed to serialize header for filtered block "+
+//			"disconnected notification: %v", err)
+//		return
+//	}
+//	ntfn := abejson.NewFilteredBlockDisconnectedNtfn(block.Height(),
+//		hex.EncodeToString(w.Bytes()))
+//	marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
+//	if err != nil {
+//		rpcsLog.Errorf("Failed to marshal filtered block disconnected "+
+//			"notification: %v", err)
+//		return
+//	}
+//	for _, wsc := range clients {
+//		wsc.QueueNotification(marshalledJSON)
+//	}
+//}
 
 // RegisterNewMempoolTxsUpdates requests notifications to the passed websocket
 // client when new transactions are added to the memory pool.
@@ -963,6 +939,7 @@ func (m *wsNotificationManager) UnregisterNewMempoolTxsUpdates(wsc *wsClient) {
 
 // notifyForNewTx notifies websocket clients that have registered for updates
 // when a new transaction is added to the memory pool.
+//	todo(ABE.MUST):
 func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClient, tx *abeutil.Tx) {
 	txHashStr := tx.Hash().String()
 	mtx := tx.MsgTx()
@@ -1010,112 +987,142 @@ func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClie
 	}
 }
 
+func (m *wsNotificationManager) notifyForNewTxAbe(clients map[chan struct{}]*wsClient, tx *abeutil.TxAbe) {
+	txHashStr := tx.Hash().String()
+	mtx := tx.MsgTx()
+
+	var amount int64
+	for _, txOut := range mtx.TxOuts {
+		amount += txOut.ValueScript
+	}
+
+	ntfn := abejson.NewTxAcceptedNtfn(txHashStr, abeutil.Amount(amount).ToABE())
+	marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
+	if err != nil {
+		rpcsLog.Errorf("Failed to marshal tx notification: %s", err.Error())
+		return
+	}
+
+	var verboseNtfn *abejson.TxAcceptedVerboseNtfnAbe
+	var marshalledJSONVerbose []byte
+	for _, wsc := range clients {
+		if wsc.verboseTxUpdates {
+			if marshalledJSONVerbose != nil {
+				wsc.QueueNotification(marshalledJSONVerbose)
+				continue
+			}
+
+			net := m.server.cfg.ChainParams
+			//	todo(ABE.must)
+			rawTx, err := createTxRawResultAbe(net, mtx, txHashStr, nil,
+				"", 0, 0)
+			if err != nil {
+				return
+			}
+
+			verboseNtfn = abejson.NewTxAcceptedVerboseNtfnAbe(*rawTx)
+			marshalledJSONVerbose, err = abejson.MarshalCmd(nil,
+				verboseNtfn)
+			if err != nil {
+				rpcsLog.Errorf("Failed to marshal verbose tx "+
+					"notification: %s", err.Error())
+				return
+			}
+			wsc.QueueNotification(marshalledJSONVerbose)
+		} else {
+			wsc.QueueNotification(marshalledJSON)
+		}
+	}
+}
+
 // RegisterSpentRequests requests a notification when each of the passed
 // outpoints is confirmed spent (contained in a block connected to the main
 // chain) for the passed websocket client.  The request is automatically
 // removed once the notification has been sent.
-func (m *wsNotificationManager) RegisterSpentRequests(wsc *wsClient, ops []*wire.OutPoint) {
-	m.queueNotification <- &notificationRegisterSpent{
-		wsc: wsc,
-		ops: ops,
-	}
-}
+//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+//func (m *wsNotificationManager) RegisterSpentRequests(wsc *wsClient, ops []*wire.OutPoint) {
+//	m.queueNotification <- &notificationRegisterSpent{
+//		wsc: wsc,
+//		ops: ops,
+//	}
+//}
 
 // addSpentRequests modifies a map of watched outpoints to sets of websocket
 // clients to add a new request watch all of the outpoints in ops and create
 // and send a notification when spent to the websocket client wsc.
-func (m *wsNotificationManager) addSpentRequests(opMap map[wire.OutPoint]map[chan struct{}]*wsClient,
-	wsc *wsClient, ops []*wire.OutPoint) {
-
-	for _, op := range ops {
-		// Track the request in the client as well so it can be quickly
-		// be removed on disconnect.
-		wsc.spentRequests[*op] = struct{}{}
-
-		// Add the client to the list to notify when the outpoint is seen.
-		// Create the list as needed.
-		cmap, ok := opMap[*op]
-		if !ok {
-			cmap = make(map[chan struct{}]*wsClient)
-			opMap[*op] = cmap
-		}
-		cmap[wsc.quit] = wsc
-	}
-
-	// Check if any transactions spending these outputs already exists in
-	// the mempool, if so send the notification immediately.
-	spends := make(map[chainhash.Hash]*abeutil.Tx)
-	for _, op := range ops {
-		spend := m.server.cfg.TxMemPool.CheckSpend(*op)
-		if spend != nil {
-			rpcsLog.Debugf("Found existing mempool spend for "+
-				"outpoint<%v>: %v", op, spend.Hash())
-			spends[*spend.Hash()] = spend
-		}
-	}
-
-	for _, spend := range spends {
-		m.notifyForTx(opMap, nil, spend, nil)
-	}
-}
+//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+//func (m *wsNotificationManager) addSpentRequests(opMap map[wire.OutPoint]map[chan struct{}]*wsClient,
+//	wsc *wsClient, ops []*wire.OutPoint) {
+//
+//	for _, op := range ops {
+//		// Track the request in the client as well so it can be quickly
+//		// be removed on disconnect.
+//		wsc.spentRequests[*op] = struct{}{}
+//
+//		// Add the client to the list to notify when the outpoint is seen.
+//		// Create the list as needed.
+//		cmap, ok := opMap[*op]
+//		if !ok {
+//			cmap = make(map[chan struct{}]*wsClient)
+//			opMap[*op] = cmap
+//		}
+//		cmap[wsc.quit] = wsc
+//	}
+//
+//	// Check if any transactions spending these outputs already exists in
+//	// the mempool, if so send the notification immediately.
+//	spends := make(map[chainhash.Hash]*abeutil.Tx)
+//	for _, op := range ops {
+//		spend := m.server.cfg.TxMemPool.CheckSpend(*op)
+//		if spend != nil {
+//			rpcsLog.Debugf("Found existing mempool spend for "+
+//				"outpoint<%v>: %v", op, spend.Hash())
+//			spends[*spend.Hash()] = spend
+//		}
+//	}
+//
+//	for _, spend := range spends {
+//		m.notifyForTx(opMap, nil, spend, nil)
+//	}
+//}
 
 // UnregisterSpentRequest removes a request from the passed websocket client
 // to be notified when the passed outpoint is confirmed spent (contained in a
 // block connected to the main chain).
-func (m *wsNotificationManager) UnregisterSpentRequest(wsc *wsClient, op *wire.OutPoint) {
-	m.queueNotification <- &notificationUnregisterSpent{
-		wsc: wsc,
-		op:  op,
-	}
-}
+//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+//func (m *wsNotificationManager) UnregisterSpentRequest(wsc *wsClient, op *wire.OutPoint) {
+//	m.queueNotification <- &notificationUnregisterSpent{
+//		wsc: wsc,
+//		op:  op,
+//	}
+//}
 
 // removeSpentRequest modifies a map of watched outpoints to remove the
 // websocket client wsc from the set of clients to be notified when a
 // watched outpoint is spent.  If wsc is the last client, the outpoint
 // key is removed from the map.
-func (*wsNotificationManager) removeSpentRequest(ops map[wire.OutPoint]map[chan struct{}]*wsClient,
-	wsc *wsClient, op *wire.OutPoint) {
-
-	// Remove the request tracking from the client.
-	delete(wsc.spentRequests, *op)
-
-	// Remove the client from the list to notify.
-	notifyMap, ok := ops[*op]
-	if !ok {
-		rpcsLog.Warnf("Attempt to remove nonexistent spent request "+
-			"for websocket client %s", wsc.addr)
-		return
-	}
-	delete(notifyMap, wsc.quit)
-
-	// Remove the map entry altogether if there are
-	// no more clients interested in it.
-	if len(notifyMap) == 0 {
-		delete(ops, *op)
-	}
-}
-
-func (*wsNotificationManager) removeSpentRequestAbe(ops map[chainhash.Hash]map[chan struct{}]*wsClient,
-	wsc *wsClient, ringMemberHash chainhash.Hash) {
-
-	// Remove the request tracking from the client.
-	delete(wsc.spentRequestsAbe, ringMemberHash)
-
-	// Remove the client from the list to notify.
-	notifyMap, ok := ops[ringMemberHash]
-	if !ok {
-		rpcsLog.Warnf("Attempt to remove nonexistent spent request "+
-			"for websocket client %s", wsc.addr)
-		return
-	}
-	delete(notifyMap, wsc.quit)
-
-	// Remove the map entry altogether if there are
-	// no more clients interested in it.
-	if len(notifyMap) == 0 {
-		delete(ops, ringMemberHash)
-	}
-}
+//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+//func (*wsNotificationManager) removeSpentRequest(ops map[wire.OutPoint]map[chan struct{}]*wsClient,
+//	wsc *wsClient, op *wire.OutPoint) {
+//
+//	// Remove the request tracking from the client.
+//	delete(wsc.spentRequests, *op)
+//
+//	// Remove the client from the list to notify.
+//	notifyMap, ok := ops[*op]
+//	if !ok {
+//		rpcsLog.Warnf("Attempt to remove nonexistent spent request "+
+//			"for websocket client %s", wsc.addr)
+//		return
+//	}
+//	delete(notifyMap, wsc.quit)
+//
+//	// Remove the map entry altogether if there are
+//	// no more clients interested in it.
+//	if len(notifyMap) == 0 {
+//		delete(ops, *op)
+//	}
+//}
 
 // txHexString returns the serialized transaction encoded in hexadecimal.
 //	todo(ABE)
@@ -1160,301 +1167,266 @@ func blockDetailsAbe(block *abeutil.BlockAbe, txIndex int) *abejson.BlockDetails
 	}
 }
 
-// newRedeemingTxNotification returns a new marshalled redeemingtx notification
-// with the passed parameters.
-func newRedeemingTxNotification(txHex string, index int, block *abeutil.Block) ([]byte, error) {
-	// Create and marshal the notification.
-	ntfn := abejson.NewRedeemingTxNtfn(txHex, blockDetails(block, index))
-	return abejson.MarshalCmd(nil, ntfn)
-}
-
-func newRedeemingTxNotificationAbe(txHex string, index int, block *abeutil.BlockAbe) ([]byte, error) {
-	// Create and marshal the notification.
-	ntfn := abejson.NewRedeemingTxNtfn(txHex, blockDetailsAbe(block, index))
-	return abejson.MarshalCmd(nil, ntfn)
-}
+//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+//// newRedeemingTxNotification returns a new marshalled redeemingtx notification
+//// with the passed parameters.
+//func newRedeemingTxNotification(txHex string, index int, block *abeutil.Block) ([]byte, error) {
+//	// Create and marshal the notification.
+//	ntfn := abejson.NewRedeemingTxNtfn(txHex, blockDetails(block, index))
+//	return abejson.MarshalCmd(nil, ntfn)
+//}
+//
+//func newRedeemingTxNotificationAbe(txHex string, index int, block *abeutil.BlockAbe) ([]byte, error) {
+//	// Create and marshal the notification.
+//	ntfn := abejson.NewRedeemingTxNtfn(txHex, blockDetailsAbe(block, index))
+//	return abejson.MarshalCmd(nil, ntfn)
+//}
 
 // notifyForTxOuts examines each transaction output, notifying interested
 // websocket clients of the transaction if an output spends to a watched
 // address.  A spent notification request is automatically registered for
 // the client for each matching output.
-//	todo(ABE):
-func (m *wsNotificationManager) notifyForTxOuts(ops map[wire.OutPoint]map[chan struct{}]*wsClient,
-	addrs map[string]map[chan struct{}]*wsClient, tx *abeutil.Tx, block *abeutil.Block) {
-
-	// Nothing to do if nobody is listening for address notifications.
-	if len(addrs) == 0 {
-		return
-	}
-
-	txHex := ""
-	wscNotified := make(map[chan struct{}]struct{})
-	for i, txOut := range tx.MsgTx().TxOut {
-		_, txAddrs, _, err := txscript.ExtractPkScriptAddrs(
-			txOut.PkScript, m.server.cfg.ChainParams)
-		if err != nil {
-			continue
-		}
-
-		for _, txAddr := range txAddrs {
-			cmap, ok := addrs[txAddr.EncodeAddress()]
-			if !ok {
-				continue
-			}
-
-			if txHex == "" {
-				txHex = txHexString(tx.MsgTx())
-			}
-			ntfn := abejson.NewRecvTxNtfn(txHex, blockDetails(block,
-				tx.Index()))
-
-			marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
-			if err != nil {
-				rpcsLog.Errorf("Failed to marshal processedtx notification: %v", err)
-				continue
-			}
-
-			op := []*wire.OutPoint{wire.NewOutPoint(tx.Hash(), uint32(i))}
-			for wscQuit, wsc := range cmap {
-				m.addSpentRequests(ops, wsc, op)
-
-				if _, ok := wscNotified[wscQuit]; !ok {
-					wscNotified[wscQuit] = struct{}{}
-					wsc.QueueNotification(marshalledJSON)
-				}
-			}
-		}
-	}
-}
-
-func (m *wsNotificationManager) notifyForTxOutsAbe(addrs map[chainhash.Hash]map[chan struct{}]*wsClient, tx *abeutil.TxAbe, block *abeutil.BlockAbe) {
-
-	// Nothing to do if nobody is listening for address notifications.
-	if len(addrs) == 0 {
-		return
-	}
-
-	txHex := ""
-	wscNotified := make(map[chan struct{}]struct{})
-	for _, txOut := range tx.MsgTx().TxOuts {
-		addrScriptHash := chainhash.DoubleHashH(txOut.AddressScript)
-
-		cmap, ok := addrs[addrScriptHash]
-		if !ok {
-			continue
-		}
-
-		if txHex == "" {
-			txHex = txHexStringAbe(tx.MsgTx())
-		}
-		ntfn := abejson.NewRecvTxNtfn(txHex, blockDetailsAbe(block, tx.Index()))
-
-		marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
-		if err != nil {
-			rpcsLog.Errorf("Failed to marshal processedtx notification: %v", err)
-			continue
-		}
-
-		//	todo(ABE): In ABE, the client could not watch the OutPoints, instead, the clients can watch the rings or rings with serial number.
-		//		op := []*wire.OutPoint{wire.NewOutPoint(tx.Hash(), uint32(i))}
-		for wscQuit, wsc := range cmap {
-			//			m.addSpentRequests(ops, wsc, op)
-			if _, ok := wscNotified[wscQuit]; !ok {
-				wscNotified[wscQuit] = struct{}{}
-				wsc.QueueNotification(marshalledJSON)
-			}
-		}
-	}
-}
+//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+//func (m *wsNotificationManager) notifyForTxOuts(ops map[wire.OutPoint]map[chan struct{}]*wsClient,
+//	addrs map[string]map[chan struct{}]*wsClient, tx *abeutil.Tx, block *abeutil.Block) {
+//
+//	// Nothing to do if nobody is listening for address notifications.
+//	if len(addrs) == 0 {
+//		return
+//	}
+//
+//	txHex := ""
+//	wscNotified := make(map[chan struct{}]struct{})
+//	for i, txOut := range tx.MsgTx().TxOut {
+//		_, txAddrs, _, err := txscript.ExtractPkScriptAddrs(
+//			txOut.PkScript, m.server.cfg.ChainParams)
+//		if err != nil {
+//			continue
+//		}
+//
+//		for _, txAddr := range txAddrs {
+//			cmap, ok := addrs[txAddr.EncodeAddress()]
+//			if !ok {
+//				continue
+//			}
+//
+//			if txHex == "" {
+//				txHex = txHexString(tx.MsgTx())
+//			}
+//			ntfn := abejson.NewRecvTxNtfn(txHex, blockDetails(block,
+//				tx.Index()))
+//
+//			marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
+//			if err != nil {
+//				rpcsLog.Errorf("Failed to marshal processedtx notification: %v", err)
+//				continue
+//			}
+//
+//			op := []*wire.OutPoint{wire.NewOutPoint(tx.Hash(), uint32(i))}
+//			for wscQuit, wsc := range cmap {
+//				m.addSpentRequests(ops, wsc, op)
+//
+//				if _, ok := wscNotified[wscQuit]; !ok {
+//					wscNotified[wscQuit] = struct{}{}
+//					wsc.QueueNotification(marshalledJSON)
+//				}
+//			}
+//		}
+//	}
+//}
+//
+//func (m *wsNotificationManager) notifyForTxOutsAbe(addrs map[chainhash.Hash]map[chan struct{}]*wsClient, tx *abeutil.TxAbe, block *abeutil.BlockAbe) {
+//
+//	// Nothing to do if nobody is listening for address notifications.
+//	if len(addrs) == 0 {
+//		return
+//	}
+//
+//	txHex := ""
+//	wscNotified := make(map[chan struct{}]struct{})
+//	for _, txOut := range tx.MsgTx().TxOuts {
+//		addrScriptHash := chainhash.DoubleHashH(txOut.AddressScript)
+//
+//		cmap, ok := addrs[addrScriptHash]
+//		if !ok {
+//			continue
+//		}
+//
+//		if txHex == "" {
+//			txHex = txHexStringAbe(tx.MsgTx())
+//		}
+//		ntfn := abejson.NewRecvTxNtfn(txHex, blockDetailsAbe(block, tx.Index()))
+//
+//		marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
+//		if err != nil {
+//			rpcsLog.Errorf("Failed to marshal processedtx notification: %v", err)
+//			continue
+//		}
+//
+//		//	todo(ABE): In ABE, the client could not watch the OutPoints, instead, the clients can watch the rings or rings with serial number.
+//		//		op := []*wire.OutPoint{wire.NewOutPoint(tx.Hash(), uint32(i))}
+//		for wscQuit, wsc := range cmap {
+//			//			m.addSpentRequests(ops, wsc, op)
+//			if _, ok := wscNotified[wscQuit]; !ok {
+//				wscNotified[wscQuit] = struct{}{}
+//				wsc.QueueNotification(marshalledJSON)
+//			}
+//		}
+//	}
+//}
 
 // notifyRelevantTxAccepted examines the inputs and outputs of the passed
 // transaction, notifying websocket clients of outputs spending to a watched
 // address and inputs spending a watched outpoint.  Any outputs paying to a
 // watched address result in the output being watched as well for future
 // notifications.
-func (m *wsNotificationManager) notifyRelevantTxAccepted(tx *abeutil.Tx,
-	clients map[chan struct{}]*wsClient) {
-
-	clientsToNotify := m.subscribedClients(tx, clients)
-
-	if len(clientsToNotify) != 0 {
-		n := abejson.NewRelevantTxAcceptedNtfn(txHexString(tx.MsgTx()))
-		marshalled, err := abejson.MarshalCmd(nil, n)
-		if err != nil {
-			rpcsLog.Errorf("Failed to marshal notification: %v", err)
-			return
-		}
-		for quitChan := range clientsToNotify {
-			clients[quitChan].QueueNotification(marshalled)
-		}
-	}
-}
+// TODO(ABE): ABE does not support filter.
+//func (m *wsNotificationManager) notifyRelevantTxAccepted(tx *abeutil.Tx,
+//	clients map[chan struct{}]*wsClient) {
+//
+//	clientsToNotify := m.subscribedClients(tx, clients)
+//
+//	if len(clientsToNotify) != 0 {
+//		n := abejson.NewRelevantTxAcceptedNtfn(txHexString(tx.MsgTx()))
+//		marshalled, err := abejson.MarshalCmd(nil, n)
+//		if err != nil {
+//			rpcsLog.Errorf("Failed to marshal notification: %v", err)
+//			return
+//		}
+//		for quitChan := range clientsToNotify {
+//			clients[quitChan].QueueNotification(marshalled)
+//		}
+//	}
+//}
 
 // notifyForTx examines the inputs and outputs of the passed transaction,
 // notifying websocket clients of outputs spending to a watched address
 // and inputs spending a watched outpoint.
-//	todo (ABE):
-func (m *wsNotificationManager) notifyForTx(ops map[wire.OutPoint]map[chan struct{}]*wsClient,
-	addrs map[string]map[chan struct{}]*wsClient, tx *abeutil.Tx, block *abeutil.Block) {
-
-	if len(ops) != 0 {
-		m.notifyForTxIns(ops, tx, block)
-	}
-	if len(addrs) != 0 {
-		m.notifyForTxOuts(ops, addrs, tx, block)
-	}
-}
-
-func (m *wsNotificationManager) notifyForTxAbe(ops map[chainhash.Hash]map[chan struct{}]*wsClient,
-	addrs map[chainhash.Hash]map[chan struct{}]*wsClient, tx *abeutil.TxAbe, block *abeutil.BlockAbe) {
-
-	if len(ops) != 0 {
-		m.notifyForTxInsAbe(ops, tx, block)
-	}
-	if len(addrs) != 0 {
-		m.notifyForTxOutsAbe(addrs, tx, block)
-	}
-}
+//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+//	When a new transaction is added into mempool, the watch list is also notified.
+//	That means, when a client addSpentNotify, the transaction does not exist yet.
+//func (m *wsNotificationManager) notifyForTx(ops map[wire.OutPoint]map[chan struct{}]*wsClient,
+//	addrs map[string]map[chan struct{}]*wsClient, tx *abeutil.Tx, block *abeutil.Block) {
+//
+//	if len(ops) != 0 {
+//		m.notifyForTxIns(ops, tx, block)
+//	}
+//	if len(addrs) != 0 {
+//		m.notifyForTxOuts(ops, addrs, tx, block)
+//	}
+//}
 
 // notifyForTxIns examines the inputs of the passed transaction and sends
 // interested websocket clients a redeemingtx notification if any inputs
 // spend a watched output.  If block is non-nil, any matching spent
 // requests are removed.
-//	todo (ABE):
-func (m *wsNotificationManager) notifyForTxIns(ops map[wire.OutPoint]map[chan struct{}]*wsClient,
-	tx *abeutil.Tx, block *abeutil.Block) {
-
-	// Nothing to do if nobody is watching outpoints.
-	if len(ops) == 0 {
-		return
-	}
-
-	txHex := ""
-	wscNotified := make(map[chan struct{}]struct{})
-	for _, txIn := range tx.MsgTx().TxIn {
-		prevOut := &txIn.PreviousOutPoint
-		if cmap, ok := ops[*prevOut]; ok {
-			if txHex == "" {
-				txHex = txHexString(tx.MsgTx())
-			}
-			marshalledJSON, err := newRedeemingTxNotification(txHex, tx.Index(), block)
-			if err != nil {
-				rpcsLog.Warnf("Failed to marshal redeemingtx notification: %v", err)
-				continue
-			}
-			for wscQuit, wsc := range cmap {
-				if block != nil {
-					m.removeSpentRequest(ops, wsc, prevOut)
-				}
-
-				if _, ok := wscNotified[wscQuit]; !ok {
-					wscNotified[wscQuit] = struct{}{}
-					wsc.QueueNotification(marshalledJSON)
-				}
-			}
-		}
-	}
-}
-
-func (m *wsNotificationManager) notifyForTxInsAbe(ops map[chainhash.Hash]map[chan struct{}]*wsClient,
-	tx *abeutil.TxAbe, block *abeutil.BlockAbe) {
-
-	// Nothing to do if nobody is watching outpoints.
-	if len(ops) == 0 {
-		return
-	}
-
-	txHex := ""
-	wscNotified := make(map[chan struct{}]struct{})
-	for _, txIn := range tx.MsgTx().TxIns {
-		ringMemberHash := txIn.RingMemberHash()
-		if cmap, ok := ops[ringMemberHash]; ok {
-			if txHex == "" {
-				txHex = txHexStringAbe(tx.MsgTx())
-			}
-			marshalledJSON, err := newRedeemingTxNotificationAbe(txHex, tx.Index(), block)
-			if err != nil {
-				rpcsLog.Warnf("Failed to marshal redeemingtx notification: %v", err)
-				continue
-			}
-			for wscQuit, wsc := range cmap {
-				if block != nil {
-					m.removeSpentRequestAbe(ops, wsc, ringMemberHash)
-				}
-
-				if _, ok := wscNotified[wscQuit]; !ok {
-					wscNotified[wscQuit] = struct{}{}
-					wsc.QueueNotification(marshalledJSON)
-				}
-			}
-		}
-	}
-}
+//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+//func (m *wsNotificationManager) notifyForTxIns(ops map[wire.OutPoint]map[chan struct{}]*wsClient,
+//	tx *abeutil.Tx, block *abeutil.Block) {
+//
+//	// Nothing to do if nobody is watching outpoints.
+//	if len(ops) == 0 {
+//		return
+//	}
+//
+//	txHex := ""
+//	wscNotified := make(map[chan struct{}]struct{})
+//	for _, txIn := range tx.MsgTx().TxIn {
+//		prevOut := &txIn.PreviousOutPoint
+//		if cmap, ok := ops[*prevOut]; ok {
+//			if txHex == "" {
+//				txHex = txHexString(tx.MsgTx())
+//			}
+//			marshalledJSON, err := newRedeemingTxNotification(txHex, tx.Index(), block)
+//			if err != nil {
+//				rpcsLog.Warnf("Failed to marshal redeemingtx notification: %v", err)
+//				continue
+//			}
+//			for wscQuit, wsc := range cmap {
+//				if block != nil {
+//					//	todo(ABE): if the txo is spent and confirmed by block, the outpont is removed from watch list
+//					m.removeSpentRequest(ops, wsc, prevOut)
+//				}
+//
+//				if _, ok := wscNotified[wscQuit]; !ok {
+//					wscNotified[wscQuit] = struct{}{}
+//					wsc.QueueNotification(marshalledJSON)
+//				}
+//			}
+//		}
+//	}
+//}
 
 // RegisterTxOutAddressRequests requests notifications to the passed websocket
 // client when a transaction output spends to the passed address.
-func (m *wsNotificationManager) RegisterTxOutAddressRequests(wsc *wsClient, addrs []string) {
-	m.queueNotification <- &notificationRegisterAddr{
-		wsc:   wsc,
-		addrs: addrs,
-	}
-}
+//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+//func (m *wsNotificationManager) RegisterTxOutAddressRequests(wsc *wsClient, addrs []string) {
+//	m.queueNotification <- &notificationRegisterAddr{
+//		wsc:   wsc,
+//		addrs: addrs,
+//	}
+//}
 
 // addAddrRequests adds the websocket client wsc to the address to client set
 // addrMap so wsc will be notified for any mempool or block transaction outputs
 // spending to any of the addresses in addrs.
-func (*wsNotificationManager) addAddrRequests(addrMap map[string]map[chan struct{}]*wsClient,
-	wsc *wsClient, addrs []string) {
-
-	for _, addr := range addrs {
-		// Track the request in the client as well so it can be quickly be
-		// removed on disconnect.
-		wsc.addrRequests[addr] = struct{}{}
-
-		// Add the client to the set of clients to notify when the
-		// outpoint is seen.  Create map as needed.
-		cmap, ok := addrMap[addr]
-		if !ok {
-			cmap = make(map[chan struct{}]*wsClient)
-			addrMap[addr] = cmap
-		}
-		cmap[wsc.quit] = wsc
-	}
-}
+//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+//func (*wsNotificationManager) addAddrRequests(addrMap map[string]map[chan struct{}]*wsClient,
+//	wsc *wsClient, addrs []string) {
+//
+//	for _, addr := range addrs {
+//		// Track the request in the client as well so it can be quickly be
+//		// removed on disconnect.
+//		wsc.addrRequests[addr] = struct{}{}
+//
+//		// Add the client to the set of clients to notify when the
+//		// outpoint is seen.  Create map as needed.
+//		cmap, ok := addrMap[addr]
+//		if !ok {
+//			cmap = make(map[chan struct{}]*wsClient)
+//			addrMap[addr] = cmap
+//		}
+//		cmap[wsc.quit] = wsc
+//	}
+//
+//	//	todo(ABE): why not check the mempool for an immediate notification?
+//}
 
 // UnregisterTxOutAddressRequest removes a request from the passed websocket
 // client to be notified when a transaction spends to the passed address.
-func (m *wsNotificationManager) UnregisterTxOutAddressRequest(wsc *wsClient, addr string) {
-	m.queueNotification <- &notificationUnregisterAddr{
-		wsc:  wsc,
-		addr: addr,
-	}
-}
+//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+//func (m *wsNotificationManager) UnregisterTxOutAddressRequest(wsc *wsClient, addr string) {
+//	m.queueNotification <- &notificationUnregisterAddr{
+//		wsc:  wsc,
+//		addr: addr,
+//	}
+//}
 
 // removeAddrRequest removes the websocket client wsc from the address to
 // client set addrs so it will no longer receive notification updates for
 // any transaction outputs send to addr.
-func (*wsNotificationManager) removeAddrRequest(addrs map[string]map[chan struct{}]*wsClient,
-	wsc *wsClient, addr string) {
-
-	// Remove the request tracking from the client.
-	delete(wsc.addrRequests, addr)
-
-	// Remove the client from the list to notify.
-	cmap, ok := addrs[addr]
-	if !ok {
-		rpcsLog.Warnf("Attempt to remove nonexistent addr request "+
-			"<%s> for websocket client %s", addr, wsc.addr)
-		return
-	}
-	delete(cmap, wsc.quit)
-
-	// Remove the map entry altogether if there are no more clients
-	// interested in it.
-	if len(cmap) == 0 {
-		delete(addrs, addr)
-	}
-}
+//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+//func (*wsNotificationManager) removeAddrRequest(addrs map[string]map[chan struct{}]*wsClient,
+//	wsc *wsClient, addr string) {
+//
+//	// Remove the request tracking from the client.
+//	delete(wsc.addrRequests, addr)
+//
+//	// Remove the client from the list to notify.
+//	cmap, ok := addrs[addr]
+//	if !ok {
+//		rpcsLog.Warnf("Attempt to remove nonexistent addr request "+
+//			"<%s> for websocket client %s", addr, wsc.addr)
+//		return
+//	}
+//	delete(cmap, wsc.quit)
+//
+//	// Remove the map entry altogether if there are no more clients
+//	// interested in it.
+//	if len(cmap) == 0 {
+//		delete(addrs, addr)
+//	}
+//}
 
 // AddClient adds the passed websocket client to the notification manager.
 func (m *wsNotificationManager) AddClient(wsc *wsClient) {
@@ -1557,23 +1529,22 @@ type wsClient struct {
 	// information about all new transactions.
 	verboseTxUpdates bool
 
-	// addrRequests is a set of addresses the caller has requested to be
-	// notified about.  It is maintained here so all requests can be removed
-	// when a wallet disconnects.  Owned by the notification manager.
-	addrRequests map[string]struct{}
-
-	// spentRequests is a set of unspent Outpoints a wallet has requested
-	// notifications for when they are spent by a processed transaction.
-	// Owned by the notification manager.
-	//	todo(ABE):
-	spentRequests    map[wire.OutPoint]struct{}
-	spentRequestsAbe map[chainhash.Hash]struct{}
-	// use the hash of TxIn, say (OutPointRing || SerialNumber) as the identifier of a consumed OutPoint
+	//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+	//// addrRequests is a set of addresses the caller has requested to be
+	//// notified about.  It is maintained here so all requests can be removed
+	//// when a wallet disconnects.  Owned by the notification manager.
+	//addrRequests map[string]struct{}
+	//
+	//// spentRequests is a set of unspent Outpoints a wallet has requested
+	//// notifications for when they are spent by a processed transaction.
+	//// Owned by the notification manager.
+	//spentRequests    map[wire.OutPoint]struct{}
 
 	// filterData is the new generation transaction filter backported from
 	// github.com/decred/dcrd for the new backported `loadtxfilter` and
 	// `rescanblocks` methods.
-	filterData *wsClientFilter
+	// TODO(ABE): ABE does not support filter.
+	//filterData *wsClientFilter
 
 	// Networking infrastructure.
 	serviceRequestSem semaphore
@@ -2000,14 +1971,15 @@ func newWebsocketClient(server *rpcServer, conn *websocket.Conn,
 	}
 
 	client := &wsClient{
-		conn:              conn,
-		addr:              remoteAddr,
-		authenticated:     authenticated,
-		isAdmin:           isAdmin,
-		sessionID:         sessionID,
-		server:            server,
-		addrRequests:      make(map[string]struct{}),
-		spentRequests:     make(map[wire.OutPoint]struct{}),
+		conn:          conn,
+		addr:          remoteAddr,
+		authenticated: authenticated,
+		isAdmin:       isAdmin,
+		sessionID:     sessionID,
+		server:        server,
+		//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+		//addrRequests:      make(map[string]struct{}),
+		//spentRequests:     make(map[wire.OutPoint]struct{}),
 		serviceRequestSem: makeSemaphore(cfg.RPCMaxConcurrentReqs),
 		ntfnChan:          make(chan []byte, 1), // nonblocking sync
 		sendChan:          make(chan wsResponse, websocketSendBufferSize),
@@ -2067,46 +2039,47 @@ func handleWebsocketHelp(wsc *wsClient, icmd interface{}) (interface{}, error) {
 // websocket connections.
 //
 // NOTE: This extension is ported from github.com/decred/dcrd
-func handleLoadTxFilter(wsc *wsClient, icmd interface{}) (interface{}, error) {
-	cmd := icmd.(*abejson.LoadTxFilterCmd)
-
-	outPoints := make([]wire.OutPoint, len(cmd.OutPoints))
-	for i := range cmd.OutPoints {
-		hash, err := chainhash.NewHashFromStr(cmd.OutPoints[i].Hash)
-		if err != nil {
-			return nil, &abejson.RPCError{
-				Code:    abejson.ErrRPCInvalidParameter,
-				Message: err.Error(),
-			}
-		}
-		outPoints[i] = wire.OutPoint{
-			Hash:  *hash,
-			Index: cmd.OutPoints[i].Index,
-		}
-	}
-
-	params := wsc.server.cfg.ChainParams
-
-	wsc.Lock()
-	if cmd.Reload || wsc.filterData == nil {
-		wsc.filterData = newWSClientFilter(cmd.Addresses, outPoints,
-			params)
-		wsc.Unlock()
-	} else {
-		wsc.Unlock()
-
-		wsc.filterData.mu.Lock()
-		for _, a := range cmd.Addresses {
-			wsc.filterData.addAddressStr(a, params)
-		}
-		for i := range outPoints {
-			wsc.filterData.addUnspentOutPoint(&outPoints[i])
-		}
-		wsc.filterData.mu.Unlock()
-	}
-
-	return nil, nil
-}
+// TODO(ABE): ABE does not support filter.
+//func handleLoadTxFilter(wsc *wsClient, icmd interface{}) (interface{}, error) {
+//	cmd := icmd.(*abejson.LoadTxFilterCmd)
+//
+//	outPoints := make([]wire.OutPoint, len(cmd.OutPoints))
+//	for i := range cmd.OutPoints {
+//		hash, err := chainhash.NewHashFromStr(cmd.OutPoints[i].Hash)
+//		if err != nil {
+//			return nil, &abejson.RPCError{
+//				Code:    abejson.ErrRPCInvalidParameter,
+//				Message: err.Error(),
+//			}
+//		}
+//		outPoints[i] = wire.OutPoint{
+//			Hash:  *hash,
+//			Index: cmd.OutPoints[i].Index,
+//		}
+//	}
+//
+//	params := wsc.server.cfg.ChainParams
+//
+//	wsc.Lock()
+//	if cmd.Reload || wsc.filterData == nil {
+//		wsc.filterData = newWSClientFilter(cmd.Addresses, outPoints,
+//			params)
+//		wsc.Unlock()
+//	} else {
+//		wsc.Unlock()
+//
+//		wsc.filterData.mu.Lock()
+//		for _, a := range cmd.Addresses {
+//			wsc.filterData.addAddressStr(a, params)
+//		}
+//		for i := range outPoints {
+//			wsc.filterData.addUnspentOutPoint(&outPoints[i])
+//		}
+//		wsc.filterData.mu.Unlock()
+//	}
+//
+//	return nil, nil
+//}
 
 // handleNotifyBlocks implements the notifyblocks command extension for
 // websocket connections.
@@ -2130,20 +2103,21 @@ func handleStopNotifyBlocks(wsc *wsClient, icmd interface{}) (interface{}, error
 
 // handleNotifySpent implements the notifyspent command extension for
 // websocket connections.
-func handleNotifySpent(wsc *wsClient, icmd interface{}) (interface{}, error) {
-	cmd, ok := icmd.(*abejson.NotifySpentCmd)
-	if !ok {
-		return nil, abejson.ErrRPCInternal
-	}
-
-	outpoints, err := deserializeOutpoints(cmd.OutPoints)
-	if err != nil {
-		return nil, err
-	}
-
-	wsc.server.ntfnMgr.RegisterSpentRequests(wsc, outpoints)
-	return nil, nil
-}
+//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+//func handleNotifySpent(wsc *wsClient, icmd interface{}) (interface{}, error) {
+//	cmd, ok := icmd.(*abejson.NotifySpentCmd)
+//	if !ok {
+//		return nil, abejson.ErrRPCInternal
+//	}
+//
+//	outpoints, err := deserializeOutpoints(cmd.OutPoints)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	wsc.server.ntfnMgr.RegisterSpentRequests(wsc, outpoints)
+//	return nil, nil
+//}
 
 // handleNotifyNewTransations implements the notifynewtransactions command
 // extension for websocket connections.
@@ -2167,114 +2141,121 @@ func handleStopNotifyNewTransactions(wsc *wsClient, icmd interface{}) (interface
 
 // handleNotifyReceived implements the notifyreceived command extension for
 // websocket connections.
-func handleNotifyReceived(wsc *wsClient, icmd interface{}) (interface{}, error) {
-	cmd, ok := icmd.(*abejson.NotifyReceivedCmd)
-	if !ok {
-		return nil, abejson.ErrRPCInternal
-	}
-
-	// Decode addresses to validate input, but the strings slice is used
-	// directly if these are all ok.
-	err := checkAddressValidity(cmd.Addresses, wsc.server.cfg.ChainParams)
-	if err != nil {
-		return nil, err
-	}
-
-	wsc.server.ntfnMgr.RegisterTxOutAddressRequests(wsc, cmd.Addresses)
-	return nil, nil
-}
+//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+//func handleNotifyReceived(wsc *wsClient, icmd interface{}) (interface{}, error) {
+//	cmd, ok := icmd.(*abejson.NotifyReceivedCmd)
+//	if !ok {
+//		return nil, abejson.ErrRPCInternal
+//	}
+//
+//	// Decode addresses to validate input, but the strings slice is used
+//	// directly if these are all ok.
+//	err := checkAddressValidity(cmd.Addresses, wsc.server.cfg.ChainParams)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	wsc.server.ntfnMgr.RegisterTxOutAddressRequests(wsc, cmd.Addresses)
+//	return nil, nil
+//}
 
 // handleStopNotifySpent implements the stopnotifyspent command extension for
 // websocket connections.
-func handleStopNotifySpent(wsc *wsClient, icmd interface{}) (interface{}, error) {
-	cmd, ok := icmd.(*abejson.StopNotifySpentCmd)
-	if !ok {
-		return nil, abejson.ErrRPCInternal
-	}
-
-	outpoints, err := deserializeOutpoints(cmd.OutPoints)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, outpoint := range outpoints {
-		wsc.server.ntfnMgr.UnregisterSpentRequest(wsc, outpoint)
-	}
-
-	return nil, nil
-}
+//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+//func handleStopNotifySpent(wsc *wsClient, icmd interface{}) (interface{}, error) {
+//	cmd, ok := icmd.(*abejson.StopNotifySpentCmd)
+//	if !ok {
+//		return nil, abejson.ErrRPCInternal
+//	}
+//
+//	outpoints, err := deserializeOutpoints(cmd.OutPoints)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	for _, outpoint := range outpoints {
+//		wsc.server.ntfnMgr.UnregisterSpentRequest(wsc, outpoint)
+//	}
+//
+//	return nil, nil
+//}
 
 // handleStopNotifyReceived implements the stopnotifyreceived command extension
 // for websocket connections.
-func handleStopNotifyReceived(wsc *wsClient, icmd interface{}) (interface{}, error) {
-	cmd, ok := icmd.(*abejson.StopNotifyReceivedCmd)
-	if !ok {
-		return nil, abejson.ErrRPCInternal
-	}
-
-	// Decode addresses to validate input, but the strings slice is used
-	// directly if these are all ok.
-	err := checkAddressValidity(cmd.Addresses, wsc.server.cfg.ChainParams)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, addr := range cmd.Addresses {
-		wsc.server.ntfnMgr.UnregisterTxOutAddressRequest(wsc, addr)
-	}
-
-	return nil, nil
-}
+//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+//func handleStopNotifyReceived(wsc *wsClient, icmd interface{}) (interface{}, error) {
+//	cmd, ok := icmd.(*abejson.StopNotifyReceivedCmd)
+//	if !ok {
+//		return nil, abejson.ErrRPCInternal
+//	}
+//
+//	// Decode addresses to validate input, but the strings slice is used
+//	// directly if these are all ok.
+//	err := checkAddressValidity(cmd.Addresses, wsc.server.cfg.ChainParams)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	for _, addr := range cmd.Addresses {
+//		wsc.server.ntfnMgr.UnregisterTxOutAddressRequest(wsc, addr)
+//	}
+//
+//	return nil, nil
+//}
 
 // checkAddressValidity checks the validity of each address in the passed
 // string slice. It does this by attempting to decode each address using the
 // current active network parameters. If any single address fails to decode
 // properly, the function returns an error. Otherwise, nil is returned.
-func checkAddressValidity(addrs []string, params *chaincfg.Params) error {
-	for _, addr := range addrs {
-		_, err := abeutil.DecodeAddress(addr, params)
-		if err != nil {
-			return &abejson.RPCError{
-				Code: abejson.ErrRPCInvalidAddressOrKey,
-				Message: fmt.Sprintf("Invalid address or key: %v",
-					addr),
-			}
-		}
-	}
-	return nil
-}
+//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+//func checkAddressValidity(addrs []string, params *chaincfg.Params) error {
+//	for _, addr := range addrs {
+//		_, err := abeutil.DecodeAddress(addr, params)
+//		if err != nil {
+//			return &abejson.RPCError{
+//				Code: abejson.ErrRPCInvalidAddressOrKey,
+//				Message: fmt.Sprintf("Invalid address or key: %v",
+//					addr),
+//			}
+//		}
+//	}
+//	return nil
+//}
 
 // deserializeOutpoints deserializes each serialized outpoint.
-func deserializeOutpoints(serializedOuts []abejson.OutPoint) ([]*wire.OutPoint, error) {
-	outpoints := make([]*wire.OutPoint, 0, len(serializedOuts))
-	for i := range serializedOuts {
-		blockHash, err := chainhash.NewHashFromStr(serializedOuts[i].Hash)
-		if err != nil {
-			return nil, rpcDecodeHexError(serializedOuts[i].Hash)
-		}
-		index := serializedOuts[i].Index
-		outpoints = append(outpoints, wire.NewOutPoint(blockHash, index))
-	}
+//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+//func deserializeOutpoints(serializedOuts []abejson.OutPoint) ([]*wire.OutPoint, error) {
+//	outpoints := make([]*wire.OutPoint, 0, len(serializedOuts))
+//	for i := range serializedOuts {
+//		blockHash, err := chainhash.NewHashFromStr(serializedOuts[i].Hash)
+//		if err != nil {
+//			return nil, rpcDecodeHexError(serializedOuts[i].Hash)
+//		}
+//		index := serializedOuts[i].Index
+//		outpoints = append(outpoints, wire.NewOutPoint(blockHash, index))
+//	}
+//
+//	return outpoints, nil
+//}
 
-	return outpoints, nil
-}
+//	todo(ABE): handleRescan seems not work well. ABE does not supprt it at this moment.
 
-type rescanKeys struct {
-	addrs   map[string]struct{}
-	unspent map[wire.OutPoint]struct{}
-}
-
-// unspentSlice returns a slice of currently-unspent outpoints for the rescan
-// lookup keys.  This is primarily intended to be used to register outpoints
-// for continuous notifications after a rescan has completed.
-func (r *rescanKeys) unspentSlice() []*wire.OutPoint {
-	ops := make([]*wire.OutPoint, 0, len(r.unspent))
-	for op := range r.unspent {
-		opCopy := op
-		ops = append(ops, &opCopy)
-	}
-	return ops
-}
+//type rescanKeys struct {
+//	addrs   map[string]struct{}
+//	unspent map[wire.OutPoint]struct{}
+//}
+//
+//// unspentSlice returns a slice of currently-unspent outpoints for the rescan
+//// lookup keys.  This is primarily intended to be used to register outpoints
+//// for continuous notifications after a rescan has completed.
+//func (r *rescanKeys) unspentSlice() []*wire.OutPoint {
+//	ops := make([]*wire.OutPoint, 0, len(r.unspent))
+//	for op := range r.unspent {
+//		opCopy := op
+//		ops = append(ops, &opCopy)
+//	}
+//	return ops
+//}
 
 // ErrRescanReorg defines the error that is returned when an unrecoverable
 // reorganize is detected during a rescan.
@@ -2285,516 +2266,522 @@ var ErrRescanReorg = abejson.RPCError{
 
 // rescanBlock rescans all transactions in a single block.  This is a helper
 // function for handleRescan.
-func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *abeutil.Block) {
-	for _, tx := range blk.Transactions() {
-		// Hexadecimal representation of this tx.  Only created if
-		// needed, and reused for later notifications if already made.
-		var txHex string
-
-		// All inputs and outputs must be iterated through to correctly
-		// modify the unspent map, however, just a single notification
-		// for any matching transaction inputs or outputs should be
-		// created and sent.
-		spentNotified := false
-		recvNotified := false
-
-		// notifySpend is a closure we'll use when we first detect that
-		// a transactions spends an outpoint/script in our filter list.
-		notifySpend := func() error {
-			if txHex == "" {
-				txHex = txHexString(tx.MsgTx())
-			}
-			marshalledJSON, err := newRedeemingTxNotification(
-				txHex, tx.Index(), blk,
-			)
-			if err != nil {
-				return fmt.Errorf("unable to marshal "+
-					"abejson.RedeeminTxNtfn: %v", err)
-			}
-
-			return wsc.QueueNotification(marshalledJSON)
-		}
-
-		// We'll start by iterating over the transaction's inputs to
-		// determine if it spends an outpoint/script in our filter list.
-		for _, txin := range tx.MsgTx().TxIn {
-			// If it spends an outpoint, we'll dispatch a spend
-			// notification for the transaction.
-			if _, ok := lookups.unspent[txin.PreviousOutPoint]; ok {
-				delete(lookups.unspent, txin.PreviousOutPoint)
-
-				if spentNotified {
-					continue
-				}
-
-				err := notifySpend()
-
-				// Stop the rescan early if the websocket client
-				// disconnected.
-				if err == ErrClientQuit {
-					return
-				}
-				if err != nil {
-					rpcsLog.Errorf("Unable to notify "+
-						"redeeming transaction %v: %v",
-						tx.Hash(), err)
-					continue
-				}
-
-				spentNotified = true
-			}
-
-			// We'll also recompute the pkScript the input is
-			// attempting to spend to determine whether it is
-			// relevant to us.
-			pkScript, err := txscript.ComputePkScript(
-				txin.SignatureScript, txin.Witness,
-			)
-			if err != nil {
-				continue
-			}
-			addr, err := pkScript.Address(wsc.server.cfg.ChainParams)
-			if err != nil {
-				continue
-			}
-
-			// If it is, we'll also dispatch a spend notification
-			// for this transaction if we haven't already.
-			if _, ok := lookups.addrs[addr.String()]; ok {
-				if spentNotified {
-					continue
-				}
-
-				err := notifySpend()
-
-				// Stop the rescan early if the websocket client
-				// disconnected.
-				if err == ErrClientQuit {
-					return
-				}
-				if err != nil {
-					rpcsLog.Errorf("Unable to notify "+
-						"redeeming transaction %v: %v",
-						tx.Hash(), err)
-					continue
-				}
-
-				spentNotified = true
-			}
-		}
-
-		for txOutIdx, txout := range tx.MsgTx().TxOut {
-			_, addrs, _, _ := txscript.ExtractPkScriptAddrs(
-				txout.PkScript, wsc.server.cfg.ChainParams)
-
-			for _, addr := range addrs {
-				if _, ok := lookups.addrs[addr.String()]; !ok {
-					continue
-				}
-
-				outpoint := wire.OutPoint{
-					Hash:  *tx.Hash(),
-					Index: uint32(txOutIdx),
-				}
-				lookups.unspent[outpoint] = struct{}{}
-
-				if recvNotified {
-					continue
-				}
-
-				if txHex == "" {
-					txHex = txHexString(tx.MsgTx())
-				}
-				ntfn := abejson.NewRecvTxNtfn(txHex,
-					blockDetails(blk, tx.Index()))
-
-				marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
-				if err != nil {
-					rpcsLog.Errorf("Failed to marshal recvtx notification: %v", err)
-					return
-				}
-
-				err = wsc.QueueNotification(marshalledJSON)
-				// Stop the rescan early if the websocket client
-				// disconnected.
-				if err == ErrClientQuit {
-					return
-				}
-				recvNotified = true
-			}
-		}
-	}
-}
+//	todo(ABE): handleRescan seems not work well. ABE does not supprt it at this moment.
+//func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *abeutil.Block) {
+//	for _, tx := range blk.Transactions() {
+//		// Hexadecimal representation of this tx.  Only created if
+//		// needed, and reused for later notifications if already made.
+//		var txHex string
+//
+//		// All inputs and outputs must be iterated through to correctly
+//		// modify the unspent map, however, just a single notification
+//		// for any matching transaction inputs or outputs should be
+//		// created and sent.
+//		spentNotified := false
+//		recvNotified := false
+//
+//		// notifySpend is a closure we'll use when we first detect that
+//		// a transactions spends an outpoint/script in our filter list.
+//		notifySpend := func() error {
+//			if txHex == "" {
+//				txHex = txHexString(tx.MsgTx())
+//			}
+//			marshalledJSON, err := newRedeemingTxNotification(
+//				txHex, tx.Index(), blk,
+//			)
+//			if err != nil {
+//				return fmt.Errorf("unable to marshal "+
+//					"abejson.RedeeminTxNtfn: %v", err)
+//			}
+//
+//			return wsc.QueueNotification(marshalledJSON)
+//		}
+//
+//		// We'll start by iterating over the transaction's inputs to
+//		// determine if it spends an outpoint/script in our filter list.
+//		for _, txin := range tx.MsgTx().TxIn {
+//			// If it spends an outpoint, we'll dispatch a spend
+//			// notification for the transaction.
+//			if _, ok := lookups.unspent[txin.PreviousOutPoint]; ok {
+//				delete(lookups.unspent, txin.PreviousOutPoint)
+//
+//				if spentNotified {
+//					continue
+//				}
+//
+//				err := notifySpend()
+//
+//				// Stop the rescan early if the websocket client
+//				// disconnected.
+//				if err == ErrClientQuit {
+//					return
+//				}
+//				if err != nil {
+//					rpcsLog.Errorf("Unable to notify "+
+//						"redeeming transaction %v: %v",
+//						tx.Hash(), err)
+//					continue
+//				}
+//
+//				spentNotified = true
+//			}
+//
+//			// We'll also recompute the pkScript the input is
+//			// attempting to spend to determine whether it is
+//			// relevant to us.
+//			pkScript, err := txscript.ComputePkScript(
+//				txin.SignatureScript, txin.Witness,
+//			)
+//			if err != nil {
+//				continue
+//			}
+//			addr, err := pkScript.Address(wsc.server.cfg.ChainParams)
+//			if err != nil {
+//				continue
+//			}
+//
+//			// If it is, we'll also dispatch a spend notification
+//			// for this transaction if we haven't already.
+//			if _, ok := lookups.addrs[addr.String()]; ok {
+//				if spentNotified {
+//					continue
+//				}
+//
+//				err := notifySpend()
+//
+//				// Stop the rescan early if the websocket client
+//				// disconnected.
+//				if err == ErrClientQuit {
+//					return
+//				}
+//				if err != nil {
+//					rpcsLog.Errorf("Unable to notify "+
+//						"redeeming transaction %v: %v",
+//						tx.Hash(), err)
+//					continue
+//				}
+//
+//				spentNotified = true
+//			}
+//		}
+//
+//		for txOutIdx, txout := range tx.MsgTx().TxOut {
+//			_, addrs, _, _ := txscript.ExtractPkScriptAddrs(
+//				txout.PkScript, wsc.server.cfg.ChainParams)
+//
+//			for _, addr := range addrs {
+//				if _, ok := lookups.addrs[addr.String()]; !ok {
+//					continue
+//				}
+//
+//				outpoint := wire.OutPoint{
+//					Hash:  *tx.Hash(),
+//					Index: uint32(txOutIdx),
+//				}
+//				lookups.unspent[outpoint] = struct{}{}
+//
+//				if recvNotified {
+//					continue
+//				}
+//
+//				if txHex == "" {
+//					txHex = txHexString(tx.MsgTx())
+//				}
+//				ntfn := abejson.NewRecvTxNtfn(txHex,
+//					blockDetails(blk, tx.Index()))
+//
+//				marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
+//				if err != nil {
+//					rpcsLog.Errorf("Failed to marshal recvtx notification: %v", err)
+//					return
+//				}
+//
+//				err = wsc.QueueNotification(marshalledJSON)
+//				// Stop the rescan early if the websocket client
+//				// disconnected.
+//				if err == ErrClientQuit {
+//					return
+//				}
+//				recvNotified = true
+//			}
+//		}
+//	}
+//}
 
 // rescanBlockFilter rescans a block for any relevant transactions for the
 // passed lookup keys. Any discovered transactions are returned hex encoded as
 // a string slice.
 //
 // NOTE: This extension is ported from github.com/decred/dcrd
-func rescanBlockFilter(filter *wsClientFilter, block *abeutil.Block, params *chaincfg.Params) []string {
-	var transactions []string
-
-	filter.mu.Lock()
-	for _, tx := range block.Transactions() {
-		msgTx := tx.MsgTx()
-
-		// Keep track of whether the transaction has already been added
-		// to the result.  It shouldn't be added twice.
-		added := false
-
-		// Scan inputs if not a coinbase transaction.
-		if !blockchain.IsCoinBaseTx(msgTx) {
-			for _, input := range msgTx.TxIn {
-				if !filter.existsUnspentOutPoint(&input.PreviousOutPoint) {
-					continue
-				}
-				if !added {
-					transactions = append(
-						transactions,
-						txHexString(msgTx))
-					added = true
-				}
-			}
-		}
-
-		// Scan outputs.
-		for i, output := range msgTx.TxOut {
-			_, addrs, _, err := txscript.ExtractPkScriptAddrs(
-				output.PkScript, params)
-			if err != nil {
-				continue
-			}
-			for _, a := range addrs {
-				if !filter.existsAddress(a) {
-					continue
-				}
-
-				op := wire.OutPoint{
-					Hash:  *tx.Hash(),
-					Index: uint32(i),
-				}
-				filter.addUnspentOutPoint(&op)
-
-				if !added {
-					transactions = append(
-						transactions,
-						txHexString(msgTx))
-					added = true
-				}
-			}
-		}
-	}
-	filter.mu.Unlock()
-
-	return transactions
-}
+// TODO(ABE): ABE does not support filter. As handleRescanBlocks is related to filter, it is not supported either.
+//func rescanBlockFilter(filter *wsClientFilter, block *abeutil.Block, params *chaincfg.Params) []string {
+//	var transactions []string
+//
+//	filter.mu.Lock()
+//	for _, tx := range block.Transactions() {
+//		msgTx := tx.MsgTx()
+//
+//		// Keep track of whether the transaction has already been added
+//		// to the result.  It shouldn't be added twice.
+//		added := false
+//
+//		// Scan inputs if not a coinbase transaction.
+//		if !blockchain.IsCoinBaseTx(msgTx) {
+//			for _, input := range msgTx.TxIn {
+//				if !filter.existsUnspentOutPoint(&input.PreviousOutPoint) {
+//					continue
+//				}
+//				if !added {
+//					transactions = append(
+//						transactions,
+//						txHexString(msgTx))
+//					added = true
+//				}
+//			}
+//		}
+//
+//		// Scan outputs.
+//		for i, output := range msgTx.TxOut {
+//			_, addrs, _, err := txscript.ExtractPkScriptAddrs(
+//				output.PkScript, params)
+//			if err != nil {
+//				continue
+//			}
+//			for _, a := range addrs {
+//				if !filter.existsAddress(a) {
+//					continue
+//				}
+//
+//				op := wire.OutPoint{
+//					Hash:  *tx.Hash(),
+//					Index: uint32(i),
+//				}
+//				filter.addUnspentOutPoint(&op)
+//
+//				if !added {
+//					transactions = append(
+//						transactions,
+//						txHexString(msgTx))
+//					added = true
+//				}
+//			}
+//		}
+//	}
+//	filter.mu.Unlock()
+//
+//	return transactions
+//}
 
 // handleRescanBlocks implements the rescanblocks command extension for
 // websocket connections.
 //
 // NOTE: This extension is ported from github.com/decred/dcrd
-func handleRescanBlocks(wsc *wsClient, icmd interface{}) (interface{}, error) {
-	cmd, ok := icmd.(*abejson.RescanBlocksCmd)
-	if !ok {
-		return nil, abejson.ErrRPCInternal
-	}
-
-	// Load client's transaction filter.  Must exist in order to continue.
-	wsc.Lock()
-	filter := wsc.filterData
-	wsc.Unlock()
-	if filter == nil {
-		return nil, &abejson.RPCError{
-			Code:    abejson.ErrRPCMisc,
-			Message: "Transaction filter must be loaded before rescanning",
-		}
-	}
-
-	blockHashes := make([]*chainhash.Hash, len(cmd.BlockHashes))
-
-	for i := range cmd.BlockHashes {
-		hash, err := chainhash.NewHashFromStr(cmd.BlockHashes[i])
-		if err != nil {
-			return nil, err
-		}
-		blockHashes[i] = hash
-	}
-
-	discoveredData := make([]abejson.RescannedBlock, 0, len(blockHashes))
-
-	// Iterate over each block in the request and rescan.  When a block
-	// contains relevant transactions, add it to the response.
-	bc := wsc.server.cfg.Chain
-	params := wsc.server.cfg.ChainParams
-	var lastBlockHash *chainhash.Hash
-	for i := range blockHashes {
-		block, err := bc.BlockByHash(blockHashes[i])
-		if err != nil {
-			return nil, &abejson.RPCError{
-				Code:    abejson.ErrRPCBlockNotFound,
-				Message: "Failed to fetch block: " + err.Error(),
-			}
-		}
-		if lastBlockHash != nil && block.MsgBlock().Header.PrevBlock != *lastBlockHash {
-			return nil, &abejson.RPCError{
-				Code: abejson.ErrRPCInvalidParameter,
-				Message: fmt.Sprintf("Block %v is not a child of %v",
-					blockHashes[i], lastBlockHash),
-			}
-		}
-		lastBlockHash = blockHashes[i]
-
-		transactions := rescanBlockFilter(filter, block, params)
-		if len(transactions) != 0 {
-			discoveredData = append(discoveredData, abejson.RescannedBlock{
-				Hash:         cmd.BlockHashes[i],
-				Transactions: transactions,
-			})
-		}
-	}
-
-	return &discoveredData, nil
-}
+// TODO(ABE): ABE does not support filter. As handleRescanBlocks is related to filter, it is not supported either.
+//func handleRescanBlocks(wsc *wsClient, icmd interface{}) (interface{}, error) {
+//	cmd, ok := icmd.(*abejson.RescanBlocksCmd)
+//	if !ok {
+//		return nil, abejson.ErrRPCInternal
+//	}
+//
+//	// Load client's transaction filter.  Must exist in order to continue.
+//	wsc.Lock()
+//	filter := wsc.filterData
+//	wsc.Unlock()
+//	if filter == nil {
+//		return nil, &abejson.RPCError{
+//			Code:    abejson.ErrRPCMisc,
+//			Message: "Transaction filter must be loaded before rescanning",
+//		}
+//	}
+//
+//	blockHashes := make([]*chainhash.Hash, len(cmd.BlockHashes))
+//
+//	for i := range cmd.BlockHashes {
+//		hash, err := chainhash.NewHashFromStr(cmd.BlockHashes[i])
+//		if err != nil {
+//			return nil, err
+//		}
+//		blockHashes[i] = hash
+//	}
+//
+//	discoveredData := make([]abejson.RescannedBlock, 0, len(blockHashes))
+//
+//	// Iterate over each block in the request and rescan.  When a block
+//	// contains relevant transactions, add it to the response.
+//	bc := wsc.server.cfg.Chain
+//	params := wsc.server.cfg.ChainParams
+//	var lastBlockHash *chainhash.Hash
+//	for i := range blockHashes {
+//		block, err := bc.BlockByHash(blockHashes[i])
+//		if err != nil {
+//			return nil, &abejson.RPCError{
+//				Code:    abejson.ErrRPCBlockNotFound,
+//				Message: "Failed to fetch block: " + err.Error(),
+//			}
+//		}
+//		if lastBlockHash != nil && block.MsgBlock().Header.PrevBlock != *lastBlockHash {
+//			return nil, &abejson.RPCError{
+//				Code: abejson.ErrRPCInvalidParameter,
+//				Message: fmt.Sprintf("Block %v is not a child of %v",
+//					blockHashes[i], lastBlockHash),
+//			}
+//		}
+//		lastBlockHash = blockHashes[i]
+//
+//		transactions := rescanBlockFilter(filter, block, params)
+//		if len(transactions) != 0 {
+//			discoveredData = append(discoveredData, abejson.RescannedBlock{
+//				Hash:         cmd.BlockHashes[i],
+//				Transactions: transactions,
+//			})
+//		}
+//	}
+//
+//	return &discoveredData, nil
+//}
 
 // recoverFromReorg attempts to recover from a detected reorganize during a
 // rescan.  It fetches a new range of block shas from the database and
 // verifies that the new range of blocks is on the same fork as a previous
 // range of blocks.  If this condition does not hold true, the JSON-RPC error
 // for an unrecoverable reorganize is returned.
-func recoverFromReorg(chain *blockchain.BlockChain, minBlock, maxBlock int32,
-	lastBlock *chainhash.Hash) ([]chainhash.Hash, error) {
-
-	hashList, err := chain.HeightRange(minBlock, maxBlock)
-	if err != nil {
-		rpcsLog.Errorf("Error looking up block range: %v", err)
-		return nil, &abejson.RPCError{
-			Code:    abejson.ErrRPCDatabase,
-			Message: "Database error: " + err.Error(),
-		}
-	}
-	if lastBlock == nil || len(hashList) == 0 {
-		return hashList, nil
-	}
-
-	blk, err := chain.BlockByHash(&hashList[0])
-	if err != nil {
-		rpcsLog.Errorf("Error looking up possibly reorged block: %v",
-			err)
-		return nil, &abejson.RPCError{
-			Code:    abejson.ErrRPCDatabase,
-			Message: "Database error: " + err.Error(),
-		}
-	}
-	jsonErr := descendantBlock(lastBlock, blk)
-	if jsonErr != nil {
-		return nil, jsonErr
-	}
-	return hashList, nil
-}
+//	todo(ABE): handleRescan seems not work well. ABE does not supprt it at this moment.
+//func recoverFromReorg(chain *blockchain.BlockChain, minBlock, maxBlock int32,
+//	lastBlock *chainhash.Hash) ([]chainhash.Hash, error) {
+//
+//	hashList, err := chain.HeightRange(minBlock, maxBlock)
+//	if err != nil {
+//		rpcsLog.Errorf("Error looking up block range: %v", err)
+//		return nil, &abejson.RPCError{
+//			Code:    abejson.ErrRPCDatabase,
+//			Message: "Database error: " + err.Error(),
+//		}
+//	}
+//	if lastBlock == nil || len(hashList) == 0 {
+//		return hashList, nil
+//	}
+//
+//	blk, err := chain.BlockByHash(&hashList[0])
+//	if err != nil {
+//		rpcsLog.Errorf("Error looking up possibly reorged block: %v",
+//			err)
+//		return nil, &abejson.RPCError{
+//			Code:    abejson.ErrRPCDatabase,
+//			Message: "Database error: " + err.Error(),
+//		}
+//	}
+//	jsonErr := descendantBlock(lastBlock, blk)
+//	if jsonErr != nil {
+//		return nil, jsonErr
+//	}
+//	return hashList, nil
+//}
 
 // descendantBlock returns the appropriate JSON-RPC error if a current block
 // fetched during a reorganize is not a direct child of the parent block hash.
-func descendantBlock(prevHash *chainhash.Hash, curBlock *abeutil.Block) error {
-	curHash := &curBlock.MsgBlock().Header.PrevBlock
-	if !prevHash.IsEqual(curHash) {
-		rpcsLog.Errorf("Stopping rescan for reorged block %v "+
-			"(replaced by block %v)", prevHash, curHash)
-		return &ErrRescanReorg
-	}
-	return nil
-}
+//	todo(ABE): handleRescan seems not work well. ABE does not supprt it at this moment.
+//func descendantBlock(prevHash *chainhash.Hash, curBlock *abeutil.Block) error {
+//	curHash := &curBlock.MsgBlock().Header.PrevBlock
+//	if !prevHash.IsEqual(curHash) {
+//		rpcsLog.Errorf("Stopping rescan for reorged block %v "+
+//			"(replaced by block %v)", prevHash, curHash)
+//		return &ErrRescanReorg
+//	}
+//	return nil
+//}
 
 // scanBlockChunks executes a rescan in chunked stages. We do this to limit the
 // amount of memory that we'll allocate to a given rescan. Every so often,
 // we'll send back a rescan progress notification to the websockets client. The
 // final block and block hash that we've scanned will be returned.
-func scanBlockChunks(wsc *wsClient, cmd *abejson.RescanCmd, lookups *rescanKeys, minBlock,
-	maxBlock int32, chain *blockchain.BlockChain) (
-	*abeutil.Block, *chainhash.Hash, error) {
-
-	// lastBlock and lastBlockHash track the previously-rescanned block.
-	// They equal nil when no previous blocks have been rescanned.
-	var (
-		lastBlock     *abeutil.Block
-		lastBlockHash *chainhash.Hash
-	)
-
-	// A ticker is created to wait at least 10 seconds before notifying the
-	// websocket client of the current progress completed by the rescan.
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
-
-	// Instead of fetching all block shas at once, fetch in smaller chunks
-	// to ensure large rescans consume a limited amount of memory.
-fetchRange:
-	for minBlock < maxBlock {
-		// Limit the max number of hashes to fetch at once to the
-		// maximum number of items allowed in a single inventory.
-		// This value could be higher since it's not creating inventory
-		// messages, but this mirrors the limiting logic used in the
-		// peer-to-peer protocol.
-		maxLoopBlock := maxBlock
-		if maxLoopBlock-minBlock > wire.MaxInvPerMsg {
-			maxLoopBlock = minBlock + wire.MaxInvPerMsg
-		}
-		hashList, err := chain.HeightRange(minBlock, maxLoopBlock)
-		if err != nil {
-			rpcsLog.Errorf("Error looking up block range: %v", err)
-			return nil, nil, &abejson.RPCError{
-				Code:    abejson.ErrRPCDatabase,
-				Message: "Database error: " + err.Error(),
-			}
-		}
-		if len(hashList) == 0 {
-			// The rescan is finished if no blocks hashes for this
-			// range were successfully fetched and a stop block
-			// was provided.
-			if maxBlock != math.MaxInt32 {
-				break
-			}
-
-			// If the rescan is through the current block, set up
-			// the client to continue to receive notifications
-			// regarding all rescanned addresses and the current set
-			// of unspent outputs.
-			//
-			// This is done safely by temporarily grabbing exclusive
-			// access of the block manager.  If no more blocks have
-			// been attached between this pause and the fetch above,
-			// then it is safe to register the websocket client for
-			// continuous notifications if necessary.  Otherwise,
-			// continue the fetch loop again to rescan the new
-			// blocks (or error due to an irrecoverable reorganize).
-			pauseGuard := wsc.server.cfg.SyncMgr.Pause()
-			best := wsc.server.cfg.Chain.BestSnapshot()
-			curHash := &best.Hash
-			again := true
-			if lastBlockHash == nil || *lastBlockHash == *curHash {
-				again = false
-				n := wsc.server.ntfnMgr
-				n.RegisterSpentRequests(wsc, lookups.unspentSlice())
-				n.RegisterTxOutAddressRequests(wsc, cmd.Addresses)
-			}
-			close(pauseGuard)
-			if err != nil {
-				rpcsLog.Errorf("Error fetching best block "+
-					"hash: %v", err)
-				return nil, nil, &abejson.RPCError{
-					Code: abejson.ErrRPCDatabase,
-					Message: "Database error: " +
-						err.Error(),
-				}
-			}
-			if again {
-				continue
-			}
-			break
-		}
-
-	loopHashList:
-		for i := range hashList {
-			blk, err := chain.BlockByHash(&hashList[i])
-			if err != nil {
-				// Only handle reorgs if a block could not be
-				// found for the hash.
-				if dbErr, ok := err.(database.Error); !ok ||
-					dbErr.ErrorCode != database.ErrBlockNotFound {
-
-					rpcsLog.Errorf("Error looking up "+
-						"block: %v", err)
-					return nil, nil, &abejson.RPCError{
-						Code: abejson.ErrRPCDatabase,
-						Message: "Database error: " +
-							err.Error(),
-					}
-				}
-
-				// If an absolute max block was specified, don't
-				// attempt to handle the reorg.
-				if maxBlock != math.MaxInt32 {
-					rpcsLog.Errorf("Stopping rescan for "+
-						"reorged block %v",
-						cmd.EndBlock)
-					return nil, nil, &ErrRescanReorg
-				}
-
-				// If the lookup for the previously valid block
-				// hash failed, there may have been a reorg.
-				// Fetch a new range of block hashes and verify
-				// that the previously processed block (if there
-				// was any) still exists in the database.  If it
-				// doesn't, we error.
-				//
-				// A goto is used to branch executation back to
-				// before the range was evaluated, as it must be
-				// reevaluated for the new hashList.
-				minBlock += int32(i)
-				hashList, err = recoverFromReorg(
-					chain, minBlock, maxBlock, lastBlockHash,
-				)
-				if err != nil {
-					return nil, nil, err
-				}
-				if len(hashList) == 0 {
-					break fetchRange
-				}
-				goto loopHashList
-			}
-			if i == 0 && lastBlockHash != nil {
-				// Ensure the new hashList is on the same fork
-				// as the last block from the old hashList.
-				jsonErr := descendantBlock(lastBlockHash, blk)
-				if jsonErr != nil {
-					return nil, nil, jsonErr
-				}
-			}
-
-			// A select statement is used to stop rescans if the
-			// client requesting the rescan has disconnected.
-			select {
-			case <-wsc.quit:
-				rpcsLog.Debugf("Stopped rescan at height %v "+
-					"for disconnected client", blk.Height())
-				return nil, nil, nil
-			default:
-				rescanBlock(wsc, lookups, blk)
-				lastBlock = blk
-				lastBlockHash = blk.Hash()
-			}
-
-			// Periodically notify the client of the progress
-			// completed.  Continue with next block if no progress
-			// notification is needed yet.
-			select {
-			case <-ticker.C: // fallthrough
-			default:
-				continue
-			}
-
-			n := abejson.NewRescanProgressNtfn(
-				hashList[i].String(), blk.Height(),
-				blk.MsgBlock().Header.Timestamp.Unix(),
-			)
-			mn, err := abejson.MarshalCmd(nil, n)
-			if err != nil {
-				rpcsLog.Errorf("Failed to marshal rescan "+
-					"progress notification: %v", err)
-				continue
-			}
-
-			if err = wsc.QueueNotification(mn); err == ErrClientQuit {
-				// Finished if the client disconnected.
-				rpcsLog.Debugf("Stopped rescan at height %v "+
-					"for disconnected client", blk.Height())
-				return nil, nil, nil
-			}
-		}
-
-		minBlock += int32(len(hashList))
-	}
-
-	return lastBlock, lastBlockHash, nil
-}
+//	todo(ABE): handleRescan seems not work well. ABE does not supprt it at this moment.
+//func scanBlockChunks(wsc *wsClient, cmd *abejson.RescanCmd, lookups *rescanKeys, minBlock,
+//	maxBlock int32, chain *blockchain.BlockChain) (
+//	*abeutil.Block, *chainhash.Hash, error) {
+//
+//	// lastBlock and lastBlockHash track the previously-rescanned block.
+//	// They equal nil when no previous blocks have been rescanned.
+//	var (
+//		lastBlock     *abeutil.Block
+//		lastBlockHash *chainhash.Hash
+//	)
+//
+//	// A ticker is created to wait at least 10 seconds before notifying the
+//	// websocket client of the current progress completed by the rescan.
+//	ticker := time.NewTicker(10 * time.Second)
+//	defer ticker.Stop()
+//
+//	// Instead of fetching all block shas at once, fetch in smaller chunks
+//	// to ensure large rescans consume a limited amount of memory.
+//fetchRange:
+//	for minBlock < maxBlock {
+//		// Limit the max number of hashes to fetch at once to the
+//		// maximum number of items allowed in a single inventory.
+//		// This value could be higher since it's not creating inventory
+//		// messages, but this mirrors the limiting logic used in the
+//		// peer-to-peer protocol.
+//		maxLoopBlock := maxBlock
+//		if maxLoopBlock-minBlock > wire.MaxInvPerMsg {
+//			maxLoopBlock = minBlock + wire.MaxInvPerMsg
+//		}
+//		hashList, err := chain.HeightRange(minBlock, maxLoopBlock)
+//		if err != nil {
+//			rpcsLog.Errorf("Error looking up block range: %v", err)
+//			return nil, nil, &abejson.RPCError{
+//				Code:    abejson.ErrRPCDatabase,
+//				Message: "Database error: " + err.Error(),
+//			}
+//		}
+//		if len(hashList) == 0 {
+//			// The rescan is finished if no blocks hashes for this
+//			// range were successfully fetched and a stop block
+//			// was provided.
+//			if maxBlock != math.MaxInt32 {
+//				break
+//			}
+//
+//			// If the rescan is through the current block, set up
+//			// the client to continue to receive notifications
+//			// regarding all rescanned addresses and the current set
+//			// of unspent outputs.
+//			//
+//			// This is done safely by temporarily grabbing exclusive
+//			// access of the block manager.  If no more blocks have
+//			// been attached between this pause and the fetch above,
+//			// then it is safe to register the websocket client for
+//			// continuous notifications if necessary.  Otherwise,
+//			// continue the fetch loop again to rescan the new
+//			// blocks (or error due to an irrecoverable reorganize).
+//			pauseGuard := wsc.server.cfg.SyncMgr.Pause()
+//			best := wsc.server.cfg.Chain.BestSnapshot()
+//			curHash := &best.Hash
+//			again := true
+//			if lastBlockHash == nil || *lastBlockHash == *curHash {
+//				again = false
+//				n := wsc.server.ntfnMgr
+//				n.RegisterSpentRequests(wsc, lookups.unspentSlice())
+//				n.RegisterTxOutAddressRequests(wsc, cmd.Addresses)
+//			}
+//			close(pauseGuard)
+//			if err != nil {
+//				rpcsLog.Errorf("Error fetching best block "+
+//					"hash: %v", err)
+//				return nil, nil, &abejson.RPCError{
+//					Code: abejson.ErrRPCDatabase,
+//					Message: "Database error: " +
+//						err.Error(),
+//				}
+//			}
+//			if again {
+//				continue
+//			}
+//			break
+//		}
+//
+//	loopHashList:
+//		for i := range hashList {
+//			blk, err := chain.BlockByHash(&hashList[i])
+//			if err != nil {
+//				// Only handle reorgs if a block could not be
+//				// found for the hash.
+//				if dbErr, ok := err.(database.Error); !ok ||
+//					dbErr.ErrorCode != database.ErrBlockNotFound {
+//
+//					rpcsLog.Errorf("Error looking up "+
+//						"block: %v", err)
+//					return nil, nil, &abejson.RPCError{
+//						Code: abejson.ErrRPCDatabase,
+//						Message: "Database error: " +
+//							err.Error(),
+//					}
+//				}
+//
+//				// If an absolute max block was specified, don't
+//				// attempt to handle the reorg.
+//				if maxBlock != math.MaxInt32 {
+//					rpcsLog.Errorf("Stopping rescan for "+
+//						"reorged block %v",
+//						cmd.EndBlock)
+//					return nil, nil, &ErrRescanReorg
+//				}
+//
+//				// If the lookup for the previously valid block
+//				// hash failed, there may have been a reorg.
+//				// Fetch a new range of block hashes and verify
+//				// that the previously processed block (if there
+//				// was any) still exists in the database.  If it
+//				// doesn't, we error.
+//				//
+//				// A goto is used to branch executation back to
+//				// before the range was evaluated, as it must be
+//				// reevaluated for the new hashList.
+//				minBlock += int32(i)
+//				hashList, err = recoverFromReorg(
+//					chain, minBlock, maxBlock, lastBlockHash,
+//				)
+//				if err != nil {
+//					return nil, nil, err
+//				}
+//				if len(hashList) == 0 {
+//					break fetchRange
+//				}
+//				goto loopHashList
+//			}
+//			if i == 0 && lastBlockHash != nil {
+//				// Ensure the new hashList is on the same fork
+//				// as the last block from the old hashList.
+//				jsonErr := descendantBlock(lastBlockHash, blk)
+//				if jsonErr != nil {
+//					return nil, nil, jsonErr
+//				}
+//			}
+//
+//			// A select statement is used to stop rescans if the
+//			// client requesting the rescan has disconnected.
+//			select {
+//			case <-wsc.quit:
+//				rpcsLog.Debugf("Stopped rescan at height %v "+
+//					"for disconnected client", blk.Height())
+//				return nil, nil, nil
+//			default:
+//				rescanBlock(wsc, lookups, blk)
+//				lastBlock = blk
+//				lastBlockHash = blk.Hash()
+//			}
+//
+//			// Periodically notify the client of the progress
+//			// completed.  Continue with next block if no progress
+//			// notification is needed yet.
+//			select {
+//			case <-ticker.C: // fallthrough
+//			default:
+//				continue
+//			}
+//
+//			n := abejson.NewRescanProgressNtfn(
+//				hashList[i].String(), blk.Height(),
+//				blk.MsgBlock().Header.Timestamp.Unix(),
+//			)
+//			mn, err := abejson.MarshalCmd(nil, n)
+//			if err != nil {
+//				rpcsLog.Errorf("Failed to marshal rescan "+
+//					"progress notification: %v", err)
+//				continue
+//			}
+//
+//			if err = wsc.QueueNotification(mn); err == ErrClientQuit {
+//				// Finished if the client disconnected.
+//				rpcsLog.Debugf("Stopped rescan at height %v "+
+//					"for disconnected client", blk.Height())
+//				return nil, nil, nil
+//			}
+//		}
+//
+//		minBlock += int32(len(hashList))
+//	}
+//
+//	return lastBlock, lastBlockHash, nil
+//}
 
 // handleRescan implements the rescan command extension for websocket
 // connections.
@@ -2806,132 +2793,134 @@ fetchRange:
 // handler erroring.  Clients must handle this by finding a block still in
 // the chain (perhaps from a rescanprogress notification) to resume their
 // rescan.
-func handleRescan(wsc *wsClient, icmd interface{}) (interface{}, error) {
-	cmd, ok := icmd.(*abejson.RescanCmd)
-	if !ok {
-		return nil, abejson.ErrRPCInternal
-	}
-
-	outpoints := make([]*wire.OutPoint, 0, len(cmd.OutPoints))
-	for i := range cmd.OutPoints {
-		cmdOutpoint := &cmd.OutPoints[i]
-		blockHash, err := chainhash.NewHashFromStr(cmdOutpoint.Hash)
-		if err != nil {
-			return nil, rpcDecodeHexError(cmdOutpoint.Hash)
-		}
-		outpoint := wire.NewOutPoint(blockHash, cmdOutpoint.Index)
-		outpoints = append(outpoints, outpoint)
-	}
-
-	numAddrs := len(cmd.Addresses)
-	if numAddrs == 1 {
-		rpcsLog.Info("Beginning rescan for 1 address")
-	} else {
-		rpcsLog.Infof("Beginning rescan for %d addresses", numAddrs)
-	}
-
-	// Build lookup maps.
-	lookups := rescanKeys{
-		addrs:   map[string]struct{}{},
-		unspent: map[wire.OutPoint]struct{}{},
-	}
-	for _, addrStr := range cmd.Addresses {
-		lookups.addrs[addrStr] = struct{}{}
-	}
-	for _, outpoint := range outpoints {
-		lookups.unspent[*outpoint] = struct{}{}
-	}
-
-	chain := wsc.server.cfg.Chain
-
-	minBlockHash, err := chainhash.NewHashFromStr(cmd.BeginBlock)
-	if err != nil {
-		return nil, rpcDecodeHexError(cmd.BeginBlock)
-	}
-	minBlock, err := chain.BlockHeightByHash(minBlockHash)
-	if err != nil {
-		return nil, &abejson.RPCError{
-			Code:    abejson.ErrRPCBlockNotFound,
-			Message: "Error getting block: " + err.Error(),
-		}
-	}
-
-	maxBlock := int32(math.MaxInt32)
-	if cmd.EndBlock != nil {
-		maxBlockHash, err := chainhash.NewHashFromStr(*cmd.EndBlock)
-		if err != nil {
-			return nil, rpcDecodeHexError(*cmd.EndBlock)
-		}
-		maxBlock, err = chain.BlockHeightByHash(maxBlockHash)
-		if err != nil {
-			return nil, &abejson.RPCError{
-				Code:    abejson.ErrRPCBlockNotFound,
-				Message: "Error getting block: " + err.Error(),
-			}
-		}
-	}
-
-	var (
-		lastBlock     *abeutil.Block
-		lastBlockHash *chainhash.Hash
-	)
-	if len(lookups.addrs) != 0 || len(lookups.unspent) != 0 {
-		// With all the arguments parsed, we'll execute our chunked rescan
-		// which will notify the clients of any address deposits or output
-		// spends.
-		lastBlock, lastBlockHash, err = scanBlockChunks(
-			wsc, cmd, &lookups, minBlock, maxBlock, chain,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		// If the last block is nil, then this means that the client
-		// disconnected mid-rescan. As a result, we don't need to send
-		// anything back to them.
-		if lastBlock == nil {
-			return nil, nil
-		}
-	} else {
-		rpcsLog.Infof("Skipping rescan as client has no addrs/utxos")
-
-		// If we didn't actually do a rescan, then we'll give the
-		// client our best known block within the final rescan finished
-		// notification.
-		chainTip := chain.BestSnapshot()
-		lastBlockHash = &chainTip.Hash
-		lastBlock, err = chain.BlockByHash(lastBlockHash)
-		if err != nil {
-			return nil, &abejson.RPCError{
-				Code:    abejson.ErrRPCBlockNotFound,
-				Message: "Error getting block: " + err.Error(),
-			}
-		}
-	}
-
-	// Notify websocket client of the finished rescan.  Due to how btcd
-	// asynchronously queues notifications to not block calling code,
-	// there is no guarantee that any of the notifications created during
-	// rescan (such as rescanprogress, recvtx and redeemingtx) will be
-	// received before the rescan RPC returns.  Therefore, another method
-	// is needed to safely inform clients that all rescan notifications have
-	// been sent.
-	n := abejson.NewRescanFinishedNtfn(
-		lastBlockHash.String(), lastBlock.Height(),
-		lastBlock.MsgBlock().Header.Timestamp.Unix(),
-	)
-	if mn, err := abejson.MarshalCmd(nil, n); err != nil {
-		rpcsLog.Errorf("Failed to marshal rescan finished "+
-			"notification: %v", err)
-	} else {
-		// The rescan is finished, so we don't care whether the client
-		// has disconnected at this point, so discard error.
-		_ = wsc.QueueNotification(mn)
-	}
-
-	rpcsLog.Info("Finished rescan")
-	return nil, nil
-}
+//	todo(ABE): handleRescan seems not work well. ABE does not supprt it at this moment.
+//func handleRescan(wsc *wsClient, icmd interface{}) (interface{}, error) {
+//	cmd, ok := icmd.(*abejson.RescanCmd)
+//	if !ok {
+//		return nil, abejson.ErrRPCInternal
+//	}
+//
+//	outpoints := make([]*wire.OutPoint, 0, len(cmd.OutPoints))
+//	for i := range cmd.OutPoints {
+//		cmdOutpoint := &cmd.OutPoints[i]
+//		//	todo(ABE): blockHash seem to be txHash
+//		blockHash, err := chainhash.NewHashFromStr(cmdOutpoint.Hash)
+//		if err != nil {
+//			return nil, rpcDecodeHexError(cmdOutpoint.Hash)
+//		}
+//		outpoint := wire.NewOutPoint(blockHash, cmdOutpoint.Index)
+//		outpoints = append(outpoints, outpoint)
+//	}
+//
+//	numAddrs := len(cmd.Addresses)
+//	if numAddrs == 1 {
+//		rpcsLog.Info("Beginning rescan for 1 address")
+//	} else {
+//		rpcsLog.Infof("Beginning rescan for %d addresses", numAddrs)
+//	}
+//
+//	// Build lookup maps.
+//	lookups := rescanKeys{
+//		addrs:   map[string]struct{}{},
+//		unspent: map[wire.OutPoint]struct{}{},
+//	}
+//	for _, addrStr := range cmd.Addresses {
+//		lookups.addrs[addrStr] = struct{}{}
+//	}
+//	for _, outpoint := range outpoints {
+//		lookups.unspent[*outpoint] = struct{}{}
+//	}
+//
+//	chain := wsc.server.cfg.Chain
+//
+//	minBlockHash, err := chainhash.NewHashFromStr(cmd.BeginBlock)
+//	if err != nil {
+//		return nil, rpcDecodeHexError(cmd.BeginBlock)
+//	}
+//	minBlock, err := chain.BlockHeightByHash(minBlockHash)
+//	if err != nil {
+//		return nil, &abejson.RPCError{
+//			Code:    abejson.ErrRPCBlockNotFound,
+//			Message: "Error getting block: " + err.Error(),
+//		}
+//	}
+//
+//	maxBlock := int32(math.MaxInt32)
+//	if cmd.EndBlock != nil {
+//		maxBlockHash, err := chainhash.NewHashFromStr(*cmd.EndBlock)
+//		if err != nil {
+//			return nil, rpcDecodeHexError(*cmd.EndBlock)
+//		}
+//		maxBlock, err = chain.BlockHeightByHash(maxBlockHash)
+//		if err != nil {
+//			return nil, &abejson.RPCError{
+//				Code:    abejson.ErrRPCBlockNotFound,
+//				Message: "Error getting block: " + err.Error(),
+//			}
+//		}
+//	}
+//
+//	var (
+//		lastBlock     *abeutil.Block
+//		lastBlockHash *chainhash.Hash
+//	)
+//	if len(lookups.addrs) != 0 || len(lookups.unspent) != 0 {
+//		// With all the arguments parsed, we'll execute our chunked rescan
+//		// which will notify the clients of any address deposits or output
+//		// spends.
+//		lastBlock, lastBlockHash, err = scanBlockChunks(
+//			wsc, cmd, &lookups, minBlock, maxBlock, chain,
+//		)
+//		if err != nil {
+//			return nil, err
+//		}
+//
+//		// If the last block is nil, then this means that the client
+//		// disconnected mid-rescan. As a result, we don't need to send
+//		// anything back to them.
+//		if lastBlock == nil {
+//			return nil, nil
+//		}
+//	} else {
+//		rpcsLog.Infof("Skipping rescan as client has no addrs/utxos")
+//
+//		// If we didn't actually do a rescan, then we'll give the
+//		// client our best known block within the final rescan finished
+//		// notification.
+//		chainTip := chain.BestSnapshot()
+//		lastBlockHash = &chainTip.Hash
+//		lastBlock, err = chain.BlockByHash(lastBlockHash)
+//		if err != nil {
+//			return nil, &abejson.RPCError{
+//				Code:    abejson.ErrRPCBlockNotFound,
+//				Message: "Error getting block: " + err.Error(),
+//			}
+//		}
+//	}
+//
+//	// Notify websocket client of the finished rescan.  Due to how btcd
+//	// asynchronously queues notifications to not block calling code,
+//	// there is no guarantee that any of the notifications created during
+//	// rescan (such as rescanprogress, recvtx and redeemingtx) will be
+//	// received before the rescan RPC returns.  Therefore, another method
+//	// is needed to safely inform clients that all rescan notifications have
+//	// been sent.
+//	n := abejson.NewRescanFinishedNtfn(
+//		lastBlockHash.String(), lastBlock.Height(),
+//		lastBlock.MsgBlock().Header.Timestamp.Unix(),
+//	)
+//	if mn, err := abejson.MarshalCmd(nil, n); err != nil {
+//		rpcsLog.Errorf("Failed to marshal rescan finished "+
+//			"notification: %v", err)
+//	} else {
+//		// The rescan is finished, so we don't care whether the client
+//		// has disconnected at this point, so discard error.
+//		_ = wsc.QueueNotification(mn)
+//	}
+//
+//	rpcsLog.Info("Finished rescan")
+//	return nil, nil
+//}
 
 func init() {
 	wsHandlers = wsHandlersBeforeInit
