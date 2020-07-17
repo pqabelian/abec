@@ -2645,6 +2645,7 @@ func New(config *Config) (*BlockChain, error) {
 		orphansBTCD:         make(map[chainhash.Hash]*orphanBlock),
 		orphansAbe:          make(map[chainhash.Hash]*orphanBlockAbe),
 		prevOrphans:         make(map[chainhash.Hash][]*orphanBlock),
+		prevOrphansAbe:		 make(map[chainhash.Hash][]*orphanBlockAbe),
 		warningCaches:       newThresholdCaches(vbNumBits),
 		deploymentCaches:    newThresholdCaches(chaincfg.DefinedDeployments),
 	}

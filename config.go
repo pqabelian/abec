@@ -58,8 +58,8 @@ const (
 	blockMaxWeightMin           = 4000
 	blockMaxWeightMax           = blockchain.MaxBlockWeight - 4000
 	// todo(abe):
-	//defaultGenerate              = false
-	defaultGenerate              = true
+	defaultGenerate              = false
+	//defaultGenerate              = true
 	defaultMaxOrphanTransactions = 100
 	defaultMaxOrphanTxSize       = 100000
 	defaultSigCacheMaxSize       = 100000
