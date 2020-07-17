@@ -2967,45 +2967,43 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	}
 
 	if !cfg.DisableRPC {
-		//	TODO(ABE, MUST)
-		return nil, errors.New("At this moment, RGC is not suppored yet. Please disable RPC.")
+		// Setup listeners for the configured RPC listen addresses and
+		// TLS settings.
+		rpcListeners, err := setupRPCListeners()
+		if err != nil {
+			return nil, err
+		}
+		if len(rpcListeners) == 0 {
+			return nil, errors.New("RPCS: No valid listen address")
+		}
 
-		/*		// Setup listeners for the configured RPC listen addresses and
-				// TLS settings.
-				rpcListeners, err := setupRPCListeners()
-				if err != nil {
-					return nil, err
-				}
-				if len(rpcListeners) == 0 {
-					return nil, errors.New("RPCS: No valid listen address")
-				}
+		s.rpcServer, err = newRPCServer(&rpcserverConfig{
+			Listeners:   rpcListeners,
+			StartupTime: s.startupTime,
+			ConnMgr:     &rpcConnManager{&s},
+			SyncMgr:     &rpcSyncMgr{&s, s.syncManager},
+			TimeSource:  s.timeSource,
+			Chain:       s.chain,
+			ChainParams: chainParams,
+			DB:          db,
+			TxMemPool:   s.txMemPool,
+			Generator:   blockTemplateGenerator,
+			CPUMiner:    s.cpuMiner,
+			TxIndex:     s.txIndex,
+			AddrIndex:   s.addrIndex,
+			// TODO(ABE): ABE does not support filter.
+			//CfIndex:      s.cfIndex,
+			FeeEstimator: s.feeEstimator,
+		})
+		if err != nil {
+			return nil, err
+		}
 
-				s.rpcServer, err = newRPCServer(&rpcserverConfig{
-					Listeners:    rpcListeners,
-					StartupTime:  s.startupTime,
-					ConnMgr:      &rpcConnManager{&s},
-					SyncMgr:      &rpcSyncMgr{&s, s.syncManager},
-					TimeSource:   s.timeSource,
-					Chain:        s.chain,
-					ChainParams:  chainParams,
-					DB:           db,
-					TxMemPool:    s.txMemPool,
-					Generator:    blockTemplateGenerator,
-					CPUMiner:     s.cpuMiner,
-					TxIndex:      s.txIndex,
-					AddrIndex:    s.addrIndex,
-					CfIndex:      s.cfIndex,
-					FeeEstimator: s.feeEstimator,
-				})
-				if err != nil {
-					return nil, err
-				}
-
-				// Signal process shutdown when the RPC server requests it.
-				go func() {
-					<-s.rpcServer.RequestedProcessShutdown()
-					shutdownRequestChannel <- struct{}{}
-				}()*/
+		// Signal process shutdown when the RPC server requests it.
+		go func() {
+			<-s.rpcServer.RequestedProcessShutdown()
+			shutdownRequestChannel <- struct{}{}
+		}()
 	}
 
 	return &s, nil

@@ -831,11 +831,12 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 	// as spent by the pool.
 	txD := &TxDescAbe{
 		TxDescAbe: mining.TxDescAbe{
-			Tx:       tx,
-			Added:    time.Now(),
-			Height:   height,
-			Fee:      fee,
-			FeePerKB: fee * 1000 / GetTxVirtualSizeAbe(tx),
+			Tx:     tx,
+			Added:  time.Now(),
+			Height: height,
+			Fee:    fee,
+			//FeePerKB: fee * 1000 / GetTxVirtualSizeAbe(tx),
+			FeePerKB: fee * 1000 / int64(tx.MsgTx().SerializeSize()),
 		},
 		StartingPriority: mining.CalcPriorityAbe(tx.MsgTx(), utxoRingView, height),
 	}
