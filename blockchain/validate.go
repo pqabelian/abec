@@ -35,7 +35,8 @@ const (
 
 	// baseSubsidy is the starting subsidy amount for mined blocks.  This
 	// value is halved every SubsidyHalvingInterval blocks.
-	baseSubsidy = 512 * abeutil.NeutrinoPerAbe
+	//baseSubsidy = 512 * abeutil.NeutrinoPerAbe       //TODO(osy):this value should be 400 to uniform
+	baseSubsidy = 400 * abeutil.NeutrinoPerAbe
 )
 
 var (

@@ -1065,10 +1065,10 @@ func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe
 
 	// Load the previous block since some details for it are needed below.
 	prevNode := node.parent
-	var prevBlock *abeutil.Block
+	var prevBlock *abeutil.BlockAbe
 	err := b.db.View(func(dbTx database.Tx) error {
 		var err error
-		prevBlock, err = dbFetchBlockByNode(dbTx, prevNode)
+		prevBlock, err = dbFetchBlockByNodeAbe(dbTx, prevNode)
 		return err
 	})
 	if err != nil {
@@ -2645,7 +2645,7 @@ func New(config *Config) (*BlockChain, error) {
 		orphansBTCD:         make(map[chainhash.Hash]*orphanBlock),
 		orphansAbe:          make(map[chainhash.Hash]*orphanBlockAbe),
 		prevOrphans:         make(map[chainhash.Hash][]*orphanBlock),
-		prevOrphansAbe:		 make(map[chainhash.Hash][]*orphanBlockAbe),
+		prevOrphansAbe:      make(map[chainhash.Hash][]*orphanBlockAbe),
 		warningCaches:       newThresholdCaches(vbNumBits),
 		deploymentCaches:    newThresholdCaches(chaincfg.DefinedDeployments),
 	}
