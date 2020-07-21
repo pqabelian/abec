@@ -1066,10 +1066,10 @@ func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe
 
 	// Load the previous block since some details for it are needed below.
 	prevNode := node.parent
-	var prevBlock *abeutil.Block
+	var prevBlock *abeutil.BlockAbe
 	err := b.db.View(func(dbTx database.Tx) error {
 		var err error
-		prevBlock, err = dbFetchBlockByNode(dbTx, prevNode)
+		prevBlock, err = dbFetchBlockByNodeAbe(dbTx, prevNode)
 		return err
 	})
 	if err != nil {
