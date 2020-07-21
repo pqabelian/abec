@@ -35,7 +35,7 @@ type UtxoRingEntry struct {
 
 	//	ringHash	chainhash.Hash	//	the hash of ring members, i.e. OutPoint(txHash, index)
 	ringBlockHeight int32
-	outPointRing    wire.OutPointRing
+	outPointRing    *wire.OutPointRing
 	txOuts          []*wire.TxOutAbe
 	//	generatingBlockHeights []int32	// height of block that generates txOuts[i]
 	serialNumbers       []*chainhash.Hash //	when a member is consumed, a corresponding serilaNumber is added
@@ -122,6 +122,23 @@ func (entry *UtxoRingEntry) RingBlockHeight() int32 {
 		return ringBlockHeight*/
 
 	return entry.ringBlockHeight
+}
+
+// BlockHeight returns the height of the block containing the output.
+func (entry *UtxoRingEntry) OutPointRing() *wire.OutPointRing {
+	return entry.outPointRing
+}
+
+func (entry *UtxoRingEntry) TxOuts() []*wire.TxOutAbe {
+	return entry.txOuts
+}
+
+func (entry *UtxoRingEntry) SerialNumbers() []*chainhash.Hash {
+	return entry.serialNumbers
+}
+
+func (entry *UtxoRingEntry) ConsumingBlockHashs() []*chainhash.Hash {
+	return entry.consumingBlockHashs
 }
 
 func (entry *UtxoRingEntry) SerializeSize() int {
@@ -474,34 +491,33 @@ func (entry *UtxoRingEntry) IsSame(obj *UtxoRingEntry) bool {
 	return true
 }
 
-func newUtxoRingEntry(ringBlockHeight int32, blockhashs []*chainhash.Hash, ringMemberTxos []*RingMemberTxo, isCoinBase bool) *UtxoRingEntry {
+func initNewUtxoRingEntry(ringBlockHeight int32, blockhashs []*chainhash.Hash, ringMemberTxos []*RingMemberTxo, isCoinBase bool) *UtxoRingEntry {
 
 	ringSize := len(ringMemberTxos)
 	if ringSize == 0 {
 		return nil
 	}
 
-	utxoRingEntry := new(UtxoRingEntry)
-	utxoRingEntry.ringBlockHeight = ringBlockHeight
+	utxoRingEntry := &UtxoRingEntry{
+		ringBlockHeight: ringBlockHeight,
+	}
 
-	utxoRingEntry.outPointRing = wire.OutPointRing{}
-	utxoRingEntry.outPointRing.BlockHashs = blockhashs
-	utxoRingEntry.outPointRing.OutPoints = make([]*wire.OutPointAbe, ringSize)
+	outPoints := make([]*wire.OutPointAbe, ringSize)
+	txOuts := make([]*wire.TxOutAbe, ringSize)
+	for i := 0; i < ringSize; i++ {
+		outPoints[i] = ringMemberTxos[i].outPoint
+		txOuts[i] = ringMemberTxos[i].txOut
+	}
 
-	utxoRingEntry.txOuts = make([]*wire.TxOutAbe, ringSize)
-	//	utxoRingEntry.generatingBlockHeights = make([]int32, ringSize )
+	utxoRingEntry.outPointRing = wire.NewOutPointRing(blockhashs, outPoints)
+	utxoRingEntry.txOuts = txOuts
+
 	utxoRingEntry.serialNumbers = nil
 	utxoRingEntry.consumingBlockHashs = nil
-	//	utxoRingEntry.consumingBlockHeights = nil
+
 	utxoRingEntry.packedFlags = tfModified
 	if isCoinBase {
 		utxoRingEntry.packedFlags |= tfCoinBase
-	}
-
-	for j := 0; j < ringSize; j++ {
-		utxoRingEntry.outPointRing.OutPoints[j] = ringMemberTxos[j].outPoint
-		utxoRingEntry.txOuts[j] = ringMemberTxos[j].txOut
-		//		utxoRingEntry.generatingBlockHeights[j] = ringMemberTxos[j].blockHeight
 	}
 
 	return utxoRingEntry
@@ -1096,7 +1112,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 	for i := 0; i < normalRingNum; i++ {
 		// rings with size wire.TxRingSize
 		start := i * wire.TxRingSize
-		utxoRingEntry := newUtxoRingEntry(ringBlockHeight, blockhashs, ringMemberTxos[start:start+wire.TxRingSize], isCoinBase)
+		utxoRingEntry := initNewUtxoRingEntry(ringBlockHeight, blockhashs, ringMemberTxos[start:start+wire.TxRingSize], isCoinBase)
 
 		outPointRingHash := utxoRingEntry.outPointRing.Hash()
 		if existingUtxoRing, ok := view.entries[outPointRingHash]; ok {
@@ -1117,7 +1133,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 
 		// rings with size1
 		start := normalRingNum * wire.TxRingSize
-		utxoRingEntry1 := newUtxoRingEntry(ringBlockHeight, blockhashs, ringMemberTxos[start:start+ringSize1], isCoinBase)
+		utxoRingEntry1 := initNewUtxoRingEntry(ringBlockHeight, blockhashs, ringMemberTxos[start:start+ringSize1], isCoinBase)
 
 		outPointRingHash1 := utxoRingEntry1.outPointRing.Hash()
 		if existingUtxoRing, ok := view.entries[outPointRingHash1]; ok {
@@ -1129,7 +1145,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 
 		// rings with size2
 		start = start + ringSize1
-		utxoRingEntry2 := newUtxoRingEntry(ringBlockHeight, blockhashs, ringMemberTxos[start:], isCoinBase)
+		utxoRingEntry2 := initNewUtxoRingEntry(ringBlockHeight, blockhashs, ringMemberTxos[start:], isCoinBase)
 
 		outPointRingHash2 := utxoRingEntry2.outPointRing.Hash()
 		if existingUtxoRing, ok := view.entries[outPointRingHash2]; ok {
@@ -1142,7 +1158,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 	} else if remainderTxoNum > 0 {
 		//	one ring with size = remainderTxoNum
 		start := normalRingNum * wire.TxRingSize
-		utxoRingEntry := newUtxoRingEntry(ringBlockHeight, blockhashs, ringMemberTxos[start:], isCoinBase)
+		utxoRingEntry := initNewUtxoRingEntry(ringBlockHeight, blockhashs, ringMemberTxos[start:], isCoinBase)
 
 		outPointRingHash := utxoRingEntry.outPointRing.Hash()
 		if existingUtxoRing, ok := view.entries[outPointRingHash]; ok {
@@ -1189,4 +1205,32 @@ func (x byOrderHashRingMemberTxo) Less(i, j int) bool {
 
 func (x byOrderHashRingMemberTxo) Swap(i, j int) {
 	x[i], x[j] = x[j], x[i]
+}
+
+// FetchUtxoEntry loads and returns the requested unspent transaction output
+// from the point of view of the end of the main chain.
+//
+// NOTE: Requesting an output for which there is no data will NOT return an
+// error.  Instead both the entry and the error will be nil.  This is done to
+// allow pruning of spent transaction outputs.  In practice this means the
+// caller must check if the returned entry is nil before invoking methods on it.
+//
+// This function is safe for concurrent access however the returned entry (if
+// any) is NOT.
+func (b *BlockChain) FetchUtxoRingEntry(outPointRing *wire.OutPointRing) (*UtxoRingEntry, error) {
+	b.chainLock.RLock()
+	defer b.chainLock.RUnlock()
+
+	ringHash := outPointRing.Hash()
+	var entry *UtxoRingEntry
+	err := b.db.View(func(dbTx database.Tx) error {
+		var err error
+		entry, err = dbFetchUtxoRingEntry(dbTx, ringHash)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return entry, nil
 }

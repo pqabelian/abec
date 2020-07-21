@@ -644,6 +644,7 @@ func (mp *TxPool) IsOrphanInPool(hash *chainhash.Hash) bool {
 // in the main pool or in the orphan pool.
 //
 // This function MUST be called with the mempool lock held (for reads).
+//	todo(ABE)
 func (mp *TxPool) haveTransaction(hash *chainhash.Hash) bool {
 	return mp.isTransactionInPoolAbe(hash) || mp.isOrphanInPoolAbe(hash)
 }
@@ -855,7 +856,7 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 	}
 	atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
 
-	// todo (ABE):
+	// todo (ABE.MUST):
 	// Add unconfirmed address index entries associated with the transaction
 	// if enabled.
 	/*	if mp.cfg.AddrIndex != nil {
@@ -1278,10 +1279,10 @@ func (mp *TxPool) fetchInputUtxoRingsAbe(tx *abeutil.TxAbe) (*blockchain.UtxoRin
 // orphans.
 //
 // This function is safe for concurrent access.
-func (mp *TxPool) FetchTransaction(txHash *chainhash.Hash) (*abeutil.Tx, error) {
+func (mp *TxPool) FetchTransaction(txHash *chainhash.Hash) (*abeutil.TxAbe, error) {
 	// Protect concurrent access.
 	mp.mtx.RLock()
-	txDesc, exists := mp.pool[*txHash]
+	txDesc, exists := mp.poolAbe[*txHash]
 	mp.mtx.RUnlock()
 
 	if exists {
@@ -2321,11 +2322,25 @@ func (mp *TxPool) TxHashes() []*chainhash.Hash {
 // The descriptors are to be treated as read only.
 //
 // This function is safe for concurrent access.
+//	todo(ABE):
 func (mp *TxPool) TxDescs() []*TxDesc {
 	mp.mtx.RLock()
 	descs := make([]*TxDesc, len(mp.pool))
 	i := 0
 	for _, desc := range mp.pool {
+		descs[i] = desc
+		i++
+	}
+	mp.mtx.RUnlock()
+
+	return descs
+}
+
+func (mp *TxPool) TxDescsAbe() []*TxDescAbe {
+	mp.mtx.RLock()
+	descs := make([]*TxDescAbe, len(mp.poolAbe))
+	i := 0
+	for _, desc := range mp.poolAbe {
 		descs[i] = desc
 		i++
 	}
@@ -2374,40 +2389,40 @@ func (mp *TxPool) RawMempoolVerbose() map[string]*abejson.GetRawMempoolVerboseRe
 	mp.mtx.RLock()
 	defer mp.mtx.RUnlock()
 
-	result := make(map[string]*abejson.GetRawMempoolVerboseResult,
-		len(mp.pool))
+	result := make(map[string]*abejson.GetRawMempoolVerboseResult, len(mp.poolAbe))
 	bestHeight := mp.cfg.BestHeight()
 
-	for _, desc := range mp.pool {
+	for _, desc := range mp.poolAbe {
 		// Calculate the current priority based on the inputs to
 		// the transaction.  Use zero if one or more of the
 		// input transactions can't be found for some reason.
 		tx := desc.Tx
 		var currentPriority float64
-		utxos, err := mp.fetchInputUtxos(tx)
+		//		utxos, err := mp.fetchInputUtxos(tx)
+		utxoRings, err := mp.fetchInputUtxoRingsAbe(tx)
 		if err == nil {
-			currentPriority = mining.CalcPriority(tx.MsgTx(), utxos,
-				bestHeight+1)
+			currentPriority = mining.CalcPriorityAbe(tx.MsgTx(), utxoRings, bestHeight+1)
 		}
 
 		mpd := &abejson.GetRawMempoolVerboseResult{
-			Size:             int32(tx.MsgTx().SerializeSize()),
-			Vsize:            int32(GetTxVirtualSize(tx)),
-			Weight:           int32(blockchain.GetTransactionWeight(tx)),
+			Size:     int32(tx.MsgTx().SerializeSize()),
+			Fullsize: int32(tx.MsgTx().SerializeSizeFull()),
+			//Vsize:            int32(GetTxVirtualSize(tx)),
+			//Weight:           int32(blockchain.GetTransactionWeight(tx)),
 			Fee:              abeutil.Amount(desc.Fee).ToABE(),
 			Time:             desc.Added.Unix(),
 			Height:           int64(desc.Height),
 			StartingPriority: desc.StartingPriority,
 			CurrentPriority:  currentPriority,
-			Depends:          make([]string, 0),
+			//			Depends:          make([]string, 0),
 		}
-		for _, txIn := range tx.MsgTx().TxIn {
-			hash := &txIn.PreviousOutPoint.Hash
-			if mp.haveTransaction(hash) {
-				mpd.Depends = append(mpd.Depends,
-					hash.String())
-			}
-		}
+		//for _, txIn := range tx.MsgTx().TxIn {
+		//	hash := &txIn.PreviousOutPoint.Hash
+		//	if mp.haveTransaction(hash) {
+		//		mpd.Depends = append(mpd.Depends,
+		//			hash.String())
+		//	}
+		//}
 
 		result[tx.Hash().String()] = mpd
 	}

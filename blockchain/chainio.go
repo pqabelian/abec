@@ -327,6 +327,24 @@ func (b *BlockChain) FetchSpendJournal(targetBlock *abeutil.Block) ([]SpentTxOut
 	return spendEntries, nil
 }
 
+func (b *BlockChain) FetchSpendJournalAbe(targetBlock *abeutil.BlockAbe) ([]*SpentTxOutAbe, error) {
+	b.chainLock.RLock()
+	defer b.chainLock.RUnlock()
+
+	var spendEntries []*SpentTxOutAbe
+	err := b.db.View(func(dbTx database.Tx) error {
+		var err error
+
+		spendEntries, err = dbFetchSpendJournalEntryAbe(dbTx, targetBlock)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return spendEntries, nil
+}
+
 // spentTxOutHeaderCode returns the calculated header code to be used when
 // serializing the provided stxo entry.
 func spentTxOutHeaderCode(stxo *SpentTxOut) uint64 {

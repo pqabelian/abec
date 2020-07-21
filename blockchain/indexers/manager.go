@@ -316,6 +316,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 
 	// Initialize each of the enabled indexes.
 	for _, indexer := range m.enabledIndexes {
+		//	todo(ABE.MUST)
 		if err := indexer.Init(); err != nil {
 			return err
 		}
@@ -354,13 +355,13 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 			// loaded directly since it is no longer in the main
 			// chain and thus the chain.BlockByHash function would
 			// error.
-			var block *abeutil.Block
+			var block *abeutil.BlockAbe
 			err := m.db.View(func(dbTx database.Tx) error {
 				blockBytes, err := dbTx.FetchBlock(hash)
 				if err != nil {
 					return err
 				}
-				block, err = abeutil.NewBlockFromBytes(blockBytes)
+				block, err = abeutil.NewBlockFromBytesAbe(blockBytes)
 				if err != nil {
 					return err
 				}
@@ -373,7 +374,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 
 			// We'll also grab the set of outputs spent by this
 			// block so we can remove them from the index.
-			spentTxos, err := chain.FetchSpendJournal(block)
+			spentTxos, err := chain.FetchSpendJournalAbe(block)
 			if err != nil {
 				return err
 			}
@@ -383,7 +384,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 			err = m.db.Update(func(dbTx database.Tx) error {
 				// Remove all of the index entries associated
 				// with the block and update the indexer tip.
-				err = dbIndexDisconnectBlock(
+				err = dbIndexDisconnectBlockAbe(
 					dbTx, indexer, block, spentTxos,
 				)
 				if err != nil {
@@ -456,7 +457,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 	for height := lowestHeight + 1; height <= bestHeight; height++ {
 		// Load the block for the height since it is required to index
 		// it.
-		block, err := chain.BlockByHeightBTCD(height)
+		block, err := chain.BlockByHeight(height)
 		if err != nil {
 			return err
 		}
@@ -466,7 +467,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 		}
 
 		// Connect the block for all indexes that need it.
-		var spentTxos []blockchain.SpentTxOut
+		var spentTxos []*blockchain.SpentTxOutAbe
 		for i, indexer := range m.enabledIndexes {
 			// Skip indexes that don't need to be updated with this
 			// block.
@@ -478,14 +479,14 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 			// and they haven't been loaded yet, they need to be
 			// retrieved from the spend journal.
 			if spentTxos == nil && indexNeedsInputs(indexer) {
-				spentTxos, err = chain.FetchSpendJournal(block)
+				spentTxos, err = chain.FetchSpendJournalAbe(block)
 				if err != nil {
 					return err
 				}
 			}
 
 			err := m.db.Update(func(dbTx database.Tx) error {
-				return dbIndexConnectBlock(
+				return dbIndexConnectBlockAbe(
 					dbTx, indexer, block, spentTxos,
 				)
 			})

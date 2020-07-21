@@ -62,14 +62,15 @@ type orphanBlockAbe struct {
 // However, the returned snapshot must be treated as immutable since it is
 // shared by all callers.
 type BestState struct {
-	Hash        chainhash.Hash // The hash of the block.
-	Height      int32          // The height of the block.
-	Bits        uint32         // The difficulty bits of the block.
-	BlockSize   uint64         // The size of the block.
-	BlockWeight uint64         // The weight of the block.
-	NumTxns     uint64         // The number of txns in the block.
-	TotalTxns   uint64         // The total number of txns in the chain.
-	MedianTime  time.Time      // Median time as per CalcPastMedianTime.
+	Hash      chainhash.Hash // The hash of the block.
+	Height    int32          // The height of the block.
+	Bits      uint32         // The difficulty bits of the block.
+	BlockSize uint64         // The size of the block.
+	//	todo(ABE): ABE does not ues weight.
+	BlockWeight uint64    // The weight of the block.
+	NumTxns     uint64    // The number of txns in the block.
+	TotalTxns   uint64    // The total number of txns in the chain.
+	MedianTime  time.Time // Median time as per CalcPastMedianTime.
 }
 
 // newBestState returns a new best stats instance for the given parameters.
@@ -2645,7 +2646,7 @@ func New(config *Config) (*BlockChain, error) {
 		orphansBTCD:         make(map[chainhash.Hash]*orphanBlock),
 		orphansAbe:          make(map[chainhash.Hash]*orphanBlockAbe),
 		prevOrphans:         make(map[chainhash.Hash][]*orphanBlock),
-		prevOrphansAbe:		 make(map[chainhash.Hash][]*orphanBlockAbe),
+		prevOrphansAbe:      make(map[chainhash.Hash][]*orphanBlockAbe),
 		warningCaches:       newThresholdCaches(vbNumBits),
 		deploymentCaches:    newThresholdCaches(chaincfg.DefinedDeployments),
 	}

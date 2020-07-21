@@ -43,6 +43,8 @@ const (
 	bytePerKb = 1000
 
 	btcPerSatoshi = 1e-8
+
+	abePerSatoshi = 1e-8
 )
 
 var (
@@ -51,11 +53,18 @@ var (
 	EstimateFeeDatabaseKey = []byte("estimatefee")
 )
 
+//	todo(ABE)
 // SatoshiPerByte is number with units of satoshis per byte.
 type SatoshiPerByte float64
 
 // BtcPerKilobyte is number with units of bitcoins per kilobyte.
 type BtcPerKilobyte float64
+
+// SatoshiPerByte is number with units of satoshis per byte.
+type NeutrinoPerByte float64
+
+// BtcPerKilobyte is number with units of bitcoins per kilobyte.
+type AbePerKilobyte float64
 
 // ToBtcPerKb returns a float value that represents the given
 // SatoshiPerByte converted to satoshis per kb.
@@ -66,6 +75,15 @@ func (rate SatoshiPerByte) ToBtcPerKb() BtcPerKilobyte {
 	}
 
 	return BtcPerKilobyte(float64(rate) * bytePerKb * btcPerSatoshi)
+}
+
+func (rate NeutrinoPerByte) ToAbePerKb() AbePerKilobyte {
+	// If our rate is the error value, return that.
+	if rate == NeutrinoPerByte(-1.0) {
+		return -1.0
+	}
+
+	return AbePerKilobyte(float64(rate) * bytePerKb * abePerSatoshi)
 }
 
 // Fee returns the fee for a transaction of a given size for
@@ -79,10 +97,23 @@ func (rate SatoshiPerByte) Fee(size uint32) abeutil.Amount {
 	return abeutil.Amount(float64(rate) * float64(size))
 }
 
+func (rate NeutrinoPerByte) Fee(size uint32) abeutil.Amount {
+	// If our rate is the error value, return that.
+	if rate == NeutrinoPerByte(-1) {
+		return abeutil.Amount(-1)
+	}
+
+	return abeutil.Amount(float64(rate) * float64(size))
+}
+
 // NewSatoshiPerByte creates a SatoshiPerByte from an Amount and a
 // size in bytes.
 func NewSatoshiPerByte(fee abeutil.Amount, size uint32) SatoshiPerByte {
 	return SatoshiPerByte(float64(fee) / float64(size))
+}
+
+func NewNeutrinoPerByte(fee abeutil.Amount, size uint32) NeutrinoPerByte {
+	return NeutrinoPerByte(float64(fee) / float64(size))
 }
 
 // observedTransaction represents an observed transaction and some
@@ -102,7 +133,29 @@ type observedTransaction struct {
 	mined int32
 }
 
+type observedTransactionAbe struct {
+	// A transaction hash.
+	hash chainhash.Hash
+
+	// The fee per byte of the transaction in satoshis.
+	feeRate NeutrinoPerByte
+
+	// The block height when it was observed.
+	observed int32
+
+	// The height of the block in which it was mined.
+	// If the transaction has not yet been mined, it is zero.
+	mined int32
+}
+
 func (o *observedTransaction) Serialize(w io.Writer) {
+	binary.Write(w, binary.BigEndian, o.hash)
+	binary.Write(w, binary.BigEndian, o.feeRate)
+	binary.Write(w, binary.BigEndian, o.observed)
+	binary.Write(w, binary.BigEndian, o.mined)
+}
+
+func (o *observedTransactionAbe) Serialize(w io.Writer) {
 	binary.Write(w, binary.BigEndian, o.hash)
 	binary.Write(w, binary.BigEndian, o.feeRate)
 	binary.Write(w, binary.BigEndian, o.observed)
@@ -111,6 +164,22 @@ func (o *observedTransaction) Serialize(w io.Writer) {
 
 func deserializeObservedTransaction(r io.Reader) (*observedTransaction, error) {
 	ot := observedTransaction{}
+
+	// The first 32 bytes should be a hash.
+	binary.Read(r, binary.BigEndian, &ot.hash)
+
+	// The next 8 are SatoshiPerByte
+	binary.Read(r, binary.BigEndian, &ot.feeRate)
+
+	// And next there are two uint32's.
+	binary.Read(r, binary.BigEndian, &ot.observed)
+	binary.Read(r, binary.BigEndian, &ot.mined)
+
+	return &ot, nil
+}
+
+func deserializeObservedTransactionAbe(r io.Reader) (*observedTransactionAbe, error) {
+	ot := observedTransactionAbe{}
 
 	// The first 32 bytes should be a hash.
 	binary.Read(r, binary.BigEndian, &ot.hash)
@@ -134,7 +203,21 @@ type registeredBlock struct {
 	transactions []*observedTransaction
 }
 
+type registeredBlockAbe struct {
+	hash         chainhash.Hash
+	transactions []*observedTransactionAbe
+}
+
 func (rb *registeredBlock) serialize(w io.Writer, txs map[*observedTransaction]uint32) {
+	binary.Write(w, binary.BigEndian, rb.hash)
+
+	binary.Write(w, binary.BigEndian, uint32(len(rb.transactions)))
+	for _, o := range rb.transactions {
+		binary.Write(w, binary.BigEndian, txs[o])
+	}
+}
+
+func (rb *registeredBlockAbe) serialize(w io.Writer, txs map[*observedTransactionAbe]uint32) {
 	binary.Write(w, binary.BigEndian, rb.hash)
 
 	binary.Write(w, binary.BigEndian, uint32(len(rb.transactions)))
@@ -163,16 +246,20 @@ type FeeEstimator struct {
 	// The number of blocks that have been registered.
 	numBlocksRegistered uint32
 
-	mtx      sync.RWMutex
-	observed map[chainhash.Hash]*observedTransaction
-	bin      [estimateFeeDepth][]*observedTransaction
+	mtx         sync.RWMutex
+	observed    map[chainhash.Hash]*observedTransaction
+	bin         [estimateFeeDepth][]*observedTransaction
+	observedAbe map[chainhash.Hash]*observedTransactionAbe
+	binAbe      [estimateFeeDepth][]*observedTransactionAbe
 
 	// The cached estimates.
-	cached []SatoshiPerByte
+	cached    []SatoshiPerByte
+	cachedAbe []NeutrinoPerByte
 
 	// Transactions that have been removed from the bins. This allows us to
 	// revert in case of an orphaned block.
-	dropped []*registeredBlock
+	dropped    []*registeredBlock
+	droppedAbe []*registeredBlockAbe
 }
 
 // NewFeeEstimator creates a FeeEstimator for which at most maxRollback blocks
@@ -187,6 +274,8 @@ func NewFeeEstimator(maxRollback, minRegisteredBlocks uint32) *FeeEstimator {
 		maxReplacements:     estimateFeeMaxReplacements,
 		observed:            make(map[chainhash.Hash]*observedTransaction),
 		dropped:             make([]*registeredBlock, 0, maxRollback),
+		observedAbe:         make(map[chainhash.Hash]*observedTransactionAbe),
+		droppedAbe:          make([]*registeredBlockAbe, 0, maxRollback),
 	}
 }
 
@@ -226,12 +315,12 @@ func (ef *FeeEstimator) ObserveTransactionAbe(t *TxDescAbe) {
 	}
 
 	hash := *t.Tx.Hash()
-	if _, ok := ef.observed[hash]; !ok {
-		size := uint32(GetTxVirtualSizeAbe(t.Tx))
+	if _, ok := ef.observedAbe[hash]; !ok {
+		size := uint32(t.Tx.MsgTx().SerializeSize())
 
-		ef.observed[hash] = &observedTransaction{
+		ef.observedAbe[hash] = &observedTransactionAbe{
 			hash:     hash,
-			feeRate:  NewSatoshiPerByte(abeutil.Amount(t.Fee), size),
+			feeRate:  NewNeutrinoPerByte(abeutil.Amount(t.Fee), size),
 			observed: t.Height,
 			mined:    mining.UnminedHeight,
 		}
@@ -351,7 +440,7 @@ func (ef *FeeEstimator) RegisterBlockAbe(block *abeutil.BlockAbe) error {
 	defer ef.mtx.Unlock()
 
 	// The previous sorted list is invalid, so delete it.
-	ef.cached = nil
+	ef.cachedAbe = nil
 
 	height := block.Height()
 	if height != ef.lastKnownHeight+1 && ef.lastKnownHeight != mining.UnminedHeight {
@@ -374,9 +463,9 @@ func (ef *FeeEstimator) RegisterBlockAbe(block *abeutil.BlockAbe) error {
 	var replacementCounts [estimateFeeDepth]int
 
 	// Keep track of which txs were dropped in case of an orphan block.
-	dropped := &registeredBlock{
+	dropped := &registeredBlockAbe{
 		hash:         *block.Hash(),
-		transactions: make([]*observedTransaction, 0, 100),
+		transactions: make([]*observedTransactionAbe, 0, 100),
 	}
 
 	// Go through the txs in the block.
@@ -384,7 +473,7 @@ func (ef *FeeEstimator) RegisterBlockAbe(block *abeutil.BlockAbe) error {
 		hash := *t.Hash()
 
 		// Have we observed this tx in the mempool?
-		o, ok := ef.observed[hash]
+		o, ok := ef.observedAbe[hash]
 		if !ok {
 			continue
 		}
@@ -414,7 +503,7 @@ func (ef *FeeEstimator) RegisterBlockAbe(block *abeutil.BlockAbe) error {
 
 		replacementCounts[blocksToConfirm]++
 
-		bin := ef.bin[blocksToConfirm]
+		bin := ef.binAbe[blocksToConfirm]
 
 		// Remove a random element and replace it with this new tx.
 		if len(bin) == int(ef.binSize) {
@@ -428,13 +517,13 @@ func (ef *FeeEstimator) RegisterBlockAbe(block *abeutil.BlockAbe) error {
 		} else {
 			bin = append(bin, o)
 		}
-		ef.bin[blocksToConfirm] = bin
+		ef.binAbe[blocksToConfirm] = bin
 	}
 
 	// Go through the mempool for txs that have been in too long.
-	for hash, o := range ef.observed {
+	for hash, o := range ef.observedAbe {
 		if o.mined == mining.UnminedHeight && height-o.observed >= estimateFeeDepth {
-			delete(ef.observed, hash)
+			delete(ef.observedAbe, hash)
 		}
 	}
 
@@ -443,10 +532,10 @@ func (ef *FeeEstimator) RegisterBlockAbe(block *abeutil.BlockAbe) error {
 		return nil
 	}
 
-	if uint32(len(ef.dropped)) == ef.maxRollback {
-		ef.dropped = append(ef.dropped[1:], dropped)
+	if uint32(len(ef.droppedAbe)) == ef.maxRollback {
+		ef.droppedAbe = append(ef.droppedAbe[1:], dropped)
 	} else {
-		ef.dropped = append(ef.dropped, dropped)
+		ef.droppedAbe = append(ef.droppedAbe, dropped)
 	}
 
 	return nil
@@ -475,13 +564,13 @@ func (ef *FeeEstimator) Rollback(hash *chainhash.Hash) error {
 
 	// Find this block in the stack of recent registered blocks.
 	var n int
-	for n = 1; n <= len(ef.dropped); n++ {
-		if ef.dropped[len(ef.dropped)-n].hash.IsEqual(hash) {
+	for n = 1; n <= len(ef.droppedAbe); n++ {
+		if ef.droppedAbe[len(ef.droppedAbe)-n].hash.IsEqual(hash) {
 			break
 		}
 	}
 
-	if n > len(ef.dropped) {
+	if n > len(ef.droppedAbe) {
 		return errors.New("no such block was recently registered")
 	}
 
@@ -496,10 +585,10 @@ func (ef *FeeEstimator) Rollback(hash *chainhash.Hash) error {
 // of registered blocks.
 func (ef *FeeEstimator) rollback() {
 	// The previous sorted list is invalid, so delete it.
-	ef.cached = nil
+	ef.cachedAbe = nil
 
 	// pop the last list of dropped txs from the stack.
-	last := len(ef.dropped) - 1
+	last := len(ef.droppedAbe) - 1
 	if last == -1 {
 		// Cannot really happen because the exported calling function
 		// only rolls back a block already known to be in the list
@@ -507,7 +596,7 @@ func (ef *FeeEstimator) rollback() {
 		return
 	}
 
-	dropped := ef.dropped[last]
+	dropped := ef.droppedAbe[last]
 
 	// where we are in each bin as we replace txs?
 	var replacementCounters [estimateFeeDepth]int
@@ -517,7 +606,7 @@ func (ef *FeeEstimator) rollback() {
 		// Which bin was this tx in?
 		blocksToConfirm := o.mined - o.observed - 1
 
-		bin := ef.bin[blocksToConfirm]
+		bin := ef.binAbe[blocksToConfirm]
 
 		var counter = replacementCounters[blocksToConfirm]
 
@@ -554,16 +643,16 @@ func (ef *FeeEstimator) rollback() {
 				break
 			}
 
-			prev := ef.bin[i][j]
+			prev := ef.binAbe[i][j]
 
 			if prev.mined == ef.lastKnownHeight {
 				prev.mined = mining.UnminedHeight
 
-				newBin := append(ef.bin[i][0:j], ef.bin[i][j+1:l]...)
+				newBin := append(ef.binAbe[i][0:j], ef.binAbe[i][j+1:l]...)
 				// TODO This line should prevent an unintentional memory
 				// leak but it causes a panic when it is uncommented.
 				// ef.bin[i][j] = nil
-				ef.bin[i] = newBin
+				ef.binAbe[i] = newBin
 
 				continue
 			}
@@ -572,7 +661,7 @@ func (ef *FeeEstimator) rollback() {
 		}
 	}
 
-	ef.dropped = ef.dropped[0:last]
+	ef.droppedAbe = ef.droppedAbe[0:last]
 
 	// The number of blocks the fee estimator has seen is decrimented.
 	ef.numBlocksRegistered--
@@ -586,13 +675,25 @@ type estimateFeeSet struct {
 	bin     [estimateFeeDepth]uint32
 }
 
-func (b *estimateFeeSet) Len() int { return len(b.feeRate) }
+type estimateFeeSetAbe struct {
+	feeRate []NeutrinoPerByte
+	bin     [estimateFeeDepth]uint32
+}
+
+func (b *estimateFeeSet) Len() int    { return len(b.feeRate) }
+func (b *estimateFeeSetAbe) Len() int { return len(b.feeRate) }
 
 func (b *estimateFeeSet) Less(i, j int) bool {
 	return b.feeRate[i] > b.feeRate[j]
 }
+func (b *estimateFeeSetAbe) Less(i, j int) bool {
+	return b.feeRate[i] > b.feeRate[j]
+}
 
 func (b *estimateFeeSet) Swap(i, j int) {
+	b.feeRate[i], b.feeRate[j] = b.feeRate[j], b.feeRate[i]
+}
+func (b *estimateFeeSetAbe) Swap(i, j int) {
 	b.feeRate[i], b.feeRate[j] = b.feeRate[j], b.feeRate[i]
 }
 
@@ -602,6 +703,37 @@ func (b *estimateFeeSet) Swap(i, j int) {
 func (b *estimateFeeSet) estimateFee(confirmations int) SatoshiPerByte {
 	if confirmations <= 0 {
 		return SatoshiPerByte(math.Inf(1))
+	}
+
+	if confirmations > estimateFeeDepth {
+		return 0
+	}
+
+	// We don't have any transactions!
+	if len(b.feeRate) == 0 {
+		return 0
+	}
+
+	var min, max int = 0, 0
+	for i := 0; i < confirmations-1; i++ {
+		min += int(b.bin[i])
+	}
+
+	max = min + int(b.bin[confirmations-1]) - 1
+	if max < min {
+		max = min
+	}
+	feeIndex := (min + max) / 2
+	if feeIndex >= len(b.feeRate) {
+		feeIndex = len(b.feeRate) - 1
+	}
+
+	return b.feeRate[feeIndex]
+}
+
+func (b *estimateFeeSetAbe) estimateFee(confirmations int) NeutrinoPerByte {
+	if confirmations <= 0 {
+		return NeutrinoPerByte(math.Inf(1))
 	}
 
 	if confirmations > estimateFeeDepth {
@@ -657,6 +789,31 @@ func (ef *FeeEstimator) newEstimateFeeSet() *estimateFeeSet {
 	return set
 }
 
+func (ef *FeeEstimator) newEstimateFeeSetAbe() *estimateFeeSetAbe {
+	set := &estimateFeeSetAbe{}
+
+	capacity := 0
+	for i, b := range ef.binAbe {
+		l := len(b)
+		set.bin[i] = uint32(l)
+		capacity += l
+	}
+
+	set.feeRate = make([]NeutrinoPerByte, capacity)
+
+	i := 0
+	for _, b := range ef.binAbe {
+		for _, o := range b {
+			set.feeRate[i] = o.feeRate
+			i++
+		}
+	}
+
+	sort.Sort(set)
+
+	return set
+}
+
 // estimates returns the set of all fee estimates from 1 to estimateFeeDepth
 // confirmations from now.
 func (ef *FeeEstimator) estimates() []SatoshiPerByte {
@@ -669,9 +826,20 @@ func (ef *FeeEstimator) estimates() []SatoshiPerByte {
 
 	return estimates
 }
+func (ef *FeeEstimator) estimatesAbe() []NeutrinoPerByte {
+	set := ef.newEstimateFeeSetAbe()
+
+	estimates := make([]NeutrinoPerByte, estimateFeeDepth)
+	for i := 0; i < estimateFeeDepth; i++ {
+		estimates[i] = set.estimateFee(i + 1)
+	}
+
+	return estimates
+}
 
 // EstimateFee estimates the fee per byte to have a tx confirmed a given
 // number of blocks from now.
+//	todo(ABE)
 func (ef *FeeEstimator) EstimateFee(numBlocks uint32) (BtcPerKilobyte, error) {
 	ef.mtx.Lock()
 	defer ef.mtx.Unlock()
@@ -700,6 +868,34 @@ func (ef *FeeEstimator) EstimateFee(numBlocks uint32) (BtcPerKilobyte, error) {
 	return ef.cached[int(numBlocks)-1].ToBtcPerKb(), nil
 }
 
+func (ef *FeeEstimator) EstimateFeeAbe(numBlocks uint32) (AbePerKilobyte, error) {
+	ef.mtx.Lock()
+	defer ef.mtx.Unlock()
+
+	// If the number of registered blocks is below the minimum, return
+	// an error.
+	if ef.numBlocksRegistered < ef.minRegisteredBlocks {
+		return -1, errors.New("not enough blocks have been observed")
+	}
+
+	if numBlocks == 0 {
+		return -1, errors.New("cannot confirm transaction in zero blocks")
+	}
+
+	if numBlocks > estimateFeeDepth {
+		return -1, fmt.Errorf(
+			"can only estimate fees for up to %d blocks from now",
+			estimateFeeBinSize)
+	}
+
+	// If there are no cached results, generate them.
+	if ef.cachedAbe == nil {
+		ef.cachedAbe = ef.estimatesAbe()
+	}
+
+	return ef.cachedAbe[int(numBlocks)-1].ToAbePerKb(), nil
+}
+
 // In case the format for the serialized version of the FeeEstimator changes,
 // we use a version number. If the version number changes, it does not make
 // sense to try to upgrade a previous version to a new version. Instead, just
@@ -714,6 +910,24 @@ func deserializeRegisteredBlock(r io.Reader, txs map[uint32]*observedTransaction
 	binary.Read(r, binary.BigEndian, &lenTransactions)
 
 	rb.transactions = make([]*observedTransaction, lenTransactions)
+
+	for i := uint32(0); i < lenTransactions; i++ {
+		var index uint32
+		binary.Read(r, binary.BigEndian, &index)
+		rb.transactions[i] = txs[index]
+	}
+
+	return rb, nil
+}
+
+func deserializeRegisteredBlockAbe(r io.Reader, txs map[uint32]*observedTransactionAbe) (*registeredBlockAbe, error) {
+	var lenTransactions uint32
+
+	rb := &registeredBlockAbe{}
+	binary.Read(r, binary.BigEndian, &rb.hash)
+	binary.Read(r, binary.BigEndian, &lenTransactions)
+
+	rb.transactions = make([]*observedTransactionAbe, lenTransactions)
 
 	for i := uint32(0); i < lenTransactions; i++ {
 		var index uint32
@@ -743,6 +957,18 @@ func (q observedTxSet) Swap(i, j int) {
 	q[i], q[j] = q[j], q[i]
 }
 
+type observedTxSetAbe []*observedTransactionAbe
+
+func (q observedTxSetAbe) Len() int { return len(q) }
+
+func (q observedTxSetAbe) Less(i, j int) bool {
+	return strings.Compare(q[i].hash.String(), q[j].hash.String()) < 0
+}
+
+func (q observedTxSetAbe) Swap(i, j int) {
+	q[i], q[j] = q[j], q[i]
+}
+
 // Save records the current state of the FeeEstimator to a []byte that
 // can be restored later.
 func (ef *FeeEstimator) Save() FeeEstimatorState {
@@ -764,17 +990,17 @@ func (ef *FeeEstimator) Save() FeeEstimatorState {
 
 	// Put all the observed transactions in a sorted list.
 	var txCount uint32
-	ots := make([]*observedTransaction, len(ef.observed))
-	for hash := range ef.observed {
-		ots[txCount] = ef.observed[hash]
+	ots := make([]*observedTransactionAbe, len(ef.observedAbe))
+	for hash := range ef.observedAbe {
+		ots[txCount] = ef.observedAbe[hash]
 		txCount++
 	}
 
-	sort.Sort(observedTxSet(ots))
+	sort.Sort(observedTxSetAbe(ots))
 
 	txCount = 0
-	observed := make(map[*observedTransaction]uint32)
-	binary.Write(w, binary.BigEndian, uint32(len(ef.observed)))
+	observed := make(map[*observedTransactionAbe]uint32)
+	binary.Write(w, binary.BigEndian, uint32(len(ef.observedAbe)))
 	for _, ot := range ots {
 		ot.Serialize(w)
 		observed[ot] = txCount
@@ -782,7 +1008,7 @@ func (ef *FeeEstimator) Save() FeeEstimatorState {
 	}
 
 	// Save all the right bins.
-	for _, list := range ef.bin {
+	for _, list := range ef.binAbe {
 
 		binary.Write(w, binary.BigEndian, uint32(len(list)))
 
@@ -792,8 +1018,8 @@ func (ef *FeeEstimator) Save() FeeEstimatorState {
 	}
 
 	// Dropped transactions.
-	binary.Write(w, binary.BigEndian, uint32(len(ef.dropped)))
-	for _, registered := range ef.dropped {
+	binary.Write(w, binary.BigEndian, uint32(len(ef.droppedAbe)))
+	for _, registered := range ef.droppedAbe {
 		registered.serialize(w, observed)
 	}
 
@@ -817,7 +1043,7 @@ func RestoreFeeEstimator(data FeeEstimatorState) (*FeeEstimator, error) {
 	}
 
 	ef := &FeeEstimator{
-		observed: make(map[chainhash.Hash]*observedTransaction),
+		observedAbe: make(map[chainhash.Hash]*observedTransactionAbe),
 	}
 
 	// Read basic parameters.
@@ -830,22 +1056,22 @@ func RestoreFeeEstimator(data FeeEstimatorState) (*FeeEstimator, error) {
 
 	// Read transactions.
 	var numObserved uint32
-	observed := make(map[uint32]*observedTransaction)
+	observed := make(map[uint32]*observedTransactionAbe)
 	binary.Read(r, binary.BigEndian, &numObserved)
 	for i := uint32(0); i < numObserved; i++ {
-		ot, err := deserializeObservedTransaction(r)
+		ot, err := deserializeObservedTransactionAbe(r)
 		if err != nil {
 			return nil, err
 		}
 		observed[i] = ot
-		ef.observed[ot.hash] = ot
+		ef.observedAbe[ot.hash] = ot
 	}
 
 	// Read bins.
 	for i := 0; i < estimateFeeDepth; i++ {
 		var numTransactions uint32
 		binary.Read(r, binary.BigEndian, &numTransactions)
-		bin := make([]*observedTransaction, numTransactions)
+		bin := make([]*observedTransactionAbe, numTransactions)
 		for j := uint32(0); j < numTransactions; j++ {
 			var index uint32
 			binary.Read(r, binary.BigEndian, &index)
@@ -856,16 +1082,16 @@ func RestoreFeeEstimator(data FeeEstimatorState) (*FeeEstimator, error) {
 				return nil, fmt.Errorf("Invalid transaction reference %d", index)
 			}
 		}
-		ef.bin[i] = bin
+		ef.binAbe[i] = bin
 	}
 
 	// Read dropped transactions.
 	var numDropped uint32
 	binary.Read(r, binary.BigEndian, &numDropped)
-	ef.dropped = make([]*registeredBlock, numDropped)
+	ef.droppedAbe = make([]*registeredBlockAbe, numDropped)
 	for i := uint32(0); i < numDropped; i++ {
 		var err error
-		ef.dropped[int(i)], err = deserializeRegisteredBlock(r, observed)
+		ef.droppedAbe[int(i)], err = deserializeRegisteredBlockAbe(r, observed)
 		if err != nil {
 			return nil, err
 		}

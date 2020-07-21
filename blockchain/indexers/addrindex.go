@@ -25,7 +25,9 @@ const (
 
 	// addrKeySize is the number of bytes an address key consumes in the
 	// index.  It consists of 1 byte address type + 20 bytes hash160.
-	addrKeySize = 1 + 20
+	//	todo(ABE): ABE does not use hash160, instead, it uses chainhash at this moment, and will use a different one.
+	//addrKeySize = 1 + 20
+	addrKeySize = chainhash.HashSize
 
 	// levelKeySize is the number of bytes a level key in the address index
 	// consumes.  It consists of the address key + 1 byte for the level.
@@ -522,6 +524,9 @@ func dbRemoveAddrIndexEntries(bucket internalBucket, addrKey [addrKeySize]byte, 
 
 // addrToKey converts known address types to an addrindex key.  An error is
 // returned for unsupported types.
+//	todo(ABE): In ABE, a new derived address is generated when a new TXO(with a new transaction) is generated.
+//	In other words, it is impossible to search transactions related to a predefined address.
+//	ABE maps addressScript to index-key
 func addrToKey(addr abeutil.Address) ([addrKeySize]byte, error) {
 	switch addr := addr.(type) {
 	case *abeutil.AddressPubKeyHash:
@@ -558,6 +563,18 @@ func addrToKey(addr abeutil.Address) ([addrKeySize]byte, error) {
 		var result [addrKeySize]byte
 		result[0] = addrKeyTypeWitnessPubKeyHash
 		copy(result[1:], addr.Hash160()[:])
+		return result, nil
+	}
+
+	return [addrKeySize]byte{}, errUnsupportedAddressType
+}
+
+func addressToKey(derivedAddress abeutil.DerivedAddress) ([addrKeySize]byte, error) {
+	switch derivedAddress := derivedAddress.(type) {
+	case *abeutil.DerivedAddressSalrs:
+		var result [addrKeySize]byte
+		serializedAddr := derivedAddress.Serialize()
+		copy(result[:], chainhash.DoubleHashB(serializedAddr)[:])
 		return result, nil
 	}
 
@@ -654,6 +671,7 @@ type writeIndexData map[[addrKeySize]byte][]int
 // indexPkScript extracts all standard addresses from the passed public key
 // script and maps each of them to the associated transaction using the passed
 // map.
+//	todo(ABE): ABE does not support this.
 func (idx *AddrIndex) indexPkScript(data writeIndexData, pkScript []byte, txIdx int) {
 	// Nothing to index if the script is non-standard or otherwise doesn't
 	// contain any addresses.
@@ -682,6 +700,37 @@ func (idx *AddrIndex) indexPkScript(data writeIndexData, pkScript []byte, txIdx 
 		indexedTxns = append(indexedTxns, txIdx)
 		data[addrKey] = indexedTxns
 	}
+}
+
+func (idx *AddrIndex) indexAddressScript(data writeIndexData, addressScript []byte, txIdx int) {
+	/*	// Nothing to index if the script is non-standard or otherwise doesn't
+		// contain any addresses.
+		abeutil.ParseDerivedAddressSalrs(addressScript)
+		_, addrs, _, err := txscript.ExtractPkScriptAddrs(pkScript,
+			idx.chainParams)
+		if err != nil || len(addrs) == 0 {
+			return
+		}
+
+		for _, addr := range addrs {
+			addrKey, err := addrToKey(addr)
+			if err != nil {
+				// Ignore unsupported address types.
+				continue
+			}
+
+			// Avoid inserting the transaction more than once.  Since the
+			// transactions are indexed serially any duplicates will be
+			// indexed in a row, so checking the most recent entry for the
+			// address is enough to detect duplicates.
+			indexedTxns := data[addrKey]
+			numTxns := len(indexedTxns)
+			if numTxns > 0 && indexedTxns[numTxns-1] == txIdx {
+				continue
+			}
+			indexedTxns = append(indexedTxns, txIdx)
+			data[addrKey] = indexedTxns
+		}*/
 }
 
 // indexBlock extract all of the standard addresses from all of the transactions

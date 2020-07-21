@@ -1180,10 +1180,18 @@ func (op OutPointAbe) String() string {
 	// optimization may go unnoticed, so allocate space for 10 decimal
 	// digits, which will fit any uint32.
 	buf := make([]byte, 2*chainhash.HashSize+1, 2*chainhash.HashSize+1+10)
-	offset := copy(buf[:], op.TxHash.String())
-	buf[offset] = ':'
-	buf = strconv.AppendUint(buf, uint64(op.Index), 10)
-	return string(buf)
+
+	start := 0
+
+	start = start + copy(buf[start:], op.TxHash.String())
+	buf[start] = ':'
+
+	start = start + 1
+	start = start + copy(buf[start:], strconv.FormatUint(uint64(op.Index), 10))
+	buf[start] = '.'
+	start = start + 1
+
+	return string(buf[0:start])
 }
 
 // NewOutPoint returns a new bitcoin transaction outpoint point with the
@@ -1291,8 +1299,47 @@ func (outPointRing *OutPointRing) Hash() chainhash.Hash {
 }
 
 func (outPointRing *OutPointRing) String() string {
-	//	todo(ABE.MUST)
-	return ""
+	// Allocate enough for hash string, colon, and 10 digits.  Although
+	// at the time of writing, the number of digits can be no greater than
+	// the length of the decimal representation of maxTxOutPerMessage, the
+	// maximum message payload may increase in the future and this
+	// optimization may go unnoticed, so allocate space for 10 decimal
+	// digits, which will fit any uint32.
+	// TxHash:index; TxHash:index; ...; serialNumber
+	//	index is at most 2 decimal digits; at this moment, only 1 decimal digits
+	strLen := len(outPointRing.BlockHashs)*(2*chainhash.HashSize+1) + len(outPointRing.OutPoints)*(2*chainhash.HashSize+1+2+1)
+
+	buf := make([]byte, strLen)
+
+	start := 0
+
+	for _, blockHash := range outPointRing.BlockHashs {
+		start = start + copy(buf[start:], blockHash.String())
+		buf[start] = ';'
+		start = start + 1
+	}
+	buf[start-1] = '.'
+
+	for _, outPoint := range outPointRing.OutPoints {
+		start = start + copy(buf[start:], outPoint.TxHash.String())
+		buf[start] = ','
+		start = start + 1
+
+		start = start + copy(buf[start:], strconv.FormatUint(uint64(outPoint.Index), 10))
+
+		buf[start] = ';'
+		start = start + 1
+	}
+	buf[start-1] = '.'
+
+	return string(buf[0:start])
+}
+
+func NewOutPointRing(blockHashs []*chainhash.Hash, outPoints []*OutPointAbe) *OutPointRing {
+	return &OutPointRing{
+		BlockHashs: blockHashs,
+		OutPoints:  outPoints,
+	}
 }
 
 //	SerialNumber appears only when some ring member is consumed in TxIn,
@@ -1329,7 +1376,7 @@ func (txIn *TxInAbe) String() string {
 	// optimization may go unnoticed, so allocate space for 10 decimal
 	// digits, which will fit any uint32.
 	// TxHash:index; TxHash:index; ...; serialNumber
-	//	index is at most 2 decimal digits; at this momembt, only 1 decimal digits
+	//	index is at most 2 decimal digits; at this moment, only 1 decimal digits
 	strLen := (2*chainhash.HashSize + 1) + len(txIn.PreviousOutPointRing.BlockHashs)*(2*chainhash.HashSize+1) + len(txIn.PreviousOutPointRing.OutPoints)*(2*chainhash.HashSize+1+2+1)
 
 	buf := make([]byte, strLen)
@@ -1358,7 +1405,7 @@ func (txIn *TxInAbe) String() string {
 	}
 	buf[start-1] = '.'
 
-	return string(buf)
+	return string(buf[0:start])
 }
 
 //	At this moment, TxIn is just a ring member (say, identified by (outpointRing, serialNumber)), so that we can use txIn.Serialize

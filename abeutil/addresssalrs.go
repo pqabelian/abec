@@ -127,3 +127,15 @@ func ParseMasterAddressSalrs(serialized []byte) (*MasterAddressSalrs, error) {
 	return maddrsalrs, nil
 
 }
+
+func ParseDerivedAddressSalrs(serialized []byte) (*DerivedAddressSalrs, error) {
+	daddrsalrs := &DerivedAddressSalrs{}
+
+	err := daddrsalrs.Deserialize(serialized)
+	if err != nil {
+		return nil, err
+	}
+
+	return daddrsalrs, nil
+
+}

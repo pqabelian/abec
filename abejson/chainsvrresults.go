@@ -1,6 +1,8 @@
 package abejson
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 // GetBlockHeaderVerboseResult models the data from the getblockheader command when
 // the verbose flag is set.  When the verbose flag is not set, getblockheader
@@ -24,23 +26,27 @@ type GetBlockHeaderVerboseResult struct {
 // verbose flag is set.  When the verbose flag is not set, getblock returns a
 // hex-encoded string.
 type GetBlockVerboseResult struct {
-	Hash          string        `json:"hash"`
-	Confirmations int64         `json:"confirmations"`
-	StrippedSize  int32         `json:"strippedsize"`
-	Size          int32         `json:"size"`
-	Weight        int32         `json:"weight"`
-	Height        int64         `json:"height"`
-	Version       int32         `json:"version"`
-	VersionHex    string        `json:"versionHex"`
-	MerkleRoot    string        `json:"merkleroot"`
-	Tx            []string      `json:"tx,omitempty"`
-	RawTx         []TxRawResult `json:"rawtx,omitempty"`
-	Time          int64         `json:"time"`
-	Nonce         uint32        `json:"nonce"`
-	Bits          string        `json:"bits"`
-	Difficulty    float64       `json:"difficulty"`
-	PreviousHash  string        `json:"previousblockhash"`
-	NextHash      string        `json:"nextblockhash,omitempty"`
+	Hash          string `json:"hash"`
+	Confirmations int64  `json:"confirmations"`
+	//	todo(ABE):
+	//StrippedSize  int32         `json:"strippedsize"`
+	//Size          int32         `json:"size"`
+	//Weight        int32         `json:"weight"`
+	Size       int32    `json:"size"`
+	FullSize   int32    `json:"fullsize"`
+	Height     int64    `json:"height"`
+	Version    int32    `json:"version"`
+	VersionHex string   `json:"versionHex"`
+	MerkleRoot string   `json:"merkleroot"`
+	Tx         []string `json:"tx,omitempty"`
+	//	todo(ABE)
+	RawTx        []TxRawResultAbe `json:"rawtx,omitempty"`
+	Time         int64            `json:"time"`
+	Nonce        uint32           `json:"nonce"`
+	Bits         string           `json:"bits"`
+	Difficulty   float64          `json:"difficulty"`
+	PreviousHash string           `json:"previousblockhash"`
+	NextHash     string           `json:"nextblockhash,omitempty"`
 }
 
 // CreateMultiSigResult models the data returned from the createmultisig
@@ -112,6 +118,7 @@ type GetBlockChainInfoResult struct {
 
 // GetBlockTemplateResultTx models the transactions field of the
 // getblocktemplate command.
+//	todo(ABE):
 type GetBlockTemplateResultTx struct {
 	Data    string  `json:"data"`
 	Hash    string  `json:"hash"`
@@ -119,6 +126,13 @@ type GetBlockTemplateResultTx struct {
 	Fee     int64   `json:"fee"`
 	SigOps  int64   `json:"sigops"`
 	Weight  int64   `json:"weight"`
+}
+
+type GetBlockTemplateResultTxAbe struct {
+	Data string `json:"data"`
+	Hash string `json:"hash"`
+	Fee  int64  `json:"fee"`
+	Size int64  `json:"size"`
 }
 
 // GetBlockTemplateResultAux models the coinbaseaux field of the
@@ -129,22 +143,23 @@ type GetBlockTemplateResultAux struct {
 
 // GetBlockTemplateResult models the data returned from the getblocktemplate
 // command.
+//	todo(ABE):
 type GetBlockTemplateResult struct {
 	// Base fields from BIP 0022.  CoinbaseAux is optional.  One of
 	// CoinbaseTxn or CoinbaseValue must be specified, but not both.
-	Bits          string                     `json:"bits"`
-	CurTime       int64                      `json:"curtime"`
-	Height        int64                      `json:"height"`
-	PreviousHash  string                     `json:"previousblockhash"`
-	SigOpLimit    int64                      `json:"sigoplimit,omitempty"`
-	SizeLimit     int64                      `json:"sizelimit,omitempty"`
-	WeightLimit   int64                      `json:"weightlimit,omitempty"`
-	Transactions  []GetBlockTemplateResultTx `json:"transactions"`
-	Version       int32                      `json:"version"`
-	CoinbaseAux   *GetBlockTemplateResultAux `json:"coinbaseaux,omitempty"`
-	CoinbaseTxn   *GetBlockTemplateResultTx  `json:"coinbasetxn,omitempty"`
-	CoinbaseValue *int64                     `json:"coinbasevalue,omitempty"`
-	WorkID        string                     `json:"workid,omitempty"`
+	Bits         string `json:"bits"`
+	CurTime      int64  `json:"curtime"`
+	Height       int64  `json:"height"`
+	PreviousHash string `json:"previousblockhash"`
+	//	SigOpLimit    int64                      `json:"sigoplimit,omitempty"`
+	SizeLimit int64 `json:"sizelimit,omitempty"`
+	//	WeightLimit   int64                      `json:"weightlimit,omitempty"`
+	Transactions []GetBlockTemplateResultTxAbe `json:"transactions"`
+	Version      int32                         `json:"version"`
+	//	CoinbaseAux   *GetBlockTemplateResultAux `json:"coinbaseaux,omitempty"`
+	CoinbaseTxn   *GetBlockTemplateResultTxAbe `json:"coinbasetxn,omitempty"`
+	CoinbaseValue *int64                       `json:"coinbasevalue,omitempty"`
+	WorkID        string                       `json:"workid,omitempty"`
 
 	// Witness commitment defined in BIP 0141.
 	DefaultWitnessCommitment string `json:"default_witness_commitment,omitempty"`
@@ -258,16 +273,19 @@ type GetPeerInfoResult struct {
 // GetRawMempoolVerboseResult models the data returned from the getrawmempool
 // command when the verbose flag is set.  When the verbose flag is not set,
 // getrawmempool returns an array of transaction hashes.
+//	todo(ABE): ABE does not use virtual size and weight, while just use size and fullsize
+//	todo(ABE): ABE does not allow dependdence on transactions not in block
 type GetRawMempoolVerboseResult struct {
-	Size             int32    `json:"size"`
-	Vsize            int32    `json:"vsize"`
-	Weight           int32    `json:"weight"`
-	Fee              float64  `json:"fee"`
-	Time             int64    `json:"time"`
-	Height           int64    `json:"height"`
-	StartingPriority float64  `json:"startingpriority"`
-	CurrentPriority  float64  `json:"currentpriority"`
-	Depends          []string `json:"depends"`
+	Size int32 `json:"size"`
+	//Vsize            int32    `json:"vsize"`
+	//Weight           int32    `json:"weight"`
+	Fullsize         int32   `json:"fullsize"`
+	Fee              float64 `json:"fee"`
+	Time             int64   `json:"time"`
+	Height           int64   `json:"height"`
+	StartingPriority float64 `json:"startingpriority"`
+	CurrentPriority  float64 `json:"currentpriority"`
+	//	Depends          []string `json:"depends"`
 }
 
 // ScriptPubKeyResult models the scriptPubKey data of a tx script.  It is
@@ -281,12 +299,22 @@ type ScriptPubKeyResult struct {
 }
 
 // GetTxOutResult models the data from the gettxout command.
+//	todo(ABE): ABE does not support 'GetTxOutCmd', as it seems that this command is to get Txo from transactions in mempool and utxo of main chain.
 type GetTxOutResult struct {
 	BestBlock     string             `json:"bestblock"`
 	Confirmations int64              `json:"confirmations"`
 	Value         float64            `json:"value"`
 	ScriptPubKey  ScriptPubKeyResult `json:"scriptPubKey"`
 	Coinbase      bool               `json:"coinbase"`
+}
+
+type GetUtxoRingResult struct {
+	RingBlockHeight     int32 `json:"ringblockheight"`
+	OutPointRing        OutPointRing
+	TxOuts              []TxOutAbe
+	SerialNumbers       []string `json:"consumedserialnumbers"`
+	ConsumingBlockHashs []string
+	IsCoinbase          bool `json:"coinbase"`
 }
 
 // GetNetTotalsResult models the data returned from the getnettotals command.
@@ -317,10 +345,9 @@ type Vin struct {
 	Witness   []string   `json:"txinwitness"`
 }
 
-type VinAbe struct {
-	Coinbase string `json:"coinbase"`
-	Txid     string `json:"txid"`
-	Vout     uint32 `json:"vout"`
+type TxIn struct {
+	SerialNumber         string `json:"serialnumber"`
+	PreviousOutPointRing *OutPointRing
 }
 
 // IsCoinBase returns a bool to show if a Vin is a Coinbase one or not.
@@ -464,6 +491,12 @@ type Vout struct {
 	ScriptPubKey ScriptPubKeyResult `json:"scriptPubKey"`
 }
 
+type TxOutAbe struct {
+	ValueScript   float64 `json:"valueScript"`
+	N             uint8   `json:"n"`
+	AddressScript string  `json:"addressScript"`
+}
+
 // GetMiningInfoResult models the data from the getmininginfo command.
 type GetMiningInfoResult struct {
 	Blocks             int64   `json:"blocks"`
@@ -521,18 +554,20 @@ type TxRawResult struct {
 	Blocktime     int64  `json:"blocktime,omitempty"`
 }
 type TxRawResultAbe struct {
-	Hex           string `json:"hex"`
-	Txid          string `json:"txid"`
-	Hash          string `json:"hash,omitempty"`
-	Size          int32  `json:"size,omitempty"`
-	Vsize         int32  `json:"vsize,omitempty"`
-	Version       int32  `json:"version"`
-	Vin           []Vin  `json:"vin"`
-	Vout          []Vout `json:"vout"`
-	BlockHash     string `json:"blockhash,omitempty"`
-	Confirmations uint64 `json:"confirmations,omitempty"`
-	Time          int64  `json:"time,omitempty"`
-	Blocktime     int64  `json:"blocktime,omitempty"`
+	Hex           string     `json:"hex"`
+	Txid          string     `json:"txid"`
+	Hash          string     `json:"hash,omitempty"`
+	Size          int32      `json:"size,omitempty"`
+	Fullsize      int32      `json:"fullsize,omitempty"`
+	Version       int32      `json:"version"`
+	Vin           []TxIn     `json:"vin"`
+	Vout          []TxOutAbe `json:"vout"`
+	Fee           float64    `json:"fee"`
+	Witness       []string   `json:"witness"`
+	BlockHash     string     `json:"blockhash,omitempty"`
+	Confirmations uint64     `json:"confirmations,omitempty"`
+	Time          int64      `json:"time,omitempty"`
+	Blocktime     int64      `json:"blocktime,omitempty"`
 }
 
 // SearchRawTransactionsResult models the data from the searchrawtransaction
@@ -555,12 +590,22 @@ type SearchRawTransactionsResult struct {
 }
 
 // TxRawDecodeResult models the data from the decoderawtransaction command.
+//	todo(ABE):
 type TxRawDecodeResult struct {
 	Txid     string `json:"txid"`
 	Version  int32  `json:"version"`
 	Locktime uint32 `json:"locktime"`
 	Vin      []Vin  `json:"vin"`
 	Vout     []Vout `json:"vout"`
+}
+
+type TxRawDecodeResultAbe struct {
+	Txid    string     `json:"txid"`
+	Version int32      `json:"version"`
+	Vin     []TxIn     `json:"vin"`
+	Vout    []TxOutAbe `json:"vout"`
+	Fee     float64    `json:"fee"`
+	Witness []string   `json:"witness"`
 }
 
 // ValidateAddressChainResult models the data returned by the chain server

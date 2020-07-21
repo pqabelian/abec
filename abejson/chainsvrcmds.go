@@ -42,16 +42,42 @@ func NewAddNodeCmd(addr string, subCmd AddNodeSubCmd) *AddNodeCmd {
 
 // TransactionInput represents the inputs to a transaction.  Specifically a
 // transaction hash and output number pair.
+//	todo(ABE):
 type TransactionInput struct {
 	Txid string `json:"txid"`
 	Vout uint32 `json:"vout"`
 }
 
+type OutPointAbe struct {
+	Txid  string `json:"txid"`
+	Index uint8  `json:"index"`
+}
+
+//	todo(ABE): Do we separate the chainsrvcmds.go and chainsrvresults.go?
+//	e.g. TransactionInput in chainsrvcmds.go and Vin in chainsrvresults.go
+//	for ABE, OutPointRingAbe is used in both chainsrvcmds.go and chainsrvresults.go
+type OutPointRing struct {
+	BlockHashs []string
+	OutPoints  []OutPointAbe
+}
+
+type TransactionInputAbe struct {
+	SerialNumber         string `json:"serialnumber"`
+	PreviousOutPointRing OutPointRing
+}
+
 // CreateRawTransactionCmd defines the createrawtransaction JSON-RPC command.
+//	todo(ABE):
 type CreateRawTransactionCmd struct {
 	Inputs   []TransactionInput
 	Amounts  map[string]float64 `jsonrpcusage:"{\"address\":amount,...}"` // In BTC
 	LockTime *int64
+}
+
+type CreateRawTransactionCmdAbe struct {
+	Inputs  []TransactionInputAbe
+	Outputs map[string]float64 `jsonrpcusage:"{\"address\":amount,...}"` // In Neutrino
+	Fee     float64            `json:"txfee"`                            // in ABE
 }
 
 // NewCreateRawTransactionCmd returns a new instance which can be used to issue
@@ -69,7 +95,12 @@ func NewCreateRawTransactionCmd(inputs []TransactionInput, amounts map[string]fl
 }
 
 // DecodeRawTransactionCmd defines the decoderawtransaction JSON-RPC command.
+//	todo(ABE):
 type DecodeRawTransactionCmd struct {
+	HexTx string
+}
+
+type DecodeRawTransactionCmdAbe struct {
 	HexTx string
 }
 
@@ -456,11 +487,9 @@ func NewGetRawMempoolCmd(verbose *bool) *GetRawMempoolCmd {
 
 // GetRawTransactionCmd defines the getrawtransaction JSON-RPC command.
 //
-// NOTE: This field is an int versus a bool to remain compatible with Bitcoin
-// Core even though it really should be a bool.
 type GetRawTransactionCmd struct {
 	Txid    string
-	Verbose *int `jsonrpcdefault:"0"`
+	Verbose *bool `jsonrpcdefault:"false"`
 }
 
 // NewGetRawTransactionCmd returns a new instance which can be used to issue a
@@ -468,7 +497,7 @@ type GetRawTransactionCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewGetRawTransactionCmd(txHash string, verbose *int) *GetRawTransactionCmd {
+func NewGetRawTransactionCmd(txHash string, verbose *bool) *GetRawTransactionCmd {
 	return &GetRawTransactionCmd{
 		Txid:    txHash,
 		Verbose: verbose,
@@ -476,10 +505,15 @@ func NewGetRawTransactionCmd(txHash string, verbose *int) *GetRawTransactionCmd 
 }
 
 // GetTxOutCmd defines the gettxout JSON-RPC command.
+//	todo(ABE): ABE does not support 'GetTxOutCmd', as it seems that this command is to get Txo from transactions in mempool and utxo of main chain.
 type GetTxOutCmd struct {
 	Txid           string
 	Vout           uint32
 	IncludeMempool *bool `jsonrpcdefault:"true"`
+}
+
+type GetUtxoRingCmd struct {
+	OutPointRing OutPointRing
 }
 
 // NewGetTxOutCmd returns a new instance which can be used to issue a gettxout

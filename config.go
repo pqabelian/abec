@@ -58,7 +58,7 @@ const (
 	blockMaxWeightMin           = 4000
 	blockMaxWeightMax           = blockchain.MaxBlockWeight - 4000
 	// todo(abe):
-	defaultGenerate              = false
+	defaultGenerate = false
 	//defaultGenerate              = true
 	defaultMaxOrphanTransactions = 100
 	defaultMaxOrphanTxSize       = 100000
@@ -758,7 +758,7 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Validate the the minrelaytxfee.
-	cfg.minRelayTxFee, err = abeutil.NewAmount(cfg.MinRelayTxFee)
+	cfg.minRelayTxFee, err = abeutil.NewAmountAbe(cfg.MinRelayTxFee)
 	if err != nil {
 		str := "%s: invalid minrelaytxfee: %v"
 		err := fmt.Errorf(str, funcName, err)

@@ -35,6 +35,8 @@ const (
 	ErrRPCDatabase            RPCErrorCode = -20
 	ErrRPCDeserialization     RPCErrorCode = -22
 	ErrRPCVerify              RPCErrorCode = -25
+	//	todo(ABE):
+	ErrRPCInvalidDerivedAddress RPCErrorCode = -201
 )
 
 // Peer-to-peer client errors.
@@ -75,6 +77,11 @@ const (
 	ErrRPCTxError           RPCErrorCode = -25
 	ErrRPCTxRejected        RPCErrorCode = -26
 	ErrRPCTxAlreadyInChain  RPCErrorCode = -27
+	//	todo(ABE):
+	ErrRPCUtxoRingInvalidBlockNumInRing RPCErrorCode = -101
+	ErrRPCUtxoRingInvalidRingSize       RPCErrorCode = -102
+	ErrRPCUtxoRingNoInfoError           RPCErrorCode = -103
+	ErrRPCUtxoRingMismatchedInfoError   RPCErrorCode = -104
 )
 
 // Errors that are specific to btcd.

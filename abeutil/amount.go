@@ -69,6 +69,7 @@ func round(f float64) Amount {
 // For creating a new Amount with an int64 value which denotes a quantity of Satoshi,
 // do a simple type conversion from type int64 to Amount.
 // See GoDoc for example: http://godoc.org/github.com/btcsuite/btcutil#example-Amount
+//	todo(ABE):
 func NewAmount(f float64) (Amount, error) {
 	// The amount is only considered invalid if it cannot be represented
 	// as an integer type.  This may happen if f is NaN or +-Infinity.
@@ -82,6 +83,21 @@ func NewAmount(f float64) (Amount, error) {
 	}
 
 	return round(f * SatoshiPerBitcoin), nil
+}
+
+func NewAmountAbe(f float64) (Amount, error) {
+	// The amount is only considered invalid if it cannot be represented
+	// as an integer type.  This may happen if f is NaN or +-Infinity.
+	switch {
+	case math.IsNaN(f):
+		fallthrough
+	case math.IsInf(f, 1):
+		fallthrough
+	case math.IsInf(f, -1):
+		return 0, errors.New("invalid ABE amount")
+	}
+
+	return round(f * NeutrinoPerAbe), nil
 }
 
 // ToUnit converts a monetary amount counted in bitcoin base units to a

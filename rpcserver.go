@@ -121,40 +121,45 @@ type commandHandler func(*rpcServer, interface{}, <-chan struct{}) (interface{},
 // a dependency loop.
 var rpcHandlers map[string]commandHandler
 var rpcHandlersBeforeInit = map[string]commandHandler{
-	"addnode":              handleAddNode,
-	"createrawtransaction": handleCreateRawTransaction,
-	"debuglevel":           handleDebugLevel,
-	"decoderawtransaction": handleDecodeRawTransaction,
-	"decodescript":         handleDecodeScript,
-	"estimatefee":          handleEstimateFee,
-	"generate":             handleGenerate,
-	"getaddednodeinfo":     handleGetAddedNodeInfo,
-	"getbestblock":         handleGetBestBlock,
-	"getbestblockhash":     handleGetBestBlockHash,
-	"getblock":             handleGetBlock,
-	"getblockchaininfo":    handleGetBlockChainInfo,
-	"getblockcount":        handleGetBlockCount,
-	"getblockhash":         handleGetBlockHash,
-	"getblockheader":       handleGetBlockHeader,
-	"getblocktemplate":     handleGetBlockTemplate,
+	"addnode": handleAddNode,
+	//	todo(ABE.MUST)
+	"createrawtransaction":    handleCreateRawTransaction,
+	"createrawtransactionAbe": handleCreateRawTransactionAbe,
+	"debuglevel":              handleDebugLevel,
+	"decoderawtransaction":    handleDecodeRawTransaction,
+	"decoderawtransactionAbe": handleDecodeRawTransactionAbe,
+	"decodescript":            handleDecodeScript,
+	"estimatefee":             handleEstimateFee,
+	"generate":                handleGenerate,
+	"getaddednodeinfo":        handleGetAddedNodeInfo,
+	"getbestblock":            handleGetBestBlock,
+	"getbestblockhash":        handleGetBestBlockHash,
+	"getblock":                handleGetBlock,
+	"getblockchaininfo":       handleGetBlockChainInfo,
+	"getblockcount":           handleGetBlockCount,
+	"getblockhash":            handleGetBlockHash,
+	"getblockheader":          handleGetBlockHeader,
+	"getblocktemplate":        handleGetBlockTemplate,
 	// TODO(ABE): ABE does not support filter.
 	//"getcfilter":            handleGetCFilter,
 	//"getcfilterheader":      handleGetCFilterHeader,
-	"getconnectioncount":    handleGetConnectionCount,
-	"getcurrentnet":         handleGetCurrentNet,
-	"getdifficulty":         handleGetDifficulty,
-	"getgenerate":           handleGetGenerate,
-	"gethashespersec":       handleGetHashesPerSec,
-	"getheaders":            handleGetHeaders,
-	"getinfo":               handleGetInfo,
-	"getmempoolinfo":        handleGetMempoolInfo,
-	"getmininginfo":         handleGetMiningInfo,
-	"getnettotals":          handleGetNetTotals,
-	"getnetworkhashps":      handleGetNetworkHashPS,
-	"getpeerinfo":           handleGetPeerInfo,
-	"getrawmempool":         handleGetRawMempool,
-	"getrawtransaction":     handleGetRawTransaction,
-	"gettxout":              handleGetTxOut,
+	"getconnectioncount": handleGetConnectionCount,
+	"getcurrentnet":      handleGetCurrentNet,
+	"getdifficulty":      handleGetDifficulty,
+	"getgenerate":        handleGetGenerate,
+	"gethashespersec":    handleGetHashesPerSec,
+	"getheaders":         handleGetHeaders,
+	"getinfo":            handleGetInfo,
+	"getmempoolinfo":     handleGetMempoolInfo,
+	"getmininginfo":      handleGetMiningInfo,
+	"getnettotals":       handleGetNetTotals,
+	"getnetworkhashps":   handleGetNetworkHashPS,
+	"getpeerinfo":        handleGetPeerInfo,
+	"getrawmempool":      handleGetRawMempool,
+	"getrawtransaction":  handleGetRawTransaction,
+	//	todo(ABE): ABE does not support 'GetTxOutCmd', as it seems that this command is to get Txo from transactions in mempool and utxo of main chain.
+	//"gettxout":              handleGetTxOut,
+	"getutxoring":           handleGetUtxoRing,
 	"help":                  handleHelp,
 	"node":                  handleNode,
 	"ping":                  handlePing,
@@ -317,6 +322,31 @@ func rpcNoTxInfoError(txHash *chainhash.Hash) *abejson.RPCError {
 	return abejson.NewRPCError(abejson.ErrRPCNoTxInfo,
 		fmt.Sprintf("No information available about transaction %v",
 			txHash))
+}
+
+//	todo(ABE):
+func rpcUtxoRingInvalidBlockNumInRingError(blockHashNum int) *abejson.RPCError {
+	return abejson.NewRPCError(abejson.ErrRPCUtxoRingInvalidBlockNumInRing,
+		fmt.Sprintf("Argument must be %d (not %d)",
+			wire.BlockNumPerRingGroup, blockHashNum))
+}
+
+func rpcUtxoRingInvalidRingSizeError(ringSize int) *abejson.RPCError {
+	return abejson.NewRPCError(abejson.ErrRPCUtxoRingInvalidRingSize,
+		fmt.Sprintf("Ring Size %d is not in the range [1,%d]",
+			ringSize, wire.TxRingSize))
+}
+
+func rpcUtxoRingNoInfoError(outPointRing *wire.OutPointRing) *abejson.RPCError {
+	return abejson.NewRPCError(abejson.ErrRPCUtxoRingNoInfoError,
+		fmt.Sprintf("No information available about utxoRing %v",
+			outPointRing.String()))
+}
+
+func rpcUtxoRingMismatchedInfoError(outPointRing *wire.OutPointRing) *abejson.RPCError {
+	return abejson.NewRPCError(abejson.ErrRPCUtxoRingMismatchedInfoError,
+		fmt.Sprintf("UtxoRing is found but mismatched with the queried outpointring %v",
+			outPointRing.String()))
 }
 
 // gbtWorkState houses state that is used in between multiple RPC invocations to
@@ -504,6 +534,7 @@ func messageToHex(msg wire.Message) (string, error) {
 }
 
 // handleCreateRawTransaction handles createrawtransaction commands.
+//	todo(ABE):
 func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.CreateRawTransactionCmd)
 
@@ -538,6 +569,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 	params := s.cfg.ChainParams
 	for encodedAddr, amount := range c.Amounts {
 		// Ensure amount is in the valid range for monetary amounts.
+		//	todo(ABE): This is a bug, since here the amount is in BTC.
 		if amount <= 0 || amount > abeutil.MaxSatoshi {
 			return nil, &abejson.RPCError{
 				Code:    abejson.ErrRPCType,
@@ -608,6 +640,121 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 	return mtxHex, nil
 }
 
+func handleCreateRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*abejson.CreateRawTransactionCmdAbe)
+
+	mtx := wire.NewMsgTxAbe(wire.TxVersion)
+
+	// Add all transaction inputs to a new transaction after performing
+	// some validity checks.
+	for _, input := range c.Inputs {
+		serialNumber, err := chainhash.NewHashFromStr(input.SerialNumber)
+		if err != nil {
+			return nil, rpcDecodeHexError(input.SerialNumber)
+		}
+
+		blockHashsNum := len(input.PreviousOutPointRing.BlockHashs)
+		if blockHashsNum != wire.BlockNumPerRingGroup {
+			return nil, rpcUtxoRingInvalidBlockNumInRingError(blockHashsNum)
+		}
+		blockHashs := make([]*chainhash.Hash, blockHashsNum)
+		for i := 0; i < blockHashsNum; i++ {
+			blockHash, err := chainhash.NewHashFromStr(input.PreviousOutPointRing.BlockHashs[i])
+			if err != nil {
+				return nil, rpcDecodeHexError(input.PreviousOutPointRing.BlockHashs[i])
+			}
+			blockHashs[i] = blockHash
+		}
+
+		ringSize := len(input.PreviousOutPointRing.OutPoints)
+		if ringSize <= 0 || ringSize > wire.TxRingSize {
+			return nil, rpcUtxoRingInvalidRingSizeError(ringSize)
+		}
+		outPoints := make([]*wire.OutPointAbe, ringSize)
+		for i := 0; i < ringSize; i++ {
+			txHash, err := chainhash.NewHashFromStr(input.PreviousOutPointRing.OutPoints[i].Txid)
+			if err != nil {
+				return nil, rpcDecodeHexError(input.PreviousOutPointRing.OutPoints[i].Txid)
+			}
+			outPoints[i] = wire.NewOutPointAbe(txHash, input.PreviousOutPointRing.OutPoints[i].Index)
+		}
+
+		previousOutPointRing := wire.NewOutPointRing(blockHashs, outPoints)
+		txIn := wire.NewTxInAbe(serialNumber, previousOutPointRing)
+
+		mtx.AddTxIn(txIn)
+	}
+
+	// Add all transaction outputs to the transaction after performing
+	// some validity checks.
+	for addressScriptStr, valueScriptAmount := range c.Outputs {
+		if valueScriptAmount <= 0 || valueScriptAmount > abeutil.MaxAbe {
+			return nil, &abejson.RPCError{
+				Code:    abejson.ErrRPCType,
+				Message: "Invalid amount",
+			}
+		}
+
+		daddr, err := abeutil.DecodeDerivedAddressAbe(addressScriptStr)
+		if err != nil {
+			return nil, &abejson.RPCError{
+				Code:    abejson.ErrRPCInvalidDerivedAddress,
+				Message: "Invalid derived address: " + err.Error(),
+			}
+		}
+
+		switch daddr.(type) {
+		case *abeutil.DerivedAddressSalrs:
+		default:
+			return nil, &abejson.RPCError{
+				Code:    abejson.ErrRPCInvalidDerivedAddress,
+				Message: "Invalid derived address",
+			}
+		}
+
+		addressScript := daddr.Serialize()
+
+		// Convert the amount to neutrino.
+		neutrino, err := abeutil.NewAmountAbe(valueScriptAmount)
+		if err != nil {
+			context := "Failed to convert amount"
+			return nil, internalRPCError(err.Error(), context)
+		}
+
+		txOut := wire.NewTxOutAbe(int64(neutrino), addressScript)
+
+		mtx.AddTxOut(txOut)
+	}
+
+	//	TxFee
+	if c.Fee <= 0 || c.Fee > abeutil.MaxAbe {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCType,
+			Message: "Invalid transaction fee",
+		}
+	}
+	// Convert the fee to neutrino.
+	neutrinoFee, err := abeutil.NewAmountAbe(c.Fee)
+	if err != nil {
+		context := "Failed to convert fee amount"
+		return nil, internalRPCError(err.Error(), context)
+	}
+	mtx.TxFee = int64(neutrinoFee)
+
+	//	TxWitness
+	mtx.TxWitness = nil
+
+	// Return the serialized and hex-encoded transaction.  Note that this
+	// is intentionally not directly returning because the first return
+	// value is a string and it would result in returning an empty string to
+	// the client instead of nothing (nil) in the case of an error.
+	mtxHex, err := messageToHex(mtx)
+	if err != nil {
+		return nil, err
+	}
+	return mtxHex, nil
+}
+
 // handleDebugLevel handles debuglevel commands.
 func handleDebugLevel(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.DebugLevelCmd)
@@ -640,6 +787,21 @@ func witnessToHex(witness wire.TxWitness) []string {
 
 	result := make([]string, 0, len(witness))
 	for _, wit := range witness {
+		result = append(result, hex.EncodeToString(wit))
+	}
+
+	return result
+}
+
+func witnessToHexAbe(txWitness *wire.TxWitnessAbe) []string {
+	// Ensure nil is returned when there are no entries versus an empty
+	// slice so it can properly be omitted as necessary.
+	if txWitness == nil || len(txWitness.Witnesses) == 0 {
+		return nil
+	}
+
+	result := make([]string, 0, len(txWitness.Witnesses))
+	for _, wit := range txWitness.Witnesses {
 		result = append(result, hex.EncodeToString(wit))
 	}
 
@@ -683,42 +845,39 @@ func createVinList(mtx *wire.MsgTx) []abejson.Vin {
 	return vinList
 }
 
-func createVinListAbe(mtx *wire.MsgTxAbe) []abejson.Vin {
+func createVinListAbe(mtx *wire.MsgTxAbe) []abejson.TxIn {
 	// Coinbase transactions only have a single txin by definition.
-	vinList := make([]abejson.Vin, len(mtx.TxIns))
-	/*	if blockchain.IsCoinBaseTx(mtx) {
-			txIn := mtx.TxIn[0]
-			vinList[0].Coinbase = hex.EncodeToString(txIn.SignatureScript)
-			vinList[0].Sequence = txIn.Sequence
-			vinList[0].Witness = witnessToHex(txIn.Witness)
-			return vinList
+	vinList := make([]abejson.TxIn, len(mtx.TxIns))
+
+	for i, txIn := range mtx.TxIns {
+		vinEntry := &vinList[i]
+		vinEntry.SerialNumber = txIn.SerialNumber.String()
+
+		blockHashNum := len(txIn.PreviousOutPointRing.BlockHashs)
+		blockHashs := make([]string, blockHashNum)
+		for i := 0; i < blockHashNum; i++ {
+			blockHashs[i] = txIn.PreviousOutPointRing.BlockHashs[i].String()
 		}
 
-		for i, txIn := range mtx.TxIn {
-			// The disassembled string will contain [error] inline
-			// if the script doesn't fully parse, so ignore the
-			// error here.
-			disbuf, _ := txscript.DisasmString(txIn.SignatureScript)
+		ringSize := len(txIn.PreviousOutPointRing.OutPoints)
+		outPoints := make([]abejson.OutPointAbe, ringSize)
+		for i := 0; i < ringSize; i++ {
+			outPoint := &outPoints[i]
+			outPoint.Txid = txIn.PreviousOutPointRing.OutPoints[i].TxHash.String()
+			outPoint.Index = txIn.PreviousOutPointRing.OutPoints[i].Index
+		}
 
-			vinEntry := &vinList[i]
-			vinEntry.Txid = txIn.PreviousOutPoint.Hash.String()
-			vinEntry.Vout = txIn.PreviousOutPoint.Index
-			vinEntry.Sequence = txIn.Sequence
-			vinEntry.ScriptSig = &abejson.ScriptSig{
-				Asm: disbuf,
-				Hex: hex.EncodeToString(txIn.SignatureScript),
-			}
-
-			if mtx.HasWitness() {
-				vinEntry.Witness = witnessToHex(txIn.Witness)
-			}
-		}*/
+		vinEntry.PreviousOutPointRing = &abejson.OutPointRing{
+			BlockHashs: blockHashs,
+			OutPoints:  outPoints}
+	}
 
 	return vinList
 }
 
 // createVoutList returns a slice of JSON objects for the outputs of the passed
 // transaction.
+//	todo(ABE)
 func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap map[string]struct{}) []abejson.Vout {
 	voutList := make([]abejson.Vout, 0, len(mtx.TxOut))
 	for i, v := range mtx.TxOut {
@@ -769,6 +928,21 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap
 	return voutList
 }
 
+func createVoutListAbe(mtx *wire.MsgTxAbe, chainParams *chaincfg.Params) []abejson.TxOutAbe {
+	voutList := make([]abejson.TxOutAbe, 0, len(mtx.TxOuts))
+	for i, txOut := range mtx.TxOuts {
+
+		var voutEntry abejson.TxOutAbe
+		voutEntry.N = uint8(i)
+		voutEntry.ValueScript = abeutil.Amount(txOut.ValueScript).ToABE()
+		voutEntry.AddressScript = hex.EncodeToString(txOut.AddressScript)
+
+		voutList = append(voutList, voutEntry)
+	}
+
+	return voutList
+}
+
 // createTxRawResult converts the passed transaction and associated parameters
 // to a raw transaction JSON object.
 func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
@@ -809,36 +983,40 @@ func createTxRawResultAbe(chainParams *chaincfg.Params, mtx *wire.MsgTxAbe,
 	txHash string, blkHeader *wire.BlockHeader, blkHash string,
 	blkHeight int32, chainHeight int32) (*abejson.TxRawResultAbe, error) {
 
-	/*	mtxHex, err := messageToHex(mtx)
-		if err != nil {
-			return nil, err
-		}
+	mtxHex, err := messageToHex(mtx)
+	if err != nil {
+		return nil, err
+	}
 
-		txReply := &abejson.TxRawResultAbe{
-			Hex:      mtxHex,
-			Txid:     txHash,
-			Hash:     mtx.TxHashFull().String(),
-			Size:     int32(mtx.SerializeSize()),
-			Vsize:    int32(mtx.SerializeSizeFull()),
-			Vin:      createVinList(mtx),
-			Vout:     createVoutList(mtx, chainParams, nil),
-			Version:  mtx.Version,
-		}
+	txReply := &abejson.TxRawResultAbe{
+		Hex:      mtxHex,
+		Txid:     txHash,
+		Hash:     mtx.TxHashFull().String(),
+		Size:     int32(mtx.SerializeSize()),
+		Fullsize: int32(mtx.SerializeSizeFull()),
+		Vin:      createVinListAbe(mtx),
+		Vout:     createVoutListAbe(mtx, chainParams),
+		Fee:      abeutil.Amount(mtx.TxFee).ToABE(),
+		Version:  mtx.Version,
+	}
 
-		if blkHeader != nil {
-			// This is not a typo, they are identical in bitcoind as well.
-			txReply.Time = blkHeader.Timestamp.Unix()
-			txReply.Blocktime = blkHeader.Timestamp.Unix()
-			txReply.BlockHash = blkHash
-			txReply.Confirmations = uint64(1 + chainHeight - blkHeight)
-		}*/
+	if mtx.HasWitness() {
+		txReply.Witness = witnessToHexAbe(mtx.TxWitness)
+	}
 
-	txReply := &abejson.TxRawResultAbe{}
+	if blkHeader != nil {
+		// This is not a typo, they are identical in bitcoind as well.
+		txReply.Time = blkHeader.Timestamp.Unix()
+		txReply.Blocktime = blkHeader.Timestamp.Unix()
+		txReply.BlockHash = blkHash
+		txReply.Confirmations = uint64(1 + chainHeight - blkHeight)
+	}
 
 	return txReply, nil
 }
 
 // handleDecodeRawTransaction handles decoderawtransaction commands.
+//	todo(ABE):
 func handleDecodeRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.DecodeRawTransactionCmd)
 
@@ -871,7 +1049,45 @@ func handleDecodeRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 	return txReply, nil
 }
 
+func handleDecodeRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*abejson.DecodeRawTransactionCmdAbe)
+
+	// Deserialize the transaction.
+	hexStr := c.HexTx
+	if len(hexStr)%2 != 0 {
+		hexStr = "0" + hexStr
+	}
+	serializedTx, err := hex.DecodeString(hexStr)
+	if err != nil {
+		return nil, rpcDecodeHexError(hexStr)
+	}
+	var mtx wire.MsgTxAbe
+	err = mtx.Deserialize(bytes.NewReader(serializedTx))
+	if err != nil {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCDeserialization,
+			Message: "TX decode failed: " + err.Error(),
+		}
+	}
+
+	// Create and return the result.
+	txReply := abejson.TxRawDecodeResultAbe{
+		Txid:    mtx.TxHash().String(),
+		Version: mtx.Version,
+		Vin:     createVinListAbe(&mtx),
+		Vout:    createVoutListAbe(&mtx, s.cfg.ChainParams),
+		Fee:     abeutil.Amount(mtx.TxFee).ToABE(),
+	}
+
+	if mtx.HasWitness() {
+		txReply.Witness = witnessToHexAbe(mtx.TxWitness)
+	}
+
+	return txReply, nil
+}
+
 // handleDecodeScript handles decodescript commands.
+//	todo(ABE): ABE does not use/support this?
 func handleDecodeScript(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.DecodeScriptCmd)
 
@@ -931,7 +1147,7 @@ func handleEstimateFee(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 		return -1.0, errors.New("Parameter NumBlocks must be positive")
 	}
 
-	feeRate, err := s.cfg.FeeEstimator.EstimateFee(uint32(c.NumBlocks))
+	feeRate, err := s.cfg.FeeEstimator.EstimateFeeAbe(uint32(c.NumBlocks))
 
 	if err != nil {
 		return -1.0, err
@@ -1155,7 +1371,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	// The verbose flag is set, so generate the JSON object and return it.
 
 	// Deserialize the block.
-	blk, err := abeutil.NewBlockFromBytes(blkBytes)
+	blk, err := abeutil.NewBlockFromBytesAbe(blkBytes)
 	if err != nil {
 		context := "Failed to deserialize block"
 		return nil, internalRPCError(err.Error(), context)
@@ -1194,11 +1410,13 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		Confirmations: int64(1 + best.Height - blockHeight),
 		Height:        int64(blockHeight),
 		Size:          int32(len(blkBytes)),
-		StrippedSize:  int32(blk.MsgBlock().SerializeSizeStripped()),
-		Weight:        int32(blockchain.GetBlockWeight(blk)),
-		Bits:          strconv.FormatInt(int64(blockHeader.Bits), 16),
-		Difficulty:    getDifficultyRatio(blockHeader.Bits, params),
-		NextHash:      nextHashString,
+		//	todo(ABE):
+		FullSize: int32(blk.MsgBlock().SerializeSize()),
+		//		StrippedSize:  int32(blk.MsgBlock().SerializeSizeStripped()),
+		//		Weight:        int32(blockchain.GetBlockWeight(blk)),
+		Bits:       strconv.FormatInt(int64(blockHeader.Bits), 16),
+		Difficulty: getDifficultyRatio(blockHeader.Bits, params),
+		NextHash:   nextHashString,
 	}
 
 	if c.VerboseTx == nil || !*c.VerboseTx {
@@ -1211,9 +1429,9 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		blockReply.Tx = txNames
 	} else {
 		txns := blk.Transactions()
-		rawTxns := make([]abejson.TxRawResult, len(txns))
+		rawTxns := make([]abejson.TxRawResultAbe, len(txns))
 		for i, tx := range txns {
-			rawTxn, err := createTxRawResult(params, tx.MsgTx(),
+			rawTxn, err := createTxRawResultAbe(params, tx.MsgTx(),
 				tx.Hash().String(), blockHeader, hash.String(),
 				blockHeight, best.Height)
 			if err != nil {
@@ -1262,6 +1480,7 @@ func handleGetBlockChainInfo(s *rpcServer, cmd interface{}, closeChan <-chan str
 		Difficulty:    getDifficultyRatio(chainSnapshot.Bits, params),
 		MedianTime:    chainSnapshot.MedianTime.Unix(),
 		Pruned:        false,
+		//	todo(ABE):
 		Bip9SoftForks: make(map[string]*abejson.Bip9SoftForkDescription),
 	}
 
@@ -1269,6 +1488,7 @@ func handleGetBlockChainInfo(s *rpcServer, cmd interface{}, closeChan <-chan str
 	// status of soft-forks deployed via the super-majority block
 	// signalling mechanism.
 	height := chainSnapshot.Height
+	//	todo(ABE.MUST):
 	chainInfo.SoftForks = []*abejson.SoftForkDescription{
 		{
 			ID:      "bip34",
@@ -1301,6 +1521,7 @@ func handleGetBlockChainInfo(s *rpcServer, cmd interface{}, closeChan <-chan str
 
 	// Finally, query the BIP0009 version bits state for all currently
 	// defined BIP0009 soft-fork deployments.
+	//	todo(ABE.MUST):
 	for deployment, deploymentDetails := range params.Deployments {
 		// Map the integer deployment ID into a human readable
 		// fork-name.
@@ -1556,7 +1777,7 @@ func (state *gbtWorkState) NotifyMempoolTx(lastUpdated time.Time) {
 	}()
 }
 
-//	Abe to do
+//	todo(ABE):
 func (state *gbtWorkState) NotifyMempoolTxAbe(lastUpdated time.Time) {
 	go func() {
 		state.Lock()
@@ -1568,8 +1789,7 @@ func (state *gbtWorkState) NotifyMempoolTxAbe(lastUpdated time.Time) {
 			return
 		}
 
-		if time.Now().After(state.lastGenerated.Add(time.Second *
-			gbtRegenerateSeconds)) {
+		if time.Now().After(state.lastGenerated.Add(time.Second * gbtRegenerateSeconds)) {
 
 			state.notifyLongPollers(state.prevHash, lastUpdated)
 		}
@@ -1634,8 +1854,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 	if template == nil || state.prevHash == nil ||
 		!state.prevHash.IsEqual(latestHash) ||
 		(state.lastTxUpdate != lastTxUpdate &&
-			time.Now().After(state.lastGenerated.Add(time.Second*
-				gbtRegenerateSeconds))) {
+			time.Now().After(state.lastGenerated.Add(time.Second*gbtRegenerateSeconds))) {
 
 		// Reset the previous best hash the block template was generated
 		// against so any errors below cause the next invocation to try
@@ -1759,7 +1978,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 	// after the template is generated, but it's important to avoid serving
 	// invalid block templates.
 	template := state.template
-	msgBlock := template.Block
+	msgBlock := template.BlockAbe
 	header := &msgBlock.Header
 	adjustedTime := state.timeSource.AdjustedTime()
 	maxTime := adjustedTime.Add(time.Second * blockchain.MaxTimeOffsetSeconds)
@@ -1777,7 +1996,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 	// transaction.  The result does not include the coinbase, so notice
 	// the adjustments to the various lengths and indices.
 	numTx := len(msgBlock.Transactions)
-	transactions := make([]abejson.GetBlockTemplateResultTx, 0, numTx-1)
+	transactions := make([]abejson.GetBlockTemplateResultTxAbe, 0, numTx-1)
 	txIndex := make(map[chainhash.Hash]int64, numTx)
 	for i, tx := range msgBlock.Transactions {
 		txHash := tx.TxHash()
@@ -1794,16 +2013,17 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 		// ensure proper ordering of the dependencies.  A map is used
 		// before creating the final array to prevent duplicate entries
 		// when multiple inputs reference the same transaction.
-		dependsMap := make(map[int64]struct{})
-		for _, txIn := range tx.TxIn {
-			if idx, ok := txIndex[txIn.PreviousOutPoint.Hash]; ok {
-				dependsMap[idx] = struct{}{}
-			}
-		}
-		depends := make([]int64, 0, len(dependsMap))
-		for idx := range dependsMap {
-			depends = append(depends, idx)
-		}
+		//	todo(ABE): ABE does not allow a transaction to depend on transactions in the same block.
+		/*		dependsMap := make(map[int64]struct{})
+				for _, txIn := range tx.TxIn {
+					if idx, ok := txIndex[txIn.PreviousOutPoint.Hash]; ok {
+						dependsMap[idx] = struct{}{}
+					}
+				}
+				depends := make([]int64, 0, len(dependsMap))
+				for idx := range dependsMap {
+					depends = append(depends, idx)
+				}*/
 
 		// Serialize the transaction for later conversion to hex.
 		txBuf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
@@ -1812,14 +2032,13 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 			return nil, internalRPCError(err.Error(), context)
 		}
 
-		bTx := abeutil.NewTx(tx)
-		resultTx := abejson.GetBlockTemplateResultTx{
-			Data:    hex.EncodeToString(txBuf.Bytes()),
-			Hash:    txHash.String(),
-			Depends: depends,
-			Fee:     template.Fees[i],
-			SigOps:  template.SigOpCosts[i],
-			Weight:  blockchain.GetTransactionWeight(bTx),
+		bTx := abeutil.NewTxAbe(tx)
+		resultTx := abejson.GetBlockTemplateResultTxAbe{
+			Data: hex.EncodeToString(txBuf.Bytes()),
+			Hash: txHash.String(),
+			Fee:  template.Fees[i],
+			//			Weight:  blockchain.GetTransactionWeight(bTx),
+			Size: int64(bTx.MsgTx().SerializeSize()),
 		}
 		transactions = append(transactions, resultTx)
 	}
@@ -1835,8 +2054,8 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 		CurTime:      header.Timestamp.Unix(),
 		Height:       int64(template.Height),
 		PreviousHash: header.PrevBlock.String(),
-		WeightLimit:  blockchain.MaxBlockWeight,
-		SigOpLimit:   blockchain.MaxBlockSigOpsCost,
+		//		WeightLimit:  blockchain.MaxBlockWeight,
+		//		SigOpLimit:   blockchain.MaxBlockSigOpsCost,
 		SizeLimit:    wire.MaxBlockPayload,
 		Transactions: transactions,
 		Version:      header.Version,
@@ -1851,13 +2070,14 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 	}
 	// If the generated block template includes transactions with witness
 	// data, then include the witness commitment in the GBT result.
+	//	todo(ABE.MUST)
 	if template.WitnessCommitment != nil {
 		reply.DefaultWitnessCommitment = hex.EncodeToString(template.WitnessCommitment)
 	}
 
 	if useCoinbaseValue {
-		reply.CoinbaseAux = gbtCoinbaseAux
-		reply.CoinbaseValue = &msgBlock.Transactions[0].TxOut[0].Value
+		//		reply.CoinbaseAux = gbtCoinbaseAux
+		reply.CoinbaseValue = &msgBlock.Transactions[0].TxOuts[0].ValueScript
 	} else {
 		// Ensure the template has a valid payment address associated
 		// with it when a full coinbase is requested.
@@ -1879,12 +2099,10 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 			return nil, internalRPCError(err.Error(), context)
 		}
 
-		resultTx := abejson.GetBlockTemplateResultTx{
-			Data:    hex.EncodeToString(txBuf.Bytes()),
-			Hash:    tx.TxHash().String(),
-			Depends: []int64{},
-			Fee:     template.Fees[0],
-			SigOps:  template.SigOpCosts[0],
+		resultTx := abejson.GetBlockTemplateResultTxAbe{
+			Data: hex.EncodeToString(txBuf.Bytes()),
+			Hash: tx.TxHash().String(),
+			Fee:  template.Fees[0],
 		}
 
 		reply.CoinbaseTxn = &resultTx
@@ -2032,6 +2250,7 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 	// way to relay a found block or receive transactions to work on.
 	// However, allow this state when running in the regression test or
 	// simulation test mode.
+	//	todo(ABE): about the rules on regressionTest and SimNet
 	if !(cfg.RegressionTest || cfg.SimNet) &&
 		s.cfg.ConnMgr.ConnectedCount() == 0 {
 
@@ -2091,6 +2310,7 @@ func chainErrToGBTErrString(err error) string {
 		return "duplicate"
 	case blockchain.ErrBlockTooBig:
 		return "bad-blk-length"
+		//	todo(ABE): ABE does not use weight
 	case blockchain.ErrBlockWeightTooHigh:
 		return "bad-blk-weight"
 	case blockchain.ErrBlockVersionTooOld:
@@ -2143,6 +2363,7 @@ func chainErrToGBTErrString(err error) string {
 		return "bad-txns-highspend"
 	case blockchain.ErrBadFees:
 		return "bad-txns-fees"
+		//	todo(ABE):
 	case blockchain.ErrTooManySigOps:
 		return "high-sigops"
 	case blockchain.ErrFirstTxNotCoinbase:
@@ -2205,14 +2426,14 @@ func handleGetBlockTemplateProposal(s *rpcServer, request *abejson.TemplateReque
 				"hexadecimal string (not %q)", hexData),
 		}
 	}
-	var msgBlock wire.MsgBlock
+	var msgBlock wire.MsgBlockAbe
 	if err := msgBlock.Deserialize(bytes.NewReader(dataBytes)); err != nil {
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCDeserialization,
 			Message: "Block decode failed: " + err.Error(),
 		}
 	}
-	block := abeutil.NewBlock(&msgBlock)
+	block := abeutil.NewBlockAbe(&msgBlock)
 
 	// Ensure the block is building from the expected previous block.
 	expectedPrevHash := s.cfg.Chain.BestSnapshot().Hash
@@ -2221,7 +2442,7 @@ func handleGetBlockTemplateProposal(s *rpcServer, request *abejson.TemplateReque
 		return "bad-prevblk", nil
 	}
 
-	if err := s.cfg.Chain.CheckConnectBlockTemplateBTCD(block); err != nil {
+	if err := s.cfg.Chain.CheckConnectBlockTemplateAbe(block); err != nil {
 		if _, ok := err.(blockchain.RuleError); !ok {
 			errStr := fmt.Sprintf("Failed to process block proposal: %v", err)
 			rpcsLog.Error(errStr)
@@ -2414,7 +2635,7 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 
 // handleGetMempoolInfo implements the getmempoolinfo command.
 func handleGetMempoolInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	mempoolTxns := s.cfg.TxMemPool.TxDescs()
+	mempoolTxns := s.cfg.TxMemPool.TxDescsAbe()
 
 	var numBytes int64
 	for _, txD := range mempoolTxns {
@@ -2509,6 +2730,7 @@ func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	// blocks.  When the passed value is negative, use the last block the
 	// difficulty changed as the starting height.  Also make sure the
 	// starting height is not before the beginning of the chain.
+	//	todo(ABE): What is this (120)?
 	numBlocks := int32(120)
 	if c.Blocks != nil {
 		numBlocks = int32(*c.Blocks)
@@ -2620,7 +2842,7 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 
 	// The response is simply an array of the transaction hashes if the
 	// verbose flag is not set.
-	descs := mp.TxDescs()
+	descs := mp.TxDescsAbe()
 	hashStrings := make([]string, len(descs))
 	for i := range hashStrings {
 		hashStrings[i] = descs[i].Tx.Hash().String()
@@ -2641,12 +2863,12 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 
 	verbose := false
 	if c.Verbose != nil {
-		verbose = *c.Verbose != 0
+		verbose = *c.Verbose
 	}
 
 	// Try to fetch the transaction from the memory pool and if that fails,
 	// try the block database.
-	var mtx *wire.MsgTx
+	var mtx *wire.MsgTxAbe
 	var blkHash *chainhash.Hash
 	var blkHeight int32
 	tx, err := s.cfg.TxMemPool.FetchTransaction(txHash)
@@ -2697,7 +2919,7 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 		}
 
 		// Deserialize the transaction
-		var msgTx wire.MsgTx
+		var msgTx wire.MsgTxAbe
 		err = msgTx.Deserialize(bytes.NewReader(txBytes))
 		if err != nil {
 			context := "Failed to deserialize transaction"
@@ -2740,7 +2962,7 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 		chainHeight = s.cfg.Chain.BestSnapshot().Height
 	}
 
-	rawTxn, err := createTxRawResult(s.cfg.ChainParams, mtx, txHash.String(),
+	rawTxn, err := createTxRawResultAbe(s.cfg.ChainParams, mtx, txHash.String(),
 		blkHeader, blkHashStr, blkHeight, chainHeight)
 	if err != nil {
 		return nil, err
@@ -2749,7 +2971,8 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 }
 
 // handleGetTxOut handles gettxout commands.
-func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+//	todo(ABE): ABE does not support 'GetTxOutCmd', as it seems that this command is to get Txo from transactions in mempool and utxo of main chain.
+/*func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.GetTxOutCmd)
 
 	// Convert the provided transaction hash hex to a Hash.
@@ -2852,6 +3075,86 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		Coinbase: isCoinbase,
 	}
 	return txOutReply, nil
+}*/
+
+func handleGetUtxoRing(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*abejson.GetUtxoRingCmd)
+
+	blockHashsNum := len(c.OutPointRing.BlockHashs)
+	if blockHashsNum != wire.BlockNumPerRingGroup {
+		return nil, rpcUtxoRingInvalidBlockNumInRingError(blockHashsNum)
+	}
+	blockHashs := make([]*chainhash.Hash, blockHashsNum)
+	for i := 0; i < blockHashsNum; i++ {
+		blockHash, err := chainhash.NewHashFromStr(c.OutPointRing.BlockHashs[i])
+		if err != nil {
+			return nil, rpcDecodeHexError(c.OutPointRing.BlockHashs[i])
+		}
+		blockHashs[i] = blockHash
+	}
+
+	ringSize := len(c.OutPointRing.OutPoints)
+	if ringSize <= 0 || ringSize > wire.TxRingSize {
+		return nil, rpcUtxoRingInvalidRingSizeError(ringSize)
+	}
+	outPoints := make([]*wire.OutPointAbe, ringSize)
+	for i := 0; i < ringSize; i++ {
+		txHash, err := chainhash.NewHashFromStr(c.OutPointRing.OutPoints[i].Txid)
+		if err != nil {
+			return nil, rpcDecodeHexError(c.OutPointRing.OutPoints[i].Txid)
+		}
+		outPoints[i] = wire.NewOutPointAbe(txHash, c.OutPointRing.OutPoints[i].Index)
+	}
+
+	outPointRing := wire.NewOutPointRing(blockHashs, outPoints)
+
+	utxoRingEntry, err := s.cfg.Chain.FetchUtxoRingEntry(outPointRing)
+	if err != nil {
+		return nil, rpcUtxoRingNoInfoError(outPointRing)
+	}
+
+	// To match the behavior of the reference client, return nil
+	// (JSON null) if the the txoring is 'all' spent in the main chain.
+	if utxoRingEntry == nil || utxoRingEntry.IsAllSpent() {
+		return nil, nil
+	}
+
+	ringHashInCmd := outPointRing.Hash()
+	ringHashFetched := utxoRingEntry.OutPointRing().Hash()
+	if !ringHashFetched.IsEqual(&ringHashInCmd) {
+		return nil, rpcUtxoRingMismatchedInfoError(outPointRing)
+	}
+
+	utxoRingReply := &abejson.GetUtxoRingResult{
+		RingBlockHeight: utxoRingEntry.RingBlockHeight(),
+		OutPointRing:    c.OutPointRing, //	directly use the OutPointRing in the cmd
+		IsCoinbase:      utxoRingEntry.IsCoinBase(),
+	}
+
+	if len(utxoRingEntry.TxOuts()) != ringSize {
+		return nil, rpcUtxoRingMismatchedInfoError(outPointRing)
+	}
+	txOuts := make([]abejson.TxOutAbe, ringSize)
+	for i := 0; i < ringSize; i++ {
+		txOuts[i] = abejson.TxOutAbe{
+			ValueScript:   abeutil.Amount(utxoRingEntry.TxOuts()[i].ValueScript).ToABE(),
+			N:             uint8(i),
+			AddressScript: hex.EncodeToString(utxoRingEntry.TxOuts()[i].AddressScript),
+		}
+	}
+	utxoRingReply.TxOuts = txOuts
+
+	consumedSnNum := len(utxoRingEntry.SerialNumbers())
+	serialNumbers := make([]string, consumedSnNum)
+	consumingBlockHashs := make([]string, consumedSnNum)
+	for i := 0; i < consumedSnNum; i++ {
+		serialNumbers[i] = utxoRingEntry.SerialNumbers()[i].String()
+		consumingBlockHashs[i] = utxoRingEntry.ConsumingBlockHashs()[i].String()
+	}
+	utxoRingReply.SerialNumbers = serialNumbers
+	utxoRingReply.ConsumingBlockHashs = consumingBlockHashs
+
+	return utxoRingReply, nil
 }
 
 // handleHelp implements the help command.
@@ -2922,10 +3225,11 @@ type retrievedTx struct {
 // fetchInputTxos fetches the outpoints from all transactions referenced by the
 // inputs to the passed transaction by checking the transaction mempool first
 // then the transaction index for those already mined into blocks.
+//	todo(ABE): ABE does not support fetch inputTxos, instead, it supprts fetchInput
 func fetchInputTxos(s *rpcServer, tx *wire.MsgTx) (map[wire.OutPoint]wire.TxOut, error) {
-	mp := s.cfg.TxMemPool
+	//	mp := s.cfg.TxMemPool
 	originOutputs := make(map[wire.OutPoint]wire.TxOut)
-	for txInIndex, txIn := range tx.TxIn {
+	/*	for txInIndex, txIn := range tx.TxIn {
 		// Attempt to fetch and use the referenced transaction from the
 		// memory pool.
 		origin := &txIn.PreviousOutPoint
@@ -2980,7 +3284,7 @@ func fetchInputTxos(s *rpcServer, tx *wire.MsgTx) (map[wire.OutPoint]wire.TxOut,
 			return nil, internalRPCError(errStr, "")
 		}
 		originOutputs[*origin] = *msgTx.TxOut[origin.Index]
-	}
+	}*/
 
 	return originOutputs, nil
 }

@@ -245,7 +245,7 @@ func DecodeMasterAddressAbe(addrstr string) (MasterAddress, error) {
 	}
 
 	serializedSize := len(serialized)
-	if serializedSize <= 2+chainhash.HashSize {     //TODO(osy): 2 + chainhash.HashSize consider nil of address?
+	if serializedSize <= 2+chainhash.HashSize { //TODO(osy): 2 + chainhash.HashSize consider nil of address?
 		return nil, errors.New("decoded address is of unknown format: bytesize <= 2 + chainhash.HashSize")
 	}
 
@@ -261,6 +261,38 @@ func DecodeMasterAddressAbe(addrstr string) (MasterAddress, error) {
 	switch cryptoScheme {
 	case abecrypto.CryptoSchemeSALRS:
 		return ParseMasterAddressSalrs(serialized[:serializedSize-chainhash.HashSize])
+	default:
+		return nil, errors.New("decoded address is of unknown/unsupported crypto scheme")
+	}
+}
+
+func DecodeDerivedAddressAbe(addrstr string) (DerivedAddress, error) {
+	if len(addrstr) == 0 {
+		return nil, errors.New("decoded address is of zero size")
+	}
+
+	serialized, err := hex.DecodeString(addrstr)
+	if err != nil {
+		return nil, err
+	}
+
+	serializedSize := len(serialized)
+	if serializedSize <= 2+chainhash.HashSize { //TODO(osy): 2 + chainhash.HashSize consider nil of address?
+		return nil, errors.New("decoded address is of unknown format: bytesize <= 2 + chainhash.HashSize")
+	}
+
+	cryptoScheme := abecrypto.CryptoScheme(binary.BigEndian.Uint16(serialized[:2]))
+
+	checkSum := serialized[serializedSize-chainhash.HashSize:]
+	computedCheckSum := chainhash.DoubleHashB(serialized[:serializedSize-chainhash.HashSize])
+	if !bytes.Equal(checkSum, computedCheckSum) {
+		return nil, errors.New("decoded address is of unknown format: the check sum does not match")
+	}
+
+	//	todo(ABE): we can support multiple crypto schemes in a sophisticated way
+	switch cryptoScheme {
+	case abecrypto.CryptoSchemeSALRS:
+		return ParseDerivedAddressSalrs(serialized[:serializedSize-chainhash.HashSize])
 	default:
 		return nil, errors.New("decoded address is of unknown/unsupported crypto scheme")
 	}
