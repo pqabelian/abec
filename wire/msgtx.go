@@ -1290,6 +1290,11 @@ func (outPointRing *OutPointRing) Hash() chainhash.Hash {
 	return chainhash.DoubleHashH(buf.Bytes())
 }
 
+func (outPointRing *OutPointRing) String() string {
+	//	todo(ABE.MUST)
+	return ""
+}
+
 //	SerialNumber appears only when some ring member is consumed in TxIn,
 //	i.e. logically, SerialNumber accompanies with TxIn.
 type TxInAbe struct {
@@ -1706,6 +1711,10 @@ func (msg *MsgTxAbe) SetWitness(txWitness *TxWitnessAbe) {
 // HasWitness returns false if none of the inputs within the transaction
 // contain witness data, true false otherwise.
 func (msg *MsgTxAbe) HasWitness() bool {
+	if msg.TxWitness == nil {
+		return false
+	}
+
 	witItemNum := len(msg.TxWitness.Witnesses)
 	if witItemNum > 0 {
 		for _, witItem := range msg.TxWitness.Witnesses {
