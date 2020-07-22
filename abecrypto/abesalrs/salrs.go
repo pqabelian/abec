@@ -1,4 +1,4 @@
-package salrs
+package abesalrs
 
 import (
 	"errors"
@@ -31,12 +31,12 @@ func (mpk *MasterPubKey) Serialize() []byte {
 	return b
 }
 
-func DeseralizeMasterPubKey(mpkByteStr []byte) (mpk *MasterPubKey, err error) {
-	if len(mpkByteStr) == 0 {
-		return nil, errors.New("mpk byte string is empty")
+func DeseralizeMasterPubKey(mpkSerialized []byte) (mpk *MasterPubKey, err error) {
+	if len(mpkSerialized) == 0 {
+		return nil, errors.New("serialzed mpk bytes are empty")
 	}
 
-	salrsmasterPubKey, salrserr := salrs.DeseralizeMasterPubKey(mpkByteStr)
+	salrsmasterPubKey, salrserr := salrs.DeseralizeMasterPubKey(mpkSerialized)
 	if salrserr != nil {
 		return nil, salrserr
 	}
@@ -51,12 +51,12 @@ func (dpk *DerivedPubKey) Serialize() []byte {
 	return b
 }
 
-func DeseralizeDerivedPubKey(dpkByteStr []byte) (dpk *DerivedPubKey, err error) {
-	if len(dpkByteStr) == 0 {
-		return nil, errors.New("dpk byte string is empty")
+func DeseralizeDerivedPubKey(dpkSerialzed []byte) (dpk *DerivedPubKey, err error) {
+	if len(dpkSerialzed) == 0 {
+		return nil, errors.New("serialzed dpk bytes are empty")
 	}
 
-	salrsderivedPubKey, salrserr := salrs.DeseralizeDerivedPubKey(dpkByteStr)
+	salrsderivedPubKey, salrserr := salrs.DeseralizeDerivedPubKey(dpkSerialzed)
 	if salrserr != nil {
 		return nil, salrserr
 	}

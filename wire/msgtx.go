@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/abesuite/abec/abecrypto/salrs"
+	"github.com/abesuite/abec/abecrypto/abesalrs"
 	"io"
 	"strconv"
 
@@ -1027,7 +1027,7 @@ func writeTxWitness(w io.Writer, pver uint32, version int32, wit [][]byte) error
 //	todo(ABE)
 
 // todo: the AddressScriptMaxLen may depend on the length of derived address and the rules that txscript builds an AddressScript from a derived address
-var AddressScriptMaxLen = uint32(salrs.DpkByteLen + 10)
+var AddressScriptMaxLen = uint32(abesalrs.DpkByteLen + 10)
 var ValueScriptMaxLen = uint32(10) //	todo (ABE): in salrs, it is just a int64; but for latter full version, it will be a commitment
 
 const (
@@ -2401,10 +2401,11 @@ func NewStandardCoinbaseTxIn(nextBlockHeight int32, extraNonce uint64) *TxInAbe 
 	previousOutPointRing.BlockHashs[2] = &hash2
 
 	previousOutPointRing.OutPoints = make([]*OutPointAbe, 1)
-	outPointAbe := OutPointAbe{}
-	outPointAbe.TxHash = chainhash.ZeroHash
-	outPointAbe.Index = 0
-	previousOutPointRing.OutPoints[0] = &outPointAbe
+	outPointAbe := &OutPointAbe{
+		TxHash: chainhash.ZeroHash,
+		Index:  0,
+	}
+	previousOutPointRing.OutPoints[0] = outPointAbe
 
 	txIn.PreviousOutPointRing = previousOutPointRing
 

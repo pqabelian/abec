@@ -411,7 +411,7 @@ func createCoinbaseTxAbe(params *chaincfg.Params, extraNonce uint64, nextBlockHe
 
 	coinbaseTxIn := wire.NewStandardCoinbaseTxIn(nextBlockHeight, extraNonce)
 
-	addressScript, err := txscript.PayToAddrScriptAbe(addr)
+	addressScript, err := txscript.PayToAddressScriptAbe(addr)
 	if err != nil {
 		return nil, err
 	}

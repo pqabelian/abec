@@ -1934,7 +1934,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 						template.Block.Transactions[0].TxOut[0].PkScript = pkScript
 						template.ValidPayAddress = true*/
 
-			addressScript, err := txscript.PayToAddrScriptAbe(payToAddr)
+			addressScript, err := txscript.PayToAddressScriptAbe(payToAddr)
 			if err != nil {
 				context := "Failed to create addressScript"
 				return internalRPCError(err.Error(), context)

@@ -465,13 +465,13 @@ func PayToAddrScript(addr abeutil.Address) ([]byte, error) {
 }
 
 //	todo(ABE):
-func PayToAddrScriptAbe(addr abeutil.MasterAddress) ([]byte, error) {
+func PayToAddressScriptAbe(maddr abeutil.MasterAddress) ([]byte, error) {
 	// Create the script to pay to the provided payment address if one was
 	// specified.  Otherwise create a script that allows the coinbase to be
 	// redeemable by anyone.
 	var addressScript []byte
-	if addr != nil {
-		daddr, err := addr.GenerateDerivedAddress()
+	if maddr != nil {
+		daddr, err := maddr.GenerateDerivedAddress()
 		if err != nil {
 			return nil, err
 		}
@@ -496,7 +496,12 @@ func BuildAddressScript(daddr abeutil.DerivedAddress) ([]byte, error) {
 		if daddr == nil {
 			return nil, scriptError(ErrUnsupportedAddress, nilAddrErrStr)
 		}
-		return daddr.Serialize(), nil
+		//	todo(ABE): At different phase of the system, for example, by protocol version, we may form different AddressScript.
+		//	At this moment, we use (serialized) DerivedAddress
+		addressScript := make([]byte, 1+daddr.SerializeSize())
+		addressScript[0] = uint8(abeutil.AddressScriptDerivedAddress)
+		copy(addressScript[1:], daddr.Serialize())
+		return addressScript, nil
 	}
 
 	str := fmt.Sprintf("unable to generate payment AddressScript for unsupported "+
