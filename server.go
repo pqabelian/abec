@@ -2744,9 +2744,13 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		indexes = append(indexes, s.txIndex)
 	}
 	if cfg.AddrIndex {
-		indxLog.Info("Address index is enabled")
-		s.addrIndex = indexers.NewAddrIndex(db, chainParams)
-		indexes = append(indexes, s.addrIndex)
+		//	ToDo(ABE.MUST): DISABLE AddrIndex. For ABE, the txo is assigend to addessScript generated using stealth address mechanism, such that addrIndex does not make sense.
+		//	ToDo(ABE.MUST): Depending on requirements, ABE may support TxoIndex.
+		cfg.AddrIndex = false
+		indxLog.Info("ABE does not support Address index. It is disabled.")
+		//indxLog.Info("Address index is enabled")
+		//s.addrIndex = indexers.NewAddrIndex(db, chainParams)
+		//indexes = append(indexes, s.addrIndex)
 	}
 	// TODO(ABE): ABE does not support filter.
 	//if !cfg.NoCFilters {
