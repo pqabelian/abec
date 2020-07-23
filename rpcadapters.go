@@ -214,8 +214,8 @@ func (cm *rpcConnManager) AddRebroadcastInventory(iv *wire.InvVect, data interfa
 
 // RelayTransactions generates and relays inventory vectors for all of the
 // passed transactions to all connected peers.
-func (cm *rpcConnManager) RelayTransactions(txns []*mempool.TxDesc) {
-	cm.server.relayTransactions(txns)
+func (cm *rpcConnManager) RelayTransactions(txns []*mempool.TxDescAbe) {
+	cm.server.relayTransactionsAbe(txns)
 }
 
 // rpcSyncMgr provides a block manager for use with the RPC server and
