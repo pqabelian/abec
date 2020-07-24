@@ -13,6 +13,9 @@ import (
 	"sync"
 )
 
+//	todo(ABE.MUST): At this moment, ABE does not support addrIndex, as it does not make sense.
+//	todo(ABE.MUST): In formal verison, it should be removed.
+
 const (
 	// addrIndexName is the human-readable name for the index.
 	addrIndexName = "address index"

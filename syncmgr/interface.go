@@ -16,7 +16,7 @@ import (
 type PeerNotifier interface {
 	AnnounceNewTransactions(newTxs []*mempool.TxDesc)
 
-	AnnounceNewTransactionAbe(newTx *mempool.TxDescAbe)
+	AnnounceNewTransactionsAbe(newTxs []*mempool.TxDescAbe)
 
 	UpdatePeerHeights(latestBlkHash *chainhash.Hash, latestHeight int32, updateSource *peer.Peer)
 

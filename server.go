@@ -1400,9 +1400,11 @@ func (s *server) relayTransactions(txns []*mempool.TxDesc) {
 }
 
 //	Abe to do
-func (s *server) relayTransactionsAbe(txn *mempool.TxDescAbe) {
-	iv := wire.NewInvVect(wire.InvTypeTx, txn.Tx.Hash())
-	s.RelayInventory(iv, txn)
+func (s *server) relayTransactionsAbe(txns []*mempool.TxDescAbe) {
+	for _, txD := range txns {
+		iv := wire.NewInvVect(wire.InvTypeTx, txD.Tx.Hash())
+		s.RelayInventory(iv, txD)
+	}
 }
 
 // AnnounceNewTransactions generates and relays inventory vectors and notifies
@@ -1422,15 +1424,15 @@ func (s *server) AnnounceNewTransactions(txns []*mempool.TxDesc) {
 }
 
 //	todo(ABE):
-func (s *server) AnnounceNewTransactionAbe(txn *mempool.TxDescAbe) {
+func (s *server) AnnounceNewTransactionsAbe(txns []*mempool.TxDescAbe) {
 	// Generate and relay inventory vectors for all newly accepted
 	// transactions.
-	s.relayTransactionsAbe(txn)
+	s.relayTransactionsAbe(txns)
 
 	// Notify both websocket and getblocktemplate long poll clients of all
 	// newly accepted transactions.
 	if s.rpcServer != nil {
-		s.rpcServer.NotifyNewTransactionsAbe(txn)
+		s.rpcServer.NotifyNewTransactionsAbe(txns)
 	}
 }
 
@@ -2742,9 +2744,13 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		indexes = append(indexes, s.txIndex)
 	}
 	if cfg.AddrIndex {
-		indxLog.Info("Address index is enabled")
-		s.addrIndex = indexers.NewAddrIndex(db, chainParams)
-		indexes = append(indexes, s.addrIndex)
+		//	ToDo(ABE.MUST): DISABLE AddrIndex. For ABE, the txo is assigend to addessScript generated using stealth address mechanism, such that addrIndex does not make sense.
+		//	ToDo(ABE.MUST): Depending on requirements, ABE may support TxoIndex.
+		cfg.AddrIndex = false
+		indxLog.Info("ABE does not support Address index. It is disabled.")
+		//indxLog.Info("Address index is enabled")
+		//s.addrIndex = indexers.NewAddrIndex(db, chainParams)
+		//indexes = append(indexes, s.addrIndex)
 	}
 	// TODO(ABE): ABE does not support filter.
 	//if !cfg.NoCFilters {
