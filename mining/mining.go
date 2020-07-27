@@ -406,7 +406,8 @@ func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockH
 	return abeutil.NewTx(tx), nil
 }
 
-//	todo (ABE):
+//	TODO(ABE): may be the total number of  outputs of coinbase transaction should be confined to 1,
+//	 it will need to modify the process of checking block and transaction
 func createCoinbaseTxAbe(params *chaincfg.Params, extraNonce uint64, nextBlockHeight int32, addr abeutil.MasterAddress) (*abeutil.TxAbe, error) {
 
 	coinbaseTxIn := wire.NewStandardCoinbaseTxIn(nextBlockHeight, extraNonce)
