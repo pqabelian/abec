@@ -1205,6 +1205,7 @@ func NewOutPointAbe(txHash *chainhash.Hash, index uint8) *OutPointAbe {
 
 //	todo: shall the ringBlockHeight be added?
 type OutPointRing struct {
+	// TODO(abe): these three successive block hash can be replaced by the hash of block whose heigt equal to 3K+2
 	BlockHashs []*chainhash.Hash //	the hashs for the blocks from which the ring was generated, at this moment it is 3 successive blocks
 	OutPoints  []*OutPointAbe
 }
