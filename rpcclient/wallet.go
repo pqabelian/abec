@@ -15,7 +15,8 @@ import (
 // *****************************
 
 // FutureGetTransactionResult is a future promise to deliver the result
-// of a GetTransactionAsync RPC invocation (or an applicable error).
+// of a GetTransactionAsync or GetTransactionWatchOnlyAsync RPC invocation
+// (or an applicable error).
 type FutureGetTransactionResult chan *response
 
 // Receive waits for the response promised by the future and returns detailed
@@ -56,6 +57,28 @@ func (c *Client) GetTransactionAsync(txHash *chainhash.Hash) FutureGetTransactio
 // See GetRawTransaction to return the raw transaction instead.
 func (c *Client) GetTransaction(txHash *chainhash.Hash) (*abejson.GetTransactionResult, error) {
 	return c.GetTransactionAsync(txHash).Receive()
+}
+
+// GetTransactionWatchOnlyAsync returns an instance of a type that can be used
+// to get the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GetTransactionWatchOnly for the blocking version and more details.
+func (c *Client) GetTransactionWatchOnlyAsync(txHash *chainhash.Hash, watchOnly bool) FutureGetTransactionResult {
+	hash := ""
+	if txHash != nil {
+		hash = txHash.String()
+	}
+
+	cmd := abejson.NewGetTransactionCmd(hash, &watchOnly)
+	return c.sendCmd(cmd)
+}
+
+// GetTransactionWatchOnly returns detailed information about a wallet
+// transaction, and allow including watch-only addresses in balance
+// calculation and details.
+func (c *Client) GetTransactionWatchOnly(txHash *chainhash.Hash, watchOnly bool) (*abejson.GetTransactionResult, error) {
+	return c.GetTransactionWatchOnlyAsync(txHash, watchOnly).Receive()
 }
 
 // FutureListTransactionsResult is a future promise to deliver the result of a
@@ -1500,6 +1523,43 @@ func (c *Client) GetBalanceMinConf(account string, minConfirms int) (abeutil.Amo
 		return FutureGetBalanceParseResult(response).Receive()
 	}
 	return c.GetBalanceMinConfAsync(account, minConfirms).Receive()
+}
+
+// FutureGetBalancesResult is a future promise to deliver the result of a
+// GetBalancesAsync RPC invocation (or an applicable error).
+type FutureGetBalancesResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// available balances from the server.
+func (r FutureGetBalancesResult) Receive() (*abejson.GetBalancesResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a floating point number.
+	var balances abejson.GetBalancesResult
+	err = json.Unmarshal(res, &balances)
+	if err != nil {
+		return nil, err
+	}
+
+	return &balances, nil
+}
+
+// GetBalancesAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetBalances for the blocking version and more details.
+func (c *Client) GetBalancesAsync() FutureGetBalancesResult {
+	cmd := abejson.NewGetBalancesCmd()
+	return c.sendCmd(cmd)
+}
+
+// GetBalances returns the available balances from the server.
+func (c *Client) GetBalances() (*abejson.GetBalancesResult, error) {
+	return c.GetBalancesAsync().Receive()
 }
 
 // FutureGetReceivedByAccountResult is a future promise to deliver the result of

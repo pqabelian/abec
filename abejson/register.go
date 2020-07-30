@@ -283,6 +283,6 @@ func RegisteredCmdMethods() []string {
 		methods = append(methods, k)
 	}
 
-	sort.Sort(sort.StringSlice(methods))
+	sort.Strings(methods)
 	return methods
 }

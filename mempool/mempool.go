@@ -1502,7 +1502,7 @@ func (mp *TxPool) validateReplacement(tx *abeutil.Tx,
 func (mp *TxPool) maybeAcceptTransactionBTCD(tx *abeutil.Tx, isNew, rateLimit, rejectDupOrphans bool) ([]*chainhash.Hash, *TxDesc, error) {
 	txHash := tx.Hash()
 
-	// If a transaction has iwtness data, and segwit isn't active yet, If
+	// If a transaction has witness data, and segwit isn't active yet, If
 	// segwit isn't active yet, then we won't accept it into the mempool as
 	// it can't be mined yet.
 	if tx.MsgTx().HasWitness() {
@@ -1512,11 +1512,18 @@ func (mp *TxPool) maybeAcceptTransactionBTCD(tx *abeutil.Tx, isNew, rateLimit, r
 		}
 
 		if !segwitActive {
+			simnetHint := ""
+			if mp.cfg.ChainParams.Net == wire.SimNet {
+				bestHeight := mp.cfg.BestHeight()
+				simnetHint = fmt.Sprintf(" (The threshold for segwit activation is 300 blocks on simnet, "+
+					"current best height is %d)", bestHeight)
+			}
 			str := fmt.Sprintf("transaction %v has witness data, "+
-				"but segwit isn't active yet", txHash)
+				"but segwit isn't active yet%s", txHash, simnetHint)
 			return nil, nil, txRuleError(wire.RejectNonstandard, str)
 		}
 	}
+
 	// when the tx exist in mempool or is one orphan but the config is rejecting orphan, this tx will be rejected
 	// Don't accept the transaction if it already exists in the pool.  This
 	// applies to orphan transactions as well when the reject duplicate

@@ -10,6 +10,12 @@ import (
 	"github.com/abesuite/abec/wire"
 )
 
+const (
+	// defaultMaxFeeRate is the default maximum fee rate in sat/KB enforced
+	// by bitcoind v0.19.0 or after for transaction broadcast.
+	defaultMaxFeeRate = abeutil.NeutrinoPerAbe / 10
+)
+
 // SigHashType enumerates the available signature hashing types that the
 // SignRawTransaction function accepts.
 type SigHashType string
@@ -194,6 +200,47 @@ func (c *Client) DecodeRawTransaction(serializedTx []byte) (*abejson.TxRawResult
 	return c.DecodeRawTransactionAsync(serializedTx).Receive()
 }
 
+// FutureFundRawTransactionResult is a future promise to deliver the result
+// of a FutureFundRawTransactionAsync RPC invocation (or an applicable error).
+type FutureFundRawTransactionResult chan *response
+
+// Receive waits for the response promised by the future and returns information
+// about a funding attempt
+func (r FutureFundRawTransactionResult) Receive() (*abejson.FundRawTransactionResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var marshalled abejson.FundRawTransactionResult
+	if err := json.Unmarshal(res, &marshalled); err != nil {
+		return nil, err
+	}
+
+	return &marshalled, nil
+}
+
+// FundRawTransactionAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See FundRawTransaction for the blocking version and more details.
+func (c *Client) FundRawTransactionAsync(tx *wire.MsgTx, opts abejson.FundRawTransactionOpts, isWitness *bool) FutureFundRawTransactionResult {
+	var txBuf bytes.Buffer
+	if err := tx.Serialize(&txBuf); err != nil {
+		return newFutureError(err)
+	}
+
+	cmd := abejson.NewFundRawTransactionCmd(txBuf.Bytes(), opts, isWitness)
+	return c.sendCmd(cmd)
+}
+
+// FundRawTransaction returns the result of trying to fund the given transaction with
+// funds from the node wallet
+func (c *Client) FundRawTransaction(tx *wire.MsgTx, opts abejson.FundRawTransactionOpts, isWitness *bool) (*abejson.FundRawTransactionResult, error) {
+	return c.FundRawTransactionAsync(tx, opts, isWitness).Receive()
+}
+
 // FutureCreateRawTransactionResult is a future promise to deliver the result
 // of a CreateRawTransactionAsync RPC invocation (or an applicable error).
 type FutureCreateRawTransactionResult chan *response
@@ -222,8 +269,13 @@ func (r FutureCreateRawTransactionResult) Receive() (*wire.MsgTx, error) {
 
 	// Deserialize the transaction and return it.
 	var msgTx wire.MsgTx
-	if err := msgTx.Deserialize(bytes.NewReader(serializedTx)); err != nil {
-		return nil, err
+	// we try both the new and old encoding format
+	witnessErr := msgTx.Deserialize(bytes.NewReader(serializedTx))
+	if witnessErr != nil {
+		legacyErr := msgTx.DeserializeNoWitness(bytes.NewReader(serializedTx))
+		if legacyErr != nil {
+			return nil, legacyErr
+		}
 	}
 	return &msgTx, nil
 }
@@ -245,7 +297,8 @@ func (c *Client) CreateRawTransactionAsync(inputs []abejson.TransactionInput,
 }
 
 // CreateRawTransaction returns a new transaction spending the provided inputs
-// and sending to the provided addresses.
+// and sending to the provided addresses. If the inputs are either nil or an
+// empty slice, it is interpreted as an empty slice.
 func (c *Client) CreateRawTransaction(inputs []abejson.TransactionInput,
 	amounts map[abeutil.Address]abeutil.Amount, lockTime *int64) (*wire.MsgTx, error) {
 
@@ -291,7 +344,31 @@ func (c *Client) SendRawTransactionAsync(tx *wire.MsgTx, allowHighFees bool) Fut
 		txHex = hex.EncodeToString(buf.Bytes())
 	}
 
-	cmd := abejson.NewSendRawTransactionCmd(txHex, &allowHighFees)
+	// Due to differences in the sendrawtransaction API for different
+	// backends, we'll need to inspect our version and construct the
+	// appropriate request.
+	version, err := c.BackendVersion()
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	var cmd *abejson.SendRawTransactionCmd
+	switch version {
+	// Starting from bitcoind v0.19.0, the MaxFeeRate field should be used.
+	case BitcoindPost19:
+		// Using a 0 MaxFeeRate is interpreted as a maximum fee rate not
+		// being enforced by bitcoind.
+		var maxFeeRate int32
+		if !allowHighFees {
+			maxFeeRate = defaultMaxFeeRate
+		}
+		cmd = abejson.NewBitcoindSendRawTransactionCmd(txHex, maxFeeRate)
+
+	// Otherwise, use the AllowHighFees field.
+	default:
+		cmd = abejson.NewSendRawTransactionCmd(txHex, &allowHighFees)
+	}
+
 	return c.sendCmd(cmd)
 }
 

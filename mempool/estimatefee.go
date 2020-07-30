@@ -44,7 +44,7 @@ const (
 
 	btcPerSatoshi = 1e-8
 
-	abePerSatoshi = 1e-8
+	abePerNeutrino = 1e-7
 )
 
 var (
@@ -83,7 +83,7 @@ func (rate NeutrinoPerByte) ToAbePerKb() AbePerKilobyte {
 		return -1.0
 	}
 
-	return AbePerKilobyte(float64(rate) * bytePerKb * abePerSatoshi)
+	return AbePerKilobyte(float64(rate) * bytePerKb * abePerNeutrino)
 }
 
 // Fee returns the fee for a transaction of a given size for

@@ -82,6 +82,13 @@ type headersMsg struct {
 	peer    *peerpkg.Peer
 }
 
+// notFoundMsg packages a bitcoin notfound message and the peer it came from
+// together so the block handler has access to that information.
+type notFoundMsg struct {
+	notFound *wire.MsgNotFound
+	peer     *peerpkg.Peer
+}
+
 // donePeerMsg signifies a newly disconnected peer to the block handler.
 type donePeerMsg struct {
 	peer *peerpkg.Peer
@@ -163,6 +170,25 @@ type peerSyncState struct {
 	requestQueue    []*wire.InvVect
 	requestedTxns   map[chainhash.Hash]struct{}
 	requestedBlocks map[chainhash.Hash]struct{}
+}
+
+// limitAdd is a helper function for maps that require a maximum limit by
+// evicting a random value if adding the new value would cause it to
+// overflow the maximum allowed.
+func limitAdd(m map[chainhash.Hash]struct{}, hash chainhash.Hash, limit int) {
+	if len(m)+1 > limit {
+		// Remove a random entry from the map.  For most compilers, Go's
+		// range statement iterates starting at a random item although
+		// that is not 100% guaranteed by the spec.  The iteration order
+		// is not important here because an adversary would have to be
+		// able to pull off preimage attacks on the hashing function in
+		// order to target eviction of specific entries anyways.
+		for txHash := range m {
+			delete(m, txHash)
+			break
+		}
+	}
+	m[hash] = struct{}{}
 }
 
 // SyncManager is used to communicate block related messages with peers. The
@@ -614,8 +640,7 @@ func (sm *SyncManager) updateSyncPeer(dcSyncPeer bool) {
 //	if err != nil {
 //		// Do not request this transaction again until a new block
 //		// has been processed.
-//		sm.rejectedTxns[*txHash] = struct{}{}
-//		sm.limitMap(sm.rejectedTxns, maxRejectedTxns)
+//		limitAdd(sm.rejectedTxns, *txHash, maxRejectedTxns)
 //
 //		// When the error is a rule error, it means the transaction was
 //		// simply rejected as opposed to something actually going wrong,
@@ -682,8 +707,9 @@ func (sm *SyncManager) handleTxMsgAbe(tmsg *txMsgAbe) {
 	if err != nil {
 		// Do not request this transaction again until a new block
 		// has been processed.
-		sm.rejectedTxns[*txHash] = struct{}{}
-		sm.limitMap(sm.rejectedTxns, maxRejectedTxns)
+		//sm.rejectedTxns[*txHash] = struct{}{}
+		//sm.limitMap(sm.rejectedTxns, maxRejectedTxns)
+		limitAdd(sm.rejectedTxns, *txHash, maxRejectedTxns)
 
 		// When the error is a rule error, it means the transaction was
 		// simply rejected as opposed to something actually going wrong,
@@ -1540,9 +1566,8 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 			// Request the block if there is not already a pending
 			// request.
 			if _, exists := sm.requestedBlocks[iv.Hash]; !exists {
-				sm.requestedBlocks[iv.Hash] = struct{}{}
-				sm.limitMap(sm.requestedBlocks, maxRequestedBlocks)
-				state.requestedBlocks[iv.Hash] = struct{}{}
+				limitAdd(sm.requestedBlocks, iv.Hash, maxRequestedBlocks)
+				limitAdd(state.requestedBlocks, iv.Hash, maxRequestedBlocks)
 
 				if peer.IsWitnessEnabled() {
 					iv.Type = wire.InvTypeWitnessBlock
@@ -1558,9 +1583,11 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 			// Request the transaction if there is not already a
 			// pending request.
 			if _, exists := sm.requestedTxns[iv.Hash]; !exists {
-				sm.requestedTxns[iv.Hash] = struct{}{}
-				sm.limitMap(sm.requestedTxns, maxRequestedTxns)
-				state.requestedTxns[iv.Hash] = struct{}{}
+				//sm.requestedTxns[iv.Hash] = struct{}{}
+				//sm.limitMap(sm.requestedTxns, maxRequestedTxns)
+				//state.requestedTxns[iv.Hash] = struct{}{}
+				limitAdd(sm.requestedTxns, iv.Hash, maxRequestedTxns)
+				limitAdd(state.requestedTxns, iv.Hash, maxRequestedTxns)
 
 				// If the peer is capable, request the txn
 				// including all witness data.
@@ -1583,23 +1610,23 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 	}
 }
 
-// limitMap is a helper function for maps that require a maximum limit by
-// evicting a random transaction if adding a new value would cause it to
-// overflow the maximum allowed.
-func (sm *SyncManager) limitMap(m map[chainhash.Hash]struct{}, limit int) {
-	if len(m)+1 > limit {
-		// Remove a random entry from the map.  For most compilers, Go's
-		// range statement iterates starting at a random item although
-		// that is not 100% guaranteed by the spec.  The iteration order
-		// is not important here because an adversary would have to be
-		// able to pull off preimage attacks on the hashing function in
-		// order to target eviction of specific entries anyways.
-		for txHash := range m {
-			delete(m, txHash)
-			return
-		}
-	}
-}
+//// limitMap is a helper function for maps that require a maximum limit by
+//// evicting a random transaction if adding a new value would cause it to
+//// overflow the maximum allowed.
+//func (sm *SyncManager) limitMap(m map[chainhash.Hash]struct{}, limit int) {
+//	if len(m)+1 > limit {
+//		// Remove a random entry from the map.  For most compilers, Go's
+//		// range statement iterates starting at a random item although
+//		// that is not 100% guaranteed by the spec.  The iteration order
+//		// is not important here because an adversary would have to be
+//		// able to pull off preimage attacks on the hashing function in
+//		// order to target eviction of specific entries anyways.
+//		for txHash := range m {
+//			delete(m, txHash)
+//			return
+//		}
+//	}
+//}
 
 // blockHandler is the main handler for the sync manager.  It must be run as a
 // goroutine.  It processes block and inv messages in a separate goroutine
@@ -1879,6 +1906,18 @@ func (sm *SyncManager) QueueHeaders(headers *wire.MsgHeaders, peer *peerpkg.Peer
 	}
 
 	sm.msgChan <- &headersMsg{headers: headers, peer: peer}
+}
+
+// QueueNotFound adds the passed notfound message and peer to the block handling
+// queue.
+func (sm *SyncManager) QueueNotFound(notFound *wire.MsgNotFound, peer *peerpkg.Peer) {
+	// No channel handling here because peers do not need to block on
+	// reject messages.
+	if atomic.LoadInt32(&sm.shutdown) != 0 {
+		return
+	}
+
+	sm.msgChan <- &notFoundMsg{notFound: notFound, peer: peer}
 }
 
 // DonePeer informs the blockmanager that a peer has disconnected.

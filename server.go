@@ -270,6 +270,7 @@ type serverPeer struct {
 	isWhitelisted  bool
 	// TODO(ABE): ABE does not support filter.
 	//	filter         *bloom.Filter
+	addressesMtx   sync.RWMutex
 	knownAddresses map[string]struct{}
 	banScore       connmgr.DynamicBanScore
 	quit           chan struct{}
@@ -303,14 +304,18 @@ func (sp *serverPeer) newestBlock() (*chainhash.Hash, int32, error) {
 // addKnownAddresses adds the given addresses to the set of known addresses to
 // the peer to prevent sending duplicate addresses.
 func (sp *serverPeer) addKnownAddresses(addresses []*wire.NetAddress) {
+	sp.addressesMtx.Lock()
 	for _, na := range addresses {
 		sp.knownAddresses[netaddrmgr.NetAddressKey(na)] = struct{}{}
 	}
+	sp.addressesMtx.Unlock()
 }
 
 // addressKnown true if the given address is already known to the peer.
 func (sp *serverPeer) addressKnown(na *wire.NetAddress) bool {
+	sp.addressesMtx.RLock()
 	_, exists := sp.knownAddresses[netaddrmgr.NetAddressKey(na)]
+	sp.addressesMtx.RUnlock()
 	return exists
 }
 
@@ -357,14 +362,14 @@ func (sp *serverPeer) pushAddrMsg(addresses []*wire.NetAddress) {
 // threshold, a warning is logged including the reason provided. Further, if
 // the score is above the ban threshold, the peer will be banned and
 // disconnected.
-func (sp *serverPeer) addBanScore(persistent, transient uint32, reason string) {
+func (sp *serverPeer) addBanScore(persistent, transient uint32, reason string) bool {
 	// No warning is logged and no score is calculated if banning is disabled.
 	if cfg.DisableBanning {
-		return
+		return false
 	}
 	if sp.isWhitelisted {
 		peerLog.Debugf("Misbehaving whitelisted peer %s: %s", sp, reason)
-		return
+		return false
 	}
 
 	warnThreshold := cfg.BanThreshold >> 1
@@ -376,7 +381,7 @@ func (sp *serverPeer) addBanScore(persistent, transient uint32, reason string) {
 			peerLog.Warnf("Misbehaving peer %s: %s -- ban score is %d, "+
 				"it was not increased this time", sp, reason, score)
 		}
-		return
+		return false
 	}
 	score := sp.banScore.Increase(persistent, transient)
 	if score > warnThreshold {
@@ -387,8 +392,10 @@ func (sp *serverPeer) addBanScore(persistent, transient uint32, reason string) {
 				sp)
 			sp.server.BanPeer(sp)
 			sp.Disconnect()
+			return false
 		}
 	}
+	return true
 }
 
 // hasServices returns whether or not the provided advertised service flags have
@@ -492,7 +499,10 @@ func (sp *serverPeer) OnVerAck(_ *peer.Peer, _ *wire.MsgVerAck) {
 //	// The ban score accumulates and passes the ban threshold if a burst of
 //	// mempool messages comes from a peer. The score decays each minute to
 //	// half of its value.
-//	sp.addBanScore(0, 33, "mempool")
+////	sp.addBanScore(0, 33, "mempool")
+//if sp.addBanScore(0, 33, "mempool") {
+//return
+//}
 //
 //	// Generate inventory message with the available transactions in the
 //	// transaction memory pool.  Limit it to the max allowed inventory
@@ -679,7 +689,9 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 	// bursts of small requests are not penalized as that would potentially ban
 	// peers performing IBD.
 	// This incremental score decays each minute to half of its value.
-	sp.addBanScore(0, uint32(length)*99/wire.MaxInvPerMsg, "getdata")
+	if sp.addBanScore(0, uint32(length)*99/wire.MaxInvPerMsg, "getdata") {
+		return
+	}
 
 	// We wait on this wait channel periodically to prevent queuing
 	// far more data than we can send in a reasonable time, wasting memory.
@@ -1267,7 +1279,7 @@ func (sp *serverPeer) OnGetAddr(_ *peer.Peer, msg *wire.MsgGetAddr) {
 	// Do not accept getaddr requests from outbound peers.  This reduces
 	// fingerprinting attacks.
 	if !sp.Inbound() {
-		peerLog.Debugf("Ignoring getaddr request from outbound peer ",
+		peerLog.Debugf("Ignoring getaddr request from outbound peer "+
 			"%v", sp)
 		return
 	}
@@ -1275,7 +1287,7 @@ func (sp *serverPeer) OnGetAddr(_ *peer.Peer, msg *wire.MsgGetAddr) {
 	// Only allow one getaddr request per connection to discourage
 	// address stamping of inv announcements.
 	if sp.sentAddrs {
-		peerLog.Debugf("Ignoring repeated getaddr request from peer ",
+		peerLog.Debugf("Ignoring repeated getaddr request from peer "+
 			"%v", sp)
 		return
 	}
@@ -1348,6 +1360,44 @@ func (sp *serverPeer) OnRead(_ *peer.Peer, bytesRead int, msg wire.Message, err 
 // the bytes sent by the server.
 func (sp *serverPeer) OnWrite(_ *peer.Peer, bytesWritten int, msg wire.Message, err error) {
 	sp.server.AddBytesSent(uint64(bytesWritten))
+}
+
+// OnNotFound is invoked when a peer sends a notfound message.
+func (sp *serverPeer) OnNotFound(p *peer.Peer, msg *wire.MsgNotFound) {
+	if !sp.Connected() {
+		return
+	}
+
+	var numBlocks, numTxns uint32
+	for _, inv := range msg.InvList {
+		switch inv.Type {
+		case wire.InvTypeBlock:
+			numBlocks++
+		case wire.InvTypeTx:
+			numTxns++
+		default:
+			peerLog.Debugf("Invalid inv type '%d' in notfound message from %s",
+				inv.Type, sp)
+			sp.Disconnect()
+			return
+		}
+	}
+	if numBlocks > 0 {
+		blockStr := pickNoun(uint64(numBlocks), "block", "blocks")
+		reason := fmt.Sprintf("%d %v not found", numBlocks, blockStr)
+		if sp.addBanScore(20*numBlocks, 0, reason) {
+			return
+		}
+	}
+	if numTxns > 0 {
+		txStr := pickNoun(uint64(numTxns), "transaction", "transactions")
+		reason := fmt.Sprintf("%d %v not found", numBlocks, txStr)
+		if sp.addBanScore(0, 10*numTxns, reason) {
+			return
+		}
+	}
+
+	sp.server.syncManager.QueueNotFound(msg, p)
 }
 
 // randomUint16Number returns a random uint16 in a specified input range.  Note
@@ -2080,10 +2130,11 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			//OnFilterAdd:    sp.OnFilterAdd,
 			//OnFilterClear:  sp.OnFilterClear,
 			//OnFilterLoad:   sp.OnFilterLoad,
-			OnGetAddr: sp.OnGetAddr,
-			OnAddr:    sp.OnAddr,
-			OnRead:    sp.OnRead,
-			OnWrite:   sp.OnWrite,
+			OnGetAddr:  sp.OnGetAddr,
+			OnAddr:     sp.OnAddr,
+			OnRead:     sp.OnRead,
+			OnWrite:    sp.OnWrite,
+			OnNotFound: sp.OnNotFound,
 
 			// Note: The reference client currently bans peers that send alerts
 			// not signed with its key.  We could verify against their key, but
@@ -2150,7 +2201,7 @@ func (s *server) peerDoneHandler(sp *serverPeer) {
 	s.donePeers <- sp      // the other endpoint of this channel is server.peerHandler
 
 	// Only tell sync manager we are gone if we ever told it we existed.
-	if sp.VersionKnown() { // utility the "true" of readremoteVersionMsg
+	if sp.VerAckReceived() { // utility the "true" of readremoteVersionMsg
 		s.syncManager.DonePeer(sp.Peer) // send a sign to syncManager to stop the sync process
 
 		// Evict any remaining orphans that were sent by the peer.
@@ -2359,9 +2410,7 @@ out:
 			// When an InvVect has been added to a block, we can
 			// now remove it, if it was present.
 			case broadcastInventoryDel:
-				if _, ok := pendingInvs[*msg]; ok {
-					delete(pendingInvs, *msg)
-				}
+				delete(pendingInvs, *msg)
 			}
 
 		case <-timer.C:
