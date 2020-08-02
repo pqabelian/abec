@@ -18,6 +18,7 @@ const (
 	// maxNonce is the maximum value a nonce can be in a block header.
 	maxNonce = ^uint32(0) // 2^32 - 1
 
+	// TODO(abe): this space in abe may be not 64 bits?
 	// maxExtraNonce is the maximum value an extra nonce used in a coinbase
 	// transaction can be.
 	maxExtraNonce = ^uint64(0) // 2^64 - 1
