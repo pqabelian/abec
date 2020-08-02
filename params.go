@@ -8,8 +8,9 @@ import (
 // activeNetParams is a pointer to the parameters specific to the
 // currently active bitcoin network.
 //	todo(ABE):
-//var activeNetParams = &mainNetParams
-var activeNetParams = &simNetParams
+var activeNetParams = &mainNetParams
+
+//var activeNetParams = &simNetParams
 
 // params is used to group parameters for various networks such as the main
 // network and test networks.
@@ -36,7 +37,7 @@ var mainNetParams = params{
 // than the reference implementation - see the mainNetParams comment for
 // details.
 var regressionNetParams = params{
-	Params:  &chaincfg.RegressionNetParams,
+	Params: &chaincfg.RegressionNetParams,
 	//rpcPort: "18334",
 	rpcPort: "18667",
 }
@@ -45,7 +46,7 @@ var regressionNetParams = params{
 // (wire.TestNet3).  NOTE: The RPC port is intentionally different than the
 // reference implementation - see the mainNetParams comment for details.
 var testNet3Params = params{
-	Params:  &chaincfg.TestNet3Params,
+	Params: &chaincfg.TestNet3Params,
 	//rpcPort: "18334",
 	rpcPort: "18667",
 }
@@ -53,7 +54,7 @@ var testNet3Params = params{
 // simNetParams contains parameters specific to the simulation test network
 // (wire.SimNet).
 var simNetParams = params{
-	Params:  &chaincfg.SimNetParams,
+	Params: &chaincfg.SimNetParams,
 	//rpcPort: "18556",
 	rpcPort: "18889",
 }
