@@ -115,15 +115,15 @@ func normalizeAddress(addr string, chain *chaincfg.Params, useWallet bool) (stri
 		switch chain {
 		case &chaincfg.TestNet3Params:
 			if useWallet {
-				defaultPort = "18332"
+				defaultPort = "18665"
 			} else {
-				defaultPort = "18334"
+				defaultPort = "18667"
 			}
 		case &chaincfg.SimNetParams:
 			if useWallet {
-				defaultPort = "18554"
+				defaultPort = "18887"
 			} else {
-				defaultPort = "18556"
+				defaultPort = "18889"
 			}
 		case &chaincfg.RegressionNetParams:
 			if useWallet {
@@ -131,7 +131,7 @@ func normalizeAddress(addr string, chain *chaincfg.Params, useWallet bool) (stri
 				paramErr := fmt.Errorf("cannot use -wallet with -regtest, btcwallet not yet compatible with regtest")
 				return "", paramErr
 			} else {
-				defaultPort = "18334"
+				defaultPort = "18667"
 			}
 		default:
 			if useWallet {
