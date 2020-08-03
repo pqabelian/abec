@@ -1276,7 +1276,7 @@ func handleGetAddedNodeInfo(s *rpcServer, cmd interface{}, closeChan <-chan stru
 		default:
 			// Do a DNS lookup for the address.  If the lookup fails, just
 			// use the host.
-			ips, err := abecLookup(host)
+			ips, err := btcdLookup(host)
 			if err != nil {
 				ipList = make([]string, 1)
 				ipList[0] = host

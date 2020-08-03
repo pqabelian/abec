@@ -2240,7 +2240,7 @@ func (s *server) peerHandler() {
 	if !cfg.DisableDNSSeed {
 		// Add peers discovered through DNS to the address manager.
 		connmgr.SeedFromDNS(activeNetParams.Params, defaultRequiredServices,
-			abecLookup, func(addrs []*wire.NetAddress) {
+			btcdLookup, func(addrs []*wire.NetAddress) {
 				// Bitcoind uses a lookup of the dns seeder here. This
 				// is rather strange since the values looked up by the
 				// DNS seed lookups will vary quite a lot.
@@ -2725,7 +2725,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	//	services &^= wire.SFNodeCF
 	//}
 
-	amgr := netaddrmgr.New(cfg.DataDir, abecLookup)
+	amgr := netaddrmgr.New(cfg.DataDir, btcdLookup)
 
 	var listeners []net.Listener
 	var nat NAT
@@ -2995,7 +2995,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		OnAccept:       s.inboundPeerConnected,
 		RetryDuration:  connectionRetryInterval,
 		TargetOutbound: uint32(targetOutbound),
-		Dial:           abecDial,                //TODO: where need changed
+		Dial:           btcdDial,                //TODO: where need changed
 		OnConnection:   s.outboundPeerConnected, //handle with the process of connected
 		GetNewAddress:  newAddressFunc,          // get the address of peer
 	})
@@ -3176,7 +3176,7 @@ func addrStringToNetAddr(addr string) (net.Addr, error) {
 	}
 
 	// Attempt to look up an IP address associated with the parsed host.
-	ips, err := abecLookup(host)
+	ips, err := btcdLookup(host)
 	if err != nil {
 		return nil, err
 	}

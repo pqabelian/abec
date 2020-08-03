@@ -10,6 +10,8 @@ import (
 //	todo(ABE):
 var activeNetParams = &mainNetParams
 
+//var activeNetParams = &simNetParams
+
 // params is used to group parameters for various networks such as the main
 // network and test networks.
 type params struct {
