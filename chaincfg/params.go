@@ -20,7 +20,9 @@ var (
 
 	// mainPowLimit is the highest proof of work value a Bitcoin block can
 	// have for the main network.  It is the value 2^224 - 1.
-	mainPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 224), bigOne)
+	//mainPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 224), bigOne)
+	// TODO(abe): this pow limit need to changed according the difficult
+	mainPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 232), bigOne)
 
 	// regressionPowLimit is the highest proof of work value a Bitcoin block
 	// can have for the regression test network.  It is the value 2^255 - 1.
@@ -238,8 +240,7 @@ var MainNetParams = Params{
 	GenesisBlock:             &genesisBlock,
 	GenesisHash:              &genesisHash,
 	PowLimit:                 mainPowLimit,
-	PowLimitBits:             0x1c4ccc80, // TODO(abe): origin is 0x1d00ffff, when we test for this net, we want to generate a block in 3 min but we do not change the genesis block, so the powlimits shoule be mul 0.3, and the targettimeperblock will be 3 min
-	//PowLimitBits:             0x207fffff, // TODO(abe): origin is 0x1d00ffff, when we test for this net, we want to generate a block in 3 min but we do not change the genesis block, so the powlimits shoule be mul 0.3, and the targettimeperblock will be 3 min
+	PowLimitBits:             0x1e00ffff, // TODO(abe): origin is 0x1d00ffff, when we test for this net, we want to generate a block in 3 min but we do not change the genesis block, so the powlimits shoule be mul 0.3, and the targettimeperblock will be 3 min
 	//PowLimitBits:             0x1d00ffff,
 	BIP0034Height:            227931, // 000000000000024b89b42a942fe0d9fea3bb44ab7bd1b19115dd6a759c0808b8 //TODO(abe):these values need to evicted
 	BIP0065Height:            388381, // 000000000000000004c2b624ed5d7756c508d90fd0da2c7c679febfa6c4735f0
@@ -250,9 +251,7 @@ var MainNetParams = Params{
 	TargetTimePerBlock:       time.Minute * 3,    // 10 minutes TODO(abe): this value may be need changed, now temporary to be 3 min
 	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
 	ReduceMinDifficulty:      false, // TODO(abe): this config may be used for adjust the difficult automatic?
-	//ReduceMinDifficulty:      true, // TODO(abe): this config may be used for adjust the difficult automatic?
-	MinDiffReductionTime:     time.Minute * 1,
-	//MinDiffReductionTime:     0,
+	MinDiffReductionTime:     0,
 	GenerateSupported:        false,
 
 	// Checkpoints ordered from oldest to newest.

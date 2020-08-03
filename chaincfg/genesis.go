@@ -629,10 +629,10 @@ var genesisCoinbaseTx = wire.MsgTxAbe{
 // genesisHash is the hash of the first block in the block chain for the main
 // network (genesis block).
 var genesisHash = chainhash.Hash([chainhash.HashSize]byte{ // Make go vet happy.
-	0x8a, 0xf2, 0x96, 0xbc, 0x17, 0x43, 0x1c, 0x69,
-	0x57, 0xec, 0xe7, 0x52, 0xf3, 0x77, 0x6d, 0xad,
-	0x15, 0x6e, 0xf6, 0x38, 0xc1, 0xfb, 0x83, 0x45,
-	0xc5, 0x16, 0x06, 0x49, 0x00, 0x00, 0x00, 0x00,
+	0xfc, 0xc8, 0x77, 0xc8, 0xfa, 0xe0, 0x5a, 0xf4,
+	0x7c, 0x8a, 0xa4, 0xdc, 0xe8, 0x08, 0x68, 0x84,
+	0x87, 0x33,	0xd2, 0x1d, 0x0d, 0xac, 0xdf, 0x14,
+	0xea, 0x45, 0xa8, 0xef, 0x27, 0x00, 0x00, 0x00,
 })
 
 // genesisMerkleRoot is the hash of the first transaction in the genesis block
@@ -651,9 +651,9 @@ var genesisBlock = wire.MsgBlockAbe{
 		Version:    1,
 		PrevBlock:  chainhash.Hash{},         // 0000000000000000000000000000000000000000000000000000000000000000
 		MerkleRoot: genesisMerkleRoot,        // 4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b
-		Timestamp:  time.Unix(0x5f1a3e20, 0), // 2020-07-09 16:55:41 +0800 CST
-		Bits:       0x1d00ffff,               // 486604799 [00000000ffff0000000000000000000000000000000000000000000000000000]
-		Nonce:      0x839119ac,               // 3890968129
+		Timestamp:  time.Unix(0x5f281a5e, 0), // 2020-07-09 16:55:41 +0800 CST
+		Bits:       0x1e00ffff,               // 486604799 [00000000ffff0000000000000000000000000000000000000000000000000000]
+		Nonce:      0x00425990,               // 3890968129
 	},
 	Transactions: []*wire.MsgTxAbe{&genesisCoinbaseTx},
 }
@@ -681,7 +681,7 @@ var regTestGenesisBlock = wire.MsgBlockAbe{
 		MerkleRoot: regTestGenesisMerkleRoot, // 4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b
 		Timestamp:  time.Unix(0x5f125ae8, 0), // 2011-02-02 23:16:42 +0000 UTC
 		Bits:       0x207fffff,               // 545259519 [7fffff0000000000000000000000000000000000000000000000000000000000]
-		Nonce:      0xbfffffff,
+		Nonce:      0xf20d5365,
 	},
 	Transactions: []*wire.MsgTxAbe{&genesisCoinbaseTx},
 }
