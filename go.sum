@@ -8,6 +8,8 @@ github.com/cryptosuite/kyber-go v0.0.0-20200701012546-a87ecb4b2ce3 h1:/7ZIZCf4WE
 github.com/cryptosuite/kyber-go v0.0.0-20200701012546-a87ecb4b2ce3/go.mod h1:1G0Jh7bXJGSUCTrC6ZB9lFpmCF+VFQehDqIwm9dJU3s=
 github.com/cryptosuite/salrs-go v0.0.0-20200711120347-3da7a58a2621 h1:IL/wIQXUtuah3IplutTEGcruIjWYiVZj/q3XBex7BRQ=
 github.com/cryptosuite/salrs-go v0.0.0-20200711120347-3da7a58a2621/go.mod h1:mJeCa86eOqj3kCJO+O4245Wnq5U07P9K9RfJplI8bQ4=
+github.com/cryptosuite/salrs-go v0.0.0-20200804021228-bff30b5fa6e8 h1:8driSRR/h0D2KfjbMXCuV8PI04jrkY0L6pwbpe5Na44=
+github.com/cryptosuite/salrs-go v0.0.0-20200804021228-bff30b5fa6e8/go.mod h1:mJeCa86eOqj3kCJO+O4245Wnq5U07P9K9RfJplI8bQ4=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/decred/dcrd/lru v1.0.0 h1:Kbsb1SFDsIlaupWPwsPp+dkxiBY1frcS07PCPgotKz8=
