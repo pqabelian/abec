@@ -119,7 +119,7 @@ type NotificationHandlers struct {
 	// OnBlockDisconnected: it receives the block's height and header.
 	OnFilteredBlockDisconnected func(height int32, header *wire.BlockHeader)
 
-	//	todo(ABE): ABE does not support OutPointSpent and addressRecive notifications.
+	//	todo(ABE): ABE does not support OutPointSpent and addressReceive notifications.
 	// OnRecvTx is invoked when a transaction that receives funds to a
 	// registered address is received into the memory pool and also
 	// connected to the longest (best) chain.  It will only be invoked if a

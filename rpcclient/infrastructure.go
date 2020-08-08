@@ -273,15 +273,16 @@ func (c *Client) trackRegisteredNtfns(cmd interface{}) {
 
 		}
 
-	case *abejson.NotifySpentCmd:
-		for _, op := range bcmd.OutPoints {
-			c.ntfnState.notifySpent[op] = struct{}{}
-		}
-
-	case *abejson.NotifyReceivedCmd:
-		for _, addr := range bcmd.Addresses {
-			c.ntfnState.notifyReceived[addr] = struct{}{}
-		}
+		//	todo(ABE): ABE deos not support OutPointSpent or addressReceive notifications
+		//case *abejson.NotifySpentCmd:
+		//	for _, op := range bcmd.OutPoints {
+		//		c.ntfnState.notifySpent[op] = struct{}{}
+		//	}
+		//
+		//case *abejson.NotifyReceivedCmd:
+		//	for _, addr := range bcmd.Addresses {
+		//		c.ntfnState.notifyReceived[addr] = struct{}{}
+		//	}
 	}
 }
 
