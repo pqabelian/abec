@@ -22,7 +22,7 @@ var (
 	// have for the main network.  It is the value 2^224 - 1.
 	//mainPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 224), bigOne)
 	// TODO(abe): this pow limit need to changed according the difficult
-	mainPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 232), bigOne)
+	mainPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 227), bigOne)
 
 	// regressionPowLimit is the highest proof of work value a Bitcoin block
 	// can have for the regression test network.  It is the value 2^255 - 1.
