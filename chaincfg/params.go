@@ -240,7 +240,7 @@ var MainNetParams = Params{
 	GenesisBlock:             &genesisBlock,
 	GenesisHash:              &genesisHash,
 	PowLimit:                 mainPowLimit,
-	PowLimitBits:             0x1e00ffff, // TODO(abe): origin is 0x1d00ffff, when we test for this net, we want to generate a block in 3 min but we do not change the genesis block, so the powlimits shoule be mul 0.3, and the targettimeperblock will be 3 min
+	PowLimitBits:             0x1d07ffff,
 	//PowLimitBits:             0x1d00ffff,
 	BIP0034Height:            227931, // 000000000000024b89b42a942fe0d9fea3bb44ab7bd1b19115dd6a759c0808b8 //TODO(abe):these values need to evicted
 	BIP0065Height:            388381, // 000000000000000004c2b624ed5d7756c508d90fd0da2c7c679febfa6c4735f0
