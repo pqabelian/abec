@@ -481,9 +481,23 @@ func PayToAddressScriptAbe(maddr abeutil.MasterAddress) ([]byte, error) {
 		}
 	} else {
 		addressScript = nil
+		//TODO(abe): return error if mpk is mil
 	}
 
 	return addressScript, nil
+}
+func ExtractAddressFromScriptAbe(script []byte) (res *abeutil.DerivedAddressSalrs, err error) {
+	// Create the script to pay to the provided payment address if one was
+	// specified.  Otherwise create a script that allows the coinbase to be
+	// redeemable by anyone.
+	if res == nil {
+		res = new(abeutil.DerivedAddressSalrs)
+	}
+	err = res.Deserialize(script[1:])
+	if err != nil {
+		return nil, err
+	}
+	return
 }
 
 //	todo(ABE): with this function, it may allow more ways to generate the AddressScript

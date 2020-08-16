@@ -185,4 +185,7 @@ func (mssk *MasterSecretSignKey) toSALRS() *salrs.MasterSecretSignKey {
 	return (*salrs.MasterSecretSignKey)(mssk)
 }
 
+func CheckDerivedPubKeyAttribute(dpk *DerivedPubKey,mpk *MasterPubKey,msvk *MasterSecretViewKey) bool {
+	return salrs.CheckDerivedPubKeyOwner(dpk.toSALRS(),mpk.toSALRS(),msvk.toSALRS())
+}
 //	private field	end
