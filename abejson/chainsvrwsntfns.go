@@ -9,6 +9,7 @@ const (
 	//
 	// Deprecated: Use FilteredBlockConnectedNtfnMethod instead.
 	BlockConnectedNtfnMethod = "blockconnected"
+	BlockAbeConnectedNtfnMethod = "blockabeconnected"
 
 	// BlockDisconnectedNtfnMethod is the legacy, deprecated method used for
 	// notifications from the chain server that a block has been
@@ -16,6 +17,7 @@ const (
 	//
 	// Deprecated: Use FilteredBlockDisconnectedNtfnMethod instead.
 	BlockDisconnectedNtfnMethod = "blockdisconnected"
+	BlockAbeDisconnectedNtfnMethod = "blockabedisconnected"
 
 	// FilteredBlockConnectedNtfnMethod is the new method used for
 	// notifications from the chain server that a block has been connected.
@@ -80,6 +82,11 @@ type BlockConnectedNtfn struct {
 	Height int32
 	Time   int64
 }
+type BlockAbeConnectedNtfn struct {
+	Hash   string
+	Height int32
+	Time   int64
+}
 
 // NewBlockConnectedNtfn returns a new instance which can be used to issue a
 // blockconnected JSON-RPC notification.
@@ -87,6 +94,13 @@ type BlockConnectedNtfn struct {
 // Deprecated: Use NewFilteredBlockConnectedNtfn instead.
 func NewBlockConnectedNtfn(hash string, height int32, time int64) *BlockConnectedNtfn {
 	return &BlockConnectedNtfn{
+		Hash:   hash,
+		Height: height,
+		Time:   time,
+	}
+}
+func NewBlockAbeConnectedNtfn(hash string, height int32, time int64) *BlockAbeConnectedNtfn {
+	return &BlockAbeConnectedNtfn{
 		Hash:   hash,
 		Height: height,
 		Time:   time,
@@ -101,6 +115,11 @@ type BlockDisconnectedNtfn struct {
 	Height int32
 	Time   int64
 }
+type BlockAbeDisconnectedNtfn struct {
+	Hash   string
+	Height int32
+	Time   int64
+}
 
 // NewBlockDisconnectedNtfn returns a new instance which can be used to issue a
 // blockdisconnected JSON-RPC notification.
@@ -108,6 +127,13 @@ type BlockDisconnectedNtfn struct {
 // Deprecated: Use NewFilteredBlockDisconnectedNtfn instead.
 func NewBlockDisconnectedNtfn(hash string, height int32, time int64) *BlockDisconnectedNtfn {
 	return &BlockDisconnectedNtfn{
+		Hash:   hash,
+		Height: height,
+		Time:   time,
+	}
+}
+func NewBlockAbeDisconnectedNtfn(hash string, height int32, time int64) *BlockAbeDisconnectedNtfn {
+	return &BlockAbeDisconnectedNtfn{
 		Hash:   hash,
 		Height: height,
 		Time:   time,
@@ -307,7 +333,9 @@ func init() {
 	flags := UFWebsocketOnly | UFNotification
 
 	MustRegisterCmd(BlockConnectedNtfnMethod, (*BlockConnectedNtfn)(nil), flags)
+	MustRegisterCmd(BlockAbeConnectedNtfnMethod, (*BlockAbeConnectedNtfn)(nil), flags)
 	MustRegisterCmd(BlockDisconnectedNtfnMethod, (*BlockDisconnectedNtfn)(nil), flags)
+	MustRegisterCmd(BlockAbeDisconnectedNtfnMethod, (*BlockDisconnectedNtfn)(nil), flags)
 	MustRegisterCmd(FilteredBlockConnectedNtfnMethod, (*FilteredBlockConnectedNtfn)(nil), flags)
 	MustRegisterCmd(FilteredBlockDisconnectedNtfnMethod, (*FilteredBlockDisconnectedNtfn)(nil), flags)
 	MustRegisterCmd(RecvTxNtfnMethod, (*RecvTxNtfn)(nil), flags)

@@ -692,6 +692,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getbestblock":          {(*abejson.GetBestBlockResult)(nil)},
 	"getbestblockhash":      {(*string)(nil)},
 	"getblock":              {(*string)(nil), (*abejson.GetBlockVerboseResult)(nil)},
+	"getblockabe":              {(*string)(nil), (*abejson.GetBlockAbeVerboseResult)(nil)},  //TODO(abe):after testing, this command will be replace by getblock
 	"getblockcount":         {(*int64)(nil)},
 	"getblockhash":          {(*string)(nil)},
 	"getblockheader":        {(*string)(nil), (*abejson.GetBlockHeaderVerboseResult)(nil)},

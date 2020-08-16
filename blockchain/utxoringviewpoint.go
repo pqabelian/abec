@@ -1087,7 +1087,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 	}
 
 	// sort
-	sort.Sort(byOrderHashRingMemberTxo(ringMemberTxos))
+	sort.Sort(ByOrderHashRingMemberTxo(ringMemberTxos))
 
 	txoNum := len(ringMemberTxos)
 
@@ -1193,17 +1193,17 @@ func NewRingMemberTxo(orderHash *chainhash.Hash, blockHash *chainhash.Hash, bloc
 	return &ringMemberTxo
 }
 
-type byOrderHashRingMemberTxo []*RingMemberTxo
+type ByOrderHashRingMemberTxo []*RingMemberTxo
 
-func (x byOrderHashRingMemberTxo) Len() int {
+func (x ByOrderHashRingMemberTxo) Len() int {
 	return len(x)
 }
 
-func (x byOrderHashRingMemberTxo) Less(i, j int) bool {
+func (x ByOrderHashRingMemberTxo) Less(i, j int) bool {
 	return x[i].orderHash.String() < x[j].orderHash.String()
 }
 
-func (x byOrderHashRingMemberTxo) Swap(i, j int) {
+func (x ByOrderHashRingMemberTxo) Swap(i, j int) {
 	x[i], x[j] = x[j], x[i]
 }
 

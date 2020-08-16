@@ -107,6 +107,10 @@ type DerivedAddressSalrs struct {
 	derivedPubKey *abesalrs.DerivedPubKey
 }
 
+func (daddr *DerivedAddressSalrs) DerivedPubKey() *abesalrs.DerivedPubKey {
+	return daddr.derivedPubKey
+}
+
 // SerializeSize returns the number of bytes it would take to serialize the DerivedAddressSalrs.
 func (daddr *DerivedAddressSalrs) SerializeSize() int {
 	return 2 + abesalrs.DpkByteLen

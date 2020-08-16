@@ -194,6 +194,10 @@ type GetBlockCmd struct {
 	Hash      string
 	Verbosity *int `jsonrpcdefault:"1"`
 }
+type GetBlockAbeCmd struct {
+	Hash      string
+	Verbosity *int `jsonrpcdefault:"1"`
+}
 
 // NewGetBlockCmd returns a new instance which can be used to issue a getblock
 // JSON-RPC command.
@@ -202,6 +206,12 @@ type GetBlockCmd struct {
 // for optional parameters will use the default value.
 func NewGetBlockCmd(hash string, verbosity *int) *GetBlockCmd {
 	return &GetBlockCmd{
+		Hash:      hash,
+		Verbosity: verbosity,
+	}
+}
+func NewGetBlockAbeCmd(hash string, verbosity *int) *GetBlockAbeCmd {
+	return &GetBlockAbeCmd{
 		Hash:      hash,
 		Verbosity: verbosity,
 	}
@@ -924,6 +934,7 @@ func init() {
 	MustRegisterCmd("getaddednodeinfo", (*GetAddedNodeInfoCmd)(nil), flags)
 	MustRegisterCmd("getbestblockhash", (*GetBestBlockHashCmd)(nil), flags)
 	MustRegisterCmd("getblock", (*GetBlockCmd)(nil), flags)
+	MustRegisterCmd("getblockabe", (*GetBlockAbeCmd)(nil), flags)
 	MustRegisterCmd("getblockchaininfo", (*GetBlockChainInfoCmd)(nil), flags)
 	MustRegisterCmd("getblockcount", (*GetBlockCountCmd)(nil), flags)
 	MustRegisterCmd("getblockhash", (*GetBlockHashCmd)(nil), flags)

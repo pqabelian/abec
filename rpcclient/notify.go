@@ -93,7 +93,7 @@ type NotificationHandlers struct {
 	//
 	// Deprecated: Use OnFilteredBlockConnected instead.
 	OnBlockConnected func(hash *chainhash.Hash, height int32, t time.Time)
-
+	OnBlockAbeConnected func(hash *chainhash.Hash, height int32, t time.Time)
 	//	todo(ABE): ABE does not support filter.
 	// OnFilteredBlockConnected is invoked when a block is connected to the
 	// longest (best) chain.  It will only be invoked if a preceding call to
@@ -109,8 +109,8 @@ type NotificationHandlers struct {
 	// function is non-nil.
 	//
 	// Deprecated: Use OnFilteredBlockDisconnected instead.
-	OnBlockDisconnected func(hash *chainhash.Hash, height int32, t time.Time)
-
+	OnBlockDisconnected    func(hash *chainhash.Hash, height int32, t time.Time)
+	OnBlockAbeDisconnected func(hash *chainhash.Hash, height int32, t time.Time)
 	//	todo(ABE): ABE does not support filter.
 	// OnFilteredBlockDisconnected is invoked when a block is disconnected
 	// from the longest (best) chain.  It will only be invoked if a
@@ -235,6 +235,21 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		}
 
 		c.ntfnHandlers.OnBlockConnected(blockHash, blockHeight, blockTime)
+	case abejson.BlockAbeConnectedNtfnMethod:
+		// Ignore the notification if the client is not interested in
+		// it.
+		if c.ntfnHandlers.OnBlockAbeConnected == nil {
+			return
+		}
+
+		blockHash, blockHeight, blockTime, err := parseChainNtfnParams(ntfn.Params)
+		if err != nil {
+			log.Warnf("Received invalid block connected "+
+				"notification: %v", err)
+			return
+		}
+
+		c.ntfnHandlers.OnBlockAbeConnected(blockHash, blockHeight, blockTime)
 
 		//	todo(ABE): ABE does not support filter.
 	// OnFilteredBlockConnected
@@ -272,7 +287,20 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		}
 
 		c.ntfnHandlers.OnBlockDisconnected(blockHash, blockHeight, blockTime)
+	case abejson.BlockAbeDisconnectedNtfnMethod:
+		// Ignore the notification if the client is not interested in
+		// it.
+		if c.ntfnHandlers.OnBlockAbeDisconnected == nil {
+			return
+		}
 
+		blockHash, blockHeight, blockTime, err := parseChainNtfnParams(ntfn.Params)
+		if err != nil {
+			log.Warnf("Received invalid block connected "+
+				"notification: %v", err)
+			return
+		}
+		c.ntfnHandlers.OnBlockAbeDisconnected(blockHash, blockHeight, blockTime)
 		//	todo(ABE): ABE does not support filter.
 	// OnFilteredBlockDisconnected
 	//case abejson.FilteredBlockDisconnectedNtfnMethod:

@@ -134,6 +134,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getbestblock":            handleGetBestBlock,
 	"getbestblockhash":        handleGetBestBlockHash,
 	"getblock":                handleGetBlock,
+	"getblockabe":             handleGetBlockAbe,  //TODO(abe):after testing, this command will be replace by getblock
 	"getblockchaininfo":       handleGetBlockChainInfo,
 	"getblockcount":           handleGetBlockCount,
 	"getblockhash":            handleGetBlockHash,
@@ -1402,6 +1403,107 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	params := s.cfg.ChainParams
 	blockHeader := &blk.MsgBlock().Header
 	blockReply := abejson.GetBlockVerboseResult{
+		Hash:          c.Hash,
+		Version:       blockHeader.Version,
+		VersionHex:    fmt.Sprintf("%08x", blockHeader.Version),
+		MerkleRoot:    blockHeader.MerkleRoot.String(),
+		PreviousHash:  blockHeader.PrevBlock.String(),
+		Nonce:         blockHeader.Nonce,
+		Time:          blockHeader.Timestamp.Unix(),
+		Confirmations: int64(1 + best.Height - blockHeight),
+		Height:        int64(blockHeight),
+		Size:          int32(len(blkBytes)),
+		// todo(ABE.MUST)
+		Fullsize: int32(blk.MsgBlock().SerializeSize()),
+		//StrippedSize:  int32(blk.MsgBlock().SerializeSizeStripped()),
+		//Weight:        int32(blockchain.GetBlockWeight(blk)),
+		Bits:       strconv.FormatInt(int64(blockHeader.Bits), 16),
+		Difficulty: getDifficultyRatio(blockHeader.Bits, params),
+		NextHash:   nextHashString,
+	}
+
+	if *c.Verbosity == 1 {
+		transactions := blk.Transactions()
+		txNames := make([]string, len(transactions))
+		for i, tx := range transactions {
+			txNames[i] = tx.Hash().String()
+		}
+
+		blockReply.Tx = txNames
+	} else {
+		txns := blk.Transactions()
+		rawTxns := make([]abejson.TxRawResultAbe, len(txns))
+		for i, tx := range txns {
+			rawTxn, err := createTxRawResultAbe(params, tx.MsgTx(),
+				tx.Hash().String(), blockHeader, hash.String(),
+				blockHeight, best.Height)
+			if err != nil {
+				return nil, err
+			}
+			rawTxns[i] = *rawTxn
+		}
+		blockReply.RawTx = rawTxns
+	}
+
+	return blockReply, nil
+}
+func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*abejson.GetBlockCmd)
+
+	// Load the raw block bytes from the database.
+	hash, err := chainhash.NewHashFromStr(c.Hash)
+	if err != nil {
+		return nil, rpcDecodeHexError(c.Hash)
+	}
+	var blkBytes []byte
+	err = s.cfg.DB.View(func(dbTx database.Tx) error {
+		var err error
+		blkBytes, err = dbTx.FetchBlock(hash)
+		return err
+	})
+	if err != nil {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCBlockNotFound,
+			Message: "Block not found",
+		}
+	}
+	// If verbosity is 0, return the serialized block as a hex encoded string.
+	if c.Verbosity != nil && *c.Verbosity == 0 {
+		return hex.EncodeToString(blkBytes), nil
+	}
+
+	// Otherwise, generate the JSON object and return it.
+
+	// Deserialize the block.
+	blk, err := abeutil.NewBlockFromBytesAbe(blkBytes)
+	if err != nil {
+		context := "Failed to deserialize block"
+		return nil, internalRPCError(err.Error(), context)
+	}
+
+	// Get the block height from chain.
+	blockHeight, err := s.cfg.Chain.BlockHeightByHash(hash)
+	if err != nil {
+		context := "Failed to obtain block height"
+		return nil, internalRPCError(err.Error(), context)
+	}
+	blk.SetHeight(blockHeight)
+	best := s.cfg.Chain.BestSnapshot()
+
+	// Get next block hash unless there are none.
+	var nextHashString string
+	if blockHeight < best.Height {
+		nextHash, err := s.cfg.Chain.BlockHashByHeight(blockHeight + 1)
+		if err != nil {
+			context := "No next block"
+			return nil, internalRPCError(err.Error(), context)
+		}
+		nextHashString = nextHash.String()
+	}
+
+	params := s.cfg.ChainParams
+	blockHeader := &blk.MsgBlock().Header
+	blockReply := abejson.GetBlockAbeVerboseResult{
 		Hash:          c.Hash,
 		Version:       blockHeader.Version,
 		VersionHex:    fmt.Sprintf("%08x", blockHeader.Version),
