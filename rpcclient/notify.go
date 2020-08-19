@@ -92,7 +92,7 @@ type NotificationHandlers struct {
 	// function is non-nil.
 	//
 	// Deprecated: Use OnFilteredBlockConnected instead.
-	OnBlockConnected func(hash *chainhash.Hash, height int32, t time.Time)
+	OnBlockConnected    func(hash *chainhash.Hash, height int32, t time.Time)
 	OnBlockAbeConnected func(hash *chainhash.Hash, height int32, t time.Time)
 	//	todo(ABE): ABE does not support filter.
 	// OnFilteredBlockConnected is invoked when a block is connected to the
@@ -1220,6 +1220,28 @@ func (c *Client) RescanAsync(startBlock *chainhash.Hash,
 	cmd := abejson.NewRescanCmd(startBlockHashStr, addrs, ops, nil)
 	return c.sendCmd(cmd)
 }
+func (c *Client) RescanAbeAsync(startBlock *chainhash.Hash) FutureRescanResult {
+
+	// Not supported in HTTP POST mode.
+	if c.config.HTTPPostMode {
+		return newFutureError(ErrWebsocketsRequired)
+	}
+
+	// Ignore the notification if the client is not interested in
+	// notifications.
+	if c.ntfnHandlers == nil {
+		return newNilFutureResult()
+	}
+
+	// Convert block hashes to strings.
+	var startBlockHashStr string
+	if startBlock != nil {
+		startBlockHashStr = startBlock.String()
+	}
+
+	cmd := abejson.NewRescanAbeCmd(startBlockHashStr, nil)
+	return c.sendCmd(cmd)
+}
 
 // Rescan rescans the block chain starting from the provided starting block to
 // the end of the longest chain for transactions that pay to the passed
@@ -1254,6 +1276,10 @@ func (c *Client) Rescan(startBlock *chainhash.Hash,
 	outpoints []*wire.OutPoint) error {
 
 	return c.RescanAsync(startBlock, addresses, outpoints).Receive()
+}
+func (c *Client) RescanAbe(startBlock *chainhash.Hash) error {
+
+	return c.RescanAbeAsync(startBlock).Receive()
 }
 
 // RescanEndBlockAsync returns an instance of a type that can be used to get
@@ -1305,7 +1331,32 @@ func (c *Client) RescanEndBlockAsync(startBlock *chainhash.Hash,
 		&endBlockHashStr)
 	return c.sendCmd(cmd)
 }
+func (c *Client) RescanAbeEndBlockAsync(startBlock *chainhash.Hash,
+	endBlock *chainhash.Hash) FutureRescanResult {
 
+	// Not supported in HTTP POST mode.
+	if c.config.HTTPPostMode {
+		return newFutureError(ErrWebsocketsRequired)
+	}
+
+	// Ignore the notification if the client is not interested in
+	// notifications.
+	if c.ntfnHandlers == nil {
+		return newNilFutureResult()
+	}
+
+	// Convert block hashes to strings.
+	var startBlockHashStr, endBlockHashStr string
+	if startBlock != nil {
+		startBlockHashStr = startBlock.String()
+	}
+	if endBlock != nil {
+		endBlockHashStr = endBlock.String()
+	}
+
+	cmd := abejson.NewRescanAbeCmd(startBlockHashStr,&endBlockHashStr)
+	return c.sendCmd(cmd)
+}
 // RescanEndHeight rescans the block chain starting from the provided starting
 // block up to the provided ending block for transactions that pay to the
 // passed addresses and transactions which spend the passed outpoints.
@@ -1334,7 +1385,10 @@ func (c *Client) RescanEndHeight(startBlock *chainhash.Hash,
 	return c.RescanEndBlockAsync(startBlock, addresses, outpoints,
 		endBlock).Receive()
 }
-
+func (c *Client) RescanAbeEndHeight(startBlock *chainhash.Hash,
+	endBlock *chainhash.Hash) error {
+	return c.RescanAbeEndBlockAsync(startBlock,endBlock).Receive()
+}
 // FutureLoadTxFilterResult is a future promise to deliver the result
 // of a LoadTxFilterAsync RPC invocation (or an applicable error).
 //

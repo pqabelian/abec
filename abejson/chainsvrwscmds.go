@@ -181,6 +181,10 @@ type RescanCmd struct {
 	OutPoints  []OutPoint
 	EndBlock   *string
 }
+type RescanAbeCmd struct {
+	BeginBlock string
+	EndBlock   *string
+}
 
 // NewRescanCmd returns a new instance which can be used to issue a rescan
 // JSON-RPC command.
@@ -194,6 +198,12 @@ func NewRescanCmd(beginBlock string, addresses []string, outPoints []OutPoint, e
 		BeginBlock: beginBlock,
 		Addresses:  addresses,
 		OutPoints:  outPoints,
+		EndBlock:   endBlock,
+	}
+}
+func NewRescanAbeCmd(beginBlock string,endBlock *string) *RescanAbeCmd {
+	return &RescanAbeCmd{
+		BeginBlock: beginBlock,
 		EndBlock:   endBlock,
 	}
 }
@@ -232,5 +242,6 @@ func init() {
 	MustRegisterCmd("stopnotifyspent", (*StopNotifySpentCmd)(nil), flags)
 	MustRegisterCmd("stopnotifyreceived", (*StopNotifyReceivedCmd)(nil), flags)
 	MustRegisterCmd("rescan", (*RescanCmd)(nil), flags)
+	MustRegisterCmd("rescanabe", (*RescanAbeCmd)(nil), flags)
 	MustRegisterCmd("rescanblocks", (*RescanBlocksCmd)(nil), flags)
 }
