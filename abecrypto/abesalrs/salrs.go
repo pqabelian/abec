@@ -184,7 +184,7 @@ func (msvk *MasterSecretViewKey) toSALRS() *salrs.MasterSecretViewKey {
 func (mssk *MasterSecretSignKey) toSALRS() *salrs.MasterSecretSignKey {
 	return (*salrs.MasterSecretSignKey)(mssk)
 }
-
+// TODO(abe): abstract the check function, not for just one crypto scheme one check
 func CheckDerivedPubKeyAttribute(dpk *DerivedPubKey,mpk *MasterPubKey,msvk *MasterSecretViewKey) bool {
 	return salrs.CheckDerivedPubKeyOwner(dpk.toSALRS(),mpk.toSALRS(),msvk.toSALRS())
 }

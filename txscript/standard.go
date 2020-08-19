@@ -486,6 +486,7 @@ func PayToAddressScriptAbe(maddr abeutil.MasterAddress) ([]byte, error) {
 
 	return addressScript, nil
 }
+// TODO(abe): abstract the derivedaddress not the derivedAddressSalrs
 func ExtractAddressFromScriptAbe(script []byte) (res *abeutil.DerivedAddressSalrs, err error) {
 	// Create the script to pay to the provided payment address if one was
 	// specified.  Otherwise create a script that allows the coinbase to be
