@@ -16,7 +16,12 @@ type MasterPubKey salrs.MasterPubKey
 type MasterSecretViewKey salrs.MasterSecretViewKey
 type MasterSecretSignKey salrs.MasterSecretSignKey
 type DerivedPubKey salrs.DerivedPubKey
-
+type Signature salrs.Signature
+type KeyImage salrs.KeyImage
+type DpkRing struct {
+	Dpks []DerivedPubKey
+	R    int
+}
 const (
 	RecommendedSeedLen = 32
 	MinSeedBytes       = 16
@@ -184,8 +189,48 @@ func (msvk *MasterSecretViewKey) toSALRS() *salrs.MasterSecretViewKey {
 func (mssk *MasterSecretSignKey) toSALRS() *salrs.MasterSecretSignKey {
 	return (*salrs.MasterSecretSignKey)(mssk)
 }
+func (sig *Signature) toSALRS() *salrs.Signature {
+	return (*salrs.Signature)(sig)
+}
+func (k *KeyImage) toSALRS() *salrs.KeyImage {
+	return (*salrs.KeyImage)(k)
+}
 // TODO(abe): abstract the check function, not for just one crypto scheme one check
 func CheckDerivedPubKeyAttribute(dpk *DerivedPubKey,mpk *MasterPubKey,msvk *MasterSecretViewKey) bool {
 	return salrs.CheckDerivedPubKeyOwner(dpk.toSALRS(),mpk.toSALRS(),msvk.toSALRS())
+}
+func Sign(msg []byte, dpkRing *DpkRing, dpk *DerivedPubKey, mpk *MasterPubKey, msvk *MasterSecretViewKey, mssk *MasterSecretSignKey) (sig *Signature, err error) {
+	dpkRingSalrs:=new(salrs.DpkRing)
+	dpkRingSalrs.R=dpkRing.R
+	for i:=0;i<dpkRing.R;i++{
+		dpkRingSalrs.Dpk=append(dpkRingSalrs.Dpk,*dpkRing.Dpks[i].toSALRS())
+	}
+	signature, err := salrs.Sign(msg, dpkRingSalrs, dpk.toSALRS(), mpk.toSALRS(), msvk.toSALRS(), mssk.toSALRS())
+	if err!=nil{
+		return nil,err
+	}
+	return (*Signature)(signature),nil
+}
+func Verify(msg []byte, dpkRing *DpkRing,sig *Signature)(*KeyImage,bool){
+	dpkRingSalrs:=new(salrs.DpkRing)
+	dpkRingSalrs.R=dpkRing.R
+	for i:=0;i<dpkRing.R;i++{
+		dpkRingSalrs.Dpk=append(dpkRingSalrs.Dpk,*dpkRing.Dpks[i].toSALRS())
+	}
+	k, b := salrs.Verify(msg, dpkRingSalrs, sig.toSALRS())
+	return (*KeyImage)(k),b
+}
+func Check(msg1 []byte, dpkRing1 *DpkRing, sig1 *Signature, msg2 []byte, dpkRing2 *DpkRing, sig2 *Signature) bool{
+	dpkRingSalrs1:=new(salrs.DpkRing)
+	dpkRingSalrs1.R=dpkRing1.R
+	for i:=0;i<dpkRing1.R;i++{
+		dpkRingSalrs1.Dpk=append(dpkRingSalrs1.Dpk,*dpkRing1.Dpks[i].toSALRS())
+	}
+	dpkRingSalrs2:=new(salrs.DpkRing)
+	dpkRingSalrs2.R=dpkRing2.R
+	for i:=0;i<dpkRing2.R;i++{
+		dpkRingSalrs2.Dpk=append(dpkRingSalrs2.Dpk,*dpkRing2.Dpks[i].toSALRS())
+	}
+	return salrs.Link(msg1, dpkRingSalrs1,sig1.toSALRS(), msg2,dpkRingSalrs2,sig2.toSALRS())
 }
 //	private field	end
