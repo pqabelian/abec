@@ -233,4 +233,24 @@ func Check(msg1 []byte, dpkRing1 *DpkRing, sig1 *Signature, msg2 []byte, dpkRing
 	}
 	return salrs.Link(msg1, dpkRingSalrs1,sig1.toSALRS(), msg2,dpkRingSalrs2,sig2.toSALRS())
 }
+func (s *Signature)Serialize()[]byte{
+	return s.toSALRS().Serialize()
+}
+func DeserializeSignature(b []byte)(*Signature,error){
+	s,err:=salrs.DeserializeSignature(b)
+	if err!=nil{
+		return nil,err
+	}
+	return (*Signature)(s), nil
+}
+func (k *KeyImage)Serialize()[]byte{
+	return k.toSALRS().Serialize()
+}
+func DeserializeKeyImage(b []byte)(*KeyImage,error){
+	r,err:=salrs.DeserializeKeyImage(b)
+	if err!=nil{
+		return nil,err
+	}
+	return (*KeyImage)(r),nil
+}
 //	private field	end
