@@ -1448,7 +1448,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	return blockReply, nil
 }
 func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	c := cmd.(*abejson.GetBlockCmd)
+	c := cmd.(*abejson.GetBlockAbeCmd)
 
 	// Load the raw block bytes from the database.
 	hash, err := chainhash.NewHashFromStr(c.Hash)

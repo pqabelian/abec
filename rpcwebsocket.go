@@ -65,6 +65,7 @@ var wsHandlersBeforeInit = map[string]wsCommandHandler{
 	//"stopnotifyreceived":        handleStopNotifyReceived,
 	//	todo(ABE.MUST): handleRescan seems not work well. ABE does not supprt it at this moment.
 	//"rescan":                    handleRescan,
+	//"rescanabe": handleRescanAbe,
 	// TODO(ABE): ABE does not support filter. As handleRescanBlocks is related to filter, it is not supported either.
 	//"rescanblocks":              handleRescanBlocks,
 }
@@ -787,7 +788,7 @@ func (*wsNotificationManager) notifyBlockConnectedAbe(clients map[chan struct{}]
 	block *abeutil.BlockAbe) {
 
 	// Notify interested websocket clients about the connected block.
-	ntfn := abejson.NewBlockConnectedNtfn(block.Hash().String(), block.Height(),
+	ntfn := abejson.NewBlockAbeConnectedNtfn(block.Hash().String(), block.Height(),
 		block.MsgBlock().Header.Timestamp.Unix())
 	marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
 	if err != nil {
@@ -833,7 +834,7 @@ func (*wsNotificationManager) notifyBlockDisconnectedAbe(clients map[chan struct
 	}
 
 	// Notify interested websocket clients about the disconnected block.
-	ntfn := abejson.NewBlockDisconnectedNtfn(block.Hash().String(),
+	ntfn := abejson.NewBlockAbeDisconnectedNtfn(block.Hash().String(),
 		block.Height(), block.MsgBlock().Header.Timestamp.Unix())
 	marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
 	if err != nil {
@@ -2921,7 +2922,84 @@ var ErrRescanReorg = abejson.RPCError{
 //	rpcsLog.Info("Finished rescan")
 //	return nil, nil
 //}
-
+// TODO(abe): in abelian, we want to use rescan to finish the sync process, i.e. send block to client
+//func handleRescanAbe(wsc *wsClient, icmd interface{}) (interface{}, error) {
+//	cmd, ok := icmd.(*abejson.RescanAbeCmd)
+//	if !ok {
+//		return nil, abejson.ErrRPCInternal
+//	}
+//
+//	chain := wsc.server.cfg.Chain
+//
+//	minBlockHash, err := chainhash.NewHashFromStr(cmd.BeginBlock)
+//	if err != nil {
+//		return nil, rpcDecodeHexError(cmd.BeginBlock)
+//	}
+//	minBlock, err := chain.BlockHeightByHash(minBlockHash)
+//	if err != nil {
+//		return nil, &abejson.RPCError{
+//			Code:    abejson.ErrRPCBlockNotFound,
+//			Message: "Error getting block: " + err.Error(),
+//		}
+//	}
+//
+//	maxBlock := int32(math.MaxInt32)
+//	if cmd.EndBlock != nil {
+//		maxBlockHash, err := chainhash.NewHashFromStr(*cmd.EndBlock)
+//		if err != nil {
+//			return nil, rpcDecodeHexError(*cmd.EndBlock)
+//		}
+//		maxBlock, err = chain.BlockHeightByHash(maxBlockHash)
+//		if err != nil {
+//			return nil, &abejson.RPCError{
+//				Code:    abejson.ErrRPCBlockNotFound,
+//				Message: "Error getting block: " + err.Error(),
+//			}
+//		}
+//	}
+//
+//	var (
+//		lastBlock     *abeutil.Block
+//		lastBlockHash *chainhash.Hash
+//	)
+//	rpcsLog.Infof("Skipping rescan as client has no addrs/utxos")
+//
+//	// If we didn't actually do a rescan, then we'll give the
+//	// client our best known block within the final rescan finished
+//	// notification.
+//	chainTip := chain.BestSnapshot()
+//	lastBlockHash = &chainTip.Hash
+//	lastBlock, err = chain.BlockByHash(lastBlockHash)
+//	if err != nil {
+//		return nil, &abejson.RPCError{
+//			Code:    abejson.ErrRPCBlockNotFound,
+//			Message: "Error getting block: " + err.Error(),
+//		}
+//	}
+//
+//	// Notify websocket client of the finished rescan.  Due to how btcd
+//	// asynchronously queues notifications to not block calling code,
+//	// there is no guarantee that any of the notifications created during
+//	// rescan (such as rescanprogress, recvtx and redeemingtx) will be
+//	// received before the rescan RPC returns.  Therefore, another method
+//	// is needed to safely inform clients that all rescan notifications have
+//	// been sent.
+//	n := abejson.NewRescanFinishedNtfn(
+//		lastBlockHash.String(), lastBlock.Height(),
+//		lastBlock.MsgBlock().Header.Timestamp.Unix(),
+//	)
+//	if mn, err := abejson.MarshalCmd(nil, n); err != nil {
+//		rpcsLog.Errorf("Failed to marshal rescan finished "+
+//			"notification: %v", err)
+//	} else {
+//		// The rescan is finished, so we don't care whether the client
+//		// has disconnected at this point, so discard error.
+//		_ = wsc.QueueNotification(mn)
+//	}
+//
+//	rpcsLog.Info("Finished rescan")
+//	return nil, nil
+//}
 func init() {
 	wsHandlers = wsHandlersBeforeInit
 }
