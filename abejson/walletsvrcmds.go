@@ -9,6 +9,10 @@ type AddMultisigAddressCmd struct {
 	Keys      []string
 	Account   *string
 }
+type AddPayeeCmd struct {
+	Name string
+	MasterPubKey string
+}
 
 // NewAddMultisigAddressCmd returns a new instance which can be used to issue a
 // addmultisigaddress JSON-RPC command.
@@ -20,6 +24,12 @@ func NewAddMultisigAddressCmd(nRequired int, keys []string, account *string) *Ad
 		NRequired: nRequired,
 		Keys:      keys,
 		Account:   account,
+	}
+}
+func NewAddPayeeCmd(name string, masterPubKey string) *AddPayeeCmd {
+	return &AddPayeeCmd{
+		Name:         name,
+		MasterPubKey: masterPubKey,
 	}
 }
 

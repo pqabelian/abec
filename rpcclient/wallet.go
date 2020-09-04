@@ -772,6 +772,7 @@ func (c *Client) SendManyComment(fromAccount string,
 // FutureAddMultisigAddressResult is a future promise to deliver the result of a
 // AddMultisigAddressAsync RPC invocation (or an applicable error).
 type FutureAddMultisigAddressResult chan *response
+type FutureAddPayeeResult chan *response
 
 // Receive waits for the response promised by the future and returns the
 // multisignature address that requires the specified number of signatures for
@@ -791,6 +792,10 @@ func (r FutureAddMultisigAddressResult) Receive() (abeutil.Address, error) {
 
 	return abeutil.DecodeAddress(addr, &chaincfg.MainNetParams)
 }
+func (r FutureAddPayeeResult) Receive() error {
+	_, err := receiveFuture(r)
+	return err
+}
 
 // AddMultisigAddressAsync returns an instance of a type that can be used to get
 // the result of the RPC at some future time by invoking the Receive function on
@@ -806,12 +811,19 @@ func (c *Client) AddMultisigAddressAsync(requiredSigs int, addresses []abeutil.A
 	cmd := abejson.NewAddMultisigAddressCmd(requiredSigs, addrs, &account)
 	return c.sendCmd(cmd)
 }
+func (c *Client) AddPayeeAsync(name string, masterPubKey string) FutureAddPayeeResult {
+	cmd := abejson.NewAddPayeeCmd(name, masterPubKey)
+	return c.sendCmd(cmd)
+}
 
 // AddMultisigAddress adds a multisignature address that requires the specified
 // number of signatures for the provided addresses to the wallet.
 func (c *Client) AddMultisigAddress(requiredSigs int, addresses []abeutil.Address, account string) (abeutil.Address, error) {
 	return c.AddMultisigAddressAsync(requiredSigs, addresses,
 		account).Receive()
+}
+func (c *Client) AddPayee(name string, masterPubKey string) error {
+	return c.AddPayeeAsync(name,masterPubKey).Receive()
 }
 
 // FutureCreateMultisigResult is a future promise to deliver the result of a
