@@ -2258,6 +2258,7 @@ func (mp *TxPool) ProcessTransactionAbe(tx *abeutil.TxAbe, allowOrphan, rateLimi
 	}
 
 	//	todo(ABE): for ABE, accept a block, does not imply there are any orphans that rely on this transaction.
+	// TODO(abe): for ABE, accept a transaction if and only if when this transaction is valid
 	//	only when a transaction is included a block, transactions may depend on this transaction.
 	//	only when a new block is accepted, some orphans may go into mempool.
 	if len(missingParents) == 0 {

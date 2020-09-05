@@ -168,6 +168,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	//	todo(ABE.MUST): ABE provides txoIndex which support searching by Txo(txid,index).
 	//	"searchrawtransactions": handleSearchRawTransactions,
 	"sendrawtransaction": handleSendRawTransaction,
+	"sendrawtransactionabe": handleSendRawTransactionAbe,
 	"setgenerate":        handleSetGenerate,
 	"stop":               handleStop,
 	"submitblock":        handleSubmitBlock,
@@ -3819,6 +3820,110 @@ func handlePing(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 //	todo(ABE): done and need clear
 func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.SendRawTransactionCmd)
+	// Deserialize and send off to tx relay
+	hexStr := c.HexTx
+	if len(hexStr)%2 != 0 {
+		hexStr = "0" + hexStr
+	}
+	serializedTx, err := hex.DecodeString(hexStr)
+	if err != nil {
+		return nil, rpcDecodeHexError(hexStr)
+	}
+	var msgTx wire.MsgTxAbe
+	err = msgTx.Deserialize(bytes.NewReader(serializedTx))
+	if err != nil {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCDeserialization,
+			Message: "TX decode failed: " + err.Error(),
+		}
+	}
+
+	// Use 0 for the tag to represent local node.
+	tx := abeutil.NewTxAbe(&msgTx)
+	acceptedTx, err := s.cfg.TxMemPool.ProcessTransactionAbe(tx, false, false, 0)
+	if err != nil {
+		// When the error is a rule error, it means the transaction was
+		// simply rejected as opposed to something actually going wrong,
+		// so log it as such. Otherwise, something really did go wrong,
+		// so log it as an actual error and return.
+		ruleErr, ok := err.(mempool.RuleError)
+		if !ok {
+			rpcsLog.Errorf("Failed to process transaction %v: %v",
+				tx.Hash(), err)
+
+			return nil, &abejson.RPCError{
+				Code:    abejson.ErrRPCTxError,
+				Message: "TX rejected: " + err.Error(),
+			}
+		}
+
+		rpcsLog.Debugf("Rejected transaction %v: %v", tx.Hash(), err)
+
+		// We'll then map the rule error to the appropriate RPC error,
+		// matching bitcoind's behavior.
+		code := abejson.ErrRPCTxError
+		if txRuleErr, ok := ruleErr.Err.(mempool.TxRuleError); ok {
+			errDesc := txRuleErr.Description
+			switch {
+			case strings.Contains(
+				strings.ToLower(errDesc), "orphan transaction",
+			):
+				code = abejson.ErrRPCTxError
+
+			case strings.Contains(
+				strings.ToLower(errDesc), "transaction already exists",
+			):
+				code = abejson.ErrRPCTxAlreadyInChain
+
+			default:
+				code = abejson.ErrRPCTxRejected
+			}
+		}
+
+		return nil, &abejson.RPCError{
+			Code:    code,
+			Message: "TX rejected: " + err.Error(),
+		}
+	}
+
+	// When the transaction was accepted it should be the first item in the
+	// returned array of accepted transactions.  The only way this will not
+	// be true is if the API for ProcessTransaction changes and this code is
+	// not properly updated, but ensure the condition holds as a safeguard.
+	//
+	// Also, since an error is being returned to the caller, ensure the
+	// transaction is removed from the memory pool.
+	/*	if len(acceptedTxs) == 0 || !acceptedTxs[0].Tx.Hash().IsEqual(tx.Hash()) {
+		s.cfg.TxMemPool.RemoveTransactionBTCD(tx, true)
+
+		errStr := fmt.Sprintf("transaction %v is not in accepted list",
+			tx.Hash())
+		return nil, internalRPCError(errStr, "")
+	}*/
+
+	// Generate and relay inventory vectors for all newly accepted
+	// transactions into the memory pool due to the original being
+	// accepted.
+	acceptedTxs := make([]*mempool.TxDescAbe, 1)
+	acceptedTxs[0] = acceptedTx
+	s.cfg.ConnMgr.RelayTransactions(acceptedTxs)
+
+	// Notify both websocket and getblocktemplate long poll clients of all
+	// newly accepted transactions.
+	s.NotifyNewTransactionsAbe(acceptedTxs)
+
+	// Keep track of all the sendrawtransaction request txns so that they
+	// can be rebroadcast if they don't make their way into a block.
+	txD := acceptedTxs[0]
+	iv := wire.NewInvVect(wire.InvTypeTx, txD.Tx.Hash())
+	s.cfg.ConnMgr.AddRebroadcastInventory(iv, txD)
+
+	return tx.Hash().String(), nil
+}
+
+
+func handleSendRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*abejson.SendRawTransactionAbeCmd)
 	// Deserialize and send off to tx relay
 	hexStr := c.HexTx
 	if len(hexStr)%2 != 0 {

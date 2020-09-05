@@ -778,6 +778,11 @@ type SendRawTransactionCmd struct {
 	MaxFeeRate    *int32
 }
 
+type SendRawTransactionAbeCmd struct {
+	HexTx         string
+	AllowHighFees *bool `jsonrpcdefault:"false"`
+	MaxFeeRate    *int32
+}
 // NewSendRawTransactionCmd returns a new instance which can be used to issue a
 // sendrawtransaction JSON-RPC command.
 //
@@ -789,6 +794,13 @@ func NewSendRawTransactionCmd(hexTx string, allowHighFees *bool) *SendRawTransac
 		AllowHighFees: allowHighFees,
 	}
 }
+func NewSendRawTransactionAbeCmd(hexTx string, allowHighFees *bool) *SendRawTransactionAbeCmd {
+	return &SendRawTransactionAbeCmd{
+		HexTx:         hexTx,
+		AllowHighFees: allowHighFees,
+	}
+}
+
 
 // NewSendRawTransactionCmd returns a new instance which can be used to issue a
 // sendrawtransaction JSON-RPC command to a bitcoind node.
@@ -971,6 +983,7 @@ func init() {
 	MustRegisterCmd("reconsiderblock", (*ReconsiderBlockCmd)(nil), flags)
 	MustRegisterCmd("searchrawtransactions", (*SearchRawTransactionsCmd)(nil), flags)
 	MustRegisterCmd("sendrawtransaction", (*SendRawTransactionCmd)(nil), flags)
+	MustRegisterCmd("sendrawtransactionabe", (*SendRawTransactionAbeCmd)(nil), flags)
 	MustRegisterCmd("setgenerate", (*SetGenerateCmd)(nil), flags)
 	MustRegisterCmd("stop", (*StopCmd)(nil), flags)
 	MustRegisterCmd("submitblock", (*SubmitBlockCmd)(nil), flags)
