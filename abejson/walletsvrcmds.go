@@ -456,6 +456,11 @@ type ListUnspentCmd struct {
 	MaxConf   *int `jsonrpcdefault:"9999999"`
 	Addresses *[]string
 }
+//TODO(abe): the utxos listed is spendable
+type ListUnspentAbeCmd struct {}
+func NewListUnspentAbeCmd() *ListUnspentAbeCmd {
+	return &ListUnspentAbeCmd{}
+}
 
 // NewListUnspentCmd returns a new instance which can be used to issue a
 // listunspent JSON-RPC command.
@@ -725,6 +730,7 @@ func init() {
 	MustRegisterCmd("listsinceblock", (*ListSinceBlockCmd)(nil), flags)
 	MustRegisterCmd("listtransactions", (*ListTransactionsCmd)(nil), flags)
 	MustRegisterCmd("listunspent", (*ListUnspentCmd)(nil), flags)
+	MustRegisterCmd("listunspentabe", (*ListUnspentAbeCmd)(nil), flags)
 	MustRegisterCmd("lockunspent", (*LockUnspentCmd)(nil), flags)
 	MustRegisterCmd("move", (*MoveCmd)(nil), flags)
 	MustRegisterCmd("sendfrom", (*SendFromCmd)(nil), flags)
