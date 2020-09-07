@@ -509,12 +509,12 @@ func (c *Client) SendToAddressAsync(address abeutil.Address, amount abeutil.Amou
 	cmd := abejson.NewSendToAddressCmd(addr, amount.ToABE(), nil, nil)
 	return c.sendCmd(cmd)
 }
-func (c *Client) SendToPayeesAsync(payees []string, amount []abeutil.Amount,minconf *int,comment string) FutureSendToPayeeResult {
+func (c *Client) SendToPayeesAsync(payees []string, amount []abeutil.Amount,minconf *int,comment *string) FutureSendToPayeeResult {
 	amounts := make(map[string]int, len(payees))
 	for i := 0; i < len(payees); i++ {
 		amounts[payees[i]]= int(amount[i])
 	}
-	cmd := abejson.NewSendToPayeesCmd(amounts, minconf, nil)
+	cmd := abejson.NewSendToPayeesCmd(amounts, minconf, comment)
 	return c.sendCmd(cmd)
 }
 
@@ -529,8 +529,8 @@ func (c *Client) SendToPayeesAsync(payees []string, amount []abeutil.Amount,minc
 func (c *Client) SendToAddress(address abeutil.Address, amount abeutil.Amount) (*chainhash.Hash, error) {
 	return c.SendToAddressAsync(address, amount).Receive()
 }
-func (c *Client) SendToPayees(payees []string, amount []abeutil.Amount) (*chainhash.Hash, error) {
-	return c.SendToPayeesAsync(payees, amount).Receive()
+func (c *Client) SendToPayees(payees []string, amount []abeutil.Amount,minconf *int,comment *string) (*chainhash.Hash, error) {
+	return c.SendToPayeesAsync(payees, amount,minconf,comment).Receive()
 }
 
 // SendToAddressCommentAsync returns an instance of a type that can be used to
