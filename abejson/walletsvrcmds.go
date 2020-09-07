@@ -562,6 +562,19 @@ func NewSendManyCmd(fromAccount string, amounts map[string]float64, minConf *int
 	}
 }
 
+type SendToPayeesCmd struct {
+	Amounts  map[string]int `jsonrpcusage:"{\"name\":amount,...}"` // In BTC
+	MinConf *int               `jsonrpcdefault:"1"`
+	Comment *string
+}
+func NewSendToPayeesCmd(amounts map[string]int, minconf *int, comment *string) *SendToPayeesCmd {
+	return &SendToPayeesCmd{
+		Amounts:  amounts,
+		MinConf: minconf,
+		Comment: comment,
+	}
+}
+
 // SendToAddressCmd defines the sendtoaddress JSON-RPC command.
 type SendToAddressCmd struct {
 	Address   string
@@ -736,6 +749,7 @@ func init() {
 	MustRegisterCmd("sendfrom", (*SendFromCmd)(nil), flags)
 	MustRegisterCmd("sendmany", (*SendManyCmd)(nil), flags)
 	MustRegisterCmd("sendtoaddress", (*SendToAddressCmd)(nil), flags)
+	MustRegisterCmd("sendtopayee", (*SendToPayeesCmd)(nil), flags)
 	MustRegisterCmd("setaccount", (*SetAccountCmd)(nil), flags)
 	MustRegisterCmd("settxfee", (*SetTxFeeCmd)(nil), flags)
 	MustRegisterCmd("signmessage", (*SignMessageCmd)(nil), flags)

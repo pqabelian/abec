@@ -464,9 +464,26 @@ func (c *Client) SetTxFee(fee abeutil.Amount) error {
 // SendToAddressAsync RPC invocation (or an applicable error).
 type FutureSendToAddressResult chan *response
 
+type FutureSendToPayeeResult chan *response
+
 // Receive waits for the response promised by the future and returns the hash
 // of the transaction sending the passed amount to the given address.
 func (r FutureSendToAddressResult) Receive() (*chainhash.Hash, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a string.
+	var txHash string
+	err = json.Unmarshal(res, &txHash)
+	if err != nil {
+		return nil, err
+	}
+
+	return chainhash.NewHashFromStr(txHash)
+}
+func (r FutureSendToPayeeResult) Receive() (*chainhash.Hash, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -492,6 +509,14 @@ func (c *Client) SendToAddressAsync(address abeutil.Address, amount abeutil.Amou
 	cmd := abejson.NewSendToAddressCmd(addr, amount.ToABE(), nil, nil)
 	return c.sendCmd(cmd)
 }
+func (c *Client) SendToPayeesAsync(payees []string, amount []abeutil.Amount,minconf *int,comment string) FutureSendToPayeeResult {
+	amounts := make(map[string]int, len(payees))
+	for i := 0; i < len(payees); i++ {
+		amounts[payees[i]]= int(amount[i])
+	}
+	cmd := abejson.NewSendToPayeesCmd(amounts, minconf, nil)
+	return c.sendCmd(cmd)
+}
 
 // SendToAddress sends the passed amount to the given address.
 //
@@ -503,6 +528,9 @@ func (c *Client) SendToAddressAsync(address abeutil.Address, amount abeutil.Amou
 // WalletPassphrase function for more details.
 func (c *Client) SendToAddress(address abeutil.Address, amount abeutil.Amount) (*chainhash.Hash, error) {
 	return c.SendToAddressAsync(address, amount).Receive()
+}
+func (c *Client) SendToPayees(payees []string, amount []abeutil.Amount) (*chainhash.Hash, error) {
+	return c.SendToPayeesAsync(payees, amount).Receive()
 }
 
 // SendToAddressCommentAsync returns an instance of a type that can be used to
@@ -823,7 +851,7 @@ func (c *Client) AddMultisigAddress(requiredSigs int, addresses []abeutil.Addres
 		account).Receive()
 }
 func (c *Client) AddPayee(name string, masterPubKey string) error {
-	return c.AddPayeeAsync(name,masterPubKey).Receive()
+	return c.AddPayeeAsync(name, masterPubKey).Receive()
 }
 
 // FutureCreateMultisigResult is a future promise to deliver the result of a
