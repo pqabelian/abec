@@ -169,3 +169,8 @@ type GetBalancesResult struct {
 	Mine      BalanceDetailsResult  `json:"mine"`
 	WatchOnly *BalanceDetailsResult `json:"watchonly"`
 }
+
+type GetBalancesAbeResult struct {
+	Mine      BalanceDetailsResult  `json:"mine"`
+	WatchOnly *BalanceDetailsResult `json:"watchonly"`
+}

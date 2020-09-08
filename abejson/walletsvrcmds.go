@@ -196,13 +196,20 @@ func NewGetBalanceCmd(account *string, minConf *int) *GetBalanceCmd {
 
 // GetBalancesCmd defines the getbalances JSON-RPC command.
 type GetBalancesCmd struct{}
+type GetBalancesAbeCmd struct{
+	Minconf *int `jsonrpcdefault:"1"`
+}
 
 // NewGetBalancesCmd returns a new instance which can be used to issue a
 // getbalances JSON-RPC command.
 func NewGetBalancesCmd() *GetBalancesCmd {
 	return &GetBalancesCmd{}
 }
-
+func NewGetBalancesAbeCmd(minconf *int) *GetBalancesAbeCmd {
+	return &GetBalancesAbeCmd{
+		Minconf: minconf,
+	}
+}
 // GetNewAddressCmd defines the getnewaddress JSON-RPC command.
 type GetNewAddressCmd struct {
 	Account *string
@@ -727,6 +734,7 @@ func init() {
 	MustRegisterCmd("getaddressesbyaccount", (*GetAddressesByAccountCmd)(nil), flags)
 	MustRegisterCmd("getbalance", (*GetBalanceCmd)(nil), flags)
 	MustRegisterCmd("getbalances", (*GetBalancesCmd)(nil), flags)
+	MustRegisterCmd("getbalancesabe", (*GetBalancesAbeCmd)(nil), flags)
 	MustRegisterCmd("getnewaddress", (*GetNewAddressCmd)(nil), flags)
 	MustRegisterCmd("getrawchangeaddress", (*GetRawChangeAddressCmd)(nil), flags)
 	MustRegisterCmd("getreceivedbyaccount", (*GetReceivedByAccountCmd)(nil), flags)

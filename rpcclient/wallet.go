@@ -1568,6 +1568,7 @@ func (c *Client) GetBalanceMinConf(account string, minConfirms int) (abeutil.Amo
 // FutureGetBalancesResult is a future promise to deliver the result of a
 // GetBalancesAsync RPC invocation (or an applicable error).
 type FutureGetBalancesResult chan *response
+type FutureGetBalancesAbeResult chan *response
 
 // Receive waits for the response promised by the future and returns the
 // available balances from the server.
@@ -1586,6 +1587,21 @@ func (r FutureGetBalancesResult) Receive() (*abejson.GetBalancesResult, error) {
 
 	return &balances, nil
 }
+func (r FutureGetBalancesAbeResult) Receive() (*abejson.GetBalancesAbeResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a floating point number.
+	var balances abejson.GetBalancesAbeResult
+	err = json.Unmarshal(res, &balances)
+	if err != nil {
+		return nil, err
+	}
+
+	return &balances, nil
+}
 
 // GetBalancesAsync returns an instance of a type that can be used to get the
 // result of the RPC at some future time by invoking the Receive function on the
@@ -1596,10 +1612,24 @@ func (c *Client) GetBalancesAsync() FutureGetBalancesResult {
 	cmd := abejson.NewGetBalancesCmd()
 	return c.sendCmd(cmd)
 }
+func (c *Client) GetBalancesAbeAsync() FutureGetBalancesAbeResult {
+	cmd := abejson.NewGetBalancesAbeCmd(nil)
+	return c.sendCmd(cmd)
+}
+func (c *Client) GetBalancesAbeMinconfAsync(minconf int) FutureGetBalancesAbeResult {
+	cmd := abejson.NewGetBalancesAbeCmd(&minconf)
+	return c.sendCmd(cmd)
+}
 
 // GetBalances returns the available balances from the server.
 func (c *Client) GetBalances() (*abejson.GetBalancesResult, error) {
 	return c.GetBalancesAsync().Receive()
+}
+func (c *Client) GetBalancesAbe() (*abejson.GetBalancesAbeResult, error) {
+	return c.GetBalancesAbeAsync().Receive()
+}
+func (c *Client) GetBalancesMinconfAbe(minconf int) (*abejson.GetBalancesAbeResult, error) {
+	return c.GetBalancesAbeMinconfAsync(minconf).Receive()
 }
 
 // FutureGetReceivedByAccountResult is a future promise to deliver the result of
