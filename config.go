@@ -879,7 +879,7 @@ func loadConfig() (*config, []string, error) {
 			fmt.Fprintln(os.Stderr, usageMessage)
 			return nil, nil, err
 		}
-		cfg.miningAddr = maddr
+		cfg.miningAddr = maddr    // set the mining address
 	}
 
 	// Add default port to all listener addresses if needed and remove

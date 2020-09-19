@@ -244,7 +244,7 @@ func DecodeMasterAddressAbe(addrstr string) (MasterAddress, error) {
 		return nil, errors.New("decoded address is of zero size")
 	}
 
-	addrBytes, err := hex.DecodeString(addrstr)
+	addrBytes, err := hex.DecodeString(addrstr) // the reverse method is hex.EncodeToString
 	if err != nil {
 		return nil, err
 	}

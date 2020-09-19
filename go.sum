@@ -14,6 +14,8 @@ github.com/cryptosuite/salrs-go v0.0.0-20200825021514-2d7e2632eea8 h1:j3LABUCe2u
 github.com/cryptosuite/salrs-go v0.0.0-20200825021514-2d7e2632eea8/go.mod h1:mJeCa86eOqj3kCJO+O4245Wnq5U07P9K9RfJplI8bQ4=
 github.com/cryptosuite/salrs-go v0.0.0-20200825022743-e929874834fe h1:VeuwBJFTQk6SB2GSGWhlwqpzR4HvI70O2azOFm8/l2A=
 github.com/cryptosuite/salrs-go v0.0.0-20200825022743-e929874834fe/go.mod h1:mJeCa86eOqj3kCJO+O4245Wnq5U07P9K9RfJplI8bQ4=
+github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1 h1:vN3Cibtye7f3YuPvrJWG4Kp/jrb/XfxS5oIwl8XZBQY=
+github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1/go.mod h1:mJeCa86eOqj3kCJO+O4245Wnq5U07P9K9RfJplI8bQ4=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/decred/dcrd/lru v1.0.0 h1:Kbsb1SFDsIlaupWPwsPp+dkxiBY1frcS07PCPgotKz8=

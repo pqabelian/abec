@@ -251,7 +251,7 @@ func RegisterCmd(method string, cmd interface{}, flags UsageFlag) error {
 
 	// Update the registration maps.
 	methodToConcreteType[method] = rtp
-	methodToInfo[method] = methodInfo{
+	methodToInfo[method] = methodInfo{      //when registering, the information for registeration will be add in here.
 		maxParams:    numFields,
 		numReqParams: numFields - numOptFields,
 		numOptParams: numOptFields,
