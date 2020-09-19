@@ -196,7 +196,7 @@ func (k *KeyImage) toSALRS() *salrs.KeyImage {
 	return (*salrs.KeyImage)(k)
 }
 // TODO(abe): abstract the check function, not for just one crypto scheme one check
-func CheckDerivedPubKeyAttribute(dpk *DerivedPubKey,mpk *MasterPubKey,msvk *MasterSecretViewKey) bool {
+func CheckDerivedPubKeyAttribute(dpk *DerivedPubKey,mpk *MasterPubKey,msvk *MasterSecretViewKey) (bool,error) {
 	return salrs.CheckDerivedPubKeyOwner(dpk.toSALRS(),mpk.toSALRS(),msvk.toSALRS())
 }
 func Sign(msg []byte, dpkRing *DpkRing, dpk *DerivedPubKey, mpk *MasterPubKey, msvk *MasterSecretViewKey, mssk *MasterSecretSignKey) (sig *Signature, err error) {
@@ -211,16 +211,16 @@ func Sign(msg []byte, dpkRing *DpkRing, dpk *DerivedPubKey, mpk *MasterPubKey, m
 	}
 	return (*Signature)(signature),nil
 }
-func Verify(msg []byte, dpkRing *DpkRing,sig *Signature)(*KeyImage,bool){
+func Verify(msg []byte, dpkRing *DpkRing,sig *Signature)(*KeyImage,bool,error){
 	dpkRingSalrs:=new(salrs.DpkRing)
 	dpkRingSalrs.R=dpkRing.R
 	for i:=0;i<dpkRing.R;i++{
 		dpkRingSalrs.Dpk=append(dpkRingSalrs.Dpk,*dpkRing.Dpks[i].toSALRS())
 	}
-	k, b := salrs.Verify(msg, dpkRingSalrs, sig.toSALRS())
-	return (*KeyImage)(k),b
+	k, b,err := salrs.Verify(msg, dpkRingSalrs, sig.toSALRS())
+	return (*KeyImage)(k),b,err
 }
-func Check(msg1 []byte, dpkRing1 *DpkRing, sig1 *Signature, msg2 []byte, dpkRing2 *DpkRing, sig2 *Signature) bool{
+func Check(msg1 []byte, dpkRing1 *DpkRing, sig1 *Signature, msg2 []byte, dpkRing2 *DpkRing, sig2 *Signature) (bool,error){
 	dpkRingSalrs1:=new(salrs.DpkRing)
 	dpkRingSalrs1.R=dpkRing1.R
 	for i:=0;i<dpkRing1.R;i++{
