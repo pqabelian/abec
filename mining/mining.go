@@ -408,26 +408,61 @@ func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockH
 
 //	TODO(ABE): may be the total number of  outputs of coinbase transaction should be confined to 1,
 //	 it will need to modify the process of checking block and transaction
+// TODO(abe): when we use 1,2,5,10 for testing, we need add a algorithm to adjust the coin value in coinbase transaction
 func createCoinbaseTxAbe(params *chaincfg.Params, extraNonce uint64, nextBlockHeight int32, addr abeutil.MasterAddress) (*abeutil.TxAbe, error) {
+	////origin
+	//coinbaseTxIn := wire.NewStandardCoinbaseTxIn(nextBlockHeight, extraNonce)
+	//
+	//addressScript, err := txscript.PayToAddressScriptAbe(addr)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//txOut := wire.TxOutAbe{}
+	//txOut.AddressScript = addressScript
+	////	TODO (ABE.MUST): for salrs test, we set fix value 100 ABE
+	////	txOut.ValueScript = blockchain.CalcBlockSubsidy(nextBlockHeight, params)
+	////	for genesis block, this value is 1000 * 10000000
+	////	For the test version of salrs, the fix-denotation is 100ABE, that is the fee and the value script must be 100.
+	////	and the valuescript in coinbase transaction is 400. THIS IS JUST FOR TEST.
+	////txOut.ValueScript = 400 * abeutil.NeutrinoPerAbe      //TODO(abe):this value shoule be reduce as the increasing block
+	//txOut.ValueScript = blockchain.CalcBlockSubsidy(nextBlockHeight, params)
+	//tx := wire.NewMsgTxAbe(wire.TxVersion)
+	//tx.AddTxIn(coinbaseTxIn)
+	//tx.AddTxOut(&txOut)
+	//tx.TxWitness = &wire.TxWitnessAbe{}
 
+	// for testing 1,2,5,10
+	tx := wire.NewMsgTxAbe(wire.TxVersion)
 	coinbaseTxIn := wire.NewStandardCoinbaseTxIn(nextBlockHeight, extraNonce)
-
+	tx.AddTxIn(coinbaseTxIn)
+	//
+	TotalSubsidies := blockchain.CalcBlockSubsidy(nextBlockHeight, params)
+	tx.TxFee=TotalSubsidies   // record the subsidied to add the tx fee in block
 	addressScript, err := txscript.PayToAddressScriptAbe(addr)
 	if err != nil {
 		return nil, err
 	}
-	txOut := wire.TxOutAbe{}
-	txOut.AddressScript = addressScript
-	//	TODO (ABE.MUST): for salrs test, we set fix value 100 ABE
-	//	txOut.ValueScript = blockchain.CalcBlockSubsidy(nextBlockHeight, params)
-	//	for genesis block, this value is 1000 * 10000000
-	//	For the test version of salrs, the fix-denotation is 100ABE, that is the fee and the value script must be 100.
-	//	and the valuescript in coinbase transaction is 400. THIS IS JUST FOR TEST.
-	//txOut.ValueScript = 400 * abeutil.NeutrinoPerAbe      //TODO(abe):this value shoule be reduce as the increasing block
-	txOut.ValueScript = blockchain.CalcBlockSubsidy(nextBlockHeight, params)
-	tx := wire.NewMsgTxAbe(wire.TxVersion)
-	tx.AddTxIn(coinbaseTxIn)
-	tx.AddTxOut(&txOut)
+	// TODO(abe): for testing 1,2,5,10, we may use more than one outputs in  coinbase transaction
+	//  divide the value script in to differennt tx out
+	coinValues:=[]int64{500,200,100,50,20,10,5,2,1}
+	for TotalSubsidies !=0{
+		i:=0
+		for TotalSubsidies < coinValues[i]* abeutil.NeutrinoPerAbe{
+			i++
+		}
+		TotalSubsidies -=coinValues[i]* abeutil.NeutrinoPerAbe
+		txOut := wire.TxOutAbe{}
+		txOut.AddressScript = addressScript
+		txOut.ValueScript=coinValues[i]* abeutil.NeutrinoPerAbe
+		tx.AddTxOut(&txOut)
+	}
+	//reserve 3 output for backward adjust
+	for i:=0;i<3;i++{
+		txOut := wire.TxOutAbe{}
+		txOut.AddressScript = addressScript
+		txOut.ValueScript=0
+		tx.AddTxOut(&txOut)
+	}
 	tx.TxWitness = &wire.TxWitnessAbe{}
 
 	return abeutil.NewTxAbe(tx), nil
@@ -613,7 +648,7 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress abeutil.MasterAddress) 
 	// identical transaction for block version 1).
 	extraNonce := uint64(0)
 	//	coinbaseScript, err := standardCoinbaseScript(nextBlockHeight, extraNonce)
-
+	//TODO(abe):for testing 1,2,5,10, the number of outputs in coinbase transactio will not only one, so we must adjust the checking coinbase transaction
 	coinbaseTx, err := createCoinbaseTxAbe(g.chainParams, extraNonce, nextBlockHeight, payToAddress)
 	if err != nil {
 		return nil, err
@@ -733,6 +768,7 @@ mempoolLoop:
 		prioItem.priority = CalcPriorityAbe(tx.MsgTx(), utxoRings, nextBlockHeight)
 
 		// Calculate the fee in Satoshi/kB.
+		// TODO(abe)：for testing 1,2,5,10, the fee will be floored to a integer. actually, it is a integer.
 		prioItem.feePerKB = txDesc.FeePerKB
 		prioItem.fee = txDesc.Fee
 
@@ -924,7 +960,44 @@ mempoolLoop:
 	// the total fees accordingly.
 	blockSize -= wire.MaxVarIntPayload - uint32(wire.VarIntSerializeSize(uint64(len(blockTxns))))
 	//	todo(ABE): now, each coinbase transaction has only one output, and the value is public
-	coinbaseTx.MsgTx().TxOuts[0].ValueScript += totalFees
+	// TODO(abe): for testing 1,2,5,10, we must adjust the transaction fee not depend on the size of block
+	//  and the total fee should be add new outputs into coinbase transaction,
+	//  and meanwhile the block size should be recomputed
+	//coinbaseTx.MsgTx().TxOuts[0].ValueScript += totalFees
+	coinValues:=[]int64{500,200,100,50,20,10,5,2,1}
+	coinbaseCoinvalue:=coinbaseTx.MsgTx().TxFee+totalFees
+	// TODO(abe):for testing 1,2,5,10, the coinbase transaction will just to a interger
+	coinbaseCoinvalue=coinbaseCoinvalue/abeutil.NeutrinoPerAbe * abeutil.NeutrinoPerAbe
+	totalOutputs:=len(coinbaseTx.MsgTx().TxOuts)
+	cnt:=0
+	for coinbaseCoinvalue !=0{  // adjust the coinbase output
+		i:=0
+		for coinbaseCoinvalue < coinValues[i]* abeutil.NeutrinoPerAbe{
+			i++
+		}
+		coinbaseCoinvalue-=coinValues[i]* abeutil.NeutrinoPerAbe
+		if cnt<totalOutputs{    // modify origin one
+			coinbaseTx.MsgTx().TxOuts[cnt].ValueScript=coinValues[i]* abeutil.NeutrinoPerAbe
+		}else{     // add new one
+			// this branch should rarely use because it will change be block size,
+			//  and because we reserve 3 outputs in generate coinbase transaction
+			txOut := wire.TxOutAbe{}
+			txOut.AddressScript = coinbaseTx.MsgTx().TxOuts[0].AddressScript
+			txOut.ValueScript=coinValues[i]* abeutil.NeutrinoPerAbe
+			coinbaseTx.MsgTx().AddTxOut(&txOut)
+		}
+		cnt++
+	}
+	// delete for redundant output
+	i:=0
+	for ;i<len(coinbaseTx.MsgTx().TxOuts);i++{
+		if coinbaseTx.MsgTx().TxOuts[i].ValueScript==0{
+			break
+		}
+	}
+	coinbaseTx.MsgTx().TxOuts=coinbaseTx.MsgTx().TxOuts[:i]
+	
+	coinbaseTx.MsgTx().TxFee=0
 	txFees[0] = -totalFees
 
 	// If segwit is active and we included transactions with witness data,

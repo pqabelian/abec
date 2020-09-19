@@ -185,9 +185,14 @@ func (m *CPUMiner) submitBlock(block *abeutil.BlockAbe) bool {
 	}
 
 	// The block was accepted.
-	coinbaseTx := block.MsgBlock().Transactions[0].TxOuts[0]
+	//TODO(abe):for testing 1,2,5,10, the coinbase outputs may more than one
+	coinbaseTxValue := int64(0)
+	for i:=0;i<len(block.MsgBlock().Transactions[0].TxOuts);i++{
+		coinbaseTxValue+=block.MsgBlock().Transactions[0].TxOuts[i].ValueScript
+	}
+
 	log.Infof("Block submitted via CPU miner accepted (hash %s, "+
-		"amount %v)", block.Hash(), abeutil.Amount(coinbaseTx.ValueScript))
+		"amount %v)", block.Hash(), abeutil.Amount(coinbaseTxValue))
 	return true
 }
 

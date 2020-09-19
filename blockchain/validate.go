@@ -36,7 +36,8 @@ const (
 	// baseSubsidy is the starting subsidy amount for mined blocks.  This
 	// value is halved every SubsidyHalvingInterval blocks.
 	//baseSubsidy = 512 * abeutil.NeutrinoPerAbe       //TODO(osy):this value should be 400 to uniform
-	baseSubsidy = 400 * abeutil.NeutrinoPerAbe
+	//baseSubsidy = 400 * abeutil.NeutrinoPerAbe      //TODO(abe): for testing 1,2,5,10, we adjust the subsidy from 400 to 512
+	baseSubsidy = 512 * abeutil.NeutrinoPerAbe      //TODO(abe): for testing 1,2,5,10, we adjust the subsidy from 400 to 512
 )
 
 var (
@@ -1234,7 +1235,7 @@ func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blo
 				}
 			}*/
 
-		coinbaseTx := block.Transactions()[0]
+		coinbaseTx := block.Transactions()[0]  // TODO(abe): for testing 1,2,5,10, we should adjust the checking logical
 		err := checkSerializedHeightAbe(coinbaseTx, blockHeight)
 		if err != nil {
 			return err
@@ -1924,7 +1925,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// errors here because those error conditions would have already been
 	// caught by checkTransactionSanity.
 	var totalNeutrinoOut int64
-	for _, txOut := range transactions[0].MsgTx().TxOuts {
+	for _, txOut := range transactions[0].MsgTx().TxOuts {  // the coinbase transaction may have more than one outputs
 		totalNeutrinoOut += txOut.ValueScript
 	}
 	expectedNeutrinoOut := CalcBlockSubsidy(node.height, b.chainParams) + totalFees
