@@ -913,23 +913,44 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 
 	blocks := []*abeutil.BlockAbe{block0, block1, block2}
 	ringBlockHeight := blocks[2].Height()
-
 	blocksNum := len(blocks)
 
 	blockHashs := make([]*chainhash.Hash, blocksNum)
-	coinBaseRmTxoNum := 0
-	transferRmTxoNum := 0
+	//coinBaseRmTxoNum := 0
+	//transferRmTxoNum := 0
 	for i := 0; i < blocksNum; i++ {
 		blockHashs[i] = blocks[i].Hash()
+		//TODO(abe): for testing 1,2,5,10, there may more than one output in coinbase transaction
+		//coinBaseRmTxoNum += len(blocks[i].Transactions()[0].MsgTx().TxOuts)
+		//for _, tx := range blocks[i].Transactions()[1:] {
+		//	transferRmTxoNum += len(tx.MsgTx().TxOuts)
+		//}
+	}
+	allCoinBaseRmTxos,allTransferRmTxos:=NewUTXORingEntriesPreparation(blocks)
 
-		coinBaseRmTxoNum += len(blocks[i].Transactions()[0].MsgTx().TxOuts)
-		for _, tx := range blocks[i].Transactions()[1:] {
-			transferRmTxoNum += len(tx.MsgTx().TxOuts)
+	for i:=0;i<9;i++{
+		if len(allCoinBaseRmTxos[i])!=0{
+			err = view.NewUtxoRingEntriesFromTxos(allCoinBaseRmTxos[i], ringBlockHeight, blockHashs, true)
+			if err != nil {
+				return err
+			}
+		}
+		if len(allTransferRmTxos[i])!=0{
+			err = view.NewUtxoRingEntriesFromTxos(allTransferRmTxos[i], ringBlockHeight, blockHashs, false)
+			if err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 
-	allCoinBaseRmTxos := make([]*RingMemberTxo, 0, coinBaseRmTxoNum)
-	allTransferRmTxos := make([]*RingMemberTxo, 0, transferRmTxoNum)
+}
+
+func NewUTXORingEntriesPreparation(blocks []*abeutil.BlockAbe)([][]*RingMemberTxo,[][]*RingMemberTxo){
+	blocksNum := len(blocks)
+	values:=map[int64]int{500:0,200:1,100:2,50:3,20:4,10:5,5:6,2:7,1:8}
+	allCoinBaseRmTxos := make([][]*RingMemberTxo, 9)
+	allTransferRmTxos := make([][]*RingMemberTxo, 9)
 
 	// str = block1.hash, block2.hash, block3.hash, blockhash, txHash, outIndex
 	// all Txos are ordered by Hash(str), then grouped into rings
@@ -954,7 +975,8 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 			txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
 			ringMemberTxo := NewRingMemberTxo(&txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
-			allCoinBaseRmTxos = append(allCoinBaseRmTxos, ringMemberTxo)
+			index:= values[txOut.ValueScript/abeutil.NeutrinoPerAbe]
+			allCoinBaseRmTxos[index] = append(allCoinBaseRmTxos[index], ringMemberTxo)
 		}
 
 		for _, tx := range block.Transactions()[1:] {
@@ -967,23 +989,12 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 				txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
 				ringMemberTxo := NewRingMemberTxo(&txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
-				allTransferRmTxos = append(allTransferRmTxos, ringMemberTxo)
+				index:= values[txOut.ValueScript/abeutil.NeutrinoPerAbe]
+				allTransferRmTxos[index] = append(allTransferRmTxos[index], ringMemberTxo)
 			}
 		}
 	}
-
-	err = view.newUtxoRingEntriesFromTxos(allCoinBaseRmTxos, ringBlockHeight, blockHashs, true)
-	if err != nil {
-		return err
-	}
-
-	err = view.newUtxoRingEntriesFromTxos(allTransferRmTxos, ringBlockHeight, blockHashs, false)
-	if err != nil {
-		return err
-	}
-
-	return nil
-
+	return allCoinBaseRmTxos,allTransferRmTxos
 }
 
 /*func (view *UtxoRingViewpoint) newUtxoRingEntriesFromBlocks(blocks []*abeutil.BlockAbe) error {
@@ -1067,12 +1078,12 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 		}
 	}
 
-	err := view.newUtxoRingEntriesFromTxos( allCoinBaseRmTxos, ringBlockHeight, blockHashs,true )
+	err := view.NewUtxoRingEntriesFromTxos( allCoinBaseRmTxos, ringBlockHeight, blockHashs,true )
 	if err != nil {
 		return err
 	}
 
-	err = view.newUtxoRingEntriesFromTxos( allTransferRmTxos, ringBlockHeight, blockHashs,false )
+	err = view.NewUtxoRingEntriesFromTxos( allTransferRmTxos, ringBlockHeight, blockHashs,false )
 	if err != nil {
 		return err
 	}
@@ -1080,7 +1091,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 	return nil
 }*/
 
-func (view *UtxoRingViewpoint) newUtxoRingEntriesFromTxos(ringMemberTxos []*RingMemberTxo, ringBlockHeight int32, blockhashs []*chainhash.Hash, isCoinBase bool) error {
+func (view *UtxoRingViewpoint) NewUtxoRingEntriesFromTxos(ringMemberTxos []*RingMemberTxo, ringBlockHeight int32, blockhashs []*chainhash.Hash, isCoinBase bool) error {
 
 	if len(ringMemberTxos) == 0 {
 		return nil
@@ -1116,7 +1127,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 
 		outPointRingHash := utxoRingEntry.outPointRing.Hash()
 		if existingUtxoRing, ok := view.entries[outPointRingHash]; ok {
-			return AssertError(fmt.Sprintf("Found a hash collision when calling newUtxoRingEntriesFromTxos with block (hash %v, height %d),"+
+			return AssertError(fmt.Sprintf("Found a hash collision when calling NewUtxoRingEntriesFromTxos with block (hash %v, height %d),"+
 				"with the UtxoRings generated with block (height %d)", view.bestHash, ringBlockHeight, existingUtxoRing.ringBlockHeight))
 		} else {
 			view.entries[outPointRingHash] = utxoRingEntry
@@ -1137,7 +1148,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 
 		outPointRingHash1 := utxoRingEntry1.outPointRing.Hash()
 		if existingUtxoRing, ok := view.entries[outPointRingHash1]; ok {
-			return AssertError(fmt.Sprintf("Found a hash collision when calling newUtxoRingEntriesFromTxos with block (hash %v, height %d),"+
+			return AssertError(fmt.Sprintf("Found a hash collision when calling NewUtxoRingEntriesFromTxos with block (hash %v, height %d),"+
 				"with the UtxoRings generated with block (height %d)", view.bestHash, ringBlockHeight, existingUtxoRing.ringBlockHeight))
 		} else {
 			view.entries[outPointRingHash1] = utxoRingEntry1
@@ -1149,7 +1160,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 
 		outPointRingHash2 := utxoRingEntry2.outPointRing.Hash()
 		if existingUtxoRing, ok := view.entries[outPointRingHash2]; ok {
-			return AssertError(fmt.Sprintf("Found a hash collision when calling newUtxoRingEntriesFromTxos with block (hash %v, height %d),"+
+			return AssertError(fmt.Sprintf("Found a hash collision when calling NewUtxoRingEntriesFromTxos with block (hash %v, height %d),"+
 				"with the UtxoRings generated with block (height %d)", view.bestHash, ringBlockHeight, existingUtxoRing.ringBlockHeight))
 		} else {
 			view.entries[outPointRingHash2] = utxoRingEntry2
@@ -1162,7 +1173,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 
 		outPointRingHash := utxoRingEntry.outPointRing.Hash()
 		if existingUtxoRing, ok := view.entries[outPointRingHash]; ok {
-			return AssertError(fmt.Sprintf("Found a hash collision when calling newUtxoRingEntriesFromTxos with block (hash %v, height %d),"+
+			return AssertError(fmt.Sprintf("Found a hash collision when calling NewUtxoRingEntriesFromTxos with block (hash %v, height %d),"+
 				"with the UtxoRings generated with block (height %d)", view.bestHash, ringBlockHeight, existingUtxoRing.ringBlockHeight))
 		} else {
 			view.entries[outPointRingHash] = utxoRingEntry
