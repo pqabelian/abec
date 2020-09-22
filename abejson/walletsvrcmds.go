@@ -721,6 +721,7 @@ func init() {
 	// The commands in this file are only usable with a wallet server.
 	flags := UFWalletOnly
 
+	MustRegisterCmd("addpayee", (*AddPayeeCmd)(nil), flags)
 	MustRegisterCmd("addmultisigaddress", (*AddMultisigAddressCmd)(nil), flags)
 	MustRegisterCmd("addwitnessaddress", (*AddWitnessAddressCmd)(nil), flags)
 	MustRegisterCmd("createmultisig", (*CreateMultisigCmd)(nil), flags)

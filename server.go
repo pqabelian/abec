@@ -611,7 +611,7 @@ func (sp *serverPeer) OnTxAbe(_ *peer.Peer, msg *wire.MsgTxAbe) {
 func (sp *serverPeer) OnBlockAbe(_ *peer.Peer, msg *wire.MsgBlockAbe, buf []byte) {
 	// Convert the raw MsgBlock to a btcutil.Block which provides some
 	// convenience methods and things such as hash caching.
-	block := abeutil.NewBlockFromBlockAndBytesAbe(msg, buf)
+	block := abeutil.NewBlockFromBlockAndBytesAbe(msg, buf) // TODO(abe): the height of block is unknow
 
 	// Add the block to the known inventory for the peer.
 	iv := wire.NewInvVect(wire.InvTypeBlock, block.Hash())
