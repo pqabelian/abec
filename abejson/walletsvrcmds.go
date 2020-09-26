@@ -570,11 +570,11 @@ func NewSendManyCmd(fromAccount string, amounts map[string]float64, minConf *int
 }
 
 type SendToPayeesCmd struct {
-	Amounts  map[string]int `jsonrpcusage:"{\"name\":amount,...}"` // In BTC
+	Amounts  map[string]float64 `jsonrpcusage:"{\"name\":amount,...}"` // In BTC
 	MinConf *int               `jsonrpcdefault:"1"`
 	Comment *string
 }
-func NewSendToPayeesCmd(amounts map[string]int, minconf *int, comment *string) *SendToPayeesCmd {
+func NewSendToPayeesCmd(amounts map[string]float64, minconf *int, comment *string) *SendToPayeesCmd {
 	return &SendToPayeesCmd{
 		Amounts:  amounts,
 		MinConf: minconf,

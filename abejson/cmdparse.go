@@ -526,8 +526,8 @@ func NewCmd(method string, args ...interface{}) (interface{}, error) {
 	// are enforced to be a pointer to a struct at registration time, it's
 	// safe to indirect to the struct now.
 	rvp := reflect.New(rtp.Elem())
-	rv := rvp.Elem()
-	rt := rtp.Elem()
+	rv := rvp.Elem()  //reflect value
+	rt := rtp.Elem()  //reflect type
 
 	// Loop through each of the struct fields and assign the associated
 	// parameter into them after checking its type validity.

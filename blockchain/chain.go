@@ -2112,6 +2112,7 @@ func (b *BlockChain) isCurrent() bool {
 	//
 	// The chain appears to be current if none of the checks reported
 	// otherwise.
+	//TODO(abe): if the node stop running more than one day, this check will be false
 	minus24Hours := b.timeSource.AdjustedTime().Add(-24 * time.Hour).Unix()
 	return b.bestChain.Tip().timestamp >= minus24Hours
 }
