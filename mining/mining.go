@@ -438,10 +438,6 @@ func createCoinbaseTxAbe(params *chaincfg.Params, extraNonce uint64, nextBlockHe
 	//
 	TotalSubsidies := blockchain.CalcBlockSubsidy(nextBlockHeight, params)
 	tx.TxFee=TotalSubsidies   // record the subsidied to add the tx fee in block
-	addressScript, err := txscript.PayToAddressScriptAbe(addr)
-	if err != nil {
-		return nil, err
-	}
 	// TODO(abe): for testing 1,2,5,10, we may use more than one outputs in  coinbase transaction
 	//  divide the value script in to differennt tx out
 	coinValues:=[]int64{500,200,100,50,20,10,5,2,1}
@@ -452,6 +448,10 @@ func createCoinbaseTxAbe(params *chaincfg.Params, extraNonce uint64, nextBlockHe
 		}
 		TotalSubsidies -=coinValues[i]* abeutil.NeutrinoPerAbe
 		txOut := wire.TxOutAbe{}
+		addressScript, err := txscript.PayToAddressScriptAbe(addr)
+		if err != nil {
+			return nil, err
+		}
 		txOut.AddressScript = addressScript
 		txOut.ValueScript=coinValues[i]* abeutil.NeutrinoPerAbe
 		tx.AddTxOut(&txOut)
@@ -459,6 +459,10 @@ func createCoinbaseTxAbe(params *chaincfg.Params, extraNonce uint64, nextBlockHe
 	//reserve 3 output for backward adjust
 	for i:=0;i<3;i++{
 		txOut := wire.TxOutAbe{}
+		addressScript, err := txscript.PayToAddressScriptAbe(addr)
+		if err != nil {
+			return nil, err
+		}
 		txOut.AddressScript = addressScript
 		txOut.ValueScript=0
 		tx.AddTxOut(&txOut)
