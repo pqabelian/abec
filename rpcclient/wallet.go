@@ -510,9 +510,9 @@ func (c *Client) SendToAddressAsync(address abeutil.Address, amount abeutil.Amou
 	return c.sendCmd(cmd)
 }
 func (c *Client) SendToPayeesAsync(payees []string, amount []abeutil.Amount,minconf *int,comment *string) FutureSendToPayeeResult {
-	amounts := make(map[string]int, len(payees))
+	amounts := make(map[string]float64, len(payees))
 	for i := 0; i < len(payees); i++ {
-		amounts[payees[i]]= int(amount[i])
+		amounts[payees[i]]= float64(amount[i])
 	}
 	cmd := abejson.NewSendToPayeesCmd(amounts, minconf, comment)
 	return c.sendCmd(cmd)
