@@ -58,8 +58,8 @@ type OutPointAbe struct {
 //	e.g. TransactionInput in chainsrvcmds.go and Vin in chainsrvresults.go
 //	for ABE, OutPointRingAbe is used in both chainsrvcmds.go and chainsrvresults.go
 type OutPointRing struct {
-	BlockHashs []string
-	OutPoints  []OutPointAbe
+	BlockHashs []string   `json:"blockhashs"`
+	OutPoints  []OutPointAbe `json:"outpoints"`
 }
 
 type TransactionInputAbe struct {
@@ -75,6 +75,7 @@ type CreateRawTransactionCmd struct {
 	LockTime *int64
 }
 
+//TODO(abe): the type of txfee may need to change to a pointer point to float64
 type CreateRawTransactionCmdAbe struct {
 	Inputs  []TransactionInputAbe
 	Outputs map[string]float64 `jsonrpcusage:"{\"address\":amount,...}"` // In Neutrino

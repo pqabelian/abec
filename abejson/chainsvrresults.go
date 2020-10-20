@@ -532,7 +532,7 @@ type Vin struct {
 
 type TxIn struct {
 	SerialNumber         string `json:"serialnumber"`
-	PreviousOutPointRing *OutPointRing
+	PreviousOutPointRing *OutPointRing `json:"prevutxoring"`
 }
 
 // IsCoinBase returns a bool to show if a Vin is a Coinbase one or not.
