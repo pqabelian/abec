@@ -645,7 +645,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 	}
 	return mtxHex, nil
 }
-
+// TODO(abe):this function will be design to use ring hash to generate a transaction
 func handleCreateRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.CreateRawTransactionCmdAbe)
 
@@ -3926,7 +3926,7 @@ func handleSendRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-chan
 	c := cmd.(*abejson.SendRawTransactionAbeCmd)
 	// Deserialize and send off to tx relay
 	hexStr := c.HexTx
-	if len(hexStr)%2 != 0 {
+	if len(hexStr)%2 != 0 { //why length of hexStr = 0 mod 2
 		hexStr = "0" + hexStr
 	}
 	serializedTx, err := hex.DecodeString(hexStr)
