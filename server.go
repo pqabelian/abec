@@ -2251,6 +2251,7 @@ func (s *server) peerHandler() {
 	}
 
 	// todo(ABE): why here is "go s.connManager.Start()" rathter than "s.connManager.Start()"
+	// osy: When the node is closed, need to handle the network source, if the conn manager also close, the source will be can not control
 	go s.connManager.Start() // connect manager depending the peeraddress
 
 out:

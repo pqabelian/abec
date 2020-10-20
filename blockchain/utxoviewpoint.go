@@ -553,7 +553,7 @@ func (view *UtxoViewpoint) fetchInputUtxos(db database.DB, block *abeutil.Block)
 	// Loop through all of the transaction inputs (except for the coinbase
 	// which has no inputs) collecting them into sets of what is needed and
 	// what is already known (in-flight).
-	neededSet := make(map[wire.OutPoint]struct{})
+	neededSet := make(map[wire.OutPoint]struct{}) // it is not in the same block
 	for i, tx := range transactions[1:] {
 		for _, txIn := range tx.MsgTx().TxIn {
 			// It is acceptable for a transaction input to reference
@@ -568,11 +568,11 @@ func (view *UtxoViewpoint) fetchInputUtxos(db database.DB, block *abeutil.Block)
 			// than the actual position of the transaction within
 			// the block due to skipping the coinbase.
 			originHash := &txIn.PreviousOutPoint.Hash
-			if inFlightIndex, ok := txInFlight[*originHash]; ok &&
+			if inFlightIndex, ok := txInFlight[*originHash]; ok &&    //spend the previous transaction in the same block
 				i >= inFlightIndex {
 
 				originTx := transactions[inFlightIndex]
-				view.AddTxOuts(originTx, block.Height())
+				view.AddTxOuts(originTx, block.Height())     // put all tx outputs into view point
 				continue
 			}
 

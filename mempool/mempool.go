@@ -205,7 +205,7 @@ type TxPool struct {
 	//	todo(ABE):	begin
 	poolAbe          map[chainhash.Hash]*TxDescAbe
 	orphansAbe       map[chainhash.Hash]*orphanTxAbe
-	outpointsAbe     map[chainhash.Hash]map[chainhash.Hash]*abeutil.TxAbe                    //	corresponding to btc's outpoints, using hash rather then TxIn as the key for map
+	outpointsAbe     map[chainhash.Hash]map[chainhash.Hash]*abeutil.TxAbe   //TODO(abe):why use two layers map                 //	corresponding to btc's outpoints, using hash rather then TxIn as the key for map
 	orphansByPrevAbe map[chainhash.Hash]map[chainhash.Hash]map[chainhash.Hash]*abeutil.TxAbe // corresponding to btc's orphansByPrev
 	//	todo(ABE):	end
 }
@@ -679,7 +679,7 @@ func (mp *TxPool) removeTransactionBTCD(tx *abeutil.Tx, removeRedeemers bool) {
 	}
 
 	// Remove the transaction if needed.
-	if txDesc, exists := mp.pool[*txHash]; exists {
+	if txDesc, exists := mp.pool[*txHash]; exists {   //this transaction exists in mem pool
 		// Remove unconfirmed address index entries associated with the
 		// transaction if enabled.
 		if mp.cfg.AddrIndex != nil {
@@ -687,7 +687,7 @@ func (mp *TxPool) removeTransactionBTCD(tx *abeutil.Tx, removeRedeemers bool) {
 		}
 
 		// Mark the referenced outpoints as unspent by the pool.
-		for _, txIn := range txDesc.Tx.MsgTx().TxIn {
+		for _, txIn := range txDesc.Tx.MsgTx().TxIn {   //update the outpoints
 			delete(mp.outpoints, txIn.PreviousOutPoint)
 		}
 		delete(mp.pool, *txHash)
@@ -2015,6 +2015,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 
 	// Verify crypto signatures for each input and reject the transaction if
 	// any don't verify.
+	//TODO(abe):design a validation progress
 	err = blockchain.ValidateTransactionScriptsAbe(tx, utxoRingView)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
@@ -2026,7 +2027,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	txD := mp.addTransactionAbe(utxoRingView, tx, bestHeight, txFee)
 
 	log.Debugf("Accepted transaction %v (pool size: %v)", txHash,
-		len(mp.pool))
+		len(mp.poolAbe))
 
 	return nil, txD, nil
 }
@@ -2076,7 +2077,7 @@ func (mp *TxPool) processOrphans(acceptedTx *abeutil.Tx) []*TxDesc {
 		processItem := firstElement.(*abeutil.Tx)
 
 		prevOut := wire.OutPoint{Hash: *processItem.Hash()}
-		for txOutIdx := range processItem.MsgTx().TxOut {
+		for txOutIdx := range processItem.MsgTx().TxOut {      // there are some transaction spend the output of this transaction
 			// Look up all orphans that redeem the output that is
 			// now available.  This will typically only be one, but
 			// it could be multiple if the orphan pool contains
@@ -2456,5 +2457,11 @@ func New(cfg *Config) *TxPool {
 		orphansByPrev:  make(map[wire.OutPoint]map[chainhash.Hash]*abeutil.Tx),
 		nextExpireScan: time.Now().Add(orphanExpireScanInterval),
 		outpoints:      make(map[wire.OutPoint]*abeutil.Tx),
+
+		poolAbe: make(map[chainhash.Hash]*TxDescAbe),
+		orphansAbe: make(map[chainhash.Hash]*orphanTxAbe),
+		outpointsAbe: make(map[chainhash.Hash]map[chainhash.Hash]*abeutil.TxAbe),
+		orphansByPrevAbe: make(map[chainhash.Hash]map[chainhash.Hash]map[chainhash.Hash]*abeutil.TxAbe),
+
 	}
 }

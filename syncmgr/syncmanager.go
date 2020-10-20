@@ -1778,9 +1778,9 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 		//	todo(ABE): mempool will not contain the transactions that double-spend those in mainchain.
 		for _, tx := range block.Transactions()[1:] {
 			sm.txMemPool.RemoveTransactionAbe(tx)
-			sm.txMemPool.RemoveDoubleSpendsAbe(tx)
+			sm.txMemPool.RemoveDoubleSpendsAbe(tx)   //remove the transactions that spend the same outpoint
 			sm.txMemPool.RemoveOrphanAbe(tx)
-			sm.peerNotifier.TransactionConfirmedAbe(tx)
+			sm.peerNotifier.TransactionConfirmedAbe(tx)  //the transaction is confirmed
 			sm.txMemPool.ProcessOrphansAbe(tx) //	remove the orphans that double-spend the txIns of tx
 			//sm.peerNotifier.AnnounceNewTransactions(acceptedTxs)
 			//todo(ABE): for ABE, sm does not need to sm.peerNotifier.AnnounceNewTransactions(acceptedTx),
