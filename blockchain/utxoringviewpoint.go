@@ -286,7 +286,7 @@ func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 	if isCoinBase {
 		entry.packedFlags |= tfCoinBase
 	}
-
+	entry.outPointRing= &wire.OutPointRing{}
 	err = entry.outPointRing.Deserialize(r)
 	if err != nil {
 		return err

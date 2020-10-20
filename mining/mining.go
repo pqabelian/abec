@@ -669,7 +669,7 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress abeutil.MasterAddress) 
 	// or not there is an area allocated for high-priority transactions.
 	sourceTxns := g.txSource.MiningDescsAbe()
 	sortedByFee := g.policy.BlockPrioritySize == 0
-	priorityQueue := newTxPriorityQueue(len(sourceTxns), sortedByFee)
+	priorityQueue := newTxPriorityQueueAbe(len(sourceTxns), sortedByFee)
 
 	// Create a slice to hold the transactions to be included in the
 	// generated block with reserved space.  Also create a utxo view to
@@ -890,7 +890,7 @@ mempoolLoop:
 				prioItem.priority, MinHighPriority)
 
 			sortedByFee = true
-			priorityQueue.SetLessFunc(txPQByFee)
+			priorityQueue.SetLessFunc(txPQByFeeAbe)
 
 			// Put the transaction back into the priority queue and
 			// skip it so it is re-priortized by fees if it won't

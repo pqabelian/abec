@@ -1037,7 +1037,7 @@ const (
 
 	TxInputMaxNum = 5
 
-	TxOutputMaxNum = 5
+	TxOutputMaxNum = 20
 
 	defaultTxInputAlloc = 3
 
@@ -2098,9 +2098,11 @@ func (msg *MsgTxAbe) SerializeSizeFull() int {
 	n := msg.SerializeSize()
 
 	//	Witness Details
-	n = n + msg.TxWitness.SerializeSize()
-
-	return n
+	if msg.TxWitness==nil{
+		return n
+	} else{
+		return  n + msg.TxWitness.SerializeSize()
+	}
 }
 
 //	for computing TxId by hash, and for being serialized in block
