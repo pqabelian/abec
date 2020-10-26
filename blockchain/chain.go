@@ -2369,7 +2369,7 @@ func (b *BlockChain) IntervalBlockHashes(endHash *chainhash.Hash, interval int,
 func (b *BlockChain) locateInventory(locator BlockLocator, hashStop *chainhash.Hash, maxEntries uint32) (*blockNode, uint32) {
 	// There are no block locators so a specific block is being requested
 	// as identified by the stop hash.
-	stopNode := b.index.LookupNode(hashStop)
+	stopNode := b.index.LookupNode(hashStop)    // from the hashStop node
 	if len(locator) == 0 {
 		if stopNode == nil {
 			// No blocks with the stop hash were found so there is
@@ -2382,11 +2382,11 @@ func (b *BlockChain) locateInventory(locator BlockLocator, hashStop *chainhash.H
 	// Find the most recent locator block hash in the main chain.  In the
 	// case none of the hashes in the locator are in the main chain, fall
 	// back to the genesis block.
-	startNode := b.bestChain.Genesis()
-	for _, hash := range locator {
+	startNode := b.bestChain.Genesis()  // default it is genesis block hash
+	for _, hash := range locator {  // the for loop will find a block node in the best chain
 		//	todo(ABE): if locator[0] does not have corresponging block in b.bestchain,
 		//	todo(ABE): it implies that the peer who sent locator has a fork that is different from b.
-		node := b.index.LookupNode(hash)
+		node := b.index.LookupNode(hash)     // hash in the locator  will be check whether it is at bestchain
 		if node != nil && b.bestChain.Contains(node) {
 			startNode = node
 			break
@@ -2396,8 +2396,8 @@ func (b *BlockChain) locateInventory(locator BlockLocator, hashStop *chainhash.H
 	// Start at the block after the most recently known block.  When there
 	// is no next block it means the most recently known block is the tip of
 	// the best chain, so there is nothing more to do.
-	startNode = b.bestChain.Next(startNode)
-	if startNode == nil {
+	startNode = b.bestChain.Next(startNode)     // next block node
+	if startNode == nil {          // if the start node is best block
 		return nil, 0
 	}
 

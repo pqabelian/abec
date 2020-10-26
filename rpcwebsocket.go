@@ -148,8 +148,8 @@ func queueHandler(in <-chan interface{}, out chan<- interface{}, quit <-chan str
 out:
 	for {
 		select {
-		case n, ok := <-in:
-			if !ok {
+		case n, ok := <-in: // take a notification
+			if !ok {       // it means that finished
 				// Sender closed input channel.
 				break out
 			}
@@ -160,7 +160,7 @@ out:
 			select {
 			case skipQueue <- n:
 			default:
-				q = append(q, n)
+				q = append(q, n)   // wait
 				dequeue = out
 				skipQueue = nil
 				next = q[0]

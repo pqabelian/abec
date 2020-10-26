@@ -875,7 +875,7 @@ func (p *Peer) PushGetBlocksMsg(locator blockchain.BlockLocator, stopHash *chain
 
 	// Construct the getblocks request and queue it to be sent.
 	msg := wire.NewMsgGetBlocks(stopHash)
-	for _, hash := range locator {
+	for _, hash := range locator {  // each hash in locator will be added into message
 		err := msg.AddBlockLocatorHash(hash)
 		if err != nil {
 			return err
@@ -1592,7 +1592,7 @@ func (p *Peer) queueHandler() {
 
 	// To avoid duplication below.
 	queuePacket := func(msg outMsg, list *list.List, waiting bool) bool {
-		if !waiting {
+		if !waiting {      // no waiting
 			p.sendQueue <- msg
 		} else {
 			list.PushBack(msg)
@@ -1640,7 +1640,7 @@ out:
 				}
 			}
 
-		case <-trickleTicker.C:
+		case <-trickleTicker.C:     // ten second
 			// Don't send anything if we're disconnecting or there
 			// is no queued inventory.
 			// version is known if send queue has any entries.
@@ -1663,7 +1663,7 @@ out:
 				}
 
 				invMsg.AddInvVect(iv)
-				if len(invMsg.InvList) >= maxInvTrickleSize {
+				if len(invMsg.InvList) >= maxInvTrickleSize {   // if the number of invVect no less than the max size
 					waiting = queuePacket(
 						outMsg{msg: invMsg},
 						pendingMsgs, waiting)
@@ -1674,7 +1674,7 @@ out:
 				// the known inventory for the peer.
 				p.AddKnownInventory(iv)
 			}
-			if len(invMsg.InvList) > 0 {
+			if len(invMsg.InvList) > 0 {     // if the number of invVect more than the max size
 				waiting = queuePacket(outMsg{msg: invMsg},
 					pendingMsgs, waiting)
 			}
@@ -1806,7 +1806,7 @@ cleanup:
 
 // pingHandler periodically pings the peer.  It must be run as a goroutine.
 func (p *Peer) pingHandler() {
-	pingTicker := time.NewTicker(pingInterval)
+	pingTicker := time.NewTicker(pingInterval)    // 2 minute
 	defer pingTicker.Stop()
 
 out:
