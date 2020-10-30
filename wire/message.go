@@ -262,11 +262,13 @@ func WriteMessage(w io.Writer, msg Message, pver uint32, btcnet AbelianNet) erro
 // messages.
 func WriteMessageWithEncodingN(w io.Writer, msg Message, pver uint32,
 	btcnet AbelianNet, encoding MessageEncoding) (int, error) {
-
-	switch msg.(type) {
-	case *MsgBlockAbe:
-		fmt.Println("sending a message to peer")
-	}
+	//
+	//switch msg.(type) {
+	//case *MsgBlockAbe:
+	//	fmt.Println("sending a block message to peer")
+	//case *MsgTxAbe:
+	//	fmt.Println("sending a tx message to peer")
+	//}
 	totalBytes := 0
 
 	// Enforce max command size.

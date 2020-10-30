@@ -875,7 +875,7 @@ func (p *Peer) PushGetBlocksMsg(locator blockchain.BlockLocator, stopHash *chain
 
 	// Construct the getblocks request and queue it to be sent.
 	msg := wire.NewMsgGetBlocks(stopHash)
-	for _, hash := range locator {  // each hash in locator will be added into message
+	for _, hash := range locator { // each hash in locator will be added into message
 		err := msg.AddBlockLocatorHash(hash)
 		if err != nil {
 			return err
@@ -1017,6 +1017,9 @@ func (p *Peer) handlePongMsg(msg *wire.MsgPong) {
 func (p *Peer) readMessage(encoding wire.MessageEncoding) (wire.Message, []byte, error) {
 	n, msg, buf, err := wire.ReadMessageWithEncodingN(p.conn,
 		p.ProtocolVersion(), p.cfg.ChainParams.Net, encoding)
+	//if msg != nil {
+	//	fmt.Printf("receive a %s from peer:%v\n", msg.Command(), p.addr)
+	//}
 	atomic.AddUint64(&p.bytesReceived, uint64(n))
 	if p.cfg.Listeners.OnRead != nil {
 		//fmt.Printf("read msg type = %T\n",msg)
@@ -1083,6 +1086,24 @@ func (p *Peer) writeMessage(msg wire.Message, enc wire.MessageEncoding) error {
 	// Write the message to the peer.
 	n, err := wire.WriteMessageWithEncodingN(p.conn, msg,
 		p.ProtocolVersion(), p.cfg.ChainParams.Net, enc)
+	//fmt.Printf("send a %s to peer:%v\n", msg.Command(), p.addr)
+	//switch msg.(type) {
+	//case *wire.MsgInv:
+	//	inv := msg.(*wire.MsgInv)
+	//	for i := 0; i < len(inv.InvList); i++ {
+	//		if inv.InvList[i].Type == wire.InvTypeWitnessTx ||
+	//			inv.InvList[i].Type == wire.InvTypeTx {
+	//			fmt.Printf("inv message is transaction :%v\n ", inv.InvList[i].Hash)
+	//		}
+	//	}
+	//case *wire.MsgTxAbe:
+	//	txAbe:=msg.(*wire.MsgTxAbe)
+	//	fmt.Printf("send a transaction abe %v to peer %s",txAbe.TxHash(),p.addr)
+	//case *wire.MsgTx:
+	//	txAbe:=msg.(*wire.MsgTx)
+	//	fmt.Printf("send a transaction %v to peer %s",txAbe.TxHash(),p.addr)
+	//}
+
 	atomic.AddUint64(&p.bytesSent, uint64(n))
 	if p.cfg.Listeners.OnWrite != nil {
 		//fmt.Printf("msg type = %T\n", msg)
@@ -1592,7 +1613,7 @@ func (p *Peer) queueHandler() {
 
 	// To avoid duplication below.
 	queuePacket := func(msg outMsg, list *list.List, waiting bool) bool {
-		if !waiting {      // no waiting
+		if !waiting { // no waiting
 			p.sendQueue <- msg
 		} else {
 			list.PushBack(msg)
@@ -1640,7 +1661,7 @@ out:
 				}
 			}
 
-		case <-trickleTicker.C:     // ten second
+		case <-trickleTicker.C: // ten second
 			// Don't send anything if we're disconnecting or there
 			// is no queued inventory.
 			// version is known if send queue has any entries.
@@ -1663,7 +1684,7 @@ out:
 				}
 
 				invMsg.AddInvVect(iv)
-				if len(invMsg.InvList) >= maxInvTrickleSize {   // if the number of invVect no less than the max size
+				if len(invMsg.InvList) >= maxInvTrickleSize { // if the number of invVect no less than the max size
 					waiting = queuePacket(
 						outMsg{msg: invMsg},
 						pendingMsgs, waiting)
@@ -1674,7 +1695,7 @@ out:
 				// the known inventory for the peer.
 				p.AddKnownInventory(iv)
 			}
-			if len(invMsg.InvList) > 0 {     // if the number of invVect more than the max size
+			if len(invMsg.InvList) > 0 { // if the number of invVect more than the max size
 				waiting = queuePacket(outMsg{msg: invMsg},
 					pendingMsgs, waiting)
 			}
@@ -1806,7 +1827,7 @@ cleanup:
 
 // pingHandler periodically pings the peer.  It must be run as a goroutine.
 func (p *Peer) pingHandler() {
-	pingTicker := time.NewTicker(pingInterval)    // 2 minute
+	pingTicker := time.NewTicker(pingInterval) // 2 minute
 	defer pingTicker.Stop()
 
 out:

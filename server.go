@@ -1859,7 +1859,7 @@ func (s *server) handleBanPeerMsg(state *peerState, sp *serverPeer) {
 func (s *server) handleRelayInvMsg(state *peerState, msg relayMsg) {
 	state.forAllPeers(func(sp *serverPeer) {
 		if !sp.Connected() {
-			return
+			return      // Why the message can not pass there?
 		}
 
 		// If the inventory is a block and the peer prefers headers,
@@ -1889,10 +1889,10 @@ func (s *server) handleRelayInvMsg(state *peerState, msg relayMsg) {
 				return
 			}
 
-			txD, ok := msg.data.(*mempool.TxDesc)
+			txD, ok := msg.data.(*mempool.TxDescAbe)  //the type must right
 			if !ok {
 				peerLog.Warnf("Underlying data for tx inv "+
-					"relay is not a *mempool.TxDesc: %T",
+					"relay is not a *mempool.TxDescAbe: %T",
 					msg.data)
 				return
 			}
@@ -2334,6 +2334,10 @@ func (s *server) BanPeer(sp *serverPeer) {
 // RelayInventory relays the passed inventory vector to all connected peers
 // that are not already known to have it.
 func (s *server) RelayInventory(invVect *wire.InvVect, data interface{}) {
+	//if invVect.Type==wire.InvTypeTx || invVect.Type==wire.InvTypeWitnessTx{
+	//	fmt.Printf("relay a transaction with hash : %v\n",invVect.Hash)
+	//	fmt.Printf("And the value is : %v\n",data)
+	//}
 	s.relayInv <- relayMsg{invVect: invVect, data: data}
 }
 
