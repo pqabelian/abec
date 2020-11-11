@@ -188,7 +188,7 @@ func (msg *MsgBlockAbe) Deserialize(r io.Reader) error {
 	msg.Transactions = make([]*MsgTxAbe, 0, txCount)
 	for i := uint64(0); i < txCount; i++ {
 		tx := MsgTxAbe{}
-		err := tx.Deserialize(r)
+		err := tx.DeserializeFull(r)
 		if err != nil {
 			return err
 		}
@@ -435,7 +435,7 @@ func (msg *MsgBlockAbe) SerializeSize() int {
 	n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
 
 	for _, tx := range msg.Transactions {
-		n += tx.SerializeSize() // to do, may remove the serializeType
+		n += tx.SerializeSizeFull() // to do, may remove the serializeType
 	}
 
 	return n
