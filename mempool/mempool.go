@@ -2016,8 +2016,6 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	// Verify crypto signatures for each input and reject the transaction if
 	// any don't verify.
 	//TODO(abe):design a validation progress
-	// 暂时跳过之前的测试数据
-
 	if tx.HasWitness() { // we do not know the witness
 		err = blockchain.ValidateTransactionScriptsAbe(tx, utxoRingView)
 		if err != nil {
@@ -2027,7 +2025,6 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 			return nil, nil, err
 		}
 	}
-	
 	txD := mp.addTransactionAbe(utxoRingView, tx, bestHeight, txFee)
 
 	log.Debugf("Accepted transaction %v (pool size: %v)", txHash,

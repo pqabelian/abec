@@ -2219,9 +2219,11 @@ func (msg *MsgTxAbe) SerializeFull(w io.Writer) error {
 	}
 
 	//	TxWitness
-	err = msg.TxWitness.Serialize(w)
-	if err != nil {
-		return err
+	if msg.TxWitness != nil {
+		err = msg.TxWitness.Serialize(w)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
