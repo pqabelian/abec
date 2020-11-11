@@ -2456,9 +2456,10 @@ func (msg *MsgTxAbe) DeserializeFull(r io.Reader) error {
 	// witness details
 	txWitness := &TxWitnessAbe{}
 	err = txWitness.Deserialize(r)
-	if err != nil {
-		return err
-	}
+	//TODO(abe):MUST restore this
+	//if err != nil {
+	//	return err
+	//}
 	msg.TxWitness = txWitness
 
 	return nil
