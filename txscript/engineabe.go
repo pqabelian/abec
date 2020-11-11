@@ -23,18 +23,18 @@ const (
 
 // EngineAbe is the virtual machine that verify the signature of the transaction.
 type EngineAbe struct {
-	txHash          *chainhash.Hash
-	msgTx           *wire.MsgTxAbe
-	txInIndex       int
-	txOutIndex      int
-	txConsumed      []*wire.TxOutAbe
-	flags           TypeFlags
+	txHash     *chainhash.Hash
+	msgTx      *wire.MsgTxAbe
+	txInIndex  int
+	txOutIndex int
+	txConsumed []*wire.TxOutAbe
+	flags      TypeFlags
 }
 
 // Execute verify the signature of the transaction.
 func (vm *EngineAbe) Execute() (err error) {
 
-	if vm.flags & ItemInput == ItemInput {
+	if vm.flags&ItemInput == ItemInput {
 		// Get message hash.
 		txMsgHash := vm.txHash
 		// Find correspondent signature. Will be changed in the future.
@@ -52,7 +52,7 @@ func (vm *EngineAbe) Execute() (err error) {
 
 		// Form public key ring.
 		derivedPubKey := make([]abesalrs.DerivedPubKey, 0, len(txConsumed))
-		for i := 0 ; i < len(txConsumed) ; i++{
+		for i := 0; i < len(txConsumed); i++ {
 			dpk, err := abesalrs.DeseralizeDerivedPubKey(txConsumed[i].AddressScript)
 			if err != nil {
 				return fmt.Errorf("error occurs when deserializing addressScript %v", err)
@@ -60,8 +60,8 @@ func (vm *EngineAbe) Execute() (err error) {
 			derivedPubKey = append(derivedPubKey, *dpk)
 		}
 		dpkRing := &abesalrs.DpkRing{
-			Dpks:      derivedPubKey,
-			R:         len(txConsumed),
+			Dpks: derivedPubKey,
+			R:    len(txConsumed),
 		}
 
 		// Verify signature.
@@ -72,12 +72,12 @@ func (vm *EngineAbe) Execute() (err error) {
 	}
 
 	// todo
-	if vm.flags & ItemOutput == ItemOutput {
+	if vm.flags&ItemOutput == ItemOutput {
 		return nil
 	}
 
 	// todo
-	if vm.flags & ItemBalance == ItemBalance {
+	if vm.flags&ItemBalance == ItemBalance {
 		return nil
 	}
 

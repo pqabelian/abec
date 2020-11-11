@@ -37,7 +37,7 @@ const (
 	// value is halved every SubsidyHalvingInterval blocks.
 	//baseSubsidy = 512 * abeutil.NeutrinoPerAbe       //TODO(osy):this value should be 400 to uniform
 	//baseSubsidy = 400 * abeutil.NeutrinoPerAbe      //TODO(abe): for testing 1,2,5,10, we adjust the subsidy from 400 to 512
-	baseSubsidy = 512 * abeutil.NeutrinoPerAbe      //TODO(abe): for testing 1,2,5,10, we adjust the subsidy from 400 to 512
+	baseSubsidy = 512 * abeutil.NeutrinoPerAbe //TODO(abe): for testing 1,2,5,10, we adjust the subsidy from 400 to 512
 )
 
 var (
@@ -1235,7 +1235,7 @@ func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blo
 				}
 			}*/
 
-		coinbaseTx := block.Transactions()[0]  // TODO(abe): for testing 1,2,5,10, we should adjust the checking logical
+		coinbaseTx := block.Transactions()[0] // TODO(abe): for testing 1,2,5,10, we should adjust the checking logical
 		err := checkSerializedHeightAbe(coinbaseTx, blockHeight)
 		if err != nil {
 			return err
@@ -1925,7 +1925,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// errors here because those error conditions would have already been
 	// caught by checkTransactionSanity.
 	var totalNeutrinoOut int64
-	for _, txOut := range transactions[0].MsgTx().TxOuts {  // the coinbase transaction may have more than one outputs
+	for _, txOut := range transactions[0].MsgTx().TxOuts { // the coinbase transaction may have more than one outputs
 		totalNeutrinoOut += txOut.ValueScript
 	}
 	expectedNeutrinoOut := CalcBlockSubsidy(node.height, b.chainParams) + totalFees
@@ -1950,7 +1950,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 
 	// Blocks created after the BIP0016 activation time need to have the
 	// pay-to-script-hash checks enabled.
-	var scriptFlags txscript.ScriptFlags
+	//var scriptFlags txscript.ScriptFlags
 	/*	if enforceBIP0016 {
 		scriptFlags |= txscript.ScriptBip16
 	}*/
@@ -2019,10 +2019,12 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// expensive ECDSA signature check scripts.  Doing this last helps
 	// prevent CPU exhaustion attacks.
 	if runScripts {
-		err := checkBlockScriptsAbe(block, view, scriptFlags, b.sigCache, b.hashCache)
+		//TODO(MUST):delete it
+		err := checkBlockScriptsAbe(block, view)
 		if err != nil {
 			return err
 		}
+
 	}
 
 	// Update the best hash for view to include this block since all of its

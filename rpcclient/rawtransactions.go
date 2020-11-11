@@ -391,8 +391,11 @@ func (c *Client) SendRawTransactionAbeAsync(tx *wire.MsgTxAbe, allowHighFees boo
 	txHex := ""
 	if tx != nil {
 		// Serialize the transaction and convert to hex string.
-		buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
-		if err := tx.Serialize(buf); err != nil {
+		//buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+		buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSizeFull()))
+		// TODO(abe): in this function, the transaction is firstly occur, so it must provide the witness
+		//  for this reason, we change the Serialize() to SerializeFull()
+		if err := tx.SerializeFull(buf); err != nil {
 			return newFutureError(err)
 		}
 		txHex = hex.EncodeToString(buf.Bytes())

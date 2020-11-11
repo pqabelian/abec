@@ -410,9 +410,15 @@ func (msg *MsgBlockAbe) Serialize(w io.Writer) error {
 	if err != nil {
 		return err
 	}
+	// TODO(abe): when transfer the block to others, whether transfer the witnesses?
+	//   In one hand, the transaction may have be transferred before being packaged into block, so does the witness
+	//   In other hand, the transaction should not be transfer more than one time.
+	//   But the question is, how can we know whether the peer have transactions or witnesses?
 
+	// TODO(abe): at this moment, we transfer the transaction with witnesses all time.
 	for _, tx := range msg.Transactions {
-		err = tx.Serialize(w)
+		//err = tx.Serialize(w)
+		err = tx.SerializeFull(w)
 		if err != nil {
 			return err
 		}
