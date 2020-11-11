@@ -1684,7 +1684,7 @@ func (txWitness TxWitnessAbe) Serialize(w io.Writer) error {
 	return nil
 }
 
-func (txWitness TxWitnessAbe) Deserialize(r io.Reader) error {
+func (txWitness *TxWitnessAbe) Deserialize(r io.Reader) error {
 	witnessNum, err := ReadVarInt(r, 0)
 	if err != nil {
 		return err
