@@ -214,7 +214,8 @@ out:
 			}
 
 			// Create a new engine for validation.
-			vm, err := txscript.NewEngineAbe(txVI.tx.Hash(), txVI.tx.MsgTx(), txVI.txInIndex, -1, utxoRing, txscript.ItemInput)
+			txConsumed := utxoRing.TxOuts()
+			vm, err := txscript.NewEngineAbe(txVI.tx.Hash(), txVI.tx.MsgTx(), txVI.txInIndex, -1, txConsumed, txscript.ItemInput)
 			if err != nil {
 				str := fmt.Sprintf("failed to parse input "+
 					"%s:%d which references output %v - "+

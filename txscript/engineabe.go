@@ -2,10 +2,9 @@ package txscript
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/blockchain"
+	"github.com/abesuite/abec/abecrypto/abesalrs"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
-	"github.com/abesuite/abec/abecrypto/abesalrs"
 )
 
 // TypeFlags is a bitmask defining which type of item should engine verify.
@@ -28,7 +27,7 @@ type EngineAbe struct {
 	msgTx           *wire.MsgTxAbe
 	txInIndex       int
 	txOutIndex      int
-	utxoRing        *blockchain.UtxoRingEntry
+	txConsumed      []*wire.TxOutAbe
 	flags           TypeFlags
 }
 
@@ -41,7 +40,7 @@ func (vm *EngineAbe) Execute() (err error) {
 		// Find correspondent signature. Will be changed in the future.
 		signature := vm.msgTx.TxWitness.Witnesses[vm.txInIndex]
 		// Collect all the outputs in the ring, which can be used to form derived public key ring later.
-		txConsumed := vm.utxoRing.TxOuts()
+		txConsumed := vm.txConsumed
 
 		// Convert message hash to bytes.
 		msg := txMsgHash.CloneBytes()
@@ -87,9 +86,9 @@ func (vm *EngineAbe) Execute() (err error) {
 
 // NewEngineAbe returns a new script engine for the transaction hash,
 // signature and transaction ring consumed
-func NewEngineAbe(txHash *chainhash.Hash, msgTx *wire.MsgTxAbe, txInIndex int, txOutIndex int, utxoRing *blockchain.UtxoRingEntry, flags TypeFlags) (*EngineAbe, error) {
+func NewEngineAbe(txHash *chainhash.Hash, msgTx *wire.MsgTxAbe, txInIndex int, txOutIndex int, txConsumed []*wire.TxOutAbe, flags TypeFlags) (*EngineAbe, error) {
 
-	vm := EngineAbe{txHash: txHash, msgTx: msgTx, txInIndex: txInIndex, txOutIndex: txOutIndex, utxoRing: utxoRing, flags: flags}
+	vm := EngineAbe{txHash: txHash, msgTx: msgTx, txInIndex: txInIndex, txOutIndex: txOutIndex, txConsumed: txConsumed, flags: flags}
 
 	return &vm, nil
 }
