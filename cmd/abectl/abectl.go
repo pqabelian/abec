@@ -1,14 +1,15 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/abesuite/abec/abejson"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -78,14 +79,17 @@ func main() {
 	// too large for the Operating System to allow as a normal command line
 	// parameter, support using '-' as an argument to allow the argument
 	// to be read from a stdin pipe.
-	bio := bufio.NewReader(os.Stdin)
+	//bio := bufio.NewReader(os.Stdin)
 	params := make([]interface{}, 0, len(args[1:]))
+	num:=1
 	for _, arg := range args[1:] {
 		if arg == "-" {
-			param, err := bio.ReadString('\n')
+			filePath := filepath.Join(abecHomeDir, "arg"+strconv.Itoa(num))
+			param,err := ioutil.ReadFile(filePath)
+			//param, err := bio.ReadString('\n')
 			if err != nil && err != io.EOF {
 				fmt.Fprintf(os.Stderr, "Failed to read data "+
-					"from stdin: %v\n", err)
+					"from file %v: %v\n",filePath, err)
 				os.Exit(1)
 			}
 			if err == io.EOF && len(param) == 0 {
@@ -93,8 +97,8 @@ func main() {
 					"provided on stdin")
 				os.Exit(1)
 			}
-			param = strings.TrimRight(param, "\r\n")
-			params = append(params, param)
+			//param = strings.TrimRight(param, "\r\n")
+			params = append(params, string(param))
 			continue
 		}
 

@@ -22,13 +22,13 @@ const (
 )
 
 var (
-	btcdHomeDir           = abeutil.AppDataDir("abec", false)
-	btcctlHomeDir         = abeutil.AppDataDir("abectl", false)
-	btcwalletHomeDir      = abeutil.AppDataDir("abewallet", false)
-	defaultConfigFile     = filepath.Join(btcctlHomeDir, "abectl.conf")
+	abecHomeDir           = abeutil.AppDataDir("abec", false)
+	abectlHomeDir         = abeutil.AppDataDir("abectl", false)
+	abewalletHomeDir      = abeutil.AppDataDir("abewallet", false)
+	defaultConfigFile     = filepath.Join(abectlHomeDir, "abectl.conf")
 	defaultRPCServer      = "localhost"
-	defaultRPCCertFile    = filepath.Join(btcdHomeDir, "rpc.cert")
-	defaultWalletCertFile = filepath.Join(btcwalletHomeDir, "rpc.cert")
+	defaultRPCCertFile    = filepath.Join(abecHomeDir, "rpc.cert")
+	defaultWalletCertFile = filepath.Join(abewalletHomeDir, "rpc.cert")
 )
 
 // listCommands categorizes and lists all of the usable commands along with
@@ -151,7 +151,7 @@ func normalizeAddress(addr string, chain *chaincfg.Params, useWallet bool) (stri
 func cleanAndExpandPath(path string) string {
 	// Expand initial ~ to OS specific home directory.
 	if strings.HasPrefix(path, "~") {
-		homeDir := filepath.Dir(btcctlHomeDir)
+		homeDir := filepath.Dir(abectlHomeDir)
 		path = strings.Replace(path, "~", homeDir, 1)
 	}
 
@@ -219,9 +219,9 @@ func loadConfig() (*config, []string, error) {
 		// Use config file for RPC server to create default btcctl config
 		var serverConfigPath string
 		if preCfg.Wallet {
-			serverConfigPath = filepath.Join(btcwalletHomeDir, "abewallet.conf")
+			serverConfigPath = filepath.Join(abewalletHomeDir, "abewallet.conf")
 		} else {
-			serverConfigPath = filepath.Join(btcdHomeDir, "abec.conf")
+			serverConfigPath = filepath.Join(abecHomeDir, "abec.conf")
 		}
 
 		err := createDefaultConfigFile(preCfg.ConfigFile, serverConfigPath)
