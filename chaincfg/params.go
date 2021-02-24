@@ -246,7 +246,7 @@ var MainNetParams = Params{
 	BIP0065Height:            388381, // 000000000000000004c2b624ed5d7756c508d90fd0da2c7c679febfa6c4735f0
 	BIP0066Height:            363725, // 00000000000000000379eaa19dce8c9b722d46ae6a57c2f1a988119488b50931
 	//CoinbaseMaturity:         100,  //TODO(abe):for testing, this value will be set to 20
-	CoinbaseMaturity:         20,
+	CoinbaseMaturity:         6,
 	SubsidyReductionInterval: 210000,
 	TargetTimespan:           time.Hour * 24 * 14, // 14 days TODO(abe):this value may be need changed
 	TargetTimePerBlock:       time.Minute * 3,    // 10 minutes TODO(abe): this value may be need changed, now temporary to be 3 min
