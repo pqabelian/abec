@@ -997,7 +997,7 @@ func dbFetchUtxoEntry(dbTx database.Tx, outpoint wire.OutPoint) (*UtxoEntry, err
 func dbFetchUtxoRingEntry(dbTx database.Tx, outPointRingHash chainhash.Hash) (*UtxoRingEntry, error) {
 	// Fetch the unspent transaction output information for the passed
 	// transaction output.  Return now when there is no entry.
-	key := outPointRingKey(outPointRingHash)
+ 	key := outPointRingKey(outPointRingHash)
 	utxoRingBucket := dbTx.Metadata().Bucket(utxoRingSetBucketName)
 	serializedUtxoRing := utxoRingBucket.Get(*key)
 	recycleOutPointRingKey(key)

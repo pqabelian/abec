@@ -294,6 +294,7 @@ func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 
 	if !isCoinBase {
 		//	ring size
+		// TODO(abe): the ring size coule be than 4? 20210225
 		ringSize, err := wire.ReadVarInt(r, 0)
 		if err != nil {
 			return err
@@ -338,9 +339,10 @@ func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 			return errUtxoRingDeserialize("The UtxoRingEntry to be deserlized has a size of consumed serialNumbers that exceeds the ring size")
 		}
 
+
 		entry.serialNumbers = make([]*chainhash.Hash, consumedNum)
 		//	serialNumbers
-		for i := uint64(0); i < ringSize; i++ {
+		for i := uint64(0); i < consumedNum; i++ {
 			serialNumber := chainhash.Hash{}
 			_, err := io.ReadFull(r, serialNumber[:])
 			if err != nil {
