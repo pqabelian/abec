@@ -22,8 +22,9 @@ var (
 	// have for the main network.  It is the value 2^224 - 1.
 	//mainPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 224), bigOne)
 	// TODO(abe): this pow limit need to changed according the difficult
-	mainPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 227), bigOne)
-
+	//mainPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 227), bigOne)
+	// TODO(abe):for testing something, the expected time have been adjusted to 3 minutes
+	mainPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 233), bigOne)
 	// regressionPowLimit is the highest proof of work value a Bitcoin block
 	// can have for the regression test network.  It is the value 2^255 - 1.
 	regressionPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 255), bigOne)
@@ -240,7 +241,7 @@ var MainNetParams = Params{
 	GenesisBlock:             &genesisBlock,
 	GenesisHash:              &genesisHash,
 	PowLimit:                 mainPowLimit,
-	PowLimitBits:             0x1d07ffff,
+	PowLimitBits:             0x1e01ffff,//0x207fffff,
 	//PowLimitBits:             0x1d00ffff,
 	BIP0034Height:            227931, // 000000000000024b89b42a942fe0d9fea3bb44ab7bd1b19115dd6a759c0808b8 //TODO(abe):these values need to evicted
 	BIP0065Height:            388381, // 000000000000000004c2b624ed5d7756c508d90fd0da2c7c679febfa6c4735f0
