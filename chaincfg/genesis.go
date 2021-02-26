@@ -112,7 +112,7 @@ var genesisBlock = wire.MsgBlockAbe{
 		PrevBlock:  chainhash.Hash{},
 		MerkleRoot: genesisMerkleRoot,
 		Timestamp:  time.Unix(0x6038f247, 0),
-		Bits:       0x1e01ffff, // simNet difficulty
+		Bits:       0x1e01ffff,
 		Nonce:      0x10ab387,
 	},
 	Transactions: []*wire.MsgTxAbe{&genesisCoinbaseTx},
