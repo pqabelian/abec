@@ -97,7 +97,7 @@ func NewAmountAbe(f float64) (Amount, error) {
 		return 0, errors.New("invalid ABE amount")
 	}
 
-	return round(f * NeutrinoPerAbe), nil
+	return round(f), nil
 }
 
 // ToUnit converts a monetary amount counted in bitcoin base units to a
