@@ -2026,6 +2026,15 @@ func (c *Client) WalletPassphrase(passphrase string, timeoutSecs int64) error {
 	return err
 }
 
+// Freshen unlocks the wallet by using the passphrase to derive the
+// decryption key which is then stored in memory for the specified timeout
+// (in seconds).
+func (c *Client) Freshen(passphrase string) error {
+	cmd := abejson.Freshen(passphrase)
+	_, err := c.sendCmdAndWait(cmd)
+	return err
+}
+
 // FutureWalletPassphraseChangeResult is a future promise to deliver the result
 // of a WalletPassphraseChangeAsync RPC invocation (or an applicable error).
 type FutureWalletPassphraseChangeResult chan *response

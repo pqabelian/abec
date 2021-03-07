@@ -571,7 +571,7 @@ func NewSendManyCmd(fromAccount string, amounts map[string]float64, minConf *int
 
 type SendToPayeesCmd struct {
 	Amounts  map[string]float64 `jsonrpcusage:"{\"name\":amount,...}"` // In BTC
-	MinConf *int               `jsonrpcdefault:"1"`
+	MinConf *int               `jsonrpcdefault:"1"` //TODO(abe) what is the minconf used for?
 	Comment *string
 }
 func NewSendToPayeesCmd(amounts map[string]float64, minconf *int, comment *string) *SendToPayeesCmd {
@@ -702,6 +702,19 @@ func NewWalletPassphraseCmd(passphrase string, timeout int64) *WalletPassphraseC
 	}
 }
 
+// FreshenCmd defines the walletpassphrase JSON-RPC command.
+type FreshenCmd struct {
+	Passphrase string
+}
+
+// Freshen returns a new instance which can be used to issue a
+// walletpassphrase JSON-RPC command.
+func Freshen(passphrase string) *FreshenCmd {
+	return &FreshenCmd{
+		Passphrase: passphrase,
+	}
+}
+
 // WalletPassphraseChangeCmd defines the walletpassphrase JSON-RPC command.
 type WalletPassphraseChangeCmd struct {
 	OldPassphrase string
@@ -765,5 +778,6 @@ func init() {
 	MustRegisterCmd("signrawtransaction", (*SignRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("walletlock", (*WalletLockCmd)(nil), flags)
 	MustRegisterCmd("walletpassphrase", (*WalletPassphraseCmd)(nil), flags)
+	MustRegisterCmd("refresh", (*FreshenCmd)(nil), flags)
 	MustRegisterCmd("walletpassphrasechange", (*WalletPassphraseChangeCmd)(nil), flags)
 }
