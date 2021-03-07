@@ -202,6 +202,7 @@ func CheckDerivedPubKeyAttribute(dpk *DerivedPubKey,mpk *MasterPubKey,msvk *Mast
 func Sign(msg []byte, dpkRing *DpkRing, dpk *DerivedPubKey, mpk *MasterPubKey, msvk *MasterSecretViewKey, mssk *MasterSecretSignKey) (sig *Signature, err error) {
 	dpkRingSalrs:=new(salrs.DpkRing)
 	dpkRingSalrs.R=dpkRing.R
+	dpkRingSalrs.Dpk=make([]salrs.DerivedPubKey,dpkRing.R)
 	for i:=0;i<dpkRing.R;i++{
 		dpkRingSalrs.Dpk=append(dpkRingSalrs.Dpk,*dpkRing.Dpks[i].toSALRS())
 	}
@@ -214,6 +215,7 @@ func Sign(msg []byte, dpkRing *DpkRing, dpk *DerivedPubKey, mpk *MasterPubKey, m
 func Verify(msg []byte, dpkRing *DpkRing,sig *Signature)(*KeyImage,bool,error){
 	dpkRingSalrs:=new(salrs.DpkRing)
 	dpkRingSalrs.R=dpkRing.R
+	dpkRingSalrs.Dpk=make([]salrs.DerivedPubKey,dpkRing.R)
 	for i:=0;i<dpkRing.R;i++{
 		dpkRingSalrs.Dpk=append(dpkRingSalrs.Dpk,*dpkRing.Dpks[i].toSALRS())
 	}
@@ -223,11 +225,13 @@ func Verify(msg []byte, dpkRing *DpkRing,sig *Signature)(*KeyImage,bool,error){
 func Check(msg1 []byte, dpkRing1 *DpkRing, sig1 *Signature, msg2 []byte, dpkRing2 *DpkRing, sig2 *Signature) (bool,error){
 	dpkRingSalrs1:=new(salrs.DpkRing)
 	dpkRingSalrs1.R=dpkRing1.R
+	dpkRingSalrs1.Dpk=make([]salrs.DerivedPubKey,dpkRing1.R)
 	for i:=0;i<dpkRing1.R;i++{
 		dpkRingSalrs1.Dpk=append(dpkRingSalrs1.Dpk,*dpkRing1.Dpks[i].toSALRS())
 	}
 	dpkRingSalrs2:=new(salrs.DpkRing)
 	dpkRingSalrs2.R=dpkRing2.R
+	dpkRingSalrs2.Dpk=make([]salrs.DerivedPubKey,dpkRing2.R)
 	for i:=0;i<dpkRing2.R;i++{
 		dpkRingSalrs2.Dpk=append(dpkRingSalrs2.Dpk,*dpkRing2.Dpks[i].toSALRS())
 	}
