@@ -778,6 +778,6 @@ func init() {
 	MustRegisterCmd("signrawtransaction", (*SignRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("walletlock", (*WalletLockCmd)(nil), flags)
 	MustRegisterCmd("walletpassphrase", (*WalletPassphraseCmd)(nil), flags)
-	MustRegisterCmd("refresh", (*FreshenCmd)(nil), flags)
+	MustRegisterCmd("freshen", (*FreshenCmd)(nil), flags)
 	MustRegisterCmd("walletpassphrasechange", (*WalletPassphraseChangeCmd)(nil), flags)
 }
