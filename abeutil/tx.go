@@ -158,9 +158,9 @@ func NewTxFromBytes(serializedTx []byte) (*Tx, error) {
 	return NewTxFromReader(br)
 }
 
-func NewTxAbeFromBytes(serializedTx []byte) (*Tx, error) {
+func NewTxAbeFromBytes(serializedTx []byte) (*TxAbe, error) {
 	br := bytes.NewReader(serializedTx)
-	return NewTxFromReader(br)
+	return NewTxAbeFromReader(br)
 }
 
 // NewTxFromReader returns a new instance of a bitcoin transaction given a

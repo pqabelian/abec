@@ -2162,6 +2162,10 @@ func (msg *MsgTxAbe) Serialize(w io.Writer) error {
 		if err != nil {
 			return err
 		}*/
+	err = writeTxWitnessAbe(w, 0, msg.Version, msg.TxWitness)
+	if err != nil {
+		return err
+	}
 
 	return nil
 
@@ -2371,7 +2375,12 @@ func (msg *MsgTxAbe) Deserialize(r io.Reader) error {
 			return err
 		}
 		msg.txWitness = txWitness*/
-
+	txWitness := TxWitnessAbe{}
+	err = readTxWitnessAbe(r, 0, msg.Version, &txWitness)
+	if err != nil {
+		return err
+	}
+	msg.TxWitness = &txWitness
 	return nil
 }
 
