@@ -3830,7 +3830,7 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 		return nil, rpcDecodeHexError(hexStr)
 	}
 	var msgTx wire.MsgTxAbe
-	err = msgTx.Deserialize(bytes.NewReader(serializedTx))
+	err = msgTx.DeserializeFull(bytes.NewReader(serializedTx))
 	if err != nil {
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCDeserialization,
@@ -3934,7 +3934,7 @@ func handleSendRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-chan
 		return nil, rpcDecodeHexError(hexStr)
 	}
 	var msgTx wire.MsgTxAbe
-	err = msgTx.Deserialize(bytes.NewReader(serializedTx))
+	err = msgTx.DeserializeFull(bytes.NewReader(serializedTx))
 	if err != nil {
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCDeserialization,

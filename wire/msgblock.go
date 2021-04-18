@@ -188,7 +188,7 @@ func (msg *MsgBlockAbe) Deserialize(r io.Reader) error {
 	msg.Transactions = make([]*MsgTxAbe, 0, txCount)
 	for i := uint64(0); i < txCount; i++ {
 		tx := MsgTxAbe{}
-		err := tx.Deserialize(r)
+		err := tx.DeserializeFull(r)
 		if err != nil {
 			return err
 		}
@@ -410,9 +410,15 @@ func (msg *MsgBlockAbe) Serialize(w io.Writer) error {
 	if err != nil {
 		return err
 	}
+	// TODO(abe): when transfer the block to others, whether transfer the witnesses?
+	//   In one hand, the transaction may have be transferred before being packaged into block, so does the witness
+	//   In other hand, the transaction should not be transfer more than one time.
+	//   But the question is, how can we know whether the peer have transactions or witnesses?
 
+	// TODO(abe): at this moment, we transfer the transaction with witnesses all time.
 	for _, tx := range msg.Transactions {
-		err = tx.Serialize(w)
+		//err = tx.Serialize(w)
+		err = tx.SerializeFull(w)
 		if err != nil {
 			return err
 		}
@@ -429,7 +435,7 @@ func (msg *MsgBlockAbe) SerializeSize() int {
 	n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
 
 	for _, tx := range msg.Transactions {
-		n += tx.SerializeSize() // to do, may remove the serializeType
+		n += tx.SerializeSizeFull() // to do, may remove the serializeType
 	}
 
 	return n

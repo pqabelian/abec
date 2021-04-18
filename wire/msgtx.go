@@ -1684,7 +1684,7 @@ func (txWitness TxWitnessAbe) Serialize(w io.Writer) error {
 	return nil
 }
 
-func (txWitness TxWitnessAbe) Deserialize(r io.Reader) error {
+func (txWitness *TxWitnessAbe) Deserialize(r io.Reader) error {
 	witnessNum, err := ReadVarInt(r, 0)
 	if err != nil {
 		return err
@@ -2098,10 +2098,10 @@ func (msg *MsgTxAbe) SerializeSizeFull() int {
 	n := msg.SerializeSize()
 
 	//	Witness Details
-	if msg.TxWitness==nil{
+	if msg.TxWitness == nil {
 		return n
-	} else{
-		return  n + msg.TxWitness.SerializeSize()
+	} else {
+		return n + msg.TxWitness.SerializeSize()
 	}
 }
 
@@ -2223,9 +2223,11 @@ func (msg *MsgTxAbe) SerializeFull(w io.Writer) error {
 	}
 
 	//	TxWitness
-	err = msg.TxWitness.Serialize(w)
-	if err != nil {
-		return err
+	if msg.TxWitness != nil {
+		err = msg.TxWitness.Serialize(w)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -2381,6 +2383,94 @@ func (msg *MsgTxAbe) Deserialize(r io.Reader) error {
 		return err
 	}
 	msg.TxWitness = &txWitness
+	return nil
+}
+func (msg *MsgTxAbe) DeserializeFull(r io.Reader) error {
+	//	Version
+	version, err := binarySerializer.Uint32(r, littleEndian)
+	if err != nil {
+		return err
+	}
+	msg.Version = int32(version)
+
+	//	inputs
+	inputNum, err := ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	if inputNum > TxInputMaxNum {
+		str := fmt.Sprintf("the number of inputs (%d) exceeds the allowed max number %d", inputNum, TxInputMaxNum)
+		return messageError("MsgTx.Deserialize", str)
+	}
+	msg.TxIns = make([]*TxInAbe, inputNum)
+	for i := uint64(0); i < inputNum; i++ {
+		txIn := TxInAbe{}
+		err = txIn.Deserialize(r)
+		if err != nil {
+			return err
+		}
+		msg.TxIns[i] = &txIn
+	}
+
+	/*	//	outputs: Txo Hash
+		outputNum, err := ReadVarInt(r, 0)
+		if err != nil {
+			return err
+		}
+		if outputNum > TxOutputMaxNum {
+			str := fmt.Sprintf("the number of outputs (%d) exceeds the allowed max number %d", outputNum,	TxOutputMaxNum)
+			return messageError("MsgTx.Deserialize", str)
+		}
+		msg.TxOutHashs = make([]*chainhash.Hash, outputNum)
+		for i := uint64(0); i < outputNum; i++ {
+			txoHash := chainhash.Hash{}
+			_, err = io.ReadFull(r, txoHash[:])
+			if err != nil {
+				return err
+			}
+			msg.TxOutHashs[i] = &txoHash
+		}
+
+		//	witness hash
+		_, err = io.ReadFull(r, msg.txWitnessHash[:])
+		if err != nil {
+			return err
+		}*/
+
+	txoNum, err := ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	if txoNum > TxOutputMaxNum {
+		str := fmt.Sprintf("the number of outputs (%d) exceeds the allowed max number %d", inputNum, TxOutputMaxNum)
+		return messageError("MsgTx.Deserialize", str)
+	}
+	msg.TxOuts = make([]*TxOutAbe, txoNum)
+	for i := uint64(0); i < txoNum; i++ {
+		txOut := TxOutAbe{}
+		err = txOut.Deserialize(r)
+		if err != nil {
+			return err
+		}
+		msg.TxOuts[i] = &txOut
+	}
+
+	//	TxFee
+	txFee, err := ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	msg.TxFee = int64(txFee)
+
+	// witness details
+	txWitness := &TxWitnessAbe{}
+	err = txWitness.Deserialize(r)
+	//TODO(abe):MUST restore this
+	//if err != nil {
+	//	return err
+	//}
+	msg.TxWitness = txWitness
+
 	return nil
 }
 
