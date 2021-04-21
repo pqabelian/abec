@@ -361,6 +361,7 @@ func (v *txValidatorInput) Validate(items []*txValidateItemInput) error {
 	// Start up validation handlers that are used to asynchronously
 	// validate each transaction input.
 	for i := 0; i < maxGoRoutines; i++ {
+		// TODO(abe): do use the lock and sync, maybe there are some wrong logic if possible?
 		go v.validateHandler()
 	}
 
@@ -466,6 +467,7 @@ func (v *txValidatorBalance) Validate(items []*abeutil.TxAbe) error {
 	// Limit the number of goroutines to do script validation based on the
 	// number of processor cores.  This helps ensure the system stays
 	// reasonably responsive under heavy load.
+	// TODO(abe): this parameter is too large?
 	maxGoRoutines := runtime.NumCPU() * 3
 	if maxGoRoutines <= 0 {
 		maxGoRoutines = 1

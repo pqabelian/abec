@@ -36,14 +36,16 @@ func (vm *EngineAbe) Execute() (err error) {
 
 	if vm.flags&ItemInput == ItemInput {
 		// Get message hash.
-		txMsgHash := vm.txHash
+		//txMsgHash := vm.txHash
 		// Find correspondent signature. Will be changed in the future.
 		signature := vm.msgTx.TxWitness.Witnesses[vm.txInIndex]
 		// Collect all the outputs in the ring, which can be used to form derived public key ring later.
 		txConsumed := vm.txConsumed
 
 		// Convert message hash to bytes.
-		msg := txMsgHash.CloneBytes()
+		// TODO(abe): what is the message of signature?
+		//msg := txMsgHash.CloneBytes()
+		msg :=[]byte("this is a test")
 		// Deserialize signature
 		sig, err := abesalrs.DeserializeSignature(signature)
 		if err != nil {
@@ -53,11 +55,12 @@ func (vm *EngineAbe) Execute() (err error) {
 		// Form public key ring.
 		derivedPubKey := make([]abesalrs.DerivedPubKey, 0, len(txConsumed))
 		for i := 0; i < len(txConsumed); i++ {
-			dpk, err := abesalrs.DeseralizeDerivedPubKey(txConsumed[i].AddressScript)
+			derivedAddress, err := ExtractAddressFromScriptAbe(txConsumed[i].AddressScript)
+			//dpk, err := abesalrs.DeseralizeDerivedPubKey(txConsumed[i].AddressScript)
 			if err != nil {
 				return fmt.Errorf("error occurs when deserializing addressScript %v", err)
 			}
-			derivedPubKey = append(derivedPubKey, *dpk)
+			derivedPubKey = append(derivedPubKey, *derivedAddress.DerivedPubKey())
 		}
 		dpkRing := &abesalrs.DpkRing{
 			Dpks: derivedPubKey,
