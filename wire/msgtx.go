@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/abesuite/abec/abecrypto/abepqringct"
 	"github.com/abesuite/abec/abecrypto/abesalrs"
 	"io"
 	"strconv"
@@ -1065,6 +1066,9 @@ type TxOutAbe struct {
 	//ValueScript   []byte
 	ValueScript   int64
 	AddressScript []byte
+
+	Version   uint16
+	TxoScript []byte
 }
 
 // SerializeSize returns the number of bytes it would take to serialize the
@@ -1072,7 +1076,8 @@ type TxOutAbe struct {
 func (txOut *TxOutAbe) SerializeSize() int {
 	// Value 8 bytes + serialized varint size for the length of AddressScript + AddressScript bytes.
 	//return VarIntSerializeSize(uint64(len(txOut.ValueScript))) + len(txOut.ValueScript) + VarIntSerializeSize(uint64(len(txOut.AddressScript))) + len(txOut.AddressScript)
-	return 8 + VarIntSerializeSize(uint64(len(txOut.AddressScript))) + len(txOut.AddressScript)
+	//return 8 + VarIntSerializeSize(uint64(len(txOut.AddressScript))) + len(txOut.AddressScript)
+	return 2 + abepqringct.CryptoPP.GetTxoByteLen()
 }
 
 func (txOut *TxOutAbe) Serialize(w io.Writer) error {
