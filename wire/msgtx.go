@@ -1061,11 +1061,12 @@ const (
 	TxPayloadMinSize = 100
 )
 
+// TxOutAbe /* As TxOut may be fetched without the corresponding Tx, a version field is used.
 type TxOutAbe struct {
 	//	Version 		int16	//	the version could be used in ABE protocol update
 	//ValueScript   []byte
-	ValueScript   int64
-	AddressScript []byte
+	//	ValueScript   int64
+	//	AddressScript []byte
 
 	Version   uint16
 	TxoScript []byte
@@ -1077,7 +1078,7 @@ func (txOut *TxOutAbe) SerializeSize() int {
 	// Value 8 bytes + serialized varint size for the length of AddressScript + AddressScript bytes.
 	//return VarIntSerializeSize(uint64(len(txOut.ValueScript))) + len(txOut.ValueScript) + VarIntSerializeSize(uint64(len(txOut.AddressScript))) + len(txOut.AddressScript)
 	//return 8 + VarIntSerializeSize(uint64(len(txOut.AddressScript))) + len(txOut.AddressScript)
-	return 2 + abepqringct.CryptoPP.GetTxoByteLen()
+	return 2 + VarIntSerializeSize(uint64(len(txOut.TxoScript))) + len(txOut.TxoScript)
 }
 
 func (txOut *TxOutAbe) Serialize(w io.Writer) error {
@@ -1086,12 +1087,12 @@ func (txOut *TxOutAbe) Serialize(w io.Writer) error {
 			return err
 		}*/
 
-	err := binarySerializer.PutUint64(w, littleEndian, uint64(txOut.ValueScript))
+	err := binarySerializer.PutUint16(w, littleEndian, txOut.Version)
 	if err != nil {
 		return err
 	}
 
-	err = WriteVarBytes(w, 0, txOut.AddressScript)
+	err = WriteVarBytes(w, 0, txOut.TxoScript)
 	if err != nil {
 		return err
 	}
@@ -1106,16 +1107,16 @@ func (txOut *TxOutAbe) Deserialize(r io.Reader) error {
 		}
 		txOut.ValueScript = valueScript*/
 
-	err := readElement(r, &txOut.ValueScript)
+	err := readElement(r, &txOut.Version)
 	if err != nil {
 		return err
 	}
 
-	addressScript, err := ReadVarBytes(r, 0, AddressScriptMaxLen, "AddressScript")
+	addressScript, err := ReadVarBytes(r, 0, abepqringct.GetTxoScriptMaxLen(txOut.Version), "TxoScript")
 	if err != nil {
 		return err
 	}
-	txOut.AddressScript = addressScript
+	txOut.TxoScript = addressScript
 
 	return nil
 }
@@ -1130,10 +1131,10 @@ func (txOut *TxOutAbe) Deserialize(r io.Reader) error {
 
 // NewTxOut returns a new bitcoin transaction output with the provided
 // transaction value and public key script.
-func NewTxOutAbe(valueScript int64, addressScript []byte) *TxOutAbe {
+func NewTxOutAbe(version uint16, txoScript []byte) *TxOutAbe {
 	return &TxOutAbe{
-		ValueScript:   valueScript,
-		AddressScript: addressScript,
+		Version:   version,
+		TxoScript: txoScript,
 	}
 }
 
@@ -1351,7 +1352,8 @@ func NewOutPointRing(blockHashs []*chainhash.Hash, outPoints []*OutPointAbe) *Ou
 //	SerialNumber appears only when some ring member is consumed in TxIn,
 //	i.e. logically, SerialNumber accompanies with TxIn.
 type TxInAbe struct {
-	SerialNumber chainhash.Hash
+	Version      uint16
+	SerialNumber []byte
 	//	identify the consumed OutPoint
 	PreviousOutPointRing OutPointRing
 }
@@ -1359,9 +1361,10 @@ type TxInAbe struct {
 // NewTxIn returns a new bitcoin transaction input with the provided
 // previous outpoint point and signature script with a default sequence of
 // MaxTxInSequenceNum.
-func NewTxInAbe(serialNumber *chainhash.Hash, previousOutPointRing *OutPointRing) *TxInAbe {
+func NewTxInAbe(version uint16, serialNumber []byte, previousOutPointRing *OutPointRing) *TxInAbe {
 	return &TxInAbe{
-		SerialNumber:         *serialNumber,
+		Version:              version,
+		SerialNumber:         serialNumber,
 		PreviousOutPointRing: *previousOutPointRing,
 	}
 }
@@ -1383,12 +1386,13 @@ func (txIn *TxInAbe) String() string {
 	// digits, which will fit any uint32.
 	// TxHash:index; TxHash:index; ...; serialNumber
 	//	index is at most 2 decimal digits; at this moment, only 1 decimal digits
-	strLen := (2*chainhash.HashSize + 1) + len(txIn.PreviousOutPointRing.BlockHashs)*(2*chainhash.HashSize+1) + len(txIn.PreviousOutPointRing.OutPoints)*(2*chainhash.HashSize+1+2+1)
+
+	strLen := (2*abepqringct.GetTxoSerialNumberLen(txIn.Version) + 1) + len(txIn.PreviousOutPointRing.BlockHashs)*(2*chainhash.HashSize+1) + len(txIn.PreviousOutPointRing.OutPoints)*(2*chainhash.HashSize+1+2+1)
 
 	buf := make([]byte, strLen)
 
 	start := 0
-	start = start + copy(buf[start:], txIn.SerialNumber.String())
+	start = start + copy(buf[start:], txIn.SerialNumber)
 	buf[start] = '.'
 	start = start + 1
 
@@ -1451,11 +1455,16 @@ func (txIn *TxInAbe) RingMemberHash() chainhash.Hash {
 
 func (txIn *TxInAbe) SerializeSize() int {
 	// chainhash.HashSize for SerialNumber
-	return chainhash.HashSize + txIn.PreviousOutPointRing.SerializeSize()
+	return 2 + abepqringct.GetTxoSerialNumberLen(txIn.Version) + txIn.PreviousOutPointRing.SerializeSize()
 }
 
 func (txIn *TxInAbe) Serialize(w io.Writer) error {
-	_, err := w.Write(txIn.SerialNumber[:])
+	err := binarySerializer.PutUint16(w, littleEndian, txIn.Version)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(txIn.SerialNumber[:])
 	if err != nil {
 		return err
 	}
@@ -1469,7 +1478,13 @@ func (txIn *TxInAbe) Serialize(w io.Writer) error {
 }
 
 func (txIn *TxInAbe) Deserialize(r io.Reader) error {
-	_, err := io.ReadFull(r, txIn.SerialNumber[:])
+	err := readElement(r, &txIn.Version)
+	if err != nil {
+		return err
+	}
+
+	txIn.SerialNumber = make([]byte, abepqringct.GetTxoSerialNumberLen(txIn.Version))
+	_, err = io.ReadFull(r, txIn.SerialNumber[:])
 	if err != nil {
 		return err
 	}
@@ -1482,10 +1497,15 @@ func (txIn *TxInAbe) Deserialize(r io.Reader) error {
 	return nil
 }
 
-// writeTxIn encodes ti to the bitcoin protocol encoding for a transaction
+// writeTxIn encodes txIn to the bitcoin protocol encoding for a transaction
 // input (TxIn) to w.
-func writeTxInAbe(w io.Writer, pver uint32, version int32, txIn *TxInAbe) error {
-	_, err := w.Write(txIn.SerialNumber[:])
+func writeTxInAbe(w io.Writer, pver uint32, version uint16, txIn *TxInAbe) error {
+	err := binarySerializer.PutUint16(w, littleEndian, txIn.Version)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(txIn.SerialNumber[:])
 	if err != nil {
 		return err
 	}
@@ -1518,7 +1538,13 @@ func writeTxInAbe(w io.Writer, pver uint32, version int32, txIn *TxInAbe) error 
 
 // readTxIn reads the next sequence of bytes from r as a transaction input
 // (TxIn).
-func readTxInAbe(r io.Reader, pver uint32, version int32, txIn *TxInAbe) error {
+func readTxInAbe(r io.Reader, pver uint32, version uint16, txIn *TxInAbe) error {
+	err := readElement(r, txIn.Version)
+	if err != nil {
+		return err
+	}
+
+	txIn.SerialNumber = make([]byte, abepqringct.GetTxoSerialNumberLen(txIn.Version))
 	_, errSn := io.ReadFull(r, txIn.SerialNumber[:])
 	if errSn != nil {
 		return errSn
@@ -1567,18 +1593,18 @@ func readTxInAbe(r io.Reader, pver uint32, version int32, txIn *TxInAbe) error {
 
 // writeTxOut encodes ti to the bitcoin protocol encoding for a transaction
 // input (TxIn) to w.
-func writeTxOutAbe(w io.Writer, pver uint32, version int32, txOut *TxOutAbe) error {
+func writeTxOutAbe(w io.Writer, pver uint32, version uint16, txOut *TxOutAbe) error {
 	/*	err := WriteVarBytes(w, pver, txOut.ValueScript)
 		if err != nil {
 			return err
 		}*/
 
-	err := binarySerializer.PutUint64(w, littleEndian, uint64(txOut.ValueScript))
+	err := binarySerializer.PutUint16(w, littleEndian, txOut.Version)
 	if err != nil {
 		return err
 	}
 
-	err = WriteVarBytes(w, pver, txOut.AddressScript)
+	err = WriteVarBytes(w, pver, txOut.TxoScript)
 	if err != nil {
 		return err
 	}
@@ -1588,22 +1614,22 @@ func writeTxOutAbe(w io.Writer, pver uint32, version int32, txOut *TxOutAbe) err
 
 // readTxOut reads the next sequence of bytes from r as a transaction input
 // (TxIn).
-func readTxOutAbe(r io.Reader, pver uint32, version int32, txOut *TxOutAbe) error {
-	err := readElement(r, &txOut.ValueScript)
+func readTxOutAbe(r io.Reader, pver uint32, version uint16, txOut *TxOutAbe) error {
+	err := readElement(r, txOut.Version)
 	if err != nil {
 		return err
 	}
 
-	addressScript, err := ReadVarBytes(r, pver, AddressScriptMaxLen, "AddressScript")
+	txoScript, err := ReadVarBytes(r, pver, abepqringct.GetTxoScriptMaxLen(txOut.Version), "TxoScript")
 	if err != nil {
 		return err
 	}
-	txOut.AddressScript = addressScript
+	txOut.TxoScript = txoScript
 
 	return nil
 }
 
-func writeTxWitnessAbe(w io.Writer, pver uint32, version int32, txWitness *TxWitnessAbe) error {
+func writeTxWitnessAbe(w io.Writer, pver uint32, version uint16, txWitness *TxWitnessAbe) error {
 	if txWitness == nil {
 		err := WriteVarInt(w, pver, uint64(0))
 		if err != nil {
@@ -1625,7 +1651,7 @@ func writeTxWitnessAbe(w io.Writer, pver uint32, version int32, txWitness *TxWit
 
 // readTxOut reads the next sequence of bytes from r as a transaction input
 // (TxIn).
-func readTxWitnessAbe(r io.Reader, pver uint32, version int32, txWitness *TxWitnessAbe) error {
+func readTxWitnessAbe(r io.Reader, pver uint32, version uint16, txWitness *TxWitnessAbe) error {
 	witItemNum, err := ReadVarInt(r, pver)
 	if err != nil {
 		return err
@@ -1735,13 +1761,17 @@ func (txWitness *TxWitnessAbe) Deserialize(r io.Reader) error {
 //	todo: For coinbase transaction, there is an additional function that returns the bytes in [blockhashs[2]] and later OutPoints
 
 type MsgTxAbe struct {
-	Version int32
+	Version uint16
 	TxIns   []*TxInAbe
 	//	TxOutHashs []*chainhash.Hash
 	TxOuts []*TxOutAbe
 	//	txWitnessHash chainhash.Hash
-	TxFee     int64
-	TxWitness *TxWitnessAbe // Each Tx has one witness, consisting all necessary information, for example, signatures for inputs, range proofs for outputs, balance between inputs and outputs
+	TxFee uint64
+
+	TxMemo []byte
+
+	//TxWitness *TxWitnessAbe // Each Tx has one witness, consisting all necessary information, for example, signatures for inputs, range proofs for outputs, balance between inputs and outputs
+	TxWitness []byte
 }
 
 // AddTxIn adds a transaction input to the message.
@@ -1763,7 +1793,7 @@ func (msg *MsgTxAbe) SetWitness(txWitness *TxWitnessAbe) {
 
 // HasWitness returns false if none of the inputs within the transaction
 // contain witness data, true false otherwise.
-func (msg *MsgTxAbe) HasWitness() bool {
+/*func (msg *MsgTxAbe) HasWitness() bool {
 	if msg.TxWitness == nil {
 		return false
 	}
@@ -1778,6 +1808,17 @@ func (msg *MsgTxAbe) HasWitness() bool {
 	}
 
 	return false
+}*/
+
+func (msg *MsgTxAbe) HasWitness() bool {
+	if len(msg.TxWitness) == 0 {
+		return false
+	}
+	if msg.TxWitness == nil {
+		return false
+	}
+
+	return true
 }
 
 // HasWitness returns false if none of the inputs within the transaction
@@ -1791,7 +1832,7 @@ func (msg *MsgTxAbe) IsCoinBase() bool {
 	// Whatever ths ring members for the TxIns[0]
 	// the ring members' (TXHash, index) can be used as coin-nonce
 	txIn := msg.TxIns[0]
-	if txIn.SerialNumber != chainhash.ZeroHash {
+	if bytes.Compare(txIn.SerialNumber, abepqringct.GetNullSerialNumber(txIn.Version)) != 0 {
 		return false
 	}
 
@@ -1861,8 +1902,19 @@ func (msg *MsgTxAbe) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) er
 		return err
 	}
 
+	//	TxMemo
+	err = WriteVarBytes(w, 0, msg.TxMemo)
+	if err != nil {
+		return err
+	}
+
 	// witness details
-	err = writeTxWitnessAbe(w, 0, msg.Version, msg.TxWitness)
+	/*	err = writeTxWitnessAbe(w, 0, msg.Version, msg.TxWitness)
+		if err != nil {
+			return err
+		}*/
+
+	err = WriteVarBytes(w, 0, msg.TxWitness)
 	if err != nil {
 		return err
 	}
@@ -1875,11 +1927,11 @@ func (msg *MsgTxAbe) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) er
 // See Deserialize for decoding transactions stored to disk, such as in a
 // database, as opposed to decoding transactions from the wire.
 func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
-	version, err := binarySerializer.Uint32(r, littleEndian)
+	version, err := binarySerializer.Uint16(r, littleEndian)
 	if err != nil {
 		return err
 	}
-	msg.Version = int32(version)
+	msg.Version = version
 
 	//	TxIns
 	txInNum, err := ReadVarInt(r, pver)
@@ -1950,15 +2002,29 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 	if err != nil {
 		return err
 	}
-	msg.TxFee = int64(txFee)
+	msg.TxFee = txFee
 
-	//	witness details
-	txWitness := TxWitnessAbe{}
-	err = readTxWitnessAbe(r, pver, msg.Version, &txWitness)
+	//	TxMemo
+	txMemo, err := ReadVarBytes(r, pver, abepqringct.GetTxMemoMaxLen(msg.Version), "TxMemo")
 	if err != nil {
 		return err
 	}
-	msg.TxWitness = &txWitness
+	msg.TxMemo = txMemo
+
+	//	witness details
+	/*	txWitness := TxWitnessAbe{}
+		err = readTxWitnessAbe(r, pver, msg.Version, &txWitness)
+		if err != nil {
+			return err
+		}
+		msg.TxWitness = &txWitness*/
+
+	//	TxWitness
+	txWitness, err := ReadVarBytes(r, pver, abepqringct.GetTxWitnessMaxLen(msg.Version), "TxWitness")
+	if err != nil {
+		return err
+	}
+	msg.TxWitness = txWitness
 
 	return nil
 }
@@ -2015,8 +2081,8 @@ func (msg *MsgTxAbe) TxHashFull() chainhash.Hash {
 // difference and separating the two allows the API to be flexible enough to
 // deal with changes.
 func (msg *MsgTxAbe) SerializeSize() int {
-	//	Version 4 bytes
-	n := 4
+	//	Version 2 bytes
+	n := 2
 
 	//	Inputs
 	//	serialized varint size for input
@@ -2060,6 +2126,9 @@ func (msg *MsgTxAbe) SerializeSize() int {
 	//	TxFee
 	n = n + VarIntSerializeSize(uint64(msg.TxFee))
 
+	//	TxMemo
+	n = n + VarIntSerializeSize(uint64(len(msg.TxMemo))) + len(msg.TxMemo)
+
 	return n
 }
 
@@ -2102,18 +2171,23 @@ func (msg *MsgTxAbe) SerializeSizeFull() int {
 
 	n := msg.SerializeSize()
 
-	//	Witness Details
-	if msg.TxWitness == nil {
-		return n
-	} else {
-		return n + msg.TxWitness.SerializeSize()
-	}
+	/*	//	Witness Details
+		if msg.TxWitness == nil {
+			return n
+		} else {
+			return n + msg.TxWitness.SerializeSize()
+		}*/
+
+	//	TxWitness
+	n = n + VarIntSerializeSize(uint64(len(msg.TxWitness))) + len(msg.TxWitness)
+
+	return n
 }
 
 //	for computing TxId by hash, and for being serialized in block
 func (msg *MsgTxAbe) Serialize(w io.Writer) error {
 	//	version
-	err := binarySerializer.PutUint32(w, littleEndian, uint32(msg.Version))
+	err := binarySerializer.PutUint16(w, littleEndian, msg.Version)
 	if err != nil {
 		return err
 	}
@@ -2157,7 +2231,13 @@ func (msg *MsgTxAbe) Serialize(w io.Writer) error {
 	}
 
 	//	TxFee
-	err = WriteVarInt(w, 0, uint64(msg.TxFee))
+	err = WriteVarInt(w, 0, msg.TxFee)
+	if err != nil {
+		return err
+	}
+
+	//	TxMemo
+	err = WriteVarBytes(w, 0, msg.TxMemo)
 	if err != nil {
 		return err
 	}
@@ -2167,10 +2247,18 @@ func (msg *MsgTxAbe) Serialize(w io.Writer) error {
 		if err != nil {
 			return err
 		}*/
-	err = writeTxWitnessAbe(w, 0, msg.Version, msg.TxWitness)
-	if err != nil {
-		return err
-	}
+	/*	err = writeTxWitnessAbe(w, 0, msg.Version, msg.TxWitness)
+		if err != nil {
+			return err
+		}
+	*/
+
+	/*	//	TxWitness
+		//	just write a length 0
+		err = WriteVarInt(w, 0, 0)
+		if err != nil {
+			return err
+		}*/
 
 	return nil
 
@@ -2178,7 +2266,7 @@ func (msg *MsgTxAbe) Serialize(w io.Writer) error {
 
 func (msg *MsgTxAbe) SerializeFull(w io.Writer) error {
 	//	version
-	err := binarySerializer.PutUint32(w, littleEndian, uint32(msg.Version))
+	err := binarySerializer.PutUint16(w, littleEndian, msg.Version)
 	if err != nil {
 		return err
 	}
@@ -2227,12 +2315,24 @@ func (msg *MsgTxAbe) SerializeFull(w io.Writer) error {
 		return err
 	}
 
+	//	TxMemo
+	err = WriteVarBytes(w, 0, msg.TxMemo)
+	if err != nil {
+		return err
+	}
+
 	//	TxWitness
-	if msg.TxWitness != nil {
+	/*	if msg.TxWitness != nil {
 		err = msg.TxWitness.Serialize(w)
 		if err != nil {
 			return err
 		}
+	}*/
+
+	//	TxWitness
+	err = WriteVarBytes(w, 0, msg.TxWitness)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -2300,11 +2400,11 @@ func (msg *MsgTxAbe) SerializeWitness(w io.Writer) error {
 // deal with changes.
 func (msg *MsgTxAbe) Deserialize(r io.Reader) error {
 	//	Version
-	version, err := binarySerializer.Uint32(r, littleEndian)
+	version, err := binarySerializer.Uint16(r, littleEndian)
 	if err != nil {
 		return err
 	}
-	msg.Version = int32(version)
+	msg.Version = version
 
 	//	inputs
 	inputNum, err := ReadVarInt(r, 0)
@@ -2373,7 +2473,14 @@ func (msg *MsgTxAbe) Deserialize(r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	msg.TxFee = int64(txFee)
+	msg.TxFee = txFee
+
+	//	TxMemo
+	txMemo, err := ReadVarBytes(r, 0, abepqringct.GetTxMemoMaxLen(msg.Version), "TxMemo")
+	if err != nil {
+		return err
+	}
+	msg.TxMemo = txMemo
 
 	/*	// witness details
 		txWitness := TxWitnessAbe{}
@@ -2382,21 +2489,23 @@ func (msg *MsgTxAbe) Deserialize(r io.Reader) error {
 			return err
 		}
 		msg.txWitness = txWitness*/
-	txWitness := TxWitnessAbe{}
-	err = readTxWitnessAbe(r, 0, msg.Version, &txWitness)
-	if err != nil {
-		return err
-	}
-	msg.TxWitness = &txWitness
+	/*	txWitness := TxWitnessAbe{}
+		err = readTxWitnessAbe(r, 0, msg.Version, &txWitness)
+		if err != nil {
+			return err
+		}
+		msg.TxWitness = &txWitness*/
+
 	return nil
 }
+
 func (msg *MsgTxAbe) DeserializeFull(r io.Reader) error {
 	//	Version
-	version, err := binarySerializer.Uint32(r, littleEndian)
+	version, err := binarySerializer.Uint16(r, littleEndian)
 	if err != nil {
 		return err
 	}
-	msg.Version = int32(version)
+	msg.Version = version
 
 	//	inputs
 	inputNum, err := ReadVarInt(r, 0)
@@ -2465,15 +2574,29 @@ func (msg *MsgTxAbe) DeserializeFull(r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	msg.TxFee = int64(txFee)
+	msg.TxFee = txFee
 
-	// witness details
-	txWitness := &TxWitnessAbe{}
-	err = txWitness.Deserialize(r)
-	//TODO(abe):MUST restore this
-	//if err != nil {
-	//	return err
-	//}
+	//	TxMemo
+	txMemo, err := ReadVarBytes(r, 0, abepqringct.GetTxMemoMaxLen(msg.Version), "TxMemo")
+	if err != nil {
+		return err
+	}
+	msg.TxMemo = txMemo
+
+	/*	// witness details
+		txWitness := &TxWitnessAbe{}
+		err = txWitness.Deserialize(r)
+		//TODO(abe):MUST restore this
+		//if err != nil {
+		//	return err
+		//}
+		msg.TxWitness = txWitness*/
+
+	//	TxWitness
+	txWitness, err := ReadVarBytes(r, 0, abepqringct.GetTxWitnessMaxLen(msg.Version), "TxWitness")
+	if err != nil {
+		return err
+	}
 	msg.TxWitness = txWitness
 
 	return nil
@@ -2484,7 +2607,7 @@ func (msg *MsgTxAbe) DeserializeFull(r io.Reader) error {
 // are no transaction inputs or outputs.  Also, the lock time is set to zero
 // to indicate the transaction is valid immediately as opposed to some time in
 // future.
-func NewMsgTxAbe(version int32) *MsgTxAbe {
+func NewMsgTxAbe(version uint16) *MsgTxAbe {
 	return &MsgTxAbe{
 		Version: version,
 		TxIns:   make([]*TxInAbe, 0, defaultTxInputAlloc),
@@ -2492,9 +2615,9 @@ func NewMsgTxAbe(version int32) *MsgTxAbe {
 	}
 }
 
-func NewStandardCoinbaseTxIn(nextBlockHeight int32, extraNonce uint64) *TxInAbe {
+func NewStandardCoinbaseTxIn(nextBlockHeight int32, extraNonce uint64, version uint16) *TxInAbe {
 	txIn := TxInAbe{}
-	txIn.SerialNumber = chainhash.ZeroHash
+	txIn.SerialNumber = abepqringct.GetNullSerialNumber(version)
 
 	previousOutPointRing := OutPointRing{}
 	previousOutPointRing.BlockHashs = make([]*chainhash.Hash, 3)
