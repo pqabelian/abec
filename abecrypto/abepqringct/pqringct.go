@@ -139,4 +139,6 @@ func CoinbaseTxGen(abeTxOutDescs []*AbeTxOutDesc, coinbaseTxMsgTemplate *wire.Ms
 }
 
 func TransferTxGen(mpk []byte, mssk []byte) {
+
+	cryptoPP.TransferTXGen()
 }
