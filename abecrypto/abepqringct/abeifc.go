@@ -41,11 +41,11 @@ func GetTxWitnessItemMaxLen(version uint32) uint32 {
 The length of serialNumber will be small, e.g. 32 or 64 bytes.
 TxoSerialNumberLen and underlying (Hash) algorothm will keep unchange.
 */
-func GetTxoSerialNumberLen() int {
+func GetTxoSerialNumberLen(version uint32) int {
 	// todo: call cryptoPP.methods
 	return 1
 }
 
-func GetNullSerialNumber() []byte {
+func GetNullSerialNumber(version uint32) []byte {
 	return nullSerialNumber
 }

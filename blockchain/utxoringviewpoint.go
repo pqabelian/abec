@@ -34,6 +34,7 @@ type UtxoRingEntry struct {
 		// usage since there will be a lot of these in memory.
 		packedFlags txoFlags*/
 
+	Version uint32
 	//	ringHash	chainhash.Hash	//	the hash of ring members, i.e. OutPoint(txHash, index)
 	ringBlockHeight int32
 	outPointRing    *wire.OutPointRing
@@ -343,7 +344,7 @@ func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 		entry.serialNumbers = make([][]byte, consumedNum)
 		//	serialNumbers
 		for i := uint64(0); i < consumedNum; i++ {
-			serialNumber := make([]byte, abepqringct.GetTxoSerialNumberLen())
+			serialNumber := make([]byte, abepqringct.GetTxoSerialNumberLen(entry.Version))
 			_, err := io.ReadFull(r, serialNumber[:])
 			if err != nil {
 				return err
