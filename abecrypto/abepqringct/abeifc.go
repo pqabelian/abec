@@ -49,3 +49,13 @@ func GetTxoSerialNumberLen(version uint32) int {
 func GetNullSerialNumber(version uint32) []byte {
 	return nullSerialNumber
 }
+
+func GetInputMaxNum(version uint32) int {
+	// todo
+	return 5
+}
+
+func GetOutputMaxNum(version uint32) int {
+	// todo
+	return 5
+}

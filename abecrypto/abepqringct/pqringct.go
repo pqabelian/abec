@@ -3,6 +3,7 @@ package abepqringct
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"github.com/abesuite/abec/abecrypto"
 	"github.com/abesuite/abec/wire"
 	"github.com/cryptosuite/pqringct"
@@ -16,19 +17,19 @@ func GetMasterPublicKeyLen(version uint32) uint32 {
 	return 1
 }
 
-type MasterPublicKey interface {
+type MasterPublicKeyIfc interface {
 	SerializeSize() uint32
 	Serialize() []byte
 	Deserialize([]byte) error
 }
 
-type MasterSecretViewKey interface {
+type MasterSecretViewKeyIfc interface {
 	SerializeSize() uint32
 	Serialize() []byte
 	Deserialize([]byte) error
 }
 
-type MasterSecretSignKey interface {
+type MasterSecretSignKeyIfc interface {
 	SerializeSize() uint32
 	Serialize() []byte
 	Deserialize([]byte) error
@@ -46,6 +47,26 @@ func NewAbeTxOutDesc(serializedMpk []byte, value uint64) *AbeTxOutDesc {
 	}
 }
 
+type AbeTxInputDesc struct {
+	serializedTxoList             []*wire.TxOutAbe
+	sidx                          int
+	serializedMasterPublicKey     []byte
+	serializedMasterSecretViewKey []byte
+	serializedMasterSecretSignKey []byte
+	value                         uint64
+}
+
+func NewAbeTxInputDesc(serializedTxoList []*wire.TxOutAbe, sidx int, serializedMpk []byte, serializedMsvk []byte, serializedMssk []byte, value uint64) *AbeTxInputDesc {
+	return &AbeTxInputDesc{
+		serializedTxoList,
+		sidx,
+		serializedMpk,
+		serializedMsvk,
+		serializedMssk,
+		value,
+	}
+}
+
 /*
 The caller should know and specify the exact MasterKeyGen() for particular pqringct version.
 */
@@ -59,9 +80,9 @@ func MasterKeyGen(inputSeed []byte, cryptoScheme abecrypto.CryptoScheme) (seed [
 		}
 	}
 
-	var mpk MasterPublicKey
-	var msvk MasterSecretViewKey
-	var mssk MasterSecretSignKey
+	var mpk MasterPublicKeyIfc
+	var msvk MasterSecretViewKeyIfc
+	var mssk MasterSecretSignKeyIfc
 
 	switch cryptoScheme {
 	case abecrypto.CryptoSchemePQRINGCT:
@@ -91,54 +112,206 @@ func MasterKeyGen(inputSeed []byte, cryptoScheme abecrypto.CryptoScheme) (seed [
 	return nil, retmpkSer, retmsvkSer, retmsskSer, nil
 }
 
-type CoinbaseTx pqringct.CoinbaseTx
-
+/*
+The caller needs to fill the Version, TxIns, TxFee fileds for coinbaseTxMsgTemplate,
+this fucntion will fill the TxOuts and TxWitness fields.
+The TxMemo filed could be modified as needed, as the TxWitness does not depends on the TxMemo.
+*/
 func CoinbaseTxGen(abeTxOutDescs []*AbeTxOutDesc, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
-	cryptoScheme := abecrypto.CryptoSchemePQRINGCT
-	if coinbaseTxMsgTemplate.Version >= 1 {
-		//	todo: the Tx.version decide what cryptoScheme should be used
-		cryptoScheme = abecrypto.CryptoSchemePQRINGCT
+	cryptoScheme := abecrypto.GetCryptoScheme(coinbaseTxMsgTemplate.Version)
+
+	outputNum := len(abeTxOutDescs)
+	if outputNum > GetOutputMaxNum(coinbaseTxMsgTemplate.Version) {
+		return nil, fmt.Errorf("the output number %d exceeds the allowed max number %d", outputNum, GetInputMaxNum(coinbaseTxMsgTemplate.Version))
 	}
 
 	if cryptoScheme == abecrypto.CryptoSchemePQRINGCT {
 		//	pqringct
-		txOutDescs := make([]*pqringct.TxOutputDesc, len(abeTxOutDescs))
-		for i := 0; i < len(abeTxOutDescs); i++ {
-			cryptoSchemeInDesc := binary.BigEndian.Uint16(abeTxOutDescs[i].serializedMasterPublicKey[:4])
+		txOutputDescs := make([]*pqringct.TxOutputDesc, len(abeTxOutDescs))
+		for j := 0; j < len(abeTxOutDescs); j++ {
+			cryptoSchemeInDesc := binary.BigEndian.Uint32(abeTxOutDescs[j].serializedMasterPublicKey[:4])
 			if abecrypto.CryptoScheme(cryptoSchemeInDesc) != cryptoScheme {
 				return nil, errors.New("the cryptoScheme in TxOutDesc does not match that implied by the MsgTx.version")
 			}
 			mpk := &pqringct.MasterPublicKey{}
-			err := mpk.Deserialize(abeTxOutDescs[i].serializedMasterPublicKey[4:])
+			err := mpk.Deserialize(abeTxOutDescs[j].serializedMasterPublicKey[4:])
 			if err != nil {
 				return nil, err
 			}
 
-			txOutDescs[i] = pqringct.NewTxOutputDesc(mpk, abeTxOutDescs[i].value)
+			txOutputDescs[j] = pqringct.NewTxOutputDesc(mpk, abeTxOutDescs[j].value)
 		}
 
-		coinbaseTx, err := cryptoPP.CoinbaseTxGen(coinbaseTxMsgTemplate.TxFee, txOutDescs)
+		cryptoCoinbaseTx, err := cryptoPP.CoinbaseTxGen(coinbaseTxMsgTemplate.TxFee, txOutputDescs)
 		if err != nil {
 			return nil, err
 		}
 
-		coinbaseTxMsgTemplate.TxOuts = make([]*wire.TxOutAbe, len(coinbaseTx.OutputTxos))
-		for i := 0; i < len(coinbaseTx.OutputTxos); i++ {
+		coinbaseTxMsgTemplate.TxOuts = make([]*wire.TxOutAbe, len(cryptoCoinbaseTx.OutputTxos))
+		for i := 0; i < len(cryptoCoinbaseTx.OutputTxos); i++ {
 			coinbaseTxMsgTemplate.TxOuts[i] = &wire.TxOutAbe{
 				coinbaseTxMsgTemplate.Version,
-				coinbaseTx.OutputTxos[i].Serialize(),
+				cryptoCoinbaseTx.OutputTxos[i].Serialize(),
 			}
 		}
 
-		coinbaseTxMsgTemplate.TxWitness = coinbaseTx.TxWitness.Serialize()
+		coinbaseTxMsgTemplate.TxWitness = cryptoCoinbaseTx.TxWitness.Serialize()
 
 		return coinbaseTxMsgTemplate, nil
+	} else if false {
+		// todo: if there is any more version to support, implement it here
 	}
 
 	return nil, nil
 }
 
-func TransferTxGen(mpk []byte, mssk []byte) {
+/*
+The caller needs to fill the Version, TxIns, TxFee, TxMemo fields of transferTxMsgTemplate
+This function will fill the serialNumbers in TxIns, and the TxOuts and TxWitness fields of transferTxMsgTemplate, and return it as the result
+*/
+func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxOutDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
+	inputNum := len(abeTxInputDescs)
+	outputNum := len(abeTxOutputDescs)
 
-	cryptoPP.TransferTXGen()
+	if inputNum <= 0 || outputNum <= 0 {
+		return nil, errors.New("the input number and the output number should be at least 1")
+	}
+
+	if inputNum > GetInputMaxNum(transferTxMsgTemplate.Version) {
+		return nil, fmt.Errorf("the input number %d exceeds the allowed max number %d", inputNum, GetInputMaxNum(transferTxMsgTemplate.Version))
+	}
+
+	if outputNum > GetOutputMaxNum(transferTxMsgTemplate.Version) {
+		return nil, fmt.Errorf("the output number %d exceeds the allowed max number %d", outputNum, GetOutputMaxNum(transferTxMsgTemplate.Version))
+	}
+
+	if inputNum != len(transferTxMsgTemplate.TxIns) {
+		return nil, errors.New("the number of InputDesc does not match the number of TxIn in transferTxMsgTemplate")
+	}
+
+	//	TxInputDescs
+	inputsVersion := transferTxMsgTemplate.TxIns[0].Version
+	txInputDescs := make([]*pqringct.TxInputDesc, inputNum)
+	for i := 0; i < inputNum; i++ {
+		if transferTxMsgTemplate.TxIns[i].Version != inputsVersion {
+			return nil, errors.New("the version of the TxIn in one transaction should be the same")
+		}
+
+		txoList := make([]*pqringct.TXO, len(abeTxInputDescs[i].serializedTxoList))
+		for j := 0; j < len(abeTxInputDescs[i].serializedTxoList); j++ {
+			if abeTxInputDescs[i].serializedTxoList[j].Version != inputsVersion {
+				return nil, errors.New("the version of Txos in abeTxInputDescs.serializedTxoList does not match the version in the corresponding TxIn")
+			}
+
+			if inputsVersion >= 1 {
+				//	Version decides the CryptoScheme
+				txo := &pqringct.TXO{}
+				err := txo.Deserialize(abeTxInputDescs[i].serializedTxoList[j].TxoScript)
+				if err != nil {
+					return nil, err
+				}
+				txoList[j] = txo
+			} else if false {
+				//	todo: if there is more versions, implement it here
+			}
+		}
+
+		cryptoSchemeInInputDesc := binary.BigEndian.Uint32(abeTxInputDescs[i].serializedMasterPublicKey[:4])
+		if abecrypto.CryptoScheme(cryptoSchemeInInputDesc) != abecrypto.GetCryptoScheme(inputsVersion) {
+			return nil, errors.New("the cryptoScheme in the serializedMasterPublicKey in the TxInputDesc does not match that implied by the trsnsferTx.version")
+		}
+		cryptoSchemeInInputDesc = binary.BigEndian.Uint32(abeTxInputDescs[i].serializedMasterSecretViewKey[:4])
+		if abecrypto.CryptoScheme(cryptoSchemeInInputDesc) != abecrypto.GetCryptoScheme(inputsVersion) {
+			return nil, errors.New("the cryptoScheme in the serializedMasterSecretViewKey in the TxInputDesc does not match that implied by the trsnsferTx.version")
+		}
+		cryptoSchemeInInputDesc = binary.BigEndian.Uint32(abeTxInputDescs[i].serializedMasterSecretSignKey[:4])
+		if abecrypto.CryptoScheme(cryptoSchemeInInputDesc) != abecrypto.GetCryptoScheme(inputsVersion) {
+			return nil, errors.New("the cryptoScheme in the serializedMasterSecretSignKey in the TxInputDesc does not match that implied by the trsnsferTx.version")
+		}
+
+		if abecrypto.GetCryptoScheme(inputsVersion) == abecrypto.CryptoSchemePQRINGCT {
+			mpk := &pqringct.MasterPublicKey{}
+			err := mpk.Deserialize(abeTxInputDescs[i].serializedMasterPublicKey[4:])
+			if err != nil {
+				return nil, err
+			}
+
+			msvk := &pqringct.MasterSecretViewKey{}
+			err = msvk.Deserialize(abeTxInputDescs[i].serializedMasterSecretViewKey[4:])
+			if err != nil {
+				return nil, err
+			}
+
+			mssk := &pqringct.MasterSecretSignKey{}
+			err = mssk.Deserialize(abeTxInputDescs[i].serializedMasterSecretSignKey[4:])
+			if err != nil {
+				return nil, err
+			}
+
+			sidx := abeTxInputDescs[i].sidx
+			value := abeTxInputDescs[i].value
+
+			txInputDescs[i] = pqringct.NewTxInputDesc(txoList, sidx, mpk, msvk, mssk, value)
+
+		} else if false {
+			//	todo: if there is more versions, implement it here
+		}
+	}
+
+	//	TxOutputDescs
+	outputsVersion := transferTxMsgTemplate.Version
+	txOutputDescs := make([]*pqringct.TxOutputDesc, outputNum)
+	for j := 0; j < outputNum; j++ {
+		cryptoSchemeInOutputDesc := binary.BigEndian.Uint32(abeTxOutputDescs[j].serializedMasterPublicKey[:4])
+		if abecrypto.CryptoScheme(cryptoSchemeInOutputDesc) != abecrypto.GetCryptoScheme(outputsVersion) {
+			return nil, errors.New("the cryptoScheme in TxOutputDesc does not match that implied by the transferTxMsg.version")
+		}
+		if abecrypto.GetCryptoScheme(inputsVersion) == abecrypto.CryptoSchemePQRINGCT {
+			mpk := &pqringct.MasterPublicKey{}
+			err := mpk.Deserialize(abeTxOutputDescs[j].serializedMasterPublicKey[4:])
+			if err != nil {
+				return nil, err
+			}
+
+			value := abeTxOutputDescs[j].value
+
+			txOutputDescs[j] = pqringct.NewTxOutputDesc(mpk, value)
+		} else if false {
+			//	todo: if there is more versions, implement it here
+		}
+	}
+
+	txMemo := make([]byte, 4+len(transferTxMsgTemplate.TxMemo))
+	binary.BigEndian.PutUint32(txMemo, transferTxMsgTemplate.Version)
+	copy(txMemo[4:], transferTxMsgTemplate.TxMemo)
+
+	if abecrypto.GetCryptoScheme(transferTxMsgTemplate.Version) == abecrypto.CryptoSchemePQRINGCT {
+		cryptoTransferTx, err := cryptoPP.TransferTxGen(txInputDescs, txOutputDescs, transferTxMsgTemplate.TxFee, txMemo)
+		if err != nil {
+			return nil, err
+		}
+
+		//	For the inputs, only the serial number needs to be set
+		for i := 0; i < inputNum; i++ {
+			transferTxMsgTemplate.TxIns[i].SerialNumber = cryptoTransferTx.Inputs[i].SerialNumber
+		}
+
+		//	Set the output Txos
+		transferTxMsgTemplate.TxOuts = make([]*wire.TxOutAbe, outputNum)
+		for j := 0; j < outputNum; j++ {
+			transferTxMsgTemplate.TxOuts[j] = &wire.TxOutAbe{
+				transferTxMsgTemplate.Version,
+				cryptoTransferTx.OutputTxos[j].Serialize(),
+			}
+		}
+
+		//	Set the TxWitness
+		transferTxMsgTemplate.TxWitness = cryptoTransferTx.TxWitness.Serialize()
+
+		return transferTxMsgTemplate, nil
+	} else if false {
+		//	todo: if there is more versions, implement it here
+	}
+
+	return nil, nil
 }

@@ -11,3 +11,8 @@ const (
 	CryptoSchemePQRINGCT   CryptoScheme = 1
 	CryptoSchemePQRINGCTV2 CryptoScheme = 2
 )
+
+func GetCryptoScheme(version uint32) CryptoScheme {
+	//	todo: for each version, there is a corresponding CryptoScheme
+	return CryptoSchemePQRINGCT
+}
