@@ -3,6 +3,7 @@ package blockchain
 import (
 	"bytes"
 	"fmt"
+	"github.com/abesuite/abec/abecrypto/abepqringct"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/database"
@@ -38,7 +39,7 @@ type UtxoRingEntry struct {
 	outPointRing    *wire.OutPointRing
 	txOuts          []*wire.TxOutAbe
 	//	generatingBlockHeights []int32	// height of block that generates txOuts[i]
-	serialNumbers       []*chainhash.Hash //	when a member is consumed, a corresponding serilaNumber is added
+	serialNumbers       [][]byte //	when a member is consumed, a corresponding serilaNumber is added
 	consumingBlockHashs []*chainhash.Hash
 	//	consumingBlockHeights	[]int32
 	//	height of block that consumes txOuts[i],
@@ -64,14 +65,14 @@ func isUtxoRingDeserializeErr(err error) bool {
 	return ok
 }
 
-func (entry *UtxoRingEntry) IsSpent(serialNumber chainhash.Hash) bool {
+func (entry *UtxoRingEntry) IsSpent(serialNumber []byte) bool {
 
 	/*	if len(entry.serialNumbers) == len(entry.txOuts) {
 		return true
 	}*/
 
 	for _, sn := range entry.serialNumbers {
-		if *sn == serialNumber {
+		if bytes.Compare(sn, serialNumber) == 0 {
 			return true
 		}
 	}
@@ -133,7 +134,7 @@ func (entry *UtxoRingEntry) TxOuts() []*wire.TxOutAbe {
 	return entry.txOuts
 }
 
-func (entry *UtxoRingEntry) SerialNumbers() []*chainhash.Hash {
+func (entry *UtxoRingEntry) SerialNumbers() [][]byte {
 	return entry.serialNumbers
 }
 
@@ -286,7 +287,7 @@ func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 	if isCoinBase {
 		entry.packedFlags |= tfCoinBase
 	}
-	entry.outPointRing= &wire.OutPointRing{}
+	entry.outPointRing = &wire.OutPointRing{}
 	err = entry.outPointRing.Deserialize(r)
 	if err != nil {
 		return err
@@ -339,16 +340,15 @@ func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 			return errUtxoRingDeserialize("The UtxoRingEntry to be deserlized has a size of consumed serialNumbers that exceeds the ring size")
 		}
 
-
-		entry.serialNumbers = make([]*chainhash.Hash, consumedNum)
+		entry.serialNumbers = make([][]byte, consumedNum)
 		//	serialNumbers
 		for i := uint64(0); i < consumedNum; i++ {
-			serialNumber := chainhash.Hash{}
+			serialNumber := make([]byte, abepqringct.GetTxoSerialNumberLen())
 			_, err := io.ReadFull(r, serialNumber[:])
 			if err != nil {
 				return err
 			}
-			entry.serialNumbers[i] = &serialNumber
+			entry.serialNumbers[i] = serialNumber
 		}
 		//	consumingBlockHashs
 		entry.consumingBlockHashs = make([]*chainhash.Hash, consumedNum)
@@ -377,22 +377,22 @@ func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 
 //	This is a temporary method, which is used only for the SALRS version, where the coin value is public,
 //	and only TXOs with the same value are grouped into a ring.
-func (entry *UtxoRingEntry) Amount() int64 {
+/*func (entry *UtxoRingEntry) Amount() int64 {
 	amount := int64(-1)
 	if len(entry.txOuts) >= 1 {
 		amount = entry.txOuts[0].ValueScript
 	}
 
 	return amount
-}
+}*/
 
 // Spend marks the output as spent.  Spending an output that is already spent
 // has no effect.
 // The caller should check double-spending before calling this function
-func (entry *UtxoRingEntry) Spend(serilaNumber *chainhash.Hash, blockHash *chainhash.Hash) {
+func (entry *UtxoRingEntry) Spend(serilaNumber []byte, blockHash *chainhash.Hash) {
 	//	Abe to do: double spending?
 	for i, sn := range entry.serialNumbers {
-		if sn.IsEqual(serilaNumber) {
+		if bytes.Compare(sn, serilaNumber) == 0 {
 			if blockHash.IsEqual(entry.consumingBlockHashs[i]) {
 				return
 			}
@@ -410,9 +410,9 @@ func (entry *UtxoRingEntry) Spend(serilaNumber *chainhash.Hash, blockHash *chain
 }
 
 //	normaly, the unspent serialNumber should be the last one, as this function should be called in reverse order
-func (entry *UtxoRingEntry) UnSpend(serilaNumber *chainhash.Hash, blockHash *chainhash.Hash) bool {
+func (entry *UtxoRingEntry) UnSpend(serilaNumber []byte, blockHash *chainhash.Hash) bool {
 	for i, sn := range entry.serialNumbers {
-		if sn.IsEqual(serilaNumber) {
+		if bytes.Compare(sn, serilaNumber) == 0 {
 			if blockHash.IsEqual(entry.consumingBlockHashs[i]) {
 				copy(entry.serialNumbers[:i], entry.serialNumbers[i+1:])
 				entry.serialNumbers = entry.serialNumbers[:len(entry.serialNumbers)-1]
@@ -446,7 +446,7 @@ func (entry *UtxoRingEntry) Clone() *UtxoRingEntry {
 	//	utxoRing.generatingBlockHeights = entry.generatingBlockHeights
 	//	the above are invariant contents for utxoRing, so we use shallow copy
 	spentTxoNum := len(entry.serialNumbers)
-	utxoRing.serialNumbers = make([]*chainhash.Hash, spentTxoNum)
+	utxoRing.serialNumbers = make([][]byte, spentTxoNum)
 	utxoRing.consumingBlockHashs = make([]*chainhash.Hash, spentTxoNum)
 	//	utxoRing.consumingBlockHeights = make([]int32, spentTxoNum)
 	for i := 0; i < spentTxoNum; i++ {
@@ -796,7 +796,7 @@ func (view *UtxoRingViewpoint) connectTransaction(tx *abeutil.TxAbe, blockhash *
 		// Mark the entry as spent.  This is not done until after the
 		// relevant details have been accessed since spending it might
 		// clear the fields from memory in the future.
-		entry.Spend(&txIn.SerialNumber, blockhash)
+		entry.Spend(txIn.SerialNumber, blockhash)
 	}
 
 	// Add the transaction's outputs as available utxos.
@@ -844,7 +844,7 @@ func (view *UtxoRingViewpoint) disconnectTransactions(db database.DB, block *abe
 		utxoRingEntry := view.entries[stxo.UtxoRing.outPointRing.Hash()]
 
 		if utxoRingEntry != nil {
-			unSpend := utxoRingEntry.UnSpend(&stxo.SerialNumber, block.Hash())
+			unSpend := utxoRingEntry.UnSpend(stxo.SerialNumber, block.Hash())
 			if !unSpend {
 				return AssertError("disconnectTransactions called with bad " +
 					"spent transaction out information: fail to unspend")
@@ -928,16 +928,16 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 		//	transferRmTxoNum += len(tx.MsgTx().TxOuts)
 		//}
 	}
-	allCoinBaseRmTxos,allTransferRmTxos:=NewUTXORingEntriesPreparation(blocks)
+	allCoinBaseRmTxos, allTransferRmTxos := NewUTXORingEntriesPreparation(blocks)
 
-	for i:=0;i<9;i++{
-		if len(allCoinBaseRmTxos[i])!=0{
+	for i := 0; i < 9; i++ {
+		if len(allCoinBaseRmTxos[i]) != 0 {
 			err = view.NewUtxoRingEntriesFromTxos(allCoinBaseRmTxos[i], ringBlockHeight, blockHashs, true)
 			if err != nil {
 				return err
 			}
 		}
-		if len(allTransferRmTxos[i])!=0{
+		if len(allTransferRmTxos[i]) != 0 {
 			err = view.NewUtxoRingEntriesFromTxos(allTransferRmTxos[i], ringBlockHeight, blockHashs, false)
 			if err != nil {
 				return err
@@ -948,9 +948,9 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 
 }
 
-func NewUTXORingEntriesPreparation(blocks []*abeutil.BlockAbe)([][]*RingMemberTxo,[][]*RingMemberTxo){
+func NewUTXORingEntriesPreparation(blocks []*abeutil.BlockAbe) ([][]*RingMemberTxo, [][]*RingMemberTxo) {
 	blocksNum := len(blocks)
-	values:=map[int64]int{500:0,200:1,100:2,50:3,20:4,10:5,5:6,2:7,1:8}
+	values := map[int64]int{500: 0, 200: 1, 100: 2, 50: 3, 20: 4, 10: 5, 5: 6, 2: 7, 1: 8}
 	allCoinBaseRmTxos := make([][]*RingMemberTxo, 9)
 	allTransferRmTxos := make([][]*RingMemberTxo, 9)
 
@@ -977,7 +977,7 @@ func NewUTXORingEntriesPreparation(blocks []*abeutil.BlockAbe)([][]*RingMemberTx
 			txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
 			ringMemberTxo := NewRingMemberTxo(&txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
-			index:= values[txOut.ValueScript/abeutil.NeutrinoPerAbe]
+			index := values[txOut.ValueScript/abeutil.NeutrinoPerAbe]
 			allCoinBaseRmTxos[index] = append(allCoinBaseRmTxos[index], ringMemberTxo)
 		}
 
@@ -991,12 +991,12 @@ func NewUTXORingEntriesPreparation(blocks []*abeutil.BlockAbe)([][]*RingMemberTx
 				txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
 				ringMemberTxo := NewRingMemberTxo(&txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
-				index:= values[txOut.ValueScript/abeutil.NeutrinoPerAbe]
+				index := values[txOut.ValueScript/abeutil.NeutrinoPerAbe]
 				allTransferRmTxos[index] = append(allTransferRmTxos[index], ringMemberTxo)
 			}
 		}
 	}
-	return allCoinBaseRmTxos,allTransferRmTxos
+	return allCoinBaseRmTxos, allTransferRmTxos
 }
 
 /*func (view *UtxoRingViewpoint) newUtxoRingEntriesFromBlocks(blocks []*abeutil.BlockAbe) error {

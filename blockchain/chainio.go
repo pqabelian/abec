@@ -262,7 +262,7 @@ type SpentTxOut struct {
 
 type SpentTxOutAbe struct {
 	//	the serialNumber of spentTxo
-	SerialNumber chainhash.Hash
+	SerialNumber []byte
 
 	//	the utoRing which contains the spentTxo
 	//	also containing all information of the utxoRing, e.g., the serialNumber of the txos previously consumed
@@ -997,7 +997,7 @@ func dbFetchUtxoEntry(dbTx database.Tx, outpoint wire.OutPoint) (*UtxoEntry, err
 func dbFetchUtxoRingEntry(dbTx database.Tx, outPointRingHash chainhash.Hash) (*UtxoRingEntry, error) {
 	// Fetch the unspent transaction output information for the passed
 	// transaction output.  Return now when there is no entry.
- 	key := outPointRingKey(outPointRingHash)
+	key := outPointRingKey(outPointRingHash)
 	utxoRingBucket := dbTx.Metadata().Bucket(utxoRingSetBucketName)
 	serializedUtxoRing := utxoRingBucket.Get(*key)
 	recycleOutPointRingKey(key)
@@ -1573,7 +1573,7 @@ func (b *BlockChain) initChainState() error {
 			return err
 		}
 		var block wire.MsgBlockAbe
-		err = block.Deserialize(bytes.NewReader(blockBytes))    // if wrongly closed, the data will damaged.
+		err = block.Deserialize(bytes.NewReader(blockBytes)) // if wrongly closed, the data will damaged.
 		if err != nil {
 			return err
 		}

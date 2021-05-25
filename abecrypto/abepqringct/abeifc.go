@@ -6,7 +6,7 @@ var nullSerialNumber []byte
 /*
 Based on the (crypto-scheme) version of the Txo, return the maxAllowedLen
 */
-func GetTxoScriptMaxLen(version uint32) uint32 {
+func GetTxoScriptLen(version uint32) uint32 {
 	// todo: call cryptoPP.methods
 	return 1
 }
@@ -39,12 +39,13 @@ func GetTxWitnessItemMaxLen(version uint32) uint32 {
 
 /*
 The length of serialNumber will be small, e.g. 32 or 64 bytes.
+TxoSerialNumberLen and underlying (Hash) algorothm will keep unchange.
 */
-func GetTxoSerialNumberLen(version uint32) int {
+func GetTxoSerialNumberLen() int {
 	// todo: call cryptoPP.methods
 	return 1
 }
 
-func GetNullSerialNumber(version uint32) []byte {
+func GetNullSerialNumber() []byte {
 	return nullSerialNumber
 }

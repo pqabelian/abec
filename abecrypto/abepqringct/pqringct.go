@@ -39,6 +39,13 @@ type AbeTxOutDesc struct {
 	value                     uint64
 }
 
+func NewAbeTxOutDesc(serializedMpk []byte, value uint64) *AbeTxOutDesc {
+	return &AbeTxOutDesc{
+		serializedMpk,
+		value,
+	}
+}
+
 /*
 The caller should know and specify the exact MasterKeyGen() for particular pqringct version.
 */

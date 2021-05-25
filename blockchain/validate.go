@@ -1,8 +1,10 @@
 package blockchain
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/abesuite/abec/abecrypto/abepqringct"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
@@ -229,7 +231,7 @@ func isBIP0030Node(node *blockNode) bool {
 //
 // At the target block generation rate for the main network, this is
 // approximately every 4 years.
-func CalcBlockSubsidy(height int32, chainParams *chaincfg.Params) int64 {
+func CalcBlockSubsidy(height int32, chainParams *chaincfg.Params) uint64 {
 	if chainParams.SubsidyReductionInterval == 0 {
 		return baseSubsidy
 	}
@@ -403,7 +405,7 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 	// Check for duplicate transaction inputs.
 	consumedOutPoints := make(map[chainhash.Hash]map[chainhash.Hash]struct{})
 	for i, txIn := range msgTx.TxIns {
-		if txIn.SerialNumber == chainhash.ZeroHash {
+		if bytes.Compare(txIn.SerialNumber, abepqringct.GetNullSerialNumber()) == 0 {
 			return ruleError(ErrBadTxInput, "transaction input refers to a serial number that is null")
 		}
 
@@ -1668,7 +1670,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *abeutil.Block, vi
 	for _, txOut := range transactions[0].MsgTx().TxOut {
 		totalSatoshiOut += txOut.Value
 	}
-	expectedSatoshiOut := CalcBlockSubsidy(node.height, b.chainParams) +
+	expectedSatoshiOut := int64(CalcBlockSubsidy(node.height, b.chainParams)) +
 		totalFees
 	if totalSatoshiOut > expectedSatoshiOut {
 		str := fmt.Sprintf("coinbase transaction for block pays %v "+
@@ -1892,7 +1894,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// still relatively cheap as compared to running the scripts) checks
 	// against all the inputs when the signature operations are out of
 	// bounds.
-	var totalFees int64
+	var totalFees uint64
 	for _, tx := range transactions {
 		err := CheckTransactionInputsAbe(tx, node.height, view,
 			b.chainParams)
@@ -1924,7 +1926,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// mining the block.  It is safe to ignore overflow and out of range
 	// errors here because those error conditions would have already been
 	// caught by checkTransactionSanity.
-	var totalNeutrinoOut int64
+	var totalNeutrinoOut uint64
 	for _, txOut := range transactions[0].MsgTx().TxOuts { // the coinbase transaction may have more than one outputs
 		totalNeutrinoOut += txOut.ValueScript
 	}

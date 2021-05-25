@@ -3,6 +3,7 @@ package mining
 import (
 	"container/heap"
 	"fmt"
+	"github.com/abesuite/abec/abecrypto/abepqringct"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chaincfg"
@@ -59,10 +60,10 @@ type TxDescAbe struct {
 	Height int32
 
 	// Fee is the total fee the transaction associated with the entry pays.
-	Fee int64
+	Fee uint64
 
 	// FeePerKB is the fee the transaction pays in Satoshi per 1000 bytes.
-	FeePerKB int64
+	FeePerKB uint64
 }
 
 // TxSource represents a source of transactions to consider for inclusion in
@@ -202,9 +203,9 @@ func newTxPriorityQueue(reserve int, sortByFee bool) *txPriorityQueue {
 // which have not been mined into a block yet.
 type txPrioItemAbe struct {
 	tx       *abeutil.TxAbe
-	fee      int64
+	fee      uint64
 	priority float64
-	feePerKB int64
+	feePerKB uint64
 }
 
 // txPriorityQueueLessFunc describes a function that can be used as a compare
@@ -316,7 +317,7 @@ type BlockTemplate struct {
 	// template pays in base units.  Since the first transaction is the
 	// coinbase, the first entry (offset 0) will contain the negative of the
 	// sum of the fees of all other transactions.
-	Fees []int64
+	Fees []uint64
 
 	// SigOpCosts contains the number of signature operations each
 	// transaction in the generated template performs.
@@ -390,7 +391,7 @@ func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockH
 		}
 	}
 
-	tx := wire.NewMsgTx(wire.TxVersion)
+	tx := wire.NewMsgTx(int32(wire.TxVersion))
 	tx.AddTxIn(&wire.TxIn{
 		// Coinbase transactions have no inputs, so previous outpoint is
 		// zero hash and max index.
@@ -400,7 +401,7 @@ func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockH
 		Sequence:        wire.MaxTxInSequenceNum,
 	})
 	tx.AddTxOut(&wire.TxOut{
-		Value:    blockchain.CalcBlockSubsidy(nextBlockHeight, params),
+		Value:    int64(blockchain.CalcBlockSubsidy(nextBlockHeight, params)),
 		PkScript: pkScript,
 	})
 	return abeutil.NewTx(tx), nil
@@ -409,7 +410,7 @@ func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockH
 //	TODO(ABE): may be the total number of  outputs of coinbase transaction should be confined to 1,
 //	 it will need to modify the process of checking block and transaction
 // TODO(abe): when we use 1,2,5,10 for testing, we need add a algorithm to adjust the coin value in coinbase transaction
-func createCoinbaseTxAbe(params *chaincfg.Params, extraNonce uint64, nextBlockHeight int32, addr abeutil.MasterAddress) (*abeutil.TxAbe, error) {
+/*func createCoinbaseTxAbe(params *chaincfg.Params, extraNonce uint64, nextBlockHeight int32, addr abeutil.MasterAddress) (*abeutil.TxAbe, error) {
 	////origin
 	//coinbaseTxIn := wire.NewStandardCoinbaseTxIn(nextBlockHeight, extraNonce)
 	//
@@ -433,7 +434,7 @@ func createCoinbaseTxAbe(params *chaincfg.Params, extraNonce uint64, nextBlockHe
 
 	// for testing 1,2,5,10
 	tx := wire.NewMsgTxAbe(wire.TxVersion)
-	coinbaseTxIn := wire.NewStandardCoinbaseTxIn(nextBlockHeight, extraNonce)
+	coinbaseTxIn := wire.NewStandardCoinbaseTxIn(nextBlockHeight, extraNonce, tx.Version)
 	tx.AddTxIn(coinbaseTxIn)
 	//
 	TotalSubsidies := blockchain.CalcBlockSubsidy(nextBlockHeight, params)
@@ -470,6 +471,33 @@ func createCoinbaseTxAbe(params *chaincfg.Params, extraNonce uint64, nextBlockHe
 	tx.TxWitness = &wire.TxWitnessAbe{}
 
 	return abeutil.NewTxAbe(tx), nil
+}*/
+
+/*
+todo: create a coinbaseTx template, where the TxOuts, the TxFee, and TxWitness are set to be 'fake' ones, and TxMemo is set to null
+*/
+func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, extraNonce uint64, txOutNum int) (*wire.MsgTxAbe, error) {
+	msgTx := wire.NewMsgTxAbe(wire.TxVersion)
+
+	//	one TxIn
+	coinbaseTxIn := wire.NewStandardCoinbaseTxIn(nextBlockHeight, extraNonce, msgTx.Version)
+	msgTx.AddTxIn(coinbaseTxIn)
+	tempTxOut := &wire.TxOutAbe{
+		Version:   msgTx.Version,
+		TxoScript: make([]byte, abepqringct.GetTxoScriptLen(msgTx.Version)),
+	}
+
+	//	one or multiple TxoOuts
+	//	Set the TxOuts and the later TxWitness to occupy block size
+	for i := 0; i < txOutNum; i++ {
+		msgTx.AddTxOut(tempTxOut)
+	}
+
+	msgTx.TxFee = abepqringct.GetMaxCoinValue(msgTx.Version)
+	msgTx.TxMemo = nil
+	msgTx.TxWitness = make([]byte, abepqringct.GetCoinbaseTxWitnessLen(msgTx.Version, txOutNum))
+
+	return msgTx, nil
 }
 
 // spendTransaction updates the passed view by marking the inputs to the passed
@@ -492,7 +520,7 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, tx *abeutil
 	for _, txIn := range tx.MsgTx().TxIns {
 		entry := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())
 		if entry != nil {
-			entry.Spend(&txIn.SerialNumber, &chainhash.ZeroHash)
+			entry.Spend(txIn.SerialNumber, &chainhash.ZeroHash)
 		}
 	}
 	return nil
@@ -637,7 +665,7 @@ func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
 //  |  transactions (while block size   |   |
 //  |  <= policy.BlockMinSize)          |   |
 //   -----------------------------------  --
-func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress abeutil.MasterAddress) (*BlockTemplate, error) {
+func (g *BlkTmplGenerator) NewBlockTemplate(payToMpk []byte) (*BlockTemplate, error) {
 	// Extend the most recently known best block.
 	best := g.chain.BestSnapshot()
 	nextBlockHeight := best.Height + 1
@@ -651,12 +679,12 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress abeutil.MasterAddress) 
 	// same value to the same public key address would otherwise be an
 	// identical transaction for block version 1).
 	extraNonce := uint64(0)
-	//	coinbaseScript, err := standardCoinbaseScript(nextBlockHeight, extraNonce)
-	//TODO(abe):for testing 1,2,5,10, the number of outputs in coinbase transactio will not only one, so we must adjust the checking coinbase transaction
-	coinbaseTx, err := createCoinbaseTxAbe(g.chainParams, extraNonce, nextBlockHeight, payToAddress)
+
+	coinbaseTxMsg, err := createCoinbaseTxAbeMsgTemplate(nextBlockHeight, extraNonce, 1)
 	if err != nil {
 		return nil, err
 	}
+	subsidy := blockchain.CalcBlockSubsidy(nextBlockHeight, g.chainParams)
 
 	//	todo(ABE): to remove
 	//	coinbaseSigOpCost := int64(blockchain.CountSigOps(coinbaseTx)) * blockchain.WitnessScaleFactor
@@ -675,7 +703,8 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress abeutil.MasterAddress) 
 	// generated block with reserved space.  Also create a utxo view to
 	// house all of the input transactions so multiple lookups can be
 	// avoided.
-	blockTxns := make([]*abeutil.TxAbe, 0, len(sourceTxns))
+	blockTxns := make([]*abeutil.TxAbe, 0, len(sourceTxns)+1)
+	coinbaseTx := abeutil.NewTxAbe(coinbaseTxMsg)
 	blockTxns = append(blockTxns, coinbaseTx)
 	blockUtxoRings := blockchain.NewUtxoRingViewpoint()
 
@@ -693,9 +722,9 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress abeutil.MasterAddress) 
 	// a transaction as it is selected for inclusion in the final block.
 	// However, since the total fees aren't known yet, use a dummy value for
 	// the coinbase fee which will be updated later.
-	txFees := make([]int64, 0, len(sourceTxns))
+	txFees := make([]uint64, 0, len(sourceTxns)+1)
 	//	txSigOpCosts := make([]int64, 0, len(sourceTxns))	//	todo(ABE): remove
-	txFees = append(txFees, -1) // Updated once known
+	txFees = append(txFees, 0) // Updated once known
 	//	txSigOpCosts = append(txSigOpCosts, coinbaseSigOpCost)	//	todo(ABE): remove
 
 	log.Debugf("Considering %d transactions for inclusion to new block",
@@ -772,7 +801,6 @@ mempoolLoop:
 		prioItem.priority = CalcPriorityAbe(tx.MsgTx(), utxoRings, nextBlockHeight)
 
 		// Calculate the fee in Satoshi/kB.
-		// TODO(abe)：for testing 1,2,5,10, the fee will be floored to a integer. actually, it is a integer.
 		prioItem.feePerKB = txDesc.FeePerKB
 		prioItem.fee = txDesc.Fee
 
@@ -806,7 +834,7 @@ mempoolLoop:
 	//		blockchain.GetTransactionWeightAbe(coinbaseTx))
 	blockSize := uint32((blockHeaderOverhead) + coinbaseTx.MsgTx().SerializeSize())
 	//	blockSigOpCost := coinbaseSigOpCost
-	totalFees := int64(0)
+	totalFee := uint64(0)
 
 	// Query the version bits state to see if segwit has been activated, if
 	// so then this means that we'll include any transactions with witness
@@ -864,7 +892,7 @@ mempoolLoop:
 		//	todo(ABE): ABE does not use weight, while use size only.
 		//	todo(ABE): as the size exceeds the minimum block size, it is unnecessary to include the free transactions
 		if sortedByFee &&
-			prioItem.feePerKB < int64(g.policy.TxMinFreeFee) &&
+			prioItem.feePerKB < uint64(g.policy.TxMinFreeFee) &&
 			//			blockPlusTxWeight >= g.policy.BlockMinWeight {
 			blockPlusTxSize >= g.policy.BlockMinSize {
 
@@ -907,7 +935,7 @@ mempoolLoop:
 		// Ensure the transaction inputs pass all of the necessary
 		// preconditions before allowing it to be added to the block.
 		//	todo(ABE): check double spending
-		err = blockchain.CheckTransactionInputsAbe(tx, nextBlockHeight, blockUtxoRings, g.chainParams)
+		err := blockchain.CheckTransactionInputsAbe(tx, nextBlockHeight, blockUtxoRings, g.chainParams)
 		if err != nil {
 			log.Tracef("Skipping tx %s due to error in "+
 				"CheckTransactionInputs: %v", tx.Hash(), err)
@@ -939,7 +967,7 @@ mempoolLoop:
 		blockTxns = append(blockTxns, tx)
 		blockSize += txSize
 		//		blockSigOpCost += int64(sigOpCost)
-		totalFees += prioItem.fee
+		totalFee += prioItem.fee
 		txFees = append(txFees, prioItem.fee)
 		//		txSigOpCosts = append(txSigOpCosts, int64(sigOpCost))
 
@@ -963,46 +991,19 @@ mempoolLoop:
 	// block weight for the real transaction count and coinbase value with
 	// the total fees accordingly.
 	blockSize -= wire.MaxVarIntPayload - uint32(wire.VarIntSerializeSize(uint64(len(blockTxns))))
-	//	todo(ABE): now, each coinbase transaction has only one output, and the value is public
-	// TODO(abe): for testing 1,2,5,10, we must adjust the transaction fee not depend on the size of block
-	//  and the total fee should be add new outputs into coinbase transaction,
-	//  and meanwhile the block size should be recomputed
+
 	//coinbaseTx.MsgTx().TxOuts[0].ValueScript += totalFees
-	coinValues:=[]int64{500,200,100,50,20,10,5,2,1}
-	coinbaseCoinvalue:=coinbaseTx.MsgTx().TxFee+totalFees
-	// TODO(abe):for testing 1,2,5,10, the coinbase transaction will just to a interger
-	coinbaseCoinvalue=coinbaseCoinvalue/abeutil.NeutrinoPerAbe * abeutil.NeutrinoPerAbe
-	totalOutputs:=len(coinbaseTx.MsgTx().TxOuts)
-	cnt:=0
-	for coinbaseCoinvalue !=0{  // adjust the coinbase output
-		i:=0
-		for coinbaseCoinvalue < coinValues[i]* abeutil.NeutrinoPerAbe{
-			i++
-		}
-		coinbaseCoinvalue-=coinValues[i]* abeutil.NeutrinoPerAbe
-		if cnt<totalOutputs{    // modify origin one
-			coinbaseTx.MsgTx().TxOuts[cnt].ValueScript=coinValues[i]* abeutil.NeutrinoPerAbe
-		}else{     // add new one
-			// this branch should rarely use because it will change be block size,
-			//  and because we reserve 3 outputs in generate coinbase transaction
-			txOut := wire.TxOutAbe{}
-			txOut.AddressScript = coinbaseTx.MsgTx().TxOuts[0].AddressScript
-			txOut.ValueScript=coinValues[i]* abeutil.NeutrinoPerAbe
-			coinbaseTx.MsgTx().AddTxOut(&txOut)
-		}
-		cnt++
+	coinbaseTxMsg.TxFee = subsidy + totalFee
+	// txFees[0] = -totalFee
+	txOutDescs := make([]*abepqringct.AbeTxOutDesc, 1)
+	txOutDescs[0] = abepqringct.NewAbeTxOutDesc(payToMpk, coinbaseTxMsg.TxFee)
+
+	coinbaseTxMsg, err = abepqringct.CoinbaseTxGen(txOutDescs, coinbaseTxMsg)
+	if err != nil {
+		return nil, err
 	}
-	// delete for redundant output
-	i:=0
-	for ;i<len(coinbaseTx.MsgTx().TxOuts);i++{
-		if coinbaseTx.MsgTx().TxOuts[i].ValueScript==0{
-			break
-		}
-	}
-	coinbaseTx.MsgTx().TxOuts=coinbaseTx.MsgTx().TxOuts[:i]
-	
-	coinbaseTx.MsgTx().TxFee=0
-	txFees[0] = -totalFees
+	coinbaseTx = abeutil.NewTxAbe(coinbaseTxMsg)
+	blockTxns[0] = coinbaseTx
 
 	// If segwit is active and we included transactions with witness data,
 	// then we'll need to include a commitment to the witness data in an
@@ -1088,14 +1089,14 @@ mempoolLoop:
 	}
 
 	log.Debugf("Created new block template (%d transactions, %d in "+
-		"fees, %d weight, target difficulty "+"%064x)", len(msgBlock.Transactions), totalFees, blockSize, blockchain.CompactToBig(msgBlock.Header.Bits))
+		"fees, %d weight, target difficulty "+"%064x)", len(msgBlock.Transactions), totalFee, blockSize, blockchain.CompactToBig(msgBlock.Header.Bits))
 
 	return &BlockTemplate{
 		BlockAbe: &msgBlock,
 		Fees:     txFees,
 		//		SigOpCosts:        txSigOpCosts,
 		Height:          nextBlockHeight,
-		ValidPayAddress: payToAddress != nil,
+		ValidPayAddress: payToMpk != nil,
 		//		WitnessCommitment: witnessCommitment,
 	}, nil
 }
@@ -1174,7 +1175,7 @@ func (g *BlkTmplGenerator) UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight
 
 //	todo(ABE):
 func (g *BlkTmplGenerator) UpdateExtraNonceAbe(msgBlock *wire.MsgBlockAbe, blockHeight int32, extraNonce uint64) error {
-	coinbaseTxIn := wire.NewStandardCoinbaseTxIn(blockHeight, extraNonce)
+	coinbaseTxIn := wire.NewStandardCoinbaseTxIn(blockHeight, extraNonce, wire.TxVersion)
 	msgBlock.Transactions[0].TxIns[0] = coinbaseTxIn
 
 	// TODO(davec): A btcutil.Block should use saved in the state to avoid
