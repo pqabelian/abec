@@ -403,9 +403,9 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 	}
 
 	// Check for duplicate transaction inputs.
-	consumedOutPoints := make(map[chainhash.Hash]map[chainhash.Hash]struct{})
+	consumedOutPoints := make(map[chainhash.Hash]map[string]struct{})
 	for i, txIn := range msgTx.TxIns {
-		if bytes.Compare(txIn.SerialNumber, abepqringct.GetNullSerialNumber()) == 0 {
+		if bytes.Compare(txIn.SerialNumber, abepqringct.GetNullSerialNumber(txIn.Version)) == 0 {
 			return ruleError(ErrBadTxInput, "transaction input refers to a serial number that is null")
 		}
 
@@ -425,14 +425,14 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 
 		ringHash := txIn.PreviousOutPointRing.Hash()
 		if _, ringExists := consumedOutPoints[ringHash]; !ringExists {
-			consumedOutPoints[ringHash] = make(map[chainhash.Hash]struct{})
+			consumedOutPoints[ringHash] = make(map[string]struct{})
 		}
-		if _, snExists := consumedOutPoints[ringHash][txIn.SerialNumber]; snExists {
+		if _, snExists := consumedOutPoints[ringHash][string(txIn.SerialNumber)]; snExists {
 			return ruleError(ErrDuplicateTxInputs, "transaction "+
 				"contains duplicate inputs")
 		}
 
-		consumedOutPoints[ringHash][txIn.SerialNumber] = struct{}{}
+		consumedOutPoints[ringHash][string(txIn.SerialNumber)] = struct{}{}
 	}
 
 	return nil
@@ -1926,10 +1926,12 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// mining the block.  It is safe to ignore overflow and out of range
 	// errors here because those error conditions would have already been
 	// caught by checkTransactionSanity.
-	var totalNeutrinoOut uint64
-	for _, txOut := range transactions[0].MsgTx().TxOuts { // the coinbase transaction may have more than one outputs
-		totalNeutrinoOut += txOut.ValueScript
-	}
+	/*	var totalNeutrinoOut uint64
+		for _, txOut := range transactions[0].MsgTx().TxOuts { // the coinbase transaction may have more than one outputs
+			totalNeutrinoOut += txOut.ValueScript
+		}*/
+	totalNeutrinoOut := transactions[0].MsgTx().TxFee // for coinbase transaction, TxFee is used to represent the Value_in
+
 	expectedNeutrinoOut := CalcBlockSubsidy(node.height, b.chainParams) + totalFees
 	if totalNeutrinoOut > expectedNeutrinoOut {
 		str := fmt.Sprintf("coinbase transaction for block pays %v "+
