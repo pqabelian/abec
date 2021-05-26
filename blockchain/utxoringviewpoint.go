@@ -494,7 +494,7 @@ func (entry *UtxoRingEntry) IsSame(obj *UtxoRingEntry) bool {
 	return true
 }
 
-func initNewUtxoRingEntry(ringBlockHeight int32, blockhashs []*chainhash.Hash, ringMemberTxos []*RingMemberTxo, isCoinBase bool) *UtxoRingEntry {
+func initNewUtxoRingEntry(version uint32,ringBlockHeight int32, blockhashs []*chainhash.Hash, ringMemberTxos []*RingMemberTxo, isCoinBase bool) *UtxoRingEntry {
 
 	ringSize := len(ringMemberTxos)
 	if ringSize == 0 {
@@ -511,7 +511,7 @@ func initNewUtxoRingEntry(ringBlockHeight int32, blockhashs []*chainhash.Hash, r
 		outPoints[i] = ringMemberTxos[i].outPoint
 		txOuts[i] = ringMemberTxos[i].txOut
 	}
-
+	utxoRingEntry.Version=version
 	utxoRingEntry.outPointRing = wire.NewOutPointRing(blockhashs, outPoints)
 	utxoRingEntry.txOuts = txOuts
 
@@ -954,7 +954,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 
 			txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
-			ringMemberTxo := NewRingMemberTxo(&txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
+			ringMemberTxo := NewRingMemberTxo(coinBaseTx.MsgTx().Version,&txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
 			allCoinBaseRmTxos = append(allCoinBaseRmTxos, ringMemberTxo)
 		}
 		for _, tx := range block.Transactions()[1:] {
@@ -966,11 +966,12 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 
 				txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
-				ringMemberTxo := NewRingMemberTxo(&txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
+				ringMemberTxo := NewRingMemberTxo(tx.MsgTx().Version,&txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
 				allTransferRmTxos = append(allTransferRmTxos, ringMemberTxo)
 			}
 		}
 	}
+	// TODO: change the version field in node and block to uint32 type?
 	err = view.newUtxoRingEntriesFromTxos(allCoinBaseRmTxos, ringBlockHeight, blockHashs, true)
 	if err != nil {
 		return err
@@ -1110,7 +1111,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 	for i := 0; i < normalRingNum; i++ {
 		// rings with size wire.TxRingSize
 		start := i * wire.TxRingSize
-		utxoRingEntry := initNewUtxoRingEntry(ringBlockHeight, blockhashs, ringMemberTxos[start:start+wire.TxRingSize], isCoinBase)
+		utxoRingEntry := initNewUtxoRingEntry(ringMemberTxos[start].version,ringBlockHeight, blockhashs, ringMemberTxos[start:start+wire.TxRingSize], isCoinBase)
 
 		outPointRingHash := utxoRingEntry.outPointRing.Hash()
 		if existingUtxoRing, ok := view.entries[outPointRingHash]; ok {
@@ -1131,7 +1132,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 
 		// rings with size1
 		start := normalRingNum * wire.TxRingSize
-		utxoRingEntry1 := initNewUtxoRingEntry(ringBlockHeight, blockhashs, ringMemberTxos[start:start+ringSize1], isCoinBase)
+		utxoRingEntry1 := initNewUtxoRingEntry(ringMemberTxos[start].version,ringBlockHeight, blockhashs, ringMemberTxos[start:start+ringSize1], isCoinBase)
 
 		outPointRingHash1 := utxoRingEntry1.outPointRing.Hash()
 		if existingUtxoRing, ok := view.entries[outPointRingHash1]; ok {
@@ -1143,7 +1144,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 
 		// rings with size2
 		start = start + ringSize1
-		utxoRingEntry2 := initNewUtxoRingEntry(ringBlockHeight, blockhashs, ringMemberTxos[start:], isCoinBase)
+		utxoRingEntry2 := initNewUtxoRingEntry(ringMemberTxos[start].version,ringBlockHeight, blockhashs, ringMemberTxos[start:], isCoinBase)
 
 		outPointRingHash2 := utxoRingEntry2.outPointRing.Hash()
 		if existingUtxoRing, ok := view.entries[outPointRingHash2]; ok {
@@ -1156,7 +1157,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 	} else if remainderTxoNum > 0 {
 		//	one ring with size = remainderTxoNum
 		start := normalRingNum * wire.TxRingSize
-		utxoRingEntry := initNewUtxoRingEntry(ringBlockHeight, blockhashs, ringMemberTxos[start:], isCoinBase)
+		utxoRingEntry := initNewUtxoRingEntry(ringMemberTxos[start].version,ringBlockHeight, blockhashs, ringMemberTxos[start:], isCoinBase)
 
 		outPointRingHash := utxoRingEntry.outPointRing.Hash()
 		if existingUtxoRing, ok := view.entries[outPointRingHash]; ok {
@@ -1171,6 +1172,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 }
 
 type RingMemberTxo struct {
+	version uint32
 	orderHash   *chainhash.Hash
 	blockHash   *chainhash.Hash
 	blockHeight int32
@@ -1178,9 +1180,9 @@ type RingMemberTxo struct {
 	txOut       *wire.TxOutAbe
 }
 
-func NewRingMemberTxo(orderHash *chainhash.Hash, blockHash *chainhash.Hash, blockHeight int32, txHash *chainhash.Hash, outIndex uint8, txOut *wire.TxOutAbe) *RingMemberTxo {
+func NewRingMemberTxo(version uint32,orderHash *chainhash.Hash, blockHash *chainhash.Hash, blockHeight int32, txHash *chainhash.Hash, outIndex uint8, txOut *wire.TxOutAbe) *RingMemberTxo {
 	ringMemberTxo := RingMemberTxo{}
-
+	ringMemberTxo.version=version
 	ringMemberTxo.orderHash = orderHash
 
 	ringMemberTxo.blockHash = blockHash
