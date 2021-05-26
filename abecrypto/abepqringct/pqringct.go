@@ -69,8 +69,8 @@ func NewAbeTxInputDesc(serializedTxoList []*wire.TxOutAbe, sidx int, serializedM
 }
 
 type AbeTxInDetail struct {
-	serializedTxoList             []*wire.TxOutAbe
-	serialNumber                  []byte
+	serializedTxoList []*wire.TxOutAbe
+	serialNumber      []byte
 }
 
 /*
@@ -261,7 +261,7 @@ func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxO
 			txoList := make([]*pqringct.TXO, len(abeTxInputDescs[i].serializedTxoList))
 			for j := 0; j < len(abeTxInputDescs[i].serializedTxoList); j++ {
 				if abeTxInputDescs[i].serializedTxoList[j].Version != inputsVersion {
-					return nil, errors.New("the version of Txos in abeTxInputDescs.serializedTxoList does not match the version in the corresponding TxIn")
+					return nil, errors.New("the version of TXOs in abeTxInputDescs.serializedTxoList does not match the version in the corresponding TxIn")
 				}
 
 				txo := &pqringct.TXO{}
@@ -274,15 +274,15 @@ func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxO
 
 			cryptoSchemeInInputDesc := binary.BigEndian.Uint32(abeTxInputDescs[i].serializedMasterPublicKey[:4])
 			if abecrypto.CryptoScheme(cryptoSchemeInInputDesc) != abecrypto.CryptoSchemePQRINGCT {
-				return nil, errors.New("the cryptoScheme in the serializedMasterPublicKey in the TxInputDesc does not match that implied by the trsnsferTx.version")
+				return nil, errors.New("the cryptoScheme of the MasterPublicKey in the TxInputDesc does not match that implied by the consumed TXO")
 			}
 			cryptoSchemeInInputDesc = binary.BigEndian.Uint32(abeTxInputDescs[i].serializedMasterSecretViewKey[:4])
 			if abecrypto.CryptoScheme(cryptoSchemeInInputDesc) != abecrypto.CryptoSchemePQRINGCT {
-				return nil, errors.New("the cryptoScheme in the serializedMasterSecretViewKey in the TxInputDesc does not match that implied by the trsnsferTx.version")
+				return nil, errors.New("the cryptoScheme of the MasterSecretViewKey in the TxInputDesc does not match that implied by the consumed TXO")
 			}
 			cryptoSchemeInInputDesc = binary.BigEndian.Uint32(abeTxInputDescs[i].serializedMasterSecretSignKey[:4])
 			if abecrypto.CryptoScheme(cryptoSchemeInInputDesc) != abecrypto.CryptoSchemePQRINGCT {
-				return nil, errors.New("the cryptoScheme in the serializedMasterSecretSignKey in the TxInputDesc does not match that implied by the trsnsferTx.version")
+				return nil, errors.New("the cryptoScheme of the MasterSecretSignKey in the TxInputDesc does not match that implied by the consumed TXO")
 			}
 
 			mpk := &pqringct.MasterPublicKey{}
@@ -364,7 +364,6 @@ func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxO
 	return nil, nil
 }
 
-
 func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail) bool {
 	if transferTx == nil {
 		return false
@@ -399,7 +398,7 @@ func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail
 			}
 
 			txoList := make([]*pqringct.TXO, len(abeTxInDetails[i].serializedTxoList))
-			for j := 0; j < len(abeTxInDetails[i].serializedTxoList) ; j++ {
+			for j := 0; j < len(abeTxInDetails[i].serializedTxoList); j++ {
 				if abeTxInDetails[i].serializedTxoList[j].Version != transferTx.TxIns[i].Version {
 					return false
 					//	The TXOs in the same ring should have the same version
@@ -426,7 +425,7 @@ func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail
 			}
 
 			cryptoTransferTx.OutputTxos[j] = &pqringct.TXO{}
-			err:= cryptoTransferTx.OutputTxos[j].Deserialize(transferTx.TxOuts[j].TxoScript)
+			err := cryptoTransferTx.OutputTxos[j].Deserialize(transferTx.TxOuts[j].TxoScript)
 			if err != nil {
 				return false
 			}
@@ -448,7 +447,7 @@ func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail
 		}
 
 		// call the crypto scheme's verify algroithm
-		bl, err := cryptoPP.TransferTxVerify( cryptoTransferTx )
+		bl, err := cryptoPP.TransferTxVerify(cryptoTransferTx)
 		if err != nil || bl == false {
 			return false
 		}
@@ -460,4 +459,67 @@ func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail
 
 	return false
 
+}
+
+func TxoSerialNumberGen(abeTxo *wire.TxOutAbe, serialzedMpk []byte, serializedMsvk []byte, serializedMssk []byte) (sn []byte, reterr error) {
+	if abeTxo == nil {
+		return nil, errors.New("cannot generate serial number for nil Txo")
+	}
+
+	if len(serialzedMpk) <= 4 || len(serializedMsvk) <= 4 || len(serializedMssk) <= 4 {
+		return nil, errors.New("incorrect format of input keys")
+	}
+
+	cryptoSchemeInTxo := abecrypto.GetCryptoScheme(abeTxo.Version)
+	cryptoSchemeInKeys := binary.BigEndian.Uint32(serialzedMpk[:4])
+	if abecrypto.CryptoScheme(cryptoSchemeInKeys) != cryptoSchemeInTxo {
+		return nil, errors.New("the cryptoScheme of the Master Public Key does not match that of the TXO")
+	}
+	cryptoSchemeInKeys = binary.BigEndian.Uint32(serializedMsvk[:4])
+	if abecrypto.CryptoScheme(cryptoSchemeInKeys) != cryptoSchemeInTxo {
+		return nil, errors.New("the cryptoScheme of the Master Secret View Key does not match that of the TXO")
+	}
+	cryptoSchemeInKeys = binary.BigEndian.Uint32(serializedMssk[:4])
+	if abecrypto.CryptoScheme(cryptoSchemeInKeys) != cryptoSchemeInTxo {
+		return nil, errors.New("the cryptoScheme of the Master Secret Sign Key does not match that of the TXO")
+	}
+
+	if cryptoSchemeInTxo == abecrypto.CryptoSchemePQRINGCT {
+		mpk := &pqringct.MasterPublicKey{}
+		err := mpk.Deserialize(serialzedMpk[4:])
+		if err != nil {
+			return nil, err
+		}
+
+		msvk := &pqringct.MasterSecretViewKey{}
+		err = msvk.Deserialize(serializedMsvk[4:])
+		if err != nil {
+			return nil, err
+		}
+
+		mssk := &pqringct.MasterSecretSignKey{}
+		err = mssk.Deserialize(serializedMssk[4:])
+		if err != nil {
+			return nil, err
+		}
+
+		cryptoTxo := &pqringct.TXO{}
+		err = cryptoTxo.Deserialize(abeTxo.TxoScript)
+		if err != nil {
+			return nil, err
+		}
+
+		retsn, err := cryptoPP.TxoSerialNumberGen(cryptoTxo, mpk, msvk, mssk)
+		if err != nil {
+			return nil, err
+		}
+
+		return retsn, nil
+
+	} else {
+		panic("Unsupported version appears! Implement here.")
+		// todo: if there is any more version to support, implement it here
+	}
+
+	return nil, nil
 }
