@@ -77,11 +77,15 @@ type AbeTxInDetail struct {
 The caller should know and specify the exact MasterKeyGen() for particular pqringct version.
 */
 //	todo: input and output seed
-func MasterKeyGen(inputSeed []byte, cryptoScheme abecrypto.CryptoScheme) (seed []byte, serializedMpk []byte, serializedMsvk []byte, serializedMssk []byte, err error) {
+func MasterKeyGen(inputSeed []byte, cryptoScheme abecrypto.CryptoScheme) (serializedSeed []byte, serializedMpk []byte, serializedMsvk []byte, serializedMssk []byte, err error) {
 	if len(inputSeed) != 0 {
+		if len(inputSeed) <= 4 {
+			err := errors.New("the leng of the inputSeed is smaller than 4")
+			return nil, nil, nil, nil, err
+		}
 		cryptoSchemeInSeed := binary.BigEndian.Uint32(inputSeed[:4])
-		if uint32(cryptoScheme) != cryptoSchemeInSeed {
-			err := errors.New("the CryptoScheme does not match that in the inputSeed")
+		if cryptoSchemeInSeed != uint32(cryptoScheme) {
+			err := errors.New("the CryptoScheme in the sedd does not match the input CryptoScheme")
 			return nil, nil, nil, nil, err
 		}
 	}
@@ -89,9 +93,14 @@ func MasterKeyGen(inputSeed []byte, cryptoScheme abecrypto.CryptoScheme) (seed [
 	var mpk MasterPublicKeyIfc
 	var msvk MasterSecretViewKeyIfc
 	var mssk MasterSecretSignKeyIfc
+	var seed []byte
 
 	if cryptoScheme == abecrypto.CryptoSchemePQRINGCT {
-		mpk, msvk, mssk, err = cryptoPP.MasterKeyGen(inputSeed)
+		if inputSeed != nil {
+			mpk, msvk, mssk, err = cryptoPP.MasterKeyGen(inputSeed[4:])
+		} else {
+			mpk, msvk, mssk, err = cryptoPP.MasterKeyGen(nil)
+		}
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -100,7 +109,12 @@ func MasterKeyGen(inputSeed []byte, cryptoScheme abecrypto.CryptoScheme) (seed [
 		// todo: if there is any more version to support, implement it here
 	}
 
-	//	todo: seed
+	retseedSer := inputSeed
+	if inputSeed == nil {
+		retseedSer := make([]byte, 4 + len(seed))
+		binary.BigEndian.PutUint32(retseedSer, uint32(cryptoScheme))
+		copy(retseedSer[4:], seed)
+	}
 
 	retmpkSer := make([]byte, 4+mpk.SerializeSize())
 	binary.BigEndian.PutUint32(retmpkSer, uint32(cryptoScheme))
@@ -114,7 +128,7 @@ func MasterKeyGen(inputSeed []byte, cryptoScheme abecrypto.CryptoScheme) (seed [
 	binary.BigEndian.PutUint32(retmsskSer, uint32(cryptoScheme))
 	copy(retmsskSer[4:], mssk.Serialize())
 
-	return nil, retmpkSer, retmsvkSer, retmsskSer, nil
+	return retseedSer, retmpkSer, retmsvkSer, retmsskSer, nil
 }
 
 /*
