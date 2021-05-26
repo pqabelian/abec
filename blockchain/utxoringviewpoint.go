@@ -919,41 +919,18 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 	blocksNum := len(blocks)
 
 	blockHashs := make([]*chainhash.Hash, blocksNum)
-	//coinBaseRmTxoNum := 0
-	//transferRmTxoNum := 0
+	coinBaseRmTxoNum := 0
+	transferRmTxoNum := 0
 	for i := 0; i < blocksNum; i++ {
 		blockHashs[i] = blocks[i].Hash()
-		//TODO(abe): for testing 1,2,5,10, there may more than one output in coinbase transaction
-		//coinBaseRmTxoNum += len(blocks[i].Transactions()[0].MsgTx().TxOuts)
-		//for _, tx := range blocks[i].Transactions()[1:] {
-		//	transferRmTxoNum += len(tx.MsgTx().TxOuts)
-		//}
-	}
-	allCoinBaseRmTxos, allTransferRmTxos := NewUTXORingEntriesPreparation(blocks)
 
-	for i := 0; i < 9; i++ {
-		if len(allCoinBaseRmTxos[i]) != 0 {
-			err = view.NewUtxoRingEntriesFromTxos(allCoinBaseRmTxos[i], ringBlockHeight, blockHashs, true)
-			if err != nil {
-				return err
-			}
-		}
-		if len(allTransferRmTxos[i]) != 0 {
-			err = view.NewUtxoRingEntriesFromTxos(allTransferRmTxos[i], ringBlockHeight, blockHashs, false)
-			if err != nil {
-				return err
-			}
+		coinBaseRmTxoNum += len(blocks[i].Transactions()[0].MsgTx().TxOuts)
+		for _, tx := range blocks[i].Transactions()[1:] {
+			transferRmTxoNum += len(tx.MsgTx().TxOuts)
 		}
 	}
-	return nil
-
-}
-
-func NewUTXORingEntriesPreparation(blocks []*abeutil.BlockAbe) ([][]*RingMemberTxo, [][]*RingMemberTxo) {
-	blocksNum := len(blocks)
-	values := map[int64]int{500: 0, 200: 1, 100: 2, 50: 3, 20: 4, 10: 5, 5: 6, 2: 7, 1: 8}
-	allCoinBaseRmTxos := make([][]*RingMemberTxo, 9)
-	allTransferRmTxos := make([][]*RingMemberTxo, 9)
+	allCoinBaseRmTxos := make([]*RingMemberTxo, 0, coinBaseRmTxoNum)
+	allTransferRmTxos := make([]*RingMemberTxo, 0, transferRmTxoNum)
 
 	// str = block1.hash, block2.hash, block3.hash, blockhash, txHash, outIndex
 	// all Txos are ordered by Hash(str), then grouped into rings
@@ -978,10 +955,8 @@ func NewUTXORingEntriesPreparation(blocks []*abeutil.BlockAbe) ([][]*RingMemberT
 			txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
 			ringMemberTxo := NewRingMemberTxo(&txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
-			index := values[txOut.ValueScript/abeutil.NeutrinoPerAbe]
-			allCoinBaseRmTxos[index] = append(allCoinBaseRmTxos[index], ringMemberTxo)
+			allCoinBaseRmTxos = append(allCoinBaseRmTxos, ringMemberTxo)
 		}
-
 		for _, tx := range block.Transactions()[1:] {
 			txHash := tx.Hash()
 			copy(txoSortStr[(blocksNum+1)*chainhash.HashSize:], txHash[:])
@@ -992,12 +967,21 @@ func NewUTXORingEntriesPreparation(blocks []*abeutil.BlockAbe) ([][]*RingMemberT
 				txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
 				ringMemberTxo := NewRingMemberTxo(&txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
-				index := values[txOut.ValueScript/abeutil.NeutrinoPerAbe]
-				allTransferRmTxos[index] = append(allTransferRmTxos[index], ringMemberTxo)
+				allTransferRmTxos = append(allTransferRmTxos, ringMemberTxo)
 			}
 		}
 	}
-	return allCoinBaseRmTxos, allTransferRmTxos
+	err = view.newUtxoRingEntriesFromTxos(allCoinBaseRmTxos, ringBlockHeight, blockHashs, true)
+	if err != nil {
+		return err
+	}
+
+	err = view.newUtxoRingEntriesFromTxos(allTransferRmTxos, ringBlockHeight, blockHashs, false)
+	if err != nil {
+		return err
+	}
+	return nil
+
 }
 
 /*func (view *UtxoRingViewpoint) newUtxoRingEntriesFromBlocks(blocks []*abeutil.BlockAbe) error {
@@ -1094,7 +1078,7 @@ func NewUTXORingEntriesPreparation(blocks []*abeutil.BlockAbe) ([][]*RingMemberT
 	return nil
 }*/
 
-func (view *UtxoRingViewpoint) NewUtxoRingEntriesFromTxos(ringMemberTxos []*RingMemberTxo, ringBlockHeight int32, blockhashs []*chainhash.Hash, isCoinBase bool) error {
+func (view *UtxoRingViewpoint) newUtxoRingEntriesFromTxos(ringMemberTxos []*RingMemberTxo, ringBlockHeight int32, blockhashs []*chainhash.Hash, isCoinBase bool) error {
 
 	if len(ringMemberTxos) == 0 {
 		return nil

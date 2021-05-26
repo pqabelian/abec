@@ -9,7 +9,7 @@ import (
 	"github.com/abesuite/abec/wire"
 	"github.com/cryptosuite/pqringct"
 )
-
+// TODO: import cycle not allowed wire->abepqringct->wire
 var cryptoPP *pqringct.PublicParameter = pqringct.DefaultPP
 
 //	todo:
