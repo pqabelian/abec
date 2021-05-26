@@ -84,15 +84,14 @@ func MasterKeyGen(inputSeed []byte, cryptoScheme abecrypto.CryptoScheme) (seed [
 	var msvk MasterSecretViewKeyIfc
 	var mssk MasterSecretSignKeyIfc
 
-	switch cryptoScheme {
-	case abecrypto.CryptoSchemePQRINGCT:
+	if cryptoScheme == abecrypto.CryptoSchemePQRINGCT {
 		mpk, msvk, mssk, err = cryptoPP.MasterKeyGen(inputSeed)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
-
-	case abecrypto.CryptoSchemePQRINGCTV2:
-		// todo: reserve for future versions
+	} else if false {
+		panic("Unsupported version appears! Implement here.")
+		// todo: if there is any more version to support, implement it here
 	}
 
 	//	todo: seed
@@ -159,10 +158,62 @@ func CoinbaseTxGen(abeTxOutDescs []*AbeTxOutDesc, coinbaseTxMsgTemplate *wire.Ms
 
 		return coinbaseTxMsgTemplate, nil
 	} else if false {
+		panic("Unsupported version appears! Implement here.")
 		// todo: if there is any more version to support, implement it here
 	}
 
 	return nil, nil
+}
+
+/*
+The caller needs to guarantee the well-form of the input coinbaseTx *wire.MsgTxAbe, such as the TxIns.
+This function only checks the balance proof, by calling the crypto-scheme.
+*/
+func CoinbaseTxVerify(coinbaseTx *wire.MsgTxAbe) bool {
+	if coinbaseTx == nil {
+		return false
+	}
+
+	if len(coinbaseTx.TxOuts) <= 0 {
+		return false
+	}
+
+	cryptoScheme := abecrypto.GetCryptoScheme(coinbaseTx.Version)
+	if cryptoScheme == abecrypto.CryptoSchemePQRINGCT {
+		cryptoCoinbaseTx := &pqringct.CoinbaseTx{}
+
+		cryptoCoinbaseTx.Vin = coinbaseTx.TxFee
+
+		cryptoCoinbaseTx.TxWitness = &pqringct.CbTxWitness{}
+		err := cryptoCoinbaseTx.TxWitness.Deserialize(coinbaseTx.TxWitness)
+		if err != nil {
+			return false
+		}
+
+		cryptoCoinbaseTx.OutputTxos = make([]*pqringct.TXO, len(coinbaseTx.TxOuts))
+		for i := 0; i < len(coinbaseTx.TxOuts); i++ {
+			if coinbaseTx.TxOuts[i].Version != coinbaseTx.Version {
+				return false
+			}
+			txo := &pqringct.TXO{}
+			err := txo.Deserialize(coinbaseTx.TxOuts[i].TxoScript)
+			if err != nil {
+				return false
+			}
+
+			cryptoCoinbaseTx.OutputTxos[i] = txo
+		}
+
+		bl, err := cryptoPP.CoinbaseTxVerify(cryptoCoinbaseTx)
+		if err != nil || bl == false {
+			return false
+		}
+	} else if false {
+		panic("Unsupported version appears! Implement here.")
+		// todo: if there is any more version to support, implement it here
+	}
+
+	return false
 }
 
 /*
