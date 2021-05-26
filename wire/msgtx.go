@@ -1204,6 +1204,7 @@ func NewOutPointAbe(txHash *chainhash.Hash, index uint8) *OutPointAbe {
 //	todo: shall the ringBlockHeight be added?
 type OutPointRing struct {
 	// TODO(abe): these three successive block hash can be replaced by the hash of block whose heigt equal to 3K+2
+	Version uint32 //	All TXOs in a ring has the same version, and this version is set to be the ring Version.
 	BlockHashs []*chainhash.Hash //	the hashs for the blocks from which the ring was generated, at this moment it is 3 successive blocks
 	OutPoints  []*OutPointAbe
 }
@@ -1211,11 +1212,16 @@ type OutPointRing struct {
 func (outPointRing *OutPointRing) SerializeSize() int {
 	blockNum := len(outPointRing.BlockHashs)
 	OutPointNum := len(outPointRing.OutPoints)
-	return VarIntSerializeSize(uint64(blockNum)) + blockNum*chainhash.HashSize + VarIntSerializeSize(uint64(OutPointNum)) + OutPointNum*(chainhash.HashSize+1)
+	return 4 + VarIntSerializeSize(uint64(blockNum)) + blockNum*chainhash.HashSize + VarIntSerializeSize(uint64(OutPointNum)) + OutPointNum*(chainhash.HashSize+1)
 }
 
 func (outPointRing *OutPointRing) Serialize(w io.Writer) error {
-	err := WriteVarInt(w, 0, uint64(len(outPointRing.BlockHashs)))
+	err := binarySerializer.PutUint32(w, littleEndian, outPointRing.Version)
+	if err != nil {
+		return err
+	}
+
+	err = WriteVarInt(w, 0, uint64(len(outPointRing.BlockHashs)))
 	if err != nil {
 		return err
 	}
@@ -1242,6 +1248,10 @@ func (outPointRing *OutPointRing) Serialize(w io.Writer) error {
 }
 
 func (outPointRing *OutPointRing) Deserialize(r io.Reader) error {
+	err := readElement(r, &outPointRing.Version)
+	if err != nil {
+		return err
+	}
 
 	blockNum, err := ReadVarInt(r, 0)
 	if err != nil {
@@ -1306,7 +1316,9 @@ func (outPointRing *OutPointRing) String() string {
 	// digits, which will fit any uint32.
 	// TxHash:index; TxHash:index; ...; serialNumber
 	//	index is at most 2 decimal digits; at this moment, only 1 decimal digits
+
 	strLen := len(outPointRing.BlockHashs)*(2*chainhash.HashSize+1) + len(outPointRing.OutPoints)*(2*chainhash.HashSize+1+2+1)
+	// Version is not included in the string
 
 	buf := make([]byte, strLen)
 
@@ -1334,17 +1346,17 @@ func (outPointRing *OutPointRing) String() string {
 	return string(buf[0:start])
 }
 
-func NewOutPointRing(blockHashs []*chainhash.Hash, outPoints []*OutPointAbe) *OutPointRing {
+func NewOutPointRing(version uint32, blockHashs []*chainhash.Hash, outPoints []*OutPointAbe) *OutPointRing {
 	return &OutPointRing{
-		BlockHashs: blockHashs,
-		OutPoints:  outPoints,
+		version,
+		blockHashs,
+		outPoints,
 	}
 }
 
 //	SerialNumber appears only when some ring member is consumed in TxIn,
 //	i.e. logically, SerialNumber accompanies with TxIn.
 type TxInAbe struct {
-	Version      uint32
 	SerialNumber []byte
 	//	identify the consumed OutPoint
 	PreviousOutPointRing OutPointRing
@@ -1353,9 +1365,8 @@ type TxInAbe struct {
 // NewTxIn returns a new bitcoin transaction input with the provided
 // previous outpoint point and signature script with a default sequence of
 // MaxTxInSequenceNum.
-func NewTxInAbe(version uint32, serialNumber []byte, previousOutPointRing *OutPointRing) *TxInAbe {
+func NewTxInAbe(serialNumber []byte, previousOutPointRing *OutPointRing) *TxInAbe {
 	return &TxInAbe{
-		Version:              version,
 		SerialNumber:         serialNumber,
 		PreviousOutPointRing: *previousOutPointRing,
 	}
@@ -1379,7 +1390,7 @@ func (txIn *TxInAbe) String() string {
 	// TxHash:index; TxHash:index; ...; serialNumber
 	//	index is at most 2 decimal digits; at this moment, only 1 decimal digits
 
-	strLen := abepqringct.GetTxoSerialNumberLen(txIn.Version) + 1 + len(txIn.PreviousOutPointRing.BlockHashs)*(2*chainhash.HashSize+1) + len(txIn.PreviousOutPointRing.OutPoints)*(2*chainhash.HashSize+1+2+1)
+	strLen := abepqringct.GetTxoSerialNumberLen(txIn.PreviousOutPointRing.Version) + 1 + len(txIn.PreviousOutPointRing.BlockHashs)*(2*chainhash.HashSize+1) + len(txIn.PreviousOutPointRing.OutPoints)*(2*chainhash.HashSize+1+2+1)
 
 	buf := make([]byte, strLen)
 
@@ -1447,16 +1458,11 @@ func (txIn *TxInAbe) RingMemberHash() chainhash.Hash {
 
 func (txIn *TxInAbe) SerializeSize() int {
 	// chainhash.HashSize for SerialNumber
-	return 4 + abepqringct.GetTxoSerialNumberLen(txIn.Version) + txIn.PreviousOutPointRing.SerializeSize()
+	return abepqringct.GetTxoSerialNumberLen(txIn.PreviousOutPointRing.Version) + txIn.PreviousOutPointRing.SerializeSize()
 }
 
 func (txIn *TxInAbe) Serialize(w io.Writer) error {
-	err := binarySerializer.PutUint32(w, littleEndian, txIn.Version)
-	if err != nil {
-		return err
-	}
-
-	_, err = w.Write(txIn.SerialNumber[:])
+	_, err := w.Write(txIn.SerialNumber[:])
 	if err != nil {
 		return err
 	}
@@ -1470,13 +1476,8 @@ func (txIn *TxInAbe) Serialize(w io.Writer) error {
 }
 
 func (txIn *TxInAbe) Deserialize(r io.Reader) error {
-	err := readElement(r, &txIn.Version)
-	if err != nil {
-		return err
-	}
-
-	txIn.SerialNumber = make([]byte, abepqringct.GetTxoSerialNumberLen(txIn.Version))
-	_, err = io.ReadFull(r, txIn.SerialNumber[:])
+	txIn.SerialNumber = make([]byte, abepqringct.GetTxoSerialNumberLen(txIn.PreviousOutPointRing.Version))
+	_, err := io.ReadFull(r, txIn.SerialNumber[:])
 	if err != nil {
 		return err
 	}
@@ -1492,12 +1493,7 @@ func (txIn *TxInAbe) Deserialize(r io.Reader) error {
 // writeTxIn encodes txIn to the bitcoin protocol encoding for a transaction
 // input (TxIn) to w.
 func writeTxInAbe(w io.Writer, pver uint32, txIn *TxInAbe) error {
-	err := binarySerializer.PutUint32(w, littleEndian, txIn.Version)
-	if err != nil {
-		return err
-	}
-
-	_, err = w.Write(txIn.SerialNumber[:])
+	_, err := w.Write(txIn.SerialNumber[:])
 	if err != nil {
 		return err
 	}
@@ -1531,12 +1527,7 @@ func writeTxInAbe(w io.Writer, pver uint32, txIn *TxInAbe) error {
 // readTxIn reads the next sequence of bytes from r as a transaction input
 // (TxIn).
 func readTxInAbe(r io.Reader, pver uint32, txIn *TxInAbe) error {
-	err := readElement(r, txIn.Version)
-	if err != nil {
-		return err
-	}
-
-	txIn.SerialNumber = make([]byte, abepqringct.GetTxoSerialNumberLen(txIn.Version))
+	txIn.SerialNumber = make([]byte, abepqringct.GetTxoSerialNumberLen(txIn.PreviousOutPointRing.Version))
 	_, errSn := io.ReadFull(r, txIn.SerialNumber[:])
 	if errSn != nil {
 		return errSn
@@ -1824,7 +1815,7 @@ func (msg *MsgTxAbe) IsCoinBase() bool {
 	// Whatever ths ring members for the TxIns[0]
 	// the ring members' (TXHash, index) can be used as coin-nonce
 	txIn := msg.TxIns[0]
-	if bytes.Compare(txIn.SerialNumber, abepqringct.GetNullSerialNumber(txIn.Version)) != 0 {
+	if bytes.Compare(txIn.SerialNumber, abepqringct.GetNullSerialNumber(txIn.PreviousOutPointRing.Version)) != 0 {
 		return false
 	}
 
@@ -2609,11 +2600,11 @@ func NewMsgTxAbe(version uint32) *MsgTxAbe {
 
 func NewStandardCoinbaseTxIn(nextBlockHeight int32, extraNonce uint64, version uint32) *TxInAbe {
 	txIn := &TxInAbe{}
-	txIn.Version = version
 
 	txIn.SerialNumber = abepqringct.GetNullSerialNumber(version)
 
 	previousOutPointRing := OutPointRing{}
+	previousOutPointRing.Version = version // this does not make sense, since this is an 'empty' ring
 	previousOutPointRing.BlockHashs = make([]*chainhash.Hash, 3)
 	hash0 := chainhash.Hash{}
 	binary.BigEndian.PutUint32(hash0[0:4], uint32(nextBlockHeight))

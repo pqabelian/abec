@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/abesuite/abec/abecrypto/abepqringct"
 	"github.com/abesuite/abec/abeutil"
@@ -34,7 +35,7 @@ type UtxoRingEntry struct {
 		// usage since there will be a lot of these in memory.
 		packedFlags txoFlags*/
 
-	Version uint32
+//	Version uint32
 	//	ringHash	chainhash.Hash	//	the hash of ring members, i.e. OutPoint(txHash, index)
 	ringBlockHeight int32
 	outPointRing    *wire.OutPointRing
@@ -344,7 +345,7 @@ func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 		entry.serialNumbers = make([][]byte, consumedNum)
 		//	serialNumbers
 		for i := uint64(0); i < consumedNum; i++ {
-			serialNumber := make([]byte, abepqringct.GetTxoSerialNumberLen(entry.Version))
+			serialNumber := make([]byte, abepqringct.GetTxoSerialNumberLen(entry.outPointRing.Version))
 			_, err := io.ReadFull(r, serialNumber[:])
 			if err != nil {
 				return err
@@ -494,11 +495,11 @@ func (entry *UtxoRingEntry) IsSame(obj *UtxoRingEntry) bool {
 	return true
 }
 
-func initNewUtxoRingEntry(version uint32,ringBlockHeight int32, blockhashs []*chainhash.Hash, ringMemberTxos []*RingMemberTxo, isCoinBase bool) *UtxoRingEntry {
+func initNewUtxoRingEntry(version uint32,ringBlockHeight int32, blockhashs []*chainhash.Hash, ringMemberTxos []*RingMemberTxo, isCoinBase bool) (*UtxoRingEntry, error) {
 
 	ringSize := len(ringMemberTxos)
 	if ringSize == 0 {
-		return nil
+		return nil, nil
 	}
 
 	utxoRingEntry := &UtxoRingEntry{
@@ -510,9 +511,12 @@ func initNewUtxoRingEntry(version uint32,ringBlockHeight int32, blockhashs []*ch
 	for i := 0; i < ringSize; i++ {
 		outPoints[i] = ringMemberTxos[i].outPoint
 		txOuts[i] = ringMemberTxos[i].txOut
+		if txOuts[i].Version != version {
+			return nil, errors.New("the TXOS to be in a ring do not have the same version")
+		}
 	}
-	utxoRingEntry.Version=version
-	utxoRingEntry.outPointRing = wire.NewOutPointRing(blockhashs, outPoints)
+
+	utxoRingEntry.outPointRing = wire.NewOutPointRing(version, blockhashs, outPoints)
 	utxoRingEntry.txOuts = txOuts
 
 	utxoRingEntry.serialNumbers = nil
@@ -523,7 +527,7 @@ func initNewUtxoRingEntry(version uint32,ringBlockHeight int32, blockhashs []*ch
 		utxoRingEntry.packedFlags |= tfCoinBase
 	}
 
-	return utxoRingEntry
+	return utxoRingEntry, nil
 }
 
 // UtxoViewpoint represents a view into the set of unspent transaction outputs
@@ -1111,7 +1115,10 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 	for i := 0; i < normalRingNum; i++ {
 		// rings with size wire.TxRingSize
 		start := i * wire.TxRingSize
-		utxoRingEntry := initNewUtxoRingEntry(ringMemberTxos[start].version,ringBlockHeight, blockhashs, ringMemberTxos[start:start+wire.TxRingSize], isCoinBase)
+		utxoRingEntry, err := initNewUtxoRingEntry(ringMemberTxos[start].version,ringBlockHeight, blockhashs, ringMemberTxos[start:start+wire.TxRingSize], isCoinBase)
+		if err != nil {
+			return err
+		}
 
 		outPointRingHash := utxoRingEntry.outPointRing.Hash()
 		if existingUtxoRing, ok := view.entries[outPointRingHash]; ok {
@@ -1132,7 +1139,10 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 
 		// rings with size1
 		start := normalRingNum * wire.TxRingSize
-		utxoRingEntry1 := initNewUtxoRingEntry(ringMemberTxos[start].version,ringBlockHeight, blockhashs, ringMemberTxos[start:start+ringSize1], isCoinBase)
+		utxoRingEntry1, err := initNewUtxoRingEntry(ringMemberTxos[start].version,ringBlockHeight, blockhashs, ringMemberTxos[start:start+ringSize1], isCoinBase)
+		if err != nil {
+			return err
+		}
 
 		outPointRingHash1 := utxoRingEntry1.outPointRing.Hash()
 		if existingUtxoRing, ok := view.entries[outPointRingHash1]; ok {
@@ -1144,7 +1154,10 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 
 		// rings with size2
 		start = start + ringSize1
-		utxoRingEntry2 := initNewUtxoRingEntry(ringMemberTxos[start].version,ringBlockHeight, blockhashs, ringMemberTxos[start:], isCoinBase)
+		utxoRingEntry2, err := initNewUtxoRingEntry(ringMemberTxos[start].version,ringBlockHeight, blockhashs, ringMemberTxos[start:], isCoinBase)
+		if err != nil {
+			return err
+		}
 
 		outPointRingHash2 := utxoRingEntry2.outPointRing.Hash()
 		if existingUtxoRing, ok := view.entries[outPointRingHash2]; ok {
@@ -1157,7 +1170,10 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 	} else if remainderTxoNum > 0 {
 		//	one ring with size = remainderTxoNum
 		start := normalRingNum * wire.TxRingSize
-		utxoRingEntry := initNewUtxoRingEntry(ringMemberTxos[start].version,ringBlockHeight, blockhashs, ringMemberTxos[start:], isCoinBase)
+		utxoRingEntry, err := initNewUtxoRingEntry(ringMemberTxos[start].version,ringBlockHeight, blockhashs, ringMemberTxos[start:], isCoinBase)
+		if err != nil {
+			return err
+		}
 
 		outPointRingHash := utxoRingEntry.outPointRing.Hash()
 		if existingUtxoRing, ok := view.entries[outPointRingHash]; ok {

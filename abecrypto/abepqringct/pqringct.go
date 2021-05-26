@@ -261,14 +261,14 @@ func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxO
 		return nil, errors.New("the number of InputDesc does not match the number of TxIn in transferTxMsgTemplate")
 	}
 
-	inputsVersion := transferTxMsgTemplate.TxIns[0].Version
+	inputsVersion := transferTxMsgTemplate.TxIns[0].PreviousOutPointRing.Version
 	outputsVersion := transferTxMsgTemplate.Version
 
 	if abecrypto.GetCryptoScheme(inputsVersion) == abecrypto.CryptoSchemePQRINGCT && abecrypto.GetCryptoScheme(outputsVersion) == abecrypto.CryptoSchemePQRINGCT {
 		//	inputDescs
 		txInputDescs := make([]*pqringct.TxInputDesc, inputNum)
 		for i := 0; i < inputNum; i++ {
-			if transferTxMsgTemplate.TxIns[i].Version != inputsVersion {
+			if transferTxMsgTemplate.TxIns[i].PreviousOutPointRing.Version != inputsVersion {
 				return nil, errors.New("the version of the TxIn in one transaction should be the same")
 			}
 
@@ -393,7 +393,7 @@ func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail
 		return false
 	}
 
-	inputsVersion := transferTx.TxIns[0].Version
+	inputsVersion := transferTx.TxIns[0].PreviousOutPointRing.Version
 	outputsVersion := transferTx.Version
 
 	if abecrypto.GetCryptoScheme(inputsVersion) == abecrypto.CryptoSchemePQRINGCT && abecrypto.GetCryptoScheme(outputsVersion) == abecrypto.CryptoSchemePQRINGCT {
@@ -402,7 +402,7 @@ func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail
 		//	Inputs
 		cryptoTransferTx.Inputs = make([]*pqringct.TrTxInput, inputNum)
 		for i := 0; i < inputNum; i++ {
-			if transferTx.TxIns[i].Version != inputsVersion {
+			if transferTx.TxIns[i].PreviousOutPointRing.Version != inputsVersion {
 				return false
 				//	This is necessary, since the same version will ensure that when calling the cryptoscheme, there are not exceptions.
 			}
@@ -413,7 +413,7 @@ func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail
 
 			txoList := make([]*pqringct.TXO, len(abeTxInDetails[i].serializedTxoList))
 			for j := 0; j < len(abeTxInDetails[i].serializedTxoList); j++ {
-				if abeTxInDetails[i].serializedTxoList[j].Version != transferTx.TxIns[i].Version {
+				if abeTxInDetails[i].serializedTxoList[j].Version != transferTx.TxIns[i].PreviousOutPointRing.Version {
 					return false
 					//	The TXOs in the same ring should have the same version
 				}
