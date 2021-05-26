@@ -96,10 +96,10 @@ func MasterKeyGen(inputSeed []byte, cryptoScheme abecrypto.CryptoScheme) (serial
 	var seed []byte
 
 	if cryptoScheme == abecrypto.CryptoSchemePQRINGCT {
-		if inputSeed != nil {
-			seed,mpk, msvk, mssk, err = cryptoPP.MasterKeyGen(inputSeed[4:])
+		if len(inputSeed) != 0 {
+			seed, mpk, msvk, mssk, err = cryptoPP.MasterKeyGen(inputSeed[4:])
 		} else {
-			seed,mpk, msvk, mssk, err = cryptoPP.MasterKeyGen(nil)
+			seed, mpk, msvk, mssk, err = cryptoPP.MasterKeyGen(nil)
 		}
 		if err != nil {
 			return nil, nil, nil, nil, err
@@ -110,7 +110,7 @@ func MasterKeyGen(inputSeed []byte, cryptoScheme abecrypto.CryptoScheme) (serial
 	}
 
 	retseedSer := inputSeed
-	if inputSeed == nil {
+	if len(inputSeed) == 0 {
 		retseedSer := make([]byte, 4 + len(seed))
 		binary.BigEndian.PutUint32(retseedSer, uint32(cryptoScheme))
 		copy(retseedSer[4:], seed)
