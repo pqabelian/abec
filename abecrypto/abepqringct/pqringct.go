@@ -97,9 +97,9 @@ func MasterKeyGen(inputSeed []byte, cryptoScheme abecrypto.CryptoScheme) (serial
 
 	if cryptoScheme == abecrypto.CryptoSchemePQRINGCT {
 		if inputSeed != nil {
-			mpk, msvk, mssk, err = cryptoPP.MasterKeyGen(inputSeed[4:])
+			seed,mpk, msvk, mssk, err = cryptoPP.MasterKeyGen(inputSeed[4:])
 		} else {
-			mpk, msvk, mssk, err = cryptoPP.MasterKeyGen(nil)
+			seed,mpk, msvk, mssk, err = cryptoPP.MasterKeyGen(nil)
 		}
 		if err != nil {
 			return nil, nil, nil, nil, err
@@ -225,8 +225,8 @@ func CoinbaseTxVerify(coinbaseTx *wire.MsgTxAbe) bool {
 		}
 
 		//	todo:
-		bl, err := cryptoPP.CoinbaseTxVerify(cryptoCoinbaseTx)
-		if err != nil || bl == false {
+		bl:= cryptoPP.CoinbaseTxVerify(cryptoCoinbaseTx)
+		if  bl == false {
 			return false
 		}
 	} else {
@@ -461,8 +461,8 @@ func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail
 		}
 
 		// call the crypto scheme's verify algroithm
-		bl, err := cryptoPP.TransferTxVerify(cryptoTransferTx)
-		if err != nil || bl == false {
+		bl:= cryptoPP.TransferTxVerify(cryptoTransferTx)
+		if  bl == false {
 			return false
 		}
 
