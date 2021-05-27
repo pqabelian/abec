@@ -1,7 +1,16 @@
-package abepqringct
+package pqringctparam
+
+import "github.com/cryptosuite/pqringct"
+
+var CryptoPP *pqringct.PublicParameter = pqringct.DefaultPP
 
 // todo: when multiple versions are supported simultaneously, and if necessary, initial multiple nullSerialNumbers
 var nullSerialNumber []byte
+
+//	todo:
+func GetMasterPublicKeyLen(version uint32) uint32 {
+	return 1
+}
 
 /*
 Based on the (crypto-scheme) version of the Txo, return the maxAllowedLen

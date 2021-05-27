@@ -6,17 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/abesuite/abec/abecrypto"
+	"github.com/abesuite/abec/abecrypto/pqringctparam"
 	"github.com/abesuite/abec/wire"
 	"github.com/cryptosuite/pqringct"
 )
-// TODO: import cycle not allowed wire->abepqringct->wire
-var cryptoPP *pqringct.PublicParameter = pqringct.DefaultPP
-
-//	todo:
-func GetMasterPublicKeyLen(version uint32) uint32 {
-
-	return 1
-}
 
 type MasterPublicKeyIfc interface {
 	SerializeSize() uint32
@@ -97,9 +90,9 @@ func MasterKeyGen(inputSeed []byte, cryptoScheme abecrypto.CryptoScheme) (serial
 
 	if cryptoScheme == abecrypto.CryptoSchemePQRINGCT {
 		if len(inputSeed) != 0 {
-			seed, mpk, msvk, mssk, err = cryptoPP.MasterKeyGen(inputSeed[4:])
+			seed, mpk, msvk, mssk, err = pqringctparam.CryptoPP.MasterKeyGen(inputSeed[4:])
 		} else {
-			seed, mpk, msvk, mssk, err = cryptoPP.MasterKeyGen(nil)
+			seed, mpk, msvk, mssk, err = pqringctparam.CryptoPP.MasterKeyGen(nil)
 		}
 		if err != nil {
 			return nil, nil, nil, nil, err
@@ -111,7 +104,7 @@ func MasterKeyGen(inputSeed []byte, cryptoScheme abecrypto.CryptoScheme) (serial
 
 	retseedSer := inputSeed
 	if len(inputSeed) == 0 {
-		retseedSer := make([]byte, 4 + len(seed))
+		retseedSer := make([]byte, 4+len(seed))
 		binary.BigEndian.PutUint32(retseedSer, uint32(cryptoScheme))
 		copy(retseedSer[4:], seed)
 	}
@@ -140,8 +133,8 @@ func CoinbaseTxGen(abeTxOutDescs []*AbeTxOutDesc, coinbaseTxMsgTemplate *wire.Ms
 	cryptoScheme := abecrypto.GetCryptoScheme(coinbaseTxMsgTemplate.Version)
 
 	outputNum := len(abeTxOutDescs)
-	if outputNum > GetOutputMaxNum(coinbaseTxMsgTemplate.Version) {
-		return nil, fmt.Errorf("the output number %d exceeds the allowed max number %d", outputNum, GetInputMaxNum(coinbaseTxMsgTemplate.Version))
+	if outputNum > pqringctparam.GetOutputMaxNum(coinbaseTxMsgTemplate.Version) {
+		return nil, fmt.Errorf("the output number %d exceeds the allowed max number %d", outputNum, pqringctparam.GetInputMaxNum(coinbaseTxMsgTemplate.Version))
 	}
 
 	if cryptoScheme == abecrypto.CryptoSchemePQRINGCT {
@@ -161,7 +154,7 @@ func CoinbaseTxGen(abeTxOutDescs []*AbeTxOutDesc, coinbaseTxMsgTemplate *wire.Ms
 			txOutputDescs[j] = pqringct.NewTxOutputDesc(mpk, abeTxOutDescs[j].value)
 		}
 
-		cryptoCoinbaseTx, err := cryptoPP.CoinbaseTxGen(coinbaseTxMsgTemplate.TxFee, txOutputDescs)
+		cryptoCoinbaseTx, err := pqringctparam.CryptoPP.CoinbaseTxGen(coinbaseTxMsgTemplate.TxFee, txOutputDescs)
 		if err != nil {
 			return nil, err
 		}
@@ -225,8 +218,8 @@ func CoinbaseTxVerify(coinbaseTx *wire.MsgTxAbe) bool {
 		}
 
 		//	todo:
-		bl:= cryptoPP.CoinbaseTxVerify(cryptoCoinbaseTx)
-		if  bl == false {
+		bl := pqringctparam.CryptoPP.CoinbaseTxVerify(cryptoCoinbaseTx)
+		if bl == false {
 			return false
 		}
 	} else {
@@ -249,12 +242,12 @@ func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxO
 		return nil, errors.New("the input number and the output number should be at least 1")
 	}
 
-	if inputNum > GetInputMaxNum(transferTxMsgTemplate.Version) {
-		return nil, fmt.Errorf("the input number %d exceeds the allowed max number %d", inputNum, GetInputMaxNum(transferTxMsgTemplate.Version))
+	if inputNum > pqringctparam.GetInputMaxNum(transferTxMsgTemplate.Version) {
+		return nil, fmt.Errorf("the input number %d exceeds the allowed max number %d", inputNum, pqringctparam.GetInputMaxNum(transferTxMsgTemplate.Version))
 	}
 
-	if outputNum > GetOutputMaxNum(transferTxMsgTemplate.Version) {
-		return nil, fmt.Errorf("the output number %d exceeds the allowed max number %d", outputNum, GetOutputMaxNum(transferTxMsgTemplate.Version))
+	if outputNum > pqringctparam.GetOutputMaxNum(transferTxMsgTemplate.Version) {
+		return nil, fmt.Errorf("the output number %d exceeds the allowed max number %d", outputNum, pqringctparam.GetOutputMaxNum(transferTxMsgTemplate.Version))
 	}
 
 	if inputNum != len(transferTxMsgTemplate.TxIns) {
@@ -347,7 +340,7 @@ func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxO
 		copy(txMemo[4:], transferTxMsgTemplate.TxMemo)
 
 		//	call the crypto scheme
-		cryptoTransferTx, err := cryptoPP.TransferTxGen(txInputDescs, txOutputDescs, transferTxMsgTemplate.TxFee, txMemo)
+		cryptoTransferTx, err := pqringctparam.CryptoPP.TransferTxGen(txInputDescs, txOutputDescs, transferTxMsgTemplate.TxFee, txMemo)
 		if err != nil {
 			return nil, err
 		}
@@ -461,8 +454,8 @@ func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail
 		}
 
 		// call the crypto scheme's verify algroithm
-		bl:= cryptoPP.TransferTxVerify(cryptoTransferTx)
-		if  bl == false {
+		bl := pqringctparam.CryptoPP.TransferTxVerify(cryptoTransferTx)
+		if bl == false {
 			return false
 		}
 
@@ -523,7 +516,7 @@ func TxoSerialNumberGen(abeTxo *wire.TxOutAbe, serialzedMpk []byte, serializedMs
 			return nil, err
 		}
 
-		retsn, err := cryptoPP.TxoSerialNumberGen(cryptoTxo, mpk, msvk, mssk)
+		retsn, err := pqringctparam.CryptoPP.TxoSerialNumberGen(cryptoTxo, mpk, msvk, mssk)
 		if err != nil {
 			return nil, err
 		}
