@@ -530,3 +530,49 @@ func TxoSerialNumberGen(abeTxo *wire.TxOutAbe, serialzedMpk []byte, serializedMs
 
 	return nil, nil
 }
+
+func TxoCoinReceive(abeTxo *wire.TxOutAbe, serialzedMpk []byte, serializedMsvk []byte) (valid bool, v uint64) {
+	if abeTxo == nil {
+		return false, 0
+	}
+
+	if len(serialzedMpk) <= 4 || len(serializedMsvk) <= 4 {
+		return false, 0
+	}
+
+	cryptoSchemeInTxo := abecrypto.GetCryptoScheme(abeTxo.Version)
+	cryptoSchemeInKeys := binary.BigEndian.Uint32(serialzedMpk[:4])
+	if abecrypto.CryptoScheme(cryptoSchemeInKeys) != cryptoSchemeInTxo {
+		return false, 0
+	}
+	cryptoSchemeInKeys = binary.BigEndian.Uint32(serializedMsvk[:4])
+	if abecrypto.CryptoScheme(cryptoSchemeInKeys) != cryptoSchemeInTxo {
+		return false, 0
+	}
+
+	if cryptoSchemeInTxo == abecrypto.CryptoSchemePQRINGCT {
+		mpk := &pqringct.MasterPublicKey{}
+		err := mpk.Deserialize(serialzedMpk[4:])
+		if err != nil {
+			return false, 0
+		}
+
+		msvk := &pqringct.MasterSecretViewKey{}
+		err = msvk.Deserialize(serializedMsvk[4:])
+		if err != nil {
+			return false, 0
+		}
+		cryptoTxo := &pqringct.TXO{}
+		err = cryptoTxo.Deserialize(abeTxo.TxoScript)
+		if err != nil {
+			return false, 0
+		}
+
+		return pqringctparam.CryptoPP.TxoCoinReceive(cryptoTxo, mpk, msvk)
+	} else {
+		panic("Unsupported version appears! Implement here.")
+		// todo: if there is any more version to support, implement it here
+	}
+
+	return false, 0
+}
