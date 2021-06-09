@@ -1,8 +1,6 @@
 package txscript
 
 import (
-	"fmt"
-	"github.com/abesuite/abec/abecrypto/abesalrs"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 )
@@ -35,43 +33,44 @@ type EngineAbe struct {
 func (vm *EngineAbe) Execute() (err error) {
 
 	if vm.flags&ItemInput == ItemInput {
-		// Get message hash.
-		//txMsgHash := vm.txHash
-		// Find correspondent signature. Will be changed in the future.
-		signature := vm.msgTx.TxWitness.Witnesses[vm.txInIndex]
-		// Collect all the outputs in the ring, which can be used to form derived public key ring later.
-		txConsumed := vm.txConsumed
-
-		// Convert message hash to bytes.
-		// TODO(abe): what is the message of signature?
-		//msg := txMsgHash.CloneBytes()
-		msg :=[]byte("this is a test")
-		// Deserialize signature
-		sig, err := abesalrs.DeserializeSignature(signature)
-		if err != nil {
-			return fmt.Errorf("error occurs when deserializing signature %v", err)
-		}
-
-		// Form public key ring.
-		derivedPubKey := make([]abesalrs.DerivedPubKey, 0, len(txConsumed))
-		for i := 0; i < len(txConsumed); i++ {
-			derivedAddress, err := ExtractAddressFromScriptAbe(txConsumed[i].AddressScript)
-			//dpk, err := abesalrs.DeseralizeDerivedPubKey(txConsumed[i].AddressScript)
-			if err != nil {
-				return fmt.Errorf("error occurs when deserializing addressScript %v", err)
-			}
-			derivedPubKey = append(derivedPubKey, *derivedAddress.DerivedPubKey())
-		}
-		dpkRing := &abesalrs.DpkRing{
-			Dpks: derivedPubKey,
-			R:    len(txConsumed),
-		}
-
-		// Verify signature.
-		_, succeed, err := abesalrs.Verify(msg, dpkRing, sig)
-		if !succeed {
-			return fmt.Errorf("script verify failed")
-		}
+		return nil
+		//// Get message hash.
+		////txMsgHash := vm.txHash
+		//// Find correspondent signature. Will be changed in the future.
+		//signature := vm.msgTx.TxWitness[vm.txInIndex]
+		//// Collect all the outputs in the ring, which can be used to form derived public key ring later.
+		//txConsumed := vm.txConsumed
+		//
+		//// Convert message hash to bytes.
+		//// TODO(abe): what is the message of signature?
+		////msg := txMsgHash.CloneBytes()
+		//msg :=[]byte("this is a test")
+		//// Deserialize signature
+		//sig, err := abesalrs.DeserializeSignature(signature)
+		//if err != nil {
+		//	return fmt.Errorf("error occurs when deserializing signature %v", err)
+		//}
+		//
+		//// Form public key ring.
+		//derivedPubKey := make([]abesalrs.DerivedPubKey, 0, len(txConsumed))
+		//for i := 0; i < len(txConsumed); i++ {
+		//	derivedAddress, err := ExtractAddressFromScriptAbe(txConsumed[i].AddressScript)
+		//	//dpk, err := abesalrs.DeseralizeDerivedPubKey(txConsumed[i].AddressScript)
+		//	if err != nil {
+		//		return fmt.Errorf("error occurs when deserializing addressScript %v", err)
+		//	}
+		//	derivedPubKey = append(derivedPubKey, *derivedAddress.DerivedPubKey())
+		//}
+		//dpkRing := &abesalrs.DpkRing{
+		//	Dpks: derivedPubKey,
+		//	R:    len(txConsumed),
+		//}
+		//
+		//// Verify signature.
+		//_, succeed, err := abesalrs.Verify(msg, dpkRing, sig)
+		//if !succeed {
+		//	return fmt.Errorf("script verify failed")
+		//}
 	}
 
 	// todo

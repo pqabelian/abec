@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
@@ -639,7 +640,7 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 	txValItemsInput := make([]*txValidateItemInput, 0, len(txIns))
 	for txInIdx, txIn := range txIns {
 		// Skip coinbases. Redundant here.
-		if txIn.SerialNumber == chainhash.ZeroHash {
+		if bytes.Equal(txIn.SerialNumber,chainhash.ZeroHash[:]) {
 			continue
 		}
 
@@ -792,7 +793,7 @@ func checkBlockScriptsAbe(block *abeutil.BlockAbe, utxoRingView *UtxoRingViewpoi
 	for _, tx := range block.Transactions() {
 		for txInIdx, txIn := range tx.MsgTx().TxIns {
 			// Skip coinbases. Redundant here.
-			if txIn.SerialNumber == chainhash.ZeroHash {
+			if bytes.Equal(txIn.SerialNumber,chainhash.ZeroHash[:]) {
 				continue
 			}
 

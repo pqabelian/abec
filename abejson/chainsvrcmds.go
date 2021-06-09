@@ -58,13 +58,18 @@ type OutPointAbe struct {
 //	e.g. TransactionInput in chainsrvcmds.go and Vin in chainsrvresults.go
 //	for ABE, OutPointRingAbe is used in both chainsrvcmds.go and chainsrvresults.go
 type OutPointRing struct {
-	BlockHashs []string   `json:"blockhashs"`
+	Version    uint32        `json:"version"`
+	BlockHashs []string      `json:"blockhashs"`
 	OutPoints  []OutPointAbe `json:"outpoints"`
 }
 
 type TransactionInputAbe struct {
 	SerialNumber         string `json:"serialnumber"`
 	PreviousOutPointRing OutPointRing
+}
+type TransactionOutputAbe struct {
+	Version   uint32 `json:"version"`
+	TxoScript string `json:"script"`
 }
 
 // CreateRawTransactionCmd defines the createrawtransaction JSON-RPC command.
@@ -78,8 +83,8 @@ type CreateRawTransactionCmd struct {
 //TODO(abe): the type of txfee may need to change to a pointer point to float64
 type CreateRawTransactionCmdAbe struct {
 	Inputs  []TransactionInputAbe
-	Outputs map[string]float64 `jsonrpcusage:"{\"address\":amount,...}"` // In Neutrino
-	Fee     float64            `json:"txfee"`                            // in ABE
+	Outputs []TransactionOutputAbe `jsonrpcusage:"{\"address\":amount,...}"` // In Neutrino TODO:no Nertrino, just script
+	Fee     float64                `json:"txfee"`                            // in ABE
 }
 
 // NewCreateRawTransactionCmd returns a new instance which can be used to issue
@@ -784,6 +789,7 @@ type SendRawTransactionAbeCmd struct {
 	AllowHighFees *bool `jsonrpcdefault:"false"`
 	MaxFeeRate    *int32
 }
+
 // NewSendRawTransactionCmd returns a new instance which can be used to issue a
 // sendrawtransaction JSON-RPC command.
 //
@@ -801,7 +807,6 @@ func NewSendRawTransactionAbeCmd(hexTx string, allowHighFees *bool) *SendRawTran
 		AllowHighFees: allowHighFees,
 	}
 }
-
 
 // NewSendRawTransactionCmd returns a new instance which can be used to issue a
 // sendrawtransaction JSON-RPC command to a bitcoind node.

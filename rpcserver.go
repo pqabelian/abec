@@ -134,7 +134,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getbestblock":            handleGetBestBlock,
 	"getbestblockhash":        handleGetBestBlockHash,
 	"getblock":                handleGetBlock,
-	"getblockabe":             handleGetBlockAbe,  //TODO(abe):after testing, this command will be replace by getblock
+	"getblockabe":             handleGetBlockAbe, //TODO(abe):after testing, this command will be replace by getblock
 	"getblockchaininfo":       handleGetBlockChainInfo,
 	"getblockcount":           handleGetBlockCount,
 	"getblockhash":            handleGetBlockHash,
@@ -167,12 +167,12 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	//	todo(ABE.MUST): However, in ABE, each address is one-time (by stealth address), it does not make sense to search by address.
 	//	todo(ABE.MUST): ABE provides txoIndex which support searching by Txo(txid,index).
 	//	"searchrawtransactions": handleSearchRawTransactions,
-	"sendrawtransaction": handleSendRawTransaction,
+	"sendrawtransaction":    handleSendRawTransaction,
 	"sendrawtransactionabe": handleSendRawTransactionAbe,
-	"setgenerate":        handleSetGenerate,
-	"stop":               handleStop,
-	"submitblock":        handleSubmitBlock,
-	"uptime":             handleUptime,
+	"setgenerate":           handleSetGenerate,
+	"stop":                  handleStop,
+	"submitblock":           handleSubmitBlock,
+	"uptime":                handleUptime,
 	//	todo(ABE.MUST): At this moment, ABE does not support this. Later if necessary, ABE will provide functions to ValidateMasterAddress.
 	//	"validateaddress":       handleValidateAddress,
 	"verifychain": handleVerifyChain,
@@ -555,7 +555,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 
 	// Add all transaction inputs to a new transaction after performing
 	// some validity checks.
-	mtx := wire.NewMsgTx(wire.TxVersion)
+	mtx := wire.NewMsgTx(int32(wire.TxVersion))
 	for _, input := range c.Inputs {
 		txHash, err := chainhash.NewHashFromStr(input.Txid)
 		if err != nil {
@@ -645,6 +645,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 	}
 	return mtxHex, nil
 }
+
 // TODO(abe):this function will be design to use ring hash to generate a transaction
 func handleCreateRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.CreateRawTransactionCmdAbe)
@@ -654,10 +655,11 @@ func handleCreateRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-ch
 	// Add all transaction inputs to a new transaction after performing
 	// some validity checks.
 	for _, input := range c.Inputs {
-		serialNumber, err := chainhash.NewHashFromStr(input.SerialNumber)
-		if err != nil {
-			return nil, rpcDecodeHexError(input.SerialNumber)
-		}
+		//serialNumber, err := chainhash.NewHashFromStr(input.SerialNumber)
+		//if err != nil {
+		//	return nil, rpcDecodeHexError(input.SerialNumber)
+		//}
+		serialNumber := []byte(input.SerialNumber)
 
 		blockHashsNum := len(input.PreviousOutPointRing.BlockHashs)
 		if blockHashsNum != wire.BlockNumPerRingGroup {
@@ -685,7 +687,7 @@ func handleCreateRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-ch
 			outPoints[i] = wire.NewOutPointAbe(txHash, input.PreviousOutPointRing.OutPoints[i].Index)
 		}
 
-		previousOutPointRing := wire.NewOutPointRing(blockHashs, outPoints)
+		previousOutPointRing := wire.NewOutPointRing(input.PreviousOutPointRing.Version, blockHashs, outPoints)
 		txIn := wire.NewTxInAbe(serialNumber, previousOutPointRing)
 
 		mtx.AddTxIn(txIn)
@@ -693,44 +695,49 @@ func handleCreateRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-ch
 
 	// Add all transaction outputs to the transaction after performing
 	// some validity checks.
-	for addressScriptStr, valueScriptAmount := range c.Outputs {
-		if valueScriptAmount <= 0 || valueScriptAmount > abeutil.MaxAbe {
-			return nil, &abejson.RPCError{
-				Code:    abejson.ErrRPCType,
-				Message: "Invalid amount",
-			}
-		}
-
-		daddr, err := abeutil.DecodeDerivedAddressAbe(addressScriptStr)
-		if err != nil {
-			return nil, &abejson.RPCError{
-				Code:    abejson.ErrRPCInvalidDerivedAddress,
-				Message: "Invalid derived address: " + err.Error(),
-			}
-		}
-
-		switch daddr.(type) {
-		case *abeutil.DerivedAddressSalrs:
-		default:
-			return nil, &abejson.RPCError{
-				Code:    abejson.ErrRPCInvalidDerivedAddress,
-				Message: "Invalid derived address",
-			}
-		}
-
-		addressScript := daddr.Serialize()
-
-		// Convert the amount to neutrino.
-		neutrino, err := abeutil.NewAmountAbe(valueScriptAmount)
-		if err != nil {
-			context := "Failed to convert amount"
-			return nil, internalRPCError(err.Error(), context)
-		}
-
-		txOut := wire.NewTxOutAbe(int64(neutrino), addressScript)
-
+	for _, output := range c.Outputs {
+		txOut := wire.NewTxOutAbe(output.Version, []byte(output.TxoScript))
 		mtx.AddTxOut(txOut)
 	}
+	//for addressScriptStr, valueScriptAmount := range c.Outputs {
+	//if valueScriptAmount <= 0 || valueScriptAmount > abeutil.MaxAbe {
+	//	return nil, &abejson.RPCError{
+	//		Code:    abejson.ErrRPCType,
+	//		Message: "Invalid amount",
+	//	}
+	//}
+	//
+	//daddr, err := abeutil.DecodeDerivedAddressAbe(addressScriptStr)
+	//if err != nil {
+	//	return nil, &abejson.RPCError{
+	//		Code:    abejson.ErrRPCInvalidDerivedAddress,
+	//		Message: "Invalid derived address: " + err.Error(),
+	//	}
+	//}
+
+	//	switch daddr.(type) {
+	//	case *abeutil.DerivedAddressSalrs:
+	//	default:
+	//		return nil, &abejson.RPCError{
+	//			Code:    abejson.ErrRPCInvalidDerivedAddress,
+	//			Message: "Invalid derived address",
+	//		}
+	//	}
+	//
+	//	addressScript := daddr.Serialize()
+	//
+	//	// Convert the amount to neutrino.
+	//	neutrino, err := abeutil.NewAmountAbe(valueScriptAmount)
+	//	if err != nil {
+	//		context := "Failed to convert amount"
+	//		return nil, internalRPCError(err.Error(), context)
+	//	}
+	//
+	//	//txOut := wire.NewTxOutAbe(int64(neutrino), addressScript)
+	//	txOut := wire.NewTxOutAbe(, addressScript)
+	//
+	//	mtx.AddTxOut(txOut)
+	//}
 
 	//	TxFee
 	if c.Fee <= 0 || c.Fee > abeutil.MaxAbe {
@@ -745,7 +752,7 @@ func handleCreateRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-ch
 		context := "Failed to convert fee amount"
 		return nil, internalRPCError(err.Error(), context)
 	}
-	mtx.TxFee = int64(neutrinoFee)
+	mtx.TxFee = uint64(neutrinoFee)
 
 	//	TxWitness
 	mtx.TxWitness = nil
@@ -857,7 +864,7 @@ func createVinListAbe(mtx *wire.MsgTxAbe) []abejson.TxIn {
 
 	for i, txIn := range mtx.TxIns {
 		vinEntry := &vinList[i]
-		vinEntry.SerialNumber = txIn.SerialNumber.String()
+		vinEntry.SerialNumber = string(txIn.SerialNumber)
 
 		blockHashNum := len(txIn.PreviousOutPointRing.BlockHashs)
 		blockHashs := make([]string, blockHashNum)
@@ -940,8 +947,7 @@ func createVoutListAbe(mtx *wire.MsgTxAbe, chainParams *chaincfg.Params) []abejs
 
 		var voutEntry abejson.TxOutAbe
 		voutEntry.N = uint8(i)
-		voutEntry.ValueScript = abeutil.Amount(txOut.ValueScript).ToABE()
-		voutEntry.AddressScript = hex.EncodeToString(txOut.AddressScript)
+		voutEntry.TxoScript = hex.EncodeToString(txOut.TxoScript)
 
 		voutList = append(voutList, voutEntry)
 	}
@@ -1007,7 +1013,7 @@ func createTxRawResultAbe(chainParams *chaincfg.Params, mtx *wire.MsgTxAbe,
 	}
 
 	if mtx.HasWitness() {
-		txReply.Witness = witnessToHexAbe(mtx.TxWitness)
+		txReply.Witness = hex.EncodeToString(mtx.TxWitness)
 	}
 
 	if blkHeader != nil {
@@ -1086,7 +1092,7 @@ func handleDecodeRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-ch
 	}
 
 	if mtx.HasWitness() {
-		txReply.Witness = witnessToHexAbe(mtx.TxWitness)
+		txReply.Witness = hex.EncodeToString(mtx.TxWitness)
 	}
 
 	return txReply, nil
@@ -1981,7 +1987,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// block template doesn't include the coinbase, so the caller
 		// will ultimately create their own coinbase which pays to the
 		// appropriate address(es).
-		blkTemplate, err := generator.NewBlockTemplate(masterAddr)
+		blkTemplate, err := generator.NewBlockTemplate(masterAddr.Serialize())
 		if err != nil {
 			return internalRPCError("Failed to create new block "+
 				"template: "+err.Error(), "")
@@ -2046,7 +2052,8 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 				context := "Failed to create addressScript"
 				return internalRPCError(err.Error(), context)
 			}
-			template.BlockAbe.Transactions[0].TxOuts[0].AddressScript = addressScript
+			// TODO: 20210609 there is wrongly code
+			template.BlockAbe.Transactions[0].TxOuts[0].TxoScript = addressScript
 			template.ValidPayAddress = true
 
 			// Update the merkle root.
@@ -2184,7 +2191,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 
 	if useCoinbaseValue {
 		//		reply.CoinbaseAux = gbtCoinbaseAux
-		reply.CoinbaseValue = &msgBlock.Transactions[0].TxOuts[0].ValueScript
+		//reply.CoinbaseValue = &msgBlock.Transactions[0].TxOuts[0].TxoScript
 	} else {
 		// Ensure the template has a valid payment address associated
 		// with it when a full coinbase is requested.
@@ -3213,7 +3220,7 @@ func handleGetUtxoRing(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 		outPoints[i] = wire.NewOutPointAbe(txHash, c.OutPointRing.OutPoints[i].Index)
 	}
 
-	outPointRing := wire.NewOutPointRing(blockHashs, outPoints)
+	outPointRing := wire.NewOutPointRing(c.OutPointRing.Version, blockHashs, outPoints)
 
 	utxoRingEntry, err := s.cfg.Chain.FetchUtxoRingEntry(outPointRing)
 	if err != nil {
@@ -3244,9 +3251,8 @@ func handleGetUtxoRing(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	txOuts := make([]abejson.TxOutAbe, ringSize)
 	for i := 0; i < ringSize; i++ {
 		txOuts[i] = abejson.TxOutAbe{
-			ValueScript:   abeutil.Amount(utxoRingEntry.TxOuts()[i].ValueScript).ToABE(),
-			N:             uint8(i),
-			AddressScript: hex.EncodeToString(utxoRingEntry.TxOuts()[i].AddressScript),
+			N:         uint8(i),
+			TxoScript: hex.EncodeToString(utxoRingEntry.TxOuts()[i].TxoScript),
 		}
 	}
 	utxoRingReply.TxOuts = txOuts
@@ -3255,7 +3261,7 @@ func handleGetUtxoRing(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	serialNumbers := make([]string, consumedSnNum)
 	consumingBlockHashs := make([]string, consumedSnNum)
 	for i := 0; i < consumedSnNum; i++ {
-		serialNumbers[i] = utxoRingEntry.SerialNumbers()[i].String()
+		serialNumbers[i] = hex.EncodeToString(utxoRingEntry.SerialNumbers()[i])
 		consumingBlockHashs[i] = utxoRingEntry.ConsumingBlockHashs()[i].String()
 	}
 	utxoRingReply.SerialNumbers = serialNumbers
@@ -3920,7 +3926,6 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 
 	return tx.Hash().String(), nil
 }
-
 
 func handleSendRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.SendRawTransactionAbeCmd)

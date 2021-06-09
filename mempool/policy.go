@@ -78,16 +78,16 @@ func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee abeutil.Amoun
 }
 
 //	Abe to do
-func calcMinRequiredTxRelayFeeAbe(serializedSize int64, minRelayTxFee abeutil.Amount) int64 {
+func calcMinRequiredTxRelayFeeAbe(serializedSize int64, minRelayTxFee abeutil.Amount) uint64 {
 	// Calculate the minimum fee for a transaction to be allowed into the
 	// mempool and relayed by scaling the base fee (which is the minimum
 	// free transaction relay fee).  minTxRelayFee is in Satoshi/kB so
 	// multiply by serializedSize (which is in bytes) and divide by 1000 to
 	// get minimum Satoshis.
-	minFee := (serializedSize * int64(minRelayTxFee)) / 1000
+	minFee := (uint64(serializedSize) * uint64(minRelayTxFee)) / 1000
 
 	if minFee == 0 && minRelayTxFee > 0 {
-		minFee = int64(minRelayTxFee)
+		minFee = uint64(minRelayTxFee)
 	}
 
 	// Set the minimum fee to the maximum possible value if the calculated
@@ -426,7 +426,7 @@ func checkTransactionStandardAbe(tx *abeutil.TxAbe, maxTxVersion int32) error {
 
 	// The transaction must be a currently supported version.
 	msgTx := tx.MsgTx()
-	if msgTx.Version > maxTxVersion || msgTx.Version < 1 {
+	if msgTx.Version > uint32(maxTxVersion) || msgTx.Version < 1 {
 		str := fmt.Sprintf("transaction version %d is not in the "+
 			"valid range of %d-%d", msgTx.Version, 1,
 			maxTxVersion)

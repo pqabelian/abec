@@ -4,6 +4,7 @@ import (
 	"container/heap"
 	"fmt"
 	"github.com/abesuite/abec/abecrypto/abepqringct"
+	"github.com/abesuite/abec/abecrypto/pqringctparam"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chaincfg"
@@ -484,7 +485,7 @@ func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, extraNonce uint64, tx
 	msgTx.AddTxIn(coinbaseTxIn)
 	tempTxOut := &wire.TxOutAbe{
 		Version:   msgTx.Version,
-		TxoScript: make([]byte, abepqringct.GetTxoScriptLen(msgTx.Version)),
+		TxoScript: make([]byte, pqringctparam.GetTxoScriptLen(msgTx.Version)),
 	}
 
 	//	one or multiple TxoOuts
@@ -493,9 +494,9 @@ func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, extraNonce uint64, tx
 		msgTx.AddTxOut(tempTxOut)
 	}
 
-	msgTx.TxFee = abepqringct.GetMaxCoinValue(msgTx.Version)
+	msgTx.TxFee = pqringctparam.GetMaxCoinValue(msgTx.Version)
 	msgTx.TxMemo = nil
-	msgTx.TxWitness = make([]byte, abepqringct.GetCoinbaseTxWitnessLen(msgTx.Version, txOutNum))
+	msgTx.TxWitness = make([]byte, pqringctparam.GetCoinbaseTxWitnessLen(msgTx.Version, txOutNum))
 
 	return msgTx, nil
 }

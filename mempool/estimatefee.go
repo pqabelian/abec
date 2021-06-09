@@ -90,8 +90,8 @@ func (rate NeutrinoPerByte) ToAbePerKb() AbePerKilobyte {
 // the given fee rate.
 func (rate SatoshiPerByte) Fee(size uint32) abeutil.Amount {
 	// If our rate is the error value, return that.
-	if rate == SatoshiPerByte(-1) {
-		return abeutil.Amount(-1)
+	if rate < 0 {
+		return abeutil.Amount(0xFFFF_FFFF_FFFF_FFFF)
 	}
 
 	return abeutil.Amount(float64(rate) * float64(size))
@@ -99,8 +99,8 @@ func (rate SatoshiPerByte) Fee(size uint32) abeutil.Amount {
 
 func (rate NeutrinoPerByte) Fee(size uint32) abeutil.Amount {
 	// If our rate is the error value, return that.
-	if rate == NeutrinoPerByte(-1) {
-		return abeutil.Amount(-1)
+	if rate < 0 {
+		return abeutil.Amount(0xFFFF_FFFF_FFFF_FFFF)
 	}
 
 	return abeutil.Amount(float64(rate) * float64(size))

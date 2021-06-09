@@ -987,15 +987,15 @@ func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClie
 		}
 	}
 }
-
+// TODO 20210609 this API need to be re-think
 func (m *wsNotificationManager) notifyForNewTxAbe(clients map[chan struct{}]*wsClient, tx *abeutil.TxAbe) {
 	txHashStr := tx.Hash().String()
 	mtx := tx.MsgTx()
 
 	var amount int64
-	for _, txOut := range mtx.TxOuts {
-		amount += txOut.ValueScript
-	}
+	//for _, txOut := range mtx.TxOuts {
+		//amount += txOut.ValueScript
+	//}
 
 	ntfn := abejson.NewTxAcceptedNtfn(txHashStr, abeutil.Amount(amount).ToABE())
 	marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)

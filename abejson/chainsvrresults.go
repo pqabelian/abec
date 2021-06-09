@@ -304,7 +304,7 @@ type GetBlockTemplateResultTx struct {
 type GetBlockTemplateResultTxAbe struct {
 	Data string `json:"data"`
 	Hash string `json:"hash"`
-	Fee  int64  `json:"fee"`
+	Fee  uint64  `json:"fee"`
 	Size int64  `json:"size"`
 }
 
@@ -331,7 +331,7 @@ type GetBlockTemplateResult struct {
 	Version      int32                         `json:"version"`
 	//	CoinbaseAux   *GetBlockTemplateResultAux `json:"coinbaseaux,omitempty"`
 	CoinbaseTxn   *GetBlockTemplateResultTxAbe `json:"coinbasetxn,omitempty"`
-	CoinbaseValue *int64                       `json:"coinbasevalue,omitempty"`
+	//CoinbaseValue *int64                       `json:"coinbasevalue,omitempty"` //TODO:this field is disable due to pqringct
 	WorkID        string                       `json:"workid,omitempty"`
 
 	// Witness commitment defined in BIP 0141.
@@ -677,9 +677,9 @@ type Vout struct {
 }
 
 type TxOutAbe struct {
-	ValueScript   float64 `json:"valueScript"`
+	//ValueScript   float64 `json:"valueScript"`
 	N             uint8   `json:"n"`
-	AddressScript string  `json:"addressScript"`
+	TxoScript string  `json:"script"`
 }
 
 // GetMiningInfoResult models the data from the getmininginfo command.
@@ -744,11 +744,11 @@ type TxRawResultAbe struct {
 	Hash          string     `json:"hash,omitempty"`
 	Size          int32      `json:"size,omitempty"`
 	Fullsize      int32      `json:"fullsize,omitempty"`
-	Version       int32      `json:"version"`
+	Version       uint32      `json:"version"`
 	Vin           []TxIn     `json:"vin"`
 	Vout          []TxOutAbe `json:"vout"`
 	Fee           float64    `json:"fee"`
-	Witness       []string   `json:"witness"`
+	Witness       string   `json:"witness"`
 	BlockHash     string     `json:"blockhash,omitempty"`
 	Confirmations uint64     `json:"confirmations,omitempty"`
 	Time          int64      `json:"time,omitempty"`
@@ -786,11 +786,11 @@ type TxRawDecodeResult struct {
 
 type TxRawDecodeResultAbe struct {
 	Txid    string     `json:"txid"`
-	Version int32      `json:"version"`
+	Version uint32      `json:"version"`
 	Vin     []TxIn     `json:"vin"`
 	Vout    []TxOutAbe `json:"vout"`
 	Fee     float64    `json:"fee"`
-	Witness []string   `json:"witness"`
+	Witness string   `json:"witness"`
 }
 
 // ValidateAddressChainResult models the data returned by the chain server

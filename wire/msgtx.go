@@ -1049,6 +1049,7 @@ const (
 	// + chainhash.HashSize for one output
 	// + commitment hash
 	//	todo(ABE): could be more accurate
+
 	TxPayloadMaxSize = 30000
 	TxPayloadMinSize = 100
 )
@@ -1056,7 +1057,7 @@ const (
 // TxOutAbe /* As TxOut may be fetched without the corresponding Tx, a version field is used.
 type TxOutAbe struct {
 	//	Version 		int16	//	the version could be used in ABE protocol update
-	//ValueScript   []byte
+	// ValueScript   []byte
 	//	ValueScript   int64
 	//	AddressScript []byte
 

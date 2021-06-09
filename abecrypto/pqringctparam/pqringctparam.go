@@ -1,6 +1,8 @@
 package pqringctparam
 
-import "github.com/cryptosuite/pqringct"
+import (
+	"github.com/cryptosuite/pqringct"
+)
 
 var CryptoPP *pqringct.PublicParameter = pqringct.DefaultPP
 

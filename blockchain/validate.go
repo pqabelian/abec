@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/abesuite/abec/abecrypto/abepqringct"
+	"github.com/abesuite/abec/abecrypto/pqringctparam"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
@@ -405,7 +405,7 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 	// Check for duplicate transaction inputs.
 	consumedOutPoints := make(map[chainhash.Hash]map[string]struct{})
 	for i, txIn := range msgTx.TxIns {
-		if bytes.Compare(txIn.SerialNumber, abepqringct.GetNullSerialNumber(txIn.Version)) == 0 {
+		if bytes.Compare(txIn.SerialNumber, pqringctparam.GetNullSerialNumber(txIn.PreviousOutPointRing.Version)) == 0 {
 			return ruleError(ErrBadTxInput, "transaction input refers to a serial number that is null")
 		}
 

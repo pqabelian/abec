@@ -205,8 +205,8 @@ type TxPool struct {
 	//	todo(ABE):	begin
 	poolAbe          map[chainhash.Hash]*TxDescAbe
 	orphansAbe       map[chainhash.Hash]*orphanTxAbe
-	outpointsAbe     map[chainhash.Hash]map[chainhash.Hash]*abeutil.TxAbe                    //TODO(abe):why use two layers map                 //	corresponding to btc's outpoints, using hash rather then TxIn as the key for map
-	orphansByPrevAbe map[chainhash.Hash]map[chainhash.Hash]map[chainhash.Hash]*abeutil.TxAbe // corresponding to btc's orphansByPrev
+	outpointsAbe     map[chainhash.Hash]map[string]*abeutil.TxAbe                    //TODO(abe):why use two layers map                 //	corresponding to btc's outpoints, using hash rather then TxIn as the key for map
+	orphansByPrevAbe map[chainhash.Hash]map[string]map[chainhash.Hash]*abeutil.TxAbe // corresponding to btc's orphansByPrev //TODO type transfer??? []byte -> string
 	//	todo(ABE):	end
 }
 
@@ -267,13 +267,13 @@ func (mp *TxPool) removeOrphanAbe(tx *abeutil.TxAbe) {
 	for _, txIn := range otx.tx.MsgTx().TxIns {
 		ringHash := txIn.PreviousOutPointRing.Hash()
 		if _, ringExists := mp.orphansByPrevAbe[ringHash]; ringExists {
-			orphans, orphanExists := mp.orphansByPrevAbe[ringHash][txIn.SerialNumber]
+			orphans, orphanExists := mp.orphansByPrevAbe[ringHash][string(txIn.SerialNumber)]
 			if orphanExists {
 				delete(orphans, *txHash)
 			}
 
 			if len(orphans) == 0 {
-				delete(mp.orphansByPrevAbe[ringHash], txIn.SerialNumber)
+				delete(mp.orphansByPrevAbe[ringHash], string(txIn.SerialNumber))
 			}
 
 			if len(mp.orphansByPrevAbe[ringHash]) == 0 {
@@ -473,13 +473,13 @@ func (mp *TxPool) addOrphanAbe(tx *abeutil.TxAbe, tag Tag) {
 		txInRingHash := txIn.PreviousOutPointRing.Hash()
 		if _, exists := mp.orphansByPrevAbe[txInRingHash]; !exists {
 			mp.orphansByPrevAbe[txInRingHash] =
-				make(map[chainhash.Hash]map[chainhash.Hash]*abeutil.TxAbe)
+				make(map[string]map[chainhash.Hash]*abeutil.TxAbe)
 		}
-		if _, exists := mp.orphansByPrevAbe[txInRingHash][txIn.SerialNumber]; !exists {
-			mp.orphansByPrevAbe[txInRingHash][txIn.SerialNumber] =
+		if _, exists := mp.orphansByPrevAbe[txInRingHash][string(txIn.SerialNumber)]; !exists {
+			mp.orphansByPrevAbe[txInRingHash][string(txIn.SerialNumber)] =
 				make(map[chainhash.Hash]*abeutil.TxAbe)
 		}
-		mp.orphansByPrevAbe[txInRingHash][txIn.SerialNumber][*tx.Hash()] = tx
+		mp.orphansByPrevAbe[txInRingHash][string(txIn.SerialNumber)][*tx.Hash()] = tx
 	}
 
 	log.Debugf("Stored orphan transaction %v (total: %d)", tx.Hash(),
@@ -562,7 +562,7 @@ func (mp *TxPool) removeOrphanDoubleSpendsAbe(tx *abeutil.TxAbe) {
 	for _, txIn := range msgTx.TxIns {
 		ringHash := txIn.PreviousOutPointRing.Hash()
 		if _, ringExists := mp.orphansByPrevAbe[ringHash]; ringExists {
-			for _, orphan := range mp.orphansByPrevAbe[ringHash][txIn.SerialNumber] {
+			for _, orphan := range mp.orphansByPrevAbe[ringHash][string(txIn.SerialNumber)] {
 				mp.removeOrphanAbe(orphan)
 
 				//	Note that mp.removeOrphanAbe(orphan) may make mp.orphansByPrevAbe[ringHash] to be nil or not exists
@@ -721,7 +721,7 @@ func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 		for _, txIn := range txDesc.Tx.MsgTx().TxIns {
 			ringHash := txIn.PreviousOutPointRing.Hash()
 			if _, ringExists := mp.outpointsAbe[ringHash]; ringExists {
-				delete(mp.outpointsAbe[ringHash], txIn.SerialNumber)
+				delete(mp.outpointsAbe[ringHash], string(txIn.SerialNumber))
 			}
 		}
 
@@ -777,7 +777,7 @@ func (mp *TxPool) RemoveDoubleSpendsAbe(tx *abeutil.TxAbe) {
 	for _, txIn := range tx.MsgTx().TxIns {
 		ringHash := txIn.PreviousOutPointRing.Hash()
 		if _, exists := mp.outpointsAbe[ringHash]; exists {
-			if txRedeemer, ok := mp.outpointsAbe[txIn.PreviousOutPointRing.Hash()][txIn.SerialNumber]; ok {
+			if txRedeemer, ok := mp.outpointsAbe[txIn.PreviousOutPointRing.Hash()][string(txIn.SerialNumber)]; ok {
 				//	This happens when tx is included in a block received, but not in mempool.
 				if !txRedeemer.Hash().IsEqual(tx.Hash()) {
 					mp.removeTransactionAbe(txRedeemer)
@@ -827,7 +827,7 @@ func (mp *TxPool) addTransaction(utxoView *blockchain.UtxoViewpoint, tx *abeutil
 	return txD
 }
 
-func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, tx *abeutil.TxAbe, height int32, fee int64) *TxDescAbe {
+func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, tx *abeutil.TxAbe, height int32, fee uint64) *TxDescAbe {
 	// Add the transaction to the pool and mark the referenced outpoints
 	// as spent by the pool.
 	txD := &TxDescAbe{
@@ -837,7 +837,7 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 			Height: height,
 			Fee:    fee,
 			//FeePerKB: fee * 1000 / GetTxVirtualSizeAbe(tx),
-			FeePerKB: fee * 1000 / int64(tx.MsgTx().SerializeSize()),
+			FeePerKB: fee * 1000 / uint64(tx.MsgTx().SerializeSize()),
 		},
 		StartingPriority: mining.CalcPriorityAbe(tx.MsgTx(), utxoRingView, height),
 	}
@@ -845,14 +845,14 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 	mp.poolAbe[*tx.Hash()] = txD
 
 	if mp.outpointsAbe == nil {
-		mp.outpointsAbe = make(map[chainhash.Hash]map[chainhash.Hash]*abeutil.TxAbe)
+		mp.outpointsAbe = make(map[chainhash.Hash]map[string]*abeutil.TxAbe)
 	}
 	for _, txIn := range tx.MsgTx().TxIns {
 		if _, ringExists := mp.outpointsAbe[txIn.PreviousOutPointRing.Hash()]; !ringExists {
-			mp.outpointsAbe[txIn.PreviousOutPointRing.Hash()] = make(map[chainhash.Hash]*abeutil.TxAbe)
+			mp.outpointsAbe[txIn.PreviousOutPointRing.Hash()] = make(map[string]*abeutil.TxAbe)
 		}
 
-		mp.outpointsAbe[txIn.PreviousOutPointRing.Hash()][txIn.SerialNumber] = tx
+		mp.outpointsAbe[txIn.PreviousOutPointRing.Hash()][string(txIn.SerialNumber)] = tx
 	}
 	atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
 
@@ -912,7 +912,7 @@ func (mp *TxPool) checkPoolDoubleSpendAbe(tx *abeutil.TxAbe) error {
 			continue
 		}
 
-		conflictTx, ok := mp.outpointsAbe[txIn.PreviousOutPointRing.Hash()][txIn.SerialNumber]
+		conflictTx, ok := mp.outpointsAbe[txIn.PreviousOutPointRing.Hash()][string(txIn.SerialNumber)]
 		if !ok {
 			continue
 		}
@@ -1211,7 +1211,7 @@ func (mp *TxPool) txConflicts(tx *abeutil.Tx) map[chainhash.Hash]*abeutil.Tx {
 func (mp *TxPool) txConflictsAbe(tx *abeutil.TxAbe) map[chainhash.Hash]*abeutil.TxAbe {
 	conflicts := make(map[chainhash.Hash]*abeutil.TxAbe)
 	for _, txIn := range tx.MsgTx().TxIns {
-		conflict, ok := mp.outpointsAbe[txIn.PreviousOutPointRing.Hash()][txIn.SerialNumber]
+		conflict, ok := mp.outpointsAbe[txIn.PreviousOutPointRing.Hash()][string(txIn.SerialNumber)]
 		if !ok {
 			continue
 		}
@@ -2461,7 +2461,7 @@ func New(cfg *Config) *TxPool {
 
 		poolAbe:          make(map[chainhash.Hash]*TxDescAbe),
 		orphansAbe:       make(map[chainhash.Hash]*orphanTxAbe),
-		outpointsAbe:     make(map[chainhash.Hash]map[chainhash.Hash]*abeutil.TxAbe),
-		orphansByPrevAbe: make(map[chainhash.Hash]map[chainhash.Hash]map[chainhash.Hash]*abeutil.TxAbe),
+		outpointsAbe:     make(map[chainhash.Hash]map[string]*abeutil.TxAbe),
+		orphansByPrevAbe: make(map[chainhash.Hash]map[string]map[chainhash.Hash]*abeutil.TxAbe),
 	}
 }
