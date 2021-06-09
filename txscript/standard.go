@@ -464,7 +464,7 @@ func PayToAddrScript(addr abeutil.Address) ([]byte, error) {
 	return nil, scriptError(ErrUnsupportedAddress, str)
 }
 
-//	todo(ABE):
+//	todo(ABE): use the txoGen replace this function
 func PayToAddressScriptAbe(maddr abeutil.MasterAddress) ([]byte, error) {
 	// Create the script to pay to the provided payment address if one was
 	// specified.  Otherwise create a script that allows the coinbase to be

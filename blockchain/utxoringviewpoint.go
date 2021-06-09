@@ -537,6 +537,7 @@ func initNewUtxoRingEntry(version uint32,ringBlockHeight int32, blockhashs []*ch
 //
 // The unspent outputs are needed by other transactions for things such as
 // script validation and double spend prevention.
+
 type UtxoRingViewpoint struct {
 	entries  map[chainhash.Hash]*UtxoRingEntry
 	bestHash chainhash.Hash
@@ -976,12 +977,12 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 		}
 	}
 	// TODO: change the version field in node and block to uint32 type?
-	err = view.newUtxoRingEntriesFromTxos(allCoinBaseRmTxos, ringBlockHeight, blockHashs, true)
+	err = view.NewUtxoRingEntriesFromTxos(allCoinBaseRmTxos, ringBlockHeight, blockHashs, true)
 	if err != nil {
 		return err
 	}
 
-	err = view.newUtxoRingEntriesFromTxos(allTransferRmTxos, ringBlockHeight, blockHashs, false)
+	err = view.NewUtxoRingEntriesFromTxos(allTransferRmTxos, ringBlockHeight, blockHashs, false)
 	if err != nil {
 		return err
 	}
@@ -1083,7 +1084,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 	return nil
 }*/
 
-func (view *UtxoRingViewpoint) newUtxoRingEntriesFromTxos(ringMemberTxos []*RingMemberTxo, ringBlockHeight int32, blockhashs []*chainhash.Hash, isCoinBase bool) error {
+func (view *UtxoRingViewpoint) NewUtxoRingEntriesFromTxos(ringMemberTxos []*RingMemberTxo, ringBlockHeight int32, blockhashs []*chainhash.Hash, isCoinBase bool) error {
 
 	if len(ringMemberTxos) == 0 {
 		return nil
