@@ -8,12 +8,8 @@ github.com/cryptosuite/kyber-go v0.0.0-20200701012546-a87ecb4b2ce3 h1:/7ZIZCf4WE
 github.com/cryptosuite/kyber-go v0.0.0-20200701012546-a87ecb4b2ce3/go.mod h1:1G0Jh7bXJGSUCTrC6ZB9lFpmCF+VFQehDqIwm9dJU3s=
 github.com/cryptosuite/kyber-go v0.0.1 h1:L12sYYZZ2OjnOPoVuYOkoUgiM8Hap9p7S3HYZJnK46Q=
 github.com/cryptosuite/kyber-go v0.0.1/go.mod h1:1G0Jh7bXJGSUCTrC6ZB9lFpmCF+VFQehDqIwm9dJU3s=
-github.com/cryptosuite/pqringct v0.0.0-20210608062645-f4e12375d0eb h1:1Ht8JjNnkFYTF+74spccp1CPJS+wjzSmvJFduc54btI=
-github.com/cryptosuite/pqringct v0.0.0-20210608062645-f4e12375d0eb/go.mod h1:UBnEgLBYVWcwds7RQdNKpFCd6b60ac8JR8UXJfCJjaE=
-github.com/cryptosuite/pqringct v0.0.0-20210609092636-8f04ca1ba77a h1:dKcEVEpkjwH7moHoHHqH2WEsckhroael+yuwfdEHZPU=
-github.com/cryptosuite/pqringct v0.0.0-20210609092636-8f04ca1ba77a/go.mod h1:UBnEgLBYVWcwds7RQdNKpFCd6b60ac8JR8UXJfCJjaE=
-github.com/cryptosuite/pqringct v0.0.0-20210609092950-91c270390f1c h1:ITz/UivtDlN4huJEUQkGV7MJ25RvNcPoKRb4ulcUcTc=
-github.com/cryptosuite/pqringct v0.0.0-20210609092950-91c270390f1c/go.mod h1:UBnEgLBYVWcwds7RQdNKpFCd6b60ac8JR8UXJfCJjaE=
+github.com/cryptosuite/pqringct v0.0.0-20210610050556-b261cad9b2a1 h1:cuteLFi7FI74tpKu47KTPs2ada44hiUQGisRwx4mxG4=
+github.com/cryptosuite/pqringct v0.0.0-20210610050556-b261cad9b2a1/go.mod h1:UBnEgLBYVWcwds7RQdNKpFCd6b60ac8JR8UXJfCJjaE=
 github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1 h1:vN3Cibtye7f3YuPvrJWG4Kp/jrb/XfxS5oIwl8XZBQY=
 github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1/go.mod h1:mJeCa86eOqj3kCJO+O4245Wnq5U07P9K9RfJplI8bQ4=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
