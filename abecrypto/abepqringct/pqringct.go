@@ -141,12 +141,12 @@ func CoinbaseTxGen(abeTxOutDescs []*AbeTxOutDesc, coinbaseTxMsgTemplate *wire.Ms
 		//	pqringct
 		txOutputDescs := make([]*pqringct.TxOutputDesc, len(abeTxOutDescs))
 		for j := 0; j < len(abeTxOutDescs); j++ {
-			cryptoSchemeInDesc := binary.BigEndian.Uint32(abeTxOutDescs[j].serializedMasterPublicKey[:4])
+			cryptoSchemeInDesc := binary.BigEndian.Uint16(abeTxOutDescs[j].serializedMasterPublicKey[:4])
 			if abecrypto.CryptoScheme(cryptoSchemeInDesc) != cryptoScheme {
 				return nil, errors.New("the cryptoScheme in TxOutDesc does not match that implied by the MsgTx.version")
 			}
 			mpk := &pqringct.MasterPublicKey{}
-			err := mpk.Deserialize(abeTxOutDescs[j].serializedMasterPublicKey[4:])
+			err := mpk.Deserialize(abeTxOutDescs[j].serializedMasterPublicKey[2:])
 			if err != nil {
 				return nil, err
 			}

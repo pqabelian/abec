@@ -7,11 +7,16 @@ import (
 var CryptoPP *pqringct.PublicParameter = pqringct.DefaultPP
 
 // todo: when multiple versions are supported simultaneously, and if necessary, initial multiple nullSerialNumbers
-var nullSerialNumber []byte
+var nullSerialNumber []byte = []byte{
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
 
 //	todo:
 func GetMasterPublicKeyLen(version uint32) uint32 {
-	return 1
+	return CryptoPP.GetMasterPublicKeyByteLen()
 }
 
 /*
@@ -19,17 +24,23 @@ Based on the (crypto-scheme) version of the Txo, return the maxAllowedLen
 */
 func GetTxoScriptLen(version uint32) uint32 {
 	// todo: call cryptoPP.methods
-	return 1
+	return CryptoPP.GetTxoByteLen()
 }
 
 func GetTxMemoMaxLen(version uint32) uint32 {
 	// todo: call cryptoPP.methods
-	return 1
+	return 32
 }
 
 func GetTxWitnessMaxLen(version uint32) uint32 {
 	// todo: call cryptoPP.methods
-	return 1
+	return func(a, b uint32) uint32 {
+		if a > b {
+			return a
+		}
+		return b
+	}(CryptoPP.GetCbTxWitnessMaxLen(), CryptoPP.GetTrTxWitnessMaxLen())
+
 }
 
 func GetMaxCoinValue(version uint32) uint64 {
@@ -54,7 +65,7 @@ TxoSerialNumberLen and underlying (Hash) algorothm will keep unchange.
 */
 func GetTxoSerialNumberLen(version uint32) int {
 	// todo: call cryptoPP.methods
-	return 1
+	return 32
 }
 
 func GetNullSerialNumber(version uint32) []byte {

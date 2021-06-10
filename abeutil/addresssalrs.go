@@ -16,8 +16,8 @@ type MasterAddressSalrs struct {
 }
 
 // SerializeSize returns the number of bytes it would take to serialize the MasterAddressSalrs.
-func (maddr *MasterAddressSalrs) SerializeSize() int {
-	return 2 + abesalrs.MpkByteLen
+func (maddr *MasterAddressSalrs) SerializeSize() uint32 {
+	return uint32(2 + abesalrs.MpkByteLen)
 }
 
 func (maddr *MasterAddressSalrs) Serialize() []byte {

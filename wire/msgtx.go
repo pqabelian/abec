@@ -1105,11 +1105,11 @@ func (txOut *TxOutAbe) Deserialize(r io.Reader) error {
 		return err
 	}
 
-	addressScript, err := ReadVarBytes(r, 0, pqringctparam.GetTxoScriptLen(txOut.Version), "TxoScript")
+	txoScript, err := ReadVarBytes(r, 0, pqringctparam.GetTxoScriptLen(txOut.Version), "TxoScript")
 	if err != nil {
 		return err
 	}
-	txOut.TxoScript = addressScript
+	txOut.TxoScript = txoScript
 
 	return nil
 }

@@ -205,6 +205,7 @@ type Params struct {
 	Bech32HRPSegwit string
 
 	// Address encoding magics
+	PQRingCTID              byte // First byte of a PQRingCT address
 	PubKeyHashAddrID        byte // First byte of a P2PKH address
 	ScriptHashAddrID        byte // First byte of a P2SH address
 	PrivateKeyID            byte // First byte of a WIF private key
@@ -238,21 +239,21 @@ var MainNetParams = Params{
 	},
 
 	// Chain parameters
-	GenesisBlock:             &genesisBlock,
-	GenesisHash:              &genesisHash,
-	PowLimit:                 mainPowLimit,
-	PowLimitBits:             0x1e01ffff,//0x207fffff,
+	GenesisBlock: &genesisBlock,
+	GenesisHash:  &genesisHash,
+	PowLimit:     mainPowLimit,
+	PowLimitBits: 0x1e01ffff, //0x207fffff,
 	//PowLimitBits:             0x1d00ffff,
-	BIP0034Height:            227931, // 000000000000024b89b42a942fe0d9fea3bb44ab7bd1b19115dd6a759c0808b8 //TODO(abe):these values need to evicted
-	BIP0065Height:            388381, // 000000000000000004c2b624ed5d7756c508d90fd0da2c7c679febfa6c4735f0
-	BIP0066Height:            363725, // 00000000000000000379eaa19dce8c9b722d46ae6a57c2f1a988119488b50931
+	BIP0034Height: 227931, // 000000000000024b89b42a942fe0d9fea3bb44ab7bd1b19115dd6a759c0808b8 //TODO(abe):these values need to evicted
+	BIP0065Height: 388381, // 000000000000000004c2b624ed5d7756c508d90fd0da2c7c679febfa6c4735f0
+	BIP0066Height: 363725, // 00000000000000000379eaa19dce8c9b722d46ae6a57c2f1a988119488b50931
 	//CoinbaseMaturity:         100,  //TODO(abe):for testing, this value will be set to 20
 	CoinbaseMaturity:         6,
 	SubsidyReductionInterval: 210000,
 	TargetTimespan:           time.Hour * 24 * 14, // 14 days TODO(abe):this value may be need changed
-	TargetTimePerBlock:       time.Minute * 3,    // 10 minutes TODO(abe): this value may be need changed, now temporary to be 3 min
+	TargetTimePerBlock:       time.Minute * 3,     // 10 minutes TODO(abe): this value may be need changed, now temporary to be 3 min
 	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
-	ReduceMinDifficulty:      false, // TODO(abe): this config may be used for adjust the difficult automatic?
+	ReduceMinDifficulty:      false,               // TODO(abe): this config may be used for adjust the difficult automatic?
 	MinDiffReductionTime:     0,
 	GenerateSupported:        false,
 
@@ -316,6 +317,7 @@ var MainNetParams = Params{
 	Bech32HRPSegwit: "bc", // always bc for main net
 
 	// Address encoding magics
+	PQRingCTID:              0x00, // starts with 1
 	PubKeyHashAddrID:        0x00, // starts with 1
 	ScriptHashAddrID:        0x05, // starts with 3
 	PrivateKeyID:            0x80, // starts with 5 (uncompressed) or K (compressed)
@@ -335,8 +337,8 @@ var MainNetParams = Params{
 // Bitcoin network.  Not to be confused with the test Bitcoin network (version
 // 3), this network is sometimes simply called "testnet".
 var RegressionNetParams = Params{
-	Name:        "regtest",
-	Net:         wire.TestNet,
+	Name: "regtest",
+	Net:  wire.TestNet,
 	//DefaultPort: "18444",
 	DefaultPort: "18777",
 	DNSSeeds:    []DNSSeed{},
@@ -410,8 +412,8 @@ var RegressionNetParams = Params{
 // (version 3).  Not to be confused with the regression test network, this
 // network is sometimes simply called "testnet".
 var TestNet3Params = Params{
-	Name:        "testnet3",
-	Net:         wire.TestNet3,
+	Name: "testnet3",
+	Net:  wire.TestNet3,
 	//DefaultPort: "18333",
 	DefaultPort: "18666",
 	DNSSeeds: []DNSSeed{
@@ -511,8 +513,8 @@ var TestNet3Params = Params{
 // following normal discovery rules.  This is important as otherwise it would
 // just turn into another public testnet.
 var SimNetParams = Params{
-	Name:        "simnet",
-	Net:         wire.SimNet,
+	Name: "simnet",
+	Net:  wire.SimNet,
 	//DefaultPort: "18555",
 	DefaultPort: "18888",
 	DNSSeeds:    []DNSSeed{}, // NOTE: There must NOT be any seeds.
