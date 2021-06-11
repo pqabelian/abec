@@ -806,20 +806,20 @@ func witnessToHex(witness wire.TxWitness) []string {
 	return result
 }
 
-func witnessToHexAbe(txWitness *wire.TxWitnessAbe) []string {
-	// Ensure nil is returned when there are no entries versus an empty
-	// slice so it can properly be omitted as necessary.
-	if txWitness == nil || len(txWitness.Witnesses) == 0 {
-		return nil
-	}
-
-	result := make([]string, 0, len(txWitness.Witnesses))
-	for _, wit := range txWitness.Witnesses {
-		result = append(result, hex.EncodeToString(wit))
-	}
-
-	return result
-}
+//func witnessToHexAbe(txWitness *wire.TxWitnessAbe) []string {
+//	// Ensure nil is returned when there are no entries versus an empty
+//	// slice so it can properly be omitted as necessary.
+//	if txWitness == nil || len(txWitness.Witnesses) == 0 {
+//		return nil
+//	}
+//
+//	result := make([]string, 0, len(txWitness.Witnesses))
+//	for _, wit := range txWitness.Witnesses {
+//		result = append(result, hex.EncodeToString(wit))
+//	}
+//
+//	return result
+//}
 
 // createVinList returns a slice of JSON objects for the inputs of the passed
 // transaction.

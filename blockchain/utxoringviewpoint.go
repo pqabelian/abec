@@ -35,7 +35,7 @@ type UtxoRingEntry struct {
 		// usage since there will be a lot of these in memory.
 		packedFlags txoFlags*/
 
-	//	Version uint32
+	Version uint32
 	//	ringHash	chainhash.Hash	//	the hash of ring members, i.e. OutPoint(txHash, index)
 	ringBlockHeight int32
 	outPointRing    *wire.OutPointRing
@@ -154,7 +154,7 @@ func (entry *UtxoRingEntry) SerializeSize() int {
 	}
 
 	n := wire.VarIntSerializeSize(utxoRingHeaderCode)
-
+	n = n + wire.VarIntSerializeSize(uint64(entry.Version))
 	//	outPointRing
 	n = n + entry.outPointRing.SerializeSize()
 
@@ -195,13 +195,17 @@ func (entry *UtxoRingEntry) Serialize(w io.Writer) error {
 	if entry.IsCoinBase() {
 		utxoRingHeaderCode |= 0x01
 	}
-
 	err := wire.WriteVarInt(w, 0, utxoRingHeaderCode)
 	if err != nil {
 		return err
 	}
 
-	err = entry.outPointRing.Serialize(w)
+	err = wire.WriteVarInt(w, 0, uint64(entry.Version))
+	if err != nil {
+		return err
+	}
+
+	err = wire.WriteOutPointRing(w, 0, entry.Version, entry.outPointRing)
 	if err != nil {
 		return err
 	}
@@ -218,7 +222,7 @@ func (entry *UtxoRingEntry) Serialize(w io.Writer) error {
 
 		//	txOuts
 		for _, txOut := range entry.txOuts {
-			err = txOut.Serialize(w)
+			err = wire.WriteTxOutAbe(w, 0, entry.Version, txOut)
 			if err != nil {
 				return err
 			}
@@ -289,8 +293,14 @@ func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 	if isCoinBase {
 		entry.packedFlags |= tfCoinBase
 	}
+	version, err := wire.ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	entry.Version = uint32(version)
+
 	entry.outPointRing = &wire.OutPointRing{}
-	err = entry.outPointRing.Deserialize(r)
+	err = wire.ReadOutPointRing(r, 0,entry.Version,entry.outPointRing)
 	if err != nil {
 		return err
 	}
@@ -313,7 +323,7 @@ func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 		//	txOuts
 		for i := uint64(0); i < ringSize; i++ {
 			txOut := wire.TxOutAbe{}
-			err = txOut.Deserialize(r)
+			err = wire.ReadTxOutAbe(r,0,entry.Version,&txOut)
 			if err != nil {
 				return err
 			}

@@ -166,36 +166,39 @@ func (msg *MsgBlockAbe) Deserialize(r io.Reader) error {
 	// At the current time, there is no difference between the wire encoding
 	// at protocol version 0 and the stable long-term storage format.  As
 	// a result, make use of BtcDecode.
-	err := msg.Header.Deserialize(r)
-	if err != nil {
-		return err
-	}
+	return msg.BtcDecode(r, 0, WitnessEncoding)
 
-	txCount, err := ReadVarInt(r, 0)
-	if err != nil {
-		return err
-	}
-
-	// Prevent more transactions than could possibly fit into a block.
-	// It would be possible to cause memory exhaustion and panics without
-	// a sane upper bound on this count.
-	if txCount > maxTxPerBlockAbe {
-		str := fmt.Sprintf("too many transactions to fit into a block "+
-			"[count %d, max %d]", txCount, maxTxPerBlockAbe)
-		return messageError("MsgBlock.BtcDecode", str)
-	}
-
-	msg.Transactions = make([]*MsgTxAbe, 0, txCount)
-	for i := uint64(0); i < txCount; i++ {
-		tx := MsgTxAbe{}
-		err := tx.DeserializeFull(r)
-		if err != nil {
-			return err
-		}
-		msg.Transactions = append(msg.Transactions, &tx)
-	}
-
-	return nil
+	//
+	//err := msg.Header.Deserialize(r)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//txCount, err := ReadVarInt(r, 0)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//// Prevent more transactions than could possibly fit into a block.
+	//// It would be possible to cause memory exhaustion and panics without
+	//// a sane upper bound on this count.
+	//if txCount > maxTxPerBlockAbe {
+	//	str := fmt.Sprintf("too many transactions to fit into a block "+
+	//		"[count %d, max %d]", txCount, maxTxPerBlockAbe)
+	//	return messageError("MsgBlock.BtcDecode", str)
+	//}
+	//
+	//msg.Transactions = make([]*MsgTxAbe, 0, txCount)
+	//for i := uint64(0); i < txCount; i++ {
+	//	tx := MsgTxAbe{}
+	//	err := tx.DeserializeFull(r)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	msg.Transactions = append(msg.Transactions, &tx)
+	//}
+	//
+	//return nil
 
 }
 
@@ -401,30 +404,31 @@ func (msg *MsgBlock) SerializeSizeStripped() int {
 }
 
 func (msg *MsgBlockAbe) Serialize(w io.Writer) error {
-	err := msg.Header.Serialize(w)
-	if err != nil {
-		return err
-	}
-
-	err = WriteVarInt(w, 0, uint64(len(msg.Transactions)))
-	if err != nil {
-		return err
-	}
-	// TODO(abe): when transfer the block to others, whether transfer the witnesses?
-	//   In one hand, the transaction may have be transferred before being packaged into block, so does the witness
-	//   In other hand, the transaction should not be transfer more than one time.
-	//   But the question is, how can we know whether the peer have transactions or witnesses?
-
-	// TODO(abe): at this moment, we transfer the transaction with witnesses all time.
-	for _, tx := range msg.Transactions {
-		//err = tx.Serialize(w)
-		err = tx.SerializeFull(w)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return msg.BtcEncode(w, 0, WitnessEncoding)
+	//err := msg.Header.Serialize(w)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//err = WriteVarInt(w, 0, uint64(len(msg.Transactions)))
+	//if err != nil {
+	//	return err
+	//}
+	//// TODO(abe): when transfer the block to others, whether transfer the witnesses?
+	////   In one hand, the transaction may have be transferred before being packaged into block, so does the witness
+	////   In other hand, the transaction should not be transfer more than one time.
+	////   But the question is, how can we know whether the peer have transactions or witnesses?
+	//
+	//// TODO(abe): at this moment, we transfer the transaction with witnesses all time.
+	//for _, tx := range msg.Transactions {
+	//	//err = tx.Serialize(w)
+	//	err = tx.SerializeFull(w)
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
+	//
+	//return nil
 }
 
 // SerializeSize returns the number of bytes it would take to serialize the
