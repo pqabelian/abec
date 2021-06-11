@@ -495,7 +495,7 @@ func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, extraNonce uint64, tx
 	}
 
 	msgTx.TxFee = pqringctparam.GetMaxCoinValue(msgTx.Version)
-	msgTx.TxMemo = nil
+	msgTx.TxMemo = []byte{byte(msgTx.Version>>24),byte(msgTx.Version>>16),byte(msgTx.Version>>8),byte(msgTx.Version)}
 	msgTx.TxWitness = make([]byte, pqringctparam.GetCoinbaseTxWitnessLen(msgTx.Version, txOutNum))
 
 	return msgTx, nil

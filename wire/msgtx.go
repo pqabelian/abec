@@ -1599,7 +1599,8 @@ func writeTxOutAbe(w io.Writer, pver uint32, txOut *TxOutAbe) error {
 // readTxOut reads the next sequence of bytes from r as a transaction input
 // (TxIn).
 func readTxOutAbe(r io.Reader, pver uint32, txOut *TxOutAbe) error {
-	err := readElement(r, txOut.Version)
+	var err error
+	txOut.Version,err = binarySerializer.Uint32(r, littleEndian)
 	if err != nil {
 		return err
 	}
