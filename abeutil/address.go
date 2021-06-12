@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/abesuite/abec/abecrypto"
+	"github.com/abesuite/abec/abecrypto/abeaddress"
 	"github.com/abesuite/abec/abeutil/base58"
 	"github.com/abesuite/abec/abeutil/bech32"
 	"github.com/abesuite/abec/btcec"
@@ -107,7 +108,7 @@ type MasterAddress interface {
 
 	MasterAddressCryptoScheme() abecrypto.CryptoScheme // just for being different interface from DerivedAddress
 
-	GenerateDerivedAddress() (DerivedAddress, error)
+	//	GenerateDerivedAddress() (DerivedAddress, error)
 }
 
 type DerivedAddress interface {
@@ -119,7 +120,7 @@ type DerivedAddress interface {
 
 	String() string
 
-	DerivedAddressCryptoScheme() abecrypto.CryptoScheme // just for being different interface from MasterAddress
+	//	DerivedAddressCryptoScheme() abecrypto.CryptoScheme // just for being different interface from MasterAddress
 }
 
 // Address is an interface type for any type of destination a transaction
@@ -288,7 +289,7 @@ func DecodeMasterAddressAbe(addrstr string) (MasterAddress, error) {
 	case abecrypto.CryptoSchemeSALRS:
 		return ParseMasterAddressSalrsFromSerialzedBytes(serialzedMasterAddress)
 	case abecrypto.CryptoSchemePQRINGCT:
-		return ParseMasterAddressPQringctFromSerialzedBytes(serialzedMasterAddress)
+		return abeaddress.ParseMasterAddressPQringctFromSerialzedBytes(serialzedMasterAddress)
 	default:
 		return nil, errors.New("decoded address is of unknown/unsupported crypto scheme")
 	}

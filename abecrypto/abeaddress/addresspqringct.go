@@ -1,59 +1,71 @@
-package abeutil
+package abeaddress
 
-/*
+import (
+	"encoding/binary"
+	"encoding/hex"
+	"errors"
+	"github.com/abesuite/abec/abecrypto"
+	"github.com/abesuite/abec/abecrypto/pqringctparam"
+	"github.com/abesuite/abec/chaincfg"
+	"github.com/cryptosuite/pqringct"
+)
+
 // MasterAddressPQringctMasterPubKey implements the interface MasterAddress for CryptoScheme SALRS
 type MasterAddressPQringct struct {
 	//	cryptoScheme seems to be redundant, at this moment, just work for double-check
 	// TODO: add the flag for network
 	netID        byte
 	cryptoScheme abecrypto.CryptoScheme
-	masterPubKey pqringct.MasterPublicKey
-}
-
-func (maddr *MasterAddressPQringct) EncodeAddress() string {
-	return hex.EncodeToString(append([]byte{maddr.netID}, maddr.Serialize()...))
+	masterPubKey *pqringct.MasterPublicKey
 }
 
 // SerializeSize returns the number of bytes it would take to serialize the MasterAddressPQringct.
 func (maddr *MasterAddressPQringct) SerializeSize() uint32 {
-	return 2 + pqringctparam.GetMasterPublicKeyLen(uint32(maddr.cryptoScheme))
+	return 5 + pqringctparam.GetMasterPublicKeyLen(uint32(maddr.cryptoScheme))
 }
 
 func (maddr *MasterAddressPQringct) Serialize() []byte {
 
-	b := make([]byte, 2+pqringctparam.GetMasterPublicKeyLen(uint32(maddr.cryptoScheme)))
+	b := make([]byte, 5+pqringctparam.GetMasterPublicKeyLen(uint32(maddr.cryptoScheme)))
 
-	binary.BigEndian.PutUint16(b, uint16(maddr.cryptoScheme))
+	b[0] = maddr.netID
 
-	copy(b[2:], maddr.masterPubKey.Serialize()[:])
+	binary.BigEndian.PutUint32(b[1:], uint32(maddr.cryptoScheme))
+
+	copy(b[5:], maddr.masterPubKey.Serialize()[:])
 
 	return b
 }
 
 func (maddr *MasterAddressPQringct) Deserialize(serialized []byte) error {
-	if len(serialized) !=2+ int(pqringctparam.GetMasterPublicKeyLen(uint32(abecrypto.CryptoSchemePQRINGCT))) {
+	if len(serialized) != 5+int(pqringctparam.GetMasterPublicKeyLen(uint32(abecrypto.CryptoSchemePQRINGCT))) {
 		return errors.New("the serialized does not match the rules for MasterAddressPQringct")
 	}
-	cryptoScheme := binary.BigEndian.Uint16(serialized[:2])
+	netId := serialized[0]
+	cryptoScheme := binary.BigEndian.Uint32(serialized[1:4])
 	if abecrypto.CryptoScheme(cryptoScheme) != abecrypto.CryptoSchemePQRINGCT {
 		return errors.New("the serialized does not match the rules for MasterAddressPQringct")
 	}
-	var mpk  pqringct.MasterPublicKey
-	err := mpk.Deserialize(serialized[2:])
+	mpk := &pqringct.MasterPublicKey{}
+	err := mpk.Deserialize(serialized[5:])
 	if err != nil {
 		return err
 	}
 
+	maddr.netID = netId
 	maddr.cryptoScheme = abecrypto.CryptoScheme(cryptoScheme)
 	maddr.masterPubKey = mpk
 
 	return nil
 }
-func (maddr *MasterAddressPQringct) GenerateDerivedAddress() (DerivedAddress, error){
-	return nil,errors.New("pqringct can not support to derive address from master address")
-}
+
 func (maddr *MasterAddressPQringct) MasterAddressCryptoScheme() abecrypto.CryptoScheme {
 	return maddr.cryptoScheme
+}
+
+func (maddr *MasterAddressPQringct) EncodeAddress() string {
+	//return hex.EncodeToString(append([]byte{maddr.netID}, maddr.Serialize()...))
+	return hex.EncodeToString(maddr.Serialize())
 }
 
 func (maddr *MasterAddressPQringct) String() string {
@@ -91,4 +103,3 @@ func ParseMasterAddressPQringctFromSerialzedBytes(serialized []byte) (*MasterAdd
 	return maddrpqringct, nil
 
 }
-*/
