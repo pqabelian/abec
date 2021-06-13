@@ -471,14 +471,15 @@ func PayToAddressScriptAbe(maddr abeutil.MasterAddress) ([]byte, error) {
 	// redeemable by anyone.
 	var addressScript []byte
 	if maddr != nil {
-		daddr, err := maddr.GenerateDerivedAddress()
-		if err != nil {
-			return nil, err
-		}
-		addressScript, err = BuildAddressScript(daddr)
-		if err != nil {
-			return nil, err
-		}
+		// todo: pqringct does not support GenerateDerivedAddress
+		/*		daddr, err := maddr.GenerateDerivedAddress()
+				if err != nil {
+					return nil, err
+				}
+				addressScript, err = BuildAddressScript(daddr)
+				if err != nil {
+					return nil, err
+				}*/
 	} else {
 		addressScript = nil
 		//TODO(abe): return error if mpk is mil
@@ -486,6 +487,7 @@ func PayToAddressScriptAbe(maddr abeutil.MasterAddress) ([]byte, error) {
 
 	return addressScript, nil
 }
+
 // TODO(abe): abstract the derivedaddress not the derivedAddressSalrs
 func ExtractAddressFromScriptAbe(script []byte) (res *abeutil.DerivedAddressSalrs, err error) {
 	// Create the script to pay to the provided payment address if one was
