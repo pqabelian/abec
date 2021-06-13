@@ -679,6 +679,8 @@ func (msg *MsgTxAbe) SerializeFull(w io.Writer) error {
 // encoded transaction is the same in both instances, but there is a distinct
 // difference and separating the two allows the API to be flexible enough to
 // deal with changes.
+// todo: re-write the serialize/deserialze, even they are the same as encode/decode
+// todo: serialize/deserialze should call the serialize of the components
 func (msg *MsgTxAbe) Deserialize(r io.Reader) error {
 	return msg.BtcDecode(r, 0, WitnessEncoding)
 }
