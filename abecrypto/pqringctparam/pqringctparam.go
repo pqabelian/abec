@@ -22,9 +22,19 @@ func GetMasterPublicKeyLen(version uint32) uint32 {
 /*
 Based on the (crypto-scheme) version of the Txo, return the maxAllowedLen
 */
-func GetTxoScriptLen(version uint32) uint32 {
+/*func GetTxoScriptLen(version uint32) uint32 {
 	// todo: call cryptoPP.methods
 	return CryptoPP.GetTxoByteLen()
+}*/
+
+func GetTxoSerializeSize(version uint32) uint32 {
+	// todo: call cryptoPP.methods
+	return CryptoPP.GetTxoSerializeSize()
+}
+
+func GetTrTxWitnessSize(txVersion uint32, inputRingSizes []int, outputTxoNum uint8) uint32 {
+	//	todo: call cryptoPP.methods
+	return CryptoPP.GetTrTxWitnessSerializeSize(inputRingSizes, outputTxoNum)
 }
 
 func GetTxMemoMaxLen(version uint32) uint32 {

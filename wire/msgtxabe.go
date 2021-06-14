@@ -289,7 +289,7 @@ func ReadTxOutAbe(r io.Reader, pver uint32, version uint32, txOut *TxOutAbe) err
 		return err
 	}
 
-	txoScript, err := ReadVarBytes(r, pver, pqringctparam.GetTxoScriptLen(version), "TxoScript")
+	txoScript, err := ReadVarBytes(r, pver, pqringctparam.GetTxoSerializeSize(version), "TxoScript")
 	if err != nil {
 		return err
 	}
@@ -526,7 +526,12 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 	}
 
 	//	TxFee
-	txFee, err := ReadVarInt(r, pver)
+	/*	txFee, err := ReadVarInt(r, pver)
+		if err != nil {
+			return err
+		}
+		msg.TxFee = txFee*/
+	txFee, err := binarySerializer.Uint64(r, littleEndian)
 	if err != nil {
 		return err
 	}
@@ -592,7 +597,12 @@ func (msg *MsgTxAbe) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) er
 	}
 
 	//	TxFee
-	err = WriteVarInt(w, 0, msg.TxFee)
+	/*	err = WriteVarInt(w, 0, msg.TxFee)
+		if err != nil {
+			return err
+		}*/
+
+	err = binarySerializer.PutUint64(w, littleEndian, msg.TxFee)
 	if err != nil {
 		return err
 	}
@@ -625,6 +635,8 @@ func (msg *MsgTxAbe) MaxPayloadLength(pver uint32) uint32 {
 	return MaxBlockPayloadAbe
 }
 
+//	todo: Is it safe to use int as the size type?
+//	Note that, in different system, int may be int16 or int32
 func (msg *MsgTxAbe) SerializeSize() int {
 	//	Version 4 bytes
 	n := 4
@@ -644,7 +656,9 @@ func (msg *MsgTxAbe) SerializeSize() int {
 	}
 
 	//	TxFee
-	n = n + VarIntSerializeSize(uint64(msg.TxFee))
+	//	use 8 bytes store the transaction fee
+	//n = n + VarIntSerializeSize(uint64(msg.TxFee))
+	n = n + 8
 
 	//	TxMemo
 	n = n + VarIntSerializeSize(uint64(len(msg.TxMemo))) + len(msg.TxMemo)
@@ -658,6 +672,47 @@ func (msg *MsgTxAbe) SerializeSizeFull() int {
 	n = n + VarIntSerializeSize(uint64(len(msg.TxWitness))) + len(msg.TxWitness)
 
 	return n
+}
+
+/**
+Compute the size according to the Serialize function, and based on the crypto-scheme
+*/
+func PrecomputeTrTxConSize(txVersion uint32, txIns []*TxInAbe, outputTxoNum uint8, txMemoLen uint32) uint32 {
+	//	Version 4 bytes
+	n := uint32(4)
+
+	//	Inputs
+	//	serialized varint size for input
+	n = n + uint32(VarIntSerializeSize(uint64(len(txIns))))
+	for _, txIn := range txIns {
+		// serialized varint size for the ring size, and (chainhash.HashSize + 1) for each OutPoint
+		n = n + uint32(txIn.SerializeSize())
+	}
+
+	// 	serialized varint size for output number
+	n = n + uint32(VarIntSerializeSize(uint64(outputTxoNum)))
+	txoScriptLen := pqringctparam.GetTxoSerializeSize(txVersion) // depending on the crypto-scheme
+	n = n + uint32(outputTxoNum)*(uint32(4+VarIntSerializeSize(uint64(txoScriptLen)))+txoScriptLen)
+	/*	for _, txOut := range msg.TxOuts {
+		n = n + txOut.SerializeSize()
+	}*/
+
+	//	TxFee
+	n = n + 8
+
+	//	TxMemo
+	n = n + uint32(VarIntSerializeSize(uint64(txMemoLen))) + txMemoLen
+
+	return n
+}
+
+func PrecomputeTrTxWitnessSize(txVersion uint32, txIns []*TxInAbe, outputTxoNum uint8) uint32 {
+	inputRingSizes := make([]int, len(txIns))
+	for i := 0; i < len(txIns); i++ {
+		inputRingSizes[i] = len(txIns[i].PreviousOutPointRing.OutPoints)
+	}
+
+	return pqringctparam.GetTrTxWitnessSize(txVersion, inputRingSizes, outputTxoNum) // depending on the crypto-scheme
 }
 
 //	for computing TxId by hash, and for being serialized in block

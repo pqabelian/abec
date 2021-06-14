@@ -485,7 +485,7 @@ func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, extraNonce uint64, tx
 	msgTx.AddTxIn(coinbaseTxIn)
 	tempTxOut := &wire.TxOutAbe{
 		Version:   msgTx.Version,
-		TxoScript: make([]byte, pqringctparam.GetTxoScriptLen(msgTx.Version)),
+		TxoScript: make([]byte, pqringctparam.GetTxoSerializeSize(msgTx.Version)),
 	}
 
 	//	one or multiple TxoOuts
@@ -494,8 +494,9 @@ func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, extraNonce uint64, tx
 		msgTx.AddTxOut(tempTxOut)
 	}
 
-	msgTx.TxFee = pqringctparam.GetMaxCoinValue(msgTx.Version)
-	msgTx.TxMemo = []byte{byte(msgTx.Version>>24),byte(msgTx.Version>>16),byte(msgTx.Version>>8),byte(msgTx.Version)}
+	//msgTx.TxFee = pqringctparam.GetMaxCoinValue(msgTx.Version)
+	msgTx.TxFee = 1 // txFee will be serialized with 8bytes.
+	msgTx.TxMemo = []byte{byte(msgTx.Version >> 24), byte(msgTx.Version >> 16), byte(msgTx.Version >> 8), byte(msgTx.Version)}
 	msgTx.TxWitness = make([]byte, pqringctparam.GetCoinbaseTxWitnessLen(msgTx.Version, txOutNum))
 
 	return msgTx, nil
