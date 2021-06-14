@@ -41,6 +41,10 @@ func NewAbeTxOutDesc(serializedMpk []byte, value uint64) *AbeTxOutDesc {
 	}
 }
 
+func (txOutDesc *AbeTxOutDesc) GetValue() uint64 {
+	return txOutDesc.value
+}
+
 type AbeTxInputDesc struct {
 	serializedTxoList             []*wire.TxOutAbe
 	sidx                          int
@@ -198,7 +202,7 @@ func CoinbaseTxVerify(coinbaseTx *wire.MsgTxAbe) bool {
 		cryptoCoinbaseTx.Vin = coinbaseTx.TxFee
 
 		cryptoCoinbaseTx.TxWitness = &pqringct.CbTxWitness{}
-		reader:=bytes.NewReader(coinbaseTx.TxWitness)
+		reader := bytes.NewReader(coinbaseTx.TxWitness)
 		err := cryptoCoinbaseTx.TxWitness.Deserialize(reader)
 		if err != nil {
 			return false
@@ -210,7 +214,7 @@ func CoinbaseTxVerify(coinbaseTx *wire.MsgTxAbe) bool {
 				return false
 			}
 			txo := &pqringct.TXO{}
-			reader:=bytes.NewReader(coinbaseTx.TxOuts[i].TxoScript)
+			reader := bytes.NewReader(coinbaseTx.TxOuts[i].TxoScript)
 			err := txo.Deserialize(reader)
 			if err != nil {
 				return false
@@ -414,7 +418,7 @@ func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail
 					//	The TXOs in the same ring should have the same version
 				}
 				txoList[j] = &pqringct.TXO{}
-				reader:=bytes.NewReader(abeTxInDetails[i].serializedTxoList[j].TxoScript)
+				reader := bytes.NewReader(abeTxInDetails[i].serializedTxoList[j].TxoScript)
 				err := txoList[j].Deserialize(reader)
 				if err != nil {
 					return false
@@ -436,7 +440,7 @@ func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail
 			}
 
 			cryptoTransferTx.OutputTxos[j] = &pqringct.TXO{}
-			reader:=bytes.NewReader(transferTx.TxOuts[j].TxoScript)
+			reader := bytes.NewReader(transferTx.TxOuts[j].TxoScript)
 			err := cryptoTransferTx.OutputTxos[j].Deserialize(reader)
 			if err != nil {
 				return false
@@ -453,7 +457,7 @@ func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail
 
 		//	TxWitness
 		cryptoTransferTx.TxWitness = &pqringct.TrTxWitness{}
-		reader:=bytes.NewReader(transferTx.TxWitness)
+		reader := bytes.NewReader(transferTx.TxWitness)
 		err := cryptoTransferTx.TxWitness.Deserialize(reader)
 		if err != nil {
 			return false
@@ -517,7 +521,7 @@ func TxoSerialNumberGen(abeTxo *wire.TxOutAbe, serialzedMpk []byte, serializedMs
 		}
 
 		cryptoTxo := &pqringct.TXO{}
-		reader:=bytes.NewReader(abeTxo.TxoScript)
+		reader := bytes.NewReader(abeTxo.TxoScript)
 		err = cryptoTxo.Deserialize(reader)
 		if err != nil {
 			return nil, err
@@ -570,7 +574,7 @@ func TxoCoinReceive(abeTxo *wire.TxOutAbe, serialzedMpk []byte, serializedMsvk [
 			return false, 0
 		}
 		cryptoTxo := &pqringct.TXO{}
-		reader:=bytes.NewReader(abeTxo.TxoScript)
+		reader := bytes.NewReader(abeTxo.TxoScript)
 		err = cryptoTxo.Deserialize(reader)
 		if err != nil {
 			return false, 0
