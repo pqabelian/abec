@@ -575,8 +575,8 @@ func NewSendManyCmd(fromAccount string, amounts map[string]float64, minConf *int
 type SendToPayeesCmd struct {
 	Amounts            map[string]float64 `jsonrpcusage:"{\"name\":amount,...}"` // In BTC
 	MinConf            *int               `jsonrpcdefault:"1"`                   //TODO(abe) what is the minconf used for?
-	ScaleToFeeSatPerKb *float64           `jsonrpcdefault:"1"`                   // todo(AliceBob): < means that will use 'FeeSpecified'
-	FeeSpecified       *float64           `jsonrpcdefault:"-1"`                  //	todo(AliceBob): valid only if 'ScaleToFeeSatPerKb<0' && 'FeeSpecified>=0'
+	ScaleToFeeSatPerKb *float64           `jsonrpcdefault:"1"`                   // todo(AliceBob): <= 0 means that will use 'FeeSpecified'
+	FeeSpecified       *float64           `jsonrpcdefault:"0"`                   //	todo(AliceBob): valid only if 'ScaleToFeeSatPerKb<=0' && 'FeeSpecified>0'
 	Comment            *string
 }
 
