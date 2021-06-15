@@ -10,7 +10,7 @@ type AddMultisigAddressCmd struct {
 	Account   *string
 }
 type AddPayeeCmd struct {
-	Name string
+	Name         string
 	MasterPubKey string
 }
 
@@ -196,7 +196,7 @@ func NewGetBalanceCmd(account *string, minConf *int) *GetBalanceCmd {
 
 // GetBalancesCmd defines the getbalances JSON-RPC command.
 type GetBalancesCmd struct{}
-type GetBalancesAbeCmd struct{
+type GetBalancesAbeCmd struct {
 	Minconf *int `jsonrpcdefault:"1"`
 }
 
@@ -210,6 +210,7 @@ func NewGetBalancesAbeCmd(minconf *int) *GetBalancesAbeCmd {
 		Minconf: minconf,
 	}
 }
+
 // GetNewAddressCmd defines the getnewaddress JSON-RPC command.
 type GetNewAddressCmd struct {
 	Account *string
@@ -463,8 +464,10 @@ type ListUnspentCmd struct {
 	MaxConf   *int `jsonrpcdefault:"9999999"`
 	Addresses *[]string
 }
+
 //TODO(abe): the utxos listed is spendable
-type ListUnspentAbeCmd struct {}
+type ListUnspentAbeCmd struct{}
+
 func NewListUnspentAbeCmd() *ListUnspentAbeCmd {
 	return &ListUnspentAbeCmd{}
 }
@@ -570,15 +573,20 @@ func NewSendManyCmd(fromAccount string, amounts map[string]float64, minConf *int
 }
 
 type SendToPayeesCmd struct {
-	Amounts  map[string]float64 `jsonrpcusage:"{\"name\":amount,...}"` // In BTC
-	MinConf *int               `jsonrpcdefault:"1"` //TODO(abe) what is the minconf used for?
-	Comment *string
+	Amounts            map[string]float64 `jsonrpcusage:"{\"name\":amount,...}"` // In BTC
+	MinConf            *int               `jsonrpcdefault:"1"`                   //TODO(abe) what is the minconf used for?
+	ScaleToFeeSatPerKb *float64           `jsonrpcdefault:"1"`                   // todo(AliceBob): < means that will use 'FeeSpecified'
+	FeeSpecified       *float64           `jsonrpcdefault:"-1"`                  //	todo(AliceBob): valid only if 'ScaleToFeeSatPerKb<0' && 'FeeSpecified>=0'
+	Comment            *string
 }
-func NewSendToPayeesCmd(amounts map[string]float64, minconf *int, comment *string) *SendToPayeesCmd {
+
+func NewSendToPayeesCmd(amounts map[string]float64, minconf *int, scaleToFeeSatPerKb *float64, feeSpecified *float64, comment *string) *SendToPayeesCmd {
 	return &SendToPayeesCmd{
-		Amounts:  amounts,
-		MinConf: minconf,
-		Comment: comment,
+		Amounts:            amounts,
+		MinConf:            minconf,
+		ScaleToFeeSatPerKb: scaleToFeeSatPerKb,
+		FeeSpecified:       feeSpecified,
+		Comment:            comment,
 	}
 }
 
