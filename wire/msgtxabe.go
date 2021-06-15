@@ -526,16 +526,17 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 	}
 
 	//	TxFee
-	/*	txFee, err := ReadVarInt(r, pver)
-		if err != nil {
-			return err
-		}
-		msg.TxFee = txFee*/
-	txFee, err := binarySerializer.Uint64(r, littleEndian)
+	txFee, err := ReadVarInt(r, pver)
 	if err != nil {
 		return err
 	}
 	msg.TxFee = txFee
+
+	/*	txFee, err := binarySerializer.Uint64(r, littleEndian)
+		if err != nil {
+			return err
+		}
+		msg.TxFee = txFee*/
 
 	//	TxMemo
 	txMemo, err := ReadVarBytes(r, pver, pqringctparam.GetTxMemoMaxLen(msg.Version), "TxMemo")
@@ -597,15 +598,15 @@ func (msg *MsgTxAbe) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) er
 	}
 
 	//	TxFee
-	/*	err = WriteVarInt(w, 0, msg.TxFee)
-		if err != nil {
-			return err
-		}*/
-
-	err = binarySerializer.PutUint64(w, littleEndian, msg.TxFee)
+	err = WriteVarInt(w, 0, msg.TxFee)
 	if err != nil {
 		return err
 	}
+
+	/*	err = binarySerializer.PutUint64(w, littleEndian, msg.TxFee)
+		if err != nil {
+			return err
+		}*/
 
 	//	TxMemo
 	err = WriteVarBytes(w, 0, msg.TxMemo)
@@ -656,9 +657,9 @@ func (msg *MsgTxAbe) SerializeSize() int {
 	}
 
 	//	TxFee
+	n = n + VarIntSerializeSize(msg.TxFee)
 	//	use 8 bytes store the transaction fee
-	//n = n + VarIntSerializeSize(uint64(msg.TxFee))
-	n = n + 8
+	//n = n + 8
 
 	//	TxMemo
 	n = n + VarIntSerializeSize(uint64(len(msg.TxMemo))) + len(msg.TxMemo)
@@ -676,6 +677,7 @@ func (msg *MsgTxAbe) SerializeSizeFull() int {
 
 /**
 Compute the size according to the Serialize function, and based on the crypto-scheme
+The result is just appropriate, will be used to compute transaction fee
 */
 func PrecomputeTrTxConSize(txVersion uint32, txIns []*TxInAbe, outputTxoNum uint8, txMemoLen uint32) uint32 {
 	//	Version 4 bytes
@@ -698,6 +700,7 @@ func PrecomputeTrTxConSize(txVersion uint32, txIns []*TxInAbe, outputTxoNum uint
 	}*/
 
 	//	TxFee
+	//	use 8
 	n = n + 8
 
 	//	TxMemo
