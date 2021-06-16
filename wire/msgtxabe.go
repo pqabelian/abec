@@ -78,6 +78,7 @@ func NewOutPointAbe(txHash *chainhash.Hash, index uint8) *OutPointAbe {
 //	todo: shall the ringBlockHeight be added?
 type OutPointRing struct {
 	// TODO(abe): these three successive block hash can be replaced by the hash of block whose heigt equal to 3K+2
+	//	todo: AliceBob 20210616 RingHash should be computed based on the version, blockhashs, and outpoints
 	Version    uint32            //	All TXOs in a ring has the same version, and this version is set to be the ring Version.
 	BlockHashs []*chainhash.Hash //	the hashs for the blocks from which the ring was generated, at this moment it is 3 successive blocks
 	OutPoints  []*OutPointAbe
@@ -92,9 +93,11 @@ func (outPointRing *OutPointRing) SerializeSize() int {
 	blockNum := len(outPointRing.BlockHashs)
 	OutPointNum := len(outPointRing.OutPoints)
 	return 4 +
-		VarIntSerializeSize(uint64(blockNum)) +
+		//VarIntSerializeSize(uint64(blockNum)) +
+		1 + //	one byte for blockNum
 		blockNum*chainhash.HashSize +
-		VarIntSerializeSize(uint64(OutPointNum)) +
+		//VarIntSerializeSize(uint64(OutPointNum)) +
+		1 + //	one byte for OutPointNum
 		OutPointNum*(chainhash.HashSize+1)
 }
 
@@ -149,10 +152,15 @@ func WriteOutPointRing(w io.Writer, pver uint32, version uint32, opr *OutPointRi
 		return err
 	}
 
-	err = WriteVarInt(w, pver, uint64(len(opr.BlockHashs)))
+	/*	err = WriteVarInt(w, pver, uint64(len(opr.BlockHashs)))
+		if err != nil {
+			return err
+		}*/
+	err = binarySerializer.PutUint8(w, uint8(len(opr.BlockHashs)))
 	if err != nil {
 		return err
 	}
+
 	for i := 0; i < len(opr.BlockHashs); i++ {
 		_, err := w.Write(opr.BlockHashs[i][:])
 		if err != nil {
@@ -160,7 +168,11 @@ func WriteOutPointRing(w io.Writer, pver uint32, version uint32, opr *OutPointRi
 		}
 	}
 
-	err = WriteVarInt(w, pver, uint64(len(opr.OutPoints)))
+	/*	err = WriteVarInt(w, pver, uint64(len(opr.OutPoints)))
+		if err != nil {
+			return err
+		}*/
+	err = binarySerializer.PutUint8(w, uint8(len(opr.OutPoints)))
 	if err != nil {
 		return err
 	}
@@ -179,16 +191,17 @@ func ReadOutPointRing(r io.Reader, pver uint32, version uint32, opr *OutPointRin
 		return err
 	}
 
-	cnt, err := ReadVarInt(r, pver)
+	//	cnt, err := ReadVarInt(r, pver)
+	blockNum, err := binarySerializer.Uint8(r)
 	if err != nil {
 		return err
 	}
-	if cnt != BlockNumPerRingGroup {
-		str := fmt.Sprintf("the ring must generated from transactions from %d blocks", BlockNumPerRingGroup)
+	if blockNum != GetWireParamBlockNumPerRingGroup(opr.Version) {
+		str := fmt.Sprintf("the block number %d in ring does not match the version %d", blockNum, opr.Version)
 		return messageError("readOutPointRing", str)
 	}
-	opr.BlockHashs = make([]*chainhash.Hash, cnt)
-	for i := 0; i < BlockNumPerRingGroup; i++ {
+	opr.BlockHashs = make([]*chainhash.Hash, blockNum)
+	for i := 0; i < int(blockNum); i++ {
 		tmp := chainhash.Hash{}
 		_, err := io.ReadFull(r, tmp[:])
 		if err != nil {
@@ -197,16 +210,17 @@ func ReadOutPointRing(r io.Reader, pver uint32, version uint32, opr *OutPointRin
 		opr.BlockHashs[i] = &tmp
 	}
 
-	cnt, err = ReadVarInt(r, pver)
+	//cnt, err = ReadVarInt(r, pver)
+	ringSize, err := binarySerializer.Uint8(r)
 	if err != nil {
 		return err
 	}
-	if cnt > TxRingSize {
-		str := fmt.Sprintf("the ring size (%d) exceeds the allowed max ring size %d", cnt, TxRingSize)
+	if ringSize > GetWireParamTxRingSize(opr.Version) {
+		str := fmt.Sprintf("the ring size (%d) exceeds the allowed max ring size %d with version %d", ringSize, GetWireParamTxRingSize(opr.Version), opr.Version)
 		return messageError("readOutPointRing", str)
 	}
-	opr.OutPoints = make([]*OutPointAbe, cnt)
-	for i := 0; i < int(cnt); i++ {
+	opr.OutPoints = make([]*OutPointAbe, ringSize)
+	for i := 0; i < int(ringSize); i++ {
 		opr.OutPoints[i] = &OutPointAbe{}
 		err = readOutPointAbe(r, pver, version, opr.OutPoints[i])
 		if err != nil {
@@ -345,6 +359,15 @@ func (txIn *TxInAbe) SerializeSize() int {
 	// chainhash.HashSize for SerialNumber
 	snLen := pqringctparam.GetTxoSerialNumberLen(txIn.PreviousOutPointRing.Version)
 	return VarIntSerializeSize(uint64(snLen)) + snLen + txIn.PreviousOutPointRing.SerializeSize()
+}
+
+func GetTxInSerializeSize(ringVersion uint32, ringSize int) uint32 {
+	n := 1 + uint32(pqringctparam.GetTxoSerialNumberLen(ringVersion)) + // 1 byte for the length of serialNumber
+		4 + //	4 bytes for the ring version
+		1 + uint32(GetWireParamBlockNumPerRingGroup(ringVersion)*chainhash.HashSize) + // 1 byte for the number of blocks, blockhashs
+		1 + uint32(ringSize*(chainhash.HashSize+1)) //	1 byte for ring size
+
+	return n
 }
 
 // writeTxIn encodes txIn to the bitcoin protocol encoding for a transaction
@@ -679,28 +702,31 @@ func (msg *MsgTxAbe) SerializeSizeFull() int {
 Compute the size according to the Serialize function, and based on the crypto-scheme
 The result is just appropriate, will be used to compute transaction fee
 */
-func PrecomputeTrTxConSize(txVersion uint32, txIns []*TxInAbe, outputTxoNum uint8, txMemoLen uint32) uint32 {
+func PrecomputeTrTxConSize(txVersion uint32, inputRingVersions []uint32, inputRingSizes []int, outputTxoNum uint8, txMemoLen uint32) uint32 {
 	//	Version 4 bytes
 	n := uint32(4)
 
 	//	Inputs
 	//	serialized varint size for input
-	n = n + uint32(VarIntSerializeSize(uint64(len(txIns))))
-	for _, txIn := range txIns {
+	n = n + 1 // 1 byte for the inputRing number
+	for i := 0; i < len(inputRingSizes); i++ {
+		n = n + GetTxInSerializeSize(inputRingVersions[i], inputRingSizes[i])
+	}
+	/*	for _, txIn := range txIns {
 		// serialized varint size for the ring size, and (chainhash.HashSize + 1) for each OutPoint
 		n = n + uint32(txIn.SerializeSize())
-	}
+	}*/
 
 	// 	serialized varint size for output number
-	n = n + uint32(VarIntSerializeSize(uint64(outputTxoNum)))
-	txoScriptLen := pqringctparam.GetTxoSerializeSize(txVersion) // depending on the crypto-scheme
+	n = n + 1                                                    // 1 byte for the output Txo Number
+	txoScriptLen := pqringctparam.GetTxoSerializeSize(txVersion) // depending on the crypto-scheme, and the TxVersion
 	n = n + uint32(outputTxoNum)*(uint32(4+VarIntSerializeSize(uint64(txoScriptLen)))+txoScriptLen)
 	/*	for _, txOut := range msg.TxOuts {
 		n = n + txOut.SerializeSize()
 	}*/
 
 	//	TxFee
-	//	use 8
+	//	use 8 (approx.)
 	n = n + 8
 
 	//	TxMemo
@@ -709,13 +735,13 @@ func PrecomputeTrTxConSize(txVersion uint32, txIns []*TxInAbe, outputTxoNum uint
 	return n
 }
 
-func PrecomputeTrTxWitnessSize(txVersion uint32, txIns []*TxInAbe, outputTxoNum uint8) uint32 {
-	inputRingSizes := make([]int, len(txIns))
-	for i := 0; i < len(txIns); i++ {
-		inputRingSizes[i] = len(txIns[i].PreviousOutPointRing.OutPoints)
-	}
+func PrecomputeTrTxWitnessSize(txVersion uint32, inputRingVersion uint32, inputRingSizes []int, outputTxoNum uint8) uint32 {
+	/*	inputRingSizes := make([]int, len(txIns))
+		for i := 0; i < len(txIns); i++ {
+			inputRingSizes[i] = len(txIns[i].PreviousOutPointRing.OutPoints)
+		}*/
 
-	return pqringctparam.GetTrTxWitnessSize(txVersion, inputRingSizes, outputTxoNum) // depending on the crypto-scheme
+	return pqringctparam.GetTrTxWitnessSize(txVersion, inputRingVersion, inputRingSizes, outputTxoNum) // depending on the crypto-scheme
 }
 
 //	for computing TxId by hash, and for being serialized in block

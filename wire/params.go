@@ -43,3 +43,15 @@ func GetWireParamBlockNumPerRingGroup(version uint32) uint8 {
 
 	return 0
 }
+
+func GetWireParamTxRingSize(version uint32) uint8 {
+	if version == wireParamV1.version {
+		return wireParamV1.txRingSize
+	}
+	// if more versions are supported
+	/*	if version == wireParamV2.version{
+		return wireParamV2.blockNumPerRingGroup
+	}*/
+
+	return 0
+}

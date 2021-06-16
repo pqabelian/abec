@@ -32,7 +32,10 @@ func GetTxoSerializeSize(version uint32) uint32 {
 	return CryptoPP.GetTxoSerializeSize()
 }
 
-func GetTrTxWitnessSize(txVersion uint32, inputRingSizes []int, outputTxoNum uint8) uint32 {
+/*
+The input rings for one transction should have the same ringVersions
+*/
+func GetTrTxWitnessSize(txVersion uint32, inputRingVersion uint32, inputRingSizes []int, outputTxoNum uint8) uint32 {
 	//	todo: call cryptoPP.methods
 	return CryptoPP.GetTrTxWitnessSerializeSize(inputRingSizes, outputTxoNum)
 }
