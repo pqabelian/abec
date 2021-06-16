@@ -1,8 +1,10 @@
 package wire
 
 type WireParam struct {
-	version              uint32
+	wireVersion          uint32
 	blockNumPerRingGroup uint8
+	blockVersion         uint32
+	txVersion            uint32
 	txRingSize           uint8
 	txInputMaxNum        uint8
 	txOutputMaxNum       uint8
@@ -10,8 +12,10 @@ type WireParam struct {
 }
 
 var wireParamV1 = WireParam{
-	version:              1,
+	wireVersion:          1,
 	blockNumPerRingGroup: 3,
+	blockVersion:         1,
+	txVersion:            1,
 	txRingSize:           7,
 	txInputMaxNum:        5,
 	txOutputMaxNum:       5,
@@ -28,12 +32,16 @@ var wireParamV1 = WireParam{
 	defaultTxInputAlloc: 3,
 }*/
 
-func GetCurrentWireVersion() uint32 {
-	return wireParamV1.version
+func GetCurrentBlockVersion() uint32 {
+	return wireParamV1.blockVersion
+}
+
+func GetCurrentTxVersion() uint32 {
+	return wireParamV1.txVersion
 }
 
 func GetWireParamBlockNumPerRingGroup(version uint32) uint8 {
-	if version == wireParamV1.version {
+	if version == wireParamV1.wireVersion {
 		return wireParamV1.blockNumPerRingGroup
 	}
 	// if more versions are supported
@@ -45,7 +53,7 @@ func GetWireParamBlockNumPerRingGroup(version uint32) uint8 {
 }
 
 func GetWireParamTxRingSize(version uint32) uint8 {
-	if version == wireParamV1.version {
+	if version == wireParamV1.wireVersion {
 		return wireParamV1.txRingSize
 	}
 	// if more versions are supported
