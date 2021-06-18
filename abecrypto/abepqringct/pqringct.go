@@ -70,6 +70,13 @@ type AbeTxInDetail struct {
 	serialNumber      []byte
 }
 
+func NewAbeTxInDetail(serializedTxoList []*wire.TxOutAbe, serialNumber []byte) *AbeTxInDetail{
+	return &AbeTxInDetail{
+		serializedTxoList,
+		serialNumber,
+	}
+}
+
 /*
 The caller should know and specify the exact MasterKeyGen() for particular pqringct version.
 */
