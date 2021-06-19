@@ -513,6 +513,7 @@ func initNewUtxoRingEntry(version uint32, ringBlockHeight int32, blockhashs []*c
 	}
 
 	utxoRingEntry := &UtxoRingEntry{
+		Version: version,
 		ringBlockHeight: ringBlockHeight,
 	}
 
