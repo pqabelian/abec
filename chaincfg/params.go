@@ -317,7 +317,7 @@ var MainNetParams = Params{
 	Bech32HRPSegwit: "bc", // always bc for main net
 
 	// Address encoding magics
-	PQRingCTID:              0x00, // starts with 1
+	PQRingCTID:              0x00, // starts with 1, TODO(abe): adjust the prefix
 	PubKeyHashAddrID:        0x00, // starts with 1
 	ScriptHashAddrID:        0x05, // starts with 3
 	PrivateKeyID:            0x80, // starts with 5 (uncompressed) or K (compressed)

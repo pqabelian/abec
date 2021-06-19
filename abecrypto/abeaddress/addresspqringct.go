@@ -42,7 +42,7 @@ func (maddr *MasterAddressPQringct) Deserialize(serialized []byte) error {
 		return errors.New("the serialized does not match the rules for MasterAddressPQringct")
 	}
 	netId := serialized[0]
-	cryptoScheme := binary.BigEndian.Uint32(serialized[1:4])
+	cryptoScheme := binary.BigEndian.Uint32(serialized[1:5])
 	if abecrypto.CryptoScheme(cryptoScheme) != abecrypto.CryptoSchemePQRINGCT {
 		return errors.New("the serialized does not match the rules for MasterAddressPQringct")
 	}
