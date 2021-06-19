@@ -275,7 +275,7 @@ func DecodeMasterAddressAbe(addrstr string) (MasterAddress, error) {
 		return nil, errors.New("decoded address is of unknown format: bytesize <= 2 + chainhash.HashSize")
 	}
 
-	cryptoScheme := abecrypto.CryptoScheme(binary.BigEndian.Uint16(addrBytes[1:5]))
+	cryptoScheme := abecrypto.CryptoScheme(binary.BigEndian.Uint32(addrBytes[1:5]))
 
 	checkSum := addrBytes[totalSize-chainhash.HashSize:]
 	serialzedMasterAddress := addrBytes[:totalSize-chainhash.HashSize]
