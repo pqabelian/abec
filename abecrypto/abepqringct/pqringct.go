@@ -270,9 +270,10 @@ func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxO
 		//	inputDescs
 		txInputDescs := make([]*pqringct.TxInputDesc, inputNum)
 		for i := 0; i < inputNum; i++ {
-			if transferTxMsgTemplate.TxIns[i].PreviousOutPointRing.Version != inputsVersion {
-				return nil, errors.New("the version of the TxIn in one transaction should be the same")
-			}
+			//// TODO:the transferTxMsgTemplate how to assign the input version???
+			//if transferTxMsgTemplate.TxIns[i].PreviousOutPointRing.Version != inputsVersion {
+			//	return nil, errors.New("the version of the TxIn in one transaction should be the same")
+			//}
 
 			txoList := make([]*pqringct.TXO, len(abeTxInputDescs[i].serializedTxoList))
 			for j := 0; j < len(abeTxInputDescs[i].serializedTxoList); j++ {
@@ -303,19 +304,19 @@ func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxO
 			}
 
 			mpk := &pqringct.MasterPublicKey{}
-			err := mpk.Deserialize(abeTxInputDescs[i].serializedMasterPublicKey[4:])
+			err := mpk.Deserialize(abeTxInputDescs[i].serializedMasterPublicKey[:])
 			if err != nil {
 				return nil, err
 			}
 
 			msvk := &pqringct.MasterSecretViewKey{}
-			err = msvk.Deserialize(abeTxInputDescs[i].serializedMasterSecretViewKey[4:])
+			err = msvk.Deserialize(abeTxInputDescs[i].serializedMasterSecretViewKey[:])
 			if err != nil {
 				return nil, err
 			}
 
 			mssk := &pqringct.MasterSecretSignKey{}
-			err = mssk.Deserialize(abeTxInputDescs[i].serializedMasterSecretSignKey[4:])
+			err = mssk.Deserialize(abeTxInputDescs[i].serializedMasterSecretSignKey[:])
 			if err != nil {
 				return nil, err
 			}
