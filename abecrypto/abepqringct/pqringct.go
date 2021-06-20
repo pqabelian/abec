@@ -304,19 +304,19 @@ func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxO
 			}
 
 			mpk := &pqringct.MasterPublicKey{}
-			err := mpk.Deserialize(abeTxInputDescs[i].serializedMasterPublicKey[:])
+			err := mpk.Deserialize(abeTxInputDescs[i].serializedMasterPublicKey[4:])
 			if err != nil {
 				return nil, err
 			}
 
 			msvk := &pqringct.MasterSecretViewKey{}
-			err = msvk.Deserialize(abeTxInputDescs[i].serializedMasterSecretViewKey[:])
+			err = msvk.Deserialize(abeTxInputDescs[i].serializedMasterSecretViewKey[4:])
 			if err != nil {
 				return nil, err
 			}
 
 			mssk := &pqringct.MasterSecretSignKey{}
-			err = mssk.Deserialize(abeTxInputDescs[i].serializedMasterSecretSignKey[:])
+			err = mssk.Deserialize(abeTxInputDescs[i].serializedMasterSecretSignKey[4:])
 			if err != nil {
 				return nil, err
 			}
