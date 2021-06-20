@@ -263,17 +263,20 @@ func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxO
 		return nil, fmt.Errorf("the output number %d exceeds the allowed max number %d", outputNum, pqringctparam.GetOutputMaxNum(transferTxMsgTemplate.Version))
 	}
 
-	inputsVersion := abeTxInputDescs[0].serializedTxoList[0].Version
+	if inputNum != len(transferTxMsgTemplate.TxIns) {
+		return nil, errors.New("the number of InputDesc does not match the number of TxIn in transferTxMsgTemplate")
+	}
+
+	inputsVersion := transferTxMsgTemplate.TxIns[0].PreviousOutPointRing.Version
 	outputsVersion := transferTxMsgTemplate.Version
 
 	if abecrypto.GetCryptoScheme(inputsVersion) == abecrypto.CryptoSchemePQRINGCT && abecrypto.GetCryptoScheme(outputsVersion) == abecrypto.CryptoSchemePQRINGCT {
 		//	inputDescs
 		txInputDescs := make([]*pqringct.TxInputDesc, inputNum)
 		for i := 0; i < inputNum; i++ {
-			//// TODO:the transferTxMsgTemplate how to assign the input version???
-			//if transferTxMsgTemplate.TxIns[i].PreviousOutPointRing.Version != inputsVersion {
-			//	return nil, errors.New("the version of the TxIn in one transaction should be the same")
-			//}
+			if transferTxMsgTemplate.TxIns[i].PreviousOutPointRing.Version != inputsVersion {
+				return nil, errors.New("the version of the TxIn in one transaction should be the same")
+			}
 
 			txoList := make([]*pqringct.TXO, len(abeTxInputDescs[i].serializedTxoList))
 			for j := 0; j < len(abeTxInputDescs[i].serializedTxoList); j++ {
@@ -471,15 +474,14 @@ func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail
 		bl := pqringctparam.CryptoPP.TransferTxVerify(cryptoTransferTx)
 		if bl == false {
 			return false
+		}else{
+			return true
 		}
 
 	} else {
 		panic("Unsupported version appears! Implement here.")
 		// todo: if there is any more version to support, implement it here
 	}
-
-	return false
-
 }
 
 func TxoSerialNumberGen(abeTxo *wire.TxOutAbe, serialzedMpk []byte, serializedMsvk []byte, serializedMssk []byte) (sn []byte, reterr error) {

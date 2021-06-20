@@ -210,7 +210,7 @@ func (entry *UtxoRingEntry) Serialize(w io.Writer) error {
 		return err
 	}
 
-	if !entry.IsCoinBase() {
+
 		//	ring size
 		if len(entry.txOuts) != len(entry.outPointRing.OutPoints) {
 			return AssertError(fmt.Sprintf("The size of txOuts does not match the numner of OutPoints"))
@@ -273,7 +273,7 @@ func (entry *UtxoRingEntry) Serialize(w io.Writer) error {
 					return err
 				}
 			}*/
-	}
+
 
 	return nil
 }
@@ -305,7 +305,7 @@ func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 		return err
 	}
 
-	if !isCoinBase {
+
 		//	ring size
 		// TODO(abe): the ring size coule be than 4? 20210225
 		ringSize, err := wire.ReadVarInt(r, 0)
@@ -382,7 +382,7 @@ func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 				}
 				entry.consumingBlockHeights[i] = int32(consumingBlockHeight)
 			}*/
-	}
+
 
 	return nil
 }
