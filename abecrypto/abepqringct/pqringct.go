@@ -263,7 +263,7 @@ func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxO
 		return nil, fmt.Errorf("the output number %d exceeds the allowed max number %d", outputNum, pqringctparam.GetOutputMaxNum(transferTxMsgTemplate.Version))
 	}
 
-	inputsVersion := transferTxMsgTemplate.TxIns[0].PreviousOutPointRing.Version
+	inputsVersion := abeTxInputDescs[0].serializedTxoList[0].Version
 	outputsVersion := transferTxMsgTemplate.Version
 
 	if abecrypto.GetCryptoScheme(inputsVersion) == abecrypto.CryptoSchemePQRINGCT && abecrypto.GetCryptoScheme(outputsVersion) == abecrypto.CryptoSchemePQRINGCT {
