@@ -263,10 +263,6 @@ func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxO
 		return nil, fmt.Errorf("the output number %d exceeds the allowed max number %d", outputNum, pqringctparam.GetOutputMaxNum(transferTxMsgTemplate.Version))
 	}
 
-	if inputNum != len(transferTxMsgTemplate.TxIns) {
-		return nil, errors.New("the number of InputDesc does not match the number of TxIn in transferTxMsgTemplate")
-	}
-
 	inputsVersion := transferTxMsgTemplate.TxIns[0].PreviousOutPointRing.Version
 	outputsVersion := transferTxMsgTemplate.Version
 
