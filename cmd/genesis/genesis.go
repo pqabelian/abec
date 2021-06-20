@@ -29,7 +29,7 @@ func gensis() {
 	fmt.Println(serializedSeed)
 	txOutDescs:=make([]*abepqringct.AbeTxOutDesc,1)
 	for i := 0; i < len(txOutDescs); i++ {
-		txOutDescs[i]=abepqringct.NewAbeTxOutDesc(mpk,512)
+		txOutDescs[i]=abepqringct.NewAbeTxOutDesc(mpk,5120000000)
 	}
 	cbTxTemplate:=&wire.MsgTxAbe{
 		Version:   wire.TxVersion,
