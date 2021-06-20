@@ -70,7 +70,7 @@ type AbeTxInDetail struct {
 	serialNumber      []byte
 }
 
-func NewAbeTxInDetail(serializedTxoList []*wire.TxOutAbe, serialNumber []byte) *AbeTxInDetail{
+func NewAbeTxInDetail(serializedTxoList []*wire.TxOutAbe, serialNumber []byte) *AbeTxInDetail {
 	return &AbeTxInDetail{
 		serializedTxoList,
 		serialNumber,
@@ -474,7 +474,7 @@ func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail
 		bl := pqringctparam.CryptoPP.TransferTxVerify(cryptoTransferTx)
 		if bl == false {
 			return false
-		}else{
+		} else {
 			return true
 		}
 
@@ -484,6 +484,7 @@ func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail
 	}
 }
 
+// todo: (AliceBob 2021.06.20) abeTxo should be serilazedTxo?
 func TxoSerialNumberGen(abeTxo *wire.TxOutAbe, serialzedMpk []byte, serializedMsvk []byte, serializedMssk []byte) (sn []byte, reterr error) {
 	if abeTxo == nil {
 		return nil, errors.New("cannot generate serial number for nil Txo")
@@ -548,6 +549,7 @@ func TxoSerialNumberGen(abeTxo *wire.TxOutAbe, serialzedMpk []byte, serializedMs
 	return nil, nil
 }
 
+// todo: (AliceBob 2021.06.20) abeTxo should be serilazedTxo?
 func TxoCoinReceive(abeTxo *wire.TxOutAbe, serialzedMpk []byte, serializedMsvk []byte) (valid bool, v uint64) {
 	if abeTxo == nil {
 		return false, 0
