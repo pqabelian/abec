@@ -342,7 +342,7 @@ out:
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		template, err := m.g.NewBlockTemplate(masterAddr.Serialize())
+		template, err := m.g.NewBlockTemplate(masterAddr.Serialize()[1:])  // discard the netID
 		m.submitBlockLock.Unlock()
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+
