@@ -85,12 +85,6 @@ func abecMain(serverChan chan<- *server) error {
 		defer pprof.StopCPUProfile()
 	}
 
-	// Perform upgrades to btcd as new versions require it.
-	if err := doUpgrades(); err != nil {
-		abecLog.Errorf("%v", err)
-		return err
-	}
-
 	// Return now if an interrupt signal was triggered.
 	if interruptRequested(interrupt) {
 		return nil
