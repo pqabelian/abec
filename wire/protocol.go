@@ -11,10 +11,6 @@ const (
 	// ProtocolVersion is the latest protocol version this package supports.
 	ProtocolVersion uint32 = 1
 
-	// BIP0035Version is the protocol version which added the mempool
-	// message (pver >= BIP0035Version).
-	BIP0035Version uint32 = 60002
-
 	// BIP0037Version is the protocol version which added new connection
 	// bloom filtering related messages and extended the version message
 	// with a relay flag (pver >= BIP0037Version).
