@@ -11,10 +11,6 @@ const (
 	// ProtocolVersion is the latest protocol version this package supports.
 	ProtocolVersion uint32 = 1
 
-	// RejectVersion is the protocol version which added a new reject
-	// message.
-	RejectVersion uint32 = 70002
-
 	// BIP0111Version is the protocol version which added the SFNodeBloom
 	// service flag.
 	BIP0111Version uint32 = 70011

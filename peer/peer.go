@@ -949,12 +949,6 @@ func (p *Peer) PushGetHeadersMsg(locator blockchain.BlockLocator, stopHash *chai
 //
 // This function is safe for concurrent access.
 func (p *Peer) PushRejectMsg(command string, code wire.RejectCode, reason string, hash *chainhash.Hash, wait bool) {
-	// Don't bother sending the reject message if the protocol version
-	// is too low.
-	if p.VersionKnown() && p.ProtocolVersion() < wire.RejectVersion {
-		return
-	}
-
 	msg := wire.NewMsgReject(command, code, reason)
 	if command == wire.CmdTx || command == wire.CmdBlock {
 		if hash == nil {
