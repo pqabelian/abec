@@ -11,10 +11,6 @@ const (
 	// ProtocolVersion is the latest protocol version this package supports.
 	ProtocolVersion uint32 = 1
 
-	// BIP0111Version is the protocol version which added the SFNodeBloom
-	// service flag.
-	BIP0111Version uint32 = 70011
-
 	// SendHeadersVersion is the protocol version which added a new
 	// sendheaders message.
 	SendHeadersVersion uint32 = 70012
