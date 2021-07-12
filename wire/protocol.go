@@ -11,10 +11,6 @@ const (
 	// ProtocolVersion is the latest protocol version this package supports.
 	ProtocolVersion uint32 = 1
 
-	// SendHeadersVersion is the protocol version which added a new
-	// sendheaders message.
-	SendHeadersVersion uint32 = 70012
-
 	// FeeFilterVersion is the protocol version which added a new
 	// feefilter message.
 	FeeFilterVersion uint32 = 70013
