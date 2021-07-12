@@ -177,21 +177,21 @@ func (ps *peerState) forAllPeers(closure func(sp *serverPeer)) {
 	ps.forAllOutboundPeers(closure)
 }
 
-// server provides a bitcoin server for handling communications to and from
-// bitcoin peers.
+// server provides an Abelian server for handling communications to and from Abelian peers.
 type server struct {
 	// The following variables must only be used atomically.
 	// Putting the uint64s first makes them 64-bit aligned for 32-bit systems.
 	bytesReceived uint64 // Total bytes received from all peers since start.
-	bytesSent     uint64 // Total bytes sent by all peers since start.
+	bytesSent     uint64 // Total bytes sent to all peers since start.
 	started       int32
 	shutdown      int32
 	shutdownSched int32
 	startupTime   int64
 
-	chainParams          *chaincfg.Params
-	addrManager          *netaddrmgr.NetAddrManager
-	connManager          *connmgr.ConnManager
+	chainParams *chaincfg.Params
+	addrManager *netaddrmgr.NetAddrManager
+	connManager *connmgr.ConnManager
+	//	TODO:(Abelian) remove txScript, sigCache, and hashCache
 	sigCache             *txscript.SigCache
 	hashCache            *txscript.HashCache
 	rpcServer            *rpcServer
@@ -218,20 +218,13 @@ type server struct {
 	// if the associated index is not enabled.  These fields are set during
 	// initial creation of the server and never changed afterwards, so they
 	// do not need to be protected for concurrent access.
-	txIndex   *indexers.TxIndex
+	txIndex *indexers.TxIndex
+	// TODO(Abelian): shall Abelian supports addrIndex?
 	addrIndex *indexers.AddrIndex
-	// TODO(ABE): ABE does not support filter.
-	//cfIndex   *indexers.CfIndex
 
 	// The fee estimator keeps track of how long transactions are left in
 	// the mempool before they are mined into blocks.
 	feeEstimator *mempool.FeeEstimator
-
-	// cfCheckptCaches stores a cached slice of filter headers for cfcheckpt
-	// messages for each filter type.
-	// TODO(ABE): ABE does not support filter.
-	//cfCheckptCaches    map[wire.FilterType][]cfHeaderKV
-	//cfCheckptCachesMtx sync.RWMutex
 
 	// agentBlacklist is a list of blacklisted substrings by which to filter
 	// user agents.
