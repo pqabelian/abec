@@ -11,10 +11,6 @@ const (
 	// ProtocolVersion is the latest protocol version this package supports.
 	ProtocolVersion uint32 = 1
 
-	// BIP0031Version is the protocol version AFTER which a pong message
-	// and nonce field in ping were added (pver > BIP0031Version).
-	BIP0031Version uint32 = 60000
-
 	// BIP0035Version is the protocol version which added the mempool
 	// message (pver >= BIP0035Version).
 	BIP0035Version uint32 = 60002
