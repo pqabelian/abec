@@ -649,13 +649,11 @@ func (sp *serverPeer) OnInv(_ *peer.Peer, msg *wire.MsgInv) {
 		if invVect.Type == wire.InvTypeTx {
 			peerLog.Tracef("Ignoring tx %v in inv from %v -- "+
 				"blocksonly enabled", invVect.Hash, sp)
-			if sp.ProtocolVersion() >= wire.BIP0037Version {
-				peerLog.Infof("Peer %v is announcing "+
-					"transactions -- disconnecting", sp)
-				sp.Disconnect()
-				return
-			}
-			continue
+			//	BIP0037 is implemented.
+			peerLog.Infof("Peer %v is announcing "+
+				"transactions -- disconnecting", sp)
+			sp.Disconnect()
+			return
 		}
 		err := newInv.AddInvVect(invVect)
 		if err != nil {

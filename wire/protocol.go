@@ -11,11 +11,6 @@ const (
 	// ProtocolVersion is the latest protocol version this package supports.
 	ProtocolVersion uint32 = 1
 
-	// BIP0037Version is the protocol version which added new connection
-	// bloom filtering related messages and extended the version message
-	// with a relay flag (pver >= BIP0037Version).
-	BIP0037Version uint32 = 70001
-
 	// RejectVersion is the protocol version which added a new reject
 	// message.
 	RejectVersion uint32 = 70002
