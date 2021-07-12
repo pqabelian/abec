@@ -34,10 +34,7 @@ import (
 )
 
 const (
-	// defaultServices describes the default services that are supported by
-	// the server.
-	// TODO(ABE): ABE does not support filter.
-	//defaultServices = wire.SFNodeNetwork | wire.SFNodeBloom | wire.SFNodeWitness | wire.SFNodeCF
+	// defaultServices describes the default services that are supported by the server.
 	defaultServices = wire.SFNodeNetwork | wire.SFNodeWitness
 
 	// defaultRequiredServices describes the default services that are
@@ -110,7 +107,7 @@ func (a simpleAddr) Network() string {
 // Ensure simpleAddr implements the net.Addr interface.
 var _ net.Addr = simpleAddr{}
 
-// broadcastMsg provides the ability to house a bitcoin message to be broadcast
+// broadcastMsg provides the ability to house an Abelian message to be broadcast
 // to all connected peers except specified excluded peers.
 type broadcastMsg struct {
 	message      wire.Message
@@ -178,13 +175,6 @@ func (ps *peerState) forAllPeers(closure func(sp *serverPeer)) {
 		closure(e)
 	}
 	ps.forAllOutboundPeers(closure)
-}
-
-// cfHeaderKV is a tuple of a filter header and its associated block hash. The
-// struct is used to cache cfcheckpt responses.
-type cfHeaderKV struct {
-	blockHash    chainhash.Hash
-	filterHeader chainhash.Hash
 }
 
 // server provides a bitcoin server for handling communications to and from
