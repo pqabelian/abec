@@ -768,6 +768,7 @@ func init() {
 	MustRegisterCmd("getbalance", (*GetBalanceCmd)(nil), flags)
 	MustRegisterCmd("getbalances", (*GetBalancesCmd)(nil), flags)
 	MustRegisterCmd("getbalancesabe", (*GetBalancesAbeCmd)(nil), flags)
+	MustRegisterCmd("getdetailedutxos", (*GetDetailedUtxosCmd)(nil), flags)
 	MustRegisterCmd("getnewaddress", (*GetNewAddressCmd)(nil), flags)
 	MustRegisterCmd("getrawchangeaddress", (*GetRawChangeAddressCmd)(nil), flags)
 	MustRegisterCmd("getreceivedbyaccount", (*GetReceivedByAccountCmd)(nil), flags)
