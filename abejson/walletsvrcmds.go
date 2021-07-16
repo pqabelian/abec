@@ -211,6 +211,17 @@ func NewGetBalancesAbeCmd(minconf *int) *GetBalancesAbeCmd {
 	}
 }
 
+// GetDetailedUtxosCmd defines the getdetailedutxos JSON-RPC command.
+type GetDetailedUtxosCmd struct{
+	Minconf *int `jsonrpcdefault:"1"`
+}
+
+func NewGetDetailedUtxosCmd(minconf *int) *GetDetailedUtxosCmd {
+	return &GetDetailedUtxosCmd{
+		Minconf: minconf,
+	}
+}
+
 // GetNewAddressCmd defines the getnewaddress JSON-RPC command.
 type GetNewAddressCmd struct {
 	Account *string
