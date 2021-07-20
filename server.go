@@ -34,10 +34,7 @@ import (
 )
 
 const (
-	// defaultServices describes the default services that are supported by
-	// the server.
-	// TODO(ABE): ABE does not support filter.
-	//defaultServices = wire.SFNodeNetwork | wire.SFNodeBloom | wire.SFNodeWitness | wire.SFNodeCF
+	// defaultServices describes the default services that are supported by the server.
 	defaultServices = wire.SFNodeNetwork | wire.SFNodeWitness
 
 	// defaultRequiredServices describes the default services that are
@@ -110,7 +107,7 @@ func (a simpleAddr) Network() string {
 // Ensure simpleAddr implements the net.Addr interface.
 var _ net.Addr = simpleAddr{}
 
-// broadcastMsg provides the ability to house a bitcoin message to be broadcast
+// broadcastMsg provides the ability to house an Abelian message to be broadcast
 // to all connected peers except specified excluded peers.
 type broadcastMsg struct {
 	message      wire.Message
@@ -180,28 +177,21 @@ func (ps *peerState) forAllPeers(closure func(sp *serverPeer)) {
 	ps.forAllOutboundPeers(closure)
 }
 
-// cfHeaderKV is a tuple of a filter header and its associated block hash. The
-// struct is used to cache cfcheckpt responses.
-type cfHeaderKV struct {
-	blockHash    chainhash.Hash
-	filterHeader chainhash.Hash
-}
-
-// server provides a bitcoin server for handling communications to and from
-// bitcoin peers.
+// server provides an Abelian server for handling communications to and from Abelian peers.
 type server struct {
 	// The following variables must only be used atomically.
 	// Putting the uint64s first makes them 64-bit aligned for 32-bit systems.
 	bytesReceived uint64 // Total bytes received from all peers since start.
-	bytesSent     uint64 // Total bytes sent by all peers since start.
+	bytesSent     uint64 // Total bytes sent to all peers since start.
 	started       int32
 	shutdown      int32
 	shutdownSched int32
 	startupTime   int64
 
-	chainParams          *chaincfg.Params
-	addrManager          *netaddrmgr.NetAddrManager
-	connManager          *connmgr.ConnManager
+	chainParams *chaincfg.Params
+	addrManager *netaddrmgr.NetAddrManager
+	connManager *connmgr.ConnManager
+	//	TODO:(Abelian) remove txScript, sigCache, and hashCache
 	sigCache             *txscript.SigCache
 	hashCache            *txscript.HashCache
 	rpcServer            *rpcServer
@@ -228,20 +218,13 @@ type server struct {
 	// if the associated index is not enabled.  These fields are set during
 	// initial creation of the server and never changed afterwards, so they
 	// do not need to be protected for concurrent access.
-	txIndex   *indexers.TxIndex
+	txIndex *indexers.TxIndex
+	// TODO(Abelian): shall Abelian supports addrIndex?
 	addrIndex *indexers.AddrIndex
-	// TODO(ABE): ABE does not support filter.
-	//cfIndex   *indexers.CfIndex
 
 	// The fee estimator keeps track of how long transactions are left in
 	// the mempool before they are mined into blocks.
 	feeEstimator *mempool.FeeEstimator
-
-	// cfCheckptCaches stores a cached slice of filter headers for cfcheckpt
-	// messages for each filter type.
-	// TODO(ABE): ABE does not support filter.
-	//cfCheckptCaches    map[wire.FilterType][]cfHeaderKV
-	//cfCheckptCachesMtx sync.RWMutex
 
 	// agentBlacklist is a list of blacklisted substrings by which to filter
 	// user agents.
@@ -649,13 +632,11 @@ func (sp *serverPeer) OnInv(_ *peer.Peer, msg *wire.MsgInv) {
 		if invVect.Type == wire.InvTypeTx {
 			peerLog.Tracef("Ignoring tx %v in inv from %v -- "+
 				"blocksonly enabled", invVect.Hash, sp)
-			if sp.ProtocolVersion() >= wire.BIP0037Version {
-				peerLog.Infof("Peer %v is announcing "+
-					"transactions -- disconnecting", sp)
-				sp.Disconnect()
-				return
-			}
-			continue
+			//	BIP0037 is implemented.
+			peerLog.Infof("Peer %v is announcing "+
+				"transactions -- disconnecting", sp)
+			sp.Disconnect()
+			return
 		}
 		err := newInv.AddInvVect(invVect)
 		if err != nil {
@@ -773,7 +754,7 @@ func (sp *serverPeer) OnGetBlocks(_ *peer.Peer, msg *wire.MsgGetBlocks) {
 	// This mirrors the behavior in the reference implementation.
 	chain := sp.server.chain
 	hashList := chain.LocateBlocks(msg.BlockLocatorHashes, &msg.HashStop,
-		wire.MaxBlocksPerMsg)       // from the start node to hash stop node or max blockhash
+		wire.MaxBlocksPerMsg) // from the start node to hash stop node or max blockhash
 
 	// Generate inventory message.
 	invMsg := wire.NewMsgInv()
@@ -791,7 +772,7 @@ func (sp *serverPeer) OnGetBlocks(_ *peer.Peer, msg *wire.MsgGetBlocks) {
 			// would prevent the entire slice from being eligible
 			// for GC as soon as it's sent.
 			continueHash := invMsg.InvList[invListLen-1].Hash
-			sp.continueHash = &continueHash      // the last one hash in the inv message
+			sp.continueHash = &continueHash // the last one hash in the inv message
 		}
 		sp.QueueMessage(invMsg, nil)
 	}
@@ -1311,11 +1292,6 @@ func (sp *serverPeer) OnAddr(_ *peer.Peer, msg *wire.MsgAddr) {
 		return
 	}
 
-	// Ignore old style addresses which don't include a timestamp.
-	if sp.ProtocolVersion() < wire.NetAddressTimeVersion {
-		return
-	}
-
 	// A message that has no addresses is invalid.
 	if len(msg.AddrList) == 0 {
 		peerLog.Errorf("Command [%s] from %s does not contain any addresses",
@@ -1584,11 +1560,11 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan cha
 	//  answer: the block may be sent in batches, use this variable to record the location of the next tranfer
 	//         beacuse last Inv message just contain the last batches, so next batches will send a inv message
 	var dc chan<- struct{}
-	continueHash := sp.continueHash    // the last hash
+	continueHash := sp.continueHash // the last hash
 	// if it is nil or cur hash do not equal the continue hash, the sendInv will be false
 	sendInv := continueHash != nil && continueHash.IsEqual(hash)
-	if !sendInv {    // if the sendInv is false, the the dc is doneChan else dc is nil
-		dc = doneChan      // and the dc is nil means that do not finish the request
+	if !sendInv { // if the sendInv is false, the the dc is doneChan else dc is nil
+		dc = doneChan // and the dc is nil means that do not finish the request
 	}
 	//	todo (ABE): as the block is fetched from database, the witness may not be included. If so, regardless of encoding, no witness is provided.
 	sp.QueueMessageWithEncoding(&msgBlock, dc, encoding)
@@ -1598,11 +1574,11 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan cha
 	// would fit into a single message, send it a new inventory message
 	// to trigger it to issue another getblocks message for the next
 	// batch of inventory.
-	if sendInv {    // if the sendInv is true, update the continueHash
+	if sendInv { // if the sendInv is true, update the continueHash
 		best := sp.server.chain.BestSnapshot()
 		invMsg := wire.NewMsgInvSizeHint(1)
-		iv := wire.NewInvVect(wire.InvTypeBlock, &best.Hash)   // best block hash
-		invMsg.AddInvVect(iv)     //just contain a message
+		iv := wire.NewInvVect(wire.InvTypeBlock, &best.Hash) // best block hash
+		invMsg.AddInvVect(iv)                                //just contain a message
 		sp.QueueMessage(invMsg, doneChan)
 		sp.continueHash = nil
 	}
@@ -1791,11 +1767,8 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 			}
 		}
 
-		// Request known addresses if the server address manager needs
-		// more and the peer has a protocol version new enough to
-		// include a timestamp with addresses.
-		hasTimestamp := sp.ProtocolVersion() >= wire.NetAddressTimeVersion
-		if s.addrManager.NeedMoreNetAddresses() && hasTimestamp {
+		// Request known addresses if the server address manager needs more.
+		if s.addrManager.NeedMoreNetAddresses() {
 			sp.QueueMessage(wire.NewMsgGetAddr(), nil)
 		}
 
@@ -1859,7 +1832,7 @@ func (s *server) handleBanPeerMsg(state *peerState, sp *serverPeer) {
 func (s *server) handleRelayInvMsg(state *peerState, msg relayMsg) {
 	state.forAllPeers(func(sp *serverPeer) {
 		if !sp.Connected() {
-			return      // Why the message can not pass there?
+			return // Why the message can not pass there?
 		}
 
 		// If the inventory is a block and the peer prefers headers,
@@ -1889,7 +1862,7 @@ func (s *server) handleRelayInvMsg(state *peerState, msg relayMsg) {
 				return
 			}
 
-			txD, ok := msg.data.(*mempool.TxDescAbe)  //the type must right
+			txD, ok := msg.data.(*mempool.TxDescAbe) //the type must right
 			if !ok {
 				peerLog.Warnf("Underlying data for tx inv "+
 					"relay is not a *mempool.TxDescAbe: %T",
@@ -2277,7 +2250,7 @@ out:
 			s.handleBanPeerMsg(state, p)
 
 		// New inventory to potentially be relayed to other peers.
-		case invMsg := <-s.relayInv:      //relay to other peers
+		case invMsg := <-s.relayInv: //relay to other peers
 			s.handleRelayInvMsg(state, invMsg)
 
 		// Message to broadcast to all connected peers except those
@@ -2403,7 +2376,7 @@ func (s *server) UpdatePeerHeights(latestBlkHash *chainhash.Hash, latestHeight i
 // them in case our peers restarted or otherwise lost track of them.
 func (s *server) rebroadcastHandler() {
 	// Wait 5 min before first tx rebroadcast.
-	timer := time.NewTimer(5 * time.Minute)    //5 minute
+	timer := time.NewTimer(5 * time.Minute) //5 minute
 	pendingInvs := make(map[wire.InvVect]interface{})
 
 out:

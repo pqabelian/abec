@@ -1,7 +1,6 @@
 package wire
 
 import (
-	"fmt"
 	"io"
 )
 
@@ -11,29 +10,18 @@ import (
 //
 // This message has no payload and was not added until protocol versions
 // starting with SendHeadersVersion.
+//	TODO:(Abelian) the current version supports SendHeaders, but the payload has not been implemented.
 type MsgSendHeaders struct{}
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgSendHeaders) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
-	if pver < SendHeadersVersion {
-		str := fmt.Sprintf("sendheaders message invalid for protocol "+
-			"version %d", pver)
-		return messageError("MsgSendHeaders.BtcDecode", str)
-	}
-
 	return nil
 }
 
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgSendHeaders) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
-	if pver < SendHeadersVersion {
-		str := fmt.Sprintf("sendheaders message invalid for protocol "+
-			"version %d", pver)
-		return messageError("MsgSendHeaders.BtcEncode", str)
-	}
-
 	return nil
 }
 

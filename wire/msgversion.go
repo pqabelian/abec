@@ -13,7 +13,7 @@ import (
 const MaxUserAgentLen = 256
 
 // DefaultUserAgent for wire in the stack
-const DefaultUserAgent = "/abecwire:0.0/"      //TODO(osy):it need to modify
+const DefaultUserAgent = "/abecwire:0.0/" //TODO(osy):it need to modify
 
 // MsgVersion implements the Message interface and represents a bitcoin version
 // message.  It is used for a peer to advertise itself as soon as an outbound
@@ -182,15 +182,14 @@ func (msg *MsgVersion) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) 
 		return err
 	}
 
-	// There was no relay transactions field before BIP0037Version.  Also,
-	// the wire encoding for the field is true when transactions should be
+	// The wire encoding for the field is true when transactions should be
 	// relayed, so reverse it from the DisableRelayTx field.
-	if pver >= BIP0037Version {
-		err = writeElement(w, !msg.DisableRelayTx)
-		if err != nil {
-			return err
-		}
+	//	BIP0037 is implemented.
+	err = writeElement(w, !msg.DisableRelayTx)
+	if err != nil {
+		return err
 	}
+
 	return nil
 }
 

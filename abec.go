@@ -1,4 +1,4 @@
-// Copyright (c) 2020 The Abelian Foundation
+// Copyright (c) 2021 The Abelian Foundation
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -85,12 +85,6 @@ func abecMain(serverChan chan<- *server) error {
 		defer pprof.StopCPUProfile()
 	}
 
-	// Perform upgrades to btcd as new versions require it.
-	if err := doUpgrades(); err != nil {
-		abecLog.Errorf("%v", err)
-		return err
-	}
-
 	// Return now if an interrupt signal was triggered.
 	if interruptRequested(interrupt) {
 		return nil
@@ -133,15 +127,6 @@ func abecMain(serverChan chan<- *server) error {
 
 		return nil
 	}
-	// TODO(ABE): ABE does not support filter.
-	//if cfg.DropCfIndex {
-	//	if err := indexers.DropCfIndex(db, interrupt); err != nil {
-	//		abecLog.Errorf("%v", err)
-	//		return err
-	//	}
-	//
-	//	return nil
-	//}
 
 	// Create P2P server and start it.
 	server, err := newServer(cfg.Listeners, cfg.AgentBlacklist,
@@ -298,7 +283,7 @@ func loadBlockDB() (database.DB, error) {
 func main() {
 	// Use all processor cores.
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	
+
 	// Block and transaction processing can cause bursty allocations.  This
 	// limits the garbage collector from excessively overallocating during
 	// bursts.  This value was arrived at with the help of profiling live

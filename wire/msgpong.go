@@ -1,15 +1,14 @@
 package wire
 
 import (
-	"fmt"
 	"io"
 )
 
-// MsgPong implements the Message interface and represents a bitcoin pong
+// MsgPong implements the Message interface and represents an Abelian pong
 // message which is used primarily to confirm that a connection is still valid
 // in response to a bitcoin ping message (MsgPing).
 //
-// This message was not added until protocol versions AFTER BIP0031Version.
+// This message is to implement BIP0031.
 type MsgPong struct {
 	// Unique value associated with message that is used to identify
 	// specific ping message.
@@ -18,29 +17,15 @@ type MsgPong struct {
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
 // This is part of the Message interface implementation.
+// BIP0031 is implemented.
 func (msg *MsgPong) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
-	// NOTE: <= is not a mistake here.  The BIP0031 was defined as AFTER
-	// the version unlike most others.
-	if pver <= BIP0031Version {
-		str := fmt.Sprintf("pong message invalid for protocol "+
-			"version %d", pver)
-		return messageError("MsgPong.BtcDecode", str)
-	}
-
 	return readElement(r, &msg.Nonce)
 }
 
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgPong) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
-	// NOTE: <= is not a mistake here.  The BIP0031 was defined as AFTER
-	// the version unlike most others.
-	if pver <= BIP0031Version {
-		str := fmt.Sprintf("pong message invalid for protocol "+
-			"version %d", pver)
-		return messageError("MsgPong.BtcEncode", str)
-	}
-
+	// BIP0031 is implemented.
 	return writeElement(w, msg.Nonce)
 }
 
@@ -53,16 +38,9 @@ func (msg *MsgPong) Command() string {
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgPong) MaxPayloadLength(pver uint32) uint32 {
-	plen := uint32(0)
-	// The pong message did not exist for BIP0031Version and earlier.
-	// NOTE: > is not a mistake here.  The BIP0031 was defined as AFTER
-	// the version unlike most others.
-	if pver > BIP0031Version {
-		// Nonce 8 bytes.
-		plen += 8
-	}
-
-	return plen
+	// BIP0031 is implemented.
+	// Nonce 8 bytes.
+	return uint32(8)
 }
 
 // NewMsgPong returns a new bitcoin pong message that conforms to the Message
