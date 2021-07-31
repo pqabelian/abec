@@ -733,7 +733,7 @@ func (sm *SyncManager) handleTxMsgAbe(tmsg *txMsgAbe) {
 	//	todo(ABE):
 	acceptedTxs := make([]*mempool.TxDescAbe, 1)
 	acceptedTxs[0] = acceptedTx
-	sm.peerNotifier.AnnounceNewTransactionsAbe(acceptedTxs)
+	sm.peerNotifier.AnnounceNewTransactions(acceptedTxs)
 	fmt.Println(acceptedTx.Height)
 }
 
@@ -1778,10 +1778,10 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 		//	todo(ABE): mempool will not contain the transactions that double-spend those in mainchain.
 		for _, tx := range block.Transactions()[1:] {
 			sm.txMemPool.RemoveTransactionAbe(tx)
-			sm.txMemPool.RemoveDoubleSpendsAbe(tx)   //remove the transactions that spend the same outpoint
+			sm.txMemPool.RemoveDoubleSpendsAbe(tx) //remove the transactions that spend the same outpoint
 			sm.txMemPool.RemoveOrphanAbe(tx)
-			sm.peerNotifier.TransactionConfirmedAbe(tx)  //the transaction is confirmed
-			sm.txMemPool.ProcessOrphansAbe(tx) //	remove the orphans that double-spend the txIns of tx
+			sm.peerNotifier.TransactionConfirmed(tx) //the transaction is confirmed
+			sm.txMemPool.ProcessOrphansAbe(tx)       //	remove the orphans that double-spend the txIns of tx
 			//sm.peerNotifier.AnnounceNewTransactions(acceptedTxs)
 			//todo(ABE): for ABE, sm does not need to sm.peerNotifier.AnnounceNewTransactions(acceptedTx),
 			// as tx is propagated with blocks, and may be announced when verify the block.

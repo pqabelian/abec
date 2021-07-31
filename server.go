@@ -889,20 +889,8 @@ func (s *server) relayTransactionsAbe(txns []*mempool.TxDescAbe) {
 // both websocket and getblocktemplate long poll clients of the passed
 // transactions.  This function should be called whenever new transactions
 // are added to the mempool.
-func (s *server) AnnounceNewTransactions(txns []*mempool.TxDesc) {
-	// Generate and relay inventory vectors for all newly accepted
-	// transactions.
-	s.relayTransactions(txns)
-
-	// Notify both websocket and getblocktemplate long poll clients of all
-	// newly accepted transactions.
-	if s.rpcServer != nil {
-		s.rpcServer.NotifyNewTransactions(txns)
-	}
-}
-
 //	todo(ABE):
-func (s *server) AnnounceNewTransactionsAbe(txns []*mempool.TxDescAbe) {
+func (s *server) AnnounceNewTransactions(txns []*mempool.TxDescAbe) {
 	// Generate and relay inventory vectors for all newly accepted
 	// transactions.
 	s.relayTransactionsAbe(txns)
@@ -916,17 +904,8 @@ func (s *server) AnnounceNewTransactionsAbe(txns []*mempool.TxDescAbe) {
 
 // Transaction has one confirmation on the main chain. Now we can mark it as no
 // longer needing rebroadcasting.
-func (s *server) TransactionConfirmed(tx *abeutil.Tx) {
-	// Rebroadcasting is only necessary when the RPC server is active.
-	if s.rpcServer == nil {
-		return
-	}
-
-	iv := wire.NewInvVect(wire.InvTypeTx, tx.Hash())
-	s.RemoveRebroadcastInventory(iv)
-}
-
-func (s *server) TransactionConfirmedAbe(tx *abeutil.TxAbe) {
+//	todo(ABE):
+func (s *server) TransactionConfirmed(tx *abeutil.TxAbe) {
 	// Rebroadcasting is only necessary when the RPC server is active.
 	if s.rpcServer == nil {
 		return

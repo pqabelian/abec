@@ -14,17 +14,13 @@ import (
 // transactions, blocks, etc. Currently server (in the main package) implements
 // this interface.
 type PeerNotifier interface {
-	AnnounceNewTransactions(newTxs []*mempool.TxDesc)
-
-	AnnounceNewTransactionsAbe(newTxs []*mempool.TxDescAbe)
+	AnnounceNewTransactions(newTxs []*mempool.TxDescAbe)
 
 	UpdatePeerHeights(latestBlkHash *chainhash.Hash, latestHeight int32, updateSource *peer.Peer)
 
 	RelayInventory(invVect *wire.InvVect, data interface{})
 
-	TransactionConfirmed(tx *abeutil.Tx)
-
-	TransactionConfirmedAbe(tx *abeutil.TxAbe)
+	TransactionConfirmed(tx *abeutil.TxAbe)
 }
 
 // Config is a configuration struct used to initialize a new SyncManager.
