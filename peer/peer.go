@@ -117,11 +117,10 @@ type MessageListeners struct {
 
 	// OnTx is invoked when a peer receives a tx bitcoin message.
 	//	OnTx    func(p *Peer, msg *wire.MsgTx)
-	OnTxAbe func(p *Peer, msg *wire.MsgTxAbe)
+	OnTx func(p *Peer, msg *wire.MsgTxAbe)
 
 	// OnBlock is invoked when a peer receives a block bitcoin message.
-	OnBlock    func(p *Peer, msg *wire.MsgBlock, buf []byte)
-	OnBlockAbe func(p *Peer, msg *wire.MsgBlockAbe, buf []byte)
+	OnBlock func(p *Peer, msg *wire.MsgBlockAbe, buf []byte)
 
 	// TODO(ABE): ABE does not support filter.
 	//// OnCFilter is invoked when a peer receives a cfilter bitcoin message.
@@ -1452,13 +1451,13 @@ out:
 					}*/
 
 		case *wire.MsgTxAbe:
-			if p.cfg.Listeners.OnTxAbe != nil {
-				p.cfg.Listeners.OnTxAbe(p, msg)
+			if p.cfg.Listeners.OnTx != nil {
+				p.cfg.Listeners.OnTx(p, msg)
 			}
 
 		case *wire.MsgBlockAbe:
-			if p.cfg.Listeners.OnBlockAbe != nil {
-				p.cfg.Listeners.OnBlockAbe(p, msg, buf)
+			if p.cfg.Listeners.OnBlock != nil {
+				p.cfg.Listeners.OnBlock(p, msg, buf)
 			}
 
 		case *wire.MsgInv:
