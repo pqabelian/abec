@@ -247,7 +247,7 @@ func (b *rpcSyncMgr) IsCurrent() bool {
 }*/
 
 func (b *rpcSyncMgr) SubmitBlockAbe(block *abeutil.BlockAbe, flags blockchain.BehaviorFlags) (bool, error) {
-	return b.syncMgr.ProcessBlockAbe(block, flags)
+	return b.syncMgr.ProcessBlock(block, flags)
 }
 
 // Pause pauses the sync manager until the returned channel is closed.

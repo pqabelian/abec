@@ -64,7 +64,7 @@ type Config struct {
 	// transaction output information.
 	FetchUtxoView func(*abeutil.Tx) (*blockchain.UtxoViewpoint, error)
 
-	FetchUtxoRingViewAbe func(*abeutil.TxAbe) (*blockchain.UtxoRingViewpoint, error)
+	FetchUtxoRingView func(*abeutil.TxAbe) (*blockchain.UtxoRingViewpoint, error)
 
 	// BestHeight defines the function to use to access the block height of
 	// the current best chain.
@@ -1266,7 +1266,7 @@ func (mp *TxPool) fetchInputUtxos(tx *abeutil.Tx) (*blockchain.UtxoViewpoint, er
 }
 
 func (mp *TxPool) fetchInputUtxoRingsAbe(tx *abeutil.TxAbe) (*blockchain.UtxoRingViewpoint, error) {
-	utxoRingView, err := mp.cfg.FetchUtxoRingViewAbe(tx)
+	utxoRingView, err := mp.cfg.FetchUtxoRingView(tx)
 	if err != nil {
 		return nil, err
 	}

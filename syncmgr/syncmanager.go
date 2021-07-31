@@ -128,13 +128,6 @@ type processBlockResponse struct {
 // above in that blockMsg is intended for blocks that came from peers and have
 // extra handling whereas this message essentially is just a concurrent safe
 // way to call ProcessBlock on the internal block chain instance.
-//	todo(ABE):
-type processBlockMsgBTCD struct {
-	block *abeutil.Block
-	flags blockchain.BehaviorFlags
-	reply chan processBlockResponse
-}
-
 type processBlockMsgAbe struct {
 	block *abeutil.BlockAbe
 	flags blockchain.BehaviorFlags
@@ -1974,7 +1967,7 @@ func (sm *SyncManager) SyncPeerID() int32 {
 //	return response.isOrphan, response.err
 //}
 
-func (sm *SyncManager) ProcessBlockAbe(block *abeutil.BlockAbe, flags blockchain.BehaviorFlags) (bool, error) {
+func (sm *SyncManager) ProcessBlock(block *abeutil.BlockAbe, flags blockchain.BehaviorFlags) (bool, error) {
 	reply := make(chan processBlockResponse, 1)
 	sm.msgChan <- processBlockMsgAbe{block: block, flags: flags, reply: reply}
 	response := <-reply

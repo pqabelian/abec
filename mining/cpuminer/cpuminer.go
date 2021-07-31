@@ -60,7 +60,7 @@ type Config struct {
 	// It typically must run the provided block through the same set of
 	// rules and handling as any other block coming from the network.
 	//	ProcessBlockBTCD func(*abeutil.Block, blockchain.BehaviorFlags) (bool, error)
-	ProcessBlockAbe func(*abeutil.BlockAbe, blockchain.BehaviorFlags) (bool, error)
+	ProcessBlock func(*abeutil.BlockAbe, blockchain.BehaviorFlags) (bool, error)
 
 	// ConnectedCount defines the function to use to obtain how many other
 	// peers the server is connected to.  This is used by the automatic
@@ -166,7 +166,7 @@ func (m *CPUMiner) submitBlock(block *abeutil.BlockAbe) bool {
 
 	// Process this block using the same rules as blocks coming from other
 	// nodes.  This will in turn relay it to the network like normal.
-	isOrphan, err := m.cfg.ProcessBlockAbe(block, blockchain.BFNone)
+	isOrphan, err := m.cfg.ProcessBlock(block, blockchain.BFNone)
 	if err != nil {
 		// Anything other than a rule violation is an unexpected error,
 		// so log that error as an internal error.
@@ -342,7 +342,7 @@ out:
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		template, err := m.g.NewBlockTemplate(masterAddr.Serialize()[1:])  // discard the netID
+		template, err := m.g.NewBlockTemplate(masterAddr.Serialize()[1:]) // discard the netID
 		m.submitBlockLock.Unlock()
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+

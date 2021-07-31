@@ -1008,68 +1008,6 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan cha
 	return nil
 }
 
-// pushMerkleBlockMsg sends a merkleblock message for the provided block hash to
-// the connected peer.  Since a merkle block requires the peer to have a filter
-// loaded, this call will simply be ignored if there is no filter loaded.  An
-// error is returned if the block hash is not known.
-// TODO(ABE): ABE does not support filter.
-//func (s *server) pushMerkleBlockMsg(sp *serverPeer, hash *chainhash.Hash,
-//	doneChan chan<- struct{}, waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
-//
-//	// Do not send a response if the peer doesn't have a filter loaded.
-//	if !sp.filter.IsLoaded() {
-//		if doneChan != nil {
-//			doneChan <- struct{}{}
-//		}
-//		return nil
-//	}
-//
-//	// Fetch the raw block bytes from the database.
-//	blk, err := sp.server.chain.BlockByHash(hash)
-//	if err != nil {
-//		peerLog.Tracef("Unable to fetch requested block hash %v: %v",
-//			hash, err)
-//
-//		if doneChan != nil {
-//			doneChan <- struct{}{}
-//		}
-//		return err
-//	}
-//
-//	// Generate a merkle block by filtering the requested block according
-//	// to the filter for the peer.
-//	merkle, matchedTxIndices := bloom.NewMerkleBlock(blk, sp.filter)
-//
-//	// Once we have fetched data wait for any previous operation to finish.
-//	if waitChan != nil {
-//		<-waitChan
-//	}
-//
-//	// Send the merkleblock.  Only send the done channel with this message
-//	// if no transactions will be sent afterwards.
-//	var dc chan<- struct{}
-//	if len(matchedTxIndices) == 0 {
-//		dc = doneChan
-//	}
-//	sp.QueueMessage(merkle, dc)
-//
-//	// Finally, send any matched transactions.
-//	blkTransactions := blk.MsgBlock().Transactions
-//	for i, txIndex := range matchedTxIndices {
-//		// Only send the done channel on the final transaction.
-//		var dc chan<- struct{}
-//		if i == len(matchedTxIndices)-1 {
-//			dc = doneChan
-//		}
-//		if txIndex < uint32(len(blkTransactions)) {
-//			sp.QueueMessageWithEncoding(blkTransactions[txIndex], dc,
-//				encoding)
-//		}
-//	}
-//
-//	return nil
-//}
-
 // handleUpdatePeerHeight updates the heights of all peers who were known to
 // announce a block we recently accepted.
 func (s *server) handleUpdatePeerHeights(state *peerState, umsg updatePeerHeightsMsg) {
@@ -1297,17 +1235,11 @@ func (s *server) handleRelayInvMsg(state *peerState, msg relayMsg) {
 			// is less than the peer's feefilter.
 			feeFilter := atomic.LoadInt64(&sp.feeFilter)
 			if feeFilter > 0 && txD.FeePerKB < uint64(feeFilter) {
+				peerLog.Warnf("Transaction fee-per-kb is less than peer's feefilter so that it is not relayed: %T",
+					msg.data)
 				return
 			}
 
-			// Don't relay the transaction if there is a bloom
-			// filter loaded and the transaction doesn't match it.
-			// TODO(ABE): ABE does not support filter.
-			//if sp.filter.IsLoaded() {
-			//	if !sp.filter.MatchTxAndUpdate(txD.Tx) {
-			//		return
-			//	}
-			//}
 		}
 
 		// Queue the inventory to be relayed with the next batch.
@@ -1508,32 +1440,21 @@ func disconnectPeer(peerList map[int32]*serverPeer, compareFunc func(*serverPeer
 func newPeerConfig(sp *serverPeer) *peer.Config {
 	return &peer.Config{
 		Listeners: peer.MessageListeners{
-			OnVersion: sp.OnVersion,
-			OnVerAck:  sp.OnVerAck,
-			// TODO(ABE): ABE does not support filter.
-			//OnMemPool: sp.OnMemPool,
-			//			OnTx:           sp.OnTx,
-			OnTx: sp.OnTx,
-			//			OnBlock:        sp.OnBlock,
+			OnVersion:    sp.OnVersion,
+			OnVerAck:     sp.OnVerAck,
+			OnTx:         sp.OnTx,
 			OnBlock:      sp.OnBlock,
 			OnInv:        sp.OnInv,
 			OnHeaders:    sp.OnHeaders,
 			OnGetData:    sp.OnGetData,
 			OnGetBlocks:  sp.OnGetBlocks,
 			OnGetHeaders: sp.OnGetHeaders,
-			// TODO(ABE): ABE does not support filter.
-			//OnGetCFilters:  sp.OnGetCFilters,
-			//OnGetCFHeaders: sp.OnGetCFHeaders,
-			//OnGetCFCheckpt: sp.OnGetCFCheckpt,
-			OnFeeFilter: sp.OnFeeFilter,
-			//OnFilterAdd:    sp.OnFilterAdd,
-			//OnFilterClear:  sp.OnFilterClear,
-			//OnFilterLoad:   sp.OnFilterLoad,
-			OnGetAddr:  sp.OnGetAddr,
-			OnAddr:     sp.OnAddr,
-			OnRead:     sp.OnRead,
-			OnWrite:    sp.OnWrite,
-			OnNotFound: sp.OnNotFound,
+			OnFeeFilter:  sp.OnFeeFilter,
+			OnGetAddr:    sp.OnGetAddr,
+			OnAddr:       sp.OnAddr,
+			OnRead:       sp.OnRead,
+			OnWrite:      sp.OnWrite,
+			OnNotFound:   sp.OnNotFound,
 
 			// Note: The reference client currently bans peers that send alerts
 			// not signed with its key.  We could verify against their key, but
@@ -1640,6 +1561,7 @@ func (s *server) peerHandler() {
 		// Add peers discovered through DNS to the address manager.
 		connmgr.SeedFromDNS(activeNetParams.Params, defaultRequiredServices,
 			btcdLookup, func(addrs []*wire.NetAddress) {
+				//	todo (ABE): 20210731
 				// Bitcoind uses a lookup of the dns seeder here. This
 				// is rather strange since the values looked up by the
 				// DNS seed lookups will vary quite a lot.
@@ -2121,13 +2043,6 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	interrupt <-chan struct{}) (*server, error) {
 
 	services := defaultServices
-	// TODO(ABE): ABE does not support filter.
-	//if cfg.NoPeerBloomFilters {
-	//	services &^= wire.SFNodeBloom
-	//}
-	//if cfg.NoCFilters {
-	//	services &^= wire.SFNodeCF
-	//}
 
 	amgr := netaddrmgr.New(cfg.DataDir, btcdLookup)
 
@@ -2169,10 +2084,8 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		services:             services,
 		sigCache:             txscript.NewSigCache(cfg.SigCacheMaxSize),
 		hashCache:            txscript.NewHashCache(cfg.SigCacheMaxSize),
-		// TODO(ABE): ABE does not support filter.
-		//cfCheckptCaches:      make(map[wire.FilterType][]cfHeaderKV),
-		agentBlacklist: agentBlacklist,
-		agentWhitelist: agentWhitelist,
+		agentBlacklist:       agentBlacklist,
+		agentWhitelist:       agentWhitelist,
 	}
 
 	// Create the transaction and address indexes if needed.
@@ -2205,12 +2118,6 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		//s.addrIndex = indexers.NewAddrIndex(db, chainParams)
 		//indexes = append(indexes, s.addrIndex)
 	}
-	// TODO(ABE): ABE does not support filter.
-	//if !cfg.NoCFilters {
-	//	indxLog.Info("Committed filter index is enabled")
-	//	s.cfIndex = indexers.NewCfIndex(db, chainParams)
-	//	indexes = append(indexes, s.cfIndex)
-	//}
 
 	// Create an index manager if any of the optional indexes are enabled.
 	var indexManager blockchain.IndexManager
@@ -2284,11 +2191,12 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 			MaxTxVersion:         2,
 			RejectReplacement:    cfg.RejectReplacement,
 		},
-		ChainParams:          chainParams,
-		FetchUtxoView:        s.chain.FetchUtxoView,
-		FetchUtxoRingViewAbe: s.chain.FetchUtxoRingView,
-		BestHeight:           func() int32 { return s.chain.BestSnapshot().Height },
-		MedianTimePast:       func() time.Time { return s.chain.BestSnapshot().MedianTime },
+		ChainParams: chainParams,
+		//	todo(ABE):
+		FetchUtxoView:     s.chain.FetchUtxoView,
+		FetchUtxoRingView: s.chain.FetchUtxoRingView,
+		BestHeight:        func() int32 { return s.chain.BestSnapshot().Height },
+		MedianTimePast:    func() time.Time { return s.chain.BestSnapshot().MedianTime },
 		CalcSequenceLock: func(tx *abeutil.Tx, view *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error) {
 			return s.chain.CalcSequenceLock(tx, view, true)
 		},
@@ -2333,11 +2241,9 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		ChainParams:            chainParams,
 		BlockTemplateGenerator: blockTemplateGenerator,
 		MiningAddr:             cfg.miningAddr,
-		//	todo(ABE)
-		//		ProcessBlockBTCD: s.syncManager.ProcessBlockBTCD,
-		ProcessBlockAbe: s.syncManager.ProcessBlockAbe,
-		ConnectedCount:  s.ConnectedCount,
-		IsCurrent:       s.syncManager.IsCurrent,
+		ProcessBlock:           s.syncManager.ProcessBlock,
+		ConnectedCount:         s.ConnectedCount,
+		IsCurrent:              s.syncManager.IsCurrent,
 	})
 
 	// Only setup a function to return new addresses to connect to when
@@ -2437,21 +2343,19 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		}
 
 		s.rpcServer, err = newRPCServer(&rpcserverConfig{
-			Listeners:   rpcListeners,
-			StartupTime: s.startupTime,
-			ConnMgr:     &rpcConnManager{&s},
-			SyncMgr:     &rpcSyncMgr{&s, s.syncManager},
-			TimeSource:  s.timeSource,
-			Chain:       s.chain,
-			ChainParams: chainParams,
-			DB:          db,
-			TxMemPool:   s.txMemPool,
-			Generator:   blockTemplateGenerator,
-			CPUMiner:    s.cpuMiner,
-			TxIndex:     s.txIndex,
-			AddrIndex:   s.addrIndex,
-			// TODO(ABE): ABE does not support filter.
-			//CfIndex:      s.cfIndex,
+			Listeners:    rpcListeners,
+			StartupTime:  s.startupTime,
+			ConnMgr:      &rpcConnManager{&s},
+			SyncMgr:      &rpcSyncMgr{&s, s.syncManager},
+			TimeSource:   s.timeSource,
+			Chain:        s.chain,
+			ChainParams:  chainParams,
+			DB:           db,
+			TxMemPool:    s.txMemPool,
+			Generator:    blockTemplateGenerator,
+			CPUMiner:     s.cpuMiner,
+			TxIndex:      s.txIndex,
+			AddrIndex:    s.addrIndex,
 			FeeEstimator: s.feeEstimator,
 		})
 		if err != nil {
