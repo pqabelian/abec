@@ -870,15 +870,7 @@ func (s *server) RemoveRebroadcastInventory(iv *wire.InvVect) {
 
 // relayTransactions generates and relays inventory vectors for all of the
 // passed transactions to all connected peers.
-func (s *server) relayTransactions(txns []*mempool.TxDesc) {
-	for _, txD := range txns {
-		iv := wire.NewInvVect(wire.InvTypeTx, txD.Tx.Hash())
-		s.RelayInventory(iv, txD)
-	}
-}
-
-//	Abe to do
-func (s *server) relayTransactionsAbe(txns []*mempool.TxDescAbe) {
+func (s *server) relayTransactions(txns []*mempool.TxDescAbe) {
 	for _, txD := range txns {
 		iv := wire.NewInvVect(wire.InvTypeTx, txD.Tx.Hash())
 		s.RelayInventory(iv, txD)
@@ -893,7 +885,7 @@ func (s *server) relayTransactionsAbe(txns []*mempool.TxDescAbe) {
 func (s *server) AnnounceNewTransactions(txns []*mempool.TxDescAbe) {
 	// Generate and relay inventory vectors for all newly accepted
 	// transactions.
-	s.relayTransactionsAbe(txns)
+	s.relayTransactions(txns)
 
 	// Notify both websocket and getblocktemplate long poll clients of all
 	// newly accepted transactions.
