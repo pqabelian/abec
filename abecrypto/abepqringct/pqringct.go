@@ -115,7 +115,7 @@ func MasterKeyGen(inputSeed []byte, cryptoScheme abecrypto.CryptoScheme) (serial
 
 	retseedSer := inputSeed
 	if len(inputSeed) == 0 {
-		retseedSer := make([]byte, 4+len(seed))
+		retseedSer = make([]byte, 4+len(seed))
 		binary.BigEndian.PutUint32(retseedSer, uint32(cryptoScheme))
 		copy(retseedSer[4:], seed)
 	}
