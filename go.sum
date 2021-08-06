@@ -9,6 +9,8 @@ github.com/cryptosuite/kyber-go v0.0.1 h1:L12sYYZZ2OjnOPoVuYOkoUgiM8Hap9p7S3HYZJ
 github.com/cryptosuite/kyber-go v0.0.1/go.mod h1:1G0Jh7bXJGSUCTrC6ZB9lFpmCF+VFQehDqIwm9dJU3s=
 github.com/cryptosuite/pqringct v0.0.1-beta h1:3dEIVnWi65oOJLd0dKUir2raBtjjaQHwzY+LIkJFYEc=
 github.com/cryptosuite/pqringct v0.0.1-beta/go.mod h1:UBnEgLBYVWcwds7RQdNKpFCd6b60ac8JR8UXJfCJjaE=
+github.com/cryptosuite/pqringct v0.0.1-beta.0.20210806120658-ae6b368f35ad h1:6+cK7dZ4yUje0OI8w4m+QJi+eNX05jmpxMREdAhQMFY=
+github.com/cryptosuite/pqringct v0.0.1-beta.0.20210806120658-ae6b368f35ad/go.mod h1:UBnEgLBYVWcwds7RQdNKpFCd6b60ac8JR8UXJfCJjaE=
 github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1 h1:vN3Cibtye7f3YuPvrJWG4Kp/jrb/XfxS5oIwl8XZBQY=
 github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1/go.mod h1:mJeCa86eOqj3kCJO+O4245Wnq5U07P9K9RfJplI8bQ4=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=

@@ -80,7 +80,7 @@ func NewAbeTxInDetail(serializedTxoList []*wire.TxOutAbe, serialNumber []byte) *
 /*
 The caller should know and specify the exact MasterKeyGen() for particular pqringct version.
 */
-//	todo: input and output seed
+//	todo_DONE: input and output seed
 func MasterKeyGen(inputSeed []byte, cryptoScheme abecrypto.CryptoScheme) (serializedSeed []byte, serializedMpk []byte, serializedMsvk []byte, serializedMssk []byte, err error) {
 	if len(inputSeed) != 0 {
 		if len(inputSeed) <= 4 {
