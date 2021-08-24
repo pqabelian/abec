@@ -588,15 +588,17 @@ type SendToPayeesCmd struct {
 	MinConf            *int               `jsonrpcdefault:"1"`                   //TODO(abe) what is the minconf used for?
 	ScaleToFeeSatPerKb *float64           `jsonrpcdefault:"1"`                   // todo(AliceBob): <= 0 means that will use 'FeeSpecified'
 	FeeSpecified       *float64           `jsonrpcdefault:"0"`                   //	todo(AliceBob): valid only if 'ScaleToFeeSatPerKb<=0' && 'FeeSpecified>0'
+	UTXOSpecified      *string
 	Comment            *string
 }
 
-func NewSendToPayeesCmd(amounts map[string]float64, minconf *int, scaleToFeeSatPerKb *float64, feeSpecified *float64, comment *string) *SendToPayeesCmd {
+func NewSendToPayeesCmd(amounts map[string]float64, minconf *int, scaleToFeeSatPerKb *float64, feeSpecified *float64, UTXOSpecified *string, comment *string) *SendToPayeesCmd {
 	return &SendToPayeesCmd{
 		Amounts:            amounts,
 		MinConf:            minconf,
 		ScaleToFeeSatPerKb: scaleToFeeSatPerKb,
 		FeeSpecified:       feeSpecified,
+		UTXOSpecified:		UTXOSpecified,
 		Comment:            comment,
 	}
 }

@@ -509,12 +509,12 @@ func (c *Client) SendToAddressAsync(address abeutil.Address, amount abeutil.Amou
 	cmd := abejson.NewSendToAddressCmd(addr, amount.ToABE(), nil, nil)
 	return c.sendCmd(cmd)
 }
-func (c *Client) SendToPayeesAsync(payees []string, amount []abeutil.Amount, minconf *int, scaleToFeeSatPerKb *float64, feeSpecified *float64, comment *string) FutureSendToPayeeResult {
+func (c *Client) SendToPayeesAsync(payees []string, amount []abeutil.Amount, minconf *int, scaleToFeeSatPerKb *float64, feeSpecified *float64, utxoSpecified *string, comment *string) FutureSendToPayeeResult {
 	amounts := make(map[string]float64, len(payees))
 	for i := 0; i < len(payees); i++ {
 		amounts[payees[i]] = float64(amount[i])
 	}
-	cmd := abejson.NewSendToPayeesCmd(amounts, minconf, scaleToFeeSatPerKb, feeSpecified, comment)
+	cmd := abejson.NewSendToPayeesCmd(amounts, minconf, scaleToFeeSatPerKb, feeSpecified, utxoSpecified, comment)
 	return c.sendCmd(cmd)
 }
 
@@ -529,8 +529,8 @@ func (c *Client) SendToPayeesAsync(payees []string, amount []abeutil.Amount, min
 func (c *Client) SendToAddress(address abeutil.Address, amount abeutil.Amount) (*chainhash.Hash, error) {
 	return c.SendToAddressAsync(address, amount).Receive()
 }
-func (c *Client) SendToPayees(payees []string, amount []abeutil.Amount, scaleToFeeSatPerKb *float64, feeSpecified *float64, minconf *int, comment *string) (*chainhash.Hash, error) {
-	return c.SendToPayeesAsync(payees, amount, minconf, scaleToFeeSatPerKb, feeSpecified, comment).Receive()
+func (c *Client) SendToPayees(payees []string, amount []abeutil.Amount, scaleToFeeSatPerKb *float64, feeSpecified *float64, utxoSpecified *string, minconf *int, comment *string) (*chainhash.Hash, error) {
+	return c.SendToPayeesAsync(payees, amount, minconf, scaleToFeeSatPerKb, feeSpecified, utxoSpecified, comment).Receive()
 }
 
 // SendToAddressCommentAsync returns an instance of a type that can be used to
