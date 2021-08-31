@@ -124,7 +124,7 @@ type config struct {
 	MaxOrphanTxs         int           `long:"maxorphantx" description:"Max number of orphan transactions to keep in memory"`
 	MaxPeers             int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
 	MiningAddr           string        `long:"miningaddr" description:"Specify a master address to use for generated blocks -- A master address is required if the generate option is set"`
-	MinRelayTxFee        float64       `long:"minrelaytxfee" description:"The minimum transaction fee in BTC/kB to be considered a non-zero fee."`
+	MinRelayTxFee        float64       `long:"minrelaytxfee" description:"The minimum transaction fee in Neutrino/kB to be considered a non-zero fee."`
 	DisableBanning       bool          `long:"nobanning" description:"Disable banning of misbehaving peers"`
 	NoCFilters           bool          `long:"nocfilters" description:"Disable committed filtering (CF) support"`
 	DisableCheckpoints   bool          `long:"nocheckpoints" description:"Disable built-in checkpoints.  Don't do this unless you know what you're doing."`
@@ -1151,14 +1151,14 @@ func btcdDial(addr net.Addr) (net.Conn, error) {
 	return cfg.dial(addr.Network(), addr.String(), defaultConnectTimeout)
 }
 
-// btcdLookup resolves the IP of the given host using the correct DNS lookup
+// abecLookup resolves the IP of the given host using the correct DNS lookup
 // function depending on the configuration options.  For example, addresses will
 // be resolved using tor when the --proxy flag was specified unless --noonion
 // was also specified in which case the normal system DNS resolver will be used.
 //
 // Any attempt to resolve a tor address (.onion) will return an error since they
 // are not intended to be resolved outside of the tor proxy.
-func btcdLookup(host string) ([]net.IP, error) {
+func abecLookup(host string) ([]net.IP, error) {
 	if strings.HasSuffix(host, ".onion") {
 		return nil, fmt.Errorf("attempt to resolve tor address %s", host)
 	}

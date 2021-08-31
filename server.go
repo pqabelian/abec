@@ -1560,7 +1560,7 @@ func (s *server) peerHandler() {
 	if !cfg.DisableDNSSeed {
 		// Add peers discovered through DNS to the address manager.
 		connmgr.SeedFromDNS(activeNetParams.Params, defaultRequiredServices,
-			btcdLookup, func(addrs []*wire.NetAddress) {
+			abecLookup, func(addrs []*wire.NetAddress) {
 				//	todo (ABE): 20210731
 				// Bitcoind uses a lookup of the dns seeder here. This
 				// is rather strange since the values looked up by the
@@ -1947,7 +1947,7 @@ out:
 			// listen port?
 			// XXX this assumes timeout is in seconds.
 			listenPort, err := s.nat.AddPortMapping("tcp", int(lport), int(lport),
-				"btcd listen port", 20*60)
+				"abec listen port", 20*60)
 			if err != nil {
 				srvrLog.Warnf("can't add UPnP port mapping: %v", err)
 			}
@@ -2044,7 +2044,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 
 	services := defaultServices
 
-	amgr := netaddrmgr.New(cfg.DataDir, btcdLookup)
+	amgr := netaddrmgr.New(cfg.DataDir, abecLookup)
 
 	var listeners []net.Listener
 	var nat NAT
@@ -2484,7 +2484,7 @@ func addrStringToNetAddr(addr string) (net.Addr, error) {
 	}
 
 	// Attempt to look up an IP address associated with the parsed host.
-	ips, err := btcdLookup(host)
+	ips, err := abecLookup(host)
 	if err != nil {
 		return nil, err
 	}

@@ -102,7 +102,7 @@ func (b *BlockChain) blockExists(hash *chainhash.Hash) (bool, error) {
 	return exists, err
 }
 
-// processOrphans determines if there are any orphans which depend on the passed
+// processOrphansAbe determines if there are any orphans which depend on the passed
 // block hash (they are no longer orphans if true) and potentially accepts them.
 // It repeats the process for the newly accepted blocks (to detect further
 // orphans which may no longer be orphans) until there are no more.
@@ -111,55 +111,7 @@ func (b *BlockChain) blockExists(hash *chainhash.Hash) (bool, error) {
 // are needed to pass along to maybeAcceptBlock.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) processOrphansBTCD(hash *chainhash.Hash, flags BehaviorFlags) error {
-	// Start with processing at least the passed hash.  Leave a little room
-	// for additional orphan blocks that need to be processed without
-	// needing to grow the array in the common case.
-	processHashes := make([]*chainhash.Hash, 0, 10)
-	processHashes = append(processHashes, hash)
-	for len(processHashes) > 0 {
-		// Pop the first hash to process from the slice.
-		processHash := processHashes[0]
-		processHashes[0] = nil // Prevent GC leak.
-		processHashes = processHashes[1:]
-
-		// Look up all orphans that are parented by the block we just
-		// accepted.  This will typically only be one, but it could
-		// be multiple if multiple blocks are mined and broadcast
-		// around the same time.  The one with the most proof of work
-		// will eventually win out.  An indexing for loop is
-		// intentionally used over a range here as range does not
-		// reevaluate the slice on each iteration nor does it adjust the
-		// index for the modified slice.
-		for i := 0; i < len(b.prevOrphans[*processHash]); i++ {
-			orphan := b.prevOrphans[*processHash][i]
-			if orphan == nil {
-				log.Warnf("Found a nil entry at index %d in the "+
-					"orphan dependency list for block %v", i,
-					processHash)
-				continue
-			}
-
-			// Remove the orphan from the orphan pool.
-			orphanHash := orphan.block.Hash()
-			b.removeOrphanBlockBTCD(orphan)
-			i--
-
-			// Potentially accept the block into the block chain.
-			_, err := b.maybeAcceptBlockBTCD(orphan.block, flags)
-			if err != nil {
-				return err
-			}
-
-			// Add this block to the list of blocks to process so
-			// any orphan blocks that depend on this block are
-			// handled too.
-			processHashes = append(processHashes, orphanHash)
-		}
-	}
-	return nil
-}
-
+// Abe todo
 func (b *BlockChain) processOrphansAbe(hash *chainhash.Hash, flags BehaviorFlags) error {
 	// Start with processing at least the passed hash.  Leave a little room
 	// for additional orphan blocks that need to be processed without
