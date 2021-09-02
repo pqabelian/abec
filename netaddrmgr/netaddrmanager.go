@@ -1137,7 +1137,7 @@ func (namgr *NetAddrManager) GetBestLocalAddress(remoteAddr *wire.NetAddress) *w
 	return bestAddress
 }
 
-// New returns a new bitcoin address manager.
+// New returns a new abec address manager.
 // Use Start to begin processing asynchronous address updates.
 func New(dataDir string, lookupFunc func(string) ([]net.IP, error)) *NetAddrManager {
 	namgr := NetAddrManager{

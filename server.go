@@ -219,8 +219,6 @@ type server struct {
 	// initial creation of the server and never changed afterwards, so they
 	// do not need to be protected for concurrent access.
 	txIndex *indexers.TxIndex
-	// TODO(Abelian): shall Abelian supports addrIndex?
-	addrIndex *indexers.AddrIndex
 
 	// The fee estimator keeps track of how long transactions are left in
 	// the mempool before they are mined into blocks.
@@ -2042,6 +2040,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	db database.DB, chainParams *chaincfg.Params,
 	interrupt <-chan struct{}) (*server, error) {
 
+	// abe todo
 	services := defaultServices
 
 	amgr := netaddrmgr.New(cfg.DataDir, abecLookup)
@@ -2095,28 +2094,11 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	// addrindex is run first, it may not have the transactions from the
 	// current block indexed.
 	var indexes []indexers.Indexer
-	if cfg.TxIndex || cfg.AddrIndex {
-		// Enable transaction index if address index is enabled since it
-		// requires it.
-		if !cfg.TxIndex {
-			indxLog.Infof("Transaction index enabled because it " +
-				"is required by the address index")
-			cfg.TxIndex = true
-		} else {
-			indxLog.Info("Transaction index is enabled")
-		}
+	if cfg.TxIndex {
+		indxLog.Info("Transaction index is enabled")
 
 		s.txIndex = indexers.NewTxIndex(db)
 		indexes = append(indexes, s.txIndex)
-	}
-	if cfg.AddrIndex {
-		//	ToDo(ABE.MUST): DISABLE AddrIndex. For ABE, the txo is assigend to addessScript generated using stealth address mechanism, such that addrIndex does not make sense.
-		//	ToDo(ABE.MUST): Depending on requirements, ABE may support TxoIndex.
-		cfg.AddrIndex = false
-		indxLog.Info("ABE does not support Address index. It is disabled.")
-		//indxLog.Info("Address index is enabled")
-		//s.addrIndex = indexers.NewAddrIndex(db, chainParams)
-		//indexes = append(indexes, s.addrIndex)
 	}
 
 	// Create an index manager if any of the optional indexes are enabled.
@@ -2203,7 +2185,6 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		IsDeploymentActive: s.chain.IsDeploymentActive,
 		SigCache:           s.sigCache,
 		HashCache:          s.hashCache,
-		AddrIndex:          s.addrIndex,
 		FeeEstimator:       s.feeEstimator,
 	}
 	s.txMemPool = mempool.New(&txC)
@@ -2305,7 +2286,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		OnAccept:       s.inboundPeerConnected,
 		RetryDuration:  connectionRetryInterval,
 		TargetOutbound: uint32(targetOutbound),
-		Dial:           btcdDial,                //TODO: where need changed
+		Dial:           abecDial,
 		OnConnection:   s.outboundPeerConnected, //handle with the process of connected
 		GetNewAddress:  newAddressFunc,          // get the address of peer
 	})
@@ -2355,7 +2336,6 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 			Generator:    blockTemplateGenerator,
 			CPUMiner:     s.cpuMiner,
 			TxIndex:      s.txIndex,
-			AddrIndex:    s.addrIndex,
 			FeeEstimator: s.feeEstimator,
 		})
 		if err != nil {

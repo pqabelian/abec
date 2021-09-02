@@ -6,7 +6,6 @@ import (
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
-	"github.com/abesuite/abec/blockchain/indexers"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/mining"
@@ -91,11 +90,6 @@ type Config struct {
 
 	// HashCache defines the transaction hash mid-state cache to use.
 	HashCache *txscript.HashCache
-
-	// AddrIndex defines the optional address index instance to use for
-	// indexing the unconfirmed transactions in the memory pool.
-	// This can be nil if the address index is not enabled.
-	AddrIndex *indexers.AddrIndex
 
 	// FeeEstimatator provides a feeEstimator. If it is not nil, the mempool
 	// records all new transactions it observes into the feeEstimator.
@@ -680,12 +674,6 @@ func (mp *TxPool) removeTransactionBTCD(tx *abeutil.Tx, removeRedeemers bool) {
 
 	// Remove the transaction if needed.
 	if txDesc, exists := mp.pool[*txHash]; exists { //this transaction exists in mem pool
-		// Remove unconfirmed address index entries associated with the
-		// transaction if enabled.
-		if mp.cfg.AddrIndex != nil {
-			mp.cfg.AddrIndex.RemoveUnconfirmedTx(txHash)
-		}
-
 		// Mark the referenced outpoints as unspent by the pool.
 		for _, txIn := range txDesc.Tx.MsgTx().TxIn { //update the outpoints
 			delete(mp.outpoints, txIn.PreviousOutPoint)
@@ -710,13 +698,6 @@ func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 
 	// Remove the transaction if needed.
 	if txDesc, exists := mp.poolAbe[*txHash]; exists {
-		// Remove unconfirmed address index entries associated with the
-		// transaction if enabled.
-		if mp.cfg.AddrIndex != nil {
-			//	todo(ABE):
-			mp.cfg.AddrIndex.RemoveUnconfirmedTx(txHash)
-		}
-
 		// Mark the referenced outpoints as unspent by the pool.
 		for _, txIn := range txDesc.Tx.MsgTx().TxIns {
 			ringHash := txIn.PreviousOutPointRing.Hash()
@@ -812,12 +793,6 @@ func (mp *TxPool) addTransaction(utxoView *blockchain.UtxoViewpoint, tx *abeutil
 		mp.outpoints[txIn.PreviousOutPoint] = tx
 	}
 	atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
-
-	// Add unconfirmed address index entries associated with the transaction
-	// if enabled.
-	if mp.cfg.AddrIndex != nil {
-		mp.cfg.AddrIndex.AddUnconfirmedTx(tx, utxoView)
-	}
 
 	// Record this tx for fee estimation if enabled.
 	if mp.cfg.FeeEstimator != nil {

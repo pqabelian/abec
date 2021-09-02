@@ -13,6 +13,10 @@ import (
 const (
 	// txIndexName is the human-readable name for the index.
 	txIndexName = "transaction index"
+
+	// Size of a transaction entry.  It consists of 4 bytes block id + 4
+	// bytes offset + 4 bytes length.
+	txEntrySize = 4 + 4 + 4
 )
 
 var (
@@ -547,13 +551,7 @@ func dropBlockIDIndex(db database.DB) error {
 }
 
 // DropTxIndex drops the transaction index from the provided database if it
-// exists.  Since the address index relies on it, the address index will also be
-// dropped when it exists.
+// exists.
 func DropTxIndex(db database.DB, interrupt <-chan struct{}) error {
-	err := dropIndex(db, addrIndexKey, addrIndexName, interrupt)
-	if err != nil {
-		return err
-	}
-
 	return dropIndex(db, txIndexKey, txIndexName, interrupt)
 }
