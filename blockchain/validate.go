@@ -1297,7 +1297,7 @@ func CheckTransactionInputs(tx *abeutil.Tx, txHeight int32, utxoView *UtxoViewpo
 	return txFeeInSatoshi, nil
 }
 
-//	Abe to do
+//	Abe todo
 func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
 	// Coinbase transactions have no inputs.
 	if IsCoinBaseAbe(tx) {

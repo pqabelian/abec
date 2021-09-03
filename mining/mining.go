@@ -667,23 +667,9 @@ mempoolLoop:
 	// possible transaction count size, plus the size of the coinbase
 	// transaction.
 	//	todo(ABE): ABE does not use weight, while use size only.
-	//	blockWeight := uint32((blockHeaderOverhead * blockchain.WitnessScaleFactor) +
-	//		blockchain.GetTransactionWeightAbe(coinbaseTx))
+	// blockWeight := (blockHeaderOverhead * blockchain.WitnessScaleFactor) + uint32(blockchain.GetTransactionWeightAbe(coinbaseTx))
 	blockSize := uint32((blockHeaderOverhead) + coinbaseTx.MsgTx().SerializeSize())
-	//	blockSigOpCost := coinbaseSigOpCost
 	totalFee := uint64(0)
-
-	// Query the version bits state to see if segwit has been activated, if
-	// so then this means that we'll include any transactions with witness
-	// data in the mempool, and also add the witness commitment as an
-	// OP_RETURN output in the coinbase transaction.
-	/*	segwitState, err := g.chain.ThresholdState(chaincfg.DeploymentSegwit)
-		if err != nil {
-			return nil, err
-		}
-		segwitActive := segwitState == blockchain.ThresholdActive
-	*/
-	//	witnessIncluded := false
 
 	// Choose which transactions make it into the block.
 	for priorityQueue.Len() > 0 {
@@ -692,59 +678,33 @@ mempoolLoop:
 		prioItem := heap.Pop(priorityQueue).(*txPrioItemAbe)
 		tx := prioItem.tx
 
-		// Enforce maximum block size.  Also check for overflow.
-		//	todo(ABE): ABE does not use weight, while use size only.
-		//		txWeight := uint32(blockchain.GetTransactionWeightAbe(tx))
+		// Enforce maximum block weight.  Also check for overflow.
 		txSize := uint32(tx.MsgTx().SerializeSize())
 		blockPlusTxSize := blockSize + txSize
-		//		if blockPlusTxWeight < blockWeight || blockPlusTxWeight >= g.policy.BlockMaxWeight {
 		if blockPlusTxSize < blockSize || blockPlusTxSize >= g.policy.BlockMaxSize {
-			//	todo(ABE): for the setting of blockmaxweight and blockmaxsize
 			log.Tracef("Skipping tx %s because it would exceed "+
 				"the max block size", tx.Hash())
-			//			logSkippedDeps(tx, deps)
 			continue
 		}
 
-		// Enforce maximum signature operation cost per block.  Also
-		// check for overflow.
-		/*		sigOpCost, err := blockchain.GetSigOpCost(tx, false,
-					blockUtxos, true, segwitActive)
-				if err != nil {
-					log.Tracef("Skipping tx %s due to error in "+
-						"GetSigOpCost: %v", tx.Hash(), err)
-					logSkippedDeps(tx, deps)
-					continue
-				}*/
-		/*		if blockSigOpCost+int64(sigOpCost) < blockSigOpCost ||
-				blockSigOpCost+int64(sigOpCost) > blockchain.MaxBlockSigOpsCost {
-				log.Tracef("Skipping tx %s because it would "+
-					"exceed the maximum sigops per block", tx.Hash())
-				logSkippedDeps(tx, deps)
-				continue
-			}*/
-
 		// Skip free transactions once the block is larger than the
 		// minimum block size.
-		//	todo(ABE): ABE does not use weight, while use size only.
-		//	todo(ABE): as the size exceeds the minimum block size, it is unnecessary to include the free transactions
 		if sortedByFee &&
 			prioItem.feePerKB < uint64(g.policy.TxMinFreeFee) &&
-			//			blockPlusTxWeight >= g.policy.BlockMinWeight {
 			blockPlusTxSize >= g.policy.BlockMinSize {
 
 			log.Tracef("Skipping tx %s with feePerKB %d "+
-				"< TxMinFreeFee %d and block weight %d >= "+
-				"minBlockWeight %d", tx.Hash(), prioItem.feePerKB,
+				"< TxMinFreeFee %d and block size %d >= "+
+				"minBlockSize %d", tx.Hash(), prioItem.feePerKB,
 				g.policy.TxMinFreeFee, blockPlusTxSize,
 				g.policy.BlockMinSize)
-			//			logSkippedDeps(tx, deps)
 			continue
 		}
 
 		// Prioritize by fee per kilobyte once the block is larger than
 		// the priority size or there are no more high-priority
 		// transactions.
+		// todo abe, prioritySize?
 		if !sortedByFee &&
 			(blockPlusTxSize >= g.policy.BlockPrioritySize || prioItem.priority <= MinHighPriority) {
 
@@ -776,7 +736,6 @@ mempoolLoop:
 		if err != nil {
 			log.Tracef("Skipping tx %s due to error in "+
 				"CheckTransactionInputs: %v", tx.Hash(), err)
-			//			logSkippedDeps(tx, deps)
 			continue
 		}
 
@@ -788,11 +747,10 @@ mempoolLoop:
 		if err != nil {
 			log.Tracef("Skipping tx %s due to error in "+
 				"ValidateTransactionScripts: %v", tx.Hash(), err)
-			//			logSkippedDeps(tx, deps)
 			continue
 		}
 
-		// Spend the transaction inputs in the block utxo view and add
+		// Spend the transaction inputs in the block utxoRing view and add
 		// an entry for it to ensure any transactions which reference
 		// this one have it available as an input and can ensure they
 		// aren't double spending.
@@ -803,33 +761,21 @@ mempoolLoop:
 		// template.
 		blockTxns = append(blockTxns, tx)
 		blockSize += txSize
-		//		blockSigOpCost += int64(sigOpCost)
 		totalFee += prioItem.fee
 		txFees = append(txFees, prioItem.fee)
-		//		txSigOpCosts = append(txSigOpCosts, int64(sigOpCost))
 
 		log.Tracef("Adding tx %s (priority %.2f, feePerKB %.2f)",
 			prioItem.tx.Hash(), prioItem.priority, prioItem.feePerKB)
-
-		// Add transactions which depend on this one (and also do not
-		// have any other unsatisified dependencies) to the priority
-		// queue.
-		/*		for _, item := range deps {
-				// Add the transaction to the priority queue if there
-				// are no more dependencies after this one.
-				delete(item.dependsOn, *tx.Hash())
-				if len(item.dependsOn) == 0 {
-					heap.Push(priorityQueue, item)
-				}
-			}*/
 	}
 
 	// Now that the actual transactions have been selected, update the
-	// block weight for the real transaction count and coinbase value with
+	// block size for the real transaction count and coinbase value with
 	// the total fees accordingly.
+	//blockWeight -= wire.MaxVarIntPayload -
+	//	(uint32(wire.VarIntSerializeSize(uint64(len(blockTxns)))) *
+	//		blockchain.WitnessScaleFactor)
 	blockSize -= wire.MaxVarIntPayload - uint32(wire.VarIntSerializeSize(uint64(len(blockTxns))))
 
-	//coinbaseTx.MsgTx().TxOuts[0].ValueScript += totalFees
 	coinbaseTxMsg.TxFee = subsidy + totalFee
 	// txFees[0] = -totalFee
 	txOutDescs := make([]*abepqringct.AbeTxOutDesc, 1)
@@ -842,47 +788,7 @@ mempoolLoop:
 	coinbaseTx = abeutil.NewTxAbe(coinbaseTxMsg)
 	blockTxns[0] = coinbaseTx
 
-	// If segwit is active and we included transactions with witness data,
-	// then we'll need to include a commitment to the witness data in an
-	// OP_RETURN output within the coinbase transaction.
 	//	todo(ABE): Does ABE need to store a commitment of the hash for the witnesses of transactions?
-	/*	var witnessCommitment []byte
-		if witnessIncluded {
-			// The witness of the coinbase transaction MUST be exactly 32-bytes
-			// of all zeroes.
-			var witnessNonce [blockchain.CoinbaseWitnessDataLen]byte
-			coinbaseTx.MsgTx().TxIn[0].Witness = wire.TxWitness{witnessNonce[:]}
-
-			// Next, obtain the merkle root of a tree which consists of the
-			// wtxid of all transactions in the block. The coinbase
-			// transaction will have a special wtxid of all zeroes.
-			witnessMerkleTree := blockchain.BuildMerkleTreeStore(blockTxns,
-				true)
-			witnessMerkleRoot := witnessMerkleTree[len(witnessMerkleTree)-1]
-
-			// The preimage to the witness commitment is:
-			// witnessRoot || coinbaseWitness
-			var witnessPreimage [64]byte
-			copy(witnessPreimage[:32], witnessMerkleRoot[:])
-			copy(witnessPreimage[32:], witnessNonce[:])
-
-			// The witness commitment itself is the double-sha256 of the
-			// witness preimage generated above. With the commitment
-			// generated, the witness script for the output is: OP_RETURN
-			// OP_DATA_36 {0xaa21a9ed || witnessCommitment}. The leading
-			// prefix is referred to as the "witness magic bytes".
-			witnessCommitment = chainhash.DoubleHashB(witnessPreimage[:])
-			witnessScript := append(blockchain.WitnessMagicBytes, witnessCommitment...)
-
-			// Finally, create the OP_RETURN carrying witness commitment
-			// output as an additional output within the coinbase.
-			commitmentOutput := &wire.TxOut{
-				Value:    0,
-				PkScript: witnessScript,
-			}
-			coinbaseTx.MsgTx().TxOut = append(coinbaseTx.MsgTx().TxOut,
-				commitmentOutput)
-		}*/
 
 	// Calculate the required difficulty for the block.  The timestamp
 	// is potentially adjusted to ensure it comes after the median time of
@@ -926,15 +832,13 @@ mempoolLoop:
 	}
 
 	log.Debugf("Created new block template (%d transactions, %d in "+
-		"fees, %d weight, target difficulty "+"%064x)", len(msgBlock.Transactions), totalFee, blockSize, blockchain.CompactToBig(msgBlock.Header.Bits))
+		"fees, %d size, target difficulty "+"%064x)", len(msgBlock.Transactions), totalFee, blockSize, blockchain.CompactToBig(msgBlock.Header.Bits))
 
 	return &BlockTemplate{
 		BlockAbe: &msgBlock,
 		Fees:     txFees,
-		//		SigOpCosts:        txSigOpCosts,
 		Height:          nextBlockHeight,
 		ValidPayAddress: payToMpk != nil,
-		//		WitnessCommitment: witnessCommitment,
 	}, nil
 }
 

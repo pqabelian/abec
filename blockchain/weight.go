@@ -34,7 +34,7 @@ const (
 	// WitnessScaleFactor determines the level of "discount" witness data
 	// receives compared to "base" data. A scale factor of 4, denotes that
 	// witness data is 1/4 as cheap as regular non-witness data.
-	WitnessScaleFactor = 4
+	WitnessScaleFactor = 10
 
 	// MinTxOutputWeight is the minimum possible weight for a transaction
 	// output.
@@ -92,11 +92,10 @@ func GetTransactionWeightAbe(tx *abeutil.TxAbe) int64 {
 	msgTx := tx.MsgTx()
 
 	baseSize := msgTx.SerializeSize()
+	// totalSize := msgTx.SerializeSizeFull()
 
+	//return int64(baseSize * (WitnessScaleFactor - 1) + totalSize)
 	return int64(baseSize)
-
-	// (baseSize * 3) + totalSize
-	//	return int64((baseSize * (WitnessScaleFactor - 1)) + totalSize)
 }
 
 // GetSigOpCost returns the unified sig op cost for the passed transaction
