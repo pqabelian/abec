@@ -79,127 +79,14 @@ type TxSource interface {
 
 	// MiningDescs returns a slice of mining descriptors for all the
 	// transactions in the source pool.
-	MiningDescs() []*TxDesc
-
-	MiningDescsAbe() []*TxDescAbe
+	MiningDescs() []*TxDescAbe
 
 	// HaveTransaction returns whether or not the passed transaction hash
 	// exists in the source pool.
 	HaveTransaction(hash *chainhash.Hash) bool
 }
 
-// txPrioItem houses a transaction along with extra information that allows the
-// transaction to be prioritized and track dependencies on other transactions
-// which have not been mined into a block yet.
-type txPrioItem struct {
-	tx       *abeutil.Tx
-	fee      int64
-	priority float64
-	feePerKB int64
-
-	// dependsOn holds a map of transaction hashes which this one depends
-	// on.  It will only be set when the transaction references other
-	// transactions in the source pool and hence must come after them in
-	// a block.
-	dependsOn map[chainhash.Hash]struct{}
-}
-
-// txPriorityQueueLessFunc describes a function that can be used as a compare
-// function for a transaction priority queue (txPriorityQueue).
-type txPriorityQueueLessFunc func(*txPriorityQueue, int, int) bool
-
-// txPriorityQueue implements a priority queue of txPrioItem elements that
-// supports an arbitrary compare function as defined by txPriorityQueueLessFunc.
-type txPriorityQueue struct {
-	lessFunc txPriorityQueueLessFunc
-	items    []*txPrioItem
-}
-
-// Len returns the number of items in the priority queue.  It is part of the
-// heap.Interface implementation.
-func (pq *txPriorityQueue) Len() int {
-	return len(pq.items)
-}
-
-// Less returns whether the item in the priority queue with index i should sort
-// before the item with index j by deferring to the assigned less function.  It
-// is part of the heap.Interface implementation.
-func (pq *txPriorityQueue) Less(i, j int) bool {
-	return pq.lessFunc(pq, i, j)
-}
-
-// Swap swaps the items at the passed indices in the priority queue.  It is
-// part of the heap.Interface implementation.
-func (pq *txPriorityQueue) Swap(i, j int) {
-	pq.items[i], pq.items[j] = pq.items[j], pq.items[i]
-}
-
-// Push pushes the passed item onto the priority queue.  It is part of the
-// heap.Interface implementation.
-func (pq *txPriorityQueue) Push(x interface{}) {
-	pq.items = append(pq.items, x.(*txPrioItem))
-}
-
-// Pop removes the highest priority item (according to Less) from the priority
-// queue and returns it.  It is part of the heap.Interface implementation.
-func (pq *txPriorityQueue) Pop() interface{} {
-	n := len(pq.items)
-	item := pq.items[n-1]
-	pq.items[n-1] = nil
-	pq.items = pq.items[0 : n-1]
-	return item
-}
-
-// SetLessFunc sets the compare function for the priority queue to the provided
-// function.  It also invokes heap.Init on the priority queue using the new
-// function so it can immediately be used with heap.Push/Pop.
-func (pq *txPriorityQueue) SetLessFunc(lessFunc txPriorityQueueLessFunc) {
-	pq.lessFunc = lessFunc
-	heap.Init(pq)
-}
-
-// txPQByPriority sorts a txPriorityQueue by transaction priority and then fees
-// per kilobyte.
-func txPQByPriority(pq *txPriorityQueue, i, j int) bool {
-	// Using > here so that pop gives the highest priority item as opposed
-	// to the lowest.  Sort by priority first, then fee.
-	if pq.items[i].priority == pq.items[j].priority {
-		return pq.items[i].feePerKB > pq.items[j].feePerKB
-	}
-	return pq.items[i].priority > pq.items[j].priority
-
-}
-
-// txPQByFee sorts a txPriorityQueue by fees per kilobyte and then transaction
-// priority.
-func txPQByFee(pq *txPriorityQueue, i, j int) bool {
-	// Using > here so that pop gives the highest fee item as opposed
-	// to the lowest.  Sort by fee first, then priority.
-	if pq.items[i].feePerKB == pq.items[j].feePerKB {
-		return pq.items[i].priority > pq.items[j].priority
-	}
-	return pq.items[i].feePerKB > pq.items[j].feePerKB
-}
-
-// newTxPriorityQueue returns a new transaction priority queue that reserves the
-// passed amount of space for the elements.  The new priority queue uses either
-// the txPQByPriority or the txPQByFee compare function depending on the
-// sortByFee parameter and is already initialized for use with heap.Push/Pop.
-// The priority queue can grow larger than the reserved space, but extra copies
-// of the underlying array can be avoided by reserving a sane value.
-func newTxPriorityQueue(reserve int, sortByFee bool) *txPriorityQueue {
-	pq := &txPriorityQueue{
-		items: make([]*txPrioItem, 0, reserve),
-	}
-	if sortByFee {
-		pq.SetLessFunc(txPQByFee)
-	} else {
-		pq.SetLessFunc(txPQByPriority)
-	}
-	return pq
-}
-
-// txPrioItem houses a transaction along with extra information that allows the
+// txPrioItemAbe houses a transaction along with extra information that allows the
 // transaction to be prioritized and track dependencies on other transactions
 // which have not been mined into a block yet.
 type txPrioItemAbe struct {
@@ -213,7 +100,7 @@ type txPrioItemAbe struct {
 // function for a transaction priority queue (txPriorityQueue).
 type txPriorityQueueLessFuncAbe func(*txPriorityQueueAbe, int, int) bool
 
-// txPriorityQueue implements a priority queue of txPrioItem elements that
+// txPriorityQueueAbe implements a priority queue of txPrioItemAbe elements that
 // supports an arbitrary compare function as defined by txPriorityQueueLessFunc.
 type txPriorityQueueAbe struct {
 	lessFunc txPriorityQueueLessFuncAbe
@@ -263,7 +150,7 @@ func (pq *txPriorityQueueAbe) SetLessFunc(lessFunc txPriorityQueueLessFuncAbe) {
 	heap.Init(pq)
 }
 
-// txPQByPriority sorts a txPriorityQueue by transaction priority and then fees
+// txPQByPriorityAbe sorts a txPriorityQueueAbe by transaction priority and then fees
 // per kilobyte.
 func txPQByPriorityAbe(pq *txPriorityQueueAbe, i, j int) bool {
 	// Using > here so that pop gives the highest priority item as opposed
@@ -272,10 +159,9 @@ func txPQByPriorityAbe(pq *txPriorityQueueAbe, i, j int) bool {
 		return pq.items[i].feePerKB > pq.items[j].feePerKB
 	}
 	return pq.items[i].priority > pq.items[j].priority
-
 }
 
-// txPQByFee sorts a txPriorityQueue by fees per kilobyte and then transaction
+// txPQByFeeAbe sorts a txPriorityQueueAbe by fees per kilobyte and then transaction
 // priority.
 func txPQByFeeAbe(pq *txPriorityQueueAbe, i, j int) bool {
 	// Using > here so that pop gives the highest fee item as opposed
@@ -286,9 +172,9 @@ func txPQByFeeAbe(pq *txPriorityQueueAbe, i, j int) bool {
 	return pq.items[i].feePerKB > pq.items[j].feePerKB
 }
 
-// newTxPriorityQueue returns a new transaction priority queue that reserves the
+// newTxPriorityQueueAbe returns a new transaction priority queue that reserves the
 // passed amount of space for the elements.  The new priority queue uses either
-// the txPQByPriority or the txPQByFee compare function depending on the
+// the txPQByPriorityAbe or the txPQByFeeAbe compare function depending on the
 // sortByFee parameter and is already initialized for use with heap.Push/Pop.
 // The priority queue can grow larger than the reserved space, but extra copies
 // of the underlying array can be avoided by reserving a sane value.
@@ -530,7 +416,7 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, tx *abeutil
 
 // logSkippedDeps logs any dependencies which are also skipped as a result of
 // skipping a transaction while generating a block template at the trace level.
-func logSkippedDeps(tx *abeutil.Tx, deps map[chainhash.Hash]*txPrioItem) {
+func logSkippedDeps(tx *abeutil.Tx, deps map[chainhash.Hash]*txPrioItemAbe) {
 	if deps == nil {
 		return
 	}
@@ -688,16 +574,13 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToMpk []byte) (*BlockTemplate, er
 	}
 	subsidy := blockchain.CalcBlockSubsidy(nextBlockHeight, g.chainParams)
 
-	//	todo(ABE): to remove
-	//	coinbaseSigOpCost := int64(blockchain.CountSigOps(coinbaseTx)) * blockchain.WitnessScaleFactor
-
 	// Get the current source transactions and create a priority queue to
 	// hold the transactions which are ready for inclusion into a block
 	// along with some priority related and fee metadata.  Reserve the same
 	// number of items that are available for the priority queue.  Also,
 	// choose the initial sort order for the priority queue based on whether
 	// or not there is an area allocated for high-priority transactions.
-	sourceTxns := g.txSource.MiningDescsAbe()
+	sourceTxns := g.txSource.MiningDescs()
 	sortedByFee := g.policy.BlockPrioritySize == 0
 	priorityQueue := newTxPriorityQueueAbe(len(sourceTxns), sortedByFee)
 
@@ -710,14 +593,6 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToMpk []byte) (*BlockTemplate, er
 	blockTxns = append(blockTxns, coinbaseTx)
 	blockUtxoRings := blockchain.NewUtxoRingViewpoint()
 
-	// dependers is used to track transactions which depend on another
-	// transaction in the source pool.  This, in conjunction with the
-	// dependsOn map kept with each dependent transaction helps quickly
-	// determine which dependent transactions are now eligible for inclusion
-	// in the block once each transaction has been included.
-	//	todo(ABE): ABE does not support such a case, to remove
-	//	dependers := make(map[chainhash.Hash]map[chainhash.Hash]*txPrioItem)
-
 	// Create slices to hold the fees and number of signature operations
 	// for each of the selected transactions and add an entry for the
 	// coinbase.  This allows the code below to simply append details about
@@ -725,9 +600,7 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToMpk []byte) (*BlockTemplate, er
 	// However, since the total fees aren't known yet, use a dummy value for
 	// the coinbase fee which will be updated later.
 	txFees := make([]uint64, 0, len(sourceTxns)+1)
-	//	txSigOpCosts := make([]int64, 0, len(sourceTxns))	//	todo(ABE): remove
 	txFees = append(txFees, 0) // Updated once known
-	//	txSigOpCosts = append(txSigOpCosts, coinbaseSigOpCost)	//	todo(ABE): remove
 
 	log.Debugf("Considering %d transactions for inclusion to new block",
 		len(sourceTxns))
@@ -742,20 +615,7 @@ mempoolLoop:
 			continue
 		}
 
-		//	todo(ABE): ABE does not support locktime at this moment, remove
-
-		/*		if !blockchain.IsFinalizedTransaction(tx, nextBlockHeight,
-				g.timeSource.AdjustedTime()) {
-
-				log.Tracef("Skipping non-finalized tx %s", tx.Hash())
-				continue
-			}*/
-
-		// Fetch all of the utxos referenced by the this transaction.
-		// NOTE: This intentionally does not fetch inputs from the
-		// mempool since a transaction which depends on other
-		// transactions in the mempool must come after those
-		// dependencies in the final generated block.
+		// Fetch all of the utxoRings referenced by the this transaction.
 		utxoRings, err := g.chain.FetchUtxoRingView(tx)
 		if err != nil {
 			log.Warnf("Unable to fetch utxoRing view for tx %s: %v",
@@ -763,9 +623,8 @@ mempoolLoop:
 			continue
 		}
 
-		// Setup dependencies for any transactions which reference
-		// other transactions in the mempool so they can be properly
-		// ordered below.
+		// If utxoRing of one of the transaction inputs does not exist,
+		// skip this transaction.
 		for _, txIn := range tx.MsgTx().TxIns {
 			entry := utxoRings.LookupEntry(txIn.PreviousOutPointRing.Hash())
 			if entry == nil || entry.IsSpent(txIn.SerialNumber) {
@@ -775,46 +634,24 @@ mempoolLoop:
 					tx.Hash(), txIn.String())
 				continue mempoolLoop
 			}
-
-			/*			// The transaction is referencing another
-						// transaction in the source pool, so setup an
-						// ordering dependency.
-						deps, exists := dependers[*originHash]
-						if !exists {
-							deps = make(map[chainhash.Hash]*txPrioItem)
-							dependers[*originHash] = deps
-						}
-						deps[*prioItem.tx.Hash()] = prioItem
-						if prioItem.dependsOn == nil {
-							prioItem.dependsOn = make(
-								map[chainhash.Hash]struct{})
-						}
-						prioItem.dependsOn[*originHash] = struct{}{}
-
-						// Skip the check below. We already know the
-						// referenced transaction is available.
-						continue*/
 		}
 
 		prioItem := &txPrioItemAbe{tx: tx}
 		// Calculate the final transaction priority using the input
-		// value age sum as well as the adjusted transaction size.  The
-		// formula is: sum(inputValue * inputAge) / adjustedTxSize
+		// value age sum as well as the adjusted transaction size.
+		// Current formula is: sum(inputAge) / adjustedTxSize
 		prioItem.priority = CalcPriorityAbe(tx.MsgTx(), utxoRings, nextBlockHeight)
 
-		// Calculate the fee in Satoshi/kB.
+		// Calculate the fee in Neutrino/kB.
 		prioItem.feePerKB = txDesc.FeePerKB
 		prioItem.fee = txDesc.Fee
 
 		// Add the transaction to the priority queue to mark it ready
-		// for inclusion in the block unless it has dependencies.
-		/*		if prioItem.dependsOn == nil {
-				heap.Push(priorityQueue, prioItem)
-			}*/
+		// for inclusion in the block
 		heap.Push(priorityQueue, prioItem)
 
 		// Merge the referenced outputs from the input transactions to
-		// this transaction into the block utxo view.  This allows the
+		// this transaction into the block utxoRing view.  This allows the
 		// code below to avoid a second lookup.
 		//	todo(ABE): how to prevent double spending
 		//mergeUtxoView(blockUtxos, utxos)
@@ -824,8 +661,6 @@ mempoolLoop:
 		}
 	}
 
-	/*	log.Tracef("Priority queue len %d, dependers len %d",
-		priorityQueue.Len(), len(dependers))*/
 	log.Tracef("Priority queue len %d", priorityQueue.Len())
 
 	// The starting block size is the size of the block header plus the max

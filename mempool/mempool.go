@@ -2339,21 +2339,8 @@ func (mp *TxPool) TxDescsAbe() []*TxDescAbe {
 //
 // This is part of the mining.TxSource interface implementation and is safe for
 // concurrent access as required by the interface contract.
-func (mp *TxPool) MiningDescs() []*mining.TxDesc {
-	mp.mtx.RLock()
-	descs := make([]*mining.TxDesc, len(mp.pool))
-	i := 0
-	for _, desc := range mp.pool {
-		descs[i] = &desc.TxDesc
-		i++
-	}
-	mp.mtx.RUnlock()
-
-	return descs
-}
-
 //	todo(ABE):
-func (mp *TxPool) MiningDescsAbe() []*mining.TxDescAbe {
+func (mp *TxPool) MiningDescs() []*mining.TxDescAbe {
 	mp.mtx.RLock()
 	descs := make([]*mining.TxDescAbe, len(mp.poolAbe))
 	i := 0

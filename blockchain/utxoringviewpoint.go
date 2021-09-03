@@ -592,7 +592,7 @@ func (view *UtxoRingViewpoint) commit() {
 	}
 }
 
-// fetchInputUtxos loads the unspent transaction outputs for the inputs
+// fetchInputUtxoRings loads the unspent transaction outputs for the inputs
 // referenced by the transactions in the given block into the view from the
 // database as needed.  In particular, referenced entries that are earlier in
 // the block are added to the view and entries that are already in the view are
@@ -658,14 +658,14 @@ func (view *UtxoRingViewpoint) fetchInputUtxoRings(db database.DB, block *abeuti
 	return view.fetchUtxoRingsMain(db, neededSet)
 }
 
-// fetchUtxosMain fetches unspent transaction output data about the provided
+// fetchUtxoRingsMain fetches unspent transaction output data about the provided
 // set of outpoints from the point of view of the end of the main chain at the
 // time of the call.
 //
 // Upon completion of this function, the view will contain an entry for each
 // requested outpoint.  Spent outputs, or those which otherwise don't exist,
 // will result in a nil entry in the view.
-//	Abe to do: to get the UtxoRings for main chain, should fetch from db
+//	Abe todo: to get the UtxoRings for main chain, should fetch from db
 func (view *UtxoRingViewpoint) fetchUtxoRingsMain(db database.DB, outPointRings map[chainhash.Hash]struct{}) error {
 	// Nothing to do if there are no requested outputs.
 	if len(outPointRings) == 0 {
@@ -693,7 +693,7 @@ func (view *UtxoRingViewpoint) fetchUtxoRingsMain(db database.DB, outPointRings 
 	})
 }
 
-// NewUtxoViewpoint returns a new empty unspent transaction output view.
+// NewUtxoRingViewpoint returns a new empty unspent transaction output view.
 func NewUtxoRingViewpoint() *UtxoRingViewpoint {
 	return &UtxoRingViewpoint{
 		entries: make(map[chainhash.Hash]*UtxoRingEntry),

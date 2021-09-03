@@ -996,7 +996,7 @@ func dbFetchUtxoEntry(dbTx database.Tx, outpoint wire.OutPoint) (*UtxoEntry, err
 //	todo(ABE):
 func dbFetchUtxoRingEntry(dbTx database.Tx, outPointRingHash chainhash.Hash) (*UtxoRingEntry, error) {
 	// Fetch the unspent transaction output information for the passed
-	// transaction output.  Return now when there is no entry.
+	// transaction output.  Return nil when there is no entry.
 	key := outPointRingKey(outPointRingHash)
 	utxoRingBucket := dbTx.Metadata().Bucket(utxoRingSetBucketName)
 	serializedUtxoRing := utxoRingBucket.Get(*key)
@@ -1012,7 +1012,7 @@ func dbFetchUtxoRingEntry(dbTx database.Tx, outPointRingHash chainhash.Hash) (*U
 			"for spent tx output %v", outPointRingHash))
 	}
 
-	// Deserialize the utxo entry and return it.
+	// Deserialize the utxoRing entry and return it.
 	entry, err := deserializeUtxoRingEntry(serializedUtxoRing)
 	if err != nil {
 		// Ensure any deserialization errors are returned as database
@@ -1020,7 +1020,7 @@ func dbFetchUtxoRingEntry(dbTx database.Tx, outPointRingHash chainhash.Hash) (*U
 		if isUtxoRingDeserializeErr(err) {
 			return nil, database.Error{
 				ErrorCode: database.ErrCorruption,
-				Description: fmt.Sprintf("corrupt utxo entry "+
+				Description: fmt.Sprintf("corrupt utxoRing entry "+
 					"for %v: %v", outPointRingHash, err),
 			}
 		}
