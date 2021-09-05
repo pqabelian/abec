@@ -421,6 +421,13 @@ func checkTransactionStandard(tx *abeutil.Tx, height int32,
 	return nil
 }
 
+// checkTransactionStandardAbe performs a series of checks on a transaction to
+// ensure it is a "standard" transaction.  A standard transaction is one that
+// conforms to several additional limiting cases over what is considered a
+// "sane" transaction such as having a version in the supported range, being
+// finalized, conforming to more stringent size constraints, having scripts
+// of recognized forms, and not containing "dust" outputs (those that are
+// so small it costs more to process them than they are worth).
 func checkTransactionStandardAbe(tx *abeutil.TxAbe, maxTxVersion int32) error {
 
 	// The transaction must be a currently supported version.

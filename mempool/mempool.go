@@ -811,7 +811,6 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 			Added:  time.Now(),
 			Height: height,
 			Fee:    fee,
-			//FeePerKB: fee * 1000 / GetTxVirtualSizeAbe(tx),
 			FeePerKB: fee * 1000 / uint64(tx.MsgTx().SerializeSize()),
 		},
 		StartingPriority: mining.CalcPriorityAbe(tx.MsgTx(), utxoRingView, height),
@@ -1876,7 +1875,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 		return nil, nil, err
 	}
 
-	//	Abe to do
+	//	todo (ABE)
 	// Transaction is an orphan if any of the referenced transaction outputs
 	// don't exist or are already spent.  Adding orphans to the orphan pool
 	// is not handled by this function, and the caller should use
@@ -1924,7 +1923,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 		}
 	}
 
-	//	Abe to do
+	//	Abe todo
 
 	// Don't allow transactions with fees too low to get into a mined block.
 	//
@@ -1938,7 +1937,6 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	// transaction does not exceeed 1000 less than the reserved space for
 	// high-priority transactions, don't require a fee for it.
 	txFee := tx.MsgTx().TxFee
-	//	serializedSize := GetTxVirtualSizeAbe(tx)
 	serializedSize := int64(tx.MsgTx().SerializeSize())
 	minFee := calcMinRequiredTxRelayFeeAbe(serializedSize,
 		mp.cfg.Policy.MinRelayTxFee)
@@ -2156,7 +2154,7 @@ func (mp *TxPool) ProcessOrphansAbe(acceptedTx *abeutil.TxAbe) {
 	mp.mtx.Unlock()
 }
 
-// ProcessTransaction is the main workhorse for handling insertion of new
+// ProcessTransactionAbe is the main workhorse for handling insertion of new
 // free-standing transactions into the memory pool.  It includes functionality
 // such as rejecting duplicate transactions, ensuring transactions follow all
 // rules, orphan transaction handling, and insertion into the memory pool.
@@ -2167,59 +2165,6 @@ func (mp *TxPool) ProcessOrphansAbe(acceptedTx *abeutil.TxAbe) {
 // the passed one being accepted.
 //
 // This function is safe for concurrent access.
-func (mp *TxPool) ProcessTransactionBTCD(tx *abeutil.Tx, allowOrphan, rateLimit bool, tag Tag) ([]*TxDesc, error) {
-	log.Tracef("Processing transaction %v", tx.Hash())
-
-	// Protect concurrent access.
-	mp.mtx.Lock()
-	defer mp.mtx.Unlock()
-
-	// Potentially accept the transaction to the memory pool.
-	missingParents, txD, err := mp.maybeAcceptTransactionBTCD(tx, true, rateLimit,
-		true)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(missingParents) == 0 {
-		// Accept any orphan transactions that depend on this
-		// transaction (they may no longer be orphans if all inputs
-		// are now available) and repeat for those accepted
-		// transactions until there are no more.
-		newTxs := mp.processOrphans(tx)
-		acceptedTxs := make([]*TxDesc, len(newTxs)+1)
-
-		// Add the parent transaction first so remote nodes
-		// do not add orphans.
-		acceptedTxs[0] = txD
-		copy(acceptedTxs[1:], newTxs)
-
-		return acceptedTxs, nil
-	}
-
-	// The transaction is an orphan (has inputs missing).  Reject
-	// it if the flag to allow orphans is not set.
-	if !allowOrphan {
-		// Only use the first missing parent transaction in
-		// the error message.
-		//
-		// NOTE: RejectDuplicate is really not an accurate
-		// reject code here, but it matches the reference
-		// implementation and there isn't a better choice due
-		// to the limited number of reject codes.  Missing
-		// inputs is assumed to mean they are already spent
-		// which is not really always the case.
-		str := fmt.Sprintf("orphan transaction %v references "+
-			"outputs of unknown or fully-spent "+
-			"transaction %v", tx.Hash(), missingParents[0])
-		return nil, txRuleError(wire.RejectDuplicate, str)
-	}
-
-	// Potentially add the orphan transaction to the orphan pool.
-	err = mp.maybeAddOrphan(tx, tag)
-	return nil, err
-}
-
 func (mp *TxPool) ProcessTransactionAbe(tx *abeutil.TxAbe, allowOrphan, rateLimit bool, tag Tag) (*TxDescAbe, error) {
 	log.Tracef("Processing transaction %v", tx.Hash())
 

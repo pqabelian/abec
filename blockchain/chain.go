@@ -287,7 +287,9 @@ func (b *BlockChain) removeOrphanBlockBTCD(orphan *orphanBlock) {
 	}
 }
 
-//	Abe to do
+// removeOrphanBlockAbe removes the passed orphan block from the orphan pool and
+// previous orphan index.
+//	Abe todo
 func (b *BlockChain) removeOrphanBlockAbe(orphan *orphanBlockAbe) {
 	// Protect concurrent access.
 	b.orphanLock.Lock()
@@ -327,49 +329,7 @@ func (b *BlockChain) removeOrphanBlockAbe(orphan *orphanBlockAbe) {
 // It also imposes a maximum limit on the number of outstanding orphan
 // blocks and will remove the oldest received orphan block if the limit is
 // exceeded.
-func (b *BlockChain) addOrphanBlockBTCD(block *abeutil.Block) {
-	// Remove expired orphan blocks.
-	for _, oBlock := range b.orphansBTCD {
-		if time.Now().After(oBlock.expiration) {
-			b.removeOrphanBlockBTCD(oBlock)
-			continue
-		}
-
-		// Update the oldest orphan block pointer so it can be discarded
-		// in case the orphan pool fills up.
-		if b.oldestOrphanBTCD == nil || oBlock.expiration.Before(b.oldestOrphanBTCD.expiration) {
-			b.oldestOrphanBTCD = oBlock
-		}
-	}
-
-	// Limit orphan blocks to prevent memory exhaustion.
-	if len(b.orphansBTCD)+1 > maxOrphanBlocks {
-		// Remove the oldest orphan to make room for the new one.
-		b.removeOrphanBlockBTCD(b.oldestOrphanBTCD)
-		b.oldestOrphanBTCD = nil
-	}
-
-	// Protect concurrent access.  This is intentionally done here instead
-	// of near the top since removeOrphanBlock does its own locking and
-	// the range iterator is not invalidated by removing map entries.
-	b.orphanLock.Lock()
-	defer b.orphanLock.Unlock()
-
-	// Insert the block into the orphan map with an expiration time
-	// 1 hour from now.
-	expiration := time.Now().Add(time.Hour)
-	oBlock := &orphanBlock{
-		block:      block,
-		expiration: expiration,
-	}
-	b.orphansBTCD[*block.Hash()] = oBlock
-
-	// Add to previous hash lookup index for faster dependency lookups.
-	prevHash := &block.MsgBlock().Header.PrevBlock
-	b.prevOrphans[*prevHash] = append(b.prevOrphans[*prevHash], oBlock)
-}
-
-func (b *BlockChain) addOrphanBlockAbe(block *abeutil.BlockAbe) {
+func (b *BlockChain) addOrphanBlock(block *abeutil.BlockAbe) {
 	// Remove expired orphan blocks.
 	for _, oBlock := range b.orphansAbe {
 		if time.Now().After(oBlock.expiration) {

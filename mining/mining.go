@@ -512,10 +512,7 @@ func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
 // block chain are immediately added to a priority queue which either
 // prioritizes based on the priority (then fee per kilobyte) or the fee per
 // kilobyte (then priority) depending on whether or not the BlockPrioritySize
-// policy setting allots space for high-priority transactions.  Transactions
-// which spend outputs from other transactions in the source pool are added to a
-// dependency map so they can be added to the priority queue once the
-// transactions they depend on have been included.
+// policy setting allots space for high-priority transactions.
 //
 // Once the high-priority area (if configured) has been filled with
 // transactions, or the priority falls below what is considered high-priority,
@@ -914,14 +911,9 @@ func (g *BlkTmplGenerator) UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight
 	return nil
 }
 
-//	todo(ABE):
 func (g *BlkTmplGenerator) UpdateExtraNonceAbe(msgBlock *wire.MsgBlockAbe, blockHeight int32, extraNonce uint64) error {
 	coinbaseTxIn := wire.NewStandardCoinbaseTxIn(blockHeight, extraNonce, wire.TxVersion)
 	msgBlock.Transactions[0].TxIns[0] = coinbaseTxIn
-
-	// TODO(davec): A btcutil.Block should use saved in the state to avoid
-	// recalculating all of the other transaction hashes.
-	// block.Transactions[0].InvalidateCache()
 
 	// Recalculate the merkle root with the updated extra nonce.
 	block := abeutil.NewBlockAbe(msgBlock)

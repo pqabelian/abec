@@ -337,8 +337,7 @@ func CheckTransactionSanity(tx *abeutil.Tx) error {
 	return nil
 }
 
-//	todo(ABE): done
-// CheckTransactionSanity performs some preliminary checks on a transaction to
+// CheckTransactionSanityAbe performs some preliminary checks on a transaction to
 // ensure it is sane.  These checks are context free.
 func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 	// A transaction must have at least one input.
@@ -712,6 +711,11 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 	return nil
 }
 
+// checkBlockSanityAbe performs some preliminary checks on a block to ensure it is
+// sane before continuing with block processing.  These checks are context free.
+//
+// The flags do not modify the behavior of this function directly, however they
+// are needed to pass along to checkBlockHeaderSanity.
 //	todo (ABE): Abe to do
 func checkBlockSanityAbe(block *abeutil.BlockAbe, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
 	msgBlock := block.MsgBlock()
@@ -801,29 +805,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, powLimit *big.Int, timeSource 
 
 	//	todo (ABE): check each transaction's witness has been verified as valid.
 
-	// The number of signature operations must be less than the maximum
-	// allowed per block.
-	/*	totalSigOps := 0
-		for _, tx := range transactions {
-			// We could potentially overflow the accumulator so check for
-			// overflow.
-			lastSigOps := totalSigOps
-			totalSigOps += (CountSigOps(tx) * WitnessScaleFactor)
-			if totalSigOps < lastSigOps || totalSigOps > MaxBlockSigOpsCost {
-				str := fmt.Sprintf("block contains too many signature "+
-					"operations - got %v, max %v", totalSigOps,
-					MaxBlockSigOpsCost)
-				return ruleError(ErrTooManySigOps, str)
-			}
-		}*/
-
 	return nil
-}
-
-// CheckBlockSanity performs some preliminary checks on a block to ensure it is
-// sane before continuing with block processing.  These checks are context free.
-func CheckBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource MedianTimeSource) error {
-	return checkBlockSanityBTCD(block, powLimit, timeSource, BFNone)
 }
 
 func CheckBlockSanity(block *abeutil.BlockAbe, powLimit *big.Int, timeSource MedianTimeSource) error {
@@ -931,7 +913,6 @@ func checkSerializedHeightAbe(coinbaseTx *abeutil.TxAbe, wantHeight int32) error
 //    the checkpoints are not performed.
 //
 // This function MUST be called with the chain state lock held (for writes).
-//	Abe todo
 func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNode *blockNode, flags BehaviorFlags) error {
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	if !fastAdd {
@@ -987,19 +968,6 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 		return ruleError(ErrForkTooOld, str)
 	}
 
-	// Reject outdated block versions once a majority of the network
-	// has upgraded.  These were originally voted on by BIP0034,
-	// BIP0065, and BIP0066.
-	/*	params := b.chainParams
-		if header.Version < 2 && blockHeight >= params.BIP0034Height ||
-			header.Version < 3 && blockHeight >= params.BIP0066Height ||
-			header.Version < 4 && blockHeight >= params.BIP0065Height {
-
-			str := "new blocks with version %d are no longer valid"
-			str = fmt.Sprintf(str, header.Version)
-			return ruleError(ErrBlockVersionTooOld, str)
-		}*/
-
 	return nil
 }
 
@@ -1008,7 +976,6 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 //
 // The flags modify the behavior of this function as follows:
 //  - BFFastAdd: The transaction are not checked to see if they are finalized
-//    and the somewhat expensive BIP0034 validation is not performed.
 //
 // The flags are also passed to checkBlockHeaderContext.  See its documentation
 // for how the flags modify its behavior.
@@ -1025,66 +992,16 @@ func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blo
 
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	if !fastAdd {
-		// Obtain the latest state of the deployed CSV soft-fork in
-		// order to properly guard the new validation behavior based on
-		// the current BIP 9 version bits state.
-		/*		csvState, err := b.deploymentState(prevNode, chaincfg.DeploymentCSV)
-				if err != nil {
-					return err
-				}*/
-
-		// Once the CSV soft-fork is fully active, we'll switch to
-		// using the current median time past of the past block's
-		// timestamps for all lock-time based checks.
-		/*		blockTime := header.Timestamp
-				if csvState == ThresholdActive {
-					blockTime = prevNode.CalcPastMedianTime()
-				}*/
-
-		//		blockTime := prevNode.CalcPastMedianTime()
 
 		// The height of this block is one more than the referenced
 		// previous block.
 		blockHeight := prevNode.height + 1
-
-		// Ensure all transactions in the block are finalized.
-		//	todo(ABE):remove, as ABE does not suppport localtime and sequence
-		/*		for _, tx := range block.Transactions() {
-				if !IsFinalizedTransactionAbe(tx, blockHeight, blockTime) {
-					str := fmt.Sprintf("block contains unfinalized "+
-						"transaction %v", tx.Hash())
-					return ruleError(ErrUnfinalizedTx, str)
-				}
-			}*/
-
-		// Ensure coinbase starts with serialized block heights for
-		// blocks whose version is the serializedHeightVersion or newer
-		// once a majority of the network has upgraded.  This is part of
-		// BIP0034.
-		/*		if ShouldHaveSerializedBlockHeight(header) &&
-				blockHeight >= b.chainParams.BIP0034Height {
-
-				coinbaseTx := block.Transactions()[0]
-				err := checkSerializedHeight(coinbaseTx, blockHeight)
-				if err != nil {
-					return err
-				}
-			}*/
 
 		coinbaseTx := block.Transactions()[0] // TODO(abe): for testing 1,2,5,10, we should adjust the checking logical
 		err := checkSerializedHeightAbe(coinbaseTx, blockHeight)
 		if err != nil {
 			return err
 		}
-
-		// Query for the Version Bits state for the segwit soft-fork
-		// deployment. If segwit is active, we'll switch over to
-		// enforcing all the new rules.
-		/*		segwitState, err := b.deploymentState(prevNode,
-					chaincfg.DeploymentSegwit)
-				if err != nil {
-					return err
-				}*/
 
 		// If segwit is active, then we'll need to fully validate the
 		// new witness commitment for adherence to the rules.

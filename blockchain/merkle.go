@@ -149,7 +149,40 @@ func BuildMerkleTreeStore(transactions []*abeutil.Tx, witness bool) []*chainhash
 	return merkles
 }
 
-//	todo(ABE): Abe to do
+// BuildMerkleTreeStoreAbe creates a merkle tree from a slice of transactions,
+// stores it using a linear array, and returns a slice of the backing array.  A
+// linear array was chosen as opposed to an actual tree structure since it uses
+// about half as much memory.  The following describes a merkle tree and how it
+// is stored in a linear array.
+//
+// A merkle tree is a tree in which every non-leaf node is the hash of its
+// children nodes.  A diagram depicting how this works for bitcoin transactions
+// where h(x) is a double sha256 follows:
+//
+//	         root = h1234 = h(h12 + h34)
+//	        /                           \
+//	  h12 = h(h1 + h2)            h34 = h(h3 + h4)
+//	   /            \              /            \
+//	h1 = h(tx1)  h2 = h(tx2)    h3 = h(tx3)  h4 = h(tx4)
+//
+// The above stored as a linear array is as follows:
+//
+// 	[h1 h2 h3 h4 h12 h34 root]
+//
+// As the above shows, the merkle root is always the last element in the array.
+//
+// The number of inputs is not always a power of two which results in a
+// balanced tree structure as above.  In that case, parent nodes with no
+// children are also zero and parent nodes with only a single left node
+// are calculated by concatenating the left node with itself before hashing.
+// Since this function uses nodes that are pointers to the hashes, empty nodes
+// will be nil.
+//
+// The additional bool parameter indicates if we are generating the merkle tree
+// using witness transaction id's rather than regular transaction id's. This
+// also presents an additional case wherein the wtxid of the coinbase transaction
+// is the zeroHash.
+// todo (ABE): parameter witness needed?
 func BuildMerkleTreeStoreAbe(transactions []*abeutil.TxAbe, witness bool) []*chainhash.Hash {
 	// Calculate how many entries are required to hold the binary merkle
 	// tree as a linear array and create an array of that size.
@@ -159,20 +192,6 @@ func BuildMerkleTreeStoreAbe(transactions []*abeutil.TxAbe, witness bool) []*cha
 
 	// Create the base transaction hashes and populate the array with them.
 	for i, tx := range transactions {
-		// If we're computing a witness merkle root, instead of the
-		// regular txid, we use the modified wtxid which includes a
-		// transaction's witness data within the digest. Additionally,
-		// the coinbase's wtxid is all zeroes.
-		/*		switch {
-				case witness && i == 0:
-					var zeroHash chainhash.Hash
-					merkles[i] = &zeroHash
-				case witness:
-					wSha := tx.MsgTx().WitnessHash()
-					merkles[i] = &wSha
-				default:
-					merkles[i] = tx.Hash()
-				}*/
 		merkles[i] = tx.Hash()
 	}
 
