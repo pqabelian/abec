@@ -16,9 +16,6 @@ import (
 	"sync"
 )
 
-// TODO incorporate Alex Morcos' modifications to Gavin's initial model
-// https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2014-October/006824.html
-
 const (
 	// estimateFeeDepth is the maximum number of blocks before a transaction
 	// is confirmed that we want to track.
@@ -42,8 +39,6 @@ const (
 
 	bytePerKb = 1000
 
-	btcPerSatoshi = 1e-8
-
 	abePerNeutrino = 1e-7
 )
 
@@ -60,23 +55,14 @@ type SatoshiPerByte float64
 // BtcPerKilobyte is number with units of bitcoins per kilobyte.
 type BtcPerKilobyte float64
 
-// SatoshiPerByte is number with units of satoshis per byte.
+// NeutrinoPerByte is number with units of neutrinos per byte.
 type NeutrinoPerByte float64
 
-// BtcPerKilobyte is number with units of bitcoins per kilobyte.
+// AbePerKilobyte is number with units of abes per kilobyte.
 type AbePerKilobyte float64
 
-// ToBtcPerKb returns a float value that represents the given
-// SatoshiPerByte converted to satoshis per kb.
-func (rate SatoshiPerByte) ToBtcPerKb() BtcPerKilobyte {
-	// If our rate is the error value, return that.
-	if rate == SatoshiPerByte(-1.0) {
-		return -1.0
-	}
-
-	return BtcPerKilobyte(float64(rate) * bytePerKb * btcPerSatoshi)
-}
-
+// ToAbePerKb returns a float value that represents the given
+// NeutrinoPerByte converted to neutrinos per kb.
 func (rate NeutrinoPerByte) ToAbePerKb() AbePerKilobyte {
 	// If our rate is the error value, return that.
 	if rate == NeutrinoPerByte(-1.0) {
@@ -88,15 +74,6 @@ func (rate NeutrinoPerByte) ToAbePerKb() AbePerKilobyte {
 
 // Fee returns the fee for a transaction of a given size for
 // the given fee rate.
-func (rate SatoshiPerByte) Fee(size uint32) abeutil.Amount {
-	// If our rate is the error value, return that.
-	if rate < 0 {
-		return abeutil.Amount(0xFFFF_FFFF_FFFF_FFFF)
-	}
-
-	return abeutil.Amount(float64(rate) * float64(size))
-}
-
 func (rate NeutrinoPerByte) Fee(size uint32) abeutil.Amount {
 	// If our rate is the error value, return that.
 	if rate < 0 {
@@ -162,29 +139,13 @@ func (o *observedTransactionAbe) Serialize(w io.Writer) {
 	binary.Write(w, binary.BigEndian, o.mined)
 }
 
-func deserializeObservedTransaction(r io.Reader) (*observedTransaction, error) {
-	ot := observedTransaction{}
-
-	// The first 32 bytes should be a hash.
-	binary.Read(r, binary.BigEndian, &ot.hash)
-
-	// The next 8 are SatoshiPerByte
-	binary.Read(r, binary.BigEndian, &ot.feeRate)
-
-	// And next there are two uint32's.
-	binary.Read(r, binary.BigEndian, &ot.observed)
-	binary.Read(r, binary.BigEndian, &ot.mined)
-
-	return &ot, nil
-}
-
 func deserializeObservedTransactionAbe(r io.Reader) (*observedTransactionAbe, error) {
 	ot := observedTransactionAbe{}
 
 	// The first 32 bytes should be a hash.
 	binary.Read(r, binary.BigEndian, &ot.hash)
 
-	// The next 8 are SatoshiPerByte
+	// The next 8 are NeutrinoPerByte
 	binary.Read(r, binary.BigEndian, &ot.feeRate)
 
 	// And next there are two uint32's.
@@ -837,37 +798,8 @@ func (ef *FeeEstimator) estimatesAbe() []NeutrinoPerByte {
 	return estimates
 }
 
-// EstimateFee estimates the fee per byte to have a tx confirmed a given
+// EstimateFeeAbe estimates the fee per byte to have a tx confirmed a given
 // number of blocks from now.
-//	todo(ABE)
-func (ef *FeeEstimator) EstimateFee(numBlocks uint32) (BtcPerKilobyte, error) {
-	ef.mtx.Lock()
-	defer ef.mtx.Unlock()
-
-	// If the number of registered blocks is below the minimum, return
-	// an error.
-	if ef.numBlocksRegistered < ef.minRegisteredBlocks {
-		return -1, errors.New("not enough blocks have been observed")
-	}
-
-	if numBlocks == 0 {
-		return -1, errors.New("cannot confirm transaction in zero blocks")
-	}
-
-	if numBlocks > estimateFeeDepth {
-		return -1, fmt.Errorf(
-			"can only estimate fees for up to %d blocks from now",
-			estimateFeeBinSize)
-	}
-
-	// If there are no cached results, generate them.
-	if ef.cached == nil {
-		ef.cached = ef.estimates()
-	}
-
-	return ef.cached[int(numBlocks)-1].ToBtcPerKb(), nil
-}
-
 func (ef *FeeEstimator) EstimateFeeAbe(numBlocks uint32) (AbePerKilobyte, error) {
 	ef.mtx.Lock()
 	defer ef.mtx.Unlock()
@@ -901,24 +833,6 @@ func (ef *FeeEstimator) EstimateFeeAbe(numBlocks uint32) (AbePerKilobyte, error)
 // sense to try to upgrade a previous version to a new version. Instead, just
 // start fee estimation over.
 const estimateFeeSaveVersion = 1
-
-func deserializeRegisteredBlock(r io.Reader, txs map[uint32]*observedTransaction) (*registeredBlock, error) {
-	var lenTransactions uint32
-
-	rb := &registeredBlock{}
-	binary.Read(r, binary.BigEndian, &rb.hash)
-	binary.Read(r, binary.BigEndian, &lenTransactions)
-
-	rb.transactions = make([]*observedTransaction, lenTransactions)
-
-	for i := uint32(0); i < lenTransactions; i++ {
-		var index uint32
-		binary.Read(r, binary.BigEndian, &index)
-		rb.transactions[i] = txs[index]
-	}
-
-	return rb, nil
-}
 
 func deserializeRegisteredBlockAbe(r io.Reader, txs map[uint32]*observedTransactionAbe) (*registeredBlockAbe, error) {
 	var lenTransactions uint32
@@ -1039,7 +953,7 @@ func RestoreFeeEstimator(data FeeEstimatorState) (*FeeEstimator, error) {
 		return nil, err
 	}
 	if version != estimateFeeSaveVersion {
-		return nil, fmt.Errorf("Incorrect version: expected %d found %d", estimateFeeSaveVersion, version)
+		return nil, fmt.Errorf("incorrect version: expected %d found %d", estimateFeeSaveVersion, version)
 	}
 
 	ef := &FeeEstimator{
@@ -1079,7 +993,7 @@ func RestoreFeeEstimator(data FeeEstimatorState) (*FeeEstimator, error) {
 			var exists bool
 			bin[j], exists = observed[index]
 			if !exists {
-				return nil, fmt.Errorf("Invalid transaction reference %d", index)
+				return nil, fmt.Errorf("invalid transaction reference %d", index)
 			}
 		}
 		ef.binAbe[i] = bin

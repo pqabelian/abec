@@ -2035,12 +2035,11 @@ func setupRPCListeners() ([]net.Listener, error) {
 // newServer returns a new abec server configured to listen on addr for the
 // abe network type specified by chainParams.  Use start to begin accepting
 // connections from peers.
-//	todo (ABE): done
 func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	db database.DB, chainParams *chaincfg.Params,
 	interrupt <-chan struct{}) (*server, error) {
 
-	// abe todo
+	// todo (abe): which service should we keep? need discuss
 	services := defaultServices
 
 	amgr := netaddrmgr.New(cfg.DataDir, abecLookup)
@@ -2087,18 +2086,16 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		agentWhitelist:       agentWhitelist,
 	}
 
-	// Create the transaction and address indexes if needed.
-	//
-	// CAUTION: the txindex needs to be first in the indexes array because
-	// the addrindex uses data from the txindex during catchup.  If the
-	// addrindex is run first, it may not have the transactions from the
-	// current block indexed.
+	// Create the transaction index if needed.
+	// todo (abe): indexers should be finished later.
 	var indexes []indexers.Indexer
 	if cfg.TxIndex {
-		indxLog.Info("Transaction index is enabled")
-
-		s.txIndex = indexers.NewTxIndex(db)
-		indexes = append(indexes, s.txIndex)
+		indxLog.Info("Transaction index is still under construction.")
+		// When txIndex is finished, uncomment the following code.
+		//indxLog.Info("Transaction index is enabled")
+		//
+		//s.txIndex = indexers.NewTxIndex(db)
+		//indexes = append(indexes, s.txIndex)
 	}
 
 	// Create an index manager if any of the optional indexes are enabled.
@@ -2108,8 +2105,6 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	}
 
 	// Merge given checkpoints with the default ones unless they are disabled.
-	//	todo(ABE): when a node starts, it can disable the checkpoints by config, or specify some checkpoints by config.
-	//	todo (ABE): the checkpoints for the chain will contain those in both the chainParams (hardcoded in sourcecode) and those in configs
 	var checkpoints []chaincfg.Checkpoint
 	if !cfg.DisableCheckpoints {
 		checkpoints = mergeCheckpoints(s.chainParams.Checkpoints, cfg.addCheckpoints)

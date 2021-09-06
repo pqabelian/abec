@@ -62,7 +62,6 @@ func abecMain(serverChan chan<- *server) error {
 	abecLog.Infof("Version %s", version())
 
 	// Enable http profiling server if requested.
-	// abe todo
 	if cfg.Profile != "" {
 		go func() {
 			listenAddr := net.JoinHostPort("", cfg.Profile)
@@ -75,7 +74,6 @@ func abecMain(serverChan chan<- *server) error {
 	}
 
 	// Write cpu profile if requested.
-	// abe todo
 	if cfg.CPUProfile != "" {
 		f, err := os.Create(cfg.CPUProfile)
 		if err != nil {

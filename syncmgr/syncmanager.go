@@ -52,29 +52,22 @@ type newPeerMsg struct {
 	peer *peerpkg.Peer
 }
 
-// blockMsg packages a bitcoin block message and the peer it came from together
+// blockMsgAbe packages a block message and the peer it came from together
 // so the block handler has access to that information.
-//	todo(ABE): Remove BTCD
-//type blockMsg struct {
-//	block *abeutil.Block
-//	peer  *peerpkg.Peer
-//	reply chan struct{}
-//}
-
 type blockMsgAbe struct {
 	block *abeutil.BlockAbe
 	peer  *peerpkg.Peer
 	reply chan struct{}
 }
 
-// invMsg packages a bitcoin inv message and the peer it came from together
+// invMsg packages an inv message and the peer it came from together
 // so the block handler has access to that information.
 type invMsg struct {
 	inv  *wire.MsgInv
 	peer *peerpkg.Peer
 }
 
-// headersMsg packages a bitcoin headers message and the peer it came from
+// headersMsg packages a headers message and the peer it came from
 // together so the block handler has access to that information.
 type headersMsg struct {
 	headers *wire.MsgHeaders
@@ -93,15 +86,7 @@ type donePeerMsg struct {
 	peer *peerpkg.Peer
 }
 
-// txMsg packages a bitcoin tx message and the peer it came from together
-// so the block handler has access to that information.
-//type txMsg struct {
-//	tx    *abeutil.Tx
-//	peer  *peerpkg.Peer
-//	reply chan struct{}
-//}
-
-// txMsg packages a bitcoin tx message and the peer it came from together
+// txMsgAbe packages a tx message and the peer it came from together
 // so the block handler has access to that information.
 type txMsgAbe struct {
 	tx    *abeutil.TxAbe
@@ -122,7 +107,7 @@ type processBlockResponse struct {
 	err      error
 }
 
-// processBlockMsg is a message type to be sent across the message channel
+// processBlockMsgAbe is a message type to be sent across the message channel
 // for requested a block is processed.  Note this call differs from blockMsg
 // above in that blockMsg is intended for blocks that came from peers and have
 // extra handling whereas this message essentially is just a concurrent safe
@@ -983,6 +968,7 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 		// block height from the scriptSig of the coinbase transaction.
 		// Extraction is only attempted if the block's version is
 		// high enough (ver 2+).
+		// todo (ABE): does abec have height stored in coinbase?
 		header := &bmsg.block.MsgBlock().Header
 		if blockchain.ShouldHaveSerializedBlockHeight(header) {
 			coinbaseTx := bmsg.block.Transactions()[0]
@@ -1580,22 +1566,6 @@ out:
 					peerID = sm.syncPeer.ID()
 				}
 				msg.reply <- peerID
-
-				//	todo(ABE):
-				/*			case processBlockMsg:
-							_, isOrphan, err := sm.chain.ProcessBlock(
-								msg.block, msg.flags)
-							if err != nil {
-								msg.reply <- processBlockResponse{
-									isOrphan: false,
-									err:      err,
-								}
-							}
-
-							msg.reply <- processBlockResponse{
-								isOrphan: isOrphan,
-								err:      nil,
-							}*/
 
 			case processBlockMsgAbe:
 				_, isOrphan, err := sm.chain.ProcessBlockAbe(
