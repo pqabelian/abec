@@ -242,11 +242,7 @@ func (b *rpcSyncMgr) IsCurrent() bool {
 //
 // This function is safe for concurrent access and is part of the
 // rpcserverSyncManager interface implementation.
-/*func (b *rpcSyncMgr) SubmitBlockBTCD(block *abeutil.Block, flags blockchain.BehaviorFlags) (bool, error) {
-	return b.syncMgr.ProcessBlockBTCD(block, flags)
-}*/
-
-func (b *rpcSyncMgr) SubmitBlockAbe(block *abeutil.BlockAbe, flags blockchain.BehaviorFlags) (bool, error) {
+func (b *rpcSyncMgr) SubmitBlock(block *abeutil.BlockAbe, flags blockchain.BehaviorFlags) (bool, error) {
 	return b.syncMgr.ProcessBlock(block, flags)
 }
 
@@ -267,7 +263,7 @@ func (b *rpcSyncMgr) SyncPeerID() int32 {
 	return b.syncMgr.SyncPeerID()
 }
 
-// LocateBlocks returns the hashes of the blocks after the first known block in
+// LocateHeaders returns the hashes of the blocks after the first known block in
 // the provided locators until the provided stop hash or the current tip is
 // reached, up to a max of wire.MaxBlockHeadersPerMsg hashes.
 //

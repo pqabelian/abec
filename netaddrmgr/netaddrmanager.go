@@ -23,7 +23,7 @@ import (
 )
 
 // NetAddrManager provides a concurrency safe address manager for caching potential
-// peers on the bitcoin network.
+// peers on the network.
 type NetAddrManager struct {
 	mtx               sync.Mutex
 	peersFile         string // store the peers to quicker build connection when the btcd restart

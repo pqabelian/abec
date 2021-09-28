@@ -181,9 +181,9 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"version": handleVersion,
 }
 
-// list of commands that we recognize, but for which btcd has no support because
+// list of commands that we recognize, but for which abec has no support because
 // it lacks support for wallet functionality. For these commands the user
-// should ask a connected instance of btcwallet.
+// should ask a connected instance of abewallet.
 var rpcAskWallet = map[string]struct{}{
 	"addmultisigaddress":     {},
 	"backupwallet":           {},
@@ -385,7 +385,7 @@ func handleUnimplemented(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 
 // handleAskWallet is the handler for commands that are recognized as valid, but
 // are unable to answer correctly since it involves wallet state.
-// These commands will be implemented in btcwallet.
+// These commands will be implemented in abewallet.
 func handleAskWallet(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	return nil, ErrRPCNoWallet
 }
@@ -4040,7 +4040,7 @@ func handleSubmitBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 
 	// Process this block using the same rules as blocks coming from other
 	// nodes.  This will in turn relay it to the network like normal.
-	_, err = s.cfg.SyncMgr.SubmitBlockAbe(block, blockchain.BFNone)
+	_, err = s.cfg.SyncMgr.SubmitBlock(block, blockchain.BFNone)
 	if err != nil {
 		return fmt.Sprintf("rejected: %s", err.Error()), nil
 	}
@@ -4825,8 +4825,7 @@ type rpcserverSyncManager interface {
 
 	// SubmitBlock submits the provided block to the network after
 	// processing it locally.
-	//	SubmitBlockBTCD(block *abeutil.Block, flags blockchain.BehaviorFlags) (bool, error)
-	SubmitBlockAbe(block *abeutil.BlockAbe, flags blockchain.BehaviorFlags) (bool, error)
+	SubmitBlock(block *abeutil.BlockAbe, flags blockchain.BehaviorFlags) (bool, error)
 
 	// Pause pauses the sync manager until the returned channel is closed.
 	Pause() chan<- struct{}
