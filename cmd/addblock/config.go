@@ -29,7 +29,7 @@ var (
 // See loadConfig for details on the configuration load process.
 type config struct {
 	AddrIndex      bool   `long:"addrindex" description:"Build a full address-based transaction index which makes the searchrawtransactions RPC available"`
-	DataDir        string `short:"b" long:"datadir" description:"Location of the btcd data directory"`
+	DataDir        string `short:"b" long:"datadir" description:"Location of the abec data directory"`
 	DbType         string `long:"dbtype" description:"Database backend to use for the Block Chain"`
 	InFile         string `short:"i" long:"infile" description:"File containing the block(s)"`
 	Progress       int    `short:"p" long:"progress" description:"Show a progress message each time this number of seconds have passed -- Use 0 to disable progress announcements"`
@@ -60,8 +60,8 @@ func validDbType(dbType string) bool {
 	return false
 }
 
-// netName returns the name used when referring to a bitcoin network.  At the
-// time of writing, btcd currently places blocks for testnet version 3 in the
+// netName returns the name used when referring to a network.  At the
+// time of writing, abec currently places blocks for testnet version 3 in the
 // data and log directory "testnet", which does not match the Name field of the
 // chaincfg parameters.  This function can be used to override this directory name
 // as "testnet" when the passed active network matches wire.TestNet3.

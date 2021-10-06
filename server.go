@@ -52,11 +52,11 @@ const (
 
 var (
 	// userAgentName is the user agent name and is used to help identify
-	// ourselves to other bitcoin peers.
+	// ourselves to other abec peers.
 	userAgentName = "abec"
 
 	// userAgentVersion is the user agent version and is used to help
-	// identify ourselves to other bitcoin peers.
+	// identify ourselves to other abec peers.
 	userAgentVersion = fmt.Sprintf("%d.%d.%d", appMajor, appMinor, appPatch)
 )
 
@@ -431,14 +431,14 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 	return nil
 }
 
-// OnVerAck is invoked when a peer receives a verack bitcoin message and is used
+// OnVerAck is invoked when a peer receives a verack message and is used
 // to kick start communication with them.
 func (sp *serverPeer) OnVerAck(_ *peer.Peer, _ *wire.MsgVerAck) {
 	sp.server.AddPeer(sp)
 }
 
-// OnTx is invoked when a peer receives a tx bitcoin message.  It blocks
-// until the bitcoin transaction has been fully processed.  Unlock the block
+// OnTx is invoked when a peer receives a tx message.  It blocks
+// until the transaction has been fully processed.  Unlock the block
 // handler this does not serialize all transactions through a single thread
 // transactions don't rely on the previous one in a linear fashion like blocks.
 func (sp *serverPeer) OnTx(_ *peer.Peer, msg *wire.MsgTxAbe) {
@@ -449,7 +449,7 @@ func (sp *serverPeer) OnTx(_ *peer.Peer, msg *wire.MsgTxAbe) {
 	}
 
 	// Add the transaction to the known inventory for the peer.
-	// Convert the raw MsgTx to a btcutil.Tx which provides some convenience
+	// Convert the raw MsgTx to a abeutil.Tx which provides some convenience
 	// methods and things such as hash caching.
 	tx := abeutil.NewTxAbe(msg)
 	iv := wire.NewInvVect(wire.InvTypeTx, tx.Hash())
@@ -464,10 +464,10 @@ func (sp *serverPeer) OnTx(_ *peer.Peer, msg *wire.MsgTxAbe) {
 	<-sp.txProcessed
 }
 
-// OnBlock is invoked when a peer receives a block bitcoin message.  It
-// blocks until the bitcoin block has been fully processed.
+// OnBlock is invoked when a peer receives a block message.  It
+// blocks until the block has been fully processed.
 func (sp *serverPeer) OnBlock(_ *peer.Peer, msg *wire.MsgBlockAbe, buf []byte) {
-	// Convert the raw MsgBlock to a btcutil.Block which provides some
+	// Convert the raw MsgBlock to a abeutil.Block which provides some
 	// convenience methods and things such as hash caching.
 	block := abeutil.NewBlockFromBlockAndBytesAbe(msg, buf) // TODO(abe): the height of block is unknown
 
@@ -477,7 +477,7 @@ func (sp *serverPeer) OnBlock(_ *peer.Peer, msg *wire.MsgBlockAbe, buf []byte) {
 
 	// Queue the block up to be handled by the block
 	// manager and intentionally block further receives
-	// until the bitcoin block is fully processed and known
+	// until the block is fully processed and known
 	// good or bad.  This helps prevent a malicious peer
 	// from queuing up a bunch of bad blocks before
 	// disconnecting (or being disconnected) and wasting
@@ -485,12 +485,12 @@ func (sp *serverPeer) OnBlock(_ *peer.Peer, msg *wire.MsgBlockAbe, buf []byte) {
 	// by at least the block acceptance test tool as the
 	// reference implementation processes blocks in the same
 	// thread and therefore blocks further messages until
-	// the bitcoin block has been fully processed.
+	// the block has been fully processed.
 	sp.server.syncManager.QueueBlockAbe(block, sp.Peer, sp.blockProcessed)
 	<-sp.blockProcessed
 }
 
-// OnInv is invoked when a peer receives an inv bitcoin message and is
+// OnInv is invoked when a peer receives an inv message and is
 // used to examine the inventory being advertised by the remote peer and react
 // accordingly.  We pass the message down to blockmanager which will call
 // QueueMessage with any appropriate responses.
@@ -525,13 +525,13 @@ func (sp *serverPeer) OnInv(_ *peer.Peer, msg *wire.MsgInv) {
 	}
 }
 
-// OnHeaders is invoked when a peer receives a headers bitcoin
+// OnHeaders is invoked when a peer receives a headers
 // message.  The message is passed down to the sync manager.
 func (sp *serverPeer) OnHeaders(_ *peer.Peer, msg *wire.MsgHeaders) {
 	sp.server.syncManager.QueueHeaders(msg, sp.Peer)
 }
 
-// handleGetData is invoked when a peer receives a getdata bitcoin message and
+// OnGetData is invoked when a peer receives a getdata message and
 // is used to deliver block and transaction information.
 func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 	numAdded := 0
@@ -609,7 +609,7 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 	}
 }
 
-// OnGetBlocks is invoked when a peer receives a getblocks bitcoin
+// OnGetBlocks is invoked when a peer receives a getblocks
 // message.
 func (sp *serverPeer) OnGetBlocks(_ *peer.Peer, msg *wire.MsgGetBlocks) {
 	// Find the most recent known block in the best chain based on the block
@@ -648,7 +648,7 @@ func (sp *serverPeer) OnGetBlocks(_ *peer.Peer, msg *wire.MsgGetBlocks) {
 	}
 }
 
-// OnGetHeaders is invoked when a peer receives a getheaders bitcoin
+// OnGetHeaders is invoked when a peer receives a getheaders
 // message.
 func (sp *serverPeer) OnGetHeaders(_ *peer.Peer, msg *wire.MsgGetHeaders) {
 	// Ignore getheaders requests if not in sync.
@@ -679,13 +679,13 @@ func (sp *serverPeer) OnGetHeaders(_ *peer.Peer, msg *wire.MsgGetHeaders) {
 	sp.QueueMessage(&wire.MsgHeaders{Headers: blockHeaders}, nil)
 }
 
-// OnFeeFilter is invoked when a peer receives a feefilter bitcoin message and
+// OnFeeFilter is invoked when a peer receives a feefilter message and
 // is used by remote peers to request that no transactions which have a fee rate
 // lower than provided value are inventoried to them.  The peer will be
 // disconnected if an invalid fee filter value is provided.
 func (sp *serverPeer) OnFeeFilter(_ *peer.Peer, msg *wire.MsgFeeFilter) {
 	// Check that the passed minimum fee is a valid amount.
-	if msg.MinFee < 0 || msg.MinFee > abeutil.MaxSatoshi {
+	if msg.MinFee < 0 || msg.MinFee > abeutil.MaxNeutrino {
 		peerLog.Debugf("Peer %v sent an invalid feefilter '%v' -- "+
 			"disconnecting", sp, abeutil.Amount(msg.MinFee))
 		sp.Disconnect()

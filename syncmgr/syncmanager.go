@@ -404,6 +404,7 @@ func (sm *SyncManager) isSyncCandidate(peer *peerpkg.Peer) bool {
 	} else {
 		// The peer is not a candidate for sync if it's not a full
 		// node.
+		//  todo (abe): the condition may change after we modify the service flag
 		nodeServices := peer.Services()
 		if nodeServices&wire.SFNodeNetwork != wire.SFNodeNetwork {
 			return false
@@ -434,7 +435,6 @@ func (sm *SyncManager) handleNewPeerMsg(peer *peerpkg.Peer) {
 	}
 
 	// Start syncing by choosing the best candidate if needed.
-	//	todo(ABE): each time a new syncandidate peer is added, it may trigger the startSync
 	if isSyncCandidate && sm.syncPeer == nil {
 		sm.startSync()
 	}

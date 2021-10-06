@@ -314,10 +314,10 @@ func newBlockImporter(db database.DB, r io.ReadSeeker) (*blockImporter, error) {
 		}
 		indexes = append(indexes, indexers.NewTxIndex(db))
 	}
-	if cfg.AddrIndex {
-		log.Info("Address index is enabled")
-		indexes = append(indexes, indexers.NewAddrIndex(db, activeNetParams))
-	}
+	//if cfg.AddrIndex {
+	//	log.Info("Address index is enabled")
+	//	indexes = append(indexes, indexers.NewAddrIndex(db, activeNetParams))
+	//}
 
 	// Create an index manager if any of the optional indexes are enabled.
 	var indexManager blockchain.IndexManager

@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	// svcName is the name of btcd service.
+	// svcName is the name of abec service.
 	svcName = "abecsvc"
 
 	// svcDisplayName is the service name that will be shown in the windows
@@ -20,14 +20,14 @@ const (
 	svcDisplayName = "Abec Service"
 
 	// svcDesc is the description of the service.
-	svcDesc = "Downloads and stays synchronized with the bitcoin block " +
+	svcDesc = "Downloads and stays synchronized with the block " +
 		"chain and provides chain services to applications."
 )
 
 // elog is used to send messages to the Windows event log.
 var elog *eventlog.Log
 
-// logServiceStartOfDay logs information about btcd when the main server has
+// logServiceStartOfDay logs information about abec when the main server has
 // been started to the Windows event log.
 func logServiceStartOfDay(srvr *server) {
 	var message string
@@ -40,19 +40,19 @@ func logServiceStartOfDay(srvr *server) {
 }
 
 // abecService houses the main service handler which handles all service
-// updates and launching btcdMain.
+// updates and launching abecMain.
 type abecService struct{}
 
 // Execute is the main entry point the winsvc package calls when receiving
 // information from the Windows service control manager.  It launches the
-// long-running btcdMain (which is the real meat of btcd), handles service
+// long-running abecMain (which is the real meat of abec), handles service
 // change requests, and notifies the service control manager of changes.
 func (s *abecService) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (bool, uint32) {
 	// Service start is pending.
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
 	changes <- svc.Status{State: svc.StartPending}
 
-	// Start btcdMain in a separate goroutine so the service can start
+	// Start abecMain in a separate goroutine so the service can start
 	// quickly.  Shutdown (along with a potential error) is reported via
 	// doneChan.  serverChan is notified with the main server instance once
 	// it is started so it can be gracefully stopped.
@@ -105,7 +105,7 @@ loop:
 	return false, 0
 }
 
-// installService attempts to install the btcd service.  Typically this should
+// installService attempts to install the abec service.  Typically this should
 // be done by the msi installer, but it is provided here since it can be useful
 // for development.
 func installService() error {
@@ -154,7 +154,7 @@ func installService() error {
 	return eventlog.InstallAsEventCreate(svcName, eventsSupported)
 }
 
-// removeService attempts to uninstall the btcd service.  Typically this should
+// removeService attempts to uninstall the abec service.  Typically this should
 // be done by the msi uninstaller, but it is provided here since it can be
 // useful for development.  Not the eventlog entry is intentionally not removed
 // since it would invalidate any existing event log messages.
@@ -177,7 +177,7 @@ func removeService() error {
 	return service.Delete()
 }
 
-// startService attempts to start the btcd service.
+// startService attempts to start the abec service.
 func startService() error {
 	// Connect to the windows service manager.
 	serviceManager, err := mgr.Connect()

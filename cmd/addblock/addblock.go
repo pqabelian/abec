@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	// blockDbNamePrefix is the prefix for the btcd block database.
+	// blockDbNamePrefix is the prefix for the abec block database.
 	blockDbNamePrefix = "blocks"
 )
 

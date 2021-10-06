@@ -18,23 +18,23 @@ var (
 	// the overhead of creating it multiple times.
 	bigOne = big.NewInt(1)
 
-	// mainPowLimit is the highest proof of work value a Bitcoin block can
+	// mainPowLimit is the highest proof of work value a block can
 	// have for the main network.  It is the value 2^224 - 1.
 	//mainPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 224), bigOne)
 	// TODO(abe): this pow limit need to changed according the difficult
 	//mainPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 227), bigOne)
 	// TODO(abe):for testing something, the expected time have been adjusted to 3 minutes
 	mainPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 233), bigOne)
-	// regressionPowLimit is the highest proof of work value a Bitcoin block
+	// regressionPowLimit is the highest proof of work value a block
 	// can have for the regression test network.  It is the value 2^255 - 1.
 	regressionPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 255), bigOne)
 
-	// testNet3PowLimit is the highest proof of work value a Bitcoin block
+	// testNet3PowLimit is the highest proof of work value a block
 	// can have for the test network (version 3).  It is the value
 	// 2^224 - 1.
 	testNet3PowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 224), bigOne)
 
-	// simNetPowLimit is the highest proof of work value a Bitcoin block
+	// simNetPowLimit is the highest proof of work value a block
 	// can have for the simulation test network.  It is the value 2^255 - 1.
 	simNetPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 255), bigOne)
 )
@@ -102,8 +102,8 @@ const (
 	DefinedDeployments
 )
 
-// Params defines a Bitcoin network by its parameters.  These parameters may be
-// used by Bitcoin applications to differentiate networks as well as addresses
+// Params defines a network by its parameters.  These parameters may be
+// used by applications to differentiate networks as well as addresses
 // and keys for one network from those intended for use on another network.
 type Params struct {
 	// Name defines a human-readable identifier for the network.
@@ -132,12 +132,6 @@ type Params struct {
 	// PowLimitBits defines the highest allowed proof of work value for a
 	// block in compact form.
 	PowLimitBits uint32
-
-	// These fields define the block heights at which the specified softfork
-	// BIP became active.
-	BIP0034Height int32
-	BIP0065Height int32
-	BIP0066Height int32
 
 	// CoinbaseMaturity is the number of blocks required before newly mined
 	// coins (coinbase transactions) can be spent.
@@ -180,8 +174,7 @@ type Params struct {
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints []Checkpoint
 
-	// These fields are related to voting on consensus rule changes as
-	// defined by BIP0009.
+	// These fields are related to voting on consensus rule changes.
 	//
 	// RuleChangeActivationThreshold is the number of blocks in a threshold
 	// state retarget window for which a positive vote for a rule change
@@ -221,7 +214,7 @@ type Params struct {
 	HDCoinType uint32
 }
 
-// MainNetParams defines the network parameters for the main Bitcoin network.
+// MainNetParams defines the network parameters for the main network.
 var MainNetParams = Params{
 	Name: "mainnet",
 	Net:  wire.MainNet,
@@ -306,7 +299,7 @@ var MainNetParams = Params{
 }
 
 // RegressionNetParams defines the network parameters for the regression test
-// Bitcoin network.  Not to be confused with the test Bitcoin network (version
+// network.  Not to be confused with the test network (version
 // 3), this network is sometimes simply called "testnet".
 var RegressionNetParams = Params{
 	Name: "regtest",
@@ -321,9 +314,6 @@ var RegressionNetParams = Params{
 	PowLimit:                 regressionPowLimit,
 	PowLimitBits:             0x207fffff,
 	CoinbaseMaturity:         100,
-	BIP0034Height:            100000000, // Not active - Permit ver 1 blocks
-	BIP0065Height:            1351,      // Used by regression tests
-	BIP0066Height:            1251,      // Used by regression tests
 	SubsidyReductionInterval: 150,
 	TargetTimespan:           time.Hour * 24 * 14, // 14 days
 	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
@@ -380,7 +370,7 @@ var RegressionNetParams = Params{
 	HDCoinType: 1,
 }
 
-// TestNet3Params defines the network parameters for the test Bitcoin network
+// TestNet3Params defines the network parameters for the test network
 // (version 3).  Not to be confused with the regression test network, this
 // network is sometimes simply called "testnet".
 var TestNet3Params = Params{
@@ -400,9 +390,6 @@ var TestNet3Params = Params{
 	GenesisHash:              &testNet3GenesisHash,
 	PowLimit:                 testNet3PowLimit,
 	PowLimitBits:             0x1d00ffff,
-	BIP0034Height:            21111,  // 0000000023b3a96d3484e5abb3755c413e7d41500f8e2a5c3f0dd01299cd8ef8
-	BIP0065Height:            581885, // 00000000007f6655f22f98e72ed80d8b06dc761d5da09df0fa1dc4be4f861eb6
-	BIP0066Height:            330776, // 000000002104c8c45e99a8853285a3b592602a3ccde2b832481da85e9e4ba182
 	CoinbaseMaturity:         100,
 	SubsidyReductionInterval: 210000,
 	TargetTimespan:           time.Hour * 24 * 14, // 14 days
@@ -463,7 +450,7 @@ var TestNet3Params = Params{
 	HDCoinType: 1,
 }
 
-// SimNetParams defines the network parameters for the simulation test Bitcoin
+// SimNetParams defines the network parameters for the simulation test
 // network.  This network is similar to the normal test network except it is
 // intended for private use within a group of individuals doing simulation
 // testing.  The functionality is intended to differ in that the only nodes
@@ -482,9 +469,6 @@ var SimNetParams = Params{
 	GenesisHash:              &simNetGenesisHash,
 	PowLimit:                 simNetPowLimit,
 	PowLimitBits:             0x207fffff,
-	BIP0034Height:            0, // Always active on simnet
-	BIP0065Height:            0, // Always active on simnet
-	BIP0066Height:            0, // Always active on simnet
 	CoinbaseMaturity:         100,
 	SubsidyReductionInterval: 210000,
 	TargetTimespan:           time.Hour * 24 * 14, // 14 days
@@ -545,10 +529,10 @@ var SimNetParams = Params{
 }
 
 var (
-	// ErrDuplicateNet describes an error where the parameters for a Bitcoin
+	// ErrDuplicateNet describes an error where the parameters for a
 	// network could not be set due to the network already being a standard
 	// network or previously-registered into this package.
-	ErrDuplicateNet = errors.New("duplicate Bitcoin network")
+	ErrDuplicateNet = errors.New("duplicate Abelian network")
 
 	// ErrUnknownHDKeyID describes an error where the provided id which
 	// is intended to identify the network for a hierarchical deterministic
@@ -569,7 +553,7 @@ func (d DNSSeed) String() string {
 	return d.Host
 }
 
-// Register registers the network parameters for a Bitcoin network.  This may
+// Register registers the network parameters for an Abelian network.  This may
 // error with ErrDuplicateNet if the network is already registered (either
 // due to a previous Register call, or the network being one of the default
 // networks).

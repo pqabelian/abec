@@ -31,7 +31,7 @@ func loadBlockDB() (database.DB, error) {
 
 // findCandidates searches the chain backwards for checkpoint candidates and
 // returns a slice of found candidates, if any.  It also stops searching for
-// candidates at the last checkpoint that is already hard coded into btcchain
+// candidates at the last checkpoint that is already hard coded into chain
 // since there is no point in finding candidates before already existing
 // checkpoints.
 func findCandidates(chain *blockchain.BlockChain, latestHash *chainhash.Hash) ([]*chaincfg.Checkpoint, error) {
@@ -114,7 +114,7 @@ func findCandidates(chain *blockchain.BlockChain, latestHash *chainhash.Hash) ([
 
 // showCandidate display a checkpoint candidate using and output format
 // determined by the configuration parameters.  The Go syntax output
-// uses the format the btcchain code expects for checkpoints added to the list.
+// uses the format the chain code expects for checkpoints added to the list.
 func showCandidate(candidateNum int, checkpoint *chaincfg.Checkpoint) {
 	if cfg.UseGoOutput {
 		fmt.Printf("Candidate %d -- {%d, newShaHashFromStr(\"%v\")},\n",

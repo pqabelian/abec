@@ -46,7 +46,7 @@ var helpDescsEnUS = map[string]string{
 	"createrawtransaction-amounts":        "JSON object with the destination addresses as keys and amounts as values",
 	"createrawtransaction-amounts--key":   "address",
 	"createrawtransaction-amounts--value": "n.nnn",
-	"createrawtransaction-amounts--desc":  "The destination address as the key and the amount in BTC as the value",
+	"createrawtransaction-amounts--desc":  "The destination address as the key and the amount in ABE as the value",
 	"createrawtransaction-locktime":       "Locktime value; a non-zero value will also locktime-activate the inputs",
 	"createrawtransaction--result0":       "Hex-encoded bytes of the serialized transaction",
 
@@ -80,10 +80,10 @@ var helpDescsEnUS = map[string]string{
 	"scriptpubkeyresult-hex":       "Hex-encoded bytes of the script",
 	"scriptpubkeyresult-reqSigs":   "The number of required signatures",
 	"scriptpubkeyresult-type":      "The type of the script (e.g. 'pubkeyhash')",
-	"scriptpubkeyresult-addresses": "The bitcoin addresses associated with this script",
+	"scriptpubkeyresult-addresses": "The addresses associated with this script",
 
 	// Vout help.
-	"vout-value":        "The amount in BTC",
+	"vout-value":        "The amount in ABE",
 	"vout-n":            "The index of this transaction output",
 	"vout-scriptPubKey": "The public key script used to pay coins as a JSON object",
 
@@ -102,7 +102,7 @@ var helpDescsEnUS = map[string]string{
 	"decodescriptresult-asm":       "Disassembly of the script",
 	"decodescriptresult-reqSigs":   "The number of required signatures",
 	"decodescriptresult-type":      "The type of the script (e.g. 'pubkeyhash')",
-	"decodescriptresult-addresses": "The bitcoin addresses associated with this script",
+	"decodescriptresult-addresses": "The addresses associated with this script",
 	"decodescriptresult-p2sh":      "The script hash for use in pay-to-script-hash transactions (only present if the provided redeem script is not already a pay-to-script-hash script)",
 
 	// DecodeScriptCmd help.
@@ -110,12 +110,12 @@ var helpDescsEnUS = map[string]string{
 	"decodescript-hexscript": "Hex-encoded script",
 
 	// EstimateFeeCmd help.
-	"estimatefee--synopsis": "Estimate the fee per kilobyte in satoshis " +
+	"estimatefee--synopsis": "Estimate the fee per kilobyte in neutrino " +
 		"required for a transaction to be mined before a certain number of " +
 		"blocks have been generated.",
 	"estimatefee-numblocks": "The maximum number of blocks which can be " +
 		"generated before the transaction is mined.",
-	"estimatefee--result0": "Estimated fee per kilobyte in satoshis for a block to " +
+	"estimatefee--result0": "Estimated fee per kilobyte in neutrino for a block to " +
 		"be mined in the next NumBlocks blocks.",
 
 	// GenerateCmd help
@@ -176,7 +176,6 @@ var helpDescsEnUS = map[string]string{
 	"getblockchaininforesult-pruneheight":          "The lowest block retained in the current pruned chain",
 	"getblockchaininforesult-chainwork":            "The total cumulative work in the best chain",
 	"getblockchaininforesult-softforks":            "The status of the super-majority soft-forks",
-	"getblockchaininforesult-unifiedsoftforks":     "The status of the super-majority soft-forks used by bitcoind on or after v0.19.0",
 
 	// SoftForkDescription help.
 	"softforkdescription-reject":  "The current activation status of the softfork",
@@ -192,10 +191,7 @@ var helpDescsEnUS = map[string]string{
 	"softforks-bip9_softforks--desc":  "The status of any defined BIP0009 soft-fork deployments",
 
 	// UnifiedSoftForks help.
-	"unifiedsoftforks-softforks":        "The status of the super-majority soft-forks used by bitcoind on or after v0.19.0",
 	"unifiedsoftforks-softforks--key":   "softforks",
-	"unifiedsoftforks-softforks--value": "An object describing an active softfork deployment used by bitcoind on or after v0.19.0",
-	"unifiedsoftforks-softforks--desc":  "JSON object describing an active softfork deployment used by bitcoind on or after v0.19.0",
 
 	// TxRawResult help.
 	"txrawresult-hex":           "Hex-encoded transaction",
@@ -294,7 +290,7 @@ var helpDescsEnUS = map[string]string{
 	"getblocktemplateresulttx-data":    "Hex-encoded transaction data (byte-for-byte)",
 	"getblocktemplateresulttx-hash":    "Hex-encoded transaction hash (little endian if treated as a 256-bit number)",
 	"getblocktemplateresulttx-depends": "Other transactions before this one (by 1-based index in the 'transactions'  list) that must be present in the final block if this one is",
-	"getblocktemplateresulttx-fee":     "Difference in value between transaction inputs and outputs (in Satoshi)",
+	"getblocktemplateresulttx-fee":     "Difference in value between transaction inputs and outputs (in Neutrino)",
 	"getblocktemplateresulttx-sigops":  "Total number of signature operations as counted for purposes of block limits",
 	"getblocktemplateresulttx-weight":  "The weight of the transaction",
 
@@ -312,7 +308,7 @@ var helpDescsEnUS = map[string]string{
 	"getblocktemplateresult-version":                    "The block version",
 	"getblocktemplateresult-coinbaseaux":                "Data that should be included in the coinbase signature script",
 	"getblocktemplateresult-coinbasetxn":                "Information about the coinbase transaction",
-	"getblocktemplateresult-coinbasevalue":              "Total amount available for the coinbase in Satoshi",
+	"getblocktemplateresult-coinbasevalue":              "Total amount available for the coinbase in Neutrino",
 	"getblocktemplateresult-workid":                     "This value must be returned with result if provided (not provided)",
 	"getblocktemplateresult-longpollid":                 "Identifier for long poll request which allows monitoring for expiration",
 	"getblocktemplateresult-longpolluri":                "An alternate URI to use for long poll requests if provided (not provided)",
@@ -354,7 +350,7 @@ var helpDescsEnUS = map[string]string{
 	"getconnectioncount--result0":  "The number of connections",
 
 	// GetCurrentNetCmd help.
-	"getcurrentnet--synopsis": "Get bitcoin network the server is running on.",
+	"getcurrentnet--synopsis": "Get network the server is running on.",
 	"getcurrentnet--result0":  "The network identifer",
 
 	// GetDifficultyCmd help.
@@ -378,14 +374,14 @@ var helpDescsEnUS = map[string]string{
 	"infochainresult-proxy":           "The proxy used by the server",
 	"infochainresult-difficulty":      "The current target difficulty",
 	"infochainresult-testnet":         "Whether or not server is using testnet",
-	"infochainresult-relayfee":        "The minimum relay fee for non-free transactions in BTC/KB",
+	"infochainresult-relayfee":        "The minimum relay fee for non-free transactions in ABE/KB",
 	"infochainresult-errors":          "Any current errors",
 
 	// InfoWalletResult help.
 	"infowalletresult-version":         "The version of the server",
 	"infowalletresult-protocolversion": "The latest supported protocol version",
 	"infowalletresult-walletversion":   "The version of the wallet server",
-	"infowalletresult-balance":         "The total bitcoin balance of the wallet",
+	"infowalletresult-balance":         "The total balance of the wallet",
 	"infowalletresult-blocks":          "The number of blocks processed",
 	"infowalletresult-timeoffset":      "The time offset",
 	"infowalletresult-connections":     "The number of connected peers",
@@ -395,8 +391,8 @@ var helpDescsEnUS = map[string]string{
 	"infowalletresult-keypoololdest":   "Seconds since 1 Jan 1970 GMT of the oldest pre-generated key in the key pool",
 	"infowalletresult-keypoolsize":     "The number of new keys that are pre-generated",
 	"infowalletresult-unlocked_until":  "The timestamp in seconds since 1 Jan 1970 GMT that the wallet is unlocked for transfers, or 0 if the wallet is locked",
-	"infowalletresult-paytxfee":        "The transaction fee set in BTC/KB",
-	"infowalletresult-relayfee":        "The minimum relay fee for non-free transactions in BTC/KB",
+	"infowalletresult-paytxfee":        "The transaction fee set in ABE/KB",
+	"infowalletresult-relayfee":        "The minimum relay fee for non-free transactions in ABE/KB",
 	"infowalletresult-errors":          "Any current errors",
 
 	// GetHeadersCmd help.
@@ -474,7 +470,7 @@ var helpDescsEnUS = map[string]string{
 
 	// GetRawMempoolVerboseResult help.
 	"getrawmempoolverboseresult-size":             "Transaction size in bytes",
-	"getrawmempoolverboseresult-fee":              "Transaction fee in bitcoins",
+	"getrawmempoolverboseresult-fee":              "Transaction fee",
 	"getrawmempoolverboseresult-time":             "Local time transaction entered pool in seconds since 1 Jan 1970 GMT",
 	"getrawmempoolverboseresult-height":           "Block height when transaction entered the pool",
 	"getrawmempoolverboseresult-startingpriority": "Priority when transaction entered the pool",
@@ -501,7 +497,7 @@ var helpDescsEnUS = map[string]string{
 	// GetTxOutResult help.
 	"gettxoutresult-bestblock":     "The block hash that contains the transaction output",
 	"gettxoutresult-confirmations": "The number of confirmations",
-	"gettxoutresult-value":         "The transaction amount in BTC",
+	"gettxoutresult-value":         "The transaction amount in ABE",
 	"gettxoutresult-scriptPubKey":  "The public key script used to pay coins as a JSON object",
 	"gettxoutresult-version":       "The transaction version",
 	"gettxoutresult-coinbase":      "Whether or not the transaction is a coinbase",
@@ -530,7 +526,7 @@ var helpDescsEnUS = map[string]string{
 		"Transactions pulled from the mempool will have the 'confirmations' field set to 0.\n" +
 		"Usage of this RPC requires the optional --addrindex flag to be activated, otherwise all responses will simply return with an error stating the address index has not yet been built.\n" +
 		"Similarly, until the address index has caught up with the current best height, all requests will return an error response in order to avoid serving stale data.",
-	"searchrawtransactions-address":     "The Bitcoin address to search for",
+	"searchrawtransactions-address":     "The address to search for",
 	"searchrawtransactions-verbose":     "Specifies the transaction is returned as a JSON object instead of hex-encoded string",
 	"searchrawtransactions--condition0": "verbose=0",
 	"searchrawtransactions--condition1": "verbose=1",
@@ -544,8 +540,7 @@ var helpDescsEnUS = map[string]string{
 	// SendRawTransactionCmd help.
 	"sendrawtransaction--synopsis":     "Submits the serialized, hex-encoded transaction to the local peer and relays it to the network.",
 	"sendrawtransaction-hextx":         "Serialized, hex-encoded signed transaction",
-	"sendrawtransaction-allowhighfees": "Whether or not to allow insanely high fees (btcd does not yet implement this parameter, so it has no effect)",
-	"sendrawtransaction-maxfeerate":    "Used by bitcoind on or after v0.19.0",
+	"sendrawtransaction-allowhighfees": "Whether or not to allow insanely high fees (abec does not yet implement this parameter, so it has no effect)",
 	"sendrawtransaction--result0":      "The hash of the transaction",
 
 	// SetGenerateCmd help.
@@ -554,8 +549,8 @@ var helpDescsEnUS = map[string]string{
 	"setgenerate-genproclimit": "The number of processors (cores) to limit generation to or -1 for default",
 
 	// StopCmd help.
-	"stop--synopsis": "Shutdown btcd.",
-	"stop--result0":  "The string 'btcd stopping.'",
+	"stop--synopsis": "Shutdown abec.",
+	"stop--result0":  "The string 'abec stopping.'",
 
 	// SubmitBlockOptions help.
 	"submitblockoptions-workid": "This parameter is currently ignored",
@@ -570,16 +565,16 @@ var helpDescsEnUS = map[string]string{
 
 	// ValidateAddressResult help.
 	"validateaddresschainresult-isvalid": "Whether or not the address is valid",
-	"validateaddresschainresult-address": "The bitcoin address (only when isvalid is true)",
+	"validateaddresschainresult-address": "The address (only when isvalid is true)",
 
 	// ValidateAddressCmd help.
 	"validateaddress--synopsis": "Verify an address is valid.",
-	"validateaddress-address":   "Bitcoin address to validate",
+	"validateaddress-address":   "Address to validate",
 
 	// VerifyChainCmd help.
 	"verifychain--synopsis": "Verifies the block chain database.\n" +
 		"The actual checks performed by the checklevel parameter are implementation specific.\n" +
-		"For btcd this is:\n" +
+		"For abec this is:\n" +
 		"checklevel=0 - Look up each block and ensure it can be loaded from the database.\n" +
 		"checklevel=1 - Perform basic context-free sanity checks on each block.",
 	"verifychain-checklevel": "How thorough the block verification is",
@@ -588,7 +583,7 @@ var helpDescsEnUS = map[string]string{
 
 	// VerifyMessageCmd help.
 	"verifymessage--synopsis": "Verify a signed message.",
-	"verifymessage-address":   "The bitcoin address to use for the signature",
+	"verifymessage-address":   "The address to use for the signature",
 	"verifymessage-signature": "The base-64 encoded signature provided by the signer",
 	"verifymessage-message":   "The signed message",
 	"verifymessage--result0":  "Whether or not the signature verified",
@@ -626,7 +621,7 @@ var helpDescsEnUS = map[string]string{
 	"outpoint-index": "The index of the outpoint",
 
 	// NotifySpentCmd help.
-	"notifyspent--synopsis": "Send a redeemingtx notification when a transaction spending an outpoint appears in mempool (if relayed to this btcd instance) and when such a transaction first appears in a newly-attached block.",
+	"notifyspent--synopsis": "Send a redeemingtx notification when a transaction spending an outpoint appears in mempool (if relayed to this abec instance) and when such a transaction first appears in a newly-attached block.",
 	"notifyspent-outpoints": "List of transaction outpoints to monitor.",
 
 	// StopNotifySpentCmd help.
