@@ -2029,37 +2029,19 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 			continue
 		}
 
-		// Create an array of 1-based indices to transactions that come
-		// before this one in the transactions list which this one
-		// depends on.  This is necessary since the created block must
-		// ensure proper ordering of the dependencies.  A map is used
-		// before creating the final array to prevent duplicate entries
-		// when multiple inputs reference the same transaction.
-		//	todo(ABE): ABE does not allow a transaction to depend on transactions in the same block.
-		/*		dependsMap := make(map[int64]struct{})
-				for _, txIn := range tx.TxIn {
-					if idx, ok := txIndex[txIn.PreviousOutPoint.Hash]; ok {
-						dependsMap[idx] = struct{}{}
-					}
-				}
-				depends := make([]int64, 0, len(dependsMap))
-				for idx := range dependsMap {
-					depends = append(depends, idx)
-				}*/
-
 		// Serialize the transaction for later conversion to hex.
-		txBuf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
-		if err := tx.Serialize(txBuf); err != nil {
-			context := "Failed to serialize transaction"
-			return nil, internalRPCError(err.Error(), context)
-		}
+		//txBuf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+		//if err := tx.Serialize(txBuf); err != nil {
+		//	context := "Failed to serialize transaction"
+		//	return nil, internalRPCError(err.Error(), context)
+		//}
 
 		bTx := abeutil.NewTxAbe(tx)
 		resultTx := abejson.GetBlockTemplateResultTxAbe{
-			Data: hex.EncodeToString(txBuf.Bytes()),
+			// Data: hex.EncodeToString(txBuf.Bytes()),
 			Hash: txHash.String(),
 			Fee:  template.Fees[i],
-			//			Weight:  blockchain.GetTransactionWeight(bTx),
+			//	Weight:  blockchain.GetTransactionWeight(bTx),
 			Size: int64(bTx.MsgTx().SerializeSize()),
 		}
 		transactions = append(transactions, resultTx)
@@ -2090,16 +2072,13 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 		NonceRange:   gbtNonceRange,
 		Capabilities: gbtCapabilities,
 	}
-	// If the generated block template includes transactions with witness
-	// data, then include the witness commitment in the GBT result.
-	//	todo(ABE.MUST)
-	if template.WitnessCommitment != nil {
-		reply.DefaultWitnessCommitment = hex.EncodeToString(template.WitnessCommitment)
-	}
 
 	if useCoinbaseValue {
-		//		reply.CoinbaseAux = gbtCoinbaseAux
-		//reply.CoinbaseValue = &msgBlock.Transactions[0].TxOuts[0].TxoScript
+		// todo (ABE): coinbaseValue not supported
+		return nil, &abejson.RPCError{
+			Code: abejson.ErrRPCInternal.Code,
+			Message: "Coinbase value is not supported",
+		}
 	} else {
 		// Ensure the template has a valid payment address associated
 		// with it when a full coinbase is requested.
@@ -2231,16 +2210,15 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 
 // handleGetBlockTemplateRequest is a helper for handleGetBlockTemplate which
 // deals with generating and returning block templates to the caller.  It
-// handles both long poll requests as specified by BIP 0022 as well as regular
-// requests.  In addition, it detects the capabilities reported by the caller
-// in regards to whether or not it supports creating its own coinbase (the
-// coinbasetxn and coinbasevalue capabilities) and modifies the returned block
-// template accordingly.
+// handles both long poll requests as well as regular requests.  In addition,
+// it detects the capabilities reported by the caller in regards to whether or
+// not it supports creating its own coinbase (the coinbasetxn and coinbasevalue
+// capabilities) and modifies the returned block template accordingly.
 func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateRequest, closeChan <-chan struct{}) (interface{}, error) {
 	// Extract the relevant passed capabilities and restrict the result to
 	// either a coinbase value or a coinbase transaction object depending on
-	// the request.  Default to only providing a coinbase value.
-	useCoinbaseValue := true
+	// the request. Default to providing a coinbase transaction.
+	useCoinbaseValue := false
 	if request != nil {
 		var hasCoinbaseValue, hasCoinbaseTxn bool
 		for _, capability := range request.Capabilities {
@@ -2252,8 +2230,8 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 			}
 		}
 
-		if hasCoinbaseTxn && !hasCoinbaseValue {
-			useCoinbaseValue = false
+		if !hasCoinbaseTxn && hasCoinbaseValue {
+			useCoinbaseValue = true
 		}
 	}
 
@@ -2272,28 +2250,29 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 	// way to relay a found block or receive transactions to work on.
 	// However, allow this state when running in the regression test or
 	// simulation test mode.
-	//	todo(ABE): about the rules on regressionTest and SimNet
-	if !(cfg.RegressionTest || cfg.SimNet) &&
-		s.cfg.ConnMgr.ConnectedCount() == 0 {
-
-		return nil, &abejson.RPCError{
-			Code:    abejson.ErrRPCClientNotConnected,
-			Message: "Bitcoin is not connected",
-		}
-	}
+	// todo (ABE): The following is commented for test convenience, uncomment it later
+	//if !(cfg.RegressionTest || cfg.SimNet) &&
+	//	s.cfg.ConnMgr.ConnectedCount() == 0 {
+	//
+	//	return nil, &abejson.RPCError{
+	//		Code:    abejson.ErrRPCClientNotConnected,
+	//		Message: "No peer connected",
+	//	}
+	//}
 
 	// No point in generating or accepting work before the chain is synced.
 	currentHeight := s.cfg.Chain.BestSnapshot().Height
 	if currentHeight != 0 && !s.cfg.SyncMgr.IsCurrent() {
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCClientInInitialDownload,
-			Message: "Bitcoin is downloading blocks...",
+			Message: "Abec is downloading blocks...",
 		}
 	}
 
 	// When a long poll ID was provided, this is a long poll request by the
 	// client to be notified when block template referenced by the ID should
 	// be replaced with a new one.
+	// todo (ABE)
 	if request != nil && request.LongPollID != "" {
 		return handleGetBlockTemplateLongPoll(s, request.LongPollID,
 			useCoinbaseValue, closeChan)
@@ -2482,9 +2461,6 @@ func handleGetBlockTemplateProposal(s *rpcServer, request *abejson.TemplateReque
 }
 
 // handleGetBlockTemplate implements the getblocktemplate command.
-//
-// See https://en.bitcoin.it/wiki/BIP_0022 and
-// https://en.bitcoin.it/wiki/BIP_0023 for more details.
 func handleGetBlockTemplate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.GetBlockTemplateCmd)
 	request := c.Request
