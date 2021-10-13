@@ -854,6 +854,13 @@ func loadConfig() (*config, []string, error) {
 			return nil, nil, err
 		}
 		cfg.miningAddr = maddr // set the mining address
+	} else {
+		if cfg.MiningAddr != "" {
+			maddr, err := abeutil.DecodeMasterAddressAbe(cfg.MiningAddr)
+			if err == nil {
+				cfg.miningAddr = maddr
+			}
+		}
 	}
 
 	// Add default port to all listener addresses if needed and remove

@@ -1923,7 +1923,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// block template doesn't include the coinbase, so the caller
 		// will ultimately create their own coinbase which pays to the
 		// appropriate address(es).
-		blkTemplate, err := generator.NewBlockTemplate(masterAddr.Serialize())
+		blkTemplate, err := generator.NewBlockTemplate(masterAddr.Serialize()[1:])
 		if err != nil {
 			return internalRPCError("Failed to create new block "+
 				"template: "+err.Error(), "")
@@ -2295,14 +2295,15 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 	//	}
 	//}
 
+	// todo (ABE): The following is commented for test convenience, uncomment it later
 	// No point in generating or accepting work before the chain is synced.
-	currentHeight := s.cfg.Chain.BestSnapshot().Height
-	if currentHeight != 0 && !s.cfg.SyncMgr.IsCurrent() {
-		return nil, &abejson.RPCError{
-			Code:    abejson.ErrRPCClientInInitialDownload,
-			Message: "Abec is downloading blocks...",
-		}
-	}
+	//currentHeight := s.cfg.Chain.BestSnapshot().Height
+	//if currentHeight != 0 && !s.cfg.SyncMgr.IsCurrent() {
+	//	return nil, &abejson.RPCError{
+	//		Code:    abejson.ErrRPCClientInInitialDownload,
+	//		Message: "Abec is downloading blocks...",
+	//	}
+	//}
 
 	// When a long poll ID was provided, this is a long poll request by the
 	// client to be notified when block template referenced by the ID should
