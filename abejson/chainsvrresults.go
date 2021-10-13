@@ -308,6 +308,15 @@ type GetBlockTemplateResultTxAbe struct {
 	Size int64  `json:"size"`
 }
 
+type GetBlockTemplateResultCoinbase struct {
+	Data string `json:"data"`
+	Hash string `json:"hash"`
+	Fee  uint64  `json:"fee"`
+	Size int64  `json:"size"`
+	ExtraNonceOffset int64 `json:"extranonceoffset"`
+	ExtraNonceLen int64	`json:"extranoncelen"`
+}
+
 // GetBlockTemplateResultAux models the coinbaseaux field of the
 // getblocktemplate command.
 type GetBlockTemplateResultAux struct {
@@ -318,19 +327,18 @@ type GetBlockTemplateResultAux struct {
 // command.
 //	todo(ABE):
 type GetBlockTemplateResult struct {
-	// Base fields from BIP 0022.  CoinbaseAux is optional.  One of
+	// CoinbaseAux is optional.  One of
 	// CoinbaseTxn or CoinbaseValue must be specified, but not both.
 	Bits         string `json:"bits"`
 	CurTime      int64  `json:"curtime"`
 	Height       int64  `json:"height"`
 	PreviousHash string `json:"previousblockhash"`
-	//	SigOpLimit    int64                      `json:"sigoplimit,omitempty"`
 	SizeLimit int64 `json:"sizelimit,omitempty"`
 	//	WeightLimit   int64                      `json:"weightlimit,omitempty"`
 	Transactions []GetBlockTemplateResultTxAbe `json:"transactions"`
 	Version      int32                         `json:"version"`
 	//	CoinbaseAux   *GetBlockTemplateResultAux `json:"coinbaseaux,omitempty"`
-	CoinbaseTxn   *GetBlockTemplateResultTxAbe `json:"coinbasetxn,omitempty"`
+	CoinbaseTxn   *GetBlockTemplateResultCoinbase `json:"coinbasetxn,omitempty"`
 	//CoinbaseValue *int64                       `json:"coinbasevalue,omitempty"` //TODO:this field is disable due to pqringct
 	WorkID        string                       `json:"workid,omitempty"`
 

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/abesuite/abec/abecrypto/pqringctparam"
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
@@ -1845,6 +1846,33 @@ func (state *gbtWorkState) templateUpdateChan(prevHash *chainhash.Hash, lastGene
 	return c
 }
 
+// GetExtraNonceOffset is a helper function which calculate the offset of extra nonce
+// in coinbase transaction.
+func GetExtraNonceOffset(tx *wire.MsgTxAbe) (int64, error) {
+	if !tx.IsCoinBase() {
+		return 0, errors.New("non-coinbase transaction does not have extra nonce")
+	}
+
+	res := 0
+	// tx version 4 bytes
+	res += 4
+	//	Inputs
+	//	serialized varint size for input
+	res += wire.VarIntSerializeSize(uint64(len(tx.TxIns)))
+	snLen := pqringctparam.GetTxoSerialNumberLen(tx.TxIns[0].PreviousOutPointRing.Version)
+	// serialized varint size for serial number
+	res += wire.VarIntSerializeSize(uint64(snLen))
+	// serial number size
+	res += snLen
+	// outpoint ring version 4 bytes
+	res += 4
+	// serialized varint size for block number
+	res += 1
+	// block hash size
+	res += chainhash.HashSize
+	return int64(res), nil
+}
+
 // updateBlockTemplate creates or updates a block template for the work state.
 // A new block template will be generated when the current best block has
 // changed or the transactions in the memory pool have been updated and it has
@@ -2074,7 +2102,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 	}
 
 	if useCoinbaseValue {
-		// todo (ABE): coinbaseValue not supported
+		// todo (ABE): currently coinbaseValue not supported
 		return nil, &abejson.RPCError{
 			Code: abejson.ErrRPCInternal.Code,
 			Message: "Coinbase value is not supported",
@@ -2094,16 +2122,23 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 
 		// Serialize the transaction for conversion to hex.
 		tx := msgBlock.Transactions[0]
-		txBuf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+		txBuf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSizeFull()))
 		if err := tx.Serialize(txBuf); err != nil {
 			context := "Failed to serialize transaction"
 			return nil, internalRPCError(err.Error(), context)
 		}
 
-		resultTx := abejson.GetBlockTemplateResultTxAbe{
+		offset, err := GetExtraNonceOffset(tx)
+		if err != nil {
+			return nil, err
+		}
+
+		resultTx := abejson.GetBlockTemplateResultCoinbase{
 			Data: hex.EncodeToString(txBuf.Bytes()),
 			Hash: tx.TxHash().String(),
 			Fee:  template.Fees[0],
+			ExtraNonceOffset: offset,
+			ExtraNonceLen: 8,
 		}
 
 		reply.CoinbaseTxn = &resultTx
