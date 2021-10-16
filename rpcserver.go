@@ -4068,15 +4068,16 @@ func handleSubmitSimplifiedBlock(s *rpcServer, cmd interface{}, closeChan <-chan
 
 	// Deserialize the submitted block.
 	hexStr := c.HexBlock
+	if len(hexStr)%2 != 0 {
+		hexStr = "0" + c.HexBlock
+	}
 
 	serializedBlock, err := hex.DecodeString(hexStr)
 	if err != nil {
 		return nil, rpcDecodeHexError(hexStr)
 	}
 
-	//todo(csw)
-
-	block, err := abeutil.NewBlockFromBytesAbe(serializedBlock)
+	msgBlock, err := abeutil.NewSimplifiedBlockFromBytes(serializedBlock)
 	if err != nil {
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCDeserialization,
@@ -4084,8 +4085,20 @@ func handleSubmitSimplifiedBlock(s *rpcServer, cmd interface{}, closeChan <-chan
 		}
 	}
 
+	if msgBlock.Coinbase == nil {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCDeserialization,
+			Message: "Currently coinbase should not be nil",
+		}
+	}
+
+	block, err := AddWitnessForSimplifiedBlock(msgBlock, s.cfg.TxMemPool)
+	if err != nil {
+		return nil, err
+	}
+
 	// Process this block using the same rules as blocks coming from other
-	// nodes.  This will in turn relay it to the network like normal.
+	// nodes. This will in turn relay it to the network like normal.
 	_, err = s.cfg.SyncMgr.SubmitBlock(block, blockchain.BFNone)
 	if err != nil {
 		return fmt.Sprintf("rejected: %s", err.Error()), nil
@@ -4093,6 +4106,28 @@ func handleSubmitSimplifiedBlock(s *rpcServer, cmd interface{}, closeChan <-chan
 
 	rpcsLog.Infof("Accepted block %s via submitblock", block.Hash())
 	return nil, nil
+}
+
+func AddWitnessForSimplifiedBlock(simplifiedBlock *wire.MsgSimplifiedBlock, txPool *mempool.TxPool) (*abeutil.BlockAbe, error) {
+	msgBlock := &wire.MsgBlockAbe{}
+	msgBlock.Header = simplifiedBlock.Header
+	msgBlock.Transactions = make([]*wire.MsgTxAbe, len(simplifiedBlock.Transactions))
+
+	// coinbase transaction
+	msgBlock.Transactions[0] = simplifiedBlock.Coinbase
+
+	// transfer transaction
+	for i := 1 ; i < len(simplifiedBlock.Transactions); i++ {
+		msgTx, err := txPool.FetchTransaction(&simplifiedBlock.Transactions[i])
+		if err != nil {
+			return nil, errors.New(fmt.Sprintf("Cannot find transaction : %v", simplifiedBlock.Transactions[i].String()))
+		}
+		msgBlock.Transactions[i] = msgTx.MsgTx()
+	}
+
+	block := abeutil.NewBlockAbe(msgBlock)
+
+	return block, nil
 }
 
 // handleUptime implements the uptime command.

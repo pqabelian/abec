@@ -353,6 +353,16 @@ func NewBlockFromBytesAbe(serializedBlock []byte) (*BlockAbe, error) {
 	return b, nil
 }
 
+func NewSimplifiedBlockFromBytes(serializedBlock []byte) (*wire.MsgSimplifiedBlock, error) {
+	br := bytes.NewReader(serializedBlock)
+	res := &wire.MsgSimplifiedBlock{}
+	err := res.Deserialize(br)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
 // NewBlockFromReader returns a new instance of a bitcoin block given a
 // Reader to deserialize the block.  See Block.
 func NewBlockFromReader(r io.Reader) (*Block, error) {
