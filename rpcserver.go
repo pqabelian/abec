@@ -173,6 +173,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"setgenerate":           handleSetGenerate,
 	"stop":                  handleStop,
 	"submitblock":           handleSubmitBlock,
+	"submitsimplifiedblock": handleSubmitSimplifiedBlock,
 	"uptime":                handleUptime,
 	//	todo(ABE.MUST): At this moment, ABE does not support this. Later if necessary, ABE will provide functions to ValidateMasterAddress.
 	//	"validateaddress":       handleValidateAddress,
@@ -4028,7 +4029,7 @@ func handleStop(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 //	return nil, nil
 //}
 
-//	todo(ABE):
+// handleSubmitBlock implements the submitblock command.
 func handleSubmitBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.SubmitBlockCmd)
 
@@ -4041,6 +4042,39 @@ func handleSubmitBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	if err != nil {
 		return nil, rpcDecodeHexError(hexStr)
 	}
+
+	block, err := abeutil.NewBlockFromBytesAbe(serializedBlock)
+	if err != nil {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCDeserialization,
+			Message: "Block decode failed: " + err.Error(),
+		}
+	}
+
+	// Process this block using the same rules as blocks coming from other
+	// nodes.  This will in turn relay it to the network like normal.
+	_, err = s.cfg.SyncMgr.SubmitBlock(block, blockchain.BFNone)
+	if err != nil {
+		return fmt.Sprintf("rejected: %s", err.Error()), nil
+	}
+
+	rpcsLog.Infof("Accepted block %s via submitblock", block.Hash())
+	return nil, nil
+}
+
+// handleSubmitSimplifiedBlock implements the submitsimplifiedblock command.
+func handleSubmitSimplifiedBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*abejson.SubmitSimplifiedBlockCmd)
+
+	// Deserialize the submitted block.
+	hexStr := c.HexBlock
+
+	serializedBlock, err := hex.DecodeString(hexStr)
+	if err != nil {
+		return nil, rpcDecodeHexError(hexStr)
+	}
+
+	//todo(csw)
 
 	block, err := abeutil.NewBlockFromBytesAbe(serializedBlock)
 	if err != nil {

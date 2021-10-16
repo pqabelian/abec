@@ -871,6 +871,24 @@ func NewSubmitBlockCmd(hexBlock string, options *SubmitBlockOptions) *SubmitBloc
 	}
 }
 
+// SubmitSimplifiedBlockCmd defines the submitsimplifiedblock JSON-RPC command.
+type SubmitSimplifiedBlockCmd struct {
+	HexBlock string
+	Options  *SubmitBlockOptions
+}
+
+// NewSubmitSimplifiedBlockCmd returns a new instance which can be used to issue a
+// submitblock JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewSubmitSimplifiedBlockCmd(hexBlock string, options *SubmitBlockOptions) *SubmitSimplifiedBlockCmd {
+	return &SubmitSimplifiedBlockCmd{
+		HexBlock: hexBlock,
+		Options:  options,
+	}
+}
+
 // UptimeCmd defines the uptime JSON-RPC command.
 type UptimeCmd struct{}
 
@@ -993,6 +1011,7 @@ func init() {
 	MustRegisterCmd("setgenerate", (*SetGenerateCmd)(nil), flags)
 	MustRegisterCmd("stop", (*StopCmd)(nil), flags)
 	MustRegisterCmd("submitblock", (*SubmitBlockCmd)(nil), flags)
+	MustRegisterCmd("submitsimplifiedblock", (*SubmitSimplifiedBlockCmd)(nil), flags)
 	MustRegisterCmd("uptime", (*UptimeCmd)(nil), flags)
 	MustRegisterCmd("validateaddress", (*ValidateAddressCmd)(nil), flags)
 	MustRegisterCmd("verifychain", (*VerifyChainCmd)(nil), flags)

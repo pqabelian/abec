@@ -370,7 +370,8 @@ func NewBlockFromReader(r io.Reader) (*Block, error) {
 	return &b, nil
 }
 
-//	Abe to do
+// NewBlockFromReaderAbe returns a new instance of an abec block given a
+// Reader to deserialize the block.  See BlockAbe.
 func NewBlockFromReaderAbe(r io.Reader) (*BlockAbe, error) {
 	// Deserialize the bytes into a MsgBlock.
 	var msgBlock wire.MsgBlockAbe

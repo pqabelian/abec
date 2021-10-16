@@ -1,12 +1,14 @@
 package rpcclient
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/wire"
 )
 
 // FutureGenerateResult is a future promise to deliver the result of a
@@ -491,4 +493,55 @@ func (c *Client) GetBlockTemplateAsync(req *abejson.TemplateRequest) FutureGetBl
 // GetBlockTemplate returns a new block template for mining.
 func (c *Client) GetBlockTemplate(req *abejson.TemplateRequest) (*abejson.GetBlockTemplateResult, error) {
 	return c.GetBlockTemplateAsync(req).Receive()
+}
+
+// FutureSubmitSimplifiedBlockResult is a future promise to deliver the result of a
+// SubmitSimplifiedBlockAsync RPC invocation (or an applicable error).
+type FutureSubmitSimplifiedBlockResult chan *response
+
+// Receive waits for the response promised by the future and returns an error if
+// any occurred when submitting the block.
+func (r FutureSubmitSimplifiedBlockResult) Receive() error {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	if string(res) != "null" {
+		var result string
+		err = json.Unmarshal(res, &result)
+		if err != nil {
+			return err
+		}
+
+		return errors.New(result)
+	}
+
+	return nil
+}
+
+// SubmitSimplifiedBlockAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See SubmitSimplifiedBlock for the blocking version and more details.
+func (c *Client) SubmitSimplifiedBlockAsync(block *wire.MsgSimplifiedBlock, options *abejson.SubmitBlockOptions) FutureSubmitSimplifiedBlockResult {
+	blockHex := ""
+	var buf bytes.Buffer
+	if block != nil {
+		err := block.Serialize(&buf)
+		if err != nil {
+			return newFutureError(err)
+		}
+
+		blockHex = hex.EncodeToString(buf.Bytes())
+	}
+
+	cmd := abejson.NewSubmitSimplifiedBlockCmd(blockHex, options)
+	return c.sendCmd(cmd)
+}
+
+// SubmitSimplifiedBlock attempts to submit a new block into the abec network.
+func (c *Client) SubmitSimplifiedBlock(block *wire.MsgSimplifiedBlock, options *abejson.SubmitBlockOptions) error {
+	return c.SubmitSimplifiedBlockAsync(block, options).Receive()
 }
