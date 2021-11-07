@@ -2137,7 +2137,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 		resultTx := abejson.GetBlockTemplateResultCoinbase{
 			Data: hex.EncodeToString(txBuf.Bytes()),
 			Hash: tx.TxHash().String(),
-			Fee:  template.Fees[0],
+			Fee:  template.BlockAbe.Transactions[0].TxFee,
 			ExtraNonceOffset: offset,
 			ExtraNonceLen: 8,
 		}
