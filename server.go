@@ -490,6 +490,50 @@ func (sp *serverPeer) OnBlock(_ *peer.Peer, msg *wire.MsgBlockAbe, buf []byte) {
 	<-sp.blockProcessed
 }
 
+func (sp *serverPeer) OnPrunedBlock(_ *peer.Peer, msg *wire.MsgPrunedBlock, buf []byte) {
+	// Convert the raw MsgBlock to a abeutil.Block which provides some
+	// convenience methods and things such as hash caching.
+	//block := abeutil.NewBlockFromBlockAndBytesAbe(msg, buf) // TODO(abe): the height of block is unknown
+	prunedBlock := abeutil.NewPrunedBlockFromPrunedBlockAndBytesAbe(msg, buf)
+	blockHash := msg.BlockHash()
+	// Add the block to the known inventory for the peer.
+	iv := wire.NewInvVect(wire.InvTypePrunedBlock, &blockHash)
+	sp.AddKnownInventory(iv)
+
+	// Queue the block up to be handled by the block
+	// manager and intentionally block further receives
+	// until the block is fully processed and known
+	// good or bad.  This helps prevent a malicious peer
+	// from queuing up a bunch of bad blocks before
+	// disconnecting (or being disconnected) and wasting
+	// memory.  Additionally, this behavior is depended on
+	// by at least the block acceptance test tool as the
+	// reference implementation processes blocks in the same
+	// thread and therefore blocks further messages until
+	// the block has been fully processed.
+	sp.server.syncManager.QueuePrunedBlock(prunedBlock, sp.Peer, sp.blockProcessed)
+	<-sp.blockProcessed
+}
+func (sp *serverPeer) OnNeedSet(_ *peer.Peer, msg *wire.MsgNeedSet, buf []byte) {
+	// Convert the raw MsgBlock to a abeutil.Block which provides some
+	// convenience methods and things such as hash caching.
+	needSet := abeutil.NewNeedSet(msg, buf)
+
+	// Queue the block up to be handled by the block
+	// manager and intentionally block further receives
+	// until the block is fully processed and known
+	// good or bad.  This helps prevent a malicious peer
+	// from queuing up a bunch of bad blocks before
+	// disconnecting (or being disconnected) and wasting
+	// memory.  Additionally, this behavior is depended on
+	// by at least the block acceptance test tool as the
+	// reference implementation processes blocks in the same
+	// thread and therefore blocks further messages until
+	// the block has been fully processed.
+	sp.server.syncManager.QueueNeedSet(needSet, sp.Peer, sp.blockProcessed)
+	<-sp.blockProcessed
+}
+
 // OnInv is invoked when a peer receives an inv message and is
 // used to examine the inventory being advertised by the remote peer and react
 // accordingly.  We pass the message down to blockmanager which will call
@@ -575,6 +619,8 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 			err = sp.server.pushBlockMsg(sp, &iv.Hash, c, waitChan, wire.WitnessEncoding)
 		case wire.InvTypeBlock:
 			err = sp.server.pushBlockMsg(sp, &iv.Hash, c, waitChan, wire.BaseEncoding)
+		case wire.InvTypePrunedBlock:
+			err = sp.server.pushPrunedBlockMsg(sp, &iv.Hash, c, waitChan, wire.BaseEncoding)
 		default:
 			peerLog.Warnf("Unknown type in inventory request %d",
 				iv.Type)
@@ -1003,6 +1049,72 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan cha
 		sp.QueueMessage(invMsg, doneChan)
 		sp.continueHash = nil
 	}
+	return nil
+}
+func (s *server) pushPrunedBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
+	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
+
+	// Fetch the raw block bytes from the database.
+	var blockBytes []byte
+	err := sp.server.db.View(func(dbTx database.Tx) error {
+		var err error
+		blockBytes, err = dbTx.FetchBlock(hash)
+		return err
+	})
+	if err != nil {
+		peerLog.Tracef("Unable to fetch requested block hash %v: %v",
+			hash, err)
+
+		if doneChan != nil {
+			doneChan <- struct{}{}
+		}
+		return err
+	}
+
+	// Deserialize the block.
+	var msgBlock wire.MsgBlockAbe
+	err = msgBlock.Deserialize(bytes.NewReader(blockBytes))
+	if err != nil {
+		peerLog.Tracef("Unable to deserialize requested block hash "+
+			"%v: %v", hash, err)
+
+		if doneChan != nil {
+			doneChan <- struct{}{}
+		}
+		return err
+	}
+
+	msgPrunedBlock, err := wire.NewMsgBlockPrunedFromMsgBlockAbe(&msgBlock)
+	if err != nil {
+		peerLog.Tracef("Unable to deserialize requested block hash "+
+			"%v: %v", hash, err)
+
+		if doneChan != nil {
+			doneChan <- struct{}{}
+		}
+		return err
+	}
+
+	// Once we have fetched data wait for any previous operation to finish.
+	if waitChan != nil {
+		<-waitChan
+	}
+
+	// We only send the channel for this message if we aren't sending
+	// an inv straight after.
+	//	todo(ABE): ?
+	//  answer: the block may be sent in batches, use this variable to record the location of the next tranfer
+	//         beacuse last Inv message just contain the last batches, so next batches will send a inv message
+	var dc chan<- struct{}
+	continueHash := sp.continueHash // the last hash
+	// if it is nil or cur hash do not equal the continue hash, the sendInv will be false
+	sendInv := continueHash != nil && continueHash.IsEqual(hash)
+	if !sendInv { // if the sendInv is false, the the dc is doneChan else dc is nil
+		dc = doneChan // and the dc is nil means that do not finish the request
+	}
+	//	todo (ABE): as the block is fetched from database, the witness may not be included. If so, regardless of encoding, no witness is provided.
+	sp.QueueMessageWithEncoding(msgPrunedBlock, dc, encoding)
+
 	return nil
 }
 
@@ -1438,10 +1550,13 @@ func disconnectPeer(peerList map[int32]*serverPeer, compareFunc func(*serverPeer
 func newPeerConfig(sp *serverPeer) *peer.Config {
 	return &peer.Config{
 		Listeners: peer.MessageListeners{
-			OnVersion:    sp.OnVersion,
-			OnVerAck:     sp.OnVerAck,
-			OnTx:         sp.OnTx,
-			OnBlock:      sp.OnBlock,
+			OnVersion:     sp.OnVersion,
+			OnVerAck:      sp.OnVerAck,
+			OnTx:          sp.OnTx,
+			OnBlock:       sp.OnBlock,
+			OnPrunedBlock: sp.OnPrunedBlock,
+			OnNeedSet:     sp.OnNeedSet,
+			//OnNeedSetResult: sp.OnNeedSetResult,
 			OnInv:        sp.OnInv,
 			OnHeaders:    sp.OnHeaders,
 			OnGetData:    sp.OnGetData,

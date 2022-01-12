@@ -1821,3 +1821,22 @@ func (b *BlockChain) BlockByHash(hash *chainhash.Hash) (*abeutil.Block, error) {
 	})
 	return block, err
 }
+
+func (b *BlockChain) BlockByHashAbe(hash *chainhash.Hash) (*abeutil.BlockAbe, error) {
+	// Lookup the block hash in block index and ensure it is in the best
+	// chain.
+	node := b.index.LookupNode(hash)
+	if node == nil || !b.bestChain.Contains(node) {
+		str := fmt.Sprintf("block %s is not in the main chain", hash)
+		return nil, errNotInMainChain(str)
+	}
+
+	// Load the block from the database and return it.
+	var block *abeutil.BlockAbe
+	err := b.db.View(func(dbTx database.Tx) error {
+		var err error
+		block, err = dbFetchBlockByNodeAbe(dbTx, node)
+		return err
+	})
+	return block, err
+}

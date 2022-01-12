@@ -48,6 +48,37 @@ type BlockAbe struct {
 	txnsGenerated            bool              // ALL wrapped transactions generated
 }
 
+//	Abe to do
+type PrunedBlock struct {
+	msgPrunedBlock        *wire.MsgPrunedBlock // Underlying MsgBlock
+	serializedPrunedBlock []byte               // Serialized bytes for the block
+	blockHash             *chainhash.Hash      // Cached block hash
+	blockHeight           int32                // Height in the main block chain
+	txnsGenerated         bool                 // ALL wrapped transactions generated
+}
+
+//	Abe to do
+type NeedSet struct {
+	msgNeedSet        *wire.MsgNeedSet // Underlying MsgBlock
+	serializedNeedSet []byte           // Serialized bytes for the block
+}
+
+func (b *NeedSet) MsgNeedSet() *wire.MsgNeedSet {
+	// Return the cached block.
+	return b.msgNeedSet
+}
+
+//	Abe to do
+type NeedSetResult struct {
+	msgNeedSetResult        *wire.MsgNeedSetResult // Underlying MsgBlock
+	serializedNeedSetResult []byte                 // Serialized bytes for the block
+}
+
+func (b *NeedSetResult) MsgNeedSetResult() *wire.MsgNeedSetResult {
+	// Return the cached block.
+	return b.msgNeedSetResult
+}
+
 // MsgBlock returns the underlying wire.MsgBlock for the Block.
 func (b *Block) MsgBlock() *wire.MsgBlock {
 	// Return the cached block.
@@ -58,6 +89,10 @@ func (b *Block) MsgBlock() *wire.MsgBlock {
 func (b *BlockAbe) MsgBlock() *wire.MsgBlockAbe {
 	// Return the cached block.
 	return b.msgBlock
+}
+func (b *PrunedBlock) MsgPrunedBlock() *wire.MsgPrunedBlock {
+	// Return the cached block.
+	return b.msgPrunedBlock
 }
 
 // Bytes returns the serialized bytes for the Block.  This is equivalent to
@@ -98,6 +133,24 @@ func (b *BlockAbe) Bytes() ([]byte, error) {
 
 	// Cache the serialized bytes and return them.
 	b.serializedBlock = serializedBlock
+	return serializedBlock, nil
+}
+func (b *PrunedBlock) Bytes() ([]byte, error) {
+	// Return the cached serialized bytes if it has already been generated.
+	if len(b.serializedPrunedBlock) != 0 {
+		return b.serializedPrunedBlock, nil
+	}
+
+	// Serialize the MsgBlock.
+	w := bytes.NewBuffer(make([]byte, 0, b.msgPrunedBlock.SerializeSize()))
+	err := b.msgPrunedBlock.Serialize(w)
+	if err != nil {
+		return nil, err
+	}
+	serializedBlock := w.Bytes()
+
+	// Cache the serialized bytes and return them.
+	b.serializedPrunedBlock = serializedBlock
 	return serializedBlock, nil
 }
 
@@ -146,6 +199,18 @@ func (b *BlockAbe) Hash() *chainhash.Hash {
 
 	// Cache the block hash and return it.
 	hash := b.msgBlock.BlockHash()
+	b.blockHash = &hash
+	return &hash
+}
+
+func (b *PrunedBlock) Hash() *chainhash.Hash {
+	// Return the cached block hash if it has already been generated.
+	if b.blockHash != nil {
+		return b.blockHash
+	}
+
+	// Cache the block hash and return it.
+	hash := b.msgPrunedBlock.BlockHash()
 	b.blockHash = &hash
 	return &hash
 }
@@ -412,5 +477,28 @@ func NewBlockFromBlockAndBytesAbe(msgBlock *wire.MsgBlockAbe, serializedBlock []
 		msgBlock:        msgBlock,
 		serializedBlock: serializedBlock,
 		blockHeight:     BlockHeightUnknown,
+	}
+}
+
+func NewPrunedBlockFromPrunedBlockAndBytesAbe(msgBlock *wire.MsgPrunedBlock, serializedBlock []byte) *PrunedBlock {
+	hash := msgBlock.BlockHash()
+	return &PrunedBlock{
+		msgPrunedBlock:        msgBlock,
+		serializedPrunedBlock: serializedBlock,
+		blockHash:             &hash,
+		blockHeight:           0,
+		txnsGenerated:         false,
+	}
+}
+func NewNeedSet(needset *wire.MsgNeedSet, serialized []byte) *NeedSet {
+	return &NeedSet{
+		msgNeedSet:        needset,
+		serializedNeedSet: serialized,
+	}
+}
+func NewNeedSetResult(needsetResult *wire.MsgNeedSetResult, serialized []byte) *NeedSetResult {
+	return &NeedSetResult{
+		msgNeedSetResult:        needsetResult,
+		serializedNeedSetResult: serialized,
 	}
 }

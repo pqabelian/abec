@@ -122,6 +122,10 @@ type MessageListeners struct {
 	// OnBlock is invoked when a peer receives a block bitcoin message.
 	OnBlock func(p *Peer, msg *wire.MsgBlockAbe, buf []byte)
 
+	OnPrunedBlock func(p *Peer, msg *wire.MsgPrunedBlock, buf []byte)
+	OnNeedSet     func(p *Peer, msg *wire.MsgNeedSet, buf []byte)
+	//OnNeedSetResult func(p *Peer, msg *wire.MsgNeedSetResult, buf []byte)
+
 	// TODO(ABE): ABE does not support filter.
 	//// OnCFilter is invoked when a peer receives a cfilter bitcoin message.
 	//OnCFilter func(p *Peer, msg *wire.MsgCFilter)
@@ -478,10 +482,13 @@ type Peer struct {
 	sendQueue     chan outMsg
 	sendDoneQueue chan struct{}
 	outputInvChan chan *wire.InvVect
-	inQuit        chan struct{}
-	queueQuit     chan struct{}
-	outQuit       chan struct{}
-	quit          chan struct{}
+
+	needsetResult chan *wire.MsgNeedSetResult
+
+	inQuit    chan struct{}
+	queueQuit chan struct{}
+	outQuit   chan struct{}
+	quit      chan struct{}
 }
 
 // String returns the peer's address and directionality as a human-readable
@@ -938,6 +945,26 @@ func (p *Peer) PushGetHeadersMsg(locator blockchain.BlockLocator, stopHash *chai
 	p.prevGetHdrsBegin = beginHash
 	p.prevGetHdrsStop = stopHash
 	p.prevGetHdrsMtx.Unlock()
+	return nil
+}
+func (p *Peer) PushNeedSetMsg(blockHash chainhash.Hash, hashes []chainhash.Hash) ([]*wire.MsgTxAbe, error) {
+	// Construct the needset request and queue it to be sent.
+	msg := wire.NewMsgNeedSet(blockHash, hashes)
+	var response *wire.MsgNeedSetResult
+	p.QueueMessage(msg, nil)
+	//	todo (ABE): No need to get the reply? if the correspoding peer does not give any reply, what will happen?
+	//	todo (ABE): how to guarantee the corresponding peer think itself to be cureent?
+
+	// Update the previous getheaders request information for filtering
+	// duplicates.
+	response = <-p.needsetResult
+	return response.Txs, nil
+}
+
+func (p *Peer) PushNeedSetResultMsg(blockHash chainhash.Hash, Txs []*wire.MsgTxAbe) error {
+	// Construct the needset request and queue it to be sent.
+	msg := wire.NewMsgNeedSetResult(blockHash, Txs)
+	p.QueueMessage(msg, nil)
 	return nil
 }
 
@@ -1459,7 +1486,16 @@ out:
 			if p.cfg.Listeners.OnBlock != nil {
 				p.cfg.Listeners.OnBlock(p, msg, buf)
 			}
-
+		case *wire.MsgPrunedBlock:
+			if p.cfg.Listeners.OnPrunedBlock != nil {
+				p.cfg.Listeners.OnPrunedBlock(p, msg, buf)
+			}
+		case *wire.MsgNeedSet:
+			if p.cfg.Listeners.OnNeedSet != nil {
+				p.cfg.Listeners.OnNeedSet(p, msg, buf)
+			}
+		case *wire.MsgNeedSetResult:
+			p.needsetResult <- msg
 		case *wire.MsgInv:
 			if p.cfg.Listeners.OnInv != nil {
 				p.cfg.Listeners.OnInv(p, msg)
@@ -1635,7 +1671,7 @@ out:
 				// out immediately, sipping the inv trickle
 				// queue.
 				if iv.Type == wire.InvTypeBlock ||
-					iv.Type == wire.InvTypeWitnessBlock {
+					iv.Type == wire.InvTypeWitnessBlock || iv.Type == wire.InvTypePrunedBlock {
 
 					invMsg := wire.NewMsgInvSizeHint(1)
 					invMsg.AddInvVect(iv)
