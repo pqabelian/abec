@@ -69,7 +69,6 @@ type prunedBlockMsg struct {
 type needSetMsg struct {
 	needset *abeutil.NeedSet
 	peer    *peerpkg.Peer
-	reply   chan struct{}
 }
 
 type needSetResultMsg struct {
@@ -1883,7 +1882,6 @@ out:
 
 			case *needSetMsg:
 				sm.handleNeedSetMsg(msg)
-				msg.reply <- struct{}{}
 
 			case *invMsg:
 				sm.handleInvMsg(msg)
@@ -2100,14 +2098,13 @@ func (sm *SyncManager) QueuePrunedBlock(block *abeutil.PrunedBlock, peer *peerpk
 
 	sm.msgChan <- &prunedBlockMsg{block: block, peer: peer, reply: done}
 }
-func (sm *SyncManager) QueueNeedSet(needset *abeutil.NeedSet, peer *peerpkg.Peer, done chan struct{}) {
+func (sm *SyncManager) QueueNeedSet(needset *abeutil.NeedSet, peer *peerpkg.Peer) {
 	// Don't accept more blocks if we're shutting down.
 	if atomic.LoadInt32(&sm.shutdown) != 0 {
-		done <- struct{}{}
 		return
 	}
 
-	sm.msgChan <- &needSetMsg{needset: needset, peer: peer, reply: done}
+	sm.msgChan <- &needSetMsg{needset: needset, peer: peer}
 }
 
 //func (sm *SyncManager) QueueNeedSetResult(res *abeutil.NeedSetResult, peer *peerpkg.Peer, done chan struct{}) {
