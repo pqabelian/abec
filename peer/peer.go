@@ -2302,7 +2302,8 @@ func newPeerBase(origCfg *Config, inbound bool) *Peer {
 		knownInventory:  lru.NewCache(maxKnownInventory),
 		stallControl:    make(chan stallControlMsg, 1), // nonblocking sync
 		outputQueue:     make(chan outMsg, outputBufferSize),
-		sendQueue:       make(chan outMsg, 1),   // nonblocking sync
+		sendQueue:       make(chan outMsg, 1), // nonblocking sync
+		needsetResult:   make(chan *wire.MsgNeedSetResult, 1),
 		sendDoneQueue:   make(chan struct{}, 1), // nonblocking sync
 		outputInvChan:   make(chan *wire.InvVect, outputBufferSize),
 		inQuit:          make(chan struct{}),

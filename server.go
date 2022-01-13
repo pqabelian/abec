@@ -512,7 +512,6 @@ func (sp *serverPeer) OnPrunedBlock(_ *peer.Peer, msg *wire.MsgPrunedBlock, buf 
 	// thread and therefore blocks further messages until
 	// the block has been fully processed.
 	sp.server.syncManager.QueuePrunedBlock(prunedBlock, sp.Peer, sp.blockProcessed)
-	<-sp.blockProcessed
 }
 func (sp *serverPeer) OnNeedSet(_ *peer.Peer, msg *wire.MsgNeedSet, buf []byte) {
 	// Convert the raw MsgBlock to a abeutil.Block which provides some
@@ -531,7 +530,6 @@ func (sp *serverPeer) OnNeedSet(_ *peer.Peer, msg *wire.MsgNeedSet, buf []byte) 
 	// thread and therefore blocks further messages until
 	// the block has been fully processed.
 	sp.server.syncManager.QueueNeedSet(needSet, sp.Peer, sp.blockProcessed)
-	<-sp.blockProcessed
 }
 
 // OnInv is invoked when a peer receives an inv message and is

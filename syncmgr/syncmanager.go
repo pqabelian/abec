@@ -1148,6 +1148,7 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	delete(sm.requestedBlocks, *blockHash)
 
 	var msgBlockAbe wire.MsgBlockAbe
+	msgBlockAbe.Header = bmsg.block.MsgPrunedBlock().Header
 	msgBlockAbe.Transactions = make([]*wire.MsgTxAbe, 0, len(bmsg.block.MsgPrunedBlock().TransactionHashes))
 	needSet := make([]chainhash.Hash, 0, len(bmsg.block.MsgPrunedBlock().TransactionHashes))
 	// try to restore the block
@@ -1164,9 +1165,10 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	}
 
 	// wait the needsetResult
-	var txmap map[chainhash.Hash]*wire.MsgTxAbe
+	txmap := make(map[chainhash.Hash]*wire.MsgTxAbe)
 	if len(needSet) != 0 {
 		txs, err := peer.PushNeedSetMsg(*blockHash, needSet)
+
 		if err != nil {
 			log.Infof("Rejected block %v from %s: %v", blockHash,
 				peer, err)
@@ -1360,7 +1362,7 @@ func (sm *SyncManager) handleNeedSetMsg(imsg *needSetMsg) {
 		return
 	}
 	originTxs := block.Transactions()
-	var txhashMap map[chainhash.Hash]*abeutil.TxAbe
+	txhashMap := make(map[chainhash.Hash]*abeutil.TxAbe)
 	for i := 0; i < len(originTxs); i++ {
 		txhash := originTxs[i].Hash()
 		txhashMap[*txhash] = originTxs[i]
@@ -1370,7 +1372,7 @@ func (sm *SyncManager) handleNeedSetMsg(imsg *needSetMsg) {
 		rtxs[i] = txhashMap[txhash].MsgTx()
 	}
 	result := wire.NewMsgNeedSetResult(blockHash, rtxs)
-	peer.QueueMessage(result, nil)
+	peer.QueueMessageWithEncoding(result, nil, wire.WitnessEncoding)
 }
 
 //func (sm *SyncManager) handleNeedSetResultMsg(imsg *needSetResultMsg) {
@@ -1621,7 +1623,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 	lastBlock := -1
 	invVects := imsg.inv.InvList
 	for i := len(invVects) - 1; i >= 0; i-- {
-		if invVects[i].Type == wire.InvTypeBlock {
+		if invVects[i].Type == wire.InvTypeBlock || invVects[i].Type == wire.InvTypePrunedBlock {
 			//	todo(ABE): for block-invMsg, for block, there is only InvTypeBlock? without InvTypeWitnessTx
 			lastBlock = i
 			break
@@ -1717,7 +1719,10 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 			state.requestQueue = append(state.requestQueue, iv)
 			continue
 		}
-
+		if iv.Type == wire.InvTypePrunedBlock {
+			state.requestQueue = append(state.requestQueue, iv)
+			continue
+		}
 		if iv.Type == wire.InvTypeBlock {
 			// The block is an orphan block that we already have.
 			// When the existing orphan was processed, it requested
@@ -1757,6 +1762,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 				peer.PushGetBlocksMsg(locator, &zeroHash)
 			}
 		}
+
 	}
 
 	// Request as much as possible at once.  Anything that won't fit into
@@ -1956,7 +1962,8 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 		}
 
 		// Generate the inventory vector and relay it.
-		iv := wire.NewInvVect(wire.InvTypeBlock, block.Hash())
+		//iv := wire.NewInvVect(wire.InvTypeBlock, block.Hash())
+		iv := wire.NewInvVect(wire.InvTypePrunedBlock, block.Hash())
 		sm.peerNotifier.RelayInventory(iv, block.MsgBlock().Header)
 
 	// A block has been connected to the main block chain.

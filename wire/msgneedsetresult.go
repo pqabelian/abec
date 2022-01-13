@@ -34,6 +34,7 @@ func (msg *MsgNeedSetResult) BtcDecode(r io.Reader, pver uint32, enc MessageEnco
 	// order to reduce the number of allocations.
 	msg.Txs = make([]*MsgTxAbe, count)
 	for i := uint64(0); i < count; i++ {
+		msg.Txs[i] = NewMsgTxAbe(TxVersion)
 		err = msg.Txs[i].Deserialize(r)
 		if err != nil {
 			return err
