@@ -466,7 +466,8 @@ func (sp *serverPeer) OnTx(_ *peer.Peer, msg *wire.MsgTxAbe) {
 
 // OnBlock is invoked when a peer receives a block message.  It
 // blocks until the block has been fully processed.
-func (sp *serverPeer) OnBlock(_ *peer.Peer, msg *wire.MsgBlockAbe, buf []byte) {
+func (sp *serverPeer) OnBlock(p *peer.Peer, msg *wire.MsgBlockAbe, buf []byte) {
+	peerLog.Debugf("Receive block %s containing %v transactions from peer %s", msg.BlockHash().String(), len(msg.Transactions), p)
 	// Convert the raw MsgBlock to a abeutil.Block which provides some
 	// convenience methods and things such as hash caching.
 	block := abeutil.NewBlockFromBlockAndBytesAbe(msg, buf) // TODO(abe): the height of block is unknown
@@ -490,7 +491,8 @@ func (sp *serverPeer) OnBlock(_ *peer.Peer, msg *wire.MsgBlockAbe, buf []byte) {
 	<-sp.blockProcessed
 }
 
-func (sp *serverPeer) OnPrunedBlock(_ *peer.Peer, msg *wire.MsgPrunedBlock, buf []byte) {
+func (sp *serverPeer) OnPrunedBlock(p *peer.Peer, msg *wire.MsgPrunedBlock, buf []byte) {
+	peerLog.Debugf("Receive pruned block %s containing %v transactions from peer %s", msg.BlockHash().String(), len(msg.TransactionHashes), p)
 	// Convert the raw MsgBlock to a abeutil.Block which provides some
 	// convenience methods and things such as hash caching.
 	//block := abeutil.NewBlockFromBlockAndBytesAbe(msg, buf) // TODO(abe): the height of block is unknown
@@ -537,7 +539,13 @@ func (sp *serverPeer) OnNeedSet(_ *peer.Peer, msg *wire.MsgNeedSet, buf []byte) 
 // used to examine the inventory being advertised by the remote peer and react
 // accordingly.  We pass the message down to blockmanager which will call
 // QueueMessage with any appropriate responses.
-func (sp *serverPeer) OnInv(_ *peer.Peer, msg *wire.MsgInv) {
+func (sp *serverPeer) OnInv(p *peer.Peer, msg *wire.MsgInv) {
+	if len(msg.InvList) == 0 {
+		peerLog.Debugf("Receive inv message with empty InvList from peer %s", p)
+	} else {
+		peerLog.Debugf("Receive inv message with length %v, type %s from peer %s", len(msg.InvList), msg.InvList[0].Type.String(), p)
+	}
+
 	if !cfg.BlocksOnly {
 		if len(msg.InvList) > 0 {
 			sp.server.syncManager.QueueInv(msg, sp.Peer)
@@ -1354,6 +1362,7 @@ func (s *server) handleRelayInvMsg(state *peerState, msg relayMsg) {
 		// Queue the inventory to be relayed with the next batch.
 		// It will be ignored if the peer is already known to
 		// have the inventory.
+		peerLog.Debugf("Send inv message type %s, hash %s to peer %s", msg.invVect.Type.String(), msg.invVect.Hash.String(), sp)
 		sp.QueueInventory(msg.invVect)
 	})
 }

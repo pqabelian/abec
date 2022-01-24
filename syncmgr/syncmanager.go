@@ -586,6 +586,8 @@ func (sm *SyncManager) handleTxMsgAbe(tmsg *txMsgAbe) {
 		return
 	}
 
+	log.Debugf("Receive tx message whose hash is %s from peer %s", tmsg.tx.MsgTx().TxHash().String(), peer)
+
 	// NOTE:  BitcoinJ, and possibly other wallets, don't follow the spec of
 	// sending an inventory message and allowing the remote peer to decide
 	// whether or not they want to request the transaction via a getdata
@@ -1096,9 +1098,11 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	peer := bmsg.peer
 	state, exists := sm.peerStates[peer]
 	if !exists {
-		log.Warnf("Received block message from unknown peer %s", peer)
+		log.Warnf("Received pruned block message from unknown peer %s", peer)
 		return
 	}
+
+	log.Debugf("Receive pruned block hash %s from peer %s", bmsg.block.Hash().String(), peer)
 
 	// If we didn't ask for this block then the peer is misbehaving.
 	blockHash := bmsg.block.Hash()
@@ -1166,6 +1170,7 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	// wait the needsetResult
 	txmap := make(map[chainhash.Hash]*wire.MsgTxAbe)
 	if len(needSet) != 0 {
+		log.Debugf("Missing %v transactions in pruned block %s from peer %s, sending needset message...", len(needSet), bmsg.block.Hash().String(), peer)
 		txs, err := peer.PushNeedSetMsg(*blockHash, needSet)
 
 		if err != nil {
@@ -1173,11 +1178,15 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 				peer, err)
 			return
 		}
+
+		log.Debugf("Receive need set result containing %v transactions from peer %s, restoring...", len(txs), peer)
+
 		for _, tx := range txs {
 			txhash := tx.TxHash()
 			txmap[txhash] = tx
 		}
 	}
+
 	// restore
 	for i := 0; i < len(bmsg.block.MsgPrunedBlock().TransactionHashes); i++ {
 		txHash := bmsg.block.MsgPrunedBlock().TransactionHashes[i]
@@ -1350,12 +1359,15 @@ func (sm *SyncManager) handleNeedSetMsg(imsg *needSetMsg) {
 	peer := imsg.peer
 	_, exists := sm.peerStates[peer]
 	if !exists {
-		log.Warnf("Received inv message from unknown peer %s", peer)
+		log.Warnf("Received needset message from unknown peer %s", peer)
 		return
 	}
 
 	hashes := imsg.needset.MsgNeedSet().Hashes
 	blockHash := imsg.needset.MsgNeedSet().BlockHash
+
+	log.Debugf("Receive needset message requiring %v transactions in block %s from peer %s", len(hashes), blockHash.String(), peer)
+
 	block, err := sm.chain.BlockByHashAbe(&blockHash)
 	if err != nil {
 		return
@@ -1371,6 +1383,8 @@ func (sm *SyncManager) handleNeedSetMsg(imsg *needSetMsg) {
 		rtxs[i] = txhashMap[txhash].MsgTx()
 	}
 	result := wire.NewMsgNeedSetResult(blockHash, rtxs)
+
+	log.Debugf("Send needsetresult message containing %v transactions in block %s to peer %s", len(hashes), blockHash.String(), peer)
 	peer.QueueMessageWithEncoding(result, nil, wire.WitnessEncoding)
 }
 
