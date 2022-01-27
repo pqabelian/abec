@@ -956,6 +956,8 @@ func (p *Peer) PushNeedSetMsg(blockHash chainhash.Hash, hashes []chainhash.Hash)
 
 	for {
 		select {
+		case <-time.After(time.Minute * 2):
+			return nil, errors.New("time out")
 		case <-p.quit:
 			return nil, errors.New("peer disconnected")
 		default:

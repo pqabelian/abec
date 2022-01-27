@@ -1355,39 +1355,39 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	}
 }
 
-func (sm *SyncManager) handleNeedSetMsg(imsg *needSetMsg) {
-	peer := imsg.peer
-	_, exists := sm.peerStates[peer]
-	if !exists {
-		log.Warnf("Received needset message from unknown peer %s", peer)
-		return
-	}
-
-	hashes := imsg.needset.MsgNeedSet().Hashes
-	blockHash := imsg.needset.MsgNeedSet().BlockHash
-
-	log.Debugf("Receive needset message requiring %v transactions in block %s from peer %s", len(hashes), blockHash.String(), peer)
-
-	block, err := sm.chain.BlockByHashAbe(&blockHash)
-	if err != nil {
-		return
-	}
-	originTxs := block.Transactions()
-	txhashMap := make(map[chainhash.Hash]*abeutil.TxAbe)
-	for i := 0; i < len(originTxs); i++ {
-		txhash := originTxs[i].Hash()
-		txhashMap[*txhash] = originTxs[i]
-	}
-	rtxs := make([]*wire.MsgTxAbe, len(hashes))
-	for i, txhash := range hashes {
-		rtxs[i] = txhashMap[txhash].MsgTx()
-	}
-	//result := wire.NewMsgNeedSetResult(blockHash, rtxs)
-
-	log.Debugf("Send needsetresult message containing %v transactions in block %s to peer %s", len(hashes), blockHash.String(), peer)
-	msg := wire.NewMsgNeedSetResult(blockHash, rtxs)
-	peer.QueueMessageWithEncoding(msg, nil, wire.WitnessEncoding)
-}
+//func (sm *SyncManager) handleNeedSetMsg(imsg *needSetMsg) {
+//	peer := imsg.peer
+//	_, exists := sm.peerStates[peer]
+//	if !exists {
+//		log.Warnf("Received needset message from unknown peer %s", peer)
+//		return
+//	}
+//
+//	hashes := imsg.needset.MsgNeedSet().Hashes
+//	blockHash := imsg.needset.MsgNeedSet().BlockHash
+//
+//	log.Debugf("Receive needset message requiring %v transactions in block %s from peer %s", len(hashes), blockHash.String(), peer)
+//
+//	block, err := sm.chain.BlockByHashAbe(&blockHash)
+//	if err != nil {
+//		return
+//	}
+//	originTxs := block.Transactions()
+//	txhashMap := make(map[chainhash.Hash]*abeutil.TxAbe)
+//	for i := 0; i < len(originTxs); i++ {
+//		txhash := originTxs[i].Hash()
+//		txhashMap[*txhash] = originTxs[i]
+//	}
+//	rtxs := make([]*wire.MsgTxAbe, len(hashes))
+//	for i, txhash := range hashes {
+//		rtxs[i] = txhashMap[txhash].MsgTx()
+//	}
+//	//result := wire.NewMsgNeedSetResult(blockHash, rtxs)
+//
+//	log.Debugf("Send needsetresult message containing %v transactions in block %s to peer %s", len(hashes), blockHash.String(), peer)
+//	msg := wire.NewMsgNeedSetResult(blockHash, rtxs)
+//	peer.QueueMessageWithEncoding(msg, nil, wire.WitnessEncoding)
+//}
 
 //func (sm *SyncManager) handleNeedSetResultMsg(imsg *needSetResultMsg) {
 //	peer := imsg.peer
@@ -1898,8 +1898,8 @@ out:
 				sm.handlePrunedBlockMsgAbe(msg)
 				msg.reply <- struct{}{}
 
-			case *needSetMsg:
-				sm.handleNeedSetMsg(msg)
+			//case *needSetMsg:
+			//	sm.handleNeedSetMsg(msg)
 
 			case *invMsg:
 				sm.handleInvMsg(msg)
@@ -2116,24 +2116,25 @@ func (sm *SyncManager) QueuePrunedBlock(block *abeutil.PrunedBlock, peer *peerpk
 
 	sm.msgChan <- &prunedBlockMsg{block: block, peer: peer, reply: done}
 }
-func (sm *SyncManager) QueueNeedSet(needset *abeutil.NeedSet, peer *peerpkg.Peer) {
-	// Don't accept more blocks if we're shutting down.
-	if atomic.LoadInt32(&sm.shutdown) != 0 {
-		return
-	}
 
-	sm.msgChan <- &needSetMsg{needset: needset, peer: peer}
-}
-
-func (sm *SyncManager) QueueNeedSetResult(res *abeutil.NeedSetResult, peer *peerpkg.Peer, done chan struct{}) {
-	// Don't accept more blocks if we're shutting down.
-	if atomic.LoadInt32(&sm.shutdown) != 0 {
-		done <- struct{}{}
-		return
-	}
-
-	sm.msgChan <- &needSetResultMsg{result: res, peer: peer, reply: done}
-}
+//func (sm *SyncManager) QueueNeedSet(needset *abeutil.NeedSet, peer *peerpkg.Peer) {
+//	// Don't accept more blocks if we're shutting down.
+//	if atomic.LoadInt32(&sm.shutdown) != 0 {
+//		return
+//	}
+//
+//	sm.msgChan <- &needSetMsg{needset: needset, peer: peer}
+//}
+//
+//func (sm *SyncManager) QueueNeedSetResult(res *abeutil.NeedSetResult, peer *peerpkg.Peer, done chan struct{}) {
+//	// Don't accept more blocks if we're shutting down.
+//	if atomic.LoadInt32(&sm.shutdown) != 0 {
+//		done <- struct{}{}
+//		return
+//	}
+//
+//	sm.msgChan <- &needSetResultMsg{result: res, peer: peer, reply: done}
+//}
 
 // QueueInv adds the passed inv message and peer to the block handling queue.
 func (sm *SyncManager) QueueInv(inv *wire.MsgInv, peer *peerpkg.Peer) {

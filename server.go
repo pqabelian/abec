@@ -256,7 +256,7 @@ type serverPeer struct {
 	// The following chans are used to sync blockmanager and server.
 	txProcessed    chan struct{}
 	blockProcessed chan struct{}
-	nsProcessed    chan struct{}
+	//nsProcessed    chan struct{}
 }
 
 // newServerPeer returns a new serverPeer instance. The peer needs to be set by
@@ -520,20 +520,10 @@ func (sp *serverPeer) OnPrunedBlock(p *peer.Peer, msg *wire.MsgPrunedBlock, buf 
 func (sp *serverPeer) OnNeedSet(_ *peer.Peer, msg *wire.MsgNeedSet, buf []byte) {
 	// Convert the raw MsgBlock to a abeutil.Block which provides some
 	// convenience methods and things such as hash caching.
-	needSet := abeutil.NewNeedSet(msg, buf)
-
-	// Queue the block up to be handled by the block
-	// manager and intentionally block further receives
-	// until the block is fully processed and known
-	// good or bad.  This helps prevent a malicious peer
-	// from queuing up a bunch of bad blocks before
-	// disconnecting (or being disconnected) and wasting
-	// memory.  Additionally, this behavior is depended on
-	// by at least the block acceptance test tool as the
-	// reference implementation processes blocks in the same
-	// thread and therefore blocks further messages until
-	// the block has been fully processed.
-	sp.server.syncManager.QueueNeedSet(needSet, sp.Peer)
+	err := sp.server.pushNeedSetResultMsg(sp, msg.BlockHash, msg.Hashes, wire.WitnessEncoding)
+	if err != nil {
+		// do nothing
+	}
 }
 
 // OnInv is invoked when a peer receives an inv message and is
@@ -988,6 +978,36 @@ func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<-
 	return nil
 }
 
+func (s *server) pushNeedSetResultMsg(sp *serverPeer, blockHash chainhash.Hash,
+	txHashes []chainhash.Hash, encoding wire.MessageEncoding) error {
+
+	block, err := sp.server.chain.BlockByHashAbe(&blockHash)
+	if err != nil {
+		sp.PushRejectMsg(wire.CmdNeedSet, wire.RejectInvalid, "invalid block hash", &blockHash, false)
+		return err
+	}
+	originTxs := block.Transactions()
+	txhashMap := make(map[chainhash.Hash]*abeutil.TxAbe)
+	for i := 0; i < len(originTxs); i++ {
+		txhash := originTxs[i].Hash()
+		txhashMap[*txhash] = originTxs[i]
+	}
+	rtxs := make([]*wire.MsgTxAbe, len(txHashes))
+	for i, txhash := range txHashes {
+		rtxs[i] = txhashMap[txhash].MsgTx()
+	}
+	resMsg := wire.NewMsgNeedSetResult(blockHash, rtxs)
+
+	doneChan := make(chan struct{}, 1)
+
+	sp.QueueMessageWithEncoding(resMsg, doneChan, encoding)
+
+	<-doneChan
+
+	fmt.Printf("Successful send a needset result message to %v\n", sp.Addr())
+	return nil
+}
+
 // pushBlockMsg sends a block message for the provided block hash to the
 // connected peer.  An error is returned if the block hash is not known.
 //	todo(ABE):
@@ -1122,33 +1142,6 @@ func (s *server) pushPrunedBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneCh
 	}
 	//	todo (ABE): as the block is fetched from database, the witness may not be included. If so, regardless of encoding, no witness is provided.
 	sp.QueueMessageWithEncoding(msgPrunedBlock, dc, encoding)
-
-	return nil
-}
-
-func (s *server) pushNeedSetResultMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
-	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
-
-	// Attempt to fetch the requested transaction from the pool.  A
-	// call could be made to check for existence first, but simply trying
-	// to fetch a missing transaction results in the same behavior.
-	tx, err := s.txMemPool.FetchTransaction(hash)
-	if err != nil {
-		peerLog.Tracef("Unable to fetch tx %v from transaction "+
-			"pool: %v", hash, err)
-
-		if doneChan != nil {
-			doneChan <- struct{}{}
-		}
-		return err
-	}
-
-	// Once we have fetched data wait for any previous operation to finish.
-	if waitChan != nil {
-		<-waitChan
-	}
-
-	sp.QueueMessageWithEncoding(tx.MsgTx(), doneChan, encoding)
 
 	return nil
 }
