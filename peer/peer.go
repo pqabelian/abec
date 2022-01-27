@@ -122,9 +122,9 @@ type MessageListeners struct {
 	// OnBlock is invoked when a peer receives a block bitcoin message.
 	OnBlock func(p *Peer, msg *wire.MsgBlockAbe, buf []byte)
 
-	OnPrunedBlock func(p *Peer, msg *wire.MsgPrunedBlock, buf []byte)
-	OnNeedSet     func(p *Peer, msg *wire.MsgNeedSet, buf []byte)
-	//OnNeedSetResult func(p *Peer, msg *wire.MsgNeedSetResult, buf []byte)
+	OnPrunedBlock   func(p *Peer, msg *wire.MsgPrunedBlock, buf []byte)
+	OnNeedSet       func(p *Peer, msg *wire.MsgNeedSet, buf []byte)
+	OnNeedSetResult func(p *Peer, msg *wire.MsgNeedSetResult, buf []byte)
 
 	// TODO(ABE): ABE does not support filter.
 	//// OnCFilter is invoked when a peer receives a cfilter bitcoin message.
@@ -957,14 +957,20 @@ func (p *Peer) PushNeedSetMsg(blockHash chainhash.Hash, hashes []chainhash.Hash)
 
 	// Update the previous getheaders request information for filtering
 	// duplicates.
-	response = <-p.needsetResult
-	return response.Txs, nil
+
+	select {
+	case response = <-p.needsetResult:
+		return response.Txs, nil
+	case <-p.quit:
+		return nil, nil
+	}
+
 }
 
 func (p *Peer) PushNeedSetResultMsg(blockHash chainhash.Hash, Txs []*wire.MsgTxAbe) error {
 	// Construct the needset request and queue it to be sent.
 	msg := wire.NewMsgNeedSetResult(blockHash, Txs)
-	p.QueueMessage(msg, nil)
+	p.QueueMessageWithEncoding(msg, nil, wire.WitnessEncoding)
 	return nil
 }
 

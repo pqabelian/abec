@@ -1173,7 +1173,7 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 		log.Debugf("Missing %v transactions in pruned block %s from peer %s, sending needset message...", len(needSet), bmsg.block.Hash().String(), peer)
 		txs, err := peer.PushNeedSetMsg(*blockHash, needSet)
 
-		if err != nil {
+		if txs == nil || err != nil {
 			log.Infof("Rejected block %v from %s: %v", blockHash,
 				peer, err)
 			return
@@ -1382,10 +1382,10 @@ func (sm *SyncManager) handleNeedSetMsg(imsg *needSetMsg) {
 	for i, txhash := range hashes {
 		rtxs[i] = txhashMap[txhash].MsgTx()
 	}
-	result := wire.NewMsgNeedSetResult(blockHash, rtxs)
+	//result := wire.NewMsgNeedSetResult(blockHash, rtxs)
 
 	log.Debugf("Send needsetresult message containing %v transactions in block %s to peer %s", len(hashes), blockHash.String(), peer)
-	peer.QueueMessageWithEncoding(result, nil, wire.WitnessEncoding)
+	peer.PushNeedSetResultMsg(blockHash, rtxs)
 }
 
 //func (sm *SyncManager) handleNeedSetResultMsg(imsg *needSetResultMsg) {
@@ -2124,15 +2124,15 @@ func (sm *SyncManager) QueueNeedSet(needset *abeutil.NeedSet, peer *peerpkg.Peer
 	sm.msgChan <- &needSetMsg{needset: needset, peer: peer}
 }
 
-//func (sm *SyncManager) QueueNeedSetResult(res *abeutil.NeedSetResult, peer *peerpkg.Peer, done chan struct{}) {
-//	// Don't accept more blocks if we're shutting down.
-//	if atomic.LoadInt32(&sm.shutdown) != 0 {
-//		done <- struct{}{}
-//		return
-//	}
-//
-//	sm.msgChan <- &needSetResultMsg{result: res, peer: peer, reply: done}
-//}
+func (sm *SyncManager) QueueNeedSetResult(res *abeutil.NeedSetResult, peer *peerpkg.Peer, done chan struct{}) {
+	// Don't accept more blocks if we're shutting down.
+	if atomic.LoadInt32(&sm.shutdown) != 0 {
+		done <- struct{}{}
+		return
+	}
+
+	sm.msgChan <- &needSetResultMsg{result: res, peer: peer, reply: done}
+}
 
 // QueueInv adds the passed inv message and peer to the block handling queue.
 func (sm *SyncManager) QueueInv(inv *wire.MsgInv, peer *peerpkg.Peer) {

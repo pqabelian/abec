@@ -256,6 +256,7 @@ type serverPeer struct {
 	// The following chans are used to sync blockmanager and server.
 	txProcessed    chan struct{}
 	blockProcessed chan struct{}
+	nsProcessed    chan struct{}
 }
 
 // newServerPeer returns a new serverPeer instance. The peer needs to be set by
@@ -533,6 +534,25 @@ func (sp *serverPeer) OnNeedSet(_ *peer.Peer, msg *wire.MsgNeedSet, buf []byte) 
 	// thread and therefore blocks further messages until
 	// the block has been fully processed.
 	sp.server.syncManager.QueueNeedSet(needSet, sp.Peer)
+}
+
+func (sp *serverPeer) OnNeedSetResult(_ *peer.Peer, msg *wire.MsgNeedSetResult, buf []byte) {
+	// Convert the raw MsgBlock to a abeutil.Block which provides some
+	// convenience methods and things such as hash caching.
+	needSet := abeutil.NewNeedSetResult(msg, buf)
+
+	// Queue the block up to be handled by the block
+	// manager and intentionally block further receives
+	// until the block is fully processed and known
+	// good or bad.  This helps prevent a malicious peer
+	// from queuing up a bunch of bad blocks before
+	// disconnecting (or being disconnected) and wasting
+	// memory.  Additionally, this behavior is depended on
+	// by at least the block acceptance test tool as the
+	// reference implementation processes blocks in the same
+	// thread and therefore blocks further messages until
+	// the block has been fully processed.
+	sp.server.syncManager.QueueNeedSetResult(needSet, sp.Peer, sp.nsProcessed)
 }
 
 // OnInv is invoked when a peer receives an inv message and is
@@ -1125,6 +1145,33 @@ func (s *server) pushPrunedBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneCh
 	return nil
 }
 
+func (s *server) pushNeedSetResultMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
+	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
+
+	// Attempt to fetch the requested transaction from the pool.  A
+	// call could be made to check for existence first, but simply trying
+	// to fetch a missing transaction results in the same behavior.
+	tx, err := s.txMemPool.FetchTransaction(hash)
+	if err != nil {
+		peerLog.Tracef("Unable to fetch tx %v from transaction "+
+			"pool: %v", hash, err)
+
+		if doneChan != nil {
+			doneChan <- struct{}{}
+		}
+		return err
+	}
+
+	// Once we have fetched data wait for any previous operation to finish.
+	if waitChan != nil {
+		<-waitChan
+	}
+
+	sp.QueueMessageWithEncoding(tx.MsgTx(), doneChan, encoding)
+
+	return nil
+}
+
 // handleUpdatePeerHeight updates the heights of all peers who were known to
 // announce a block we recently accepted.
 func (s *server) handleUpdatePeerHeights(state *peerState, umsg updatePeerHeightsMsg) {
@@ -1558,24 +1605,24 @@ func disconnectPeer(peerList map[int32]*serverPeer, compareFunc func(*serverPeer
 func newPeerConfig(sp *serverPeer) *peer.Config {
 	return &peer.Config{
 		Listeners: peer.MessageListeners{
-			OnVersion:     sp.OnVersion,
-			OnVerAck:      sp.OnVerAck,
-			OnTx:          sp.OnTx,
-			OnBlock:       sp.OnBlock,
-			OnPrunedBlock: sp.OnPrunedBlock,
-			OnNeedSet:     sp.OnNeedSet,
-			//OnNeedSetResult: sp.OnNeedSetResult,
-			OnInv:        sp.OnInv,
-			OnHeaders:    sp.OnHeaders,
-			OnGetData:    sp.OnGetData,
-			OnGetBlocks:  sp.OnGetBlocks,
-			OnGetHeaders: sp.OnGetHeaders,
-			OnFeeFilter:  sp.OnFeeFilter,
-			OnGetAddr:    sp.OnGetAddr,
-			OnAddr:       sp.OnAddr,
-			OnRead:       sp.OnRead,
-			OnWrite:      sp.OnWrite,
-			OnNotFound:   sp.OnNotFound,
+			OnVersion:       sp.OnVersion,
+			OnVerAck:        sp.OnVerAck,
+			OnTx:            sp.OnTx,
+			OnBlock:         sp.OnBlock,
+			OnPrunedBlock:   sp.OnPrunedBlock,
+			OnNeedSet:       sp.OnNeedSet,
+			OnNeedSetResult: sp.OnNeedSetResult,
+			OnInv:           sp.OnInv,
+			OnHeaders:       sp.OnHeaders,
+			OnGetData:       sp.OnGetData,
+			OnGetBlocks:     sp.OnGetBlocks,
+			OnGetHeaders:    sp.OnGetHeaders,
+			OnFeeFilter:     sp.OnFeeFilter,
+			OnGetAddr:       sp.OnGetAddr,
+			OnAddr:          sp.OnAddr,
+			OnRead:          sp.OnRead,
+			OnWrite:         sp.OnWrite,
+			OnNotFound:      sp.OnNotFound,
 
 			// Note: The reference client currently bans peers that send alerts
 			// not signed with its key.  We could verify against their key, but
