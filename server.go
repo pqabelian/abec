@@ -536,25 +536,6 @@ func (sp *serverPeer) OnNeedSet(_ *peer.Peer, msg *wire.MsgNeedSet, buf []byte) 
 	sp.server.syncManager.QueueNeedSet(needSet, sp.Peer)
 }
 
-func (sp *serverPeer) OnNeedSetResult(_ *peer.Peer, msg *wire.MsgNeedSetResult, buf []byte) {
-	// Convert the raw MsgBlock to a abeutil.Block which provides some
-	// convenience methods and things such as hash caching.
-	needSet := abeutil.NewNeedSetResult(msg, buf)
-
-	// Queue the block up to be handled by the block
-	// manager and intentionally block further receives
-	// until the block is fully processed and known
-	// good or bad.  This helps prevent a malicious peer
-	// from queuing up a bunch of bad blocks before
-	// disconnecting (or being disconnected) and wasting
-	// memory.  Additionally, this behavior is depended on
-	// by at least the block acceptance test tool as the
-	// reference implementation processes blocks in the same
-	// thread and therefore blocks further messages until
-	// the block has been fully processed.
-	sp.server.syncManager.QueueNeedSetResult(needSet, sp.Peer, sp.nsProcessed)
-}
-
 // OnInv is invoked when a peer receives an inv message and is
 // used to examine the inventory being advertised by the remote peer and react
 // accordingly.  We pass the message down to blockmanager which will call
@@ -1605,24 +1586,24 @@ func disconnectPeer(peerList map[int32]*serverPeer, compareFunc func(*serverPeer
 func newPeerConfig(sp *serverPeer) *peer.Config {
 	return &peer.Config{
 		Listeners: peer.MessageListeners{
-			OnVersion:       sp.OnVersion,
-			OnVerAck:        sp.OnVerAck,
-			OnTx:            sp.OnTx,
-			OnBlock:         sp.OnBlock,
-			OnPrunedBlock:   sp.OnPrunedBlock,
-			OnNeedSet:       sp.OnNeedSet,
-			OnNeedSetResult: sp.OnNeedSetResult,
-			OnInv:           sp.OnInv,
-			OnHeaders:       sp.OnHeaders,
-			OnGetData:       sp.OnGetData,
-			OnGetBlocks:     sp.OnGetBlocks,
-			OnGetHeaders:    sp.OnGetHeaders,
-			OnFeeFilter:     sp.OnFeeFilter,
-			OnGetAddr:       sp.OnGetAddr,
-			OnAddr:          sp.OnAddr,
-			OnRead:          sp.OnRead,
-			OnWrite:         sp.OnWrite,
-			OnNotFound:      sp.OnNotFound,
+			OnVersion:     sp.OnVersion,
+			OnVerAck:      sp.OnVerAck,
+			OnTx:          sp.OnTx,
+			OnBlock:       sp.OnBlock,
+			OnPrunedBlock: sp.OnPrunedBlock,
+			OnNeedSet:     sp.OnNeedSet,
+			//OnNeedSetResult: sp.OnNeedSetResult,
+			OnInv:        sp.OnInv,
+			OnHeaders:    sp.OnHeaders,
+			OnGetData:    sp.OnGetData,
+			OnGetBlocks:  sp.OnGetBlocks,
+			OnGetHeaders: sp.OnGetHeaders,
+			OnFeeFilter:  sp.OnFeeFilter,
+			OnGetAddr:    sp.OnGetAddr,
+			OnAddr:       sp.OnAddr,
+			OnRead:       sp.OnRead,
+			OnWrite:      sp.OnWrite,
+			OnNotFound:   sp.OnNotFound,
 
 			// Note: The reference client currently bans peers that send alerts
 			// not signed with its key.  We could verify against their key, but

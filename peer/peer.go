@@ -122,9 +122,9 @@ type MessageListeners struct {
 	// OnBlock is invoked when a peer receives a block bitcoin message.
 	OnBlock func(p *Peer, msg *wire.MsgBlockAbe, buf []byte)
 
-	OnPrunedBlock   func(p *Peer, msg *wire.MsgPrunedBlock, buf []byte)
-	OnNeedSet       func(p *Peer, msg *wire.MsgNeedSet, buf []byte)
-	OnNeedSetResult func(p *Peer, msg *wire.MsgNeedSetResult, buf []byte)
+	OnPrunedBlock func(p *Peer, msg *wire.MsgPrunedBlock, buf []byte)
+	OnNeedSet     func(p *Peer, msg *wire.MsgNeedSet, buf []byte)
+	//OnNeedSetResult func(p *Peer, msg *wire.MsgNeedSetResult, buf []byte)
 
 	// TODO(ABE): ABE does not support filter.
 	//// OnCFilter is invoked when a peer receives a cfilter bitcoin message.
@@ -483,7 +483,7 @@ type Peer struct {
 	sendDoneQueue chan struct{}
 	outputInvChan chan *wire.InvVect
 
-	needsetResult chan *wire.MsgNeedSetResult
+	needsetResult map[chainhash.Hash]*wire.MsgNeedSetResult
 
 	inQuit    chan struct{}
 	queueQuit chan struct{}
@@ -950,28 +950,20 @@ func (p *Peer) PushGetHeadersMsg(locator blockchain.BlockLocator, stopHash *chai
 func (p *Peer) PushNeedSetMsg(blockHash chainhash.Hash, hashes []chainhash.Hash) ([]*wire.MsgTxAbe, error) {
 	// Construct the needset request and queue it to be sent.
 	msg := wire.NewMsgNeedSet(blockHash, hashes)
-	var response *wire.MsgNeedSetResult
 	p.QueueMessage(msg, nil)
 	//	todo (ABE): No need to get the reply? if the correspoding peer does not give any reply, what will happen?
 	//	todo (ABE): how to guarantee the corresponding peer think itself to be cureent?
 
-	// Update the previous getheaders request information for filtering
-	// duplicates.
-
-	select {
-	case response = <-p.needsetResult:
-		return response.Txs, nil
-	case <-p.quit:
-		return nil, nil
+	for {
+		select {
+		case <-p.quit:
+			return nil, errors.New("peer disconnected")
+		default:
+			if response, ok := p.needsetResult[blockHash]; ok {
+				return response.Txs, nil
+			}
+		}
 	}
-
-}
-
-func (p *Peer) PushNeedSetResultMsg(blockHash chainhash.Hash, Txs []*wire.MsgTxAbe) error {
-	// Construct the needset request and queue it to be sent.
-	msg := wire.NewMsgNeedSetResult(blockHash, Txs)
-	p.QueueMessageWithEncoding(msg, nil, wire.WitnessEncoding)
-	return nil
 }
 
 // PushRejectMsg sends a reject message for the provided command, reject code,
@@ -1501,7 +1493,8 @@ out:
 				p.cfg.Listeners.OnNeedSet(p, msg, buf)
 			}
 		case *wire.MsgNeedSetResult:
-			p.needsetResult <- msg
+			p.needsetResult[msg.BlockHash] = msg
+
 		case *wire.MsgInv:
 			if p.cfg.Listeners.OnInv != nil {
 				p.cfg.Listeners.OnInv(p, msg)
@@ -2309,7 +2302,7 @@ func newPeerBase(origCfg *Config, inbound bool) *Peer {
 		stallControl:    make(chan stallControlMsg, 1), // nonblocking sync
 		outputQueue:     make(chan outMsg, outputBufferSize),
 		sendQueue:       make(chan outMsg, 1), // nonblocking sync
-		needsetResult:   make(chan *wire.MsgNeedSetResult, 1),
+		needsetResult:   make(map[chainhash.Hash]*wire.MsgNeedSetResult),
 		sendDoneQueue:   make(chan struct{}, 1), // nonblocking sync
 		outputInvChan:   make(chan *wire.InvVect, outputBufferSize),
 		inQuit:          make(chan struct{}),

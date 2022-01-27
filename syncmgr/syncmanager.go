@@ -1385,7 +1385,8 @@ func (sm *SyncManager) handleNeedSetMsg(imsg *needSetMsg) {
 	//result := wire.NewMsgNeedSetResult(blockHash, rtxs)
 
 	log.Debugf("Send needsetresult message containing %v transactions in block %s to peer %s", len(hashes), blockHash.String(), peer)
-	peer.PushNeedSetResultMsg(blockHash, rtxs)
+	msg := wire.NewMsgNeedSetResult(blockHash, rtxs)
+	peer.QueueMessageWithEncoding(msg, nil, wire.WitnessEncoding)
 }
 
 //func (sm *SyncManager) handleNeedSetResultMsg(imsg *needSetResultMsg) {
