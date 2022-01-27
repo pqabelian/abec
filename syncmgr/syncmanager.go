@@ -1715,6 +1715,10 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 					continue
 				}
 			}
+			if iv.Type == wire.InvTypePrunedBlock {
+				state.requestQueue = append(state.requestQueue, iv)
+				continue
+			}
 
 			// Ignore invs block invs from non-witness enabled
 			// peers, as after segwit activation we only want to
@@ -1734,10 +1738,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 			state.requestQueue = append(state.requestQueue, iv)
 			continue
 		}
-		if iv.Type == wire.InvTypePrunedBlock {
-			state.requestQueue = append(state.requestQueue, iv)
-			continue
-		}
+
 		if iv.Type == wire.InvTypeBlock {
 			// The block is an orphan block that we already have.
 			// When the existing orphan was processed, it requested
