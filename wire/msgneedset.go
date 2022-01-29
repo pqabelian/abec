@@ -9,7 +9,6 @@ import (
 type MsgNeedSet struct {
 	BlockHash chainhash.Hash
 	Hashes    []chainhash.Hash
-	response  MsgNeedSetResult
 }
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.

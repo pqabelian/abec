@@ -483,7 +483,7 @@ type Peer struct {
 	sendDoneQueue chan struct{}
 	outputInvChan chan *wire.InvVect
 
-	needsetResult map[chainhash.Hash]*wire.MsgNeedSetResult
+	needsetResult sync.Map
 
 	inQuit    chan struct{}
 	queueQuit chan struct{}
@@ -953,16 +953,22 @@ func (p *Peer) PushNeedSetMsg(blockHash chainhash.Hash, hashes []chainhash.Hash)
 	p.QueueMessage(msg, nil)
 	//	todo (ABE): No need to get the reply? if the correspoding peer does not give any reply, what will happen?
 	//	todo (ABE): how to guarantee the corresponding peer think itself to be cureent?
+	cnt := 1
+	timeout := time.Tick(time.Minute * 2)
 
 	for {
 		select {
-		case <-time.After(time.Minute * 2):
+		case <-timeout:
+			log.Debugf("The %d-th waiting the result", cnt)
 			return nil, errors.New("time out")
 		case <-p.quit:
 			return nil, errors.New("peer disconnected")
 		default:
-			if response, ok := p.needsetResult[blockHash]; ok {
-				return response.Txs, nil
+			if response, ok := p.needsetResult.LoadAndDelete(blockHash); ok {
+				res := response.(*wire.MsgNeedSetResult)
+				return res.Txs, nil
+			} else {
+				cnt++
 			}
 		}
 	}
@@ -1486,16 +1492,19 @@ out:
 			if p.cfg.Listeners.OnBlock != nil {
 				p.cfg.Listeners.OnBlock(p, msg, buf)
 			}
+
 		case *wire.MsgPrunedBlock:
 			if p.cfg.Listeners.OnPrunedBlock != nil {
 				p.cfg.Listeners.OnPrunedBlock(p, msg, buf)
 			}
+
 		case *wire.MsgNeedSet:
 			if p.cfg.Listeners.OnNeedSet != nil {
 				p.cfg.Listeners.OnNeedSet(p, msg, buf)
 			}
+
 		case *wire.MsgNeedSetResult:
-			p.needsetResult[msg.BlockHash] = msg
+			p.needsetResult.Store(msg.BlockHash, msg)
 
 		case *wire.MsgInv:
 			if p.cfg.Listeners.OnInv != nil {
@@ -2300,11 +2309,11 @@ func newPeerBase(origCfg *Config, inbound bool) *Peer {
 		inbound:      inbound,
 		wireEncoding: wire.BaseEncoding,
 		//knownInventory:  newMruInventoryMap(maxKnownInventory),
-		knownInventory:  lru.NewCache(maxKnownInventory),
-		stallControl:    make(chan stallControlMsg, 1), // nonblocking sync
-		outputQueue:     make(chan outMsg, outputBufferSize),
-		sendQueue:       make(chan outMsg, 1), // nonblocking sync
-		needsetResult:   make(map[chainhash.Hash]*wire.MsgNeedSetResult),
+		knownInventory: lru.NewCache(maxKnownInventory),
+		stallControl:   make(chan stallControlMsg, 1), // nonblocking sync
+		outputQueue:    make(chan outMsg, outputBufferSize),
+		sendQueue:      make(chan outMsg, 1), // nonblocking sync
+		//needsetResult:   ,
 		sendDoneQueue:   make(chan struct{}, 1), // nonblocking sync
 		outputInvChan:   make(chan *wire.InvVect, outputBufferSize),
 		inQuit:          make(chan struct{}),

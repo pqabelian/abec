@@ -1095,6 +1095,12 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 }
 
 func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
+	defer sm.wg.Done()
+	defer func() {
+		if bmsg.reply != nil {
+			bmsg.reply <- struct{}{}
+		}
+	}()
 	peer := bmsg.peer
 	state, exists := sm.peerStates[peer]
 	if !exists {
@@ -1895,8 +1901,9 @@ out:
 				msg.reply <- struct{}{}
 
 			case *prunedBlockMsg:
-				sm.handlePrunedBlockMsgAbe(msg)
-				msg.reply <- struct{}{}
+				// using goroutine to handle pruned block asynchronously
+				sm.wg.Add(1)
+				go sm.handlePrunedBlockMsgAbe(msg)
 
 			//case *needSetMsg:
 			//	sm.handleNeedSetMsg(msg)

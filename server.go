@@ -514,8 +514,7 @@ func (sp *serverPeer) OnPrunedBlock(p *peer.Peer, msg *wire.MsgPrunedBlock, buf 
 	// reference implementation processes blocks in the same
 	// thread and therefore blocks further messages until
 	// the block has been fully processed.
-	sp.server.syncManager.QueuePrunedBlock(prunedBlock, sp.Peer, sp.blockProcessed)
-	<-sp.blockProcessed
+	sp.server.syncManager.QueuePrunedBlock(prunedBlock, sp.Peer, nil)
 }
 func (sp *serverPeer) OnNeedSet(_ *peer.Peer, msg *wire.MsgNeedSet, buf []byte) {
 	// Convert the raw MsgBlock to a abeutil.Block which provides some
@@ -998,13 +997,10 @@ func (s *server) pushNeedSetResultMsg(sp *serverPeer, blockHash chainhash.Hash,
 	}
 	resMsg := wire.NewMsgNeedSetResult(blockHash, rtxs)
 
-	doneChan := make(chan struct{}, 1)
+	sp.QueueMessageWithEncoding(resMsg, nil, encoding)
+	//sp.QueueMessageWithEncoding(block.MsgBlock(), doneChan, encoding)
+	//sp.PushRejectMsg(wire.CmdNeedSet, wire.RejectInvalid, "invalid block hash", &blockHash, false)
 
-	sp.QueueMessageWithEncoding(resMsg, doneChan, encoding)
-
-	<-doneChan
-
-	fmt.Printf("Successful send a needset result message to %v\n", sp.Addr())
 	return nil
 }
 
