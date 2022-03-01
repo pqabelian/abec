@@ -32,7 +32,8 @@ func (msg *MsgPrunedBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncodi
 	if err != nil {
 		return err
 	}
-
+	// TODO: There are something problem becasuse the transaction version would be updated in the future
+	msg.CoinbaseTx = NewMsgTxAbe(TxVersion)
 	err = msg.CoinbaseTx.BtcDecode(r, pver, enc)
 	if err != nil {
 		return err
