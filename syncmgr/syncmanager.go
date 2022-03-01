@@ -1158,9 +1158,11 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 
 	var msgBlockAbe wire.MsgBlockAbe
 	msgBlockAbe.Header = bmsg.block.MsgPrunedBlock().Header
-	msgBlockAbe.Transactions = make([]*wire.MsgTxAbe, 0, len(bmsg.block.MsgPrunedBlock().TransactionHashes))
+	// Add the coinbase transaction to the block
+	msgBlockAbe.Transactions = make([]*wire.MsgTxAbe, 1, len(bmsg.block.MsgPrunedBlock().TransactionHashes))
+	msgBlockAbe.Transactions[0] = bmsg.block.MsgPrunedBlock().CoinbaseTx
 	needSet := make([]chainhash.Hash, 0, len(bmsg.block.MsgPrunedBlock().TransactionHashes))
-	// try to restore the block
+	// try to restore the block with the help of local transaction pool
 	for i := 0; i < len(bmsg.block.MsgPrunedBlock().TransactionHashes); i++ {
 		txHash := bmsg.block.MsgPrunedBlock().TransactionHashes[i]
 		if sm.txMemPool.HaveTransaction(&txHash) {
