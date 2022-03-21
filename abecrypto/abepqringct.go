@@ -89,17 +89,17 @@ func CryptoAddressGen(pp *pqringct.PublicParameter, seed []byte) (serializedAddr
 	return serializedAddress, serializedVSk, serializedASksp, serializedASksn, nil
 }
 
-func valueKeyGen(pp *pqringct.PublicParameter, seed []byte) (serializedVPk []byte, serializedVSksn []byte, serializedVSksp []byte, err error) {
+func valueKeyGen(pp *pqringct.PublicParameter, seed []byte) (serializedVPk []byte, serializedVSk []byte, err error) {
 	if seed == nil || len(seed) != pp.ParamSeedBytesLen() {
-		return nil, nil, nil, errors.New("invalid length of seed")
+		return nil, nil, errors.New("invalid length of seed")
 	}
 	return pqringct.ValueKeyGen(pp, seed)
 }
 
 // AddressKeyGen generate the address key pair for pqringct
-func addressKeyGen(pp *pqringct.PublicParameter, seed []byte) (serializedAPk []byte, serializedASk []byte, err error) {
+func addressKeyGen(pp *pqringct.PublicParameter, seed []byte) (serializedAPk []byte, serializedASksp []byte, serializedASksn []byte, err error) {
 	if seed == nil || len(seed) != pp.ParamSeedBytesLen() {
-		return nil, nil, errors.New("invalid length of seed")
+		return nil, nil, nil, errors.New("invalid length of seed")
 	}
 	return pqringct.AddressKeyGen(pp, seed)
 }
@@ -114,9 +114,9 @@ func CoinbaseTxGen(pp *pqringct.PublicParameter, abeTxOutDescs []*AbeTxOutDesc, 
 	txOutputDescs := make([]*pqringct.TxOutputDescv2, len(abeTxOutDescs))
 	for j := 0; j < len(abeTxOutDescs); j++ {
 		// TODO(20220320): parse the address to serializedApk and serializedVpk
-		pp.GetAddressPublicKeySerializeSize()
-		pp.GetValuePublicKeySerializeSize()
-		serializedApk, serializedVpk := abeTxOutDescs[j].address[:], abeTxOutDescs[j].address[:]
+		apkLen := pp.GetAddressPublicKeySerializeSize()
+		vpkLen := pp.GetValuePublicKeySerializeSize()
+		serializedApk, serializedVpk := abeTxOutDescs[j].address[:apkLen], abeTxOutDescs[j].address[apkLen:apkLen+vpkLen]
 		txOutputDescs[j] = pqringct.NewTxOutputDescv2(serializedApk, serializedVpk, abeTxOutDescs[j].value)
 	}
 	// call the pqringct.CoinbaseTxGen
@@ -238,7 +238,7 @@ func TransferTxGen(pp *pqringct.PublicParameter, abeTxInputDescs []*AbeTxInputDe
 		value := uint64(0)
 		// TODO(20220320): parse the serializedSk to serialized serializedASk, serializedVSk, serialziedVPk
 		serializedASk, serializedVSk, serializedVPk := abeTxInputDescs[i].serializedSk[:], abeTxInputDescs[i].serializedSk[:], abeTxInputDescs[i].serializedSk[:]
-		txInputDescs[i] = pqringct.NewTxInputDescv2(txoList, sidx, serializedASk, serializedVPk, serializedVSk, value)
+		txInputDescs[i] = pqringct.NewTxInputDescv2(txoList, sidx, serializedASk, serializedASk, serializedVPk, serializedVSk, value)
 	}
 
 	// outputDescs
@@ -397,9 +397,7 @@ func TxoSerialNumberGen(pp *pqringct.PublicParameter, txo *wire.TxOutAbe, ringHa
 	return nil
 }
 func TxoCoinReceive(pp *pqringct.PublicParameter, abeTxo *wire.TxOutAbe, address []byte, serializedSkvalue []byte) (valid bool, v uint64) {
-
-	r := bytes.NewReader(abeTxo.TxoScript)
-	txo, err := pp.ReadTxo(r)
+	txo, err := pp.TxoDeserialize(abeTxo.TxoScript)
 	if err != nil {
 		return false, 0
 	}

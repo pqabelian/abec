@@ -32,7 +32,7 @@ func (maddr *AddressPQringct) Serialize() []byte {
 
 	binary.BigEndian.PutUint32(b[1:], uint32(maddr.Version))
 
-	serializeAddressPublicKey, err := maddr.RingCT.SerializeAddressPublicKey(maddr.pk)
+	serializeAddressPublicKey, err := maddr.RingCT.AddressPublicKeySerialize(maddr.pk)
 	if err != nil {
 		panic(err)
 	}
@@ -50,7 +50,7 @@ func (maddr *AddressPQringct) Deserialize(serialized []byte) error {
 	if abecrypto.CryptoScheme(cryptoScheme) != abecrypto.CryptoSchemePQRINGCT {
 		return errors.New("the serialized does not match the rules for AddressPQringct")
 	}
-	mpk, err := maddr.RingCT.DeserializeAddressPublicKey(serialized[5:])
+	mpk, err := maddr.RingCT.AddressPublicKeyDeserialize(serialized[5:])
 	if err != nil {
 		return err
 	}

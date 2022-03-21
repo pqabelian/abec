@@ -100,10 +100,10 @@ func NewAbeTxOutDesc(address []byte, value uint64) *AbeTxOutDesc {
 }
 
 func (pp *AbeCryptoParam) AbeCryptoAddressGen(seed []byte) (retSerializedCryptoAddress []byte, retSerializedVSk []byte, retSerializedASksp []byte, retSerializedASksn []byte, err error) {
-	var serializedAddress, serializedSk []byte
+	var serializedAddress, serializedVSk, serializedASkSp, serializedASkSn []byte
 	switch pp.Version {
 	case CryptoSchemePQRINGCTV2:
-		serializedAddress, serializedSk, err = CryptoAddressGen(pp.RingCT, seed)
+		serializedAddress, serializedVSk, serializedASkSp, serializedASkSn, err = CryptoAddressGen(pp.RingCT, seed)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -117,14 +117,28 @@ func (pp *AbeCryptoParam) AbeCryptoAddressGen(seed []byte) (retSerializedCryptoA
 	retSerializedCryptoAddress = append(retSerializedCryptoAddress, byte(pp.Version>>24))
 	retSerializedCryptoAddress = append(retSerializedCryptoAddress, serializedAddress...)
 
-	retSerializedVSk = make([]byte, 0, 4+len(serializedSk))
+	retSerializedVSk = make([]byte, 0, 4+len(serializedVSk))
 	retSerializedVSk = append(retSerializedVSk, byte(pp.Version>>0))
 	retSerializedVSk = append(retSerializedVSk, byte(pp.Version>>8))
 	retSerializedVSk = append(retSerializedVSk, byte(pp.Version>>16))
 	retSerializedVSk = append(retSerializedVSk, byte(pp.Version>>24))
-	retSerializedVSk = append(retSerializedVSk, serializedSk...)
+	retSerializedVSk = append(retSerializedVSk, serializedVSk...)
 
-	return retSerializedCryptoAddress, retSerializedVSk, nil
+	retSerializedASksp = make([]byte, 0, 4+len(serializedASkSp))
+	retSerializedASksp = append(retSerializedASksp, byte(pp.Version>>0))
+	retSerializedASksp = append(retSerializedASksp, byte(pp.Version>>8))
+	retSerializedASksp = append(retSerializedASksp, byte(pp.Version>>16))
+	retSerializedASksp = append(retSerializedASksp, byte(pp.Version>>24))
+	retSerializedASksp = append(retSerializedASksp, serializedASkSp...)
+
+	retSerializedASksn = make([]byte, 0, 4+len(serializedASkSn))
+	retSerializedASksn = append(retSerializedASksn, byte(pp.Version>>0))
+	retSerializedASksn = append(retSerializedASksn, byte(pp.Version>>8))
+	retSerializedASksn = append(retSerializedASksn, byte(pp.Version>>16))
+	retSerializedASksn = append(retSerializedASksn, byte(pp.Version>>24))
+	retSerializedASksn = append(retSerializedASksn, serializedASkSn...)
+
+	return retSerializedCryptoAddress, retSerializedVSk, retSerializedASksp, retSerializedASksn, nil
 }
 
 func (pp *AbeCryptoParam) CoinbaseTxGen(abeTxOutDescs []*AbeTxOutDesc, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
