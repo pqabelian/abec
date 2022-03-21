@@ -587,7 +587,9 @@ func (b *BlockChain) maybeUpgradeDbBuckets(interrupt <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
+	if utxoSetVersion != 0 {
 
+	}
 	// Update the utxo set to v2 if needed.
 	//TODO(abe):we just have one  version
 	//if utxoSetVersion < 2 {

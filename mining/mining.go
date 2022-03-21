@@ -3,8 +3,7 @@ package mining
 import (
 	"container/heap"
 	"fmt"
-	"github.com/abesuite/abec/abecrypto/abepqringct"
-	"github.com/abesuite/abec/abecrypto/pqringctparam"
+	"github.com/abesuite/abec/abecrypto"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chaincfg"
@@ -371,7 +370,7 @@ func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, extraNonce uint64, tx
 	msgTx.AddTxIn(coinbaseTxIn)
 	tempTxOut := &wire.TxOutAbe{
 		Version:   msgTx.Version,
-		TxoScript: make([]byte, pqringctparam.GetTxoSerializeSize(msgTx.Version)),
+		TxoScript: make([]byte, abecrypto.CryptoPP.GetTxoSerializeSize(msgTx.Version)),
 	}
 
 	//	one or multiple TxoOuts
@@ -383,7 +382,7 @@ func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, extraNonce uint64, tx
 	//msgTx.TxFee = pqringctparam.GetMaxCoinValue(msgTx.Version)
 	msgTx.TxFee = 1 // txFee will be serialized with 8bytes.
 	msgTx.TxMemo = []byte{byte(msgTx.Version >> 24), byte(msgTx.Version >> 16), byte(msgTx.Version >> 8), byte(msgTx.Version)}
-	msgTx.TxWitness = make([]byte, pqringctparam.GetCoinbaseTxWitnessLen(msgTx.Version, txOutNum))
+	msgTx.TxWitness = make([]byte, abecrypto.CryptoPP.GetCoinbaseTxWitnessLen(msgTx.Version, txOutNum))
 
 	return msgTx, nil
 }
@@ -775,10 +774,10 @@ mempoolLoop:
 
 	coinbaseTxMsg.TxFee = subsidy + totalFee
 	// txFees[0] = -totalFee
-	txOutDescs := make([]*abepqringct.AbeTxOutDesc, 1)
-	txOutDescs[0] = abepqringct.NewAbeTxOutDesc(payToMpk, coinbaseTxMsg.TxFee)
+	txOutDescs := make([]*abecrypto.AbeTxOutDesc, 1)
+	txOutDescs[0] = abecrypto.NewAbeTxOutDesc(payToMpk, coinbaseTxMsg.TxFee)
 
-	coinbaseTxMsg, err = abepqringct.CoinbaseTxGen(txOutDescs, coinbaseTxMsg)
+	coinbaseTxMsg, err = abecrypto.CryptoPP.CoinbaseTxGen(txOutDescs, coinbaseTxMsg)
 	if err != nil {
 		return nil, err
 	}
@@ -832,8 +831,8 @@ mempoolLoop:
 		"fees, %d size, target difficulty "+"%064x)", len(msgBlock.Transactions), totalFee, blockSize, blockchain.CompactToBig(msgBlock.Header.Bits))
 
 	return &BlockTemplate{
-		BlockAbe: &msgBlock,
-		Fees:     txFees,
+		BlockAbe:        &msgBlock,
+		Fees:            txFees,
 		Height:          nextBlockHeight,
 		ValidPayAddress: payToMpk != nil,
 	}, nil

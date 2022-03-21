@@ -289,7 +289,7 @@ func DecodeMasterAddressAbe(addrstr string) (MasterAddress, error) {
 	case abecrypto.CryptoSchemeSALRS:
 		return ParseMasterAddressSalrsFromSerialzedBytes(serialzedMasterAddress)
 	case abecrypto.CryptoSchemePQRINGCT:
-		return abeaddress.ParseMasterAddressPQringctFromSerialzedBytes(serialzedMasterAddress)
+		return abeaddress.ParseAddressPQringctFromSerialzedBytes(serialzedMasterAddress)
 	default:
 		return nil, errors.New("decoded address is of unknown/unsupported crypto scheme")
 	}

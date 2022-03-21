@@ -5,11 +5,10 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"io"
-	"strconv"
-
 	"github.com/abesuite/abec/abecrypto/pqringctparam"
 	"github.com/abesuite/abec/chainhash"
+	"io"
+	"strconv"
 )
 
 // borrow something from msgtx.go
@@ -303,7 +302,7 @@ func ReadTxOutAbe(r io.Reader, pver uint32, version uint32, txOut *TxOutAbe) err
 		return err
 	}
 
-	txoScript, err := ReadVarBytes(r, pver, pqringctparam.GetTxoSerializeSize(version), "TxoScript")
+	txoScript, err := ReadVarBytes(r, pver, uint32(pqringctparam.GetTxoSerializeSize(version)), "TxoScript")
 	if err != nil {
 		return err
 	}
@@ -562,7 +561,7 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 		msg.TxFee = txFee*/
 
 	//	TxMemo
-	txMemo, err := ReadVarBytes(r, pver, pqringctparam.GetTxMemoMaxLen(msg.Version), "TxMemo")
+	txMemo, err := ReadVarBytes(r, pver, uint32(pqringctparam.GetTxMemoMaxLen(msg.Version)), "TxMemo")
 	if err != nil {
 		return err
 	}
@@ -578,7 +577,7 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 
 	if enc == WitnessEncoding {
 		//	TxWitness
-		txWitness, err := ReadVarBytes(r, pver, pqringctparam.GetTxWitnessMaxLen(msg.Version), "TxWitness")
+		txWitness, err := ReadVarBytes(r, pver, uint32(pqringctparam.GetTxWitnessMaxLen(msg.Version)), "TxWitness")
 		if err != nil {
 			msg.TxWitness = nil
 		}
@@ -720,7 +719,7 @@ func PrecomputeTrTxConSize(txVersion uint32, inputRingVersions []uint32, inputRi
 	// 	serialized varint size for output number
 	n = n + 1                                                    // 1 byte for the output Txo Number
 	txoScriptLen := pqringctparam.GetTxoSerializeSize(txVersion) // depending on the crypto-scheme, and the TxVersion
-	n = n + uint32(outputTxoNum)*(uint32(4+VarIntSerializeSize(uint64(txoScriptLen)))+txoScriptLen)
+	n = n + uint32(outputTxoNum)*(uint32(4+VarIntSerializeSize(uint64(txoScriptLen)))+uint32(txoScriptLen))
 	/*	for _, txOut := range msg.TxOuts {
 		n = n + txOut.SerializeSize()
 	}*/
@@ -741,7 +740,7 @@ func PrecomputeTrTxWitnessSize(txVersion uint32, inputRingVersion uint32, inputR
 			inputRingSizes[i] = len(txIns[i].PreviousOutPointRing.OutPoints)
 		}*/
 
-	return pqringctparam.GetTrTxWitnessSize(txVersion, inputRingVersion, inputRingSizes, outputTxoNum) // depending on the crypto-scheme
+	return uint32(pqringctparam.GetTrTxWitnessSize(txVersion, inputRingVersion, inputRingSizes, outputTxoNum)) // depending on the crypto-scheme
 }
 
 //	for computing TxId by hash, and for being serialized in block

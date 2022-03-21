@@ -1,10 +1,8 @@
 package pqringctparam
 
-import (
-	"github.com/cryptosuite/pqringct"
-)
+import "github.com/cryptosuite/pqringct"
 
-var CryptoPP *pqringct.PublicParameter = pqringct.DefaultPP
+var CryptoPP = pqringct.DefaultPPV2
 
 // todo: when multiple versions are supported simultaneously, and if necessary, initial multiple nullSerialNumbers
 var nullSerialNumber []byte = []byte{
@@ -16,7 +14,7 @@ var nullSerialNumber []byte = []byte{
 
 //	todo:
 func GetMasterPublicKeyLen(version uint32) uint32 {
-	return CryptoPP.GetMasterPublicKeyByteLen()
+	return uint32(CryptoPP.GetPublicKeyByteLen())
 }
 
 /*
@@ -29,7 +27,7 @@ Based on the (crypto-scheme) version of the Txo, return the maxAllowedLen
 
 func GetTxoSerializeSize(version uint32) uint32 {
 	// todo: call cryptoPP.methods
-	return CryptoPP.GetTxoSerializeSize()
+	return uint32(CryptoPP.GetTxoSerializeSize(version))
 }
 
 /*
@@ -37,7 +35,7 @@ The input rings for one transction should have the same ringVersions
 */
 func GetTrTxWitnessSize(txVersion uint32, inputRingVersion uint32, inputRingSizes []int, outputTxoNum uint8) uint32 {
 	//	todo: call cryptoPP.methods
-	return CryptoPP.GetTrTxWitnessSerializeSize(inputRingSizes, outputTxoNum)
+	return uint32(CryptoPP.GetTrTxWitnessSerializeSize(txVersion, inputRingVersion, inputRingSizes, outputTxoNum))
 }
 
 func GetTxMemoMaxLen(version uint32) uint32 {
@@ -52,7 +50,8 @@ func GetTxWitnessMaxLen(version uint32) uint32 {
 			return a
 		}
 		return b
-	}(CryptoPP.GetCbTxWitnessMaxLen(), CryptoPP.GetTrTxWitnessMaxLen())
+		// TODO(20220320): decide the parameter
+	}(uint32(CryptoPP.GetCbTxWitnessMaxLen(version, 5)), uint32(CryptoPP.GetTrTxWitnessMaxLen(version)))
 
 }
 

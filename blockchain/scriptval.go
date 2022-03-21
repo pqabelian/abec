@@ -3,7 +3,7 @@ package blockchain
 import (
 	"bytes"
 	"fmt"
-	"github.com/abesuite/abec/abecrypto/abepqringct"
+	"github.com/abesuite/abec/abecrypto"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/txscript"
@@ -37,7 +37,7 @@ type txValidateItemInput struct {
 type txValidateItemOutput struct {
 	txOutIndex int
 	txOut      *wire.TxOutAbe
-	tx        *abeutil.TxAbe
+	tx         *abeutil.TxAbe
 }
 
 // txValidator provides a type which asynchronously validates transaction
@@ -629,7 +629,7 @@ func ValidateTransactionScriptsAbe2(tx *abeutil.TxAbe, utxoRingView *UtxoRingVie
 	txValItemsBalance := make([]*abeutil.TxAbe, 0, 1)
 	txValItemsBalance = append(txValItemsBalance, tx)
 	validatorBalance := newTxValidatorBalance(utxoRingView)
-	if err := validatorBalance.Validate(txValItemsBalance) ; err != nil {
+	if err := validatorBalance.Validate(txValItemsBalance); err != nil {
 		return err
 	}
 
@@ -640,7 +640,7 @@ func ValidateTransactionScriptsAbe2(tx *abeutil.TxAbe, utxoRingView *UtxoRingVie
 	txValItemsInput := make([]*txValidateItemInput, 0, len(txIns))
 	for txInIdx, txIn := range txIns {
 		// Skip coinbases. Redundant here.
-		if bytes.Equal(txIn.SerialNumber,chainhash.ZeroHash[:]) {
+		if bytes.Equal(txIn.SerialNumber, chainhash.ZeroHash[:]) {
 			continue
 		}
 
@@ -654,7 +654,7 @@ func ValidateTransactionScriptsAbe2(tx *abeutil.TxAbe, utxoRingView *UtxoRingVie
 
 	// Validate all of the inputs.
 	validatorInput := newTxValidatorInput(utxoRingView)
-	if err := validatorInput.Validate(txValItemsInput) ; err != nil {
+	if err := validatorInput.Validate(txValItemsInput); err != nil {
 		return err
 	}
 
@@ -667,15 +667,15 @@ func ValidateTransactionScriptsAbe2(tx *abeutil.TxAbe, utxoRingView *UtxoRingVie
 	for txOutIdx, txOut := range txOuts {
 		txVI := &txValidateItemOutput{
 			txOutIndex: txOutIdx,
-			txOut:     txOut,
-			tx:        tx,
+			txOut:      txOut,
+			tx:         tx,
 		}
 		txValItemsOutput = append(txValItemsOutput, txVI)
 	}
 
 	// Validate all of the outputs.
 	validatorOutput := newTxValidatorOutput(utxoRingView)
-	if err := validatorOutput.Validate(txValItemsOutput) ; err != nil {
+	if err := validatorOutput.Validate(txValItemsOutput); err != nil {
 		return err
 	}
 
@@ -688,7 +688,7 @@ func ValidateTransactionScriptsAbe2(tx *abeutil.TxAbe, utxoRingView *UtxoRingVie
 func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingViewpoint) error {
 
 	txInLen := len(tx.MsgTx().TxIns)
-	abeTxInDetail := make([]*abepqringct.AbeTxInDetail, txInLen)
+	abeTxInDetail := make([]*abecrypto.AbeTxInDetail, txInLen)
 	for i := 0; i < txInLen; i++ {
 		utxoRing := utxoRingView.LookupEntry(tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash())
 		if utxoRing == nil {
@@ -701,11 +701,12 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 		}
 
 		serializedTxoList := utxoRing.TxOuts()
-		abetxIn := abepqringct.NewAbeTxInDetail(serializedTxoList, tx.MsgTx().TxIns[i].SerialNumber)
-		abeTxInDetail[i] = abetxIn
+		// TODO(20220320): compute the ringHash and choose the sidx
+		ringHash := chainhash.ZeroHash
+		abeTxInDetail[i] = abecrypto.NewAbeTxInDetail(ringHash, serializedTxoList, tx.MsgTx().TxIns[i].SerialNumber)
 	}
 
-	isValid := abepqringct.TransferTxVerify(tx.MsgTx(), abeTxInDetail)
+	isValid := abecrypto.CryptoPP.TransferTxVerify(tx.MsgTx(), abeTxInDetail)
 	if !isValid {
 		str := fmt.Sprintf("transaction %s verify failed", tx.Hash())
 		return ruleError(ErrScriptValidation, str)
@@ -806,7 +807,7 @@ func checkBlockScriptsAbe(block *abeutil.BlockAbe, utxoRingView *UtxoRingViewpoi
 	validatorBalance := newTxValidatorBalance(utxoRingView)
 
 	start := time.Now()
-	if err := validatorBalance.Validate(txValItemsBalance) ; err != nil {
+	if err := validatorBalance.Validate(txValItemsBalance); err != nil {
 		return err
 	}
 	elapsed := time.Since(start)
@@ -824,7 +825,7 @@ func checkBlockScriptsAbe(block *abeutil.BlockAbe, utxoRingView *UtxoRingViewpoi
 	for _, tx := range block.Transactions() {
 		for txInIdx, txIn := range tx.MsgTx().TxIns {
 			// Skip coinbases. Redundant here.
-			if bytes.Equal(txIn.SerialNumber,chainhash.ZeroHash[:]) {
+			if bytes.Equal(txIn.SerialNumber, chainhash.ZeroHash[:]) {
 				continue
 			}
 
@@ -841,7 +842,7 @@ func checkBlockScriptsAbe(block *abeutil.BlockAbe, utxoRingView *UtxoRingViewpoi
 	validatorInput := newTxValidatorInput(utxoRingView)
 
 	start = time.Now()
-	if err := validatorInput.Validate(txValItemsInput) ; err != nil {
+	if err := validatorInput.Validate(txValItemsInput); err != nil {
 		return err
 	}
 	elapsed = time.Since(start)
@@ -873,7 +874,7 @@ func checkBlockScriptsAbe(block *abeutil.BlockAbe, utxoRingView *UtxoRingViewpoi
 	validatorOutput := newTxValidatorOutput(utxoRingView)
 
 	start = time.Now()
-	if err := validatorOutput.Validate(txValItemsOutput) ; err != nil {
+	if err := validatorOutput.Validate(txValItemsOutput); err != nil {
 		return err
 	}
 	elapsed = time.Since(start)

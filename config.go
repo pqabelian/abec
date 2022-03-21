@@ -432,7 +432,9 @@ func loadConfig() (*config, []string, error) {
 		TxIndex:              defaultTxIndex,
 	}
 	// Service options which are only added on Windows.
-	serviceOpts := serviceOptions{} //TODO(osy): this set is ingoned, we should detect it!
+	// TODO(osy): this set is ingoned, we should detect it!
+	// Answer(osy): this set is helpful for Windows, but we do not know the function.
+	serviceOpts := serviceOptions{}
 
 	// Pre-parse the command line options to see if an alternative config
 	// file or the version flag was specified.  Any errors aside from the
@@ -843,6 +845,7 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	//	mining address
+	// TODO(abe) This part should be re-thought.
 	if cfg.Generate {
 		//				ConfigTest(&cfg)
 		maddr, err := abeutil.DecodeMasterAddressAbe(cfg.MiningAddr)
