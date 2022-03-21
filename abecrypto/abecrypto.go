@@ -92,6 +92,9 @@ type AbeTxOutDesc struct {
 	value   uint64
 }
 
+func (txout *AbeTxOutDesc) GetValue() uint64 {
+	return txout.value
+}
 func NewAbeTxOutDesc(address []byte, value uint64) *AbeTxOutDesc {
 	return &AbeTxOutDesc{
 		address: address,
