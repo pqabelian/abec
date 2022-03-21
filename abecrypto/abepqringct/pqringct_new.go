@@ -396,5 +396,5 @@ func TxoSerialNumberGen(pp pqringct.PublicParameter, abeTxo *wire.TxOutAbe, seri
 // todo: (AliceBob 2021.06.20) abeTxo should be serilazedTxo?
 func TxoCoinReceive(pp pqringct.PublicParameter, abeTxo *wire.TxOutAbe, serialzedMpk []byte, serializedMsvk []byte) (valid bool, v uint64) {
 	panic("implement me")
-	return false, -1
+	return false, 0
 }

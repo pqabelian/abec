@@ -71,17 +71,18 @@ import (
 //	}
 //}
 func CryptoAddressGen(pp *pqringct.PublicParameter, seed []byte) (serializedAddress []byte, serializedVSk []byte, serializedASksp []byte, serializedASksn []byte, err error) {
-	if 2*pp.ParamSeedBytesLen() != len(seed) {
+	expectedSeedLen := pp.ParamSeedBytesLen()
+	if 2*expectedSeedLen != len(seed) {
 		return nil, nil, nil, nil, errors.New("invalid length of seed")
 	}
 	var serializedAPk []byte
-	serializedAPk, serializedASksp, serializedASksn, err = addressKeyGen(pp, seed)
+	serializedAPk, serializedASksp, serializedASksn, err = addressKeyGen(pp, seed[:expectedSeedLen])
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
 	serializedAddress = append(serializedAddress, serializedAPk...)
 	var serializedVPk []byte
-	serializedVPk, serializedVSk, err = valueKeyGen(pp, seed)
+	serializedVPk, serializedVSk, err = valueKeyGen(pp, seed[expectedSeedLen:])
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
