@@ -235,6 +235,7 @@ func (pp *AbeCryptoParam) TxoCoinReceive(abeTxo *wire.TxOutAbe, address []byte, 
 		if CryptoScheme(version) != CryptoSchemePQRINGCTV2 {
 			return false, 0
 		}
+		address = address[4:]
 		version = serializedSkvalue[0]
 		version |= serializedSkvalue[1]
 		version |= serializedSkvalue[2]
