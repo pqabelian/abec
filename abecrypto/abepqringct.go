@@ -408,7 +408,8 @@ func TxoCoinReceive(pp *pqringct.PublicParameter, abeTxo *wire.TxOutAbe, address
 	if err != nil {
 		return false, 0
 	}
-	return pqringct.TxoCoinReceive(pp, txo, address, serializedSkvalue)
+	apkSize := pp.GetAddressPublicKeySerializeSize()
+	return pqringct.TxoCoinReceive(pp, txo, address[:apkSize], serializedSkvalue)
 }
 func GetTxoSerializeSize(pp *pqringct.PublicParameter, version uint32) int {
 	return pp.GetTxoSerializeSize()
