@@ -27,7 +27,7 @@ Based on the (crypto-scheme) version of the Txo, return the maxAllowedLen
 
 func GetTxoSerializeSize(version uint32) uint32 {
 	// todo: call cryptoPP.methods
-	return uint32(CryptoPP.GetTxoSerializeSize())
+	return uint32(CryptoPP.GetTxoSerializeSize() + 1000)
 }
 
 /*
@@ -35,12 +35,12 @@ The input rings for one transction should have the same ringVersions
 */
 func GetTrTxWitnessSize(txVersion uint32, inputRingVersion uint32, inputRingSizes []int, outputTxoNum uint8) uint32 {
 	//	todo: call cryptoPP.methods
-	return uint32(CryptoPP.GetTrTxWitnessSerializeSize(inputRingSizes, outputTxoNum))
+	return uint32(CryptoPP.GetTrTxWitnessSerializeSize(inputRingSizes, int(outputTxoNum)))
 }
 
 func GetTxMemoMaxLen(version uint32) uint32 {
 	// todo: call cryptoPP.methods
-	return 32
+	return 56
 }
 
 func GetTxWitnessMaxLen(version uint32) uint32 {
@@ -51,7 +51,7 @@ func GetTxWitnessMaxLen(version uint32) uint32 {
 		}
 		return b
 		// TODO(20220320): decide the parameter
-	}(uint32(CryptoPP.GetCbTxWitnessMaxLen(5)), uint32(CryptoPP.GetTrTxWitnessMaxLen()))
+	}(uint32(CryptoPP.GetCbTxWitnessMaxLen()), uint32(CryptoPP.GetTrTxWitnessMaxLen()))
 
 }
 

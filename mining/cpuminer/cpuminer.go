@@ -54,7 +54,8 @@ type Config struct {
 
 	// MiningAddr is a master addresses to use for the generated blocks.
 	// Each generated block will use derived address from the master address.
-	MiningAddr abeutil.MasterAddress
+	MiningAddr      abeutil.MasterAddress
+	MiningAddrBytes []byte
 
 	// ProcessBlock defines the function to call with any solved blocks.
 	// It typically must run the provided block through the same set of
@@ -336,12 +337,12 @@ out:
 		}
 
 		// Choose a payment address at random.
-		masterAddr := m.cfg.MiningAddr
+		masterAddr := m.cfg.MiningAddrBytes
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		template, err := m.g.NewBlockTemplate(masterAddr.Serialize()[1:]) // discard the netID
+		template, err := m.g.NewBlockTemplate(masterAddr) // discard the netID
 		m.submitBlockLock.Unlock()
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+

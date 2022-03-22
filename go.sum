@@ -7,8 +7,8 @@ github.com/aead/siphash v1.0.1/go.mod h1:Nywa3cDsYNNK3gaciGTWPwHt0wlpNV15vwmswBA
 github.com/cryptosuite/kyber-go v0.0.0-20200701012546-a87ecb4b2ce3/go.mod h1:1G0Jh7bXJGSUCTrC6ZB9lFpmCF+VFQehDqIwm9dJU3s=
 github.com/cryptosuite/kyber-go v0.0.2-alpha h1:JHvNqZho24qJq7c4JnyKGtyQuF03VOeEH7TcsKk8yZc=
 github.com/cryptosuite/kyber-go v0.0.2-alpha/go.mod h1:1G0Jh7bXJGSUCTrC6ZB9lFpmCF+VFQehDqIwm9dJU3s=
-github.com/cryptosuite/pqringct v0.0.1-beta.0.20220321083559-8fdac8e172b4 h1:nvVQY3B33Ndm3k27g+JE8oaR/KpOF2J/TBXlKqQQgs0=
-github.com/cryptosuite/pqringct v0.0.1-beta.0.20220321083559-8fdac8e172b4/go.mod h1:kJOGcHk4w5NNw2KDnVrGDPpUJr/H21+KnM6yjtu+7UA=
+github.com/cryptosuite/pqringct v0.0.1-beta.0.20220322063057-d869375eba66 h1:TZNHHzXAFc1bHT66rrP74K3oPoM94sEb2/RYKYIbWkE=
+github.com/cryptosuite/pqringct v0.0.1-beta.0.20220322063057-d869375eba66/go.mod h1:kJOGcHk4w5NNw2KDnVrGDPpUJr/H21+KnM6yjtu+7UA=
 github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1 h1:vN3Cibtye7f3YuPvrJWG4Kp/jrb/XfxS5oIwl8XZBQY=
 github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1/go.mod h1:mJeCa86eOqj3kCJO+O4245Wnq5U07P9K9RfJplI8bQ4=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=

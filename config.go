@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -170,6 +171,7 @@ type config struct {
 	dial                 func(string, string, time.Duration) (net.Conn, error)
 	addCheckpoints       []chaincfg.Checkpoint
 	miningAddr           abeutil.MasterAddress
+	miningAddrBytes      []byte
 	minRelayTxFee        abeutil.Amount
 	whitelists           []*net.IPNet
 }
@@ -848,21 +850,23 @@ func loadConfig() (*config, []string, error) {
 	// TODO(abe) This part should be re-thought.
 	if cfg.Generate {
 		//				ConfigTest(&cfg)
-		maddr, err := abeutil.DecodeMasterAddressAbe(cfg.MiningAddr)
-		if err != nil {
-			str := "%s: the generate flag is set. Mining address '%s' failed to decode: %v"
-			err := fmt.Errorf(str, funcName, cfg.MiningAddr, err)
-			fmt.Fprintln(os.Stderr, err)
-			fmt.Fprintln(os.Stderr, usageMessage)
-			return nil, nil, err
-		}
-		cfg.miningAddr = maddr // set the mining address
+		//maddr, err := abeutil.DecodeMasterAddressAbe(cfg.MiningAddr)
+		//if err != nil {
+		//	str := "%s: the generate flag is set. Mining address '%s' failed to decode: %v"
+		//	err := fmt.Errorf(str, funcName, cfg.MiningAddr, err)
+		//	fmt.Fprintln(os.Stderr, err)
+		//	fmt.Fprintln(os.Stderr, usageMessage)
+		//	return nil, nil, err
+		//}
+		cfg.miningAddr = nil
+		cfg.miningAddrBytes, _ = hex.DecodeString(cfg.MiningAddr) // set the mining address
 	} else {
 		if cfg.MiningAddr != "" {
-			maddr, err := abeutil.DecodeMasterAddressAbe(cfg.MiningAddr)
-			if err == nil {
-				cfg.miningAddr = maddr
-			}
+			cfg.miningAddrBytes, _ = hex.DecodeString(cfg.MiningAddr)
+			//maddr, err := abeutil.DecodeMasterAddressAbe(cfg.MiningAddr)
+			//if err == nil {
+			//	cfg.miningAddr = maddr
+			//}
 		}
 	}
 

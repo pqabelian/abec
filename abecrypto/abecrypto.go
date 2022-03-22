@@ -149,7 +149,17 @@ func (pp *AbeCryptoParam) CoinbaseTxGen(abeTxOutDescs []*AbeTxOutDesc, coinbaseT
 	var err error
 	switch pp.Version {
 	case CryptoSchemePQRINGCTV2:
-		// parse address -> address public key and value public key
+		// check the address in abeTxOutDescs
+		for i := 0; i < len(abeTxOutDescs); i++ {
+			version := abeTxOutDescs[i].address[0]
+			version |= abeTxOutDescs[i].address[1]
+			version |= abeTxOutDescs[i].address[2]
+			version |= abeTxOutDescs[i].address[3]
+			if CryptoScheme(version) != CryptoSchemePQRINGCTV2 {
+				return nil, errors.New("unmatched version and address")
+			}
+			abeTxOutDescs[i].address = abeTxOutDescs[i].address[4:]
+		}
 		cbTx, err = CoinbaseTxGen(pp.RingCT, abeTxOutDescs, coinbaseTxMsgTemplate)
 		if err != nil {
 			return nil, err
@@ -212,13 +222,20 @@ func (pp *AbeCryptoParam) TxoSerialNumberGen(txo *wire.TxOutAbe, ringHash chainh
 	return sn
 }
 
-func (pp *AbeCryptoParam) TxoCoinReceive(abeTxo *wire.TxOutAbe, address []byte, serializedSkvalue []byte) (valid bool, v uint64) {
-	// switch
-	panic("TxoCoinReceive implement me")
-	return false, 0
+func (pp *AbeCryptoParam) TxoCoinReceive(abeTxo *wire.TxOutAbe, address []byte, serializedSkvalue []byte) (bool, uint64) {
+	var valid bool
+	var b uint64
+	switch pp.Version {
+	case CryptoSchemePQRINGCTV2:
+		// parse address -> address public key and value public key
+		valid, b = TxoCoinReceive(pp.RingCT, abeTxo, address, serializedSkvalue)
+	default:
+		log.Fatalln("Unsupporte crypto scheme")
+	}
+	return valid, b
 }
 func LedgerTxoIdGen(ringHash chainhash.Hash, index int) []byte {
-	w := bytes.NewBuffer(make([]byte, 0, 32+4))
+	w := bytes.NewBuffer(make([]byte, 0, 36))
 	var err error
 	// ringHash
 	_, err = w.Write(ringHash[:])
@@ -243,4 +260,35 @@ func LedgerTxoIdGen(ringHash chainhash.Hash, index int) []byte {
 		return nil
 	}
 	return chainhash.DoubleHashB(w.Bytes())
+}
+
+func (pp *AbeCryptoParam) GetTxoSerializeSize(version uint32) int {
+	var length int
+	switch pp.Version {
+	case CryptoSchemePQRINGCTV2:
+		// parse address -> address public key and value public key
+		length = GetTxoSerializeSize(pp.RingCT, version)
+	default:
+		log.Fatalln("Unsupporte crypto scheme")
+	}
+	return length
+}
+func (pp *AbeCryptoParam) GetCoinbaseTxWitnessLen(version uint32, num int) int {
+	return GetCoinbaseTxWitnessLen(pp.RingCT, version)
+}
+func (pp *AbeCryptoParam) GetTxoSerialNumberLen(version uint32) int {
+	return GetTxoSerializeSize(pp.RingCT, version)
+}
+func (pp *AbeCryptoParam) GetNullSerialNumber(version uint32) []byte {
+	return GetNullSerialNumber(pp.RingCT, version)
+}
+
+func (pp *AbeCryptoParam) GetTxMemoMaxLen(version uint32) int {
+	return GetTxMemoMaxLen(pp.RingCT, version)
+}
+func (pp *AbeCryptoParam) GetTxWitnessMaxLen(version uint32) int {
+	return GetTxWitnessMaxLen(pp.RingCT, version)
+}
+func (pp *AbeCryptoParam) GetTrTxWitnessSize(txVersion uint32, inputRingVersion uint32, inputRingSizes []int, outputTxoNum uint8) int {
+	return GetTrTxWitnessSize(pp.RingCT, inputRingSizes, int(outputTxoNum))
 }

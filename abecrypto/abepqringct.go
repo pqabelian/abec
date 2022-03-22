@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"github.com/abesuite/abec/abecrypto/pqringctparam"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 	"github.com/cryptosuite/pqringct"
@@ -116,8 +117,8 @@ func CoinbaseTxGen(pp *pqringct.PublicParameter, abeTxOutDescs []*AbeTxOutDesc, 
 	for j := 0; j < len(abeTxOutDescs); j++ {
 		// TODO(20220320): parse the address to serializedApk and serializedVpk
 		apkLen := pp.GetAddressPublicKeySerializeSize()
-		vpkLen := pp.GetValuePublicKeySerializeSize()
-		serializedApk, serializedVpk := abeTxOutDescs[j].address[:apkLen], abeTxOutDescs[j].address[apkLen:apkLen+vpkLen]
+		//vpkLen := pp.GetValuePublicKeySerializeSize()
+		serializedApk, serializedVpk := abeTxOutDescs[j].address[:apkLen], abeTxOutDescs[j].address[apkLen:]
 		txOutputDescs[j] = pqringct.NewTxOutputDescv2(serializedApk, serializedVpk, abeTxOutDescs[j].value)
 	}
 	// call the pqringct.CoinbaseTxGen
@@ -129,20 +130,34 @@ func CoinbaseTxGen(pp *pqringct.PublicParameter, abeTxOutDescs []*AbeTxOutDesc, 
 	coinbaseTxMsgTemplate.TxOuts = make([]*wire.TxOutAbe, len(cryptoCoinbaseTx.OutputTxos))
 	for i := 0; i < len(cryptoCoinbaseTx.OutputTxos); i++ {
 		w := bytes.NewBuffer(make([]byte, 0, 100000))
-		err := cryptoCoinbaseTx.OutputTxos[i].Serialize0(w)
+		serializeTxo, err := pp.SerializeTxo(cryptoCoinbaseTx.OutputTxos[i])
+		if err != nil {
+			return nil, err
+		}
+		_, err = w.Write(serializeTxo)
 		if err != nil {
 			return nil, err
 		}
 		coinbaseTxMsgTemplate.TxOuts[i] = &wire.TxOutAbe{
-			coinbaseTxMsgTemplate.Version,
-			w.Bytes(),
+			Version:   coinbaseTxMsgTemplate.Version,
+			TxoScript: w.Bytes(),
 		}
 	}
 	w := bytes.NewBuffer(make([]byte, 0, 100000))
-	err = cryptoCoinbaseTx.TxWitness.Serialize0(w)
+	var serializeCbTxWit []byte
+	if len(cryptoCoinbaseTx.OutputTxos) == 1 {
+		serializeCbTxWit, err = pp.SerializeCbTxWitnessJ1(cryptoCoinbaseTx.TxWitnessJ1)
+	} else {
+		serializeCbTxWit, err = pp.SerializeCbTxWitnessJ2(cryptoCoinbaseTx.TxWitnessJ2)
+	}
 	if err != nil {
 		return nil, err
 	}
+	_, err = w.Write(serializeCbTxWit)
+	if err != nil {
+		return nil, err
+	}
+
 	coinbaseTxMsgTemplate.TxWitness = w.Bytes()
 	return coinbaseTxMsgTemplate, nil
 }
@@ -158,11 +173,14 @@ func CoinbaseTxVerify(pp *pqringct.PublicParameter, coinbaseTx *wire.MsgTxAbe) b
 	if len(coinbaseTx.TxOuts) <= 0 {
 		return false
 	}
+	var err error
 	cryptoCoinbaseTx := &pqringct.CoinbaseTxv2{}
 	cryptoCoinbaseTx.Vin = coinbaseTx.TxFee
-	cryptoCoinbaseTx.TxWitness = &pqringct.CbTxWitnessv2{}
-	reader := bytes.NewReader(coinbaseTx.TxWitness)
-	err := cryptoCoinbaseTx.TxWitness.Deserialize(reader)
+	if len(coinbaseTx.TxOuts) == 1 {
+		cryptoCoinbaseTx.TxWitnessJ1, err = pp.DeserializeCbTxWitnessJ1(coinbaseTx.TxWitness)
+	} else {
+		cryptoCoinbaseTx.TxWitnessJ2, err = pp.DeserializeCbTxWitnessJ2(coinbaseTx.TxWitness)
+	}
 	if err != nil {
 		return false
 	}
@@ -171,13 +189,10 @@ func CoinbaseTxVerify(pp *pqringct.PublicParameter, coinbaseTx *wire.MsgTxAbe) b
 		if coinbaseTx.TxOuts[i].Version != coinbaseTx.Version {
 			return false
 		}
-		txo := &pqringct.Txo{}
-		reader = bytes.NewReader(coinbaseTx.TxOuts[i].TxoScript)
-		err = txo.Deserialize(reader)
+		cryptoCoinbaseTx.OutputTxos[i], err = pp.DeserializeTxo(coinbaseTx.TxOuts[i].TxoScript)
 		if err != nil {
 			return false
 		}
-		cryptoCoinbaseTx.OutputTxos[i] = txo
 	}
 	bl := pqringct.CoinbaseTxVerify(pp, cryptoCoinbaseTx)
 	if bl == false {
@@ -210,7 +225,7 @@ func TransferTxGen(pp *pqringct.PublicParameter, abeTxInputDescs []*AbeTxInputDe
 	if inputNum != len(transferTxMsgTemplate.TxIns) {
 		return nil, errors.New("the number of InputDesc does not match the number of TxIn in transferTxMsgTemplate")
 	}
-
+	var err error
 	inputsVersion := transferTxMsgTemplate.TxIns[0].PreviousOutPointRing.Version
 	//outputsVersion := transferTxMsgTemplate.Version
 
@@ -226,8 +241,7 @@ func TransferTxGen(pp *pqringct.PublicParameter, abeTxInputDescs []*AbeTxInputDe
 			if abeTxInputDescs[i].txoList[j].Version != inputsVersion {
 				return nil, errors.New("the version of TXOs in abeTxInputDescs.serializedTxoList does not match the version in the corresponding TxIn")
 			}
-			reader := bytes.NewReader(abeTxInputDescs[i].txoList[j].TxoScript)
-			err := txoList[j].Txo.Deserialize(reader)
+			txoList[j].Txo, err = pp.DeserializeTxo(abeTxInputDescs[i].txoList[j].TxoScript)
 			if err != nil {
 				return nil, err
 			}
@@ -268,24 +282,21 @@ func TransferTxGen(pp *pqringct.PublicParameter, abeTxInputDescs []*AbeTxInputDe
 	//	Set the output Txos
 	transferTxMsgTemplate.TxOuts = make([]*wire.TxOutAbe, outputNum)
 	for j := 0; j < outputNum; j++ {
-		w := bytes.NewBuffer(make([]byte, 0, 10000))
-		err = cryptoTransferTx.OutputTxos[j].Serialize0(w)
+		serializeTxo, err := pp.SerializeTxo(cryptoTransferTx.OutputTxos[j])
 		if err != nil {
 			return nil, err
 		}
 		transferTxMsgTemplate.TxOuts[j] = &wire.TxOutAbe{
-			transferTxMsgTemplate.Version,
-			w.Bytes(),
+			Version:   transferTxMsgTemplate.Version,
+			TxoScript: serializeTxo,
 		}
 	}
 
 	//	Set the TxWitness
-	w := bytes.NewBuffer(make([]byte, 0, 10000))
-	err = cryptoTransferTx.TxWitness.Serialize0(w)
+	transferTxMsgTemplate.TxWitness, err = pp.SerializeTrTxWitness(cryptoTransferTx.TxWitness)
 	if err != nil {
 		return nil, err
 	}
-	transferTxMsgTemplate.TxWitness = w.Bytes()
 
 	return transferTxMsgTemplate, nil
 
@@ -306,6 +317,7 @@ func TransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.MsgTxAbe, a
 		return false
 	}
 
+	var err error
 	inputsVersion := transferTx.TxIns[0].PreviousOutPointRing.Version
 	outputsVersion := transferTx.Version
 
@@ -330,21 +342,19 @@ func TransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.MsgTxAbe, a
 				//	The Txos in the same ring should have the same version
 			}
 			txoList[j] = &pqringct.LgrTxo{
-				Txo: pqringct.Txo{},
+				Txo: nil,
 				Id:  nil,
 			}
-			reader := bytes.NewReader(abeTxInDetails[i].txoList[j].TxoScript)
-			err := txoList[j].Txo.Deserialize(reader)
+			txoList[j].Txo, err = pp.DeserializeTxo(abeTxInDetails[i].txoList[j].TxoScript)
 			if err != nil {
 				return false
 			}
-			// TODO(20220320): where is from "index"?
-			index := 0
-			txoList[j].Id = LedgerTxoIdGen(abeTxInDetails[i].ringHash, index)
+			// TODO(20220320): where is from "index"? is j?
+			txoList[j].Id = LedgerTxoIdGen(abeTxInDetails[i].ringHash, j)
 		}
 		cryptoTransferTx.Inputs[i] = &pqringct.TrTxInputv2{
-			txoList,
-			abeTxInDetails[i].serialNumber,
+			TxoList:      txoList,
+			SerialNumber: abeTxInDetails[i].serialNumber,
 		}
 	}
 
@@ -356,9 +366,7 @@ func TransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.MsgTxAbe, a
 			//	The output Txos of a transaction should have the same version as the transaction.
 		}
 
-		cryptoTransferTx.OutputTxos[j] = &pqringct.Txo{}
-		reader := bytes.NewReader(transferTx.TxOuts[j].TxoScript)
-		err := cryptoTransferTx.OutputTxos[j].Deserialize(reader)
+		cryptoTransferTx.OutputTxos[j], err = pp.DeserializeTxo(transferTx.TxOuts[j].TxoScript)
 		if err != nil {
 			return false
 		}
@@ -373,9 +381,7 @@ func TransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.MsgTxAbe, a
 	copy(cryptoTransferTx.TxMemo[4:], transferTx.TxMemo)
 
 	//	TxWitness
-	cryptoTransferTx.TxWitness = &pqringct.TrTxWitnessv2{}
-	reader := bytes.NewReader(transferTx.TxWitness)
-	err := cryptoTransferTx.TxWitness.Deserialize(reader)
+	cryptoTransferTx.TxWitness, err = pp.DeserializeTrTxWitness(transferTx.TxWitness)
 	if err != nil {
 		return false
 	}
@@ -398,38 +404,36 @@ func TxoSerialNumberGen(pp *pqringct.PublicParameter, txo *wire.TxOutAbe, ringHa
 	return nil
 }
 func TxoCoinReceive(pp *pqringct.PublicParameter, abeTxo *wire.TxOutAbe, address []byte, serializedSkvalue []byte) (valid bool, v uint64) {
-	txo, err := pp.TxoDeserialize(abeTxo.TxoScript)
+	txo, err := pp.DeserializeTxo(abeTxo.TxoScript)
 	if err != nil {
 		return false, 0
 	}
 	return pqringct.TxoCoinReceive(pp, txo, address, serializedSkvalue)
 }
-func (pp *AbeCryptoParam) GetTxoSerializeSize(version uint32) int {
-	panic("GetTxoSerializeSize implement me")
-	return -1
+func GetTxoSerializeSize(pp *pqringct.PublicParameter, version uint32) int {
+	return pp.GetTxoSerializeSize()
 }
-func (pp *AbeCryptoParam) GetCoinbaseTxWitnessLen(version uint32, num int) int {
-	panic("GetCoinbaseTxWitnessLen implement me")
-	return -1
+func GetCoinbaseTxWitnessLen(pp *pqringct.PublicParameter, version uint32) int {
+	return pp.GetCbTxWitnessMaxLen()
 }
-func (pp *AbeCryptoParam) GetTxoSerialNumberLen(version uint32) int {
-	panic("GetTxoSerialNumberLen implement me")
-	return -1
+func GetTxoSerialNumberLen(pp *pqringct.PublicParameter, version uint32) int {
+	return pp.GetTxoSerialNumberLen()
 }
-func (pp *AbeCryptoParam) GetNullSerialNumber(version uint32) []byte {
-	panic("GetNullSerialNumber implement me")
-	return nil
+func GetNullSerialNumber(pp *pqringct.PublicParameter, version uint32) []byte {
+	return pqringctparam.GetNullSerialNumber(version)
 }
 
-func (pp *AbeCryptoParam) GetTxMemoMaxLen(version uint32) int {
-	panic("GetNullSerialNumber implement me")
-	return -1
+func GetTxMemoMaxLen(pp *pqringct.PublicParameter, version uint32) int {
+	return pp.GetTxMemoMaxLen()
 }
-func (pp *AbeCryptoParam) GetTxWitnessMaxLen(version uint32) int {
-	panic("GetNullSerialNumber implement me")
-	return -1
+func GetTxWitnessMaxLen(pp *pqringct.PublicParameter, version uint32) int {
+	cbTxWitMaxLen := pp.GetCbTxWitnessMaxLen()
+	trTxWitMaxLen := pp.GetTrTxWitnessMaxLen()
+	if cbTxWitMaxLen < trTxWitMaxLen {
+		return cbTxWitMaxLen
+	}
+	return trTxWitMaxLen
 }
-func (pp *AbeCryptoParam) GetTrTxWitnessSize(txVersion uint32, inputRingVersion uint32, inputRingSizes []int, outputTxoNum uint8) int {
-	panic("GetNullSerialNumber implement me")
-	return -1
+func GetTrTxWitnessSize(pp *pqringct.PublicParameter, inputRingSizes []int, outputTxoNum int) int {
+	return pp.GetTrTxWitnessSerializeSize(inputRingSizes, outputTxoNum)
 }

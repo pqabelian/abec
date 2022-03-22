@@ -239,11 +239,11 @@ var MainNetParams = Params{
 	//PowLimitBits:             0x1d00ffff,
 	//CoinbaseMaturity:         100,  //TODO(abe):for testing, this value will be set to 20
 	CoinbaseMaturity:         6,
-	SubsidyReductionInterval: 210000,
-	TargetTimespan:           time.Hour * 24 * 14, // 14 days TODO(abe):this value may be need changed
-	TargetTimePerBlock:       time.Minute * 3,     // 10 minutes TODO(abe): this value may be need changed, now temporary to be 3 min
-	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
-	ReduceMinDifficulty:      false,               // TODO(abe): this config may be used for adjust the difficult automatic?
+	SubsidyReductionInterval: 400_000,
+	TargetTimespan:           time.Second * 256 * 4000, // 14 days TODO(abe):this value may be need changed
+	TargetTimePerBlock:       time.Second * 256,        // 10 minutes TODO(abe): this value may be need changed, now temporary to be 3 min
+	RetargetAdjustmentFactor: 4,                        // 25% less, 400% more
+	ReduceMinDifficulty:      false,                    // TODO(abe): this config may be used for adjust the difficult automatic?
 	MinDiffReductionTime:     0,
 	GenerateSupported:        false,
 

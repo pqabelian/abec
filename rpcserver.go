@@ -1914,9 +1914,9 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// Choose a payment address at random if the caller requests a
 		// full coinbase as opposed to only the pertinent details needed
 		// to create their own coinbase.
-		var masterAddr abeutil.MasterAddress
+		var masterAddr []byte
 		if !useCoinbaseValue {
-			masterAddr = cfg.miningAddr
+			masterAddr = cfg.miningAddrBytes
 		}
 
 		// Create a new block template that has a coinbase which anyone
@@ -1924,7 +1924,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// block template doesn't include the coinbase, so the caller
 		// will ultimately create their own coinbase which pays to the
 		// appropriate address(es).
-		blkTemplate, err := generator.NewBlockTemplate(masterAddr.Serialize()[1:])
+		blkTemplate, err := generator.NewBlockTemplate(masterAddr)
 		if err != nil {
 			return internalRPCError("Failed to create new block "+
 				"template: "+err.Error(), "")
@@ -1971,7 +1971,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// returned if none have been specified.
 		if !useCoinbaseValue && !template.ValidPayAddress {
 			// Choose a payment address at random.
-			payToAddr := cfg.miningAddr
+			payToAddr := cfg.miningAddrBytes
 
 			// Update the block coinbase output of the template to
 			// pay to the randomly selected payment address.
@@ -1984,13 +1984,13 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 						template.Block.Transactions[0].TxOut[0].PkScript = pkScript
 						template.ValidPayAddress = true*/
 
-			addressScript, err := txscript.PayToAddressScriptAbe(payToAddr)
-			if err != nil {
-				context := "Failed to create addressScript"
-				return internalRPCError(err.Error(), context)
-			}
+			//addressScript, err := txscript.PayToAddressScriptAbe(payToAddr)
+			//if err != nil {
+			//	context := "Failed to create addressScript"
+			//	return internalRPCError(err.Error(), context)
+			//}
 			// TODO: 20210609 there is wrongly code
-			template.BlockAbe.Transactions[0].TxOuts[0].TxoScript = addressScript
+			template.BlockAbe.Transactions[0].TxOuts[0].TxoScript = payToAddr
 			template.ValidPayAddress = true
 
 			// Update the merkle root.
@@ -2105,7 +2105,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 	if useCoinbaseValue {
 		// todo (ABE): currently coinbaseValue not supported
 		return nil, &abejson.RPCError{
-			Code: abejson.ErrRPCInternal.Code,
+			Code:    abejson.ErrRPCInternal.Code,
 			Message: "Coinbase value is not supported",
 		}
 	} else {
@@ -2135,11 +2135,11 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 		}
 
 		resultTx := abejson.GetBlockTemplateResultCoinbase{
-			Data: hex.EncodeToString(txBuf.Bytes()),
-			Hash: tx.TxHash().String(),
-			Fee:  template.BlockAbe.Transactions[0].TxFee,
+			Data:             hex.EncodeToString(txBuf.Bytes()),
+			Hash:             tx.TxHash().String(),
+			Fee:              template.BlockAbe.Transactions[0].TxFee,
 			ExtraNonceOffset: offset,
-			ExtraNonceLen: 8,
+			ExtraNonceLen:    8,
 		}
 
 		reply.CoinbaseTxn = &resultTx
@@ -2273,7 +2273,7 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 
 	// When a coinbase transaction has been requested, respond with an error
 	// if there are no addresses to pay the created block template to.
-	if !useCoinbaseValue && cfg.miningAddr == nil {
+	if !useCoinbaseValue && (cfg.miningAddr == nil && cfg.miningAddrBytes == nil) {
 		return nil, &abejson.RPCError{
 			Code: abejson.ErrRPCInternal.Code,
 			Message: "A coinbase transaction has been requested, " +
@@ -4118,7 +4118,7 @@ func AddWitnessForSimplifiedBlock(simplifiedBlock *wire.MsgSimplifiedBlock, txPo
 	msgBlock.Transactions[0] = simplifiedBlock.Coinbase
 
 	// transfer transaction
-	for i := 1 ; i < len(simplifiedBlock.Transactions); i++ {
+	for i := 1; i < len(simplifiedBlock.Transactions); i++ {
 		msgTx, err := txPool.FetchTransaction(&simplifiedBlock.Transactions[i])
 		if err != nil {
 			return nil, errors.New(fmt.Sprintf("Cannot find transaction : %v", simplifiedBlock.Transactions[i].String()))
@@ -4964,7 +4964,7 @@ type rpcserverConfig struct {
 
 	// These fields define any optional indexes the RPC server can make use
 	// of to provide additional data when queried.
-	TxIndex   *indexers.TxIndex
+	TxIndex *indexers.TxIndex
 
 	// The fee estimator keeps track of how long transactions are left in
 	// the mempool before they are mined into blocks.
