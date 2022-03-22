@@ -36,8 +36,6 @@ func gensis() {
 		log.Fatalf("error in MasterKeyGen")
 	}
 	fmt.Println(hex.EncodeToString(retSerializedCryptoAddress))
-	fmt.Fprintln(f, seed)
-	return
 	txOutDescs := make([]*abecrypto.AbeTxOutDesc, 1)
 	for i := 0; i < len(txOutDescs); i++ {
 		txOutDescs[i] = abecrypto.NewAbeTxOutDesc(retSerializedCryptoAddress, 205_799_813_685_247)
