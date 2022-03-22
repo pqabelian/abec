@@ -338,11 +338,14 @@ out:
 
 		// Choose a payment address at random.
 		masterAddr := m.cfg.MiningAddrBytes
+		// TODO(20220322): check the tailed hash in the master Addr
+		// Now it just discard this hash
+		masterAddr = masterAddr[:len(masterAddr)-32]
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		template, err := m.g.NewBlockTemplate(masterAddr) // discard the netID
+		template, err := m.g.NewBlockTemplate(masterAddr[1:]) // discard the netID
 		m.submitBlockLock.Unlock()
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+
