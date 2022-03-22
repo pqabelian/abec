@@ -235,7 +235,14 @@ func (pp *AbeCryptoParam) TxoCoinReceive(abeTxo *wire.TxOutAbe, address []byte, 
 		if CryptoScheme(version) != CryptoSchemePQRINGCTV2 {
 			return false, 0
 		}
-		address = address[4:]
+		version = serializedSkvalue[0]
+		version |= serializedSkvalue[1]
+		version |= serializedSkvalue[2]
+		version |= serializedSkvalue[3]
+		if CryptoScheme(version) != CryptoSchemePQRINGCTV2 {
+			return false, 0
+		}
+		serializedSkvalue = serializedSkvalue[4:]
 		valid, b = TxoCoinReceive(pp.RingCT, abeTxo, address, serializedSkvalue)
 	default:
 		log.Fatalln("Unsupporte crypto scheme")
