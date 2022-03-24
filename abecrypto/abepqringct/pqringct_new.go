@@ -195,12 +195,12 @@ import (
 //		return nil, errors.New("the input number and the output number should be at least 1")
 //	}
 //
-//	//if inputNum > pqringctparam.GetInputMaxNum(transferTxMsgTemplate.Version) {
-//	//	return nil, fmt.Errorf("the input number %d exceeds the allowed max number %d", inputNum, pqringctparam.GetInputMaxNum(transferTxMsgTemplate.Version))
+//	//if inputNum > abecryptoparam.GetInputMaxNum(transferTxMsgTemplate.Version) {
+//	//	return nil, fmt.Errorf("the input number %d exceeds the allowed max number %d", inputNum, abecryptoparam.GetInputMaxNum(transferTxMsgTemplate.Version))
 //	//}
 //	//
-//	//if outputNum > pqringctparam.GetOutputMaxNum(transferTxMsgTemplate.Version) {
-//	//	return nil, fmt.Errorf("the output number %d exceeds the allowed max number %d", outputNum, pqringctparam.GetOutputMaxNum(transferTxMsgTemplate.Version))
+//	//if outputNum > abecryptoparam.GetOutputMaxNum(transferTxMsgTemplate.Version) {
+//	//	return nil, fmt.Errorf("the output number %d exceeds the allowed max number %d", outputNum, abecryptoparam.GetOutputMaxNum(transferTxMsgTemplate.Version))
 //	//}
 //
 //	if inputNum != len(transferTxMsgTemplate.TxIns) {

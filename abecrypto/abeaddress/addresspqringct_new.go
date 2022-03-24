@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"github.com/abesuite/abec/abecrypto"
-	"github.com/abesuite/abec/abecrypto/pqringctparam"
+	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/cryptosuite/pqringct"
 )
@@ -21,12 +21,12 @@ type AddressPQringct struct {
 
 // SerializeSize returns the number of bytes it would take to serialize the MasterAddressPQringct.
 func (maddr *AddressPQringct) SerializeSize() uint32 {
-	return 5 + pqringctparam.GetMasterPublicKeyLen(uint32(maddr.Version))
+	return 5 + abecryptoparam.GetMasterPublicKeyLen(uint32(maddr.Version))
 }
 
 func (maddr *AddressPQringct) Serialize() []byte {
 
-	b := make([]byte, 5+pqringctparam.GetMasterPublicKeyLen(uint32(maddr.Version)))
+	b := make([]byte, 5+abecryptoparam.GetMasterPublicKeyLen(uint32(maddr.Version)))
 
 	b[0] = maddr.netID
 
@@ -42,7 +42,7 @@ func (maddr *AddressPQringct) Serialize() []byte {
 }
 
 func (maddr *AddressPQringct) Deserialize(serialized []byte) error {
-	if len(serialized) != 5+int(pqringctparam.GetMasterPublicKeyLen(uint32(abecrypto.CryptoSchemePQRINGCT))) {
+	if len(serialized) != 5+int(abecryptoparam.GetMasterPublicKeyLen(uint32(abecrypto.CryptoSchemePQRINGCT))) {
 		return errors.New("the serialized does not match the rules for AddressPQringct")
 	}
 	netId := serialized[0]

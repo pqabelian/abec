@@ -1,11 +1,10 @@
-package abecrypto
+package abecryptoparam
 
 import (
 	"bytes"
-	"errors"
-	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
+	"github.com/cryptosuite/pqringct"
 	"log"
 )
 
@@ -13,28 +12,40 @@ import (
 //	The different versions of 'same' CryptoSchemes are regarded as different CryptoSchemes.
 //	e.g. SalrsV0, SalrsV1
 
-//type CryptoScheme uint32
+type CryptoScheme uint32
+
+const (
+	CryptoSchemeSALRS CryptoScheme = iota
+	CryptoSchemePQRINGCT
+	CryptoSchemePQRINGCTV2
+)
+
+func GetCryptoScheme(version uint32) CryptoScheme {
+	//	todo: for each version, there is a corresponding CryptoScheme
+	return CryptoSchemePQRINGCT
+}
+
+type AbeCryptoParam struct {
+	Version CryptoScheme
+	// When updating the crypto scheme, add new pointer to new crypto scheme parameter
+	RingCT *pqringct.PublicParameter
+}
+
+// CryptoPP is hardcode global parameter for whole blockchain system
+var CryptoPP = &AbeCryptoParam{
+	Version: CryptoSchemePQRINGCTV2,
+	RingCT:  pqringct.DefaultPPV2,
+}
+
+// wire ->  abecryptoparam.GetSize()
 //
-//const (
-//	CryptoSchemeSALRS      CryptoScheme = 0
-//	CryptoSchemePQRINGCT   CryptoScheme = 1
-//	CryptoSchemePQRINGCTV2 CryptoScheme = 2
-//)
-//
-//func GetCryptoScheme(version uint32) CryptoScheme {
-//	//	todo: for each version, there is a corresponding CryptoScheme
-//	return CryptoSchemePQRINGCT
-//}
-//
-//type AbeCryptoParam struct {
-//	Version CryptoScheme
-//	RingCT  *pqringct.PublicParameter
-//}
-//
-//var CryptoPP = &AbeCryptoParam{
-//	Version: CryptoSchemePQRINGCTV2,
-//	RingCT:  pqringct.DefaultPPV2,
-//}
+func GetSize(version int) {
+	switch version {
+	case 1:
+		pqringctGetSize(CryptoPP.RingCT)
+
+	}
+}
 
 // LedgerTxoIDCompute(ringID, idx) → txolid.
 func LedgerTXOSerialNumberGen(txo []byte, txolid []byte, sksn []byte) []byte {
@@ -102,10 +113,10 @@ func NewAbeTxOutDesc(address []byte, value uint64) *AbeTxOutDesc {
 	}
 }
 
-func AbeCryptoAddressGen(pp *abecryptoparam.AbeCryptoParam, seed []byte) (retSerializedCryptoAddress []byte, retSerializedVSk []byte, retSerializedASksp []byte, retSerializedASksn []byte, err error) {
+func (pp *AbeCryptoParam) AbeCryptoAddressGen(seed []byte) (retSerializedCryptoAddress []byte, retSerializedVSk []byte, retSerializedASksp []byte, retSerializedASksn []byte, err error) {
 	var serializedAddress, serializedVSk, serializedASkSp, serializedASkSn []byte
 	switch pp.Version {
-	case abecryptoparam.CryptoSchemePQRINGCTV2:
+	case CryptoSchemePQRINGCTV2:
 		serializedAddress, serializedVSk, serializedASkSp, serializedASkSn, err = CryptoAddressGen(pp.RingCT, seed)
 		if err != nil {
 			return nil, nil, nil, nil, err
@@ -144,18 +155,18 @@ func AbeCryptoAddressGen(pp *abecryptoparam.AbeCryptoParam, seed []byte) (retSer
 	return retSerializedCryptoAddress, retSerializedVSk, retSerializedASksp, retSerializedASksn, nil
 }
 
-func CoinbaseTxGen(pp *abecryptoparam.AbeCryptoParam, abeTxOutDescs []*AbeTxOutDesc, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
+func (pp *AbeCryptoParam) CoinbaseTxGen(abeTxOutDescs []*AbeTxOutDesc, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 	var cbTx *wire.MsgTxAbe
 	var err error
 	switch pp.Version {
-	case abecryptoparam.CryptoSchemePQRINGCTV2:
+	case CryptoSchemePQRINGCTV2:
 		// check the address in abeTxOutDescs
 		for i := 0; i < len(abeTxOutDescs); i++ {
 			version := abeTxOutDescs[i].address[0]
 			version |= abeTxOutDescs[i].address[1]
 			version |= abeTxOutDescs[i].address[2]
 			version |= abeTxOutDescs[i].address[3]
-			if abecryptoparam.CryptoScheme(version) != abecryptoparam.CryptoSchemePQRINGCTV2 {
+			if CryptoScheme(version) != CryptoSchemePQRINGCTV2 {
 				return nil, errors.New("unmatched version and address")
 			}
 			abeTxOutDescs[i].address = abeTxOutDescs[i].address[4:]

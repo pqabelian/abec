@@ -11,12 +11,12 @@ package abeaddress
 //
 //// SerializeSize returns the number of bytes it would take to serialize the MasterAddressPQringct.
 //func (maddr *MasterAddressPQringct) SerializeSize() uint32 {
-//	return 5 + pqringctparam.GetMasterPublicKeyLen(uint32(maddr.cryptoScheme))
+//	return 5 + abecryptoparam.GetMasterPublicKeyLen(uint32(maddr.cryptoScheme))
 //}
 //
 //func (maddr *MasterAddressPQringct) Serialize() []byte {
 //
-//	b := make([]byte, 5+pqringctparam.GetMasterPublicKeyLen(uint32(maddr.cryptoScheme)))
+//	b := make([]byte, 5+abecryptoparam.GetMasterPublicKeyLen(uint32(maddr.cryptoScheme)))
 //
 //	b[0] = maddr.netID
 //
@@ -28,7 +28,7 @@ package abeaddress
 //}
 //
 //func (maddr *MasterAddressPQringct) Deserialize(serialized []byte) error {
-//	if len(serialized) != 5+int(pqringctparam.GetMasterPublicKeyLen(uint32(abecrypto.CryptoSchemePQRINGCT))) {
+//	if len(serialized) != 5+int(abecryptoparam.GetMasterPublicKeyLen(uint32(abecrypto.CryptoSchemePQRINGCT))) {
 //		return errors.New("the serialized does not match the rules for MasterAddressPQringct")
 //	}
 //	netId := serialized[0]

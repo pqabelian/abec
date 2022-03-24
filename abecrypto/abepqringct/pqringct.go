@@ -7,7 +7,7 @@ package abepqringct
 //	"errors"
 //	"fmt"
 //	"github.com/abesuite/abec/abecrypto"
-//	"github.com/abesuite/abec/abecrypto/pqringctparam"
+//	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 //	"github.com/abesuite/abec/wire"
 //	"github.com/cryptosuite/pqringct"
 //)
@@ -102,9 +102,9 @@ package abepqringct
 //
 //	if cryptoScheme == abecrypto.CryptoSchemePQRINGCT {
 //		if len(inputSeed) != 0 {
-//			seed, mpk, msvk, mssk, err = pqringctparam.CryptoPP.MasterKeyGen(inputSeed[4:])
+//			seed, mpk, msvk, mssk, err = abecryptoparam.CryptoPP.MasterKeyGen(inputSeed[4:])
 //		} else {
-//			seed, mpk, msvk, mssk, err = pqringctparam.CryptoPP.MasterKeyGen(nil)
+//			seed, mpk, msvk, mssk, err = abecryptoparam.CryptoPP.MasterKeyGen(nil)
 //		}
 //		if err != nil {
 //			return nil, nil, nil, nil, err
@@ -145,8 +145,8 @@ package abepqringct
 //	cryptoScheme := abecrypto.GetCryptoScheme(coinbaseTxMsgTemplate.Version)
 //
 //	outputNum := len(abeTxOutDescs)
-//	if outputNum > pqringctparam.GetOutputMaxNum(coinbaseTxMsgTemplate.Version) {
-//		return nil, fmt.Errorf("the output number %d exceeds the allowed max number %d", outputNum, pqringctparam.GetInputMaxNum(coinbaseTxMsgTemplate.Version))
+//	if outputNum > abecryptoparam.GetOutputMaxNum(coinbaseTxMsgTemplate.Version) {
+//		return nil, fmt.Errorf("the output number %d exceeds the allowed max number %d", outputNum, abecryptoparam.GetInputMaxNum(coinbaseTxMsgTemplate.Version))
 //	}
 //
 //	if cryptoScheme == abecrypto.CryptoSchemePQRINGCT {
@@ -166,7 +166,7 @@ package abepqringct
 //			txOutputDescs[j] = pqringct.NewTxOutputDesc(mpk, abeTxOutDescs[j].value)
 //		}
 //
-//		cryptoCoinbaseTx, err := pqringctparam.CryptoPP.CoinbaseTxGen(coinbaseTxMsgTemplate.TxFee, txOutputDescs)
+//		cryptoCoinbaseTx, err := abecryptoparam.CryptoPP.CoinbaseTxGen(coinbaseTxMsgTemplate.TxFee, txOutputDescs)
 //		if err != nil {
 //			return nil, err
 //		}
@@ -232,7 +232,7 @@ package abepqringct
 //		}
 //
 //		//	todo:
-//		bl := pqringctparam.CryptoPP.CoinbaseTxVerify(cryptoCoinbaseTx)
+//		bl := abecryptoparam.CryptoPP.CoinbaseTxVerify(cryptoCoinbaseTx)
 //		if bl == false {
 //			return false
 //		}
@@ -256,12 +256,12 @@ package abepqringct
 //		return nil, errors.New("the input number and the output number should be at least 1")
 //	}
 //
-//	if inputNum > pqringctparam.GetInputMaxNum(transferTxMsgTemplate.Version) {
-//		return nil, fmt.Errorf("the input number %d exceeds the allowed max number %d", inputNum, pqringctparam.GetInputMaxNum(transferTxMsgTemplate.Version))
+//	if inputNum > abecryptoparam.GetInputMaxNum(transferTxMsgTemplate.Version) {
+//		return nil, fmt.Errorf("the input number %d exceeds the allowed max number %d", inputNum, abecryptoparam.GetInputMaxNum(transferTxMsgTemplate.Version))
 //	}
 //
-//	if outputNum > pqringctparam.GetOutputMaxNum(transferTxMsgTemplate.Version) {
-//		return nil, fmt.Errorf("the output number %d exceeds the allowed max number %d", outputNum, pqringctparam.GetOutputMaxNum(transferTxMsgTemplate.Version))
+//	if outputNum > abecryptoparam.GetOutputMaxNum(transferTxMsgTemplate.Version) {
+//		return nil, fmt.Errorf("the output number %d exceeds the allowed max number %d", outputNum, abecryptoparam.GetOutputMaxNum(transferTxMsgTemplate.Version))
 //	}
 //
 //	if inputNum != len(transferTxMsgTemplate.TxIns) {
@@ -355,7 +355,7 @@ package abepqringct
 //		copy(txMemo[4:], transferTxMsgTemplate.TxMemo)
 //
 //		//	call the crypto scheme
-//		cryptoTransferTx, err := pqringctparam.CryptoPP.TransferTxGen(txInputDescs, txOutputDescs, transferTxMsgTemplate.TxFee, txMemo)
+//		cryptoTransferTx, err := abecryptoparam.CryptoPP.TransferTxGen(txInputDescs, txOutputDescs, transferTxMsgTemplate.TxFee, txMemo)
 //		if err != nil {
 //			return nil, err
 //		}
@@ -472,7 +472,7 @@ package abepqringct
 //		}
 //
 //		// call the crypto scheme's verify algroithm
-//		bl := pqringctparam.CryptoPP.TransferTxVerify(cryptoTransferTx)
+//		bl := abecryptoparam.CryptoPP.TransferTxVerify(cryptoTransferTx)
 //		if bl == false {
 //			return false
 //		} else {
@@ -535,7 +535,7 @@ package abepqringct
 //			return nil, err
 //		}
 //
-//		retsn, err := pqringctparam.CryptoPP.TxoSerialNumberGen(cryptoTxo, mpk, msvk, mssk)
+//		retsn, err := abecryptoparam.CryptoPP.TxoSerialNumberGen(cryptoTxo, mpk, msvk, mssk)
 //		if err != nil {
 //			return nil, err
 //		}
@@ -589,7 +589,7 @@ package abepqringct
 //			return false, 0
 //		}
 //
-//		return pqringctparam.CryptoPP.TxoCoinReceive(cryptoTxo, mpk, msvk)
+//		return abecryptoparam.CryptoPP.TxoCoinReceive(cryptoTxo, mpk, msvk)
 //	} else {
 //		panic("Unsupported version appears! Implement here.")
 //		// todo: if there is any more version to support, implement it here

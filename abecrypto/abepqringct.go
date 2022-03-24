@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"github.com/abesuite/abec/abecrypto/pqringctparam"
+	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 	"github.com/cryptosuite/pqringct"
@@ -214,12 +214,12 @@ func TransferTxGen(pp *pqringct.PublicParameter, abeTxInputDescs []*AbeTxInputDe
 		return nil, errors.New("the input number and the output number should be at least 1")
 	}
 
-	//if inputNum > pqringctparam.GetInputMaxNum(transferTxMsgTemplate.Version) {
-	//	return nil, fmt.Errorf("the input number %d exceeds the allowed max number %d", inputNum, pqringctparam.GetInputMaxNum(transferTxMsgTemplate.Version))
+	//if inputNum > abecryptoparam.GetInputMaxNum(transferTxMsgTemplate.Version) {
+	//	return nil, fmt.Errorf("the input number %d exceeds the allowed max number %d", inputNum, abecryptoparam.GetInputMaxNum(transferTxMsgTemplate.Version))
 	//}
 	//
-	//if outputNum > pqringctparam.GetOutputMaxNum(transferTxMsgTemplate.Version) {
-	//	return nil, fmt.Errorf("the output number %d exceeds the allowed max number %d", outputNum, pqringctparam.GetOutputMaxNum(transferTxMsgTemplate.Version))
+	//if outputNum > abecryptoparam.GetOutputMaxNum(transferTxMsgTemplate.Version) {
+	//	return nil, fmt.Errorf("the output number %d exceeds the allowed max number %d", outputNum, abecryptoparam.GetOutputMaxNum(transferTxMsgTemplate.Version))
 	//}
 
 	if inputNum != len(transferTxMsgTemplate.TxIns) {
@@ -421,7 +421,7 @@ func GetTxoSerialNumberLen(pp *pqringct.PublicParameter, version uint32) int {
 	return pp.GetTxoSerialNumberLen()
 }
 func GetNullSerialNumber(pp *pqringct.PublicParameter, version uint32) []byte {
-	return pqringctparam.GetNullSerialNumber(version)
+	return abecryptoparam.GetNullSerialNumber(version)
 }
 
 func GetTxMemoMaxLen(pp *pqringct.PublicParameter, version uint32) int {

@@ -1,9 +1,16 @@
 package wire
 
+import "github.com/abesuite/abec/abecrypto/abecryptoparam"
+
+// WireParam define the blockchain protocol.
+// Blockchain is essentially a P2P network, so the protocol
+// and the parameter of blockchain is the fundamental.
+// TODO: Need to considerate the relation of this struct and crypto scheme
 type WireParam struct {
 	wireVersion          uint32
 	blockNumPerRingGroup uint8
 	blockVersion         uint32
+	cryptoSchemeVersion  abecryptoparam.CryptoScheme
 	txVersion            uint32
 	txRingSize           uint8
 	txInputMaxNum        uint8
@@ -11,10 +18,11 @@ type WireParam struct {
 	defaultTxInputAlloc  uint8
 }
 
-var wireParamV1 = WireParam{
+var wireParamV1 = &WireParam{
 	wireVersion:          1,
 	blockNumPerRingGroup: 3,
 	blockVersion:         1,
+	cryptoSchemeVersion:  abecryptoparam.CryptoSchemePQRINGCTV2,
 	txVersion:            1,
 	txRingSize:           7,
 	txInputMaxNum:        5,

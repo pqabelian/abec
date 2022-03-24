@@ -4,6 +4,7 @@ import (
 	"container/heap"
 	"fmt"
 	"github.com/abesuite/abec/abecrypto"
+	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chaincfg"
@@ -370,7 +371,7 @@ func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, extraNonce uint64, tx
 	msgTx.AddTxIn(coinbaseTxIn)
 	tempTxOut := &wire.TxOutAbe{
 		Version:   msgTx.Version,
-		TxoScript: make([]byte, abecrypto.CryptoPP.GetTxoSerializeSize(msgTx.Version)),
+		TxoScript: make([]byte, abecryptoparam.CryptoPP.GetTxoSerializeSize(msgTx.Version)),
 	}
 
 	//	one or multiple TxoOuts
@@ -379,10 +380,10 @@ func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, extraNonce uint64, tx
 		msgTx.AddTxOut(tempTxOut)
 	}
 
-	//msgTx.TxFee = pqringctparam.GetMaxCoinValue(msgTx.Version)
+	//msgTx.TxFee = abecryptoparam.GetMaxCoinValue(msgTx.Version)
 	msgTx.TxFee = 1 // txFee will be serialized with 8bytes.
 	msgTx.TxMemo = []byte{byte(msgTx.Version >> 24), byte(msgTx.Version >> 16), byte(msgTx.Version >> 8), byte(msgTx.Version)}
-	msgTx.TxWitness = make([]byte, abecrypto.CryptoPP.GetCoinbaseTxWitnessLen(msgTx.Version, txOutNum))
+	msgTx.TxWitness = make([]byte, abecryptoparam.CryptoPP.GetCoinbaseTxWitnessLen(msgTx.Version, txOutNum))
 
 	return msgTx, nil
 }
@@ -777,7 +778,7 @@ mempoolLoop:
 	txOutDescs := make([]*abecrypto.AbeTxOutDesc, 1)
 	txOutDescs[0] = abecrypto.NewAbeTxOutDesc(payToMpk, coinbaseTxMsg.TxFee)
 
-	coinbaseTxMsg, err = abecrypto.CryptoPP.CoinbaseTxGen(txOutDescs, coinbaseTxMsg)
+	coinbaseTxMsg, err = abecrypto.CoinbaseTxGen(abecryptoparam.CryptoPP, txOutDescs, coinbaseTxMsg)
 	if err != nil {
 		return nil, err
 	}

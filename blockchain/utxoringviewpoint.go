@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abecrypto/pqringctparam"
+	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/database"
@@ -210,70 +210,68 @@ func (entry *UtxoRingEntry) Serialize(w io.Writer) error {
 		return err
 	}
 
+	//	ring size
+	if len(entry.txOuts) != len(entry.outPointRing.OutPoints) {
+		return AssertError(fmt.Sprintf("The size of txOuts does not match the numner of OutPoints"))
+	}
+	err = wire.WriteVarInt(w, 0, uint64(len(entry.txOuts)))
+	if err != nil {
+		return err
+	}
 
-		//	ring size
-		if len(entry.txOuts) != len(entry.outPointRing.OutPoints) {
-			return AssertError(fmt.Sprintf("The size of txOuts does not match the numner of OutPoints"))
-		}
-		err = wire.WriteVarInt(w, 0, uint64(len(entry.txOuts)))
+	//	txOuts
+	for _, txOut := range entry.txOuts {
+		err = wire.WriteTxOutAbe(w, 0, entry.Version, txOut)
 		if err != nil {
 			return err
 		}
+	}
 
-		//	txOuts
-		for _, txOut := range entry.txOuts {
-			err = wire.WriteTxOutAbe(w, 0, entry.Version, txOut)
+	/*	//	GeneratingBlockHeights
+		if len(entry.generatingBlockHeights) != len(entry.txOuts) {
+			return AssertError(fmt.Sprintf("The size of GeneratingBlockHeights does not match the ring size"))
+		}
+		for _, generatingBlockHeight := range entry.generatingBlockHeights {
+			err = wire.WriteVarInt(w, 0, uint64(generatingBlockHeight))
 			if err != nil {
 				return err
 			}
+		}*/
+
+	//	number of consumed (serialNumbers)
+	if len(entry.serialNumbers) > len(entry.txOuts) {
+		return AssertError(fmt.Sprintf("The size of consumed serialNumbers exceeds the ring size"))
+	}
+	err = wire.WriteVarInt(w, 0, uint64(len(entry.serialNumbers)))
+	if err != nil {
+		return err
+	}
+	for _, serialNumber := range entry.serialNumbers {
+		_, err = w.Write(serialNumber[:])
+		if err != nil {
+			return err
 		}
+	}
+	if len(entry.consumingBlockHashs) != len(entry.serialNumbers) {
+		return AssertError(fmt.Sprintf("The number of consumed serialNumbers does not mathc the number of corresponidng block hashes"))
+	}
+	for _, consumingBlockHash := range entry.consumingBlockHashs {
+		_, err = w.Write(consumingBlockHash[:])
+		if err != nil {
+			return err
+		}
+	}
 
-		/*	//	GeneratingBlockHeights
-			if len(entry.generatingBlockHeights) != len(entry.txOuts) {
-				return AssertError(fmt.Sprintf("The size of GeneratingBlockHeights does not match the ring size"))
-			}
-			for _, generatingBlockHeight := range entry.generatingBlockHeights {
-				err = wire.WriteVarInt(w, 0, uint64(generatingBlockHeight))
-				if err != nil {
-					return err
-				}
-			}*/
-
-		//	number of consumed (serialNumbers)
-		if len(entry.serialNumbers) > len(entry.txOuts) {
+	/*
+		if len(entry.consumingBlockHeights) != len(entry.serialNumbers) {
 			return AssertError(fmt.Sprintf("The size of consumed serialNumbers exceeds the ring size"))
 		}
-		err = wire.WriteVarInt(w, 0, uint64(len(entry.serialNumbers)))
-		if err != nil {
-			return err
-		}
-		for _, serialNumber := range entry.serialNumbers {
-			_, err = w.Write(serialNumber[:])
+		for _, consumingBlockHeight := range entry.consumingBlockHeights {
+			err = wire.WriteVarInt(w, 0, uint64(consumingBlockHeight))
 			if err != nil {
 				return err
 			}
-		}
-		if len(entry.consumingBlockHashs) != len(entry.serialNumbers) {
-			return AssertError(fmt.Sprintf("The number of consumed serialNumbers does not mathc the number of corresponidng block hashes"))
-		}
-		for _, consumingBlockHash := range entry.consumingBlockHashs {
-			_, err = w.Write(consumingBlockHash[:])
-			if err != nil {
-				return err
-			}
-		}
-
-		/*
-			if len(entry.consumingBlockHeights) != len(entry.serialNumbers) {
-				return AssertError(fmt.Sprintf("The size of consumed serialNumbers exceeds the ring size"))
-			}
-			for _, consumingBlockHeight := range entry.consumingBlockHeights {
-				err = wire.WriteVarInt(w, 0, uint64(consumingBlockHeight))
-				if err != nil {
-					return err
-				}
-			}*/
-
+		}*/
 
 	return nil
 }
@@ -300,89 +298,87 @@ func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 	entry.Version = uint32(version)
 
 	entry.outPointRing = &wire.OutPointRing{}
-	err = wire.ReadOutPointRing(r, 0,entry.Version,entry.outPointRing)
+	err = wire.ReadOutPointRing(r, 0, entry.Version, entry.outPointRing)
 	if err != nil {
 		return err
 	}
 
+	//	ring size
+	// TODO(abe): the ring size coule be than 4? 20210225
+	ringSize, err := wire.ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	if ringSize > wire.TxRingSize {
+		return errUtxoRingDeserialize("The UtxoRingEntry to be deserlized has a ring size greater than the allowed max value")
+	}
+	if ringSize != uint64(len(entry.outPointRing.OutPoints)) {
+		return errUtxoRingDeserialize("The UtxoRingEntry to be deserlized has a ring size does not match the size in OutPointRing")
+	}
 
-		//	ring size
-		// TODO(abe): the ring size coule be than 4? 20210225
-		ringSize, err := wire.ReadVarInt(r, 0)
+	entry.txOuts = make([]*wire.TxOutAbe, ringSize)
+	//	txOuts
+	for i := uint64(0); i < ringSize; i++ {
+		txOut := wire.TxOutAbe{}
+		err = wire.ReadTxOutAbe(r, 0, entry.Version, &txOut)
 		if err != nil {
 			return err
 		}
-		if ringSize > wire.TxRingSize {
-			return errUtxoRingDeserialize("The UtxoRingEntry to be deserlized has a ring size greater than the allowed max value")
-		}
-		if ringSize != uint64(len(entry.outPointRing.OutPoints)) {
-			return errUtxoRingDeserialize("The UtxoRingEntry to be deserlized has a ring size does not match the size in OutPointRing")
-		}
+		entry.txOuts[i] = &txOut
+	}
 
-		entry.txOuts = make([]*wire.TxOutAbe, ringSize)
-		//	txOuts
+	/*	//	GeneratingBlockHeights
+		entry.generatingBlockHeights = make([]int32, ringSize)
 		for i := uint64(0); i < ringSize; i++ {
-			txOut := wire.TxOutAbe{}
-			err = wire.ReadTxOutAbe(r,0,entry.Version,&txOut)
+			generatingBlockHeight, err := wire.ReadVarInt(r, 0)
 			if err != nil {
 				return err
 			}
-			entry.txOuts[i] = &txOut
-		}
+			if int32(generatingBlockHeight) > ringBlockHeight {
+				return errUtxoRingDeserialize("The UtxoRingEntry to be deserlized does not obey the protocol on the block height of the ring members and the ring.")
+			}
+			entry.generatingBlockHeights[i] = int32(generatingBlockHeight)
+		}*/
 
-		/*	//	GeneratingBlockHeights
-			entry.generatingBlockHeights = make([]int32, ringSize)
-			for i := uint64(0); i < ringSize; i++ {
-				generatingBlockHeight, err := wire.ReadVarInt(r, 0)
-				if err != nil {
-					return err
-				}
-				if int32(generatingBlockHeight) > ringBlockHeight {
-					return errUtxoRingDeserialize("The UtxoRingEntry to be deserlized does not obey the protocol on the block height of the ring members and the ring.")
-				}
-				entry.generatingBlockHeights[i] = int32(generatingBlockHeight)
-			}*/
+	//	consumed serialNumbers
+	consumedNum, err := wire.ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	if consumedNum > ringSize {
+		return errUtxoRingDeserialize("The UtxoRingEntry to be deserlized has a size of consumed serialNumbers that exceeds the ring size")
+	}
 
-		//	consumed serialNumbers
-		consumedNum, err := wire.ReadVarInt(r, 0)
+	entry.serialNumbers = make([][]byte, consumedNum)
+	//	serialNumbers
+	for i := uint64(0); i < consumedNum; i++ {
+		serialNumber := make([]byte, abecryptoparam.GetTxoSerialNumberLen(entry.outPointRing.Version))
+		_, err := io.ReadFull(r, serialNumber[:])
 		if err != nil {
 			return err
 		}
-		if consumedNum > ringSize {
-			return errUtxoRingDeserialize("The UtxoRingEntry to be deserlized has a size of consumed serialNumbers that exceeds the ring size")
+		entry.serialNumbers[i] = serialNumber
+	}
+	//	consumingBlockHashs
+	entry.consumingBlockHashs = make([]*chainhash.Hash, consumedNum)
+	for i := uint64(0); i < consumedNum; i++ {
+		consumingBlockHash := chainhash.Hash{}
+		_, err := io.ReadFull(r, consumingBlockHash[:])
+		if err != nil {
+			return err
 		}
+		entry.consumingBlockHashs[i] = &consumingBlockHash
+	}
 
-		entry.serialNumbers = make([][]byte, consumedNum)
-		//	serialNumbers
+	/*	//	consumingBlockHeights
+		entry.consumingBlockHeights = make([]int32, consumedNum)
 		for i := uint64(0); i < consumedNum; i++ {
-			serialNumber := make([]byte, pqringctparam.GetTxoSerialNumberLen(entry.outPointRing.Version))
-			_, err := io.ReadFull(r, serialNumber[:])
+			consumingBlockHeight, err := wire.ReadVarInt(r, 0)
 			if err != nil {
 				return err
 			}
-			entry.serialNumbers[i] = serialNumber
-		}
-		//	consumingBlockHashs
-		entry.consumingBlockHashs = make([]*chainhash.Hash, consumedNum)
-		for i := uint64(0); i < consumedNum; i++ {
-			consumingBlockHash := chainhash.Hash{}
-			_, err := io.ReadFull(r, consumingBlockHash[:])
-			if err != nil {
-				return err
-			}
-			entry.consumingBlockHashs[i] = &consumingBlockHash
-		}
-
-		/*	//	consumingBlockHeights
-			entry.consumingBlockHeights = make([]int32, consumedNum)
-			for i := uint64(0); i < consumedNum; i++ {
-				consumingBlockHeight, err := wire.ReadVarInt(r, 0)
-				if err != nil {
-					return err
-				}
-				entry.consumingBlockHeights[i] = int32(consumingBlockHeight)
-			}*/
-
+			entry.consumingBlockHeights[i] = int32(consumingBlockHeight)
+		}*/
 
 	return nil
 }
@@ -513,7 +509,7 @@ func initNewUtxoRingEntry(version uint32, ringBlockHeight int32, blockhashs []*c
 	}
 
 	utxoRingEntry := &UtxoRingEntry{
-		Version: version,
+		Version:         version,
 		ringBlockHeight: ringBlockHeight,
 	}
 

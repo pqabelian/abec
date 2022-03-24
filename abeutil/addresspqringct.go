@@ -16,12 +16,12 @@ func (maddr *MasterAddressPQringct) EncodeAddress() string {
 
 // SerializeSize returns the number of bytes it would take to serialize the MasterAddressPQringct.
 func (maddr *MasterAddressPQringct) SerializeSize() uint32 {
-	return 2 + pqringctparam.GetMasterPublicKeyLen(uint32(maddr.cryptoScheme))
+	return 2 + abecryptoparam.GetMasterPublicKeyLen(uint32(maddr.cryptoScheme))
 }
 
 func (maddr *MasterAddressPQringct) Serialize() []byte {
 
-	b := make([]byte, 2+pqringctparam.GetMasterPublicKeyLen(uint32(maddr.cryptoScheme)))
+	b := make([]byte, 2+abecryptoparam.GetMasterPublicKeyLen(uint32(maddr.cryptoScheme)))
 
 	binary.BigEndian.PutUint16(b, uint16(maddr.cryptoScheme))
 
@@ -31,7 +31,7 @@ func (maddr *MasterAddressPQringct) Serialize() []byte {
 }
 
 func (maddr *MasterAddressPQringct) Deserialize(serialized []byte) error {
-	if len(serialized) !=2+ int(pqringctparam.GetMasterPublicKeyLen(uint32(abecrypto.CryptoSchemePQRINGCT))) {
+	if len(serialized) !=2+ int(abecryptoparam.GetMasterPublicKeyLen(uint32(abecrypto.CryptoSchemePQRINGCT))) {
 		return errors.New("the serialized does not match the rules for MasterAddressPQringct")
 	}
 	cryptoScheme := binary.BigEndian.Uint16(serialized[:2])

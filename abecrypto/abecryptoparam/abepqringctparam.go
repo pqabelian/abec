@@ -1,8 +1,12 @@
-package pqringctparam
+package abecryptoparam
 
 import "github.com/cryptosuite/pqringct"
 
-var CryptoPP = pqringct.DefaultPPV2
+var pp = &pqringct.PublicParameter{}
+
+func pqringctGetSize(pp *pqringct.PublicParameter) {
+	pqringct.GetSize(pp)
+}
 
 // todo: when multiple versions are supported simultaneously, and if necessary, initial multiple nullSerialNumbers
 var nullSerialNumber []byte = []byte{
