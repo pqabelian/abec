@@ -212,7 +212,7 @@ func NewGetBalancesAbeCmd(minconf *int) *GetBalancesAbeCmd {
 }
 
 // GetDetailedUtxosCmd defines the getdetailedutxos JSON-RPC command.
-type GetDetailedUtxosCmd struct{
+type GetDetailedUtxosCmd struct {
 	Minconf *int `jsonrpcdefault:"1"`
 }
 
@@ -598,7 +598,7 @@ func NewSendToPayeesCmd(amounts map[string]float64, minconf *int, scaleToFeeSatP
 		MinConf:            minconf,
 		ScaleToFeeSatPerKb: scaleToFeeSatPerKb,
 		FeeSpecified:       feeSpecified,
-		UTXOSpecified:		UTXOSpecified,
+		UTXOSpecified:      UTXOSpecified,
 		Comment:            comment,
 	}
 }
@@ -792,6 +792,8 @@ func init() {
 	MustRegisterCmd("move", (*MoveCmd)(nil), flags)
 	MustRegisterCmd("sendfrom", (*SendFromCmd)(nil), flags)
 	MustRegisterCmd("sendmany", (*SendManyCmd)(nil), flags)
+	MustRegisterCmd("sendtoaddressesabe", (*SendToPayeesCmd)(nil), flags)
+	MustRegisterCmd("generateaddressabe", (*GetBalancesAbeCmd)(nil), flags)
 	MustRegisterCmd("sendtoaddress", (*SendToAddressCmd)(nil), flags)
 	MustRegisterCmd("sendtopayee", (*SendToPayeesCmd)(nil), flags)
 	MustRegisterCmd("setaccount", (*SetAccountCmd)(nil), flags)
