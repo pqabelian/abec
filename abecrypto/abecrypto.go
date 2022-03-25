@@ -55,19 +55,27 @@ func LedgerTXOSerialNumberGen(txo []byte, txolid []byte, sksn []byte) []byte {
 
 // 20220320 Input and Output struct should be defined by config and decide to assign to which version
 type AbeTxInputDesc struct {
-	ringHash     chainhash.Hash // txoRing identifier
-	txoList      []*wire.TxOutAbe
-	sidx         int // spend which one
-	serializedSk []byte
+	ringHash         chainhash.Hash // txoRing identifier
+	txoList          []*wire.TxOutAbe
+	sidx             int    // spend which one
+	serializeAddress []byte // address
+	serializedASksp  []byte // asksp
+	serializedASksn  []byte // asksn
+	serializedVSk    []byte //  vsk
+	value            uint64
 }
 
 func NewAbeTxInputDesc(ringHash chainhash.Hash, txoList []*wire.TxOutAbe,
-	sidx int, serializedSk []byte) *AbeTxInputDesc {
+	sidx int, serializeAddress, serializedASksp, serializedASksn, serializedVSk []byte, value uint64) *AbeTxInputDesc {
 	return &AbeTxInputDesc{
-		ringHash:     ringHash,
-		txoList:      txoList,
-		sidx:         sidx,
-		serializedSk: serializedSk,
+		ringHash:         ringHash,
+		txoList:          txoList,
+		sidx:             sidx,
+		serializeAddress: serializeAddress,
+		serializedASksp:  serializedASksp,
+		serializedASksn:  serializedASksn,
+		serializedVSk:    serializedVSk,
+		value:            value,
 	}
 }
 
@@ -210,6 +218,15 @@ func (pp *AbeCryptoParam) TransferTxGen(
 	switch pp.Version {
 	case CryptoSchemePQRINGCTV2:
 		// parse address -> address public key and value public key
+		for i := 0; i < len(abeTxInputDescs); i++ {
+			abeTxInputDescs[i].serializeAddress = abeTxInputDescs[i].serializeAddress[4:]
+			abeTxInputDescs[i].serializedASksp = abeTxInputDescs[i].serializedASksp[4:]
+			abeTxInputDescs[i].serializedASksn = abeTxInputDescs[i].serializedASksn[4:]
+			abeTxInputDescs[i].serializedVSk = abeTxInputDescs[i].serializedVSk[4:]
+		}
+		for i := 0; i < len(abeTxOutputDescs); i++ {
+			abeTxOutputDescs[i].address = abeTxOutputDescs[i].address[4:]
+		}
 		cbTx, err = TransferTxGen(pp.RingCT, abeTxInputDescs, abeTxOutputDescs, transferTxMsgTemplate)
 		if err != nil {
 			return nil, err
@@ -314,7 +331,7 @@ func (pp *AbeCryptoParam) GetCoinbaseTxWitnessLen(version uint32, num int) int {
 	return GetCoinbaseTxWitnessLen(pp.RingCT, version)
 }
 func (pp *AbeCryptoParam) GetTxoSerialNumberLen(version uint32) int {
-	return GetTxoSerializeSize(pp.RingCT, version)
+	return GetTxoSerialNumberLen(pp.RingCT, version)
 }
 func (pp *AbeCryptoParam) GetNullSerialNumber(version uint32) []byte {
 	return GetNullSerialNumber(pp.RingCT, version)
