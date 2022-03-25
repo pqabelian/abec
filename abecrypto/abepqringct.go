@@ -271,8 +271,8 @@ func TransferTxGen(pp *pqringct.PublicParameter, abeTxInputDescs []*AbeTxInputDe
 	// outputDescs
 	txOutputDescs := make([]*pqringct.TxOutputDescv2, outputNum)
 	for j := 0; j < outputNum; j++ {
-		// TODO(20220320): parse the address to serializedApk and serializedVpk
-		serializedApk, serializedVpk := abeTxOutputDescs[j].address[:], abeTxOutputDescs[j].address[:]
+		apkSize := pp.AddressPublicKeySerializeSize()
+		serializedApk, serializedVpk := abeTxOutputDescs[j].address[:apkSize], abeTxOutputDescs[j].address[apkSize:]
 		txOutputDescs[j] = pqringct.NewTxOutputDescv2(serializedApk, serializedVpk, abeTxOutputDescs[j].value)
 	}
 
