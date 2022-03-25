@@ -258,8 +258,7 @@ func TransferTxGen(pp *pqringct.PublicParameter, abeTxInputDescs []*AbeTxInputDe
 		}
 
 		sidx := abeTxInputDescs[i].sidx
-		// TODO(20220320): compute the value from txo[sidx] with vsk
-		value := uint64(0)
+		value := abeTxInputDescs[i].value
 		// TODO(20220320): parse the serializedSk to serialized serializedASk, serializedVSk, serialziedVPk
 		apkSize := pp.AddressPublicKeySerializeSize()
 		vpk := abeTxInputDescs[i].serializeAddress[apkSize:]
