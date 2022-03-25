@@ -249,6 +249,7 @@ func TransferTxGen(pp *pqringct.PublicParameter, abeTxInputDescs []*AbeTxInputDe
 			if abeTxInputDescs[i].txoList[j].Version != inputsVersion {
 				return nil, errors.New("the version of TXOs in abeTxInputDescs.serializedTxoList does not match the version in the corresponding TxIn")
 			}
+			txoList[j] = &pqringct.LgrTxo{}
 			txoList[j].Txo, err = pp.DeserializeTxo(abeTxInputDescs[i].txoList[j].TxoScript)
 			if err != nil {
 				return nil, err
