@@ -196,8 +196,13 @@ func NewGetBalanceCmd(account *string, minConf *int) *GetBalanceCmd {
 
 // GetBalancesCmd defines the getbalances JSON-RPC command.
 type GetBalancesCmd struct{}
+type GenerateAddressCmd struct{}
 type GetBalancesAbeCmd struct {
 	Minconf *int `jsonrpcdefault:"1"`
+}
+
+func NewGenerateAddressCmd() *GenerateAddressCmd {
+	return &GenerateAddressCmd{}
 }
 
 // NewGetBalancesCmd returns a new instance which can be used to issue a
@@ -793,7 +798,7 @@ func init() {
 	MustRegisterCmd("sendfrom", (*SendFromCmd)(nil), flags)
 	MustRegisterCmd("sendmany", (*SendManyCmd)(nil), flags)
 	MustRegisterCmd("sendtoaddressesabe", (*SendToPayeesCmd)(nil), flags)
-	MustRegisterCmd("generateaddressabe", (*GetBalancesAbeCmd)(nil), flags)
+	MustRegisterCmd("generateaddressabe", (*GenerateAddressCmd)(nil), flags)
 	MustRegisterCmd("sendtoaddress", (*SendToAddressCmd)(nil), flags)
 	MustRegisterCmd("sendtopayee", (*SendToPayeesCmd)(nil), flags)
 	MustRegisterCmd("setaccount", (*SetAccountCmd)(nil), flags)
