@@ -101,7 +101,28 @@ func NewAbeTxOutDesc(address []byte, value uint64) *AbeTxOutDesc {
 		value:   value,
 	}
 }
+func (pp *AbeCryptoParam) ExtractCoinAddressFromTxoScript(txoscript []byte) ([]byte, error) {
+	var coinAddr []byte
+	var err error
+	switch pp.Version {
+	case CryptoSchemePQRINGCTV2:
+		coinAddr, err = ExtractCoinAddressFromTxoScript(pp.RingCT, txoscript)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.New("unsupported ringct version")
+	}
 
+	//retSerializedASksn = make([]byte, 0, 4+len(serializedASkSn))
+	//retSerializedASksn = append(retSerializedASksn, byte(pp.Version>>0))
+	//retSerializedASksn = append(retSerializedASksn, byte(pp.Version>>8))
+	//retSerializedASksn = append(retSerializedASksn, byte(pp.Version>>16))
+	//retSerializedASksn = append(retSerializedASksn, byte(pp.Version>>24))
+	//retSerializedASksn = append(retSerializedASksn, serializedASkSn...)
+
+	return coinAddr, nil
+}
 func (pp *AbeCryptoParam) AbeCryptoAddressGen(seed []byte) (retSerializedCryptoAddress []byte, retSerializedVSk []byte, retSerializedASksp []byte, retSerializedASksn []byte, err error) {
 	var serializedAddress, serializedVSk, serializedASkSp, serializedASkSn []byte
 	switch pp.Version {

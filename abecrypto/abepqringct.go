@@ -71,6 +71,14 @@ import (
 //		serialNumber,
 //	}
 //}
+func ExtractCoinAddressFromTxoScript(pp *pqringct.PublicParameter, txoscript []byte) ([]byte, error) {
+	txo, err := pp.DeserializeTxo(txoscript)
+	if err != nil {
+		return nil, err
+	}
+	return pp.SerializeAddressPublicKey(txo.AddressPublicKey)
+}
+
 func CryptoAddressGen(pp *pqringct.PublicParameter, seed []byte) (serializedAddress []byte, serializedVSk []byte, serializedASksp []byte, serializedASksn []byte, err error) {
 	expectedSeedLen := pp.ParamSeedBytesLen()
 	if 2*expectedSeedLen != len(seed) {
