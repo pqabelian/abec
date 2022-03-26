@@ -14,7 +14,7 @@ var nullSerialNumber []byte = []byte{
 
 //	todo:
 func GetMasterPublicKeyLen(version uint32) uint32 {
-	return uint32(CryptoPP.GetPublicKeyByteLen())
+	return uint32(CryptoPP.GetAddressPublicKeySerializeSize())
 }
 
 /*
