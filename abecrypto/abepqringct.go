@@ -254,7 +254,7 @@ func TransferTxGen(pp *pqringct.PublicParameter, abeTxInputDescs []*AbeTxInputDe
 			if err != nil {
 				return nil, err
 			}
-			txoList[j].Id = LedgerTxoIdGen(abeTxInputDescs[i].ringHash, abeTxInputDescs[i].sidx)
+			txoList[j].Id = LedgerTxoIdGen(abeTxInputDescs[i].ringHash, j)
 		}
 
 		sidx := abeTxInputDescs[i].sidx
