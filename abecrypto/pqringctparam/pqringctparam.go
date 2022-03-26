@@ -44,6 +44,7 @@ func GetTxMemoMaxLen(version uint32) uint32 {
 }
 
 func GetTxWitnessMaxLen(version uint32) uint32 {
+	return 1<<32 - 1
 	// todo: call cryptoPP.methods
 	return func(a, b uint32) uint32 {
 		if a > b {
