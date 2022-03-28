@@ -730,15 +730,12 @@ func NewWalletPassphraseCmd(passphrase string, timeout int64) *WalletPassphraseC
 
 // FreshenCmd defines the walletpassphrase JSON-RPC command.
 type FreshenCmd struct {
-	Passphrase string
 }
 
 // Freshen returns a new instance which can be used to issue a
 // walletpassphrase JSON-RPC command.
 func Freshen(passphrase string) *FreshenCmd {
-	return &FreshenCmd{
-		Passphrase: passphrase,
-	}
+	return &FreshenCmd{}
 }
 
 // WalletPassphraseChangeCmd defines the walletpassphrase JSON-RPC command.
