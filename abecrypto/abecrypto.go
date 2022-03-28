@@ -248,12 +248,12 @@ func (pp *AbeCryptoParam) TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDet
 	return b
 }
 
-func (pp *AbeCryptoParam) TxoSerialNumberGen(txo *wire.TxOutAbe, ringHash chainhash.Hash, serializedSksn []byte) []byte {
+func (pp *AbeCryptoParam) TxoSerialNumberGen(txo *wire.TxOutAbe, ringHash chainhash.Hash, index uint8, serializedSksn []byte) []byte {
 	var sn []byte
 	switch pp.Version {
 	case CryptoSchemePQRINGCTV2:
 		// parse address -> address public key and value public key
-		sn = TxoSerialNumberGen(pp.RingCT, txo, ringHash, serializedSksn)
+		sn = TxoSerialNumberGen(pp.RingCT, txo, ringHash, index, serializedSksn)
 	default:
 		log.Fatalln("Unsupporte crypto scheme")
 	}

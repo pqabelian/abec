@@ -409,7 +409,7 @@ func TransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.MsgTxAbe, a
 }
 
 // For wallet
-func TxoSerialNumberGen(pp *pqringct.PublicParameter, txo *wire.TxOutAbe, ringHash chainhash.Hash, serializedSksn []byte) []byte {
+func TxoSerialNumberGen(pp *pqringct.PublicParameter, txo *wire.TxOutAbe, ringHash chainhash.Hash, index uint8, serializedSksn []byte) []byte {
 	// ringHash + index -> ID
 	//	// (ID+txo) + Sksn -> sn [pqringct]
 	panic("TxoSerialNumberGen implement me")
