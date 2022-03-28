@@ -248,7 +248,7 @@ func (pp *AbeCryptoParam) TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDet
 	return b
 }
 
-func (pp *AbeCryptoParam) TxoSerialNumberGen(txo *wire.TxOutAbe, ringHash chainhash.Hash, index uint8, serializedSksn []byte) []byte {
+func (pp *AbeCryptoParam) TxoSerialNumberGen(txo *wire.TxOutAbe, ringHash chainhash.Hash, index int, serializedSksn []byte) []byte {
 	var sn []byte
 	switch pp.Version {
 	case CryptoSchemePQRINGCTV2:

@@ -409,11 +409,20 @@ func TransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.MsgTxAbe, a
 }
 
 // For wallet
-func TxoSerialNumberGen(pp *pqringct.PublicParameter, txo *wire.TxOutAbe, ringHash chainhash.Hash, index uint8, serializedSksn []byte) []byte {
+func TxoSerialNumberGen(pp *pqringct.PublicParameter, txo *wire.TxOutAbe, ringHash chainhash.Hash, index int, serializedSksn []byte) []byte {
 	// ringHash + index -> ID
+	tmp := make([]byte, 0, chainhash.HashSize+4)
+	tmp = append(tmp, ringHash[:]...)
+	tmp = append(tmp, byte(uint64(index)>>0))
+	tmp = append(tmp, byte(uint64(index)>>1))
+	tmp = append(tmp, byte(uint64(index)>>2))
+	tmp = append(tmp, byte(uint64(index)>>3))
+	id, err := pqringct.LedgerTxoIdCompute(pp, tmp)
+	if err != nil {
+		return nil
+	}
 	//	// (ID+txo) + Sksn -> sn [pqringct]
-	panic("TxoSerialNumberGen implement me")
-	return nil
+	return pqringct.LedgerTxoSerialNumberGen(pp, txo.TxoScript, id, serializedSksn)
 }
 func TxoCoinReceive(pp *pqringct.PublicParameter, abeTxo *wire.TxOutAbe, address []byte, serializedSkvalue []byte) (valid bool, v uint64) {
 	txo, err := pp.DeserializeTxo(abeTxo.TxoScript)
