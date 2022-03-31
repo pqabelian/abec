@@ -364,14 +364,27 @@ func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockH
 todo: create a coinbaseTx template, where the TxOuts, the TxFee, and TxWitness are set to be 'fake' ones, and TxMemo is set to null
 */
 func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, extraNonce uint64, txOutNum int) (*wire.MsgTxAbe, error) {
+	//	When a new msgTx is created for a new transaction, it should use the current Txversion
+	// msgTx := wire.NewMsgTxAbe(wire.TxVersion)
 	msgTx := wire.NewMsgTxAbe(wire.TxVersion)
 
 	//	one TxIn
-	coinbaseTxIn := wire.NewStandardCoinbaseTxIn(nextBlockHeight, extraNonce, msgTx.Version)
+	//	For coinbase transaction, as there is no real consumed coin, the TxIn is set by particular policy,
+	//	which depends on the TxVersion
+	coinbaseTxIn, err := wire.NewStandardCoinbaseTxIn(nextBlockHeight, extraNonce, msgTx.Version)
+	if err != nil {
+		return nil, err
+	}
 	msgTx.AddTxIn(coinbaseTxIn)
+	txoSizeApprxo, err := abecryptoparam.GetTxoSerializeSizeApprox(msgTx.Version)
+	if err != nil {
+		return nil, err
+	}
 	tempTxOut := &wire.TxOutAbe{
-		Version:   msgTx.Version,
-		TxoScript: make([]byte, abecryptoparam.CryptoPP.GetTxoSerializeSize(msgTx.Version)),
+		//	Txo inherits the version from the Tx
+		Version: msgTx.Version,
+		//	TxoSerialize here is used to occupy the space
+		TxoScript: make([]byte, txoSizeApprxo),
 	}
 
 	//	one or multiple TxoOuts
@@ -381,9 +394,14 @@ func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, extraNonce uint64, tx
 	}
 
 	//msgTx.TxFee = abecryptoparam.GetMaxCoinValue(msgTx.Version)
-	msgTx.TxFee = 1 // txFee will be serialized with 8bytes.
+	msgTx.TxFee = 0 // txFee will be serialized with 8bytes.
 	msgTx.TxMemo = []byte{byte(msgTx.Version >> 24), byte(msgTx.Version >> 16), byte(msgTx.Version >> 8), byte(msgTx.Version)}
-	msgTx.TxWitness = make([]byte, abecryptoparam.CryptoPP.GetCoinbaseTxWitnessLen(msgTx.Version, txOutNum))
+	//	TxWitnessSerializeSize here is used to occupy space.
+	txWitnessSizeApprox, err := abecryptoparam.GetCbTxWitnessSerializeSizeApprox(msgTx.Version, txOutNum)
+	if err != nil {
+		return nil, err
+	}
+	msgTx.TxWitness = make([]byte, txWitnessSizeApprox)
 
 	return msgTx, nil
 }
@@ -550,7 +568,7 @@ func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
 //  |  transactions (while block size   |   |
 //  |  <= policy.BlockMinSize)          |   |
 //   -----------------------------------  --
-func (g *BlkTmplGenerator) NewBlockTemplate(payToMpk []byte) (*BlockTemplate, error) {
+func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress []byte) (*BlockTemplate, error) {
 	// Extend the most recently known best block.
 	best := g.chain.BestSnapshot()
 	nextBlockHeight := best.Height + 1
@@ -607,7 +625,8 @@ mempoolLoop:
 		// A block can't have more than one coinbase or contain
 		// non-finalized transactions.
 		tx := txDesc.Tx
-		if blockchain.IsCoinBaseAbe(tx) {
+		isCb, err := blockchain.IsCoinBaseAbe(tx)
+		if isCb {
 			log.Tracef("Skipping coinbase tx %s", tx.Hash())
 			continue
 		}
@@ -775,10 +794,10 @@ mempoolLoop:
 
 	coinbaseTxMsg.TxFee = subsidy + totalFee
 	// txFees[0] = -totalFee
-	txOutDescs := make([]*abecrypto.AbeTxOutDesc, 1)
-	txOutDescs[0] = abecrypto.NewAbeTxOutDesc(payToMpk, coinbaseTxMsg.TxFee)
+	txOutDescs := make([]*abecrypto.AbeTxOutputDesc, 1)
+	txOutDescs[0] = abecrypto.NewAbeTxOutDesc(payToAddress, coinbaseTxMsg.TxFee)
 
-	coinbaseTxMsg, err = abecrypto.CoinbaseTxGen(abecryptoparam.CryptoPP, txOutDescs, coinbaseTxMsg)
+	coinbaseTxMsg, err = abecrypto.CoinbaseTxGen(txOutDescs, coinbaseTxMsg)
 	if err != nil {
 		return nil, err
 	}
@@ -835,7 +854,7 @@ mempoolLoop:
 		BlockAbe:        &msgBlock,
 		Fees:            txFees,
 		Height:          nextBlockHeight,
-		ValidPayAddress: payToMpk != nil,
+		ValidPayAddress: payToAddress != nil,
 	}, nil
 }
 
@@ -912,7 +931,10 @@ func (g *BlkTmplGenerator) UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight
 }
 
 func (g *BlkTmplGenerator) UpdateExtraNonceAbe(msgBlock *wire.MsgBlockAbe, blockHeight int32, extraNonce uint64) error {
-	coinbaseTxIn := wire.NewStandardCoinbaseTxIn(blockHeight, extraNonce, wire.TxVersion)
+	coinbaseTxIn, err := wire.NewStandardCoinbaseTxIn(blockHeight, extraNonce, wire.TxVersion)
+	if err != nil {
+		return err
+	}
 	msgBlock.Transactions[0].TxIns[0] = coinbaseTxIn
 
 	// Recalculate the merkle root with the updated extra nonce.

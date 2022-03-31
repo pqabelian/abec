@@ -8,23 +8,19 @@ import (
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/chainhash"
 	"io"
+	"log"
 	"strconv"
 )
 
 // borrow something from msgtx.go
 //	todo(ABE)
 const (
-	BlockNumPerRingGroup = 3
+	//TxInputMaxNum = 5
+	//
+	//TxOutputMaxNum = 5
 
-	TxRingSize = 7
-
-	TxInputMaxNum = 5
-
-	TxOutputMaxNum = 5
-
-	defaultTxInputAlloc = 3
-
-	defaultTxOutputAlloc = 3
+	defaultTxInputAlloc  = 2
+	defaultTxOutputAlloc = 2
 
 	// minTxPayload is the minimum payload size for a (transfer) transaction.  Note
 	// that any realistically usable transaction must have at least one
@@ -195,7 +191,7 @@ func ReadOutPointRing(r io.Reader, pver uint32, version uint32, opr *OutPointRin
 	if err != nil {
 		return err
 	}
-	if blockNum != GetWireParamBlockNumPerRingGroup(opr.Version) {
+	if blockNum != GetBlockNumPerRingGroupByRingVersion(opr.Version) {
 		str := fmt.Sprintf("the block number %d in ring does not match the version %d", blockNum, opr.Version)
 		return messageError("readOutPointRing", str)
 	}
@@ -214,8 +210,8 @@ func ReadOutPointRing(r io.Reader, pver uint32, version uint32, opr *OutPointRin
 	if err != nil {
 		return err
 	}
-	if ringSize > GetWireParamTxRingSize(opr.Version) {
-		str := fmt.Sprintf("the ring size (%d) exceeds the allowed max ring size %d with version %d", ringSize, GetWireParamTxRingSize(opr.Version), opr.Version)
+	if ringSize > GetTxoRingSizeByRingVersion(opr.Version) {
+		str := fmt.Sprintf("the ring size (%d) exceeds the allowed max ring size %d with version %d", ringSize, GetTxoRingSizeByRingVersion(opr.Version), opr.Version)
 		return messageError("readOutPointRing", str)
 	}
 	opr.OutPoints = make([]*OutPointAbe, ringSize)
@@ -302,7 +298,9 @@ func ReadTxOutAbe(r io.Reader, pver uint32, version uint32, txOut *TxOutAbe) err
 		return err
 	}
 
-	txoScript, err := ReadVarBytes(r, pver, uint32(abecryptoparam.GetTxoSerializeSize(version)), "TxoScript")
+	//txoScript, err := ReadVarBytes(r, pver, uint32(abecryptoparam.GetTxoSerializeSizeApprox(version)), "TxoScript")
+	//	For performance, here the maxallowedlen uses constant, rather than calling funciton.
+	txoScript, err := ReadVarBytes(r, pver, abecryptoparam.TxoSerializeSizeMaxAllowed, "TxoScript")
 	if err != nil {
 		return err
 	}
@@ -339,7 +337,12 @@ func (txIn *TxInAbe) String() string {
 	// TxHash:index; TxHash:index; ...; serialNumber
 	//	index is at most 2 decimal digits; at this moment, only 1 decimal digits
 
-	strLen := 2*abecryptoparam.GetTxoSerialNumberLen(txIn.PreviousOutPointRing.Version) + 1 +
+	snLen, err := abecryptoparam.GetSerialNumberSerializeSize(txIn.PreviousOutPointRing.Version)
+	if err != nil {
+		//	todo: 202203 cannot throw err for String()
+		log.Default()
+	}
+	strLen := 2*snLen + 1 +
 		len(txIn.PreviousOutPointRing.BlockHashs)*(2*chainhash.HashSize+1) + len(txIn.PreviousOutPointRing.OutPoints)*(2*chainhash.HashSize+2) + 1
 
 	buf := make([]byte, strLen)
@@ -356,17 +359,23 @@ func (txIn *TxInAbe) String() string {
 
 func (txIn *TxInAbe) SerializeSize() int {
 	// chainhash.HashSize for SerialNumber
-	snLen := abecryptoparam.GetTxoSerialNumberLen(txIn.PreviousOutPointRing.Version)
+	//snLen := abepqringctparam.GetTxoSerialNumberLen(txIn.PreviousOutPointRing.Version)
+	snLen := len(txIn.SerialNumber)
 	return VarIntSerializeSize(uint64(snLen)) + snLen + txIn.PreviousOutPointRing.SerializeSize()
 }
 
-func GetTxInSerializeSize(ringVersion uint32, ringSize int) uint32 {
-	n := 1 + uint32(abecryptoparam.GetTxoSerialNumberLen(ringVersion)) + // 1 byte for the length of serialNumber
+func GetTxInSerializeSizeApprox(ringVersion uint32, ringSize int) (uint32, error) {
+	snSize, err := abecryptoparam.GetSerialNumberSerializeSize(ringVersion)
+	if err != nil {
+		return 0, err
+	}
+
+	n := 1 + uint32(snSize) + // 1 byte for the length of serialNumber
 		4 + //	4 bytes for the ring version
-		1 + uint32(GetWireParamBlockNumPerRingGroup(ringVersion)*chainhash.HashSize) + // 1 byte for the number of blocks, blockhashs
+		1 + uint32(GetBlockNumPerRingGroupByRingVersion(ringVersion)*chainhash.HashSize) + // 1 byte for the number of blocks, blockhashs
 		1 + uint32(ringSize*(chainhash.HashSize+1)) //	1 byte for ring size
 
-	return n
+	return n, nil
 }
 
 // writeTxIn encodes txIn to the bitcoin protocol encoding for a transaction
@@ -384,7 +393,10 @@ func writeTxInAbe(w io.Writer, pver uint32, version uint32, txIn *TxInAbe) error
 // (TxIn).
 func readTxInAbe(r io.Reader, pver uint32, version uint32, txIn *TxInAbe) error {
 	var err error
-	txIn.SerialNumber, err = ReadVarBytes(r, pver, uint32(abecryptoparam.CryptoPP.GetTxoSerialNumberLen(version)), "SerialNumber")
+
+	//txIn.SerialNumber, err = ReadVarBytes(r, pver, uint32(abecryptoparam.GetTxoSerializeSizeApprox(version)), "SerialNumber")
+	// For better performance, here we use constant to specify the maxallowedsize, rather than calling a function.
+	txIn.SerialNumber, err = ReadVarBytes(r, pver, abecryptoparam.SerialNumberSerializeSizeMaxAllowed, "SerialNumber")
 	if err != nil {
 		return err
 	}
@@ -437,6 +449,7 @@ type MsgTxAbe struct {
 	//	txWitnessHash chainhash.Hash
 	TxFee uint64
 
+	//	At most 1024 bytes
 	TxMemo []byte
 
 	//TxWitness *TxWitnessAbe // Each Tx has one witness, consisting all necessary information, for example, signatures for inputs, range proofs for outputs, balance between inputs and outputs
@@ -462,20 +475,24 @@ func (msg *MsgTxAbe) HasWitness() bool {
 	return true
 }
 
-func (msg *MsgTxAbe) IsCoinBase() bool {
+func (msg *MsgTxAbe) IsCoinBase() (bool, error) {
 	if len(msg.TxIns) != 1 {
-		return false
+		return false, nil
 	}
 
 	// The serialNumber of the consumed coin must be a zero hash.
 	// Whatever ths ring members for the TxIns[0]
 	// the ring members' (TXHash, index) can be used as coin-nonce
 	txIn := msg.TxIns[0]
-	if bytes.Compare(txIn.SerialNumber, abecryptoparam.GetNullSerialNumber(txIn.PreviousOutPointRing.Version)) != 0 {
-		return false
+	nullSn, err := abecryptoparam.GetNullSerialNumber(txIn.PreviousOutPointRing.Version)
+	if err != nil {
+		return false, err
+	}
+	if bytes.Compare(txIn.SerialNumber, nullSn) != 0 {
+		return false, nil
 	}
 
-	return true
+	return true, nil
 }
 
 // TxHash generates the Hash for the transaction.
@@ -512,15 +529,19 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 	if err != nil {
 		return err
 	}
-	if txInNum > TxInputMaxNum {
+	txInputMaxNum, err := abecryptoparam.GetTxInputMaxNum(msg.Version)
+	if err != nil {
+		return err
+	}
+	if txInNum > uint64(txInputMaxNum) {
 		str := fmt.Sprintf("The numner of inputs exceeds the allowd max number [txInNum %d, max %d]", txInNum,
-			TxInputMaxNum)
+			txInputMaxNum)
 		return messageError("MsgTx.BtcDecode", str)
 	}
 	msg.TxIns = make([]*TxInAbe, txInNum)
 	for i := uint64(0); i < txInNum; i++ {
 		txIn := TxInAbe{}
-		err = readTxInAbe(r, pver, version, &txIn)
+		err = readTxInAbe(r, pver, msg.Version, &txIn)
 		if err != nil {
 			return err
 		}
@@ -532,15 +553,19 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 	if err != nil {
 		return err
 	}
-	if txoNum > TxOutputMaxNum {
+	txOutputMaxNum, err := abecryptoparam.GetTxOutputMaxNum(msg.Version)
+	if err != nil {
+		return err
+	}
+	if txoNum > uint64(txOutputMaxNum) {
 		str := fmt.Sprintf("The numner of inputs exceeds the allowd max number [txInNum %d, max %d]", txoNum,
-			TxOutputMaxNum)
+			txOutputMaxNum)
 		return messageError("MsgTx.BtcDecode", str)
 	}
 	msg.TxOuts = make([]*TxOutAbe, txoNum)
 	for i := uint64(0); i < txoNum; i++ {
 		txOut := TxOutAbe{}
-		err = ReadTxOutAbe(r, pver, version, &txOut)
+		err = ReadTxOutAbe(r, pver, msg.Version, &txOut)
 		if err != nil {
 			return err
 		}
@@ -561,7 +586,9 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 		msg.TxFee = txFee*/
 
 	//	TxMemo
-	txMemo, err := ReadVarBytes(r, pver, uint32(abecryptoparam.GetTxMemoMaxLen(msg.Version)), "TxMemo")
+	//	For better performance, we use constant to specify the maxallowed size, rather than calling a function.
+	// txMemo, err := ReadVarBytes(r, pver, uint32(abepqringctparam.GetTxMemoMaxLen(msg.Version)), "TxMemo")
+	txMemo, err := ReadVarBytes(r, pver, abecryptoparam.TxMemoSerializeSizeMaxAllowed, "TxMemo")
 	if err != nil {
 		return err
 	}
@@ -577,7 +604,9 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 
 	if enc == WitnessEncoding {
 		//	TxWitness
-		txWitness, err := ReadVarBytes(r, pver, uint32(abecryptoparam.GetTxWitnessMaxLen(msg.Version)), "TxWitness")
+		//	For better performance, we use constant to specify the maxallowed size, rather than calling a function.
+		// txWitness, err := ReadVarBytes(r, pver, uint32(abepqringctparam.GetTxWitnessMaxLen(msg.Version)), "TxWitness")
+		txWitness, err := ReadVarBytes(r, pver, abecryptoparam.TxWitnessSerializeSizeMaxAllowed, "TxWitness")
 		if err != nil {
 			msg.TxWitness = nil
 		}
@@ -701,7 +730,7 @@ func (msg *MsgTxAbe) SerializeSizeFull() int {
 Compute the size according to the Serialize function, and based on the crypto-scheme
 The result is just appropriate, will be used to compute transaction fee
 */
-func PrecomputeTrTxConSize(txVersion uint32, inputRingVersions []uint32, inputRingSizes []int, outputTxoNum uint8, txMemoLen uint32) uint32 {
+func PrecomputeTrTxConSize(txVersion uint32, inputRingVersions []uint32, inputRingSizes []int, outputTxoNum uint8, txMemoLen uint32) (uint32, error) {
 	//	Version 4 bytes
 	n := uint32(4)
 
@@ -709,7 +738,12 @@ func PrecomputeTrTxConSize(txVersion uint32, inputRingVersions []uint32, inputRi
 	//	serialized varint size for input
 	n = n + 1 // 1 byte for the inputRing number
 	for i := 0; i < len(inputRingSizes); i++ {
-		n = n + GetTxInSerializeSize(inputRingVersions[i], inputRingSizes[i])
+		//n = n + GetTxInSerializeSizeApprox(inputRingVersions[i], inputRingSizes[i])
+		txInSizeApprox, err := GetTxInSerializeSizeApprox(inputRingVersions[i], inputRingSizes[i])
+		if err != nil {
+			return 0, err
+		}
+		n = n + txInSizeApprox
 	}
 	/*	for _, txIn := range txIns {
 		// serialized varint size for the ring size, and (chainhash.HashSize + 1) for each OutPoint
@@ -717,8 +751,11 @@ func PrecomputeTrTxConSize(txVersion uint32, inputRingVersions []uint32, inputRi
 	}*/
 
 	// 	serialized varint size for output number
-	n = n + 1                                                     // 1 byte for the output Txo Number
-	txoScriptLen := abecryptoparam.GetTxoSerializeSize(txVersion) // depending on the crypto-scheme, and the TxVersion
+	n = n + 1                                                                // 1 byte for the output Txo Number
+	txoScriptLen, err := abecryptoparam.GetTxoSerializeSizeApprox(txVersion) // depending on the crypto-scheme, and the TxVersion
+	if err != nil {
+		return 0, err
+	}
 	n = n + uint32(outputTxoNum)*(uint32(4+VarIntSerializeSize(uint64(txoScriptLen)))+uint32(txoScriptLen))
 	/*	for _, txOut := range msg.TxOuts {
 		n = n + txOut.SerializeSize()
@@ -731,16 +768,21 @@ func PrecomputeTrTxConSize(txVersion uint32, inputRingVersions []uint32, inputRi
 	//	TxMemo
 	n = n + uint32(VarIntSerializeSize(uint64(txMemoLen))) + txMemoLen
 
-	return n
+	return n, nil
 }
 
-func PrecomputeTrTxWitnessSize(txVersion uint32, inputRingVersion uint32, inputRingSizes []int, outputTxoNum uint8) uint32 {
+func PrecomputeTrTxWitnessSize(txVersion uint32, inputRingVersion uint32, inputRingSizes []int, outputTxoNum int) (uint32, error) {
 	/*	inputRingSizes := make([]int, len(txIns))
 		for i := 0; i < len(txIns); i++ {
 			inputRingSizes[i] = len(txIns[i].PreviousOutPointRing.OutPoints)
 		}*/
 
-	return uint32(abecryptoparam.GetTrTxWitnessSize(txVersion, inputRingVersion, inputRingSizes, outputTxoNum)) // depending on the crypto-scheme
+	//return uint32(abecryptoparam.GetTrTxWitnessSerializeSizeApprox(txVersion, inputRingVersion, inputRingSizes, outputTxoNum)) // depending on the crypto-scheme
+	approxSize, err := abecryptoparam.GetTrTxWitnessSerializeSizeApprox(txVersion, inputRingVersion, inputRingSizes, outputTxoNum) // depending on the crypto-scheme
+	if err != nil {
+		return 0, err
+	}
+	return uint32(approxSize), nil
 }
 
 //	for computing TxId by hash, and for being serialized in block
@@ -781,17 +823,24 @@ func NewMsgTxAbe(version uint32) *MsgTxAbe {
 	return &MsgTxAbe{
 		Version: version,
 		TxIns:   make([]*TxInAbe, 0, defaultTxInputAlloc),
-		TxOuts:  make([]*TxOutAbe, 0, defaultTxInOutAlloc),
+		TxOuts:  make([]*TxOutAbe, 0, defaultTxOutputAlloc),
 	}
 }
 
-func NewStandardCoinbaseTxIn(nextBlockHeight int32, extraNonce uint64, version uint32) *TxInAbe {
+func NewStandardCoinbaseTxIn(nextBlockHeight int32, extraNonce uint64, txVersion uint32) (*TxInAbe, error) {
 	txIn := &TxInAbe{}
 
-	txIn.SerialNumber = abecryptoparam.GetNullSerialNumber(version)
+	nullSn, err := abecryptoparam.GetNullSerialNumber(txVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	txIn.SerialNumber = nullSn
 
 	previousOutPointRing := OutPointRing{}
-	previousOutPointRing.Version = version // this does not make sense, since this is an 'empty' ring
+	// For coinbase transaction, as the previousOutPointRing is actually empty (withour any real Txo),
+	// the ring version is set the same as the transaction.
+	previousOutPointRing.Version = txVersion
 	previousOutPointRing.BlockHashs = make([]*chainhash.Hash, 3)
 	hash0 := chainhash.Hash{}
 	binary.BigEndian.PutUint32(hash0[0:4], uint32(nextBlockHeight))
@@ -802,6 +851,7 @@ func NewStandardCoinbaseTxIn(nextBlockHeight int32, extraNonce uint64, version u
 	previousOutPointRing.BlockHashs[1] = &hash1
 	previousOutPointRing.BlockHashs[2] = &hash2
 
+	//	The 'empty' ring contains only 1 empty outpoint.
 	previousOutPointRing.OutPoints = make([]*OutPointAbe, 1)
 	outPointAbe := &OutPointAbe{
 		TxHash: chainhash.ZeroHash,
@@ -811,7 +861,7 @@ func NewStandardCoinbaseTxIn(nextBlockHeight int32, extraNonce uint64, version u
 
 	txIn.PreviousOutPointRing = previousOutPointRing
 
-	return txIn
+	return txIn, nil
 }
 
 //	the caller must have checked the format of the coinbaseTxMsg
@@ -1023,7 +1073,7 @@ func ExtractCoinbaseHeight(coinbaseTx *MsgTxAbe) int32 {
 //}
 //
 //func (txIn *TxInAbe) Deserialize(r io.Reader) error {
-//	txIn.SerialNumber = make([]byte, abecryptoparam.GetTxoSerialNumberLen(txIn.PreviousOutPointRing.Version))
+//	txIn.SerialNumber = make([]byte, abecryptoparam.GetSerialNumberSerializeSize(txIn.PreviousOutPointRing.Version))
 //	_, err := r.Read(txIn.SerialNumber[:])
 //	if err != nil {
 //		return err

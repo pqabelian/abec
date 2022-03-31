@@ -30,13 +30,13 @@ func gensis() {
 	if err != nil {
 		panic(err)
 	}
-	//retSerializedCryptoAddress, retSerializedVSk, retSerializedASksp, retSerializedASksn, err := abecrypto.CryptoPP.AbeCryptoAddressGen(seed)
+	//retSerializedCryptoAddress, retSerializedVSk, retSerializedASksp, retSerializedASksn, err := abecrypto.CryptoPP.CryptoAddressKeyGen(seed)
 	retSerializedCryptoAddress, _, _, _, err := abecrypto.CryptoPP.AbeCryptoAddressGen(seed)
 	if err != nil {
 		log.Fatalf("error in MasterKeyGen")
 	}
 	fmt.Println(hex.EncodeToString(retSerializedCryptoAddress))
-	txOutDescs := make([]*abecrypto.AbeTxOutDesc, 1)
+	txOutDescs := make([]*abecrypto.AbeTxOutputDesc, 1)
 	for i := 0; i < len(txOutDescs); i++ {
 		txOutDescs[i] = abecrypto.NewAbeTxOutDesc(retSerializedCryptoAddress, 205_799_813_685_247)
 	}

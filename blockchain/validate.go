@@ -113,7 +113,7 @@ func IsCoinBase(tx *abeutil.Tx) bool {
 	return IsCoinBaseTx(tx.MsgTx())
 }
 
-func IsCoinBaseAbe(tx *abeutil.TxAbe) bool {
+func IsCoinBaseAbe(tx *abeutil.TxAbe) (bool, error) {
 	return tx.MsgTx().IsCoinBase()
 }
 
@@ -353,12 +353,20 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 	}
 
 	// At his moment, ABE limits the numbers of inputs and outputs, so does not consider the payload size
-	if len(msgTx.TxIns) > wire.TxInputMaxNum {
-		str := fmt.Sprintf("the number of inputs exceeds the allowd max number %d", wire.TxInputMaxNum)
+	txInputMaxNum, err := abecryptoparam.GetTxInputMaxNum(msgTx.Version)
+	if err != nil {
+		return err
+	}
+	if len(msgTx.TxIns) > txInputMaxNum {
+		str := fmt.Sprintf("the number of inputs exceeds the allowd max number %d", txInputMaxNum)
 		return ruleError(ErrTooManyTxInputs, str)
 	}
-	if len(msgTx.TxOuts) > wire.TxOutputMaxNum {
-		str := fmt.Sprintf("the number of txo exceeds the allowd max number %d", wire.TxOutputMaxNum)
+	txOutputMaxNum, err := abecryptoparam.GetTxOutputMaxNum(msgTx.Version)
+	if err != nil {
+		return err
+	}
+	if len(msgTx.TxOuts) > txOutputMaxNum {
+		str := fmt.Sprintf("the number of txo exceeds the allowd max number %d", txOutputMaxNum)
 		return ruleError(ErrTooManyTxOutputs, str)
 	}
 
@@ -379,46 +387,77 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		return ruleError(ErrTxTooBig, str)
 	}
 
-	if IsCoinBaseAbe(tx) {
+	isCb, err := IsCoinBaseAbe(tx)
+	if err != nil {
+		return err
+	}
+	if isCb {
 		previousOutPointRing := msgTx.TxIns[0].PreviousOutPointRing
 		/*		if previousOutPointRing == nil {
 				return ruleError(ErrBadTxInput, "Coinbase Transaction refers to an OutPointRing that is null")
 			}*/
+		//	For coinbase transaction, the previousOutPointRing is hardcoded by design,
+		//	where the ringVersion is set the same as the coinbase transaction.
+		blockNumPerRingGroup, err := wire.GetBlockNumPerRingGroupByRingVersion(previousOutPointRing.Version)
+		if err != nil {
+			return err
+		}
+		txoRingSize, err := wire.GetTxoRingSizeByRingVersion(previousOutPointRing.Version)
+		if err != nil {
+			return err
+		}
+
 		blkHashNum := len(previousOutPointRing.BlockHashs)
-		if blkHashNum != wire.BlockNumPerRingGroup {
+		if blkHashNum != int(blockNumPerRingGroup) {
 			str := fmt.Sprintf("Coinbase Transaction refers to an OutPointRing with block-hash-number "+
-				"%d, should be %d", blkHashNum, wire.BlockNumPerRingGroup)
+				"%d, should be %d", blkHashNum, blockNumPerRingGroup)
 			return ruleError(ErrBadTxInput, str)
 		}
 
 		ringSize := len(previousOutPointRing.OutPoints)
-		if ringSize > wire.TxRingSize {
+		if ringSize > int(txoRingSize) {
 			str := fmt.Sprintf("Coinbase Transaction refers to an OutPointRing with ring-size too big: "+
-				"%d, max %d", ringSize, wire.TxRingSize)
+				"%d, max %d", ringSize, txoRingSize)
 			return ruleError(ErrBadTxInput, str)
 		}
 
 		return nil
 	}
 
+	// A transfer transaction can consume only the rings with the same version, i.e., the Txos with the same version,
+	// the Txos genreated by the same crypto-scheme.
+	inputRingVersion := msgTx.TxIns[0].PreviousOutPointRing.Version
+	blockNumPerRingGroup, err := wire.GetBlockNumPerRingGroupByRingVersion(inputRingVersion)
+	txoRingSize, err := wire.GetTxoRingSizeByRingVersion(inputRingVersion)
+
 	// Check for duplicate transaction inputs.
 	consumedOutPoints := make(map[chainhash.Hash]map[string]struct{})
 	for i, txIn := range msgTx.TxIns {
-		if bytes.Compare(txIn.SerialNumber, abecryptoparam.GetNullSerialNumber(txIn.PreviousOutPointRing.Version)) == 0 {
+		nullSn, err := abecryptoparam.GetNullSerialNumber(txIn.PreviousOutPointRing.Version)
+		if err != nil {
+			return err
+		}
+		if bytes.Compare(txIn.SerialNumber, nullSn) == 0 {
 			return ruleError(ErrBadTxInput, "transaction input refers to a serial number that is null")
 		}
 
+		if txIn.PreviousOutPointRing.Version != inputRingVersion {
+			str := fmt.Sprintf("transaction's %d -th input refers to an OutPointRing with ring version "+
+				"%d, different from 0-th input ring's version %d", i, txIn.PreviousOutPointRing.Version, inputRingVersion)
+			return ruleError(ErrBadTxInput, str)
+		}
+
 		blkHashNum := len(txIn.PreviousOutPointRing.BlockHashs)
-		if blkHashNum != wire.BlockNumPerRingGroup {
+		if blkHashNum != int(blockNumPerRingGroup) {
 			str := fmt.Sprintf("transaction's %d -th input refers to an OutPointRing with block-hash-number "+
-				"%d, should be %d", i, blkHashNum, wire.BlockNumPerRingGroup)
+				"%d, should be %d", i, blkHashNum, blockNumPerRingGroup)
 			return ruleError(ErrBadTxInput, str)
 		}
 
 		ringSize := len(txIn.PreviousOutPointRing.OutPoints)
-		if ringSize > wire.TxRingSize {
+		if ringSize > int(txoRingSize) {
 			str := fmt.Sprintf("transaction's %d -th input refers to an OutPointRing with ring-size too big: "+
-				"%d, max %d", i, ringSize, wire.TxRingSize)
+				"%d, max %d", i, ringSize, txoRingSize)
 			return ruleError(ErrBadTxInput, str)
 		}
 
@@ -751,14 +790,23 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, powLimit *big.Int, timeSource 
 
 	// The first transaction in a block must be a coinbase.
 	transactions := block.Transactions()
-	if !transactions[0].IsCoinBase() {
+	isCb, err := transactions[0].IsCoinBase()
+	if err != nil {
+		return err
+	}
+	if !isCb {
 		return ruleError(ErrFirstTxNotCoinbase, "first transaction in "+
 			"block is not a coinbase")
 	}
 
 	// A block must not have more than one coinbase.
 	for i, tx := range transactions[1:] {
-		if tx.IsCoinBase() {
+		isCb, err := tx.IsCoinBase()
+		if err != nil {
+			return err
+		}
+
+		if isCb {
 			str := fmt.Sprintf("block contains second coinbase at "+
 				"index %d", i+1)
 			return ruleError(ErrMultipleCoinbases, str)
@@ -860,7 +908,11 @@ func ExtractCoinbaseHeightAbe(coinbaseTx *abeutil.TxAbe) (int32, error) {
 		return 0, ruleError(ErrMissingCoinbaseHeight, str)
 	}
 
-	if !coinbaseTx.IsCoinBase() {
+	isCb, err := coinbaseTx.IsCoinBase()
+	if err != nil {
+		return 0, err
+	}
+	if !isCb {
 		str := "Cannot extract blockHeight from a transaction that is not coinbase"
 		return 0, ruleError(ErrMissingCoinbaseHeight, str)
 	}
@@ -1217,7 +1269,11 @@ func CheckTransactionInputs(tx *abeutil.Tx, txHeight int32, utxoView *UtxoViewpo
 //	Abe todo
 func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
 	// Coinbase transactions have no inputs.
-	if IsCoinBaseAbe(tx) {
+	isCb, err := IsCoinBaseAbe(tx)
+	if err != nil {
+		return err
+	}
+	if isCb {
 		return nil
 	}
 

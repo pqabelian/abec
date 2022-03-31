@@ -45,7 +45,7 @@ hidden service for this reason.
 Configuring btcd as a Tor client is straightforward.  The first step is
 obviously to install Tor and ensure it is working. Once that is done, all that
 typically needs to be done is to specify the `--proxy` flag via the btcd command
-line or in the btcd configuration file.  Typically the Tor proxy address will be
+line or in the btcd configuration file.  Typically the Tor proxy cryptoAddress will be
 127.0.0.1:9050 (if using standalone Tor) or 127.0.0.1:9150 (if using the Tor
 Browser Bundle).  If you have Tor configured to require a username and password,
 you may specify them with the `--proxyuser` and `--proxypass` flags.
@@ -93,7 +93,7 @@ discuss since btcd will act as the server.
 In short, the instructions linked above entail modifying your `torrc` file to
 add something similar to the following, restarting Tor, and opening the
 `hostname` file in the `HiddenServiceDir` to obtain your hidden service .onion
-address.
+cryptoAddress.
 
 ```text
 HiddenServiceDir /var/tor/btcd
@@ -101,13 +101,13 @@ HiddenServicePort 8333 127.0.0.1:8333
 ```
 
 Once Tor is configured to provide the hidden service and you have obtained your
-generated .onion address, configuring btcd as a Tor hidden service requires
+generated .onion cryptoAddress, configuring btcd as a Tor hidden service requires
 three flags:
 * `--proxy` to identify the Tor (SOCKS 5) proxy to use for outgoing traffic.
   This is typically 127.0.0.1:9050.
 * `--listen` to enable listening for inbound connections since `--proxy`
   disables listening by default
-* `--externalip` to set the .onion address that is advertised to other peers
+* `--externalip` to set the .onion cryptoAddress that is advertised to other peers
 
 <a name="HiddenServiceCLIExample" />
 
@@ -139,7 +139,7 @@ externalip=fooanon.onion
 
 btcd provides support for operating as a bridge between regular nodes and hidden
 service nodes.  In particular this means only traffic which is directed to or
-from a .onion address is sent through Tor while other traffic is sent normally.
+from a .onion cryptoAddress is sent through Tor while other traffic is sent normally.
 _As a result, this mode is **NOT** anonymous._
 
 This mode works by specifying an onion-specific proxy, which is pointed at Tor,
@@ -150,7 +150,7 @@ password, you may specify them with the `--onionuser` and `--onionpass` flags.
 NOTE: This mode will also work in conjunction with a hidden service which means
 you could accept inbound connections both via the normal network and to your
 hidden service through the Tor network.  To enable your hidden service in bridge
-mode, you only need to specify your hidden service's .onion address via the
+mode, you only need to specify your hidden service's .onion cryptoAddress via the
 `--externalip` flag since traffic to and from .onion addresses are already
 routed via Tor due to the `--onion` flag.
 

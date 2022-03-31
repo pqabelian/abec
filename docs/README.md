@@ -80,10 +80,10 @@ details on how to install on the supported operating systems.
 - Install Go according to the installation instructions here:
   http://golang.org/doc/install
 
-- Ensure Go was installed properly and is a supported version:
+- Ensure Go was installed properly and is a supported txVersion:
 
 ```bash
-$ go version
+$ go txVersion
 $ go env GOROOT GOPATH
 ```
 

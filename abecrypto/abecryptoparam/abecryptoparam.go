@@ -1,321 +1,151 @@
 package abecryptoparam
 
 import (
-	"bytes"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"errors"
 	"github.com/cryptosuite/pqringct"
-	"log"
 )
 
 //	ABE can support at most 2^32 different CryptoSchemes
 //	The different versions of 'same' CryptoSchemes are regarded as different CryptoSchemes.
-//	e.g. SalrsV0, SalrsV1
-
 type CryptoScheme uint32
 
 const (
-	CryptoSchemeSALRS CryptoScheme = iota
-	CryptoSchemePQRINGCT
-	CryptoSchemePQRINGCTV2
+	CryptoSchemePQRingCT CryptoScheme = iota
+	//CryptoSchemePQRingCTV2
 )
 
-func GetCryptoScheme(version uint32) CryptoScheme {
+// The public parameters for the supported crypto-schemes.
+// PQRingCTPP is the public parameter for CryptoSchemePQRingCT.
+var PQRingCTPP = pqringct.DefaultPPV2
+
+// var PQRingCT2PP = pqringct2.DefaultPP
+
+// These constants are related/decided by the underlying crypto-schemes.
+// When underlying crypto-schemes are updated, we need to check these constants, and update them when necessary.
+const (
+	//	PQRingCT, 2022.03.31
+	TxoSerializeSizeMaxAllowed          = 1048576 //1024*1024*1, 1M bytes
+	SerialNumberSerializeSizeMaxAllowed = 128     // 128 bytes
+	TxMemoSerializeSizeMaxAllowed       = 1024    // 1024 bytes
+	TxWitnessSerializeSizeMaxAllowed    = 8388608 //1024*1024*8, 8M bytes
+)
+
+//	The mapping between TxVersion/TxoVersion/RingVersion/ and crypto-scheme	begin
+// GetCryptoSchemeByTxVersion returns the CrypoScheme corresponding to the input TxVersion/TxoVersion/RingVersion.
+// For each TxVersion, there is a corresponding CryptoScheme, while multiple TxVersions may use the same CryptoScheme.
+// The package abec.abecrypto will access the function.
+func GetCryptoSchemeByTxVersion(txVersion uint32) (CryptoScheme, error) {
 	//	todo: for each version, there is a corresponding CryptoScheme
-	return CryptoSchemePQRINGCT
-}
-
-type AbeCryptoParam struct {
-	Version CryptoScheme
-	// When updating the crypto scheme, add new pointer to new crypto scheme parameter
-	RingCT *pqringct.PublicParameter
-}
-
-// CryptoPP is hardcode global parameter for whole blockchain system
-var CryptoPP = &AbeCryptoParam{
-	Version: CryptoSchemePQRINGCTV2,
-	RingCT:  pqringct.DefaultPPV2,
-}
-
-// wire ->  abecryptoparam.GetSize()
-//
-func GetSize(version int) {
-	switch version {
+	switch txVersion {
 	case 1:
-		pqringctGetSize(CryptoPP.RingCT)
-
-	}
-}
-
-// LedgerTxoIDCompute(ringID, idx) → txolid.
-func LedgerTXOSerialNumberGen(txo []byte, txolid []byte, sksn []byte) []byte {
-	panic("implement me")
-	return nil
-}
-
-// 											View of Abec :  			Address , Proof
-// 																			\	 /
-// 											View of Abewallet[TrTxGen] : 	(Pk,Sk)
-// ------------  [KeyGen,CbTxGen/Vrf,TrTxGen/Vrf]  	 \
-// pqringct   | --->  abepqringct  -------------> 	abecrypto -> abec[CoinbaseTxGen,CoinbaseTxVrf,TrTxVrg]
-// 			  |					    			/	[AddressKeyGen,]
-// pqringctv2 | --->  abepqringctv2 -----------
-
-// abec call coinbaseTxGen() -> abecrypto.coinbaseTxGen()->pqringct.coinbaseTxGen()?pqringctv2.coinbaseTxGen()?
-// parse the address to different struct
-
-// 20220320 Input and Output struct should be defined by config and decide to assign to which version
-type AbeTxInputDesc struct {
-	ringHash     chainhash.Hash // txoRing identifier
-	txoList      []*wire.TxOutAbe
-	sidx         int // spend which one
-	serializedSk []byte
-}
-
-func NewAbeTxInputDesc(ringHash chainhash.Hash, txoList []*wire.TxOutAbe,
-	sidx int, serializedSk []byte) *AbeTxInputDesc {
-	return &AbeTxInputDesc{
-		ringHash:     ringHash,
-		txoList:      txoList,
-		sidx:         sidx,
-		serializedSk: serializedSk,
-	}
-}
-
-// 20220320 for trTx verify
-type AbeTxInDetail struct {
-	ringHash     chainhash.Hash // txoRing identifier
-	txoList      []*wire.TxOutAbe
-	serialNumber []byte
-}
-
-func NewAbeTxInDetail(ringHash chainhash.Hash, txoList []*wire.TxOutAbe, serialNumber []byte) *AbeTxInDetail {
-	return &AbeTxInDetail{
-		ringHash:     ringHash,
-		txoList:      txoList,
-		serialNumber: serialNumber,
-	}
-}
-
-// 20220320 for trTxGen and cbTxGen
-type AbeTxOutDesc struct {
-	address []byte
-	value   uint64
-}
-
-func (txout *AbeTxOutDesc) GetValue() uint64 {
-	return txout.value
-}
-func NewAbeTxOutDesc(address []byte, value uint64) *AbeTxOutDesc {
-	return &AbeTxOutDesc{
-		address: address,
-		value:   value,
-	}
-}
-
-func (pp *AbeCryptoParam) AbeCryptoAddressGen(seed []byte) (retSerializedCryptoAddress []byte, retSerializedVSk []byte, retSerializedASksp []byte, retSerializedASksn []byte, err error) {
-	var serializedAddress, serializedVSk, serializedASkSp, serializedASkSn []byte
-	switch pp.Version {
-	case CryptoSchemePQRINGCTV2:
-		serializedAddress, serializedVSk, serializedASkSp, serializedASkSn, err = CryptoAddressGen(pp.RingCT, seed)
-		if err != nil {
-			return nil, nil, nil, nil, err
-		}
+		return CryptoSchemePQRingCT, nil
 	default:
-		return nil, nil, nil, nil, errors.New("unsupported ringct version")
+		return 0, errors.New("GetCryptoSchemeByTxVersion: Unsupported TxVersion")
 	}
-	retSerializedCryptoAddress = make([]byte, 0, 4+len(serializedAddress))
-	retSerializedCryptoAddress = append(retSerializedCryptoAddress, byte(pp.Version>>0))
-	retSerializedCryptoAddress = append(retSerializedCryptoAddress, byte(pp.Version>>8))
-	retSerializedCryptoAddress = append(retSerializedCryptoAddress, byte(pp.Version>>16))
-	retSerializedCryptoAddress = append(retSerializedCryptoAddress, byte(pp.Version>>24))
-	retSerializedCryptoAddress = append(retSerializedCryptoAddress, serializedAddress...)
-
-	retSerializedVSk = make([]byte, 0, 4+len(serializedVSk))
-	retSerializedVSk = append(retSerializedVSk, byte(pp.Version>>0))
-	retSerializedVSk = append(retSerializedVSk, byte(pp.Version>>8))
-	retSerializedVSk = append(retSerializedVSk, byte(pp.Version>>16))
-	retSerializedVSk = append(retSerializedVSk, byte(pp.Version>>24))
-	retSerializedVSk = append(retSerializedVSk, serializedVSk...)
-
-	retSerializedASksp = make([]byte, 0, 4+len(serializedASkSp))
-	retSerializedASksp = append(retSerializedASksp, byte(pp.Version>>0))
-	retSerializedASksp = append(retSerializedASksp, byte(pp.Version>>8))
-	retSerializedASksp = append(retSerializedASksp, byte(pp.Version>>16))
-	retSerializedASksp = append(retSerializedASksp, byte(pp.Version>>24))
-	retSerializedASksp = append(retSerializedASksp, serializedASkSp...)
-
-	retSerializedASksn = make([]byte, 0, 4+len(serializedASkSn))
-	retSerializedASksn = append(retSerializedASksn, byte(pp.Version>>0))
-	retSerializedASksn = append(retSerializedASksn, byte(pp.Version>>8))
-	retSerializedASksn = append(retSerializedASksn, byte(pp.Version>>16))
-	retSerializedASksn = append(retSerializedASksn, byte(pp.Version>>24))
-	retSerializedASksn = append(retSerializedASksn, serializedASkSn...)
-
-	return retSerializedCryptoAddress, retSerializedVSk, retSerializedASksp, retSerializedASksn, nil
 }
 
-func (pp *AbeCryptoParam) CoinbaseTxGen(abeTxOutDescs []*AbeTxOutDesc, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
-	var cbTx *wire.MsgTxAbe
-	var err error
-	switch pp.Version {
-	case CryptoSchemePQRINGCTV2:
-		// check the address in abeTxOutDescs
-		for i := 0; i < len(abeTxOutDescs); i++ {
-			version := abeTxOutDescs[i].address[0]
-			version |= abeTxOutDescs[i].address[1]
-			version |= abeTxOutDescs[i].address[2]
-			version |= abeTxOutDescs[i].address[3]
-			if CryptoScheme(version) != CryptoSchemePQRINGCTV2 {
-				return nil, errors.New("unmatched version and address")
-			}
-			abeTxOutDescs[i].address = abeTxOutDescs[i].address[4:]
-		}
-		cbTx, err = CoinbaseTxGen(pp.RingCT, abeTxOutDescs, coinbaseTxMsgTemplate)
-		if err != nil {
-			return nil, err
-		}
+// GetCurrentCryptoScheme return the crypto-scheme that is currently used by the blockchian.
+// In other words, the crypto-scheme corresponding to the current TxVersion is returned.
+func GetCurrentCryptoScheme() CryptoScheme {
+	//	When the current TxVersion is updated due to crypto-scheme update, here the updated crypto-scheme is set.
+	return CryptoSchemePQRingCT
+}
+
+//	The mapping between TxVersion/TxoVersion/RingVersion/ and crypto-scheme	end
+
+// GetTxInputMaxNum returns the allowed maximum number of inputs for transaction, which is decided by the TxVersion.
+// Note that the transactions are generated and versified by the underlying crypto-scheme,
+// the allowed maximum number of inputs actually depends on the underlying crypto-scheme.
+// That's why txVersion is required as the input for this function.
+func GetTxInputMaxNum(txVersion uint32) (int, error) {
+	switch txVersion {
+	// todo: for each version, there is a corresponding CryptoScheme.
+	// Here we call the function of corresponding crypto-scheme
+	case 1:
+		//
+		return pqringct.GetTxInputMaxNum(PQRingCTPP), nil
+
 	default:
-		log.Fatalln("Unsupporte crypto scheme")
+		return 0, errors.New("GetTxInputMaxNum: Unsupported TxVersion")
 	}
-	return cbTx, nil
-}
-func (pp *AbeCryptoParam) CoinbaseTxVerify(coinbaseTx *wire.MsgTxAbe) bool {
-	var b bool
-	switch pp.Version {
-	case CryptoSchemePQRINGCTV2:
-		// parse address -> address public key and value public key
-		b = CoinbaseTxVerify(pp.RingCT, coinbaseTx)
-	default:
-		log.Fatalln("Unsupporte crypto scheme")
-	}
-	return b
 }
 
-func (pp *AbeCryptoParam) TransferTxGen(
-	abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxOutDesc,
-	transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
-	var cbTx *wire.MsgTxAbe
-	var err error
-	switch pp.Version {
-	case CryptoSchemePQRINGCTV2:
-		// parse address -> address public key and value public key
-		cbTx, err = TransferTxGen(pp.RingCT, abeTxInputDescs, abeTxOutputDescs, transferTxMsgTemplate)
-		if err != nil {
-			return nil, err
-		}
+// GetTxOutputMaxNum returns the allowed maximum number of outputs for transaction, which is decided by the TxVersion.
+// Note that the transactions are generated and versified by the underlying crypto-scheme,
+// the allowed maximum number of outputs actually depends on the underlying crypto-scheme.
+// That's why txVersion is required as the input for this function.
+func GetTxOutputMaxNum(txVersion uint32) (int, error) {
+	switch txVersion {
+	case 1:
+		return pqringct.GetTxOutputMaxNum(PQRingCTPP), nil
+
 	default:
-		log.Fatalln("Unsupporte crypto scheme")
+		return 0, errors.New("GetTxOutputMaxNum: Unsupported TxVersion")
 	}
-	return cbTx, nil
-}
-func (pp *AbeCryptoParam) TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail) bool {
-	var b bool
-	switch pp.Version {
-	case CryptoSchemePQRINGCTV2:
-		// parse address -> address public key and value public key
-		b = TransferTxVerify(pp.RingCT, transferTx, abeTxInDetails)
-	default:
-		log.Fatalln("Unsupporte crypto scheme")
-	}
-	return b
 }
 
-func (pp *AbeCryptoParam) TxoSerialNumberGen(txo *wire.TxOutAbe, ringHash chainhash.Hash, serializedSksn []byte) []byte {
-	var sn []byte
-	switch pp.Version {
-	case CryptoSchemePQRINGCTV2:
-		// parse address -> address public key and value public key
-		sn = TxoSerialNumberGen(pp.RingCT, txo, ringHash, serializedSksn)
+// GetSerialNumberSerializeSize returns the exact serialize size for SerialNumber, which is decided by the TxVersion.
+// Note that the transactions are generated and versified by the underlying crypto-scheme,
+// the approximate serialize size for SerialNumber actually depends on the underlying crypto-scheme.
+// That's why txVersion is required as the input for this function.
+func GetSerialNumberSerializeSize(txVersion uint32) (int, error) {
+	switch txVersion {
+	case 1:
+		//	CryptoSchemePQRingCT
+		return pqringct.GetSerialNumberSerializeSize(PQRingCTPP), nil
 	default:
-		log.Fatalln("Unsupporte crypto scheme")
+		return 0, errors.New("GetCbTxWitnessSerializeSizeApprox: Unsupported txVersion")
 	}
-	return sn
 }
 
-func (pp *AbeCryptoParam) TxoCoinReceive(abeTxo *wire.TxOutAbe, address []byte, serializedSkvalue []byte) (bool, uint64) {
-	var valid bool
-	var b uint64
-	switch pp.Version {
-	case CryptoSchemePQRINGCTV2:
-		// parse address -> address public key and value public key
-		version := address[0]
-		version |= address[1]
-		version |= address[2]
-		version |= address[3]
-		if CryptoScheme(version) != CryptoSchemePQRINGCTV2 {
-			return false, 0
-		}
-		address = address[4:]
-		version = serializedSkvalue[0]
-		version |= serializedSkvalue[1]
-		version |= serializedSkvalue[2]
-		version |= serializedSkvalue[3]
-		if CryptoScheme(version) != CryptoSchemePQRINGCTV2 {
-			return false, 0
-		}
-		serializedSkvalue = serializedSkvalue[4:]
-		valid, b = TxoCoinReceive(pp.RingCT, abeTxo, address, serializedSkvalue)
+// GetNullSerialNumber() return the null serial number.
+func GetNullSerialNumber(txVersion uint32) ([]byte, error) {
+	switch txVersion {
+	case 1:
+		//	CryptoSchemePQRingCT
+		return pqringct.GetNullSerialNumber(PQRingCTPP), nil
 	default:
-		log.Fatalln("Unsupporte crypto scheme")
+		return nil, errors.New("GetNullSerialNumber: Unsupported txVersion")
 	}
-	return valid, b
-}
-func LedgerTxoIdGen(ringHash chainhash.Hash, index int) []byte {
-	w := bytes.NewBuffer(make([]byte, 0, 36))
-	var err error
-	// ringHash
-	_, err = w.Write(ringHash[:])
-	if err != nil {
-		return nil
-	}
-	// index
-	err = w.WriteByte(byte(index >> 0))
-	if err != nil {
-		return nil
-	}
-	err = w.WriteByte(byte(index >> 1))
-	if err != nil {
-		return nil
-	}
-	err = w.WriteByte(byte(index >> 2))
-	if err != nil {
-		return nil
-	}
-	err = w.WriteByte(byte(index >> 3))
-	if err != nil {
-		return nil
-	}
-	return chainhash.DoubleHashB(w.Bytes())
 }
 
-func (pp *AbeCryptoParam) GetTxoSerializeSize(version uint32) int {
-	var length int
-	switch pp.Version {
-	case CryptoSchemePQRINGCTV2:
-		// parse address -> address public key and value public key
-		length = GetTxoSerializeSize(pp.RingCT, version)
+// GetTxoSerializeSizeApprox returns the approximate serialize size for Txo, which is decided by the TxVersion.
+// Note that the transactions are generated and versified by the underlying crypto-scheme,
+// the approximate serialize size for Txo actually depends on the underlying crypto-scheme.
+// That's why txVersion is required as the input for this function.
+func GetTxoSerializeSizeApprox(txVersion uint32) (int, error) {
+	switch txVersion {
+	case 1:
+		return pqringct.GetTxoSerializeSizeApprox(PQRingCTPP), nil
 	default:
-		log.Fatalln("Unsupporte crypto scheme")
+		return 0, errors.New("GetTxoSerializeSizeApprox: Unsupported txVersion")
 	}
-	return length
-}
-func (pp *AbeCryptoParam) GetCoinbaseTxWitnessLen(version uint32, num int) int {
-	return GetCoinbaseTxWitnessLen(pp.RingCT, version)
-}
-func (pp *AbeCryptoParam) GetTxoSerialNumberLen(version uint32) int {
-	return GetTxoSerializeSize(pp.RingCT, version)
-}
-func (pp *AbeCryptoParam) GetNullSerialNumber(version uint32) []byte {
-	return GetNullSerialNumber(pp.RingCT, version)
 }
 
-func (pp *AbeCryptoParam) GetTxMemoMaxLen(version uint32) int {
-	return GetTxMemoMaxLen(pp.RingCT, version)
+// GetCbTxWitnessSerializeSizeApprox returns the approximate serialize size for CoinbaseTxWitness, which is decided by the TxVersion and the number of out Txo.
+// Note that the transactions are generated and versified by the underlying crypto-scheme,
+// the approximate serialize size for CoinbaseTxWitness actually depends on the underlying crypto-scheme.
+// That's why txVersion is required as the input for this function.
+func GetCbTxWitnessSerializeSizeApprox(txVersion uint32, outTxoNum int) (int, error) {
+	switch txVersion {
+	case 1:
+		return pqringct.GetCbTxWitnessSerializeSizeApprox(PQRingCTPP, outTxoNum), nil
+	default:
+		return 0, errors.New("GetCbTxWitnessSerializeSizeApprox: Unsupported txVersion")
+	}
 }
-func (pp *AbeCryptoParam) GetTxWitnessMaxLen(version uint32) int {
-	return GetTxWitnessMaxLen(pp.RingCT, version)
-}
-func (pp *AbeCryptoParam) GetTrTxWitnessSize(txVersion uint32, inputRingVersion uint32, inputRingSizes []int, outputTxoNum uint8) int {
-	return GetTrTxWitnessSize(pp.RingCT, inputRingSizes, int(outputTxoNum))
+
+// GetTrTxWitnessSerializeSizeApprox() returns the approximate serialize size for TrTxWitness, which is decided by the TxVersion, inputRingSizes, and the number of out Txo.
+// Note that the transactions are generated and versified by the underlying crypto-scheme,
+// the approximate serialize size for TrTxWitness actually depends on the underlying crypto-scheme.
+// That's why txVersion is required as the input for this function.
+// In the future, the inputRingVersion may be different from the txVersion.
+// At this moment, inputRingVersion is the same as txVersion.
+func GetTrTxWitnessSerializeSizeApprox(txVersion uint32, inputRingVersion uint32, inputRingSizes []int, outputTxoNum int) (int, error) {
+	switch txVersion {
+	case 1:
+		return pqringct.GetTrTxWitnessSerializeSizeApprox(PQRingCTPP, inputRingSizes, outputTxoNum), nil
+	default:
+		return 0, errors.New("GetTrTxWitnessSerializeSizeApprox: Unsupported txVersion")
+	}
 }

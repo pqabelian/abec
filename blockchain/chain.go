@@ -1275,7 +1275,14 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 
 		//	Abe to do new UtxoRings if n.height % 2 == 0
 		//	These utxoRings should will be deleted from database
-		if n.height%3 == 2 {
+		//	TODO: when BlockNumPerRingGroup or TxoRingSize change, it may cause fork.
+		//	The mapping between BlockNumPerRingGroup/TxoRingSize and height is hardcoded in wire.GetBlockNumPerRingGroup/TxoRingSize.
+		//	Here we should call blockNumPerRingGroup = wire.GetBlockNumPerRingGroup()
+		//	At this moment (no fork due to BlockNumPerRingGroup/TxoRingSize change), we directly use the constant.
+		blockNumPerRingGroup := int32(wire.GetBlockNumPerRingGroupByBlockHeight(n.height))
+		//		if n.height%3 == 2 {
+		//if n.height%wire.BlockNumPerRingGroup == wire.BlockNumPerRingGroup-1 {
+		if n.height%blockNumPerRingGroup == blockNumPerRingGroup-1 {
 			viewToDelAll.SetBestHash(&n.hash)
 			err = viewToDelAll.newUtxoRingEntries(b.db, n, block)
 			if err != nil {
@@ -1389,7 +1396,14 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		newBest = n
 
 		//	Abe to do: new UtxoRings if n.height % 3 == 2
-		if n.height%3 == 2 {
+		//	TODO: when BlockNumPerRingGroup or TxoRingSize change, it may cause fork.
+		//	The mapping between BlockNumPerRingGroup/TxoRingSize and height is hardcoded in wire.GetBlockNumPerRingGroup/TxoRingSize.
+		//	Here we should call blockNumPerRingGroup = wire.GetBlockNumPerRingGroup()
+		//	At this moment (no fork due to BlockNumPerRingGroup/TxoRingSize change), we directly use the constant.
+		blockNumPerRingGroup := int32(wire.GetBlockNumPerRingGroupByBlockHeight(n.height))
+		//if n.height%3 == 2 {
+		//if n.height%wire.BlockNumPerRingGroup == wire.BlockNumPerRingGroup-1 {
+		if n.height%blockNumPerRingGroup == blockNumPerRingGroup-1 {
 			err = view.newUtxoRingEntries(b.db, n, block)
 			if err != nil {
 				return err
@@ -1433,8 +1447,14 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		//	Abe to do
 		//	view.disconnectTransactions update the view for this block, the following b.disconnectBlock persist the changes for this block to the database
 		//	So, here we need to generate the utxoRings that need to be deleted from database
-
-		if n.height%3 == 2 {
+		//	TODO: when BlockNumPerRingGroup or TxoRingSize change, it may cause fork.
+		//	The mapping between BlockNumPerRingGroup/TxoRingSize and height is hardcoded in wire.GetBlockNumPerRingGroup/TxoRingSize.
+		//	Here we should call blockNumPerRingGroup = wire.GetBlockNumPerRingGroup()
+		//	At this moment (no fork due to BlockNumPerRingGroup/TxoRingSize change), we directly use the constant.
+		blockNumPerRingGroup := int32(wire.GetBlockNumPerRingGroupByBlockHeight(n.height))
+		//if n.height%3 == 2 {
+		//if n.height%wire.BlockNumPerRingGroup == wire.BlockNumPerRingGroup-1 {
+		if n.height%blockNumPerRingGroup == blockNumPerRingGroup-1 {
 			err = viewToDel.newUtxoRingEntries(b.db, n, block)
 			if err != nil {
 				return err
@@ -1484,7 +1504,14 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		}
 
 		//	Abe to do: new UtxoRings if n.height % 3 == 2
-		if n.height%3 == 2 {
+		//	TODO: when BlockNumPerRingGroup or TxoRingSize change, it may cause fork.
+		//	The mapping between BlockNumPerRingGroup/TxoRingSize and height is hardcoded in wire.GetBlockNumPerRingGroup/TxoRingSize.
+		//	Here we should call blockNumPerRingGroup = wire.GetBlockNumPerRingGroup()
+		//	At this moment (no fork due to BlockNumPerRingGroup/TxoRingSize change), we directly use the constant.
+		blockNumPerRingGroup := int32(wire.GetTxoRingSizeByBlockHeight(n.height))
+		// if n.height%3 == 2 {
+		//if n.height%wire.BlockNumPerRingGroup == wire.BlockNumPerRingGroup-1 {
+		if n.height%blockNumPerRingGroup == blockNumPerRingGroup-1 {
 			err = view.newUtxoRingEntries(b.db, n, block)
 			if err != nil {
 				return err
@@ -1588,7 +1615,13 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 
 		//	TODO: generating new UtxoRingEntry if currentblock.height%2 = 0
 		//if node.height%2 == 0 {
-		if node.height%3 == 2 {
+		//	TODO: when BlockNumPerRingGroup or TxoRingSize change, it may cause fork.
+		//	The mapping between BlockNumPerRingGroup/TxoRingSize and height is hardcoded in wire.GetBlockNumPerRingGroup/TxoRingSize.
+		//	Here we should call blockNumPerRingGroup = wire.GetBlockNumPerRingGroup()
+		//	At this moment (no fork due to BlockNumPerRingGroup/TxoRingSize change), we directly use the constant.
+		blockNumPerRingGroup := int32(wire.GetTxoRingSizeByBlockHeight(node.height))
+		//if node.height%wire.BlockNumPerRingGroup == wire.BlockNumPerRingGroup-1 {
+		if node.height%blockNumPerRingGroup == blockNumPerRingGroup-1 {
 			err := view.newUtxoRingEntries(b.db, node, block)
 			if err != nil {
 				return false, err
@@ -1947,7 +1980,7 @@ func (b *BlockChain) IntervalBlockHashes(endHash *chainhash.Hash, interval int,
 func (b *BlockChain) locateInventory(locator BlockLocator, hashStop *chainhash.Hash, maxEntries uint32) (*blockNode, uint32) {
 	// There are no block locators so a specific block is being requested
 	// as identified by the stop hash.
-	stopNode := b.index.LookupNode(hashStop)    // from the hashStop node
+	stopNode := b.index.LookupNode(hashStop) // from the hashStop node
 	if len(locator) == 0 {
 		if stopNode == nil {
 			// No blocks with the stop hash were found so there is
@@ -1960,11 +1993,11 @@ func (b *BlockChain) locateInventory(locator BlockLocator, hashStop *chainhash.H
 	// Find the most recent locator block hash in the main chain.  In the
 	// case none of the hashes in the locator are in the main chain, fall
 	// back to the genesis block.
-	startNode := b.bestChain.Genesis()  // default it is genesis block hash
-	for _, hash := range locator {  // the for loop will find a block node in the best chain
+	startNode := b.bestChain.Genesis() // default it is genesis block hash
+	for _, hash := range locator {     // the for loop will find a block node in the best chain
 		//	todo(ABE): if locator[0] does not have corresponging block in b.bestchain,
 		//	todo(ABE): it implies that the peer who sent locator has a fork that is different from b.
-		node := b.index.LookupNode(hash)     // hash in the locator  will be check whether it is at bestchain
+		node := b.index.LookupNode(hash) // hash in the locator  will be check whether it is at bestchain
 		if node != nil && b.bestChain.Contains(node) {
 			startNode = node
 			break
@@ -1974,8 +2007,8 @@ func (b *BlockChain) locateInventory(locator BlockLocator, hashStop *chainhash.H
 	// Start at the block after the most recently known block.  When there
 	// is no next block it means the most recently known block is the tip of
 	// the best chain, so there is nothing more to do.
-	startNode = b.bestChain.Next(startNode)     // next block node
-	if startNode == nil {          // if the start node is best block
+	startNode = b.bestChain.Next(startNode) // next block node
+	if startNode == nil {                   // if the start node is best block
 		return nil, 0
 	}
 

@@ -333,16 +333,16 @@ func rpcNoTxInfoError(txHash *chainhash.Hash) *abejson.RPCError {
 }
 
 //	todo(ABE):
-func rpcUtxoRingInvalidBlockNumInRingError(blockHashNum int) *abejson.RPCError {
+func rpcUtxoRingInvalidBlockNumInRingError(blockHashNum int, blockNumPerRingGroupParam int) *abejson.RPCError {
 	return abejson.NewRPCError(abejson.ErrRPCUtxoRingInvalidBlockNumInRing,
 		fmt.Sprintf("Argument must be %d (not %d)",
-			wire.BlockNumPerRingGroup, blockHashNum))
+			blockNumPerRingGroupParam, blockHashNum))
 }
 
-func rpcUtxoRingInvalidRingSizeError(ringSize int) *abejson.RPCError {
+func rpcUtxoRingInvalidRingSizeError(ringSize int, txoRingSizeParam int) *abejson.RPCError {
 	return abejson.NewRPCError(abejson.ErrRPCUtxoRingInvalidRingSize,
 		fmt.Sprintf("Ring Size %d is not in the range [1,%d]",
-			ringSize, wire.TxRingSize))
+			ringSize, txoRingSizeParam))
 }
 
 func rpcUtxoRingNoInfoError(outPointRing *wire.OutPointRing) *abejson.RPCError {
@@ -664,8 +664,12 @@ func handleCreateRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-ch
 		serialNumber := []byte(input.SerialNumber)
 
 		blockHashsNum := len(input.PreviousOutPointRing.BlockHashs)
-		if blockHashsNum != wire.BlockNumPerRingGroup {
-			return nil, rpcUtxoRingInvalidBlockNumInRingError(blockHashsNum)
+		blockNumPerRingGroup, err := wire.GetBlockNumPerRingGroupByRingVersion(input.PreviousOutPointRing.Version)
+		if err != nil {
+			return nil, err
+		}
+		if blockHashsNum != int(blockNumPerRingGroup) {
+			return nil, rpcUtxoRingInvalidBlockNumInRingError(blockHashsNum, int(blockNumPerRingGroup))
 		}
 		blockHashs := make([]*chainhash.Hash, blockHashsNum)
 		for i := 0; i < blockHashsNum; i++ {
@@ -677,8 +681,12 @@ func handleCreateRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-ch
 		}
 
 		ringSize := len(input.PreviousOutPointRing.OutPoints)
-		if ringSize <= 0 || ringSize > wire.TxRingSize {
-			return nil, rpcUtxoRingInvalidRingSizeError(ringSize)
+		txoRingSize, err := wire.GetTxoRingSizeByRingVersion(input.PreviousOutPointRing.Version)
+		if err != nil {
+			return nil, err
+		}
+		if ringSize <= 0 || ringSize > int(txoRingSize) {
+			return nil, rpcUtxoRingInvalidRingSizeError(ringSize, int(txoRingSize))
 		}
 		outPoints := make([]*wire.OutPointAbe, ringSize)
 		for i := 0; i < ringSize; i++ {
@@ -1850,7 +1858,11 @@ func (state *gbtWorkState) templateUpdateChan(prevHash *chainhash.Hash, lastGene
 // GetExtraNonceOffset is a helper function which calculate the offset of extra nonce
 // in coinbase transaction.
 func GetExtraNonceOffset(tx *wire.MsgTxAbe) (int64, error) {
-	if !tx.IsCoinBase() {
+	isCb, err := tx.IsCoinBase()
+	if err != nil {
+		return 0, err
+	}
+	if !isCb {
 		return 0, errors.New("non-coinbase transaction does not have extra nonce")
 	}
 
@@ -1860,7 +1872,11 @@ func GetExtraNonceOffset(tx *wire.MsgTxAbe) (int64, error) {
 	//	Inputs
 	//	serialized varint size for input
 	res += wire.VarIntSerializeSize(uint64(len(tx.TxIns)))
-	snLen := abecryptoparam.GetTxoSerialNumberLen(tx.TxIns[0].PreviousOutPointRing.Version)
+	//snLen := abepqringctparam.GetTxoSerialNumberLen(tx.TxIns[0].PreviousOutPointRing.Version)
+	snLen, err := abecryptoparam.GetSerialNumberSerializeSize(tx.TxIns[0].PreviousOutPointRing.Version)
+	if err != nil {
+		return 0, err
+	}
 	// serialized varint size for serial number
 	res += wire.VarIntSerializeSize(uint64(snLen))
 	// serial number size
@@ -3116,8 +3132,9 @@ func handleGetUtxoRing(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	c := cmd.(*abejson.GetUtxoRingCmd)
 
 	blockHashsNum := len(c.OutPointRing.BlockHashs)
-	if blockHashsNum != wire.BlockNumPerRingGroup {
-		return nil, rpcUtxoRingInvalidBlockNumInRingError(blockHashsNum)
+	blockNumPerRingGroup, err := wire.GetBlockNumPerRingGroupByRingVersion(c.OutPointRing.Version)
+	if blockHashsNum != int(blockNumPerRingGroup) {
+		return nil, rpcUtxoRingInvalidBlockNumInRingError(blockHashsNum, int(blockNumPerRingGroup))
 	}
 	blockHashs := make([]*chainhash.Hash, blockHashsNum)
 	for i := 0; i < blockHashsNum; i++ {
@@ -3129,8 +3146,12 @@ func handleGetUtxoRing(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	}
 
 	ringSize := len(c.OutPointRing.OutPoints)
-	if ringSize <= 0 || ringSize > wire.TxRingSize {
-		return nil, rpcUtxoRingInvalidRingSizeError(ringSize)
+	txoRingSize, err := wire.GetTxoRingSizeByRingVersion(c.OutPointRing.Version)
+	if err != nil {
+		return nil, err
+	}
+	if ringSize <= 0 || ringSize > int(txoRingSize) {
+		return nil, rpcUtxoRingInvalidRingSizeError(ringSize, int(txoRingSize))
 	}
 	outPoints := make([]*wire.OutPointAbe, ringSize)
 	for i := 0; i < ringSize; i++ {

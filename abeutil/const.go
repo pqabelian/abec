@@ -15,6 +15,7 @@ const (
 	// SatoshiPerBitcent is the number of satoshi in one bitcoin cent.
 	//	SatoshiPerBitcent = 1e6
 
+	//	todo: 20220327 Denote the value by uint64
 	// NeutrinoPerAbe is the number of Neutrino in one Abe (1 ABE).
 	NeutrinoPerAbe = 1e7
 

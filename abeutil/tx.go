@@ -46,7 +46,7 @@ func (tx *TxAbe) MsgTx() *wire.MsgTxAbe {
 	return tx.msgTx
 }
 
-func (tx *TxAbe) IsCoinBase() bool {
+func (tx *TxAbe) IsCoinBase() (bool, error) {
 	return tx.msgTx.IsCoinBase()
 }
 

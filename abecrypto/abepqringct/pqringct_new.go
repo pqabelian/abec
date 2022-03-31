@@ -1,10 +1,5 @@
 package abepqringct
 
-import (
-	"github.com/abesuite/abec/wire"
-	"github.com/cryptosuite/pqringct"
-)
-
 //import (
 //	"bytes"
 //	"encoding/binary"
@@ -96,7 +91,7 @@ import (
 //this fucntion will fill the TxOuts and TxWitness fields.
 //The TxMemo filed could be modified as needed, as the TxWitness does not depends on the TxMemo.
 //*/
-//func CoinbaseTxGen(pp *pqringct.PublicParameter, abeTxOutDescs []*AbeTxOutDescNew, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
+//func pqringctCoinbaseTxGen(pp *pqringct.PublicParameter, abeTxOutDescs []*AbeTxOutDescNew, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 //	//	pqringct
 //	txOutputDescs := make([]*pqringct.TxOutputDescv2, len(abeTxOutDescs))
 //	for j := 0; j < len(abeTxOutDescs); j++ {
@@ -107,7 +102,7 @@ import (
 //	//	OutputTxos []*Txo
 //	//	TxWitness  *CbTxWitnessv2
 //	//}
-//	cryptoCoinbaseTx, err := pqringct.CoinbaseTxGen(pp, coinbaseTxMsgTemplate.TxFee, txOutputDescs)
+//	cryptoCoinbaseTx, err := pqringct.pqringctCoinbaseTxGen(pp, coinbaseTxMsgTemplate.TxFee, txOutputDescs)
 //	if err != nil {
 //		return nil, err
 //	}
@@ -139,7 +134,7 @@ import (
 //The caller needs to guarantee the well-form of the input coinbaseTx *wire.MsgTxAbe, such as the TxIns.
 //This function only checks the balance proof, by calling the crypto-scheme.
 //*/
-//func CoinbaseTxVerify(pp *pqringct.PublicParameter, coinbaseTx *wire.MsgTxAbe) bool {
+//func pqringctCoinbaseTxVerify(pp *pqringct.PublicParameter, coinbaseTx *wire.MsgTxAbe) bool {
 //	if coinbaseTx == nil {
 //		return false
 //	}
@@ -175,7 +170,7 @@ import (
 //	}
 //
 //	//	todo:
-//	bl := pqringct.CoinbaseTxVerify(pp, cryptoCoinbaseTx)
+//	bl := pqringct.pqringctCoinbaseTxVerify(pp, cryptoCoinbaseTx)
 //	if bl == false {
 //		return false
 //	}
@@ -187,7 +182,7 @@ import (
 //The caller needs to fill the Version, TxIns, TxFee, TxMemo fields of transferTxMsgTemplate
 //This function will fill the serialNumbers in TxIns, and the TxOuts and TxWitness fields of transferTxMsgTemplate, and return it as the result
 //*/
-//func TransferTxGen(pp *pqringct.PublicParameter, abeTxInputDescs []*AbeTxInputDescNew, abeTxOutputDescs []*AbeTxOutDescNew, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
+//func pqringctTransferTxGen(pp *pqringct.PublicParameter, abeTxInputDescs []*AbeTxInputDescNew, abeTxOutputDescs []*AbeTxOutDescNew, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 //	inputNum := len(abeTxInputDescs)
 //	outputNum := len(abeTxOutputDescs)
 //
@@ -247,7 +242,7 @@ import (
 //	copy(txMemo[4:], transferTxMsgTemplate.TxMemo)
 //
 //	//	call the crypto scheme
-//	cryptoTransferTx, err := pp.TransferTxGen(txInputDescs, txOutputDescs, transferTxMsgTemplate.TxFee, txMemo)
+//	cryptoTransferTx, err := pp.pqringctTransferTxGen(txInputDescs, txOutputDescs, transferTxMsgTemplate.TxFee, txMemo)
 //	if err != nil {
 //		return nil, err
 //	}
@@ -283,7 +278,7 @@ import (
 //
 //}
 //
-//func TransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetailNew) bool {
+//func pqringctTransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetailNew) bool {
 //	if transferTx == nil {
 //		return false
 //	}
@@ -371,7 +366,7 @@ import (
 //	}
 //
 //	// call the crypto scheme's verify algroithm
-//	bl := pqringct.TransferTxVerify(pp, cryptoTransferTx)
+//	bl := pqringct.pqringctTransferTxVerify(pp, cryptoTransferTx)
 //	if bl == false {
 //		return false
 //	} else {
@@ -386,15 +381,15 @@ import (
 //}
 
 // the following content maybe deleted in pqringct
-
-// todo: (AliceBob 2021.06.20) abeTxo should be serilazedTxo?
-func TxoSerialNumberGen(pp pqringct.PublicParameter, abeTxo *wire.TxOutAbe, serialzedMpk []byte, serializedMsvk []byte, serializedMssk []byte) (sn []byte, reterr error) {
-	panic("implement me")
-	return nil, nil
-}
-
-// todo: (AliceBob 2021.06.20) abeTxo should be serilazedTxo?
-func TxoCoinReceive(pp pqringct.PublicParameter, abeTxo *wire.TxOutAbe, serialzedMpk []byte, serializedMsvk []byte) (valid bool, v uint64) {
-	panic("implement me")
-	return false, 0
-}
+//
+//// todo: (AliceBob 2021.06.20) abeTxo should be serilazedTxo?
+//func TxoSerialNumberGen(pp pqringct.PublicParameter, abeTxo *wire.TxOutAbe, serialzedMpk []byte, serializedMsvk []byte, serializedMssk []byte) (sn []byte, reterr error) {
+//	panic("implement me")
+//	return nil, nil
+//}
+//
+//// todo: (AliceBob 2021.06.20) abeTxo should be serilazedTxo?
+//func pqringctTxoCoinReceive(pp pqringct.PublicParameter, abeTxo *wire.TxOutAbe, serialzedMpk []byte, serializedMsvk []byte) (valid bool, v uint64) {
+//	panic("implement me")
+//	return false, 0
+//}

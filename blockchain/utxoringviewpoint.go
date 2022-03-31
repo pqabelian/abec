@@ -309,7 +309,7 @@ func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	if ringSize > wire.TxRingSize {
+	if ringSize > uint64(wire.GetTxoRingSizeByRingVersion(entry.Version)) {
 		return errUtxoRingDeserialize("The UtxoRingEntry to be deserlized has a ring size greater than the allowed max value")
 	}
 	if ringSize != uint64(len(entry.outPointRing.OutPoints)) {
@@ -351,8 +351,12 @@ func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 
 	entry.serialNumbers = make([][]byte, consumedNum)
 	//	serialNumbers
+	snSize, err := abecryptoparam.GetSerialNumberSerializeSize(entry.outPointRing.Version)
+	if err != nil {
+		return err
+	}
 	for i := uint64(0); i < consumedNum; i++ {
-		serialNumber := make([]byte, abecryptoparam.GetTxoSerialNumberLen(entry.outPointRing.Version))
+		serialNumber := make([]byte, snSize)
 		_, err := io.ReadFull(r, serialNumber[:])
 		if err != nil {
 			return err
@@ -705,7 +709,11 @@ func (b *BlockChain) FetchUtxoRingView(tx *abeutil.TxAbe) (*UtxoRingViewpoint, e
 	// inputs of the passed transaction.
 	neededSet := make(map[chainhash.Hash]struct{})
 
-	if !tx.IsCoinBase() {
+	isCb, err := tx.IsCoinBase()
+	if err != nil {
+		return nil, err
+	}
+	if !isCb {
 		for _, txIn := range tx.MsgTx().TxIns {
 			neededSet[txIn.PreviousOutPointRing.Hash()] = struct{}{}
 		}
@@ -715,7 +723,7 @@ func (b *BlockChain) FetchUtxoRingView(tx *abeutil.TxAbe) (*UtxoRingViewpoint, e
 	// chain.
 	view := NewUtxoRingViewpoint()
 	b.chainLock.RLock()
-	err := view.fetchUtxoRingsMain(b.db, neededSet)
+	err = view.fetchUtxoRingsMain(b.db, neededSet)
 	b.chainLock.RUnlock()
 	return view, err
 }
@@ -772,7 +780,12 @@ func (b *BlockChain) FetchUtxoRingView(tx *abeutil.TxAbe) (*UtxoRingViewpoint, e
 //	Only the blocks with height%3 ==0 will trigger the generation of new TxoRings.
 func (view *UtxoRingViewpoint) connectTransaction(tx *abeutil.TxAbe, blockhash *chainhash.Hash, stxos *[]*SpentTxOutAbe) error {
 	// Coinbase transactions don't have any inputs to spend.
-	if tx.IsCoinBase() {
+	isCb, err := tx.IsCoinBase()
+	if err != nil {
+		return err
+	}
+
+	if isCb {
 		/*		// Add the transaction's outputs as available utxos.
 				view.AddTxOuts(tx, blockHeight)*/
 		return nil
@@ -888,52 +901,91 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 		return AssertError("newUtxoRingEntriesFromNode is called with nil node or nil block.")
 	}
 
-	if !(node.height%3 == 2) {
-		return AssertError("newUtxoRingEntriesFromNode is called with node where node.height % 3 != 2.")
+	//	TODO: when BlockNumPerRingGroup or TxoRingSize change, it may cause fork.
+	//	The mapping between BlockNumPerRingGroup/TxoRingSize and height is hardcoded in wire.GetBlockNumPerRingGroup/TxoRingSize.
+	//	Here we should call blockNumPerRingGroup = wire.GetBlockNumPerRingGroup()
+	//	At this moment (no fork due to BlockNumPerRingGroup/TxoRingSize change), we directly use the constant.
+	blockNumPerRingGroup := int32(wire.GetBlockNumPerRingGroupByBlockHeight(node.height))
+	txoRingSize := int(wire.GetTxoRingSizeByBlockHeight(node.height))
+	//if !(node.height%wire.BlockNumPerRingGroup == wire.BlockNumPerRingGroup-1) {
+	if !(node.height%blockNumPerRingGroup == blockNumPerRingGroup-1) {
+		return AssertError("newUtxoRingEntriesFromNode is called with node where node.height % BlockNumPerRingGroup != BlockNumPerRingGroup-1.")
 	}
 
 	if !view.bestHash.IsEqual(block.Hash()) {
 		return AssertError("newUtxoRingEntriesFromNode is called with block's hash not equal to the view.bestHash")
 	}
 
-	node1 := node.parent
-	node0 := node1.parent
-	if node1 == nil || node0 == nil {
-		return AssertError("a node with height %2 == 0 should have two previous successive nodes.")
-	}
-
 	if !node.hash.IsEqual(block.Hash()) {
 		return AssertError("newUtxoRingEntries is called with block that has different hash with the node.")
 	}
 
-	block2 := block
-	var block1 *abeutil.BlockAbe
-	var block0 *abeutil.BlockAbe
-	err := db.View(func(dbTx database.Tx) error {
-		var err error
-		block1, err = dbFetchBlockByNodeAbe(dbTx, node1)
+	ringBlockHeight := block.Height()
+	//blockNum := wire.BlockNumPerRingGroup
+	blockNum := int(blockNumPerRingGroup)
+	nodeTmp := node
+	blockTmp := block
+	blocks := make([]*abeutil.BlockAbe, blockNum)
+	for i := blockNum - 1; i >= 0; i-- {
+		blocks[i] = blockTmp
+		if i == 0 {
+			break
+		}
+
+		nodeTmp = nodeTmp.parent
+		if nodeTmp == nil {
+			//return AssertError("a node with height % BlockNumPerRingGroup == BlockNumPerRingGroup-1 should have BlockNumPerRingGroup previous successive nodes.")
+			return AssertError("newUtxoRingEntries is called with node that does not have (BlockNumPerRingGroup-1) previous successive blocks in database")
+		}
+
+		err := db.View(func(dbTx database.Tx) error {
+			var err error
+			blockTmp, err = dbFetchBlockByNodeAbe(dbTx, nodeTmp)
+			return err
+		})
 		if err != nil {
 			return err
 		}
-		block0, err = dbFetchBlockByNodeAbe(dbTx, node0)
-		return err
-	})
-	if err != nil {
-		return err
 	}
 
-	if block0 == nil || block1 == nil {
-		return AssertError("newUtxoRingEntries is called with node that does not have 2 previous successive blocks in database")
-	}
+	//node1 := node.parent
+	//node0 := node1.parent
+	//if node1 == nil || node0 == nil {
+	//	return AssertError("a node with height %2 == 0 should have two previous successive nodes.")
+	//}
+	//
+	//if !node.hash.IsEqual(block.Hash()) {
+	//	return AssertError("newUtxoRingEntries is called with block that has different hash with the node.")
+	//}
+	//
+	//block2 := block
+	//var block1 *abeutil.BlockAbe
+	//var block0 *abeutil.BlockAbe
+	//err := db.View(func(dbTx database.Tx) error {
+	//	var err error
+	//	block1, err = dbFetchBlockByNodeAbe(dbTx, node1)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	block0, err = dbFetchBlockByNodeAbe(dbTx, node0)
+	//	return err
+	//})
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//if block0 == nil || block1 == nil {
+	//	return AssertError("newUtxoRingEntries is called with node that does not have 2 previous successive blocks in database")
+	//}
+	//
+	//blocks := []*abeutil.BlockAbe{block0, block1, block2}
+	//ringBlockHeight := blocks[2].Height()
+	//blockNum := len(blocks)
 
-	blocks := []*abeutil.BlockAbe{block0, block1, block2}
-	ringBlockHeight := blocks[2].Height()
-	blocksNum := len(blocks)
-
-	blockHashs := make([]*chainhash.Hash, blocksNum)
+	blockHashs := make([]*chainhash.Hash, blockNum)
 	coinBaseRmTxoNum := 0
 	transferRmTxoNum := 0
-	for i := 0; i < blocksNum; i++ {
+	for i := 0; i < blockNum; i++ {
 		blockHashs[i] = blocks[i].Hash()
 
 		coinBaseRmTxoNum += len(blocks[i].Transactions()[0].MsgTx().TxOuts)
@@ -946,23 +998,23 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 
 	// str = block1.hash, block2.hash, block3.hash, blockhash, txHash, outIndex
 	// all Txos are ordered by Hash(str), then grouped into rings
-	txoSortStr := make([]byte, blocksNum*chainhash.HashSize+chainhash.HashSize+chainhash.HashSize+1)
-	for i := 0; i < blocksNum; i++ {
+	txoSortStr := make([]byte, blockNum*chainhash.HashSize+chainhash.HashSize+chainhash.HashSize+1)
+	for i := 0; i < blockNum; i++ {
 		copy(txoSortStr[i*chainhash.HashSize:], blocks[i].Hash()[:])
 	}
 
-	for i := 0; i < blocksNum; i++ {
+	for i := 0; i < blockNum; i++ {
 		block := blocks[i]
 		blockHash := block.Hash()
 		blockHeight := block.Height()
 
-		copy(txoSortStr[blocksNum*chainhash.HashSize:], blockHash[:])
+		copy(txoSortStr[blockNum*chainhash.HashSize:], blockHash[:])
 
 		coinBaseTx := block.Transactions()[0]
 		txHash := coinBaseTx.Hash()
-		copy(txoSortStr[(blocksNum+1)*chainhash.HashSize:], txHash[:])
+		copy(txoSortStr[(blockNum+1)*chainhash.HashSize:], txHash[:])
 		for outIndex, txOut := range coinBaseTx.MsgTx().TxOuts {
-			txoSortStr[(blocksNum+2)*chainhash.HashSize] = uint8(outIndex)
+			txoSortStr[(blockNum+2)*chainhash.HashSize] = uint8(outIndex)
 
 			txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
@@ -971,10 +1023,10 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 		}
 		for _, tx := range block.Transactions()[1:] {
 			txHash := tx.Hash()
-			copy(txoSortStr[(blocksNum+1)*chainhash.HashSize:], txHash[:])
+			copy(txoSortStr[(blockNum+1)*chainhash.HashSize:], txHash[:])
 
 			for outIndex, txOut := range tx.MsgTx().TxOuts {
-				txoSortStr[(blocksNum+2)*chainhash.HashSize] = uint8(outIndex)
+				txoSortStr[(blockNum+2)*chainhash.HashSize] = uint8(outIndex)
 
 				txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
@@ -983,13 +1035,19 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 			}
 		}
 	}
+
 	// TODO: change the version field in node and block to uint32 type?
-	err = view.NewUtxoRingEntriesFromTxos(allCoinBaseRmTxos, ringBlockHeight, blockHashs, true)
+	//	TODO: when BlockNumPerRingGroup or TxoRingSize change, it may cause fork.
+	//	The mapping between BlockNumPerRingGroup/TxoRingSize and height is hardcoded in wire.GetBlockNumPerRingGroup/TxoRingSize.
+	//	Here we should call blockNumPerRingGroup = wire.TxoRingSize()
+	//	At this moment (no fork due to BlockNumPerRingGroup/TxoRingSize change), we directly use the constant.
+	//txoRingSize := wire.TxoRingSize
+	err := view.NewUtxoRingEntriesFromTxos(allCoinBaseRmTxos, ringBlockHeight, blockHashs, txoRingSize, true)
 	if err != nil {
 		return err
 	}
 
-	err = view.NewUtxoRingEntriesFromTxos(allTransferRmTxos, ringBlockHeight, blockHashs, false)
+	err = view.NewUtxoRingEntriesFromTxos(allTransferRmTxos, ringBlockHeight, blockHashs, txoRingSize, false)
 	if err != nil {
 		return err
 	}
@@ -1091,7 +1149,10 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 	return nil
 }*/
 
-func (view *UtxoRingViewpoint) NewUtxoRingEntriesFromTxos(ringMemberTxos []*RingMemberTxo, ringBlockHeight int32, blockhashs []*chainhash.Hash, isCoinBase bool) error {
+// NewUtxoRingEntriesFromTxos divide the Txos in ringMemberTxos into rings, based on the txoRingSize parameter.
+// Here txoRingSize is set as an input parameter, to avoid using the global parameter TxoRingSize.
+// txoRingSize is set by the caller which may decides the value of txoRingSize based on the wire/protocol version.
+func (view *UtxoRingViewpoint) NewUtxoRingEntriesFromTxos(ringMemberTxos []*RingMemberTxo, ringBlockHeight int32, blockhashs []*chainhash.Hash, txoRingSize int, isCoinBase bool) error {
 
 	if len(ringMemberTxos) == 0 {
 		return nil
@@ -1103,8 +1164,8 @@ func (view *UtxoRingViewpoint) NewUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 	txoNum := len(ringMemberTxos)
 
 	//	group Txos to rings
-	normalRingNum := txoNum / wire.TxRingSize
-	remainderTxoNum := txoNum % wire.TxRingSize
+	normalRingNum := txoNum / txoRingSize
+	remainderTxoNum := txoNum % txoRingSize
 
 	//	totalRingNum := normalRingNum
 	if remainderTxoNum != 0 {
@@ -1121,9 +1182,9 @@ func (view *UtxoRingViewpoint) NewUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 	}
 
 	for i := 0; i < normalRingNum; i++ {
-		// rings with size wire.TxRingSize
-		start := i * wire.TxRingSize
-		utxoRingEntry, err := initNewUtxoRingEntry(ringMemberTxos[start].version, ringBlockHeight, blockhashs, ringMemberTxos[start:start+wire.TxRingSize], isCoinBase)
+		// rings with size txoRingSize
+		start := i * txoRingSize
+		utxoRingEntry, err := initNewUtxoRingEntry(ringMemberTxos[start].version, ringBlockHeight, blockhashs, ringMemberTxos[start:start+txoRingSize], isCoinBase)
 		if err != nil {
 			return err
 		}
@@ -1137,8 +1198,8 @@ func (view *UtxoRingViewpoint) NewUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 		}
 	}
 
-	remainderTxoNum = txoNum - normalRingNum*wire.TxRingSize
-	if remainderTxoNum > wire.TxRingSize {
+	remainderTxoNum = txoNum - normalRingNum*txoRingSize
+	if remainderTxoNum > txoRingSize {
 		//	divide (the last normalRing and the remainder Txos) into 2 rings with sizes remainderTxoNum/2
 		ringSize1 := remainderTxoNum / 2
 		if remainderTxoNum%2 != 0 {
@@ -1146,7 +1207,7 @@ func (view *UtxoRingViewpoint) NewUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 		}
 
 		// rings with size1
-		start := normalRingNum * wire.TxRingSize
+		start := normalRingNum * txoRingSize
 		utxoRingEntry1, err := initNewUtxoRingEntry(ringMemberTxos[start].version, ringBlockHeight, blockhashs, ringMemberTxos[start:start+ringSize1], isCoinBase)
 		if err != nil {
 			return err
@@ -1177,7 +1238,7 @@ func (view *UtxoRingViewpoint) NewUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 
 	} else if remainderTxoNum > 0 {
 		//	one ring with size = remainderTxoNum
-		start := normalRingNum * wire.TxRingSize
+		start := normalRingNum * txoRingSize
 		utxoRingEntry, err := initNewUtxoRingEntry(ringMemberTxos[start].version, ringBlockHeight, blockhashs, ringMemberTxos[start:], isCoinBase)
 		if err != nil {
 			return err

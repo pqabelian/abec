@@ -771,10 +771,10 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 	// as spent by the pool.
 	txD := &TxDescAbe{
 		TxDescAbe: mining.TxDescAbe{
-			Tx:     tx,
-			Added:  time.Now(),
-			Height: height,
-			Fee:    fee,
+			Tx:       tx,
+			Added:    time.Now(),
+			Height:   height,
+			Fee:      fee,
 			FeePerKB: fee * 1000 / uint64(tx.MsgTx().SerializeSize()),
 		},
 		StartingPriority: mining.CalcPriorityAbe(tx.MsgTx(), utxoRingView, height),
@@ -1464,7 +1464,11 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	}
 
 	// A standalone transaction must not be a coinbase transaction.
-	if blockchain.IsCoinBaseAbe(tx) {
+	isCb, err := blockchain.IsCoinBaseAbe(tx)
+	if err != nil {
+		return nil, nil, err
+	}
+	if isCb {
 		str := fmt.Sprintf("transaction %v is an individual coinbase",
 			txHash)
 		return nil, nil, txRuleError(wire.RejectInvalid, str)

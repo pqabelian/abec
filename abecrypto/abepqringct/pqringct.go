@@ -141,7 +141,7 @@ package abepqringct
 //this fucntion will fill the TxOuts and TxWitness fields.
 //The TxMemo filed could be modified as needed, as the TxWitness does not depends on the TxMemo.
 //*/
-//func CoinbaseTxGen(abeTxOutDescs []*AbeTxOutDesc, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
+//func pqringctCoinbaseTxGen(abeTxOutDescs []*AbeTxOutDesc, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 //	cryptoScheme := abecrypto.GetCryptoScheme(coinbaseTxMsgTemplate.Version)
 //
 //	outputNum := len(abeTxOutDescs)
@@ -166,7 +166,7 @@ package abepqringct
 //			txOutputDescs[j] = pqringct.NewTxOutputDesc(mpk, abeTxOutDescs[j].value)
 //		}
 //
-//		cryptoCoinbaseTx, err := abecryptoparam.CryptoPP.CoinbaseTxGen(coinbaseTxMsgTemplate.TxFee, txOutputDescs)
+//		cryptoCoinbaseTx, err := abecryptoparam.CryptoPP.pqringctCoinbaseTxGen(coinbaseTxMsgTemplate.TxFee, txOutputDescs)
 //		if err != nil {
 //			return nil, err
 //		}
@@ -194,7 +194,7 @@ package abepqringct
 //The caller needs to guarantee the well-form of the input coinbaseTx *wire.MsgTxAbe, such as the TxIns.
 //This function only checks the balance proof, by calling the crypto-scheme.
 //*/
-//func CoinbaseTxVerify(coinbaseTx *wire.MsgTxAbe) bool {
+//func pqringctCoinbaseTxVerify(coinbaseTx *wire.MsgTxAbe) bool {
 //	if coinbaseTx == nil {
 //		return false
 //	}
@@ -232,7 +232,7 @@ package abepqringct
 //		}
 //
 //		//	todo:
-//		bl := abecryptoparam.CryptoPP.CoinbaseTxVerify(cryptoCoinbaseTx)
+//		bl := abecryptoparam.CryptoPP.pqringctCoinbaseTxVerify(cryptoCoinbaseTx)
 //		if bl == false {
 //			return false
 //		}
@@ -248,7 +248,7 @@ package abepqringct
 //The caller needs to fill the Version, TxIns, TxFee, TxMemo fields of transferTxMsgTemplate
 //This function will fill the serialNumbers in TxIns, and the TxOuts and TxWitness fields of transferTxMsgTemplate, and return it as the result
 //*/
-//func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxOutDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
+//func pqringctTransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxOutDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 //	inputNum := len(abeTxInputDescs)
 //	outputNum := len(abeTxOutputDescs)
 //
@@ -355,7 +355,7 @@ package abepqringct
 //		copy(txMemo[4:], transferTxMsgTemplate.TxMemo)
 //
 //		//	call the crypto scheme
-//		cryptoTransferTx, err := abecryptoparam.CryptoPP.TransferTxGen(txInputDescs, txOutputDescs, transferTxMsgTemplate.TxFee, txMemo)
+//		cryptoTransferTx, err := abecryptoparam.CryptoPP.pqringctTransferTxGen(txInputDescs, txOutputDescs, transferTxMsgTemplate.TxFee, txMemo)
 //		if err != nil {
 //			return nil, err
 //		}
@@ -386,7 +386,7 @@ package abepqringct
 //	return nil, nil
 //}
 //
-//func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail) bool {
+//func pqringctTransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail) bool {
 //	if transferTx == nil {
 //		return false
 //	}
@@ -472,7 +472,7 @@ package abepqringct
 //		}
 //
 //		// call the crypto scheme's verify algroithm
-//		bl := abecryptoparam.CryptoPP.TransferTxVerify(cryptoTransferTx)
+//		bl := abecryptoparam.CryptoPP.pqringctTransferTxVerify(cryptoTransferTx)
 //		if bl == false {
 //			return false
 //		} else {
@@ -551,7 +551,7 @@ package abepqringct
 //}
 //
 //// todo: (AliceBob 2021.06.20) abeTxo should be serilazedTxo?
-//func TxoCoinReceive(abeTxo *wire.TxOutAbe, serialzedMpk []byte, serializedMsvk []byte) (valid bool, v uint64) {
+//func pqringctTxoCoinReceive(abeTxo *wire.TxOutAbe, serialzedMpk []byte, serializedMsvk []byte) (valid bool, v uint64) {
 //	if abeTxo == nil {
 //		return false, 0
 //	}
@@ -589,7 +589,7 @@ package abepqringct
 //			return false, 0
 //		}
 //
-//		return abecryptoparam.CryptoPP.TxoCoinReceive(cryptoTxo, mpk, msvk)
+//		return abecryptoparam.CryptoPP.pqringctTxoCoinReceive(cryptoTxo, mpk, msvk)
 //	} else {
 //		panic("Unsupported version appears! Implement here.")
 //		// todo: if there is any more version to support, implement it here
