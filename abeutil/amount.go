@@ -7,12 +7,14 @@ import (
 )
 
 // AmountUnit describes a method of converting an Amount to something
-// other than the base unit of a bitcoin.  The value of the AmountUnit
+// other than the base unit of a abelian.  The value of the AmountUnit
 // is the exponent component of the decadic multiple to convert from
-// an amount in bitcoin to an amount counted in units.
+// an amount in abelian to an amount counted in units.
 type AmountUnit int
 
-// These constants define various units used when describing a bitcoin
+// 0b1011_1011_0010_1100_1000_0000_1100_1010_0001_1111_1111_1111
+
+// These constants define various units used when describing an abelian
 // monetary amount.
 const (
 	AmountMegaABE  AmountUnit = 6
@@ -45,8 +47,8 @@ func (u AmountUnit) String() string {
 	}
 }
 
-// Amount represents the base bitcoin monetary unit (colloquially referred
-// to as a `Satoshi').  A single Amount is equal to 1e-8 of a bitcoin.
+// Amount represents the base abelian monetary unit (colloquially referred
+// to as a `Neutrino').  A single Amount is equal to 1e-7 of a abelian.
 type Amount uint64
 
 // round converts a floating point number, which may or may not be representable
@@ -79,7 +81,7 @@ func NewAmount(f float64) (Amount, error) {
 	case math.IsInf(f, 1):
 		fallthrough
 	case math.IsInf(f, -1):
-		return 0, errors.New("invalid bitcoin amount")
+		return 0, errors.New("invalid abelian amount")
 	}
 
 	return round(f * SatoshiPerBitcoin), nil

@@ -45,7 +45,7 @@ const (
 	// purposes.  It is also used to help determine if a transaction is
 	// considered dust and as a base for calculating minimum required fees
 	// for larger transactions.  This value is in Neutrino/1000 bytes.
-	DefaultMinRelayTxFee = abeutil.Amount(1000)
+	DefaultMinRelayTxFee = 1000
 
 	// maxStandardMultiSigKeys is the maximum number of public keys allowed
 	// in a multi-signature transaction output script for it to be

@@ -135,7 +135,7 @@ func pqringctCoinbaseTxVerify(pp *pqringct.PublicParameter, coinbaseTx *wire.Msg
 	}
 	var err error
 
-	cryptoCoinbaseTx := &pqringct.CoinbaseTxv2{}4
+	cryptoCoinbaseTx := &pqringct.CoinbaseTxv2{}
 
 	cryptoCoinbaseTx.Vin = coinbaseTx.TxFee
 
@@ -186,19 +186,27 @@ func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 		return nil, errors.New("pqringctTransferTxGen: the input number and the output number should be at least 1")
 	}
 
-	if inputNum > pqringct.GetTxInputMaxNum() {
-		return nil, fmt.Errorf("pqringctTransferTxGen: the input number %d exceeds the allowed max number %d", inputNum, abecryptoparam.GetInputMaxNum(transferTxMsgTemplate.Version))
+	txInputMaxNum, err := abecryptoparam.GetTxInputMaxNum(transferTxMsgTemplate.Version)
+	if err != nil {
+		return nil, errors.New("pqringctTransferTxGen:" + err.Error())
+	}
+	maxInputNum := pqringct.GetTxInputMaxNum(abecryptoparam.PQRingCTPP)
+	if inputNum > maxInputNum {
+		return nil, fmt.Errorf("pqringctTransferTxGen: the input number %d exceeds the allowed max number %d", inputNum, txInputMaxNum)
 	}
 
-	if outputNum > pqringct.GetTxOutputMaxNum() {
-		return nil, fmt.Errorf("pqringctTransferTxGen: the output number %d exceeds the allowed max number %d", outputNum, abecryptoparam.GetOutputMaxNum(transferTxMsgTemplate.Version))
+	txOutputMaxNum, err := abecryptoparam.GetTxOutputMaxNum(transferTxMsgTemplate.Version)
+	if err != nil {
+		return nil, errors.New("pqringctTransferTxGen:" + err.Error())
+	}
+	maxOutputNum := pqringct.GetTxOutputMaxNum(abecryptoparam.PQRingCTPP)
+	if outputNum > maxOutputNum {
+		return nil, fmt.Errorf("pqringctTransferTxGen: the output number %d exceeds the allowed max number %d", outputNum, txOutputMaxNum)
 	}
 
 	if inputNum != len(transferTxMsgTemplate.TxIns) {
 		return nil, errors.New("the number of InputDesc does not match the number of TxIn in transferTxMsgTemplate")
 	}
-
-	var err error
 
 	inputsRingVersion := transferTxMsgTemplate.TxIns[0].PreviousOutPointRing.Version
 	if inputsRingVersion != transferTxMsgTemplate.Version {
@@ -225,7 +233,7 @@ func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 
 		lgrTxoList := make([]*pqringct.LgrTxo, len(abeTxInputDescs[i].txoList))
 		for j := 0; j < len(abeTxInputDescs[i].txoList); j++ {
-			if abeTxInputDescs[i].txoList[j].Version != inputsVersion {
+			if abeTxInputDescs[i].txoList[j].Version != inputsRingVersion {
 				return nil, errors.New("pqringctTransferTxGen: the version of TXOs in abeTxInputDescs.serializedTxoList does not match the version in the corresponding TxIn")
 			}
 			lgrTxoList[j] = &pqringct.LgrTxo{}
@@ -274,7 +282,7 @@ func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 			return nil, errors.New("pqringctTransferTxGen: unmatched cryptoScheme for input address and transaction")
 		}
 		apkLen := pqringct.GetAddressPublicKeySerializeSize(pp)
-		serializedVpk := abeTxOutDescs[j].cryptoAddress[4+apkLen:]
+		serializedVpk := abeTxInputDescs[i].cryptoAddress[4+apkLen:]
 
 		txInputDescs[i] = pqringct.NewTxInputDescv2(pp, lgrTxoList, sidx, serializedASksp, serializedASksn, serializedVpk, serializedVSk, value)
 	}
@@ -443,7 +451,7 @@ func pqringctTxoCoinReceive(pp *pqringct.PublicParameter, cryptoScheme abecrypto
 		return false, 0, errors.New("pqringctTxoCoinReceive: unmatched cryptoScheme for input instanceAddress")
 	}
 	apkLen := pqringct.GetAddressPublicKeySerializeSize(pp)
-	serializedApk := cryptoAddress[4:4+apkLen]
+	serializedApk := cryptoAddress[4 : 4+apkLen]
 	serializedVpk := cryptoAddress[4+apkLen:]
 
 	cryptoSchemeInVsk := cryptoVsk[0]
@@ -480,7 +488,7 @@ func pqringctTxoCoinSerialNumberGen(pp *pqringct.PublicParameter, cryptoScheme a
 
 	lgrTxo := &pqringct.LgrTxo{
 		Txo: txo,
-		Id: txolid,
+		Id:  txolid,
 	}
 
 	cryptoSchemeInSnsk := cryptoSnsk[0]
@@ -529,4 +537,3 @@ func ledgerTxoIdGen(ringHash chainhash.Hash, index int) []byte {
 	}
 	return chainhash.DoubleHashB(w.Bytes())
 }
-

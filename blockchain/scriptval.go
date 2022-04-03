@@ -706,8 +706,8 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 		abeTxInDetail[i] = abecrypto.NewAbeTxInDetail(ringHash, serializedTxoList, tx.MsgTx().TxIns[i].SerialNumber)
 	}
 
-	isValid := abecrypto.CryptoPP.TransferTxVerify(tx.MsgTx(), abeTxInDetail)
-	if !isValid {
+	isValid, err := abecrypto.TransferTxVerify(tx.MsgTx(), abeTxInDetail)
+	if !isValid || err != nil {
 		str := fmt.Sprintf("transaction %s verify failed", tx.Hash())
 		return ruleError(ErrScriptValidation, str)
 	}

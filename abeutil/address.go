@@ -6,8 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abecrypto"
-	"github.com/abesuite/abec/abecrypto/abeaddress"
+	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/abeutil/base58"
 	"github.com/abesuite/abec/abeutil/bech32"
 	"github.com/abesuite/abec/btcec"
@@ -106,7 +105,7 @@ type MasterAddress interface {
 
 	String() string
 
-	MasterAddressCryptoScheme() abecrypto.CryptoScheme // just for being different interface from DerivedAddress
+	MasterAddressCryptoScheme() abecryptoparam.CryptoScheme // just for being different interface from DerivedAddress
 
 	//	GenerateDerivedAddress() (DerivedAddress, error)
 }
@@ -275,7 +274,7 @@ func DecodeMasterAddressAbe(addrstr string) (MasterAddress, error) {
 		return nil, errors.New("decoded address is of unknown format: bytesize <= 2 + chainhash.HashSize")
 	}
 
-	cryptoScheme := abecrypto.CryptoScheme(binary.BigEndian.Uint32(addrBytes[1:5]))
+	cryptoScheme := abecryptoparam.CryptoScheme(binary.BigEndian.Uint32(addrBytes[1:5]))
 
 	checkSum := addrBytes[totalSize-chainhash.HashSize:]
 	serialzedMasterAddress := addrBytes[:totalSize-chainhash.HashSize]
@@ -286,10 +285,10 @@ func DecodeMasterAddressAbe(addrstr string) (MasterAddress, error) {
 
 	//	todo(ABE): we can support multiple crypto schemes in a sophisticated way
 	switch cryptoScheme {
-	case abecrypto.CryptoSchemeSALRS:
-		return ParseMasterAddressSalrsFromSerialzedBytes(serialzedMasterAddress)
-	case abecrypto.CryptoSchemePQRINGCT:
-		return abeaddress.ParseAddressPQringctFromSerialzedBytes(serialzedMasterAddress)
+	//case abecryptoparam.CryptoSchemeSALRS:
+	//	return ParseMasterAddressSalrsFromSerialzedBytes(serialzedMasterAddress)
+	//case abecryptoparam.CryptoSchemePQRingCT:
+	//return abeaddress.ParseAddressPQringctFromSerialzedBytes(serialzedMasterAddress)
 	default:
 		return nil, errors.New("decoded address is of unknown/unsupported crypto scheme")
 	}
@@ -312,12 +311,12 @@ func DecodeDerivedAddressAbe(addrstr string) (DerivedAddress, error) {
 		return nil, errors.New("decoded address is of unknown format: bytesize <= 2")
 	}
 
-	cryptoScheme := abecrypto.CryptoScheme(binary.BigEndian.Uint16(serialized[:2]))
+	cryptoScheme := abecryptoparam.CryptoScheme(binary.BigEndian.Uint16(serialized[:2]))
 
 	//	todo(ABE): we can support multiple crypto schemes in a sophisticated way
 	switch cryptoScheme {
-	case abecrypto.CryptoSchemeSALRS:
-		return ParseDerivedAddressSalrsFromStr(addrstr)
+	//case abecryptoparam.CryptoSchemeSALRS:
+	//	return ParseDerivedAddressSalrsFromStr(addrstr)
 	default:
 		return nil, errors.New("decoded address is of unknown/unsupported crypto scheme")
 	}

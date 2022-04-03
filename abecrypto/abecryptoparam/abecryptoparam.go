@@ -16,7 +16,7 @@ const (
 
 // The public parameters for the supported crypto-schemes.
 // PQRingCTPP is the public parameter for CryptoSchemePQRingCT.
-var PQRingCTPP = pqringct.DefaultPPV2
+var PQRingCTPP = pqringct.DefaultPP
 
 // var PQRingCT2PP = pqringct2.DefaultPP
 

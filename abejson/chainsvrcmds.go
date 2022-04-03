@@ -83,8 +83,9 @@ type CreateRawTransactionCmd struct {
 //TODO(abe): the type of txfee may need to change to a pointer point to float64
 type CreateRawTransactionCmdAbe struct {
 	Inputs  []TransactionInputAbe
-	Outputs []TransactionOutputAbe `jsonrpcusage:"{\"address\":amount,...}"` // In Neutrino TODO:no Nertrino, just script
-	Fee     float64                `json:"txfee"`                            // in ABE
+	Outputs []TransactionOutputAbe `jsonrpcusage:"{\"address\":\"amount\",...}"` // TODO: without value just a script
+	Witness []byte
+	Fee     string `json:"txfee"` // in Neutrino
 }
 
 // NewCreateRawTransactionCmd returns a new instance which can be used to issue

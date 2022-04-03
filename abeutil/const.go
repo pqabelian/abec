@@ -20,7 +20,7 @@ const (
 	NeutrinoPerAbe = 1e7
 
 	// MaxAbe is the maximum transaction amount allowed in Neutrino.
-	MaxAbe = 296e6
+	MaxAbe = 1<<51 - 1
 
 	// MaxNeutrino is the maximum transaction amount allowed in Neutrino.
 	MaxNeutrino = 296e6 * NeutrinoPerAbe

@@ -309,7 +309,11 @@ func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	if ringSize > uint64(wire.GetTxoRingSizeByRingVersion(entry.Version)) {
+	expectedRingSize, err := wire.GetTxoRingSizeByRingVersion(entry.Version)
+	if err != nil {
+		return err
+	}
+	if ringSize > uint64(expectedRingSize) {
 		return errUtxoRingDeserialize("The UtxoRingEntry to be deserlized has a ring size greater than the allowed max value")
 	}
 	if ringSize != uint64(len(entry.outPointRing.OutPoints)) {

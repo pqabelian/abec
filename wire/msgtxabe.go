@@ -191,7 +191,12 @@ func ReadOutPointRing(r io.Reader, pver uint32, version uint32, opr *OutPointRin
 	if err != nil {
 		return err
 	}
-	if blockNum != GetBlockNumPerRingGroupByRingVersion(opr.Version) {
+	expectedBlockNum, err := GetBlockNumPerRingGroupByRingVersion(opr.Version)
+	if err != nil {
+		str := fmt.Sprintf("cannot get the block numberock number with  version %d", opr.Version)
+		return messageError("readOutPointRing", str)
+	}
+	if blockNum != expectedBlockNum {
 		str := fmt.Sprintf("the block number %d in ring does not match the version %d", blockNum, opr.Version)
 		return messageError("readOutPointRing", str)
 	}
@@ -210,8 +215,13 @@ func ReadOutPointRing(r io.Reader, pver uint32, version uint32, opr *OutPointRin
 	if err != nil {
 		return err
 	}
-	if ringSize > GetTxoRingSizeByRingVersion(opr.Version) {
-		str := fmt.Sprintf("the ring size (%d) exceeds the allowed max ring size %d with version %d", ringSize, GetTxoRingSizeByRingVersion(opr.Version), opr.Version)
+	maxRingSize, err := GetTxoRingSizeByRingVersion(opr.Version)
+	if err != nil {
+		str := fmt.Sprintf("cannot get the ring size with  version %d", opr.Version)
+		return messageError("readOutPointRing", str)
+	}
+	if ringSize > maxRingSize {
+		str := fmt.Sprintf("the ring size (%d) exceeds the allowed max ring size %d with version %d", ringSize, maxRingSize, opr.Version)
 		return messageError("readOutPointRing", str)
 	}
 	opr.OutPoints = make([]*OutPointAbe, ringSize)
@@ -370,9 +380,14 @@ func GetTxInSerializeSizeApprox(ringVersion uint32, ringSize int) (uint32, error
 		return 0, err
 	}
 
+	blockNum, err := GetBlockNumPerRingGroupByRingVersion(ringVersion)
+	if err != nil {
+		str := fmt.Sprintf("cannot get the block numberock number with  version %d", ringVersion)
+		return 0, messageError("readOutPointRing", str)
+	}
 	n := 1 + uint32(snSize) + // 1 byte for the length of serialNumber
 		4 + //	4 bytes for the ring version
-		1 + uint32(GetBlockNumPerRingGroupByRingVersion(ringVersion)*chainhash.HashSize) + // 1 byte for the number of blocks, blockhashs
+		1 + uint32(blockNum*chainhash.HashSize) + // 1 byte for the number of blocks, blockhashs
 		1 + uint32(ringSize*(chainhash.HashSize+1)) //	1 byte for ring size
 
 	return n, nil

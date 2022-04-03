@@ -207,7 +207,7 @@ func TxoCoinSerialNumberGen(txo *wire.TxOutAbe, ringHash chainhash.Hash, txoInde
 
 	switch cryptoScheme {
 	case abecryptoparam.CryptoSchemePQRingCT:
-		sn, err := pqringctTxoCoinSerialNumberGen(abecryptoparam.PQRingCTPP, abecryptoparam.PQRingCTPP, txo, ringHash, txoIndexInRing, serializedSksn)
+		sn, err := pqringctTxoCoinSerialNumberGen(abecryptoparam.PQRingCTPP, abecryptoparam.CryptoSchemePQRingCT, txo, ringHash, txoIndexInRing, serializedSksn)
 		if err != nil {
 			return nil, err
 		}

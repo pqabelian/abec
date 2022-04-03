@@ -4,14 +4,14 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
-	"github.com/abesuite/abec/abecrypto"
+	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/abecrypto/abesalrs"
 )
 
 // MasterAddressSalrsMasterPubKey implements the interface MasterAddress for CryptoScheme SALRS
 type MasterAddressSalrs struct {
 	//	cryptoScheme seems to be redundant, at this moment, just work for double-check
-	cryptoScheme abecrypto.CryptoScheme
+	cryptoScheme abecryptoparam.CryptoScheme
 	masterPubKey *abesalrs.MasterPubKey
 }
 
@@ -36,22 +36,22 @@ func (maddr *MasterAddressSalrs) Deserialize(serialized []byte) error {
 		return errors.New("the serialized does not match the rules for MasterAddressSalrs")
 	}
 	cryptoScheme := binary.BigEndian.Uint16(serialized[:2])
-	if abecrypto.CryptoScheme(cryptoScheme) != abecrypto.CryptoSchemeSALRS {
-		return errors.New("the serialized does not match the rules for MasterAddressSalrs")
-	}
+	//if abecryptoparam.CryptoScheme(cryptoScheme) != abecryptoparam.CryptoSchemeSALRS {
+	//	return errors.New("the serialized does not match the rules for MasterAddressSalrs")
+	//}
 
 	mpk, err := abesalrs.DeseralizeMasterPubKey(serialized[2:])
 	if err != nil {
 		return err
 	}
 
-	maddr.cryptoScheme = abecrypto.CryptoScheme(cryptoScheme)
+	maddr.cryptoScheme = abecryptoparam.CryptoScheme(cryptoScheme)
 	maddr.masterPubKey = mpk
 
 	return nil
 }
 
-func (maddr *MasterAddressSalrs) MasterAddressCryptoScheme() abecrypto.CryptoScheme {
+func (maddr *MasterAddressSalrs) MasterAddressCryptoScheme() abecryptoparam.CryptoScheme {
 
 	return maddr.cryptoScheme
 }
@@ -103,7 +103,7 @@ func (maddr *MasterAddressSalrs) GenerateDerivedAddress() (DerivedAddress, error
 
 // DerivedAddressSalrsDerivedPubKey implements the interface DerivedAddress for CryptoScheme SALRS
 type DerivedAddressSalrs struct {
-	cryptoScheme  abecrypto.CryptoScheme
+	cryptoScheme  abecryptoparam.CryptoScheme
 	derivedPubKey *abesalrs.DerivedPubKey
 }
 
@@ -132,22 +132,22 @@ func (daddr *DerivedAddressSalrs) Deserialize(serialized []byte) error {
 		return errors.New("the serialized does not match the rules for DerivedAddressSalrs")
 	}
 	cryptoScheme := binary.BigEndian.Uint16(serialized[:2])
-	if abecrypto.CryptoScheme(cryptoScheme) != abecrypto.CryptoSchemeSALRS {
-		return errors.New("the serialized does not match the rules for DerivedAddressSalrs")
-	}
+	//if abecryptoparam.CryptoScheme(cryptoScheme) != abecryptoparam.CryptoSchemeSALRS {
+	//	return errors.New("the serialized does not match the rules for DerivedAddressSalrs")
+	//}
 
 	dpk, err := abesalrs.DeseralizeDerivedPubKey(serialized[2:])
 	if err != nil {
 		return nil
 	}
 
-	daddr.cryptoScheme = abecrypto.CryptoScheme(cryptoScheme)
+	daddr.cryptoScheme = abecryptoparam.CryptoScheme(cryptoScheme)
 	daddr.derivedPubKey = dpk
 
 	return nil
 }
 
-func (daddr *DerivedAddressSalrs) DerivedAddressCryptoScheme() abecrypto.CryptoScheme {
+func (daddr *DerivedAddressSalrs) DerivedAddressCryptoScheme() abecryptoparam.CryptoScheme {
 
 	return daddr.cryptoScheme
 }

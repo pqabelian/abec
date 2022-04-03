@@ -750,22 +750,19 @@ func handleCreateRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-ch
 	//}
 
 	//	TxFee
-	if c.Fee <= 0 || c.Fee > abeutil.MaxAbe {
+	//  converting string to uint64 using
+	fee, err := strconv.ParseUint(c.Fee, 10, 64)
+	if err != nil || fee <= 0 || fee > abeutil.MaxNeutrino {
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCType,
 			Message: "Invalid transaction fee",
 		}
 	}
 	// Convert the fee to neutrino.
-	neutrinoFee, err := abeutil.NewAmountAbe(c.Fee)
-	if err != nil {
-		context := "Failed to convert fee amount"
-		return nil, internalRPCError(err.Error(), context)
-	}
-	mtx.TxFee = uint64(neutrinoFee)
+	mtx.TxFee = fee
 
 	//	TxWitness
-	mtx.TxWitness = nil
+	mtx.TxWitness = c.Witness
 
 	// Return the serialized and hex-encoded transaction.  Note that this
 	// is intentionally not directly returning because the first return
