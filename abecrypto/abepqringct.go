@@ -247,7 +247,7 @@ func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 			if err != nil {
 				return nil, err
 			}
-			lgrTxoList[j].Id = ledgerTxoIdGen(abeTxInputDescs[i].ringHash, abeTxInputDescs[i].sidx)
+			lgrTxoList[j].Id = ledgerTxoIdGen(abeTxInputDescs[i].ringHash, j)
 		}
 
 		sidx := abeTxInputDescs[i].sidx
