@@ -317,7 +317,10 @@ func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 	if err != nil {
 		return nil, err
 	}
-
+	valid, err := pqringct.TransferTxVerify(pp, cryptoTransferTx)
+	if err != nil || !valid {
+		return nil, errors.New("wrong")
+	}
 	//	For the inputs, only the serial number needs to be set
 	for i := 0; i < inputNum; i++ {
 		transferTxMsgTemplate.TxIns[i].SerialNumber = cryptoTransferTx.Inputs[i].SerialNumber
