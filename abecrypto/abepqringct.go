@@ -510,6 +510,13 @@ func pqringctTxoCoinSerialNumberGen(pp *pqringct.PublicParameter, cryptoScheme a
 
 }
 
+func pqringctExtractCoinAddressFromTxoScript(pp *pqringct.PublicParameter, txoscript []byte) ([]byte, error) {
+	txo, err := pp.DeserializeTxo(txoscript)
+	if err != nil {
+		return nil, err
+	}
+	return pp.SerializeAddressPublicKey(txo.AddressPublicKey)
+}
 func ledgerTxoIdGen(ringHash chainhash.Hash, index int) []byte {
 	w := bytes.NewBuffer(make([]byte, 0, 36))
 	var err error

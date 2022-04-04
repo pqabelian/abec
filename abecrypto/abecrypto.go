@@ -61,18 +61,20 @@ func NewAbeTxOutDesc(cryptoAddress []byte, value uint64) *AbeTxOutputDesc {
 		value:         value,
 	}
 }
-func (pp *AbeCryptoParam) ExtractCoinAddressFromTxoScript(txoscript []byte) ([]byte, error) {
+func ExtractCoinAddressFromTxoScript(txoscript []byte, cryptoScheme abecryptoparam.CryptoScheme) ([]byte, error) {
 	var coinAddr []byte
 	var err error
-	switch pp.Version {
-	case CryptoSchemePQRINGCTV2:
-		coinAddr, err = ExtractCoinAddressFromTxoScript(pp.RingCT, txoscript)
+	switch cryptoScheme {
+	case abecryptoparam.CryptoSchemePQRingCT:
+		coinAddr, err = pqringctExtractCoinAddressFromTxoScript(abecryptoparam.PQRingCTPP, txoscript)
 		if err != nil {
 			return nil, err
 		}
 	default:
 		return nil, errors.New("unsupported ringct version")
 	}
+	return coinAddr, nil
+}
 
 //	data structures for abec side	end
 
