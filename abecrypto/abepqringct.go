@@ -236,7 +236,7 @@ func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 		if transferTxMsgTemplate.TxIns[i].PreviousOutPointRing.Version != inputsRingVersion {
 			return nil, errors.New("pqringctTransferTxGen: the version of the TxIn in one transaction should be the same")
 		}
-
+		fmt.Println("TrTxGen()")
 		lgrTxoList := make([]*pqringct.LgrTxo, len(abeTxInputDescs[i].txoList))
 		for j := 0; j < len(abeTxInputDescs[i].txoList); j++ {
 			if abeTxInputDescs[i].txoList[j].Version != inputsRingVersion {
@@ -248,6 +248,7 @@ func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 				return nil, err
 			}
 			lgrTxoList[j].Id = ledgerTxoIdGen(abeTxInputDescs[i].ringHash, j)
+			fmt.Printf("%d -- %v\n", j, lgrTxoList[j].Id)
 		}
 
 		sidx := abeTxInputDescs[i].sidx
@@ -376,7 +377,7 @@ func pqringctTransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.Msg
 			return false, nil
 			//	This check can be removed, as the caller will provide abeTxInDetails, which are made by querying the database using the transferTx.TxIns information
 		}
-
+		fmt.Println("TrTxVrf()")
 		txoList := make([]*pqringct.LgrTxo, len(abeTxInDetails[i].txoList))
 		for j := 0; j < len(abeTxInDetails[i].txoList); j++ {
 			if abeTxInDetails[i].txoList[j].Version != transferTx.TxIns[i].PreviousOutPointRing.Version {
@@ -389,6 +390,7 @@ func pqringctTransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.Msg
 				return false, err
 			}
 			txoList[j].Id = ledgerTxoIdGen(abeTxInDetails[i].ringHash, j)
+			fmt.Printf("%d -- %v\n", j, txoList[j].Id)
 		}
 		cryptoTransferTx.Inputs[i] = &pqringct.TrTxInputv2{
 			TxoList:      txoList,
