@@ -702,7 +702,7 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 
 		serializedTxoList := utxoRing.TxOuts()
 		// TODO(20220320): compute the ringHash and choose the sidx
-		ringHash := chainhash.ZeroHash
+		ringHash := utxoRing.outPointRing.Hash()
 		abeTxInDetail[i] = abecrypto.NewAbeTxInDetail(ringHash, serializedTxoList, tx.MsgTx().TxIns[i].SerialNumber)
 	}
 

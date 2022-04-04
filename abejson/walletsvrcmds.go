@@ -196,8 +196,13 @@ func NewGetBalanceCmd(account *string, minConf *int) *GetBalanceCmd {
 
 // GetBalancesCmd defines the getbalances JSON-RPC command.
 type GetBalancesCmd struct{}
+type GenerateAddressCmd struct{}
 type GetBalancesAbeCmd struct {
 	Minconf *int `jsonrpcdefault:"1"`
+}
+
+func NewGenerateAddressCmd() *GenerateAddressCmd {
+	return &GenerateAddressCmd{}
 }
 
 // NewGetBalancesCmd returns a new instance which can be used to issue a
@@ -212,7 +217,7 @@ func NewGetBalancesAbeCmd(minconf *int) *GetBalancesAbeCmd {
 }
 
 // GetDetailedUtxosCmd defines the getdetailedutxos JSON-RPC command.
-type GetDetailedUtxosCmd struct{
+type GetDetailedUtxosCmd struct {
 	Minconf *int `jsonrpcdefault:"1"`
 }
 
@@ -598,7 +603,7 @@ func NewSendToPayeesCmd(amounts map[string]float64, minconf *int, scaleToFeeSatP
 		MinConf:            minconf,
 		ScaleToFeeSatPerKb: scaleToFeeSatPerKb,
 		FeeSpecified:       feeSpecified,
-		UTXOSpecified:		UTXOSpecified,
+		UTXOSpecified:      UTXOSpecified,
 		Comment:            comment,
 	}
 }
@@ -725,15 +730,12 @@ func NewWalletPassphraseCmd(passphrase string, timeout int64) *WalletPassphraseC
 
 // FreshenCmd defines the walletpassphrase JSON-RPC command.
 type FreshenCmd struct {
-	Passphrase string
 }
 
 // Freshen returns a new instance which can be used to issue a
 // walletpassphrase JSON-RPC command.
 func Freshen(passphrase string) *FreshenCmd {
-	return &FreshenCmd{
-		Passphrase: passphrase,
-	}
+	return &FreshenCmd{}
 }
 
 // WalletPassphraseChangeCmd defines the walletpassphrase JSON-RPC command.
@@ -792,6 +794,8 @@ func init() {
 	MustRegisterCmd("move", (*MoveCmd)(nil), flags)
 	MustRegisterCmd("sendfrom", (*SendFromCmd)(nil), flags)
 	MustRegisterCmd("sendmany", (*SendManyCmd)(nil), flags)
+	MustRegisterCmd("sendtoaddressesabe", (*SendToPayeesCmd)(nil), flags)
+	MustRegisterCmd("generateaddressabe", (*GenerateAddressCmd)(nil), flags)
 	MustRegisterCmd("sendtoaddress", (*SendToAddressCmd)(nil), flags)
 	MustRegisterCmd("sendtopayee", (*SendToPayeesCmd)(nil), flags)
 	MustRegisterCmd("setaccount", (*SetAccountCmd)(nil), flags)

@@ -1,6 +1,6 @@
 module github.com/abesuite/abec
 
-go 1.18
+go 1.14
 
 require (
 	github.com/abesuite/go-socks v0.0.0-20170105172521-4720035b7bfd
