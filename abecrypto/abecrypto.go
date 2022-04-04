@@ -14,6 +14,10 @@ type AbeTxOutputDesc struct {
 	value         uint64
 }
 
+func (o *AbeTxOutputDesc) GetValue() uint64 {
+	return o.value
+}
+
 // AbeTxInputDesc defines the data that are need to spend a TxoCoin, in TransferTxGen
 type AbeTxInputDesc struct {
 	ringHash      chainhash.Hash // txoRing identifier
