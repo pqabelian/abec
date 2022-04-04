@@ -13,7 +13,13 @@ import (
 //// abecrypto -> abepqringct -> pqringct
 // pqringctCryptoAddressGen() generates cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, by calling pqringct's key-generation functions and encapsed the keys.
 // cryptoScheme is set as a parameter, since the map between CryptoScheme and the real crypto-scheme (here is pqringct) is coded by abecryptoparam.
-func pqringctCryptoAddressGen(pp *pqringct.PublicParameter, seed []byte, cryptoScheme abecryptoparam.CryptoScheme) (cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk []byte, cryptoVsk []byte, err error) {
+func pqringctCryptoAddressGen(pp *pqringct.PublicParameter, seed []byte,
+	cryptoScheme abecryptoparam.CryptoScheme) (
+	cryptoAddress []byte,
+	cryptoSpsk []byte,
+	cryptoSnsk []byte,
+	cryptoVsk []byte,
+	err error) {
 	expectedSeedLen := pqringct.GetParamSeedBytesLen(pp)
 	if 2*expectedSeedLen != len(seed) {
 		return nil, nil, nil, nil, errors.New("invalid length of seed in pqringctCryptoAddressGen")
@@ -429,12 +435,12 @@ func pqringctTransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.Msg
 }
 
 func pqringctTxoCoinReceive(pp *pqringct.PublicParameter, cryptoScheme abecryptoparam.CryptoScheme, abeTxo *wire.TxOutAbe, cryptoAddress []byte, cryptoVsk []byte) (valid bool, v uint64, err error) {
-	cryptoScheme4Txo, err := abecryptoparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
+	cryptoSchemeTxo, err := abecryptoparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
 	if err != nil {
 		return false, 0, err
 	}
 
-	if cryptoScheme4Txo != cryptoScheme {
+	if cryptoSchemeTxo != cryptoScheme {
 		return false, 0, errors.New("pqringctTxoCoinReceive: unmatched cryptoScheme for input Txo")
 	}
 

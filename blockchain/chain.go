@@ -1619,7 +1619,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 		//	The mapping between BlockNumPerRingGroup/TxoRingSize and height is hardcoded in wire.GetBlockNumPerRingGroup/TxoRingSize.
 		//	Here we should call blockNumPerRingGroup = wire.GetBlockNumPerRingGroup()
 		//	At this moment (no fork due to BlockNumPerRingGroup/TxoRingSize change), we directly use the constant.
-		blockNumPerRingGroup := int32(wire.GetTxoRingSizeByBlockHeight(node.height))
+		blockNumPerRingGroup := int32(wire.GetBlockNumPerRingGroupByBlockHeight(node.height))
 		//if node.height%wire.BlockNumPerRingGroup == wire.BlockNumPerRingGroup-1 {
 		if node.height%blockNumPerRingGroup == blockNumPerRingGroup-1 {
 			err := view.newUtxoRingEntries(b.db, node, block)

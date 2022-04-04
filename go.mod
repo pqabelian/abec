@@ -6,7 +6,7 @@ require (
 	github.com/abesuite/go-socks v0.0.0-20170105172521-4720035b7bfd
 	github.com/abesuite/go-spew v1.1.1
 	github.com/aead/siphash v1.0.1
-	github.com/cryptosuite/pqringct v0.0.2-alpha.0.20220403021119-aaf2fadd16a2
+	github.com/cryptosuite/pqringct v0.0.2-alpha.0.20220404105155-f359c6282c76
 	github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1
 	github.com/decred/dcrd/lru v1.0.0
 	github.com/gorilla/websocket v1.4.2
@@ -18,9 +18,4 @@ require (
 	golang.org/x/sys v0.0.0-20201119102817-f84b799fce68
 )
 
-require (
-	github.com/cryptosuite/kyber-go v0.0.2-alpha // indirect
-	github.com/cryptosuite/liboqs-go v0.0.0-20220402044024-a952f3d76a7c // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db // indirect
-)
+require github.com/davecgh/go-spew v1.1.1 // indirect
