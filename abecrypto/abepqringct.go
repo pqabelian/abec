@@ -242,12 +242,13 @@ func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 			if abeTxInputDescs[i].txoList[j].Version != inputsRingVersion {
 				return nil, errors.New("pqringctTransferTxGen: the version of TXOs in abeTxInputDescs.serializedTxoList does not match the version in the corresponding TxIn")
 			}
-			lgrTxoList[j] = &pqringct.LgrTxo{}
-			lgrTxoList[j].Txo, err = pqringct.DeserializeTxo(pp, abeTxInputDescs[i].txoList[j].TxoScript)
+			txo, err := pqringct.DeserializeTxo(pp, abeTxInputDescs[i].txoList[j].TxoScript)
 			if err != nil {
 				return nil, err
 			}
-			lgrTxoList[j].Id = ledgerTxoIdGen(abeTxInputDescs[i].ringHash, j)
+			txolid := ledgerTxoIdGen(abeTxInputDescs[i].ringHash, j)
+
+			lgrTxoList[j] = pqringct.NewLgrTxo(txo, txolid)
 		}
 
 		sidx := abeTxInputDescs[i].sidx
@@ -329,6 +330,7 @@ func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 		if err != nil {
 			return nil, err
 		}
+		//	todo: wire.TxOutAbe use NewTxOutAbe()
 		transferTxMsgTemplate.TxOuts[j] = &wire.TxOutAbe{
 			Version:   transferTxMsgTemplate.Version,
 			TxoScript: serializeTxo,
@@ -383,12 +385,13 @@ func pqringctTransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.Msg
 				return false, nil
 				//	The Txos in the same ring should have the same version
 			}
-			txoList[j] = &pqringct.LgrTxo{}
-			txoList[j].Txo, err = pp.DeserializeTxo(abeTxInDetails[i].txoList[j].TxoScript)
+
+			txo, err := pp.DeserializeTxo(abeTxInDetails[i].txoList[j].TxoScript)
 			if err != nil {
 				return false, err
 			}
-			txoList[j].Id = ledgerTxoIdGen(abeTxInDetails[i].ringHash, j)
+			txolid := ledgerTxoIdGen(abeTxInDetails[i].ringHash, j)
+			txoList[j] = pqringct.NewLgrTxo(txo, txolid)
 		}
 		cryptoTransferTx.Inputs[i] = &pqringct.TrTxInputv2{
 			TxoList:      txoList,
@@ -492,10 +495,7 @@ func pqringctTxoCoinSerialNumberGen(pp *pqringct.PublicParameter, cryptoScheme a
 
 	txolid := ledgerTxoIdGen(ringHash, txoIndexInRing)
 
-	lgrTxo := &pqringct.LgrTxo{
-		Txo: txo,
-		Id:  txolid,
-	}
+	lgrTxo := pqringct.NewLgrTxo(txo, txolid)
 
 	cryptoSchemeInSnsk := cryptoSnsk[0]
 	cryptoSchemeInSnsk |= cryptoSnsk[1]
@@ -523,7 +523,9 @@ func pqringctExtractCoinAddressFromTxoScript(pp *pqringct.PublicParameter, txosc
 	}
 	return pp.SerializeAddressPublicKey(txo.AddressPublicKey)
 }
-func ledgerTxoIdGen(ringHash chainhash.Hash, index int) []byte {
+
+// todo: index needs a scope, since we need to serialize it.
+func ledgerTxoIdGen(ringHash chainhash.Hash, index uint8) []byte {
 	w := bytes.NewBuffer(make([]byte, 0, 36))
 	var err error
 	// ringHash
