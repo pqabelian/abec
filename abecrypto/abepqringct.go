@@ -76,7 +76,7 @@ func pqringctCryptoAddressGen(pp *pqringct.PublicParameter, seed []byte,
 //	Or, in our design, TxMemo is not guaranteed to be claimed by the transfer transaction issuer.
 func pqringctCoinbaseTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptoparam.CryptoScheme, abeTxOutputDescs []*AbeTxOutputDesc, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 	//	pqringct
-	txOutputDescs := make([]*pqringct.TxOutputDescv2, len(abeTxOutputDescs))
+	txOutputDescs := make([]*pqringct.TxOutputDesc, len(abeTxOutputDescs))
 	for j := 0; j < len(abeTxOutputDescs); j++ {
 		cryptoscheme4address := abeTxOutputDescs[j].cryptoAddress[0]
 		cryptoscheme4address |= abeTxOutputDescs[j].cryptoAddress[1]
@@ -91,7 +91,7 @@ func pqringctCoinbaseTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 		//vpkLen := pp.GetValuePublicKeySerializeSize()
 		serializedApk := abeTxOutputDescs[j].cryptoAddress[4 : 4+apkLen]
 		serializedVpk := abeTxOutputDescs[j].cryptoAddress[4+apkLen:]
-		txOutputDescs[j] = pqringct.NewTxOutputDescv2(pp, serializedApk, serializedVpk, abeTxOutputDescs[j].value)
+		txOutputDescs[j] = pqringct.NewTxOutputDesc(pp, serializedApk, serializedVpk, abeTxOutputDescs[j].value)
 	}
 
 	// call the pqringct.CoinbaseTxGen
@@ -141,7 +141,7 @@ func pqringctCoinbaseTxVerify(pp *pqringct.PublicParameter, coinbaseTx *wire.Msg
 	}
 	var err error
 
-	cryptoCoinbaseTx := &pqringct.CoinbaseTxv2{}
+	cryptoCoinbaseTx := &pqringct.CoinbaseTx{}
 
 	cryptoCoinbaseTx.Vin = coinbaseTx.TxFee
 
@@ -231,12 +231,12 @@ func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 	//outputsVersion := transferTxMsgTemplate.Version
 
 	//	inputDescs
-	txInputDescs := make([]*pqringct.TxInputDescv2, inputNum)
+	txInputDescs := make([]*pqringct.TxInputDesc, inputNum)
 	for i := 0; i < inputNum; i++ {
 		if transferTxMsgTemplate.TxIns[i].PreviousOutPointRing.Version != inputsRingVersion {
 			return nil, errors.New("pqringctTransferTxGen: the version of the TxIn in one transaction should be the same")
 		}
-
+		fmt.Println("TrTxGen()")
 		lgrTxoList := make([]*pqringct.LgrTxo, len(abeTxInputDescs[i].txoList))
 		for j := 0; j < len(abeTxInputDescs[i].txoList); j++ {
 			if abeTxInputDescs[i].txoList[j].Version != inputsRingVersion {
@@ -246,9 +246,13 @@ func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 			if err != nil {
 				return nil, err
 			}
-			txolid := ledgerTxoIdGen(abeTxInputDescs[i].ringHash, j)
+
+			txolid := ledgerTxoIdGen(abeTxInputDescs[i].ringHash, uint8(j))
 
 			lgrTxoList[j] = pqringct.NewLgrTxo(txo, txolid)
+
+			fmt.Printf("%d -- %v\n", j, lgrTxoList[j].Id)
+
 		}
 
 		sidx := abeTxInputDescs[i].sidx
@@ -291,11 +295,11 @@ func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 		apkLen := pqringct.GetAddressPublicKeySerializeSize(pp)
 		serializedVpk := abeTxInputDescs[i].cryptoAddress[4+apkLen:]
 
-		txInputDescs[i] = pqringct.NewTxInputDescv2(pp, lgrTxoList, sidx, serializedASksp, serializedASksn, serializedVpk, serializedVSk, value)
+		txInputDescs[i] = pqringct.NewTxInputDesc(pp, lgrTxoList, sidx, serializedASksp, serializedASksn, serializedVpk, serializedVSk, value)
 	}
 
 	// outputDescs
-	txOutputDescs := make([]*pqringct.TxOutputDescv2, outputNum)
+	txOutputDescs := make([]*pqringct.TxOutputDesc, outputNum)
 	for j := 0; j < outputNum; j++ {
 		cryptoscheme4outAddress := abeTxOutputDescs[j].cryptoAddress[0]
 		cryptoscheme4outAddress |= abeTxOutputDescs[j].cryptoAddress[1]
@@ -309,7 +313,7 @@ func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 		serializedApk := abeTxOutputDescs[j].cryptoAddress[4 : 4+apkLen]
 		serializedVpk := abeTxOutputDescs[j].cryptoAddress[4+apkLen:]
 
-		txOutputDescs[j] = pqringct.NewTxOutputDescv2(pp, serializedApk, serializedVpk, abeTxOutputDescs[j].value)
+		txOutputDescs[j] = pqringct.NewTxOutputDesc(pp, serializedApk, serializedVpk, abeTxOutputDescs[j].value)
 	}
 
 	//	call the crypto scheme
@@ -317,7 +321,10 @@ func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 	if err != nil {
 		return nil, err
 	}
-
+	valid, err := pqringct.TransferTxVerify(pp, cryptoTransferTx)
+	if err != nil || !valid {
+		return nil, errors.New("wrong")
+	}
 	//	For the inputs, only the serial number needs to be set
 	for i := 0; i < inputNum; i++ {
 		transferTxMsgTemplate.TxIns[i].SerialNumber = cryptoTransferTx.Inputs[i].SerialNumber
@@ -365,10 +372,10 @@ func pqringctTransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.Msg
 	inputsVersion := transferTx.TxIns[0].PreviousOutPointRing.Version
 	outputsVersion := transferTx.Version
 
-	cryptoTransferTx := &pqringct.TransferTxv2{}
+	cryptoTransferTx := &pqringct.TransferTx{}
 
 	//	Inputs
-	cryptoTransferTx.Inputs = make([]*pqringct.TrTxInputv2, inputNum)
+	cryptoTransferTx.Inputs = make([]*pqringct.TrTxInput, inputNum)
 	for i := 0; i < inputNum; i++ {
 		if transferTx.TxIns[i].PreviousOutPointRing.Version != inputsVersion {
 			return false, nil
@@ -378,7 +385,7 @@ func pqringctTransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.Msg
 			return false, nil
 			//	This check can be removed, as the caller will provide abeTxInDetails, which are made by querying the database using the transferTx.TxIns information
 		}
-
+		fmt.Println("TrTxVrf()")
 		txoList := make([]*pqringct.LgrTxo, len(abeTxInDetails[i].txoList))
 		for j := 0; j < len(abeTxInDetails[i].txoList); j++ {
 			if abeTxInDetails[i].txoList[j].Version != transferTx.TxIns[i].PreviousOutPointRing.Version {
@@ -390,10 +397,12 @@ func pqringctTransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.Msg
 			if err != nil {
 				return false, err
 			}
-			txolid := ledgerTxoIdGen(abeTxInDetails[i].ringHash, j)
+			txolid := ledgerTxoIdGen(abeTxInDetails[i].ringHash, uint8(j))
 			txoList[j] = pqringct.NewLgrTxo(txo, txolid)
+
+			fmt.Printf("%d -- %v\n", j, txoList[j].Id)
 		}
-		cryptoTransferTx.Inputs[i] = &pqringct.TrTxInputv2{
+		cryptoTransferTx.Inputs[i] = &pqringct.TrTxInput{
 			TxoList:      txoList,
 			SerialNumber: abeTxInDetails[i].serialNumber,
 		}
@@ -476,7 +485,7 @@ func pqringctTxoCoinReceive(pp *pqringct.PublicParameter, cryptoScheme abecrypto
 }
 
 // For wallet
-func pqringctTxoCoinSerialNumberGen(pp *pqringct.PublicParameter, cryptoScheme abecryptoparam.CryptoScheme, abeTxo *wire.TxOutAbe, ringHash chainhash.Hash, txoIndexInRing int, cryptoSnsk []byte) ([]byte, error) {
+func pqringctTxoCoinSerialNumberGen(pp *pqringct.PublicParameter, cryptoScheme abecryptoparam.CryptoScheme, abeTxo *wire.TxOutAbe, ringHash chainhash.Hash, txoIndexInRing uint8, cryptoSnsk []byte) ([]byte, error) {
 	// ringHash + index -> ID
 	//	// (txo, txolid) + Sksn -> sn [pqringct]
 	cryptoScheme4Txo, err := abecryptoparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
@@ -526,7 +535,7 @@ func pqringctExtractCoinAddressFromTxoScript(pp *pqringct.PublicParameter, txosc
 
 // todo: index needs a scope, since we need to serialize it.
 func ledgerTxoIdGen(ringHash chainhash.Hash, index uint8) []byte {
-	w := bytes.NewBuffer(make([]byte, 0, 36))
+	w := bytes.NewBuffer(make([]byte, 0, chainhash.HashSize+1))
 	var err error
 	// ringHash
 	_, err = w.Write(ringHash[:])
@@ -534,19 +543,7 @@ func ledgerTxoIdGen(ringHash chainhash.Hash, index uint8) []byte {
 		return nil
 	}
 	// index
-	err = w.WriteByte(byte(index >> 0))
-	if err != nil {
-		return nil
-	}
-	err = w.WriteByte(byte(index >> 1))
-	if err != nil {
-		return nil
-	}
-	err = w.WriteByte(byte(index >> 2))
-	if err != nil {
-		return nil
-	}
-	err = w.WriteByte(byte(index >> 3))
+	err = w.WriteByte(index >> 0)
 	if err != nil {
 		return nil
 	}
