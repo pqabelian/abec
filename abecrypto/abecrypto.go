@@ -165,18 +165,6 @@ func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxO
 		if err != nil {
 			return nil, err
 		}
-		abeTxIndetails := make([]*AbeTxInDetail, len(abeTxInputDescs))
-		for i := 0; i < len(abeTxInputDescs); i++ {
-			abeTxIndetails[i] = &AbeTxInDetail{
-				ringHash:     abeTxInputDescs[i].ringHash,
-				txoList:      abeTxInputDescs[i].txoList,
-				serialNumber: trTx.TxIns[i].SerialNumber,
-			}
-		}
-		valid, err := pqringctTransferTxVerify(abecryptoparam.PQRingCTPP, trTx, abeTxIndetails)
-		if err != nil || !valid {
-			return nil, err
-		}
 		return trTx, nil
 	default:
 		return nil, errors.New("TransferTxGen: Unsupported crypto scheme")
