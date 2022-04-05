@@ -533,7 +533,6 @@ func pqringctExtractCoinAddressFromTxoScript(pp *pqringct.PublicParameter, txosc
 	return pp.SerializeAddressPublicKey(txo.AddressPublicKey)
 }
 
-// todo: index needs a scope, since we need to serialize it.
 func ledgerTxoIdGen(ringHash chainhash.Hash, index uint8) []byte {
 	w := bytes.NewBuffer(make([]byte, 0, chainhash.HashSize+1))
 	var err error
