@@ -6,7 +6,7 @@ require (
 	github.com/abesuite/go-socks v0.0.0-20170105172521-4720035b7bfd
 	github.com/abesuite/go-spew v1.1.1
 	github.com/aead/siphash v1.0.1
-	github.com/cryptosuite/pqringct v0.0.2-alpha.0.20220404105155-f359c6282c76
+	github.com/cryptosuite/pqringct v0.0.2-alpha.0.20220404150003-e909fa18ad54
 	github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1
 	github.com/decred/dcrd/lru v1.0.0
 	github.com/gorilla/websocket v1.4.2

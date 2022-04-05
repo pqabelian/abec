@@ -91,7 +91,7 @@ func pqringctCoinbaseTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 		//vpkLen := pp.GetValuePublicKeySerializeSize()
 		serializedApk := abeTxOutputDescs[j].cryptoAddress[4 : 4+apkLen]
 		serializedVpk := abeTxOutputDescs[j].cryptoAddress[4+apkLen:]
-		txOutputDescs[j] = pqringct.NewTxOutputDesc(pp, serializedApk, serializedVpk, abeTxOutputDescs[j].value)
+		txOutputDescs[j] = pqringct.NewTxOutputDescv2(pp, serializedApk, serializedVpk, abeTxOutputDescs[j].value)
 	}
 
 	// call the pqringct.CoinbaseTxGen
@@ -251,7 +251,7 @@ func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 
 			lgrTxoList[j] = pqringct.NewLgrTxo(txo, txolid)
 
-			fmt.Printf("%d -- %v\n", j, lgrTxoList[j].Id)
+			fmt.Printf("%d -- %v\n", j, txolid)
 
 		}
 
@@ -295,7 +295,7 @@ func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 		apkLen := pqringct.GetAddressPublicKeySerializeSize(pp)
 		serializedVpk := abeTxInputDescs[i].cryptoAddress[4+apkLen:]
 
-		txInputDescs[i] = pqringct.NewTxInputDesc(pp, lgrTxoList, sidx, serializedASksp, serializedASksn, serializedVpk, serializedVSk, value)
+		txInputDescs[i] = pqringct.NewTxInputDescv2(pp, lgrTxoList, int(sidx), serializedASksp, serializedASksn, serializedVpk, serializedVSk, value)
 	}
 
 	// outputDescs
@@ -313,7 +313,7 @@ func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 		serializedApk := abeTxOutputDescs[j].cryptoAddress[4 : 4+apkLen]
 		serializedVpk := abeTxOutputDescs[j].cryptoAddress[4+apkLen:]
 
-		txOutputDescs[j] = pqringct.NewTxOutputDesc(pp, serializedApk, serializedVpk, abeTxOutputDescs[j].value)
+		txOutputDescs[j] = pqringct.NewTxOutputDescv2(pp, serializedApk, serializedVpk, abeTxOutputDescs[j].value)
 	}
 
 	//	call the crypto scheme
@@ -400,7 +400,7 @@ func pqringctTransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.Msg
 			txolid := ledgerTxoIdGen(abeTxInDetails[i].ringHash, uint8(j))
 			txoList[j] = pqringct.NewLgrTxo(txo, txolid)
 
-			fmt.Printf("%d -- %v\n", j, txoList[j].Id)
+			fmt.Printf("%d -- %v\n", j, txolid)
 		}
 		cryptoTransferTx.Inputs[i] = &pqringct.TrTxInput{
 			TxoList:      txoList,
