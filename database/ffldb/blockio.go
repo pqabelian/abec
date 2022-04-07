@@ -27,7 +27,8 @@ const (
 	// 512MiB each for a total of ~476.84PiB (roughly 7.4 times the current
 	// theoretical max), so there is room for the max block size to grow in
 	// the future.
-	blockFilenameTemplate = "%09d.fdb"
+	blockFilenameTemplate   = "%09d.fdb"
+	witnessFilenameTemplate = "w%09d.fdb"
 
 	// maxOpenFiles is the max number of open files to maintain in the
 	// open blocks cache.  Note that this does not include the current
@@ -159,9 +160,16 @@ type blockStore struct {
 	fileNumToLRUElem map[uint32]*list.Element
 	openBlockFiles   map[uint32]*lockableFile
 
+	obfWitnessMutex         sync.RWMutex
+	lruWitnessMutex         sync.Mutex
+	openWitnessLRU          *list.List // Contains uint32 block file numbers.
+	fileNumToLRUElemWitness map[uint32]*list.Element
+	openWitnessFiles        map[uint32]*lockableFile
+
 	// writeCursor houses the state for the current file and location that
 	// new blocks are written to.
-	writeCursor *writeCursor
+	writeCursor           *writeCursor
+	writeCursorForWitness *writeCursor
 
 	// These functions are set to openFile, openWriteFile, and deleteFile by
 	// default, but are exposed here to allow the whitebox tests to replace
@@ -169,6 +177,10 @@ type blockStore struct {
 	openFileFunc      func(fileNum uint32) (*lockableFile, error)
 	openWriteFileFunc func(fileNum uint32) (filer, error)
 	deleteFileFunc    func(fileNum uint32) error
+
+	openWitnessFileFunc      func(fileNum uint32) (*lockableFile, error)
+	openWriteWitnessFileFunc func(fileNum uint32) (filer, error)
+	deleteWitnessFileFunc    func(fileNum uint32) error
 }
 
 // blockLocation identifies a particular block file and location.
@@ -176,6 +188,11 @@ type blockLocation struct {
 	blockFileNum uint32
 	fileOffset   uint32
 	blockLen     uint32
+}
+type witnessLocation struct {
+	witnessFileNum uint32
+	fileOffset     uint32
+	witnessLen     uint32
 }
 
 // deserializeBlockLoc deserializes the passed serialized block location
@@ -196,6 +213,18 @@ func deserializeBlockLoc(serializedLoc []byte) blockLocation {
 		blockLen:     byteOrder.Uint32(serializedLoc[8:12]),
 	}
 }
+func deserializeWitnessLoc(serializedLoc []byte) witnessLocation {
+	// The serialized block location format is:
+	//
+	//  [0:4]  Block file (4 bytes)
+	//  [4:8]  File offset (4 bytes)
+	//  [8:12] Block length (4 bytes)
+	return witnessLocation{
+		witnessFileNum: byteOrder.Uint32(serializedLoc[0:4]),
+		fileOffset:     byteOrder.Uint32(serializedLoc[4:8]),
+		witnessLen:     byteOrder.Uint32(serializedLoc[8:12]),
+	}
+}
 
 // serializeBlockLoc returns the serialization of the passed block location.
 // This is data to be stored into the block index metadata for each block.
@@ -211,10 +240,27 @@ func serializeBlockLoc(loc blockLocation) []byte {
 	byteOrder.PutUint32(serializedData[8:12], loc.blockLen)
 	return serializedData[:]
 }
+func serializeWitnessLoc(loc witnessLocation) []byte {
+	// The serialized block location format is:
+	//
+	//  [0:4]  Block file (4 bytes)
+	//  [4:8]  File offset (4 bytes)
+	//  [8:12] Block length (4 bytes)
+	var serializedData [12]byte
+	byteOrder.PutUint32(serializedData[0:4], loc.witnessFileNum)
+	byteOrder.PutUint32(serializedData[4:8], loc.fileOffset)
+	byteOrder.PutUint32(serializedData[8:12], loc.witnessLen)
+	return serializedData[:]
+}
 
 // blockFilePath return the file path for the provided block file number.
 func blockFilePath(dbPath string, fileNum uint32) string {
 	fileName := fmt.Sprintf(blockFilenameTemplate, fileNum)
+	return filepath.Join(dbPath, fileName)
+}
+
+func witnessFilePath(dbPath string, fileNum uint32) string {
+	fileName := fmt.Sprintf(witnessFilenameTemplate, fileNum)
 	return filepath.Join(dbPath, fileName)
 }
 
@@ -228,6 +274,19 @@ func (s *blockStore) openWriteFile(fileNum uint32) (filer, error) {
 	// append to it.  Also, it shouldn't be part of the least recently used
 	// file.
 	filePath := blockFilePath(s.basePath, fileNum)
+	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0666)
+	if err != nil {
+		str := fmt.Sprintf("failed to open file %q: %v", filePath, err)
+		return nil, makeDbErr(database.ErrDriverSpecific, str, err)
+	}
+
+	return file, nil
+}
+func (s *blockStore) openWriteWitnessFile(fileNum uint32) (filer, error) {
+	// The current block file needs to be read-write so it is possible to
+	// append to it.  Also, it shouldn't be part of the least recently used
+	// file.
+	filePath := witnessFilePath(s.basePath, fileNum)
 	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		str := fmt.Sprintf("failed to open file %q: %v", filePath, err)
@@ -289,12 +348,65 @@ func (s *blockStore) openFile(fileNum uint32) (*lockableFile, error) {
 
 	return blockFile, nil
 }
+func (s *blockStore) openWitnessFile(fileNum uint32) (*lockableFile, error) {
+	// Open the appropriate file as read-only.
+	filePath := witnessFilePath(s.basePath, fileNum)
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, makeDbErr(database.ErrDriverSpecific, err.Error(),
+			err)
+	}
+	witnessFile := &lockableFile{file: file}
+
+	// Close the least recently used file if the file exceeds the max
+	// allowed open files.  This is not done until after the file open in
+	// case the file fails to open, there is no need to close any files.
+	//
+	// A write lock is required on the LRU list here to protect against
+	// modifications happening as already open files are read from and
+	// shuffled to the front of the list.
+	//
+	// Also, add the file that was just opened to the front of the least
+	// recently used list to indicate it is the most recently used file and
+	// therefore should be closed last.
+	s.lruWitnessMutex.Lock()
+	lruList := s.openWitnessLRU
+	if lruList.Len() >= maxOpenFiles {
+		lruFileNum := lruList.Remove(lruList.Back()).(uint32)
+		oldWitnessFile := s.openWitnessFiles[lruFileNum]
+
+		// Close the old file under the write lock for the file in case
+		// any readers are currently reading from it so it's not closed
+		// out from under them.
+		oldWitnessFile.Lock()
+		_ = oldWitnessFile.file.Close()
+		oldWitnessFile.Unlock()
+
+		delete(s.openWitnessFiles, lruFileNum)
+		delete(s.fileNumToLRUElemWitness, lruFileNum)
+	}
+	s.fileNumToLRUElemWitness[fileNum] = lruList.PushFront(fileNum)
+	s.lruWitnessMutex.Unlock()
+
+	// Store a reference to it in the open block files map.
+	s.openWitnessFiles[fileNum] = witnessFile
+
+	return witnessFile, nil
+}
 
 // deleteFile removes the block file for the passed flat file number.  The file
 // must already be closed and it is the responsibility of the caller to do any
 // other state cleanup necessary.
 func (s *blockStore) deleteFile(fileNum uint32) error {
 	filePath := blockFilePath(s.basePath, fileNum)
+	if err := os.Remove(filePath); err != nil {
+		return makeDbErr(database.ErrDriverSpecific, err.Error(), err)
+	}
+
+	return nil
+}
+func (s *blockStore) deleteWitnessFile(fileNum uint32) error {
+	filePath := witnessFilePath(s.basePath, fileNum)
 	if err := os.Remove(filePath); err != nil {
 		return makeDbErr(database.ErrDriverSpecific, err.Error(), err)
 	}
@@ -359,6 +471,53 @@ func (s *blockStore) blockFile(fileNum uint32) (*lockableFile, error) {
 	return obf, nil
 }
 
+func (s *blockStore) witnessFile(fileNum uint32) (*lockableFile, error) {
+	// When the requested block file is open for writes, return it.
+	wc := s.writeCursorForWitness
+	wc.RLock()
+	if fileNum == wc.curFileNum && wc.curFile.file != nil {
+		obf := wc.curFile
+		obf.RLock()
+		wc.RUnlock()
+		return obf, nil
+	}
+	wc.RUnlock()
+
+	// Try to return an open file under the overall files read lock.
+	s.obfWitnessMutex.RLock()
+	if obf, ok := s.openWitnessFiles[fileNum]; ok {
+		s.lruWitnessMutex.Lock()
+		s.openWitnessLRU.MoveToFront(s.fileNumToLRUElemWitness[fileNum])
+		s.lruWitnessMutex.Unlock()
+
+		obf.RLock()
+		s.obfWitnessMutex.RUnlock()
+		return obf, nil
+	}
+	s.obfWitnessMutex.RUnlock()
+
+	// Since the file isn't open already, need to check the open block files
+	// map again under write lock in case multiple readers got here and a
+	// separate one is already opening the file.
+	s.obfWitnessMutex.Lock()
+	if obf, ok := s.openWitnessFiles[fileNum]; ok {
+		obf.RLock()
+		s.obfWitnessMutex.Unlock()
+		return obf, nil
+	}
+
+	// The file isn't open, so open it while potentially closing the least
+	// recently used one as needed.
+	obf, err := s.openWitnessFileFunc(fileNum)
+	if err != nil {
+		s.obfWitnessMutex.Unlock()
+		return nil, err
+	}
+	obf.RLock()
+	s.obfWitnessMutex.Unlock()
+	return obf, nil
+}
+
 // writeData is a helper function for writeBlock which writes the provided data
 // at the current write offset and updates the write cursor accordingly.  The
 // field name parameter is only used when there is an error to provide a nicer
@@ -372,6 +531,19 @@ func (s *blockStore) blockFile(fileNum uint32) (*lockableFile, error) {
 // locked for writes.  Also, the write cursor current file must NOT be nil.
 func (s *blockStore) writeData(data []byte, fieldName string) error {
 	wc := s.writeCursor
+	n, err := wc.curFile.file.WriteAt(data, int64(wc.curOffset))
+	wc.curOffset += uint32(n)
+	if err != nil {
+		str := fmt.Sprintf("failed to write %s to file %d at "+
+			"offset %d: %v", fieldName, wc.curFileNum,
+			wc.curOffset-uint32(n), err)
+		return makeDbErr(database.ErrDriverSpecific, str, err)
+	}
+
+	return nil
+}
+func (s *blockStore) writeDataWitness(data []byte, fieldName string) error {
+	wc := s.writeCursorForWitness
 	n, err := wc.curFile.file.WriteAt(data, int64(wc.curOffset))
 	wc.curOffset += uint32(n)
 	if err != nil {
@@ -487,6 +659,116 @@ func (s *blockStore) writeBlock(rawBlock []byte) (blockLocation, error) {
 	return loc, nil
 }
 
+// Format: <network><witness length><witness><checksum>
+func (s *blockStore) writeWitness(rawWitness map[chainhash.Hash][]byte) (witnessLocation, error) {
+	// Compute how many bytes will be written.
+	// 4 bytes each for block network + 4 bytes for block length +
+	// length of raw block + 4 bytes for checksum.
+	witnessLen := uint32(0)
+	for _, witness := range rawWitness {
+		witnessLen += chainhash.HashSize + 4 + uint32(len(witness))
+	}
+	fullLen := witnessLen + 12
+
+	// Move to the next block file if adding the new block would exceed the
+	// max allowed size for the current block file.  Also detect overflow
+	// to be paranoid, even though it isn't possible currently, numbers
+	// might change in the future to make it possible.
+	//
+	// NOTE: The writeCursor.offset field isn't protected by the mutex
+	// since it's only read/changed during this function which can only be
+	// called during a write transaction, of which there can be only one at
+	// a time.
+	wc := s.writeCursorForWitness
+	finalOffset := wc.curOffset + fullLen
+	// TODO change the number of block not the size of file
+	if finalOffset < wc.curOffset || finalOffset > s.maxBlockFileSize {
+		// This is done under the write cursor lock since the curFileNum
+		// field is accessed elsewhere by readers.
+		//
+		// Close the current write file to force a read-only reopen
+		// with LRU tracking.  The close is done under the write lock
+		// for the file to prevent it from being closed out from under
+		// any readers currently reading from it.
+		wc.Lock()
+		wc.curFile.Lock()
+		if wc.curFile.file != nil {
+			_ = wc.curFile.file.Close()
+			wc.curFile.file = nil
+		}
+		wc.curFile.Unlock()
+
+		// Start writes into next file.
+		wc.curFileNum++
+		wc.curOffset = 0
+		wc.Unlock()
+	}
+
+	// All writes are done under the write lock for the file to ensure any
+	// readers are finished and blocked first.
+	wc.curFile.Lock()
+	defer wc.curFile.Unlock()
+
+	// Open the current file if needed.  This will typically only be the
+	// case when moving to the next file to write to or on initial database
+	// load.  However, it might also be the case if rollbacks happened after
+	// file writes started during a transaction commit.
+	if wc.curFile.file == nil {
+		file, err := s.openWriteWitnessFileFunc(wc.curFileNum)
+		if err != nil {
+			return witnessLocation{}, err
+		}
+		wc.curFile.file = file
+	}
+
+	// Bitcoin network.
+	origOffset := wc.curOffset
+	hasher := crc32.New(castagnoli)
+	var scratch [4]byte
+	byteOrder.PutUint32(scratch[:], uint32(s.network))
+	if err := s.writeDataWitness(scratch[:], "network"); err != nil {
+		return witnessLocation{}, err
+	}
+	_, _ = hasher.Write(scratch[:])
+
+	// Block length.
+	byteOrder.PutUint32(scratch[:], witnessLen)
+	if err := s.writeDataWitness(scratch[:], "block length"); err != nil {
+		return witnessLocation{}, err
+	}
+	_, _ = hasher.Write(scratch[:])
+
+	// Witness
+	for txHash, witness := range rawWitness {
+		if err := s.writeDataWitness(txHash[:], "txHash"); err != nil {
+			return witnessLocation{}, err
+		}
+		_, _ = hasher.Write(txHash[:])
+		var tmp [4]byte
+		byteOrder.PutUint32(tmp[:], uint32(len(witness)))
+		if err := s.writeDataWitness(tmp[:], "witness_length"); err != nil {
+			return witnessLocation{}, err
+		}
+		_, _ = hasher.Write(tmp[:])
+		if err := s.writeDataWitness(witness[:], "witness"); err != nil {
+			return witnessLocation{}, err
+		}
+		_, _ = hasher.Write(witness[:])
+	}
+
+	// Castagnoli CRC-32 as a checksum of all the previous.
+	if err := s.writeDataWitness(hasher.Sum(nil), "checksum"); err != nil {
+		return witnessLocation{}, err
+	}
+
+	loc := witnessLocation{
+		witnessFileNum: wc.curFileNum,
+		fileOffset:     origOffset,
+		witnessLen:     fullLen,
+	}
+	return loc, nil
+}
+
 // readBlock reads the specified block record and returns the serialized block.
 // It ensures the integrity of the block data by checking that the serialized
 // network matches the current network associated with the block store and
@@ -548,6 +830,67 @@ func (s *blockStore) readBlock(hash *chainhash.Hash, loc blockLocation) ([]byte,
 	return serializedData[8 : n-4], nil
 }
 
+func (s *blockStore) readWitness(hash *chainhash.Hash, loc witnessLocation) (map[chainhash.Hash][]byte, error) {
+	// Get the referenced block file handle opening the file as needed.  The
+	// function also handles closing files as needed to avoid going over the
+	// max allowed open files.
+	witnessFile, err := s.witnessFile(loc.witnessFileNum)
+	if err != nil {
+		return nil, err
+	}
+
+	serializedData := make([]byte, loc.witnessLen)
+	n, err := witnessFile.file.ReadAt(serializedData, int64(loc.fileOffset))
+	witnessFile.RUnlock()
+	if err != nil {
+		str := fmt.Sprintf("failed to read block %s from file %d, "+
+			"offset %d: %v", hash, loc.witnessFileNum, loc.fileOffset,
+			err)
+		return nil, makeDbErr(database.ErrDriverSpecific, str, err)
+	}
+
+	// Calculate the checksum of the read data and ensure it matches the
+	// serialized checksum.  This will detect any data corruption in the
+	// flat file without having to do much more expensive merkle root
+	// calculations on the loaded block.
+	serializedChecksum := binary.BigEndian.Uint32(serializedData[n-4:])
+	calculatedChecksum := crc32.Checksum(serializedData[:n-4], castagnoli)
+	if serializedChecksum != calculatedChecksum {
+		str := fmt.Sprintf("block data for block %s checksum "+
+			"does not match - got %x, want %x", hash,
+			calculatedChecksum, serializedChecksum)
+		return nil, makeDbErr(database.ErrCorruption, str, nil)
+	}
+
+	// The network associated with the block must match the current active
+	// network, otherwise somebody probably put the block files for the
+	// wrong network in the directory.
+	serializedNet := byteOrder.Uint32(serializedData[:4])
+	if serializedNet != uint32(s.network) {
+		str := fmt.Sprintf("witness data for witness %s is for the "+
+			"wrong network - got %d, want %d", hash, serializedNet,
+			uint32(s.network))
+		return nil, makeDbErr(database.ErrDriverSpecific, str, nil)
+	}
+
+	// The raw block excludes the network, length of the block, and
+	// checksum.
+	rawWitness := make(map[chainhash.Hash][]byte, (n-12)/(chainhash.HashSize+4))
+	cur, end := uint32(8), uint32(n-4)
+	for cur < end {
+		keyHash, _ := chainhash.NewHash(serializedData[cur : cur+chainhash.HashSize])
+		witnessSize := byteOrder.Uint32(serializedData[cur+chainhash.HashSize : cur+chainhash.HashSize+4])
+		rawWitness[*keyHash] = serializedData[cur+chainhash.HashSize+4 : cur+chainhash.HashSize+4+witnessSize]
+		cur = cur + chainhash.HashSize + 4 + witnessSize
+	}
+	if cur != end {
+		str := fmt.Sprintf("witness data for witness %s is for "+
+			"wrong length", hash)
+		return nil, makeDbErr(database.ErrDriverSpecific, str, nil)
+	}
+	return rawWitness, nil
+}
+
 // readBlockRegion reads the specified amount of data at the provided offset for
 // a given block location.  The offset is relative to the start of the
 // serialized block (as opposed to the beginning of the block record).  This
@@ -591,6 +934,28 @@ func (s *blockStore) readBlockRegion(loc blockLocation, offset, numBytes uint32)
 // metadata and block data can be properly reconciled in failure scenarios.
 func (s *blockStore) syncBlocks() error {
 	wc := s.writeCursor
+	wc.RLock()
+	defer wc.RUnlock()
+
+	// Nothing to do if there is no current file associated with the write
+	// cursor.
+	wc.curFile.RLock()
+	defer wc.curFile.RUnlock()
+	if wc.curFile.file == nil {
+		return nil
+	}
+
+	// Sync the file to disk.
+	if err := wc.curFile.file.Sync(); err != nil {
+		str := fmt.Sprintf("failed to sync file %d: %v", wc.curFileNum,
+			err)
+		return makeDbErr(database.ErrDriverSpecific, str, err)
+	}
+
+	return nil
+}
+func (s *blockStore) syncWitness() error {
+	wc := s.writeCursorForWitness
 	wc.RLock()
 	defer wc.RUnlock()
 
@@ -707,6 +1072,78 @@ func (s *blockStore) handleRollback(oldBlockFileNum, oldBlockOffset uint32) {
 	}
 }
 
+func (s *blockStore) handleRollbackForWitness(oldWitnessFileNum, oldWitnessOffset uint32) {
+	// Grab the write cursor mutex since it is modified throughout this
+	// function.
+	wc := s.writeCursorForWitness
+	wc.Lock()
+	defer wc.Unlock()
+
+	// Nothing to do if the rollback point is the same as the current write
+	// cursor.
+	if wc.curFileNum == oldWitnessFileNum && wc.curOffset == oldWitnessOffset {
+		return
+	}
+
+	// Regardless of any failures that happen below, reposition the write
+	// cursor to the old block file and offset.
+	defer func() {
+		wc.curFileNum = oldWitnessFileNum
+		wc.curOffset = oldWitnessOffset
+	}()
+
+	log.Debugf("ROLLBACK: Rolling back to file %d, offset %d",
+		oldWitnessFileNum, oldWitnessOffset)
+
+	// Close the current write file if it needs to be deleted.  Then delete
+	// all files that are newer than the provided rollback file while
+	// also moving the write cursor file backwards accordingly.
+	if wc.curFileNum > oldWitnessFileNum {
+		wc.curFile.Lock()
+		if wc.curFile.file != nil {
+			_ = wc.curFile.file.Close()
+			wc.curFile.file = nil
+		}
+		wc.curFile.Unlock()
+	}
+	for ; wc.curFileNum > oldWitnessFileNum; wc.curFileNum-- {
+		if err := s.deleteWitnessFileFunc(wc.curFileNum); err != nil {
+			log.Warnf("ROLLBACK: Failed to delete block file "+
+				"number %d: %v", wc.curFileNum, err)
+			return
+		}
+	}
+
+	// Open the file for the current write cursor if needed.
+	wc.curFile.Lock()
+	if wc.curFile.file == nil {
+		obf, err := s.openWriteWitnessFileFunc(wc.curFileNum)
+		if err != nil {
+			wc.curFile.Unlock()
+			log.Warnf("ROLLBACK: %v", err)
+			return
+		}
+		wc.curFile.file = obf
+	}
+
+	// Truncate the to the provided rollback offset.
+	if err := wc.curFile.file.Truncate(int64(oldWitnessOffset)); err != nil {
+		wc.curFile.Unlock()
+		log.Warnf("ROLLBACK: Failed to truncate file %d: %v",
+			wc.curFileNum, err)
+		return
+	}
+
+	// Sync the file to disk.
+	err := wc.curFile.file.Sync()
+	wc.curFile.Unlock()
+	if err != nil {
+		log.Warnf("ROLLBACK: Failed to sync file %d: %v",
+			wc.curFileNum, err)
+		return
+	}
+}
+
 // scanBlockFiles searches the database directory for all flat block files to
 // find the end of the most recent file.  This position is considered the
 // current write cursor which is also stored in the metadata.  Thus, it is used
@@ -717,6 +1154,24 @@ func scanBlockFiles(dbPath string) (int, uint32) {
 	fileLen := uint32(0)
 	for i := 0; ; i++ {
 		filePath := blockFilePath(dbPath, uint32(i))
+		st, err := os.Stat(filePath)
+		if err != nil {
+			break
+		}
+		lastFile = i
+
+		fileLen = uint32(st.Size())
+	}
+
+	log.Tracef("Scan found latest block file #%d with length %d", lastFile,
+		fileLen)
+	return lastFile, fileLen
+}
+func scanWitnessFiles(dbPath string) (int, uint32) {
+	lastFile := -1
+	fileLen := uint32(0)
+	for i := 0; ; i++ {
+		filePath := witnessFilePath(dbPath, uint32(i))
 		st, err := os.Stat(filePath)
 		if err != nil {
 			break
@@ -742,6 +1197,11 @@ func newBlockStore(basePath string, network wire.AbelianNet) *blockStore {
 		fileNum = 0
 		fileOff = 0
 	}
+	witnessFileNum, witnessFileOff := scanWitnessFiles(basePath)
+	if witnessFileNum == -1 {
+		witnessFileNum = 0
+		witnessFileOff = 0
+	}
 
 	store := &blockStore{
 		network:          network,
@@ -751,14 +1211,27 @@ func newBlockStore(basePath string, network wire.AbelianNet) *blockStore {
 		openBlocksLRU:    list.New(),
 		fileNumToLRUElem: make(map[uint32]*list.Element),
 
+		openWitnessFiles:        make(map[uint32]*lockableFile),
+		openWitnessLRU:          list.New(),
+		fileNumToLRUElemWitness: make(map[uint32]*list.Element),
+
 		writeCursor: &writeCursor{
 			curFile:    &lockableFile{},
 			curFileNum: uint32(fileNum),
 			curOffset:  fileOff,
 		},
+		writeCursorForWitness: &writeCursor{
+			curFile:    &lockableFile{},
+			curFileNum: uint32(witnessFileNum),
+			curOffset:  witnessFileOff,
+		},
 	}
 	store.openFileFunc = store.openFile
 	store.openWriteFileFunc = store.openWriteFile
 	store.deleteFileFunc = store.deleteFile
+
+	store.openWitnessFileFunc = store.openWitnessFile
+	store.openWriteWitnessFileFunc = store.openWriteWitnessFile
+	store.deleteWitnessFileFunc = store.deleteWitnessFile
 	return store
 }

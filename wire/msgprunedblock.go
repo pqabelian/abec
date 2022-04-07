@@ -113,7 +113,7 @@ func (msg *MsgPrunedBlock) Serialize(w io.Writer) error {
 func (msg *MsgPrunedBlock) SerializeSize() int {
 	// Block header bytes + Serialized varint size for the number of
 	// transactions.
-	n := blockHeaderLen + msg.CoinbaseTx.SerializeSize() + VarIntSerializeSize(uint64(len(msg.TransactionHashes))) + len(msg.TransactionHashes)*32
+	n := blockHeaderLen + msg.CoinbaseTx.SerializeSizeFull() + VarIntSerializeSize(uint64(len(msg.TransactionHashes))) + len(msg.TransactionHashes)*32
 	return n
 }
 func (msg *MsgPrunedBlock) Command() string {

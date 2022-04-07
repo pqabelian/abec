@@ -61,7 +61,7 @@ func (op OutPointAbe) String() string {
 	return string(buf)
 }
 
-// NewOutPoint returns a new bitcoin transaction outpoint point with the
+// NewOutPointAbe returns a new bitcoin transaction outpoint point with the
 // provided hash and index.
 func NewOutPointAbe(txHash *chainhash.Hash, index uint8) *OutPointAbe {
 	return &OutPointAbe{
@@ -510,8 +510,7 @@ func (msg *MsgTxAbe) IsCoinBase() (bool, error) {
 	return true, nil
 }
 
-// TxHash generates the Hash for the transaction.
-// TxHash
+// TxHash generates the Hash for the transaction without witness.
 func (msg *MsgTxAbe) TxHash() chainhash.Hash {
 	// Encode the transaction and calculate double sha256 on the result.
 	// Ignore the error returns since the only way the encode could fail
@@ -522,6 +521,7 @@ func (msg *MsgTxAbe) TxHash() chainhash.Hash {
 	return chainhash.DoubleHashH(buf.Bytes())
 }
 
+// TxHashFull generates the Hash for the transaction with witness.
 func (msg *MsgTxAbe) TxHashFull() chainhash.Hash {
 	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSizeFull()))
 	_ = msg.SerializeFull(buf)
@@ -802,7 +802,7 @@ func PrecomputeTrTxWitnessSize(txVersion uint32, inputRingVersion uint32, inputR
 
 //	for computing TxId by hash, and for being serialized in block
 func (msg *MsgTxAbe) Serialize(w io.Writer) error {
-	return msg.BtcEncode(w, 0, WitnessEncoding)
+	return msg.BtcEncode(w, 0, BaseEncoding)
 }
 
 func (msg *MsgTxAbe) SerializeFull(w io.Writer) error {

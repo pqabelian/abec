@@ -1687,7 +1687,7 @@ func dbFetchBlockByNode(dbTx database.Tx, node *blockNode) (*abeutil.Block, erro
 
 func dbFetchBlockByNodeAbe(dbTx database.Tx, node *blockNode) (*abeutil.BlockAbe, error) {
 	// Load the raw block bytes from the database.
-	blockBytes, err := dbTx.FetchBlock(&node.hash)
+	blockBytes, txHashToWitness, err := dbTx.FetchBlockAbe(&node.hash)
 	if err != nil {
 		return nil, err
 	}
@@ -1696,6 +1696,13 @@ func dbFetchBlockByNodeAbe(dbTx database.Tx, node *blockNode) (*abeutil.BlockAbe
 	block, err := abeutil.NewBlockFromBytesAbe(blockBytes)
 	if err != nil {
 		return nil, err
+	}
+
+	// Witness
+	txs := block.Transactions()
+	for i := 0; i < len(txs); i++ {
+		txHash := txs[i].Hash()
+		txs[i].MsgTx().TxWitness = txHashToWitness[*txHash]
 	}
 	block.SetHeight(node.height)
 

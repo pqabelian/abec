@@ -154,6 +154,25 @@ func (b *PrunedBlock) Bytes() ([]byte, error) {
 	return serializedBlock, nil
 }
 
+func (b *BlockAbe) BytesNoWitness() ([]byte, error) {
+	// Return the cached serialized bytes if it has already been generated.
+	if len(b.serializedBlockNoWitness) != 0 {
+		return b.serializedBlockNoWitness, nil
+	}
+
+	// Serialize the MsgBlock.
+	var w bytes.Buffer
+	err := b.msgBlock.SerializeNoWitness(&w)
+	if err != nil {
+		return nil, err
+	}
+	serializedBlock := w.Bytes()
+
+	// Cache the serialized bytes and return them.
+	b.serializedBlockNoWitness = serializedBlock
+	return serializedBlock, nil
+}
+
 // BytesNoWitness returns the serialized bytes for the block with transactions
 // encoded without any witness data.
 func (b *Block) BytesNoWitness() ([]byte, error) {
@@ -450,7 +469,7 @@ func NewBlockFromReader(r io.Reader) (*Block, error) {
 func NewBlockFromReaderAbe(r io.Reader) (*BlockAbe, error) {
 	// Deserialize the bytes into a MsgBlock.
 	var msgBlock wire.MsgBlockAbe
-	err := msgBlock.Deserialize(r)
+	err := msgBlock.DeserializeNoWitness(r)
 	if err != nil {
 		return nil, err
 	}

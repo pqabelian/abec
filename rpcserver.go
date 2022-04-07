@@ -2137,7 +2137,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 		// Serialize the transaction for conversion to hex.
 		tx := msgBlock.Transactions[0]
 		txBuf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSizeFull()))
-		if err := tx.Serialize(txBuf); err != nil {
+		if err := tx.SerializeFull(txBuf); err != nil {
 			context := "Failed to serialize transaction"
 			return nil, internalRPCError(err.Error(), context)
 		}

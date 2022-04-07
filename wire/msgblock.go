@@ -55,6 +55,7 @@ type MsgBlock struct {
 type MsgBlockAbe struct {
 	Header       BlockHeader
 	Transactions []*MsgTxAbe
+	WitnessHashs []*chainhash.Hash
 }
 
 // MsgSimplifiedBlock is used to submit simplified block (without transaction content)
@@ -74,6 +75,8 @@ func (msg *MsgBlock) AddTransaction(tx *MsgTx) error {
 
 func (msg *MsgBlockAbe) AddTransaction(tx *MsgTxAbe) error {
 	msg.Transactions = append(msg.Transactions, tx)
+	witHash := chainhash.DoubleHashH(tx.TxWitness)
+	msg.WitnessHashs = append(msg.WitnessHashs, &witHash)
 	return nil
 }
 
@@ -84,6 +87,7 @@ func (msg *MsgBlock) ClearTransactions() {
 
 func (msg *MsgBlockAbe) ClearTransactions() {
 	msg.Transactions = make([]*MsgTxAbe, 0, defaultTransactionAllocAbe)
+	msg.WitnessHashs = make([]*chainhash.Hash, 0, defaultTransactionAllocAbe)
 }
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
@@ -253,6 +257,9 @@ func (msg *MsgBlockAbe) Deserialize(r io.Reader) error {
 
 func (msg *MsgSimplifiedBlock) Deserialize(r io.Reader) error {
 	return msg.AbeDecode(r, 0, WitnessEncoding)
+}
+func (msg *MsgBlockAbe) DeserializeNoWitness(r io.Reader) error {
+	return msg.BtcDecode(r, 0, BaseEncoding)
 }
 
 // DeserializeNoWitness decodes a block from r into the receiver similar to
@@ -459,6 +466,9 @@ func (msg *MsgSimplifiedBlock) AbeEncode(w io.Writer, pver uint32, enc MessageEn
 
 	return nil
 }
+func (msg *MsgBlockAbe) SerializeNoWitness(w io.Writer) error {
+	return msg.BtcEncode(w, 0, BaseEncoding)
+}
 
 // SerializeNoWitness encodes a block to w using an identical format to
 // Serialize, with all (if any) witness data stripped from all transactions.
@@ -492,6 +502,17 @@ func (msg *MsgBlock) SerializeSizeStripped() int {
 
 	for _, tx := range msg.Transactions {
 		n += tx.SerializeSizeStripped()
+	}
+
+	return n
+}
+func (msg *MsgBlockAbe) SerializeSizeStripped() int {
+	// Block header bytes + Serialized varint size for the number of
+	// transactions.
+	n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
+
+	for _, tx := range msg.Transactions {
+		n += tx.SerializeSize()
 	}
 
 	return n

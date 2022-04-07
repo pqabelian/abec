@@ -61,7 +61,8 @@ var (
 
 	// blockIdxBucketID is the ID of the internal block metadata bucket.
 	// It is the value 1 encoded as an unsigned big-endian uint32.
-	blockIdxBucketID = [4]byte{0x00, 0x00, 0x00, 0x01}
+	blockIdxBucketID   = [4]byte{0x00, 0x00, 0x00, 0x01}
+	witnessIdxBucketID = [4]byte{0x00, 0x00, 0x00, 0x02}
 
 	// blockIdxBucketName is the bucket used internally to track block
 	// metadata.
@@ -944,23 +945,31 @@ type pendingBlock struct {
 	hash  *chainhash.Hash
 	bytes []byte
 }
+type pendingBlockAbe struct {
+	hash           *chainhash.Hash
+	bytesNoWitness []byte
+	bytesWitness   map[chainhash.Hash][]byte //transaction hash -> witness
+}
 
 // transaction represents a database transaction.  It can either be read-only or
 // read-write and implements the database.Tx interface.  The transaction
 // provides a root bucket against which all read and writes occur.
 type transaction struct {
-	managed        bool             // Is the transaction managed?
-	closed         bool             // Is the transaction closed?
-	writable       bool             // Is the transaction writable?
-	db             *db              // DB instance the tx was created from.
-	snapshot       *dbCacheSnapshot // Underlying snapshot for txns.
-	metaBucket     *bucket          // The root metadata bucket.
-	blockIdxBucket *bucket          // The block index bucket.
+	managed          bool             // Is the transaction managed?
+	closed           bool             // Is the transaction closed?
+	writable         bool             // Is the transaction writable?
+	db               *db              // DB instance the tx was created from.
+	snapshot         *dbCacheSnapshot // Underlying snapshot for txns.
+	metaBucket       *bucket          // The root metadata bucket.
+	blockIdxBucket   *bucket          // The block index bucket.
+	witnessIdxBucket *bucket          // The block index bucket.
 
 	// Blocks that need to be stored on commit.  The pendingBlocks map is
 	// kept to allow quick lookups of pending data by block hash.
-	pendingBlocks    map[chainhash.Hash]int
-	pendingBlockData []pendingBlock
+	pendingBlocks       map[chainhash.Hash]int
+	pendingBlockData    []pendingBlock
+	pendingBlocksAbe    map[chainhash.Hash]int
+	pendingBlockAbeData []pendingBlockAbe
 
 	// Keys that need to be stored or deleted on commit.
 	pendingKeys   *treap.Mutable
@@ -1134,7 +1143,7 @@ func (tx *transaction) hasBlock(hash *chainhash.Hash) bool {
 func (tx *transaction) hasBlockAbe(hash *chainhash.Hash) bool {
 	// Return true if the block is pending to be written on commit since
 	// it exists from the viewpoint of this transaction.
-	if _, exists := tx.pendingBlocks[*hash]; exists {
+	if _, exists := tx.pendingBlocksAbe[*hash]; exists {
 		return true
 	}
 
@@ -1170,7 +1179,6 @@ func (tx *transaction) StoreBlock(block *abeutil.Block) error {
 		str := fmt.Sprintf("block %s already exists", blockHash)
 		return makeDbErr(database.ErrBlockExists, str, nil)
 	}
-
 	blockBytes, err := block.Bytes()
 	if err != nil {
 		str := fmt.Sprintf("failed to get serialized bytes for block %s",
@@ -1214,24 +1222,31 @@ func (tx *transaction) StoreBlockAbe(block *abeutil.BlockAbe) error {
 		return makeDbErr(database.ErrBlockExists, str, nil)
 	}
 
-	blockBytes, err := block.Bytes()
+	blockBytesNoWitness, err := block.BytesNoWitness()
 	if err != nil {
 		str := fmt.Sprintf("failed to get serialized bytes for block %s",
 			blockHash)
 		return makeDbErr(database.ErrDriverSpecific, str, err)
 	}
 
+	txs := block.Transactions()
+	txHashToWitness := make(map[chainhash.Hash][]byte, len(txs))
+	for i := 0; i < len(txs); i++ {
+		txHashToWitness[*txs[i].Hash()] = txs[i].MsgTx().TxWitness
+	}
+
 	// Add the block to be stored to the list of pending blocks to store
 	// when the transaction is committed.  Also, add it to pending blocks
 	// map so it is easy to determine the block is pending based on the
 	// block hash.
-	if tx.pendingBlocks == nil {
-		tx.pendingBlocks = make(map[chainhash.Hash]int)
+	if tx.pendingBlocksAbe == nil {
+		tx.pendingBlocksAbe = make(map[chainhash.Hash]int)
 	}
-	tx.pendingBlocks[*blockHash] = len(tx.pendingBlockData)
-	tx.pendingBlockData = append(tx.pendingBlockData, pendingBlock{
-		hash:  blockHash,
-		bytes: blockBytes,
+	tx.pendingBlocksAbe[*blockHash] = len(tx.pendingBlockAbeData)
+	tx.pendingBlockAbeData = append(tx.pendingBlockAbeData, pendingBlockAbe{
+		hash:           blockHash,
+		bytesNoWitness: blockBytesNoWitness,
+		bytesWitness:   txHashToWitness,
 	})
 	log.Tracef("Added block %s to pending blocks", blockHash)
 
@@ -1289,6 +1304,15 @@ func (tx *transaction) HasBlocks(hashes []chainhash.Hash) ([]bool, error) {
 // hash.  It will return ErrBlockNotFound if there is no entry.
 func (tx *transaction) fetchBlockRow(hash *chainhash.Hash) ([]byte, error) {
 	blockRow := tx.blockIdxBucket.Get(hash[:])
+	if blockRow == nil {
+		str := fmt.Sprintf("block %s does not exist", hash)
+		return nil, makeDbErr(database.ErrBlockNotFound, str, nil)
+	}
+
+	return blockRow, nil
+}
+func (tx *transaction) fetchWitnessRow(hash *chainhash.Hash) ([]byte, error) {
+	blockRow := tx.witnessIdxBucket.Get(hash[:])
 	if blockRow == nil {
 		str := fmt.Sprintf("block %s does not exist", hash)
 		return nil, makeDbErr(database.ErrBlockNotFound, str, nil)
@@ -1391,6 +1415,49 @@ func (tx *transaction) FetchBlock(hash *chainhash.Hash) ([]byte, error) {
 	}
 
 	return blockBytes, nil
+}
+
+func (tx *transaction) FetchBlockAbe(hash *chainhash.Hash) ([]byte, map[chainhash.Hash][]byte, error) {
+	// Ensure transaction state is valid.
+	if err := tx.checkClosed(); err != nil {
+		return nil, nil, err
+	}
+
+	// When the block is pending to be written on commit return the bytes
+	// from there.
+	if idx, exists := tx.pendingBlocks[*hash]; exists {
+		return tx.pendingBlockAbeData[idx].bytesNoWitness, tx.pendingBlockAbeData[idx].bytesWitness, nil
+	}
+
+	// Lookup the location of the block in the files from the block index.
+	blockRow, err := tx.fetchBlockRow(hash)
+	if err != nil {
+		return nil, nil, err
+	}
+	location := deserializeBlockLoc(blockRow)
+
+	// Read the block from the appropriate location.  The function also
+	// performs a checksum over the data to detect data corruption.
+	blockBytes, err := tx.db.store.readBlock(hash, location)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Lookup the location of the block in the files from the block index.
+	witnessRow, err := tx.fetchWitnessRow(hash)
+	if err != nil {
+		return nil, nil, err
+	}
+	witLocation := deserializeWitnessLoc(witnessRow)
+
+	// Read the block from the appropriate location.  The function also
+	// performs a checksum over the data to detect data corruption.
+	txHashTowintess, err := tx.db.store.readWitness(hash, witLocation)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return blockBytes, txHashTowintess, nil
 }
 
 // FetchBlocks returns the raw serialized bytes for the blocks identified by the
@@ -1652,6 +1719,9 @@ func (tx *transaction) close() {
 	tx.pendingBlocks = nil
 	tx.pendingBlockData = nil
 
+	tx.pendingBlocksAbe = nil
+	tx.pendingBlockAbeData = nil
+
 	// Clear pending keys that would have been written or deleted on commit.
 	tx.pendingKeys = nil
 	tx.pendingRemove = nil
@@ -1688,11 +1758,18 @@ func (tx *transaction) writePendingAndCommit() error {
 	oldBlkOffset := wc.curOffset
 	wc.RUnlock()
 
+	wcForWit := tx.db.store.writeCursorForWitness
+	wcForWit.RLock()
+	oldWitFileNum := wcForWit.curFileNum
+	oldWitOffset := wcForWit.curOffset
+	wcForWit.RUnlock()
+
 	// rollback is a closure that is used to rollback all writes to the
 	// block files.
 	rollback := func() {
 		// Rollback any modifications made to the block files if needed.
 		tx.db.store.handleRollback(oldBlkFileNum, oldBlkOffset)
+		tx.db.store.handleRollbackForWitness(oldWitFileNum, oldWitOffset)
 	}
 
 	// Loop through all of the pending blocks to store and write them.
@@ -1716,12 +1793,47 @@ func (tx *transaction) writePendingAndCommit() error {
 		}
 	}
 
+	// Loop through all of the pending blocks to store and write them.
+	for _, blockData := range tx.pendingBlockAbeData {
+		log.Tracef("Storing block %s", blockData.hash)
+		location, err := tx.db.store.writeBlock(blockData.bytesNoWitness)
+		if err != nil {
+			rollback()
+			return err
+		}
+
+		// Add a record in the block index for the block.  The record
+		// includes the location information needed to locate the block
+		// on the filesystem as well as the block header since they are
+		// so commonly needed.
+		blockRow := serializeBlockLoc(location)
+		err = tx.blockIdxBucket.Put(blockData.hash[:], blockRow)
+		if err != nil {
+			rollback()
+			return err
+		}
+
+		// witness
+		wLocation, err := tx.db.store.writeWitness(blockData.bytesWitness)
+		if err != nil {
+			rollback()
+			return err
+		}
+		witnessRow := serializeWitnessLoc(wLocation)
+		err = tx.witnessIdxBucket.Put(blockData.hash[:], witnessRow)
+		if err != nil {
+			rollback()
+			return err
+		}
+	}
 	// Update the metadata for the current write file and offset.
 	writeRow := serializeWriteRow(wc.curFileNum, wc.curOffset)
 	if err := tx.metaBucket.Put(writeLocKeyName, writeRow); err != nil {
 		rollback()
 		return convertErr("failed to store write cursor", err)
 	}
+
+	// TODO witness Row
 
 	// Atomically update the database cache.  The cache automatically
 	// handles flushing to the underlying persistent storage database.
@@ -1856,6 +1968,7 @@ func (db *db) begin(writable bool) (*transaction, error) {
 	}
 	tx.metaBucket = &bucket{tx: tx, id: metadataBucketID}
 	tx.blockIdxBucket = &bucket{tx: tx, id: blockIdxBucketID}
+	tx.witnessIdxBucket = &bucket{tx: tx, id: witnessIdxBucketID}
 	return tx, nil
 }
 
