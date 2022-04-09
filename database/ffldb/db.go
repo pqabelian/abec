@@ -66,11 +66,13 @@ var (
 
 	// blockIdxBucketName is the bucket used internally to track block
 	// metadata.
-	blockIdxBucketName = []byte("ffldb-blockidx")
+	blockIdxBucketName   = []byte("ffldb-blockidx")
+	witnessIdxBucketName = []byte("ffldb-blockwitnessidx")
 
 	// writeLocKeyName is the key used to store the current write file
 	// location.
-	writeLocKeyName = []byte("ffldb-writeloc")
+	writeLocKeyName        = []byte("ffldb-writeloc")
+	writeLocWitnessKeyName = []byte("ffldb-writeloc-witness")
 )
 
 // Common error strings.
@@ -644,6 +646,8 @@ func (b *bucket) CreateBucket(key []byte) (database.Bucket, error) {
 	var childID [4]byte
 	if b.id == metadataBucketID && bytes.Equal(key, blockIdxBucketName) {
 		childID = blockIdxBucketID
+	} else if b.id == metadataBucketID && bytes.Equal(key, witnessIdxBucketName) {
+		childID = witnessIdxBucketID
 	} else {
 		var err error
 		childID, err = b.tx.nextBucketID()
@@ -1148,6 +1152,15 @@ func (tx *transaction) hasBlockAbe(hash *chainhash.Hash) bool {
 	}
 
 	return tx.hasKey(bucketizedKey(blockIdxBucketID, hash[:]))
+}
+func (tx *transaction) hasWitness(hash *chainhash.Hash) bool {
+	// Return true if the block is pending to be written on commit since
+	// it exists from the viewpoint of this transaction.
+	if _, exists := tx.pendingBlocksAbe[*hash]; exists {
+		return true
+	}
+
+	return tx.hasKey(bucketizedKey(witnessIdxBucketID, hash[:]))
 }
 
 // StoreBlock stores the provided block into the database.  There are no checks
@@ -1833,7 +1846,11 @@ func (tx *transaction) writePendingAndCommit() error {
 		return convertErr("failed to store write cursor", err)
 	}
 
-	// TODO witness Row
+	writeWitnessRow := serializeWriteRow(wcForWit.curFileNum, wcForWit.curOffset)
+	if err := tx.metaBucket.Put(writeLocWitnessKeyName, writeWitnessRow); err != nil {
+		rollback()
+		return convertErr("failed to store write cursor", err)
+	}
 
 	// Atomically update the database cache.  The cache automatically
 	// handles flushing to the underlying persistent storage database.
@@ -2131,6 +2148,8 @@ func initDB(ldb *leveldb.DB) error {
 	batch := new(leveldb.Batch)
 	batch.Put(bucketizedKey(metadataBucketID, writeLocKeyName),
 		serializeWriteRow(0, 0))
+	batch.Put(bucketizedKey(metadataBucketID, writeLocWitnessKeyName),
+		serializeWriteRow(0, 0))
 
 	// Create block index bucket and set the current bucket id.
 	//
@@ -2140,7 +2159,9 @@ func initDB(ldb *leveldb.DB) error {
 	// need to account for it to ensure there are no key collisions.
 	batch.Put(bucketIndexKey(metadataBucketID, blockIdxBucketName),
 		blockIdxBucketID[:])
-	batch.Put(curBucketIDKeyName, blockIdxBucketID[:])
+	batch.Put(bucketIndexKey(metadataBucketID, witnessIdxBucketName),
+		witnessIdxBucketID[:])
+	batch.Put(curBucketIDKeyName, witnessIdxBucketID[:])
 
 	// Write everything as a single batch.
 	if err := ldb.Write(batch, nil); err != nil {

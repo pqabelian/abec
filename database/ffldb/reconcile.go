@@ -55,7 +55,9 @@ func reconcileDB(pdb *db, create bool) (database.DB, error) {
 
 	// Load the current write cursor position from the metadata.
 	var curFileNum, curOffset uint32
+	var curWitnessFileNum, curWitnessOffset uint32
 	err := pdb.View(func(tx database.Tx) error {
+		// For block
 		writeRow := tx.Metadata().Get(writeLocKeyName)
 		if writeRow == nil {
 			str := "write cursor does not exist"
@@ -64,6 +66,15 @@ func reconcileDB(pdb *db, create bool) (database.DB, error) {
 
 		var err error
 		curFileNum, curOffset, err = deserializeWriteRow(writeRow)
+
+		// For witness
+		writeRowForWitness := tx.Metadata().Get(writeLocWitnessKeyName)
+		if writeRowForWitness == nil {
+			str := "write cursor does not exist"
+			return makeDbErr(database.ErrCorruption, str, nil)
+		}
+
+		curWitnessFileNum, curWitnessOffset, err = deserializeWriteRow(writeRowForWitness)
 		return err
 	})
 	if err != nil {
@@ -89,6 +100,18 @@ func reconcileDB(pdb *db, create bool) (database.DB, error) {
 		log.Infof("Database sync complete")
 	}
 
+	wcForWitness := pdb.store.writeCursorForWitness
+	if wcForWitness.curFileNum > curWitnessFileNum || (wcForWitness.curFileNum == curWitnessFileNum &&
+		wcForWitness.curOffset > curWitnessOffset) {
+
+		log.Info("Detected unclean shutdown - Repairing...")
+		log.Debugf("Metadata claims file %d, offset %d. Block data is "+
+			"at file %d, offset %d", curFileNum, curOffset,
+			wcForWitness.curFileNum, wcForWitness.curOffset)
+		pdb.store.handleRollbackForWitness(curFileNum, curOffset)
+		log.Infof("Database sync complete")
+	}
+
 	// When the write cursor position found by scanning the block files on
 	// disk is BEFORE the position the metadata believes to be true, return
 	// a corruption error.  Since sync is called after each block is written
@@ -104,6 +127,16 @@ func reconcileDB(pdb *db, create bool) (database.DB, error) {
 		str := fmt.Sprintf("metadata claims file %d, offset %d, but "+
 			"block data is at file %d, offset %d", curFileNum,
 			curOffset, wc.curFileNum, wc.curOffset)
+		log.Warnf("***Database corruption detected***: %v", str)
+		return nil, makeDbErr(database.ErrCorruption, str, nil)
+	}
+
+	if wcForWitness.curFileNum < curWitnessFileNum || (wcForWitness.curFileNum == curWitnessFileNum &&
+		wcForWitness.curOffset < curWitnessOffset) {
+
+		str := fmt.Sprintf("metadata claims file %d, offset %d, but "+
+			"block data is at file %d, offset %d", curFileNum,
+			curOffset, wcForWitness.curFileNum, wcForWitness.curOffset)
 		log.Warnf("***Database corruption detected***: %v", str)
 		return nil, makeDbErr(database.ErrCorruption, str, nil)
 	}

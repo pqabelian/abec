@@ -490,6 +490,9 @@ func (c *dbCache) flush() error {
 	if err := c.store.syncBlocks(); err != nil {
 		return err
 	}
+	if err := c.store.syncWitness(); err != nil {
+		return err
+	}
 
 	// Since the cached keys to be added and removed use an immutable treap,
 	// a snapshot is simply obtaining the root of the tree under the lock

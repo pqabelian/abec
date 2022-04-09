@@ -257,6 +257,7 @@ var MainNetParams = Params{
 	RuleChangeActivationThreshold: 1916, // 95% of MinerConfirmationWindow
 	//		todo: 20220324
 	MinerConfirmationWindow: 2016, //
+	// TODO(20220409): clear the deployment information
 	Deployments: [DefinedDeployments]ConsensusDeployment{
 		DeploymentTestDummy: {
 			BitNumber:  28,

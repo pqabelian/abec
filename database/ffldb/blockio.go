@@ -744,12 +744,14 @@ func (s *blockStore) writeWitness(rawWitness map[chainhash.Hash][]byte) (witness
 			return witnessLocation{}, err
 		}
 		_, _ = hasher.Write(txHash[:])
+
 		var tmp [4]byte
 		byteOrder.PutUint32(tmp[:], uint32(len(witness)))
 		if err := s.writeDataWitness(tmp[:], "witness_length"); err != nil {
 			return witnessLocation{}, err
 		}
 		_, _ = hasher.Write(tmp[:])
+
 		if err := s.writeDataWitness(witness[:], "witness"); err != nil {
 			return witnessLocation{}, err
 		}
@@ -918,6 +920,32 @@ func (s *blockStore) readBlockRegion(loc blockLocation, offset, numBytes uint32)
 	if err != nil {
 		str := fmt.Sprintf("failed to read region from block file %d, "+
 			"offset %d, len %d: %v", loc.blockFileNum, readOffset,
+			numBytes, err)
+		return nil, makeDbErr(database.ErrDriverSpecific, str, err)
+	}
+
+	return serializedData, nil
+}
+
+func (s *blockStore) readWitnessRegion(loc witnessLocation, offset, numBytes uint32) ([]byte, error) {
+	// Get the referenced block file handle opening the file as needed.  The
+	// function also handles closing files as needed to avoid going over the
+	// max allowed open files.
+	witnessFile, err := s.witnessFile(loc.witnessFileNum)
+	if err != nil {
+		return nil, err
+	}
+
+	// Regions are offsets into the actual block, however the serialized
+	// data for a block includes an initial 4 bytes for network + 4 bytes
+	// for block length.  Thus, add 8 bytes to adjust.
+	readOffset := loc.fileOffset + 8 + offset
+	serializedData := make([]byte, numBytes)
+	_, err = witnessFile.file.ReadAt(serializedData, int64(readOffset))
+	witnessFile.RUnlock()
+	if err != nil {
+		str := fmt.Sprintf("failed to read region from block file %d, "+
+			"offset %d, len %d: %v", loc.witnessFileNum, readOffset,
 			numBytes, err)
 		return nil, makeDbErr(database.ErrDriverSpecific, str, err)
 	}
