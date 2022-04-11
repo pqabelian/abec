@@ -4,6 +4,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/abesuite/abec/abecrypto"
+	"github.com/abesuite/abec/abecrypto/abecryptoparam"
+	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
@@ -31,7 +33,7 @@ func gensis() {
 		panic(err)
 	}
 	//retSerializedCryptoAddress, retSerializedVSk, retSerializedASksp, retSerializedASksn, err := abecrypto.CryptoPP.CryptoAddressKeyGen(seed)
-	retSerializedCryptoAddress, _, _, _, err := abecrypto.CryptoPP.AbeCryptoAddressGen(seed)
+	retSerializedCryptoAddress, _, _, _, err := abecrypto.CryptoAddressKeyGen(seed, abecryptoparam.CryptoSchemePQRingCT)
 	if err != nil {
 		log.Fatalf("error in MasterKeyGen")
 	}
@@ -79,7 +81,7 @@ func gensis() {
 		},
 		TxWitness: nil,
 	}
-	genesisCoinbaseTx, err := abecrypto.CryptoPP.CoinbaseTxGen(txOutDescs, cbTxTemplate)
+	genesisCoinbaseTx, err := abecrypto.CoinbaseTxGen(txOutDescs, cbTxTemplate)
 	if err != nil {
 		log.Fatalf("error in CoinbaseTxGen")
 	}
@@ -98,7 +100,11 @@ func gensis() {
 			fmt.Fprintln(f)
 		}
 	}
-	genesisMerkleRoot := genesisCoinbaseTx.TxHash()
+	blockTxns := make([]*abeutil.TxAbe, 1)
+	coinbaseTx := abeutil.NewTxAbe(genesisCoinbaseTx)
+	blockTxns[0] = coinbaseTx
+	genesisMerkleRoot := blockchain.BuildMerkleTreeStoreAbe(blockTxns, false)
+
 	fmt.Fprintln(f, "coinbase tx hash:")
 	for i := 0; i < len(genesisMerkleRoot); i++ {
 		fmt.Fprintf(f, "%#2x, ", genesisMerkleRoot[i])
@@ -108,16 +114,18 @@ func gensis() {
 	fmt.Fprintln(f, "Time:")
 	fmt.Fprintf(f, "%#x", currentTime.Unix())
 	fmt.Fprintln(f)
+	genesisWitnessHash := chainhash.DoubleHashH(genesisCoinbaseTx.TxWitness)
 	genesisBlock := wire.MsgBlockAbe{
 		Header: wire.BlockHeader{
 			Version:    1,
 			PrevBlock:  chainhash.Hash{},
-			MerkleRoot: genesisMerkleRoot,
+			MerkleRoot: *genesisMerkleRoot[len(genesisMerkleRoot)-1],
 			Timestamp:  currentTime,
 			Bits:       0x1e01ffff, // TODO(adjust difficult...need to estimate the speed of whole network):256s per block？
 			Nonce:      0,
 		},
 		Transactions: []*wire.MsgTxAbe{genesisCoinbaseTx},
+		WitnessHashs: []*chainhash.Hash{&genesisWitnessHash},
 	}
 	for i := uint32(0); i <= ^uint32(0); i++ {
 		genesisBlock.Header.Nonce = i

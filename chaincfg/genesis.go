@@ -9515,6 +9515,7 @@ var genesisCoinbaseTx = wire.MsgTxAbe{
 		0x38, 0x4B, 0x2F, 0x48, 0x81, 0x07,
 	},
 }
+var genesisCbTxWitnessHash = chainhash.DoubleHashH(genesisCoinbaseTx.TxWitness)
 
 // genesisHash is the hash of the first block in the block chain for the main
 // network (genesis block).
@@ -9569,6 +9570,7 @@ var genesisBlock = wire.MsgBlockAbe{
 		Nonce:      0x1d0bad,
 	},
 	Transactions: []*wire.MsgTxAbe{&genesisCoinbaseTx},
+	WitnessHashs: []*chainhash.Hash{&genesisCbTxWitnessHash},
 }
 
 // regTestGenesisHash is the hash of the first block in the block chain for the
@@ -9597,6 +9599,7 @@ var regTestGenesisBlock = wire.MsgBlockAbe{
 		Nonce:      0xf20d5365,
 	},
 	Transactions: []*wire.MsgTxAbe{&genesisCoinbaseTx},
+	WitnessHashs: []*chainhash.Hash{&genesisCbTxWitnessHash},
 }
 
 // testNet3GenesisHash is the hash of the first block in the block chain for the
@@ -9625,6 +9628,7 @@ var testNet3GenesisBlock = wire.MsgBlockAbe{
 		Nonce:      0x18aea41a,                // 414098458
 	},
 	Transactions: []*wire.MsgTxAbe{&genesisCoinbaseTx},
+	WitnessHashs: []*chainhash.Hash{&genesisCbTxWitnessHash},
 }
 
 // simNetGenesisHash is the hash of the first block in the block chain for the
@@ -9653,4 +9657,5 @@ var simNetGenesisBlock = wire.MsgBlockAbe{
 		Nonce:      0xbffffffe,
 	},
 	Transactions: []*wire.MsgTxAbe{&genesisCoinbaseTx},
+	WitnessHashs: []*chainhash.Hash{&genesisCbTxWitnessHash},
 }

@@ -157,6 +157,16 @@ func (msg *MsgBlockAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding)
 		msg.Transactions = append(msg.Transactions, &tx)
 	}
 
+	msg.WitnessHashs = make([]*chainhash.Hash, txCount)
+	for i := uint64(0); i < txCount; i++ {
+		tmp := chainhash.Hash{}
+		_, err := io.ReadFull(r, tmp[:])
+		if err != nil {
+			return err
+		}
+		msg.WitnessHashs[i] = &tmp
+	}
+
 	return nil
 }
 
@@ -418,6 +428,13 @@ func (msg *MsgBlockAbe) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding)
 
 	for _, tx := range msg.Transactions {
 		err = tx.BtcEncode(w, pver, enc)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, witHash := range msg.WitnessHashs {
+		_, err = w.Write(witHash[:])
 		if err != nil {
 			return err
 		}

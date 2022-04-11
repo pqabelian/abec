@@ -193,6 +193,7 @@ func BuildMerkleTreeStoreAbe(transactions []*abeutil.TxAbe, witness bool) []*cha
 	// Create the base transaction hashes and populate the array with them.
 	for i, tx := range transactions {
 		tmp := make([]byte, chainhash.HashSize*2)
+		// chainhash.DoubleHashH(tx Hash || witness Hash)
 		copy(tmp[:chainhash.HashSize], tx.Hash()[:])
 		copy(tmp[chainhash.HashSize:], chainhash.DoubleHashB(tx.MsgTx().TxWitness))
 		tHash := chainhash.DoubleHashH(tmp)
