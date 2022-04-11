@@ -100,21 +100,26 @@ func gensis() {
 			fmt.Fprintln(f)
 		}
 	}
+	fmt.Fprintln(f)
 	blockTxns := make([]*abeutil.TxAbe, 1)
 	coinbaseTx := abeutil.NewTxAbe(genesisCoinbaseTx)
 	blockTxns[0] = coinbaseTx
 	genesisMerkleRoot := blockchain.BuildMerkleTreeStoreAbe(blockTxns, false)
 
 	fmt.Fprintln(f, "coinbase tx hash:")
-	for i := 0; i < len(genesisMerkleRoot); i++ {
-		fmt.Fprintf(f, "%#2x, ", genesisMerkleRoot[i])
+	for i := 0; i < len(genesisMerkleRoot[len(genesisMerkleRoot)-1]); i++ {
+		fmt.Fprintf(f, "%#2x, ", genesisMerkleRoot[len(genesisMerkleRoot)-1][i])
 	}
 	fmt.Fprintln(f)
 	currentTime := time.Now()
 	fmt.Fprintln(f, "Time:")
-	fmt.Fprintf(f, "%#x", currentTime.Unix())
+	fmt.Fprintf(f, "%#x\n", currentTime.Unix())
 	fmt.Fprintln(f)
 	genesisWitnessHash := chainhash.DoubleHashH(genesisCoinbaseTx.TxWitness)
+	fmt.Fprintln(f, "coinbase witness hash")
+	for i := 0; i < len(genesisWitnessHash); i++ {
+		fmt.Fprintf(f, "%#2x, ", genesisWitnessHash[i])
+	}
 	genesisBlock := wire.MsgBlockAbe{
 		Header: wire.BlockHeader{
 			Version:    1,
