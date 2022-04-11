@@ -2127,6 +2127,18 @@ func (db *db) Close() error {
 	db.store.openBlocksLRU.Init()
 	db.store.fileNumToLRUElem = nil
 
+	wcForWitness := db.store.writeCursorForWitness
+	if wcForWitness.curFile.file != nil {
+		_ = wcForWitness.curFile.file.Close()
+		wcForWitness.curFile.file = nil
+	}
+	for _, witnessFile := range db.store.openWitnessFiles {
+		_ = witnessFile.file.Close()
+	}
+	db.store.openWitnessFiles = nil
+	db.store.openWitnessLRU.Init()
+	db.store.fileNumToLRUElemWitness = nil
+
 	return closeErr
 }
 

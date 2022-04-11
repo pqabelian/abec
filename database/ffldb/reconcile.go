@@ -106,9 +106,9 @@ func reconcileDB(pdb *db, create bool) (database.DB, error) {
 
 		log.Info("Detected unclean shutdown - Repairing...")
 		log.Debugf("Metadata claims file %d, offset %d. Block data is "+
-			"at file %d, offset %d", curFileNum, curOffset,
+			"at file %d, offset %d", curWitnessFileNum, curWitnessOffset,
 			wcForWitness.curFileNum, wcForWitness.curOffset)
-		pdb.store.handleRollbackForWitness(curFileNum, curOffset)
+		pdb.store.handleRollbackForWitness(curWitnessFileNum, curWitnessOffset)
 		log.Infof("Database sync complete")
 	}
 
