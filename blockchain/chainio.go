@@ -1573,7 +1573,7 @@ func (b *BlockChain) initChainState() error {
 			return err
 		}
 		var block wire.MsgBlockAbe
-		err = block.Deserialize(bytes.NewReader(blockBytes)) // if wrongly closed, the data will damaged.
+		err = block.DeserializeNoWitness(bytes.NewReader(blockBytes)) // if wrongly closed, the data will damaged.
 		if err != nil {
 			return err
 		}

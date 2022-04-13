@@ -189,12 +189,13 @@ func (c *Client) GetBlock(blockHash *chainhash.Hash) (*wire.MsgBlock, error) {
 	return c.GetBlockAsync(blockHash).Receive()
 }
 
-type FutureGetBlockAbeResult struct{
-	client *Client
-	hash string
+type FutureGetBlockAbeResult struct {
+	client   *Client
+	hash     string
 	Response chan *response
 }
-func (r FutureGetBlockAbeResult)Receive()(*wire.MsgBlockAbe,error){
+
+func (r FutureGetBlockAbeResult) Receive() (*wire.MsgBlockAbe, error) {
 	res, err := r.client.waitForGetBlockAbeRes(r.Response, r.hash, false, false)
 	if err != nil {
 		return nil, err
@@ -215,7 +216,7 @@ func (r FutureGetBlockAbeResult)Receive()(*wire.MsgBlockAbe,error){
 
 	// Deserialize the block and return it.
 	var msgBlock wire.MsgBlockAbe
-	err = msgBlock.Deserialize(bytes.NewReader(serializedBlock))
+	err = msgBlock.DeserializeNoWitness(bytes.NewReader(serializedBlock))
 	if err != nil {
 		return nil, err
 	}
@@ -378,7 +379,6 @@ func (r FutureGetBlockAbeVerboseTxResult) Receive() (*abejson.GetBlockAbeVerbose
 
 	return &blockResult, nil
 }
-
 
 // GetBlockVerboseTxAsync returns an instance of a type that can be used to get
 // the result of the RPC at some future time by invoking the Receive function on
