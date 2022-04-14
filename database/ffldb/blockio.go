@@ -664,9 +664,9 @@ func (s *blockStore) writeWitness(rawWitness [][]byte) (witnessLocation, error) 
 	// Compute how many bytes will be written.
 	// 4 bytes each for block network + 4 bytes for block length +
 	// length of raw block + 4 bytes for checksum.
-	witnessLen := uint32(0)
+	witnessLen := uint32(4)
 	for _, witness := range rawWitness {
-		witnessLen += uint32(len(witness))
+		witnessLen += 4 + uint32(len(witness))
 	}
 	fullLen := witnessLen + 12
 
@@ -731,19 +731,33 @@ func (s *blockStore) writeWitness(rawWitness [][]byte) (witnessLocation, error) 
 	}
 	_, _ = hasher.Write(scratch[:])
 
-	// Block length.
+	// witness length.
 	byteOrder.PutUint32(scratch[:], witnessLen)
 	if err := s.writeDataWitness(scratch[:], "block length"); err != nil {
 		return witnessLocation{}, err
 	}
 	_, _ = hasher.Write(scratch[:])
 
-	// Witness [txHash, size, witness]
+	// witness num
+	byteOrder.PutUint32(scratch[:], uint32(len(rawWitness)))
+	if err := s.writeDataWitness(scratch[:], "block length"); err != nil {
+		return witnessLocation{}, err
+	}
+	_, _ = hasher.Write(scratch[:])
+
+	// Witness [txHash, witness]
 	for i := 0; i < len(rawWitness); i++ {
-		if err := s.writeDataWitness(rawWitness[i][:], "witness"); err != nil {
+		// length
+		byteOrder.PutUint32(scratch[:], uint32(len(rawWitness[i])))
+		if err := s.writeDataWitness(scratch[:], "block length"); err != nil {
 			return witnessLocation{}, err
 		}
-		_, _ = hasher.Write(rawWitness[i][:])
+		_, _ = hasher.Write(scratch[:])
+		// witness data
+		if err := s.writeDataWitness(rawWitness[i], "witness"); err != nil {
+			return witnessLocation{}, err
+		}
+		_, _ = hasher.Write(rawWitness[i])
 	}
 
 	// Castagnoli CRC-32 as a checksum of all the previous.
@@ -863,18 +877,24 @@ func (s *blockStore) readWitness(hash *chainhash.Hash, loc witnessLocation) ([][
 		return nil, makeDbErr(database.ErrDriverSpecific, str, nil)
 	}
 
+	witnessesLength := byteOrder.Uint32(serializedData[4:8])
+	if uint32(len(serializedData)) != 12+witnessesLength {
+		str := fmt.Sprintf("witness data for witness %s is for the "+
+			"wrong witness - got %d, want %d", hash, witnessesLength,
+			12+witnessesLength)
+		return nil, makeDbErr(database.ErrDriverSpecific, str, nil)
+	}
+
 	// The raw block excludes the network, length of the block, and
 	// checksum.
-	witnessNum := (n - 12) / (chainhash.HashSize + 4)
+	witnessNum := byteOrder.Uint32(serializedData[8:12])
 	rawWitness := make([][]byte, witnessNum)
-	cur, end := uint32(8), uint32(n-4)
-	for i := 0; i < witnessNum; i++ {
-		keyHash, _ := chainhash.NewHash(serializedData[cur : cur+chainhash.HashSize])
-		witnessSize := byteOrder.Uint32(serializedData[cur+chainhash.HashSize : cur+chainhash.HashSize+4])
-		rawWitness[i] = make([]byte, witnessSize+chainhash.HashSize)
-		copy(rawWitness[i][:chainhash.HashSize], keyHash[:])
-		copy(rawWitness[i][chainhash.HashSize:], serializedData[cur+chainhash.HashSize+4:cur+chainhash.HashSize+4+witnessSize])
-		cur = cur + chainhash.HashSize + 4 + witnessSize
+	cur, end := uint32(12), uint32(n-4)
+	for i := uint32(0); i < witnessNum; i++ {
+		witnessLen := byteOrder.Uint32(serializedData[cur : cur+4])
+		rawWitness[i] = make([]byte, witnessLen)
+		copy(rawWitness[i][:], serializedData[cur+4:cur+4+witnessLen])
+		cur = cur + 4 + witnessLen
 	}
 	if cur != end {
 		str := fmt.Sprintf("witness data for witness %s is for "+

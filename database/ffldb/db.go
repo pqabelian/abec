@@ -1248,10 +1248,9 @@ func (tx *transaction) StoreBlockAbe(block *abeutil.BlockAbe) error {
 	for i := 0; i < len(txs); i++ {
 		txHash := txs[i].Hash()
 		witness = txs[i].MsgTx().TxWitness
-		witnesses[i] = make([]byte, chainhash.HashSize+4+len(witness))
+		witnesses[i] = make([]byte, chainhash.HashSize+len(witness))
 		copy(witnesses[i][:chainhash.HashSize], txHash[:])
-		byteOrder.PutUint32(witness[chainhash.HashSize:chainhash.HashSize+4], uint32(len(witness)))
-		copy(witnesses[i][chainhash.HashSize+4:], witness[:])
+		copy(witnesses[i][chainhash.HashSize:], witness[:])
 	}
 
 	// Add the block to be stored to the list of pending blocks to store
