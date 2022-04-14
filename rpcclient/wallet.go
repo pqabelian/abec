@@ -463,12 +463,28 @@ func (c *Client) SetTxFee(fee abeutil.Amount) error {
 // FutureSendToAddressResult is a future promise to deliver the result of a
 // SendToAddressAsync RPC invocation (or an applicable error).
 type FutureSendToAddressResult chan *response
+type FutureSendToAddressAbeResult chan *response
 
 type FutureSendToPayeeResult chan *response
 
 // Receive waits for the response promised by the future and returns the hash
 // of the transaction sending the passed amount to the given address.
 func (r FutureSendToAddressResult) Receive() (*chainhash.Hash, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a string.
+	var txHash string
+	err = json.Unmarshal(res, &txHash)
+	if err != nil {
+		return nil, err
+	}
+
+	return chainhash.NewHashFromStr(txHash)
+}
+func (r FutureSendToAddressAbeResult) Receive() (*chainhash.Hash, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -518,6 +534,18 @@ func (c *Client) SendToPayeesAsync(payees []string, amount []abeutil.Amount, min
 	return c.sendCmd(cmd)
 }
 
+func (c *Client) NewSendToAddressAbeAsync(payees []string, amount []abeutil.Amount, minconf *int, scaleToFeeSatPerKb *float64, feeSpecified *float64, utxoSpecified *string, comment *string) FutureSendToAddressAbeResult {
+	amounts := make([]abejson.Pair, len(payees))
+	for i := 0; i < len(payees); i++ {
+		amounts[i] = abejson.Pair{
+			Address: payees[i],
+			Amount:  float64(amount[i]),
+		}
+	}
+	cmd := abejson.NewSendToAddressAbeCmd(amounts, minconf, scaleToFeeSatPerKb, feeSpecified, utxoSpecified, comment)
+	return c.sendCmd(cmd)
+}
+
 // SendToAddress sends the passed amount to the given address.
 //
 // See SendToAddressComment to associate comments with the transaction in the
@@ -531,6 +559,9 @@ func (c *Client) SendToAddress(address abeutil.Address, amount abeutil.Amount) (
 }
 func (c *Client) SendToPayees(payees []string, amount []abeutil.Amount, scaleToFeeSatPerKb *float64, feeSpecified *float64, utxoSpecified *string, minconf *int, comment *string) (*chainhash.Hash, error) {
 	return c.SendToPayeesAsync(payees, amount, minconf, scaleToFeeSatPerKb, feeSpecified, utxoSpecified, comment).Receive()
+}
+func (c *Client) SendToAddressAbe(payees []string, amount []abeutil.Amount, scaleToFeeSatPerKb *float64, feeSpecified *float64, utxoSpecified *string, minconf *int, comment *string) (*chainhash.Hash, error) {
+	return c.NewSendToAddressAbeAsync(payees, amount, minconf, scaleToFeeSatPerKb, feeSpecified, utxoSpecified, comment).Receive()
 }
 
 // SendToAddressCommentAsync returns an instance of a type that can be used to

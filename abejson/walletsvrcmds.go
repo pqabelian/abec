@@ -588,6 +588,30 @@ func NewSendManyCmd(fromAccount string, amounts map[string]float64, minConf *int
 	}
 }
 
+type Pair struct {
+	Address string  `json:"address"`
+	Amount  float64 `json:"amount"`
+}
+type SendToAddressAbeCmd struct {
+	Amounts            []Pair
+	MinConf            *int     `jsonrpcdefault:"1"` //TODO(abe) what is the minconf used for?
+	ScaleToFeeSatPerKb *float64 `jsonrpcdefault:"1"` // todo(AliceBob): <= 0 means that will use 'FeeSpecified'
+	FeeSpecified       *float64 `jsonrpcdefault:"0"` //	todo(AliceBob): valid only if 'ScaleToFeeSatPerKb<=0' && 'FeeSpecified>0'
+	UTXOSpecified      *string
+	Comment            *string
+}
+
+func NewSendToAddressAbeCmd(amounts []Pair, minconf *int, scaleToFeeSatPerKb *float64, feeSpecified *float64, UTXOSpecified *string, comment *string) *SendToAddressAbeCmd {
+	return &SendToAddressAbeCmd{
+		Amounts:            amounts,
+		MinConf:            minconf,
+		ScaleToFeeSatPerKb: scaleToFeeSatPerKb,
+		FeeSpecified:       feeSpecified,
+		UTXOSpecified:      UTXOSpecified,
+		Comment:            comment,
+	}
+}
+
 type SendToPayeesCmd struct {
 	Amounts            map[string]float64 `jsonrpcusage:"{\"name\":amount,...}"` // In BTC
 	MinConf            *int               `jsonrpcdefault:"1"`                   //TODO(abe) what is the minconf used for?
@@ -794,7 +818,7 @@ func init() {
 	MustRegisterCmd("move", (*MoveCmd)(nil), flags)
 	MustRegisterCmd("sendfrom", (*SendFromCmd)(nil), flags)
 	MustRegisterCmd("sendmany", (*SendManyCmd)(nil), flags)
-	MustRegisterCmd("sendtoaddressesabe", (*SendToPayeesCmd)(nil), flags)
+	MustRegisterCmd("sendtoaddressesabe", (*SendToAddressAbeCmd)(nil), flags)
 	MustRegisterCmd("generateaddressabe", (*GenerateAddressCmd)(nil), flags)
 	MustRegisterCmd("sendtoaddress", (*SendToAddressCmd)(nil), flags)
 	MustRegisterCmd("sendtopayee", (*SendToPayeesCmd)(nil), flags)
