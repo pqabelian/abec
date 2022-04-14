@@ -613,9 +613,9 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 		case wire.InvTypeTx:
 			err = sp.server.pushTxMsg(sp, &iv.Hash, c, waitChan, wire.BaseEncoding)
 		case wire.InvTypeWitnessBlock:
-			err = sp.server.pushBlockMsg(sp, &iv.Hash, c, waitChan, wire.WitnessEncoding)
+			err = sp.server.pushBlockMsgAbe(sp, &iv.Hash, c, waitChan, wire.WitnessEncoding)
 		case wire.InvTypeBlock:
-			err = sp.server.pushBlockMsg(sp, &iv.Hash, c, waitChan, wire.BaseEncoding)
+			err = sp.server.pushBlockMsgAbe(sp, &iv.Hash, c, waitChan, wire.BaseEncoding)
 		case wire.InvTypePrunedBlock:
 			err = sp.server.pushPrunedBlockMsg(sp, &iv.Hash, c, waitChan, wire.WitnessEncoding)
 		default:
@@ -1075,6 +1075,82 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan cha
 	}
 	return nil
 }
+
+func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
+	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
+
+	// Fetch the raw block bytes from the database.
+	var blockBytes []byte
+	var witnesses [][]byte
+	err := sp.server.db.View(func(dbTx database.Tx) error {
+		var err error
+		blockBytes, witnesses, err = dbTx.FetchBlockAbe(hash)
+		return err
+	})
+	if err != nil {
+		peerLog.Tracef("Unable to fetch requested block hash %v: %v",
+			hash, err)
+
+		if doneChan != nil {
+			doneChan <- struct{}{}
+		}
+		return err
+	}
+
+	// Deserialize the block.
+	var msgBlock wire.MsgBlockAbe
+	err = msgBlock.DeserializeNoWitness(bytes.NewReader(blockBytes))
+	if err != nil {
+		peerLog.Tracef("Unable to deserialize requested block hash "+
+			"%v: %v", hash, err)
+
+		if doneChan != nil {
+			doneChan <- struct{}{}
+		}
+		return err
+	}
+
+	txs := msgBlock.Transactions
+	for i := 0; i < len(txs); i++ {
+		txs[i].TxWitness = witnesses[i][chainhash.HashSize:]
+	}
+
+	// Once we have fetched data wait for any previous operation to finish.
+	if waitChan != nil {
+		<-waitChan
+	}
+
+	// We only send the channel for this message if we aren't sending
+	// an inv straight after.
+	//	todo(ABE): ?
+	//  answer: the block may be sent in batches, use this variable to record the location of the next tranfer
+	//         beacuse last Inv message just contain the last batches, so next batches will send a inv message
+	var dc chan<- struct{}
+	continueHash := sp.continueHash // the last hash
+	// if it is nil or cur hash do not equal the continue hash, the sendInv will be false
+	sendInv := continueHash != nil && continueHash.IsEqual(hash)
+	if !sendInv { // if the sendInv is false, the the dc is doneChan else dc is nil
+		dc = doneChan // and the dc is nil means that do not finish the request
+	}
+	//	todo (ABE): as the block is fetched from database, the witness may not be included. If so, regardless of encoding, no witness is provided.
+	sp.QueueMessageWithEncoding(&msgBlock, dc, encoding)
+
+	// When the peer requests the final block that was advertised in
+	// response to a getblocks message which requested more blocks than
+	// would fit into a single message, send it a new inventory message
+	// to trigger it to issue another getblocks message for the next
+	// batch of inventory.
+	if sendInv { // if the sendInv is true, update the continueHash
+		best := sp.server.chain.BestSnapshot()
+		invMsg := wire.NewMsgInvSizeHint(1)
+		iv := wire.NewInvVect(wire.InvTypeBlock, &best.Hash) // best block hash
+		invMsg.AddInvVect(iv)                                //just contain a message
+		sp.QueueMessage(invMsg, doneChan)
+		sp.continueHash = nil
+	}
+	return nil
+}
+
 func (s *server) pushPrunedBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
 	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
 

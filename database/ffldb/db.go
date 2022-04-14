@@ -952,7 +952,7 @@ type pendingBlock struct {
 type pendingBlockAbe struct {
 	hash           *chainhash.Hash
 	bytesNoWitness []byte
-	bytesWitness   map[chainhash.Hash][]byte //transaction hash -> witness
+	bytesWitness   [][]byte //transaction hash -> witness
 }
 
 // transaction represents a database transaction.  It can either be read-only or
@@ -1243,9 +1243,15 @@ func (tx *transaction) StoreBlockAbe(block *abeutil.BlockAbe) error {
 	}
 
 	txs := block.Transactions()
-	txHashToWitness := make(map[chainhash.Hash][]byte, len(txs))
+	witnesses := make([][]byte, len(txs))
+	var witness []byte
 	for i := 0; i < len(txs); i++ {
-		txHashToWitness[*txs[i].Hash()] = txs[i].MsgTx().TxWitness
+		txHash := txs[i].Hash()
+		witness = txs[i].MsgTx().TxWitness
+		witnesses[i] = make([]byte, chainhash.HashSize+4+len(witness))
+		copy(witnesses[i][:chainhash.HashSize], txHash[:])
+		byteOrder.PutUint32(witness[chainhash.HashSize:chainhash.HashSize+4], uint32(len(witness)))
+		copy(witnesses[i][chainhash.HashSize+4:], witness[:])
 	}
 
 	// Add the block to be stored to the list of pending blocks to store
@@ -1259,7 +1265,7 @@ func (tx *transaction) StoreBlockAbe(block *abeutil.BlockAbe) error {
 	tx.pendingBlockAbeData = append(tx.pendingBlockAbeData, pendingBlockAbe{
 		hash:           blockHash,
 		bytesNoWitness: blockBytesNoWitness,
-		bytesWitness:   txHashToWitness,
+		bytesWitness:   witnesses,
 	})
 	log.Tracef("Added block %s to pending blocks", blockHash)
 
@@ -1430,7 +1436,7 @@ func (tx *transaction) FetchBlock(hash *chainhash.Hash) ([]byte, error) {
 	return blockBytes, nil
 }
 
-func (tx *transaction) FetchBlockAbe(hash *chainhash.Hash) ([]byte, map[chainhash.Hash][]byte, error) {
+func (tx *transaction) FetchBlockAbe(hash *chainhash.Hash) ([]byte, [][]byte, error) {
 	// Ensure transaction state is valid.
 	if err := tx.checkClosed(); err != nil {
 		return nil, nil, err
@@ -1465,12 +1471,12 @@ func (tx *transaction) FetchBlockAbe(hash *chainhash.Hash) ([]byte, map[chainhas
 
 	// Read the block from the appropriate location.  The function also
 	// performs a checksum over the data to detect data corruption.
-	txHashTowintess, err := tx.db.store.readWitness(hash, witLocation)
+	witnesses, err := tx.db.store.readWitness(hash, witLocation)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return blockBytes, txHashTowintess, nil
+	return blockBytes, witnesses, nil
 }
 
 // FetchBlocks returns the raw serialized bytes for the blocks identified by the

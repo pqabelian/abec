@@ -660,13 +660,13 @@ func (s *blockStore) writeBlock(rawBlock []byte) (blockLocation, error) {
 }
 
 // Format: <network><witness length><witness><checksum>
-func (s *blockStore) writeWitness(rawWitness map[chainhash.Hash][]byte) (witnessLocation, error) {
+func (s *blockStore) writeWitness(rawWitness [][]byte) (witnessLocation, error) {
 	// Compute how many bytes will be written.
 	// 4 bytes each for block network + 4 bytes for block length +
 	// length of raw block + 4 bytes for checksum.
 	witnessLen := uint32(0)
 	for _, witness := range rawWitness {
-		witnessLen += chainhash.HashSize + 4 + uint32(len(witness))
+		witnessLen += uint32(len(witness))
 	}
 	fullLen := witnessLen + 12
 
@@ -738,24 +738,12 @@ func (s *blockStore) writeWitness(rawWitness map[chainhash.Hash][]byte) (witness
 	}
 	_, _ = hasher.Write(scratch[:])
 
-	// Witness
-	for txHash, witness := range rawWitness {
-		if err := s.writeDataWitness(txHash[:], "txHash"); err != nil {
+	// Witness [txHash, size, witness]
+	for i := 0; i < len(rawWitness); i++ {
+		if err := s.writeDataWitness(rawWitness[i][:], "witness"); err != nil {
 			return witnessLocation{}, err
 		}
-		_, _ = hasher.Write(txHash[:])
-
-		var tmp [4]byte
-		byteOrder.PutUint32(tmp[:], uint32(len(witness)))
-		if err := s.writeDataWitness(tmp[:], "witness_length"); err != nil {
-			return witnessLocation{}, err
-		}
-		_, _ = hasher.Write(tmp[:])
-
-		if err := s.writeDataWitness(witness[:], "witness"); err != nil {
-			return witnessLocation{}, err
-		}
-		_, _ = hasher.Write(witness[:])
+		_, _ = hasher.Write(rawWitness[i][:])
 	}
 
 	// Castagnoli CRC-32 as a checksum of all the previous.
@@ -832,7 +820,7 @@ func (s *blockStore) readBlock(hash *chainhash.Hash, loc blockLocation) ([]byte,
 	return serializedData[8 : n-4], nil
 }
 
-func (s *blockStore) readWitness(hash *chainhash.Hash, loc witnessLocation) (map[chainhash.Hash][]byte, error) {
+func (s *blockStore) readWitness(hash *chainhash.Hash, loc witnessLocation) ([][]byte, error) {
 	// Get the referenced block file handle opening the file as needed.  The
 	// function also handles closing files as needed to avoid going over the
 	// max allowed open files.
@@ -877,12 +865,15 @@ func (s *blockStore) readWitness(hash *chainhash.Hash, loc witnessLocation) (map
 
 	// The raw block excludes the network, length of the block, and
 	// checksum.
-	rawWitness := make(map[chainhash.Hash][]byte, (n-12)/(chainhash.HashSize+4))
+	witnessNum := (n - 12) / (chainhash.HashSize + 4)
+	rawWitness := make([][]byte, witnessNum)
 	cur, end := uint32(8), uint32(n-4)
-	for cur < end {
+	for i := 0; i < witnessNum; i++ {
 		keyHash, _ := chainhash.NewHash(serializedData[cur : cur+chainhash.HashSize])
 		witnessSize := byteOrder.Uint32(serializedData[cur+chainhash.HashSize : cur+chainhash.HashSize+4])
-		rawWitness[*keyHash] = serializedData[cur+chainhash.HashSize+4 : cur+chainhash.HashSize+4+witnessSize]
+		rawWitness[i] = make([]byte, witnessSize+chainhash.HashSize)
+		copy(rawWitness[i][:chainhash.HashSize], keyHash[:])
+		copy(rawWitness[i][chainhash.HashSize:], serializedData[cur+chainhash.HashSize+4:cur+chainhash.HashSize+4+witnessSize])
 		cur = cur + chainhash.HashSize + 4 + witnessSize
 	}
 	if cur != end {

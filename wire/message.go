@@ -110,7 +110,7 @@ func makeEmptyMessage(command string) (Message, error) {
 
 	case CmdBlock:
 		msg = &MsgBlockAbe{}
-		
+
 	case CmdPrunedBlock:
 		msg = &MsgPrunedBlock{}
 

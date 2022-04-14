@@ -150,7 +150,7 @@ func (msg *MsgBlockAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding)
 	msg.Transactions = make([]*MsgTxAbe, 0, txCount)
 	for i := uint64(0); i < txCount; i++ {
 		tx := MsgTxAbe{}
-		err := tx.BtcDecode(r, pver, enc)
+		err := tx.BtcDecode(r, pver, BaseEncoding)
 		if err != nil {
 			return err
 		}
@@ -166,7 +166,21 @@ func (msg *MsgBlockAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding)
 		}
 		msg.WitnessHashs[i] = &tmp
 	}
-
+	existWitness := make([]byte, 1)
+	_, err = r.Read(existWitness)
+	if err != nil {
+		return err
+	}
+	if enc == WitnessEncoding && existWitness[0] == 1 {
+		var tmp []byte
+		for _, tx := range msg.Transactions {
+			tmp, err = ReadVarBytes(r, pver, MaxBlockPayload, "tx.Witness")
+			if err != nil {
+				return err
+			}
+			tx.TxWitness = tmp
+		}
+	}
 	return nil
 }
 
@@ -427,7 +441,7 @@ func (msg *MsgBlockAbe) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding)
 	}
 
 	for _, tx := range msg.Transactions {
-		err = tx.BtcEncode(w, pver, enc)
+		err = tx.BtcEncode(w, pver, BaseEncoding)
 		if err != nil {
 			return err
 		}
@@ -440,6 +454,23 @@ func (msg *MsgBlockAbe) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding)
 		}
 	}
 
+	if enc == WitnessEncoding && msg.HasWitness() {
+		_, err = w.Write([]byte{1})
+		if err != nil {
+			return err
+		}
+		for _, tx := range msg.Transactions {
+			err = WriteVarBytes(w, pver, tx.TxWitness)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		_, err = w.Write([]byte{0})
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -610,6 +641,14 @@ func (msg *MsgBlock) BlockHash() chainhash.Hash {
 
 func (msg *MsgBlockAbe) BlockHash() chainhash.Hash {
 	return msg.Header.BlockHash()
+}
+
+func (msg *MsgBlockAbe) HasWitness() bool {
+	witness := msg.Transactions[0].TxWitness
+	if witness != nil && len(witness) != 0 {
+		return true
+	}
+	return false
 }
 
 // TxHashes returns a slice of hashes of all of transactions in this block.

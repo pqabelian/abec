@@ -313,7 +313,7 @@ type Tx interface {
 	// additional data copies and allows support for memory-mapped database
 	// implementations.
 	FetchBlock(hash *chainhash.Hash) ([]byte, error)
-	FetchBlockAbe(hash *chainhash.Hash) ([]byte, map[chainhash.Hash][]byte, error)
+	FetchBlockAbe(hash *chainhash.Hash) ([]byte, [][]byte, error)
 
 	// FetchBlocks returns the raw serialized bytes for the blocks
 	// identified by the given hashes.  The raw bytes are in the format
