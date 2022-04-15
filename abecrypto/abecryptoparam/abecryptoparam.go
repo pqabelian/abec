@@ -16,7 +16,7 @@ const (
 
 // The public parameters for the supported crypto-schemes.
 // PQRingCTPP is the public parameter for CryptoSchemePQRingCT.
-var PQRingCTPP = pqringct.DefaultPP
+var PQRingCTPP = pqringct.Initialize([]byte("Welcome to Post Quantum World! From the Abelian Team"))
 
 // var PQRingCT2PP = pqringct2.DefaultPP
 
@@ -70,7 +70,6 @@ func GetTxInputMaxNum(txVersion uint32) (int, error) {
 	// todo: for each version, there is a corresponding CryptoScheme.
 	// Here we call the function of corresponding crypto-scheme
 	case 1:
-		//
 		return pqringct.GetTxInputMaxNum(PQRingCTPP), nil
 
 	default:

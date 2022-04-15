@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/abesuite/abec/abecrypto"
+	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/txscript"
@@ -825,7 +826,11 @@ func checkBlockScriptsAbe(block *abeutil.BlockAbe, utxoRingView *UtxoRingViewpoi
 	for _, tx := range block.Transactions() {
 		for txInIdx, txIn := range tx.MsgTx().TxIns {
 			// Skip coinbases. Redundant here.
-			if bytes.Equal(txIn.SerialNumber, chainhash.ZeroHash[:]) {
+			nullSerialNumber, err := abecryptoparam.GetNullSerialNumber(tx.MsgTx().Version)
+			if err != nil {
+				return err
+			}
+			if bytes.Equal(txIn.SerialNumber, nullSerialNumber) {
 				continue
 			}
 

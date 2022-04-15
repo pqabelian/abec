@@ -291,7 +291,7 @@ func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 		apkLen := pqringct.GetAddressPublicKeySerializeSize(pp)
 		serializedVpk := abeTxInputDescs[i].cryptoAddress[4+apkLen:]
 
-		txInputDescs[i] = pqringct.NewTxInputDescv2(pp, lgrTxoList, int(sidx), serializedASksp, serializedASksn, serializedVpk, serializedVSk, value)
+		txInputDescs[i] = pqringct.NewTxInputDescv2(pp, lgrTxoList, sidx, serializedASksp, serializedASksn, serializedVpk, serializedVSk, value)
 	}
 
 	// outputDescs

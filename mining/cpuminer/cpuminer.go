@@ -338,8 +338,9 @@ out:
 
 		// Choose a payment address at random.
 		masterAddr := m.cfg.MiningAddrBytes
-		// TODO(20220322): check the tailed hash in the master Addr
-		// Now it just discard this hash
+
+		//
+
 		masterAddr = masterAddr[:len(masterAddr)-32]
 
 		// Create a new block template using the available transactions

@@ -25,8 +25,23 @@ func gensis() {
 	defer f.Close()
 	seed := []byte{
 		//0, 0, 0, 2,
-		219, 217, 91, 2, 159, 136, 1, 196, 124, 21, 172, 45, 38, 93, 166, 104, 63, 44, 77, 35, 189, 247, 110, 45, 52, 145, 117, 158, 38, 15, 152, 122,
-		61, 254, 149, 166, 25, 239, 148, 229, 111, 42, 136, 249, 231, 100, 67, 134, 20, 80, 87, 78, 169, 196, 253, 137, 98, 107, 133, 174, 161, 254, 106, 236,
+		219, 217, 91, 2, 159, 136, 1, 196,
+		124, 21, 172, 45, 38, 93, 166, 104,
+		63, 44, 77, 35, 189, 247, 110, 45,
+		52, 145, 117, 158, 38, 15, 152, 122,
+		61, 254, 149, 166, 25, 239, 148, 229,
+		111, 42, 136, 249, 231, 100, 67, 134,
+		20, 80, 87, 78, 169, 196, 253, 137,
+		98, 107, 133, 174, 161, 254, 106, 236,
+
+		219, 217, 91, 2, 159, 136, 1, 196,
+		124, 21, 172, 45, 38, 93, 166, 104,
+		63, 44, 77, 35, 189, 247, 110, 45,
+		52, 145, 117, 158, 38, 15, 152, 122,
+		61, 254, 149, 166, 25, 239, 148, 229,
+		111, 42, 136, 249, 231, 100, 67, 134,
+		20, 80, 87, 78, 169, 196, 253, 137,
+		98, 107, 133, 174, 161, 254, 106, 236,
 	}
 	_, err = fmt.Fprintf(f, "seed = %s\n", hex.EncodeToString(seed))
 	if err != nil {
@@ -37,30 +52,26 @@ func gensis() {
 	if err != nil {
 		log.Fatalf("error in MasterKeyGen")
 	}
-	fmt.Println(hex.EncodeToString(retSerializedCryptoAddress))
+	address := append([]byte{0}, retSerializedCryptoAddress...)
+	fmt.Println(hex.EncodeToString(address))
+	hash := chainhash.DoubleHashB(address)
+	fmt.Println(hex.EncodeToString(hash))
 	txOutDescs := make([]*abecrypto.AbeTxOutputDesc, 1)
 	for i := 0; i < len(txOutDescs); i++ {
 		txOutDescs[i] = abecrypto.NewAbeTxOutDesc(retSerializedCryptoAddress, 205_799_813_685_247)
 	}
+	nullSerialNumer, _ := abecryptoparam.GetNullSerialNumber(wire.TxVersion)
 	cbTxTemplate := &wire.MsgTxAbe{
 		Version: wire.TxVersion,
 		TxIns: []*wire.TxInAbe{
 			{
-				SerialNumber: chainhash.ZeroHash[:],
+				SerialNumber: nullSerialNumer,
 				PreviousOutPointRing: wire.OutPointRing{
 					Version: wire.TxVersion,
 					BlockHashs: []*chainhash.Hash{
 						&chainhash.ZeroHash,
-						{
-							0x48, 0x68, 0x46,
-						}, //this value can be covered by any value as a nonce of coinbase
-						{
-							/*This is the first block of abe*/
-							0x54, 0x68, 0x69, 0x73, 0x20, 0x69, 0x73, 0x20, 0x74,
-							0x68, 0x65, 0x20, 0x66, 0x69, 0x72, 0x73, 0x74, 0x20,
-							0x62, 0x6c, 0x6f, 0x63, 0x6b, 0x20, 0x6f, 0x66, 0x20,
-							0x61, 0x62, 0x65,
-						}, //this value can be any value
+						&chainhash.ZeroHash,
+						&chainhash.ZeroHash,
 					},
 					OutPoints: []*wire.OutPointAbe{
 						{
@@ -73,11 +84,14 @@ func gensis() {
 		},
 		TxOuts: nil,
 		TxFee:  205_799_813_685_247, //as the vin
-		TxMemo: []byte{ // "All my life's efforts, but to complete the ordinary life"
-			0x41, 0x6c, 0x6c, 0x20, 0x6d, 0x79, 0x20, 0x6c, 0x69, 0x66, 0x65, 0x27, 0x73, 0x20, 0x65, 0x66,
-			0x66, 0x6f, 0x72, 0x74, 0x73, 0x2c, 0x20, 0x62, 0x75, 0x74, 0x20, 0x74, 0x6f, 0x20, 0x63, 0x6f,
-			0x6d, 0x70, 0x6c, 0x65, 0x74, 0x65, 0x20, 0x74, 0x68, 0x65, 0x20, 0x6f, 0x72, 0x64, 0x69, 0x6e,
-			0x61, 0x72, 0x79, 0x20, 0x6c, 0x69, 0x66, 0x65,
+		TxMemo: []byte{ // "Abelian - a Post-Quantum Blockchain Ecosystem. Hello World to a Brand New Generation of Blockchain Era"
+			0x41, 0x62, 0x65, 0x6c, 0x69, 0x61, 0x6e, 0x20, 0x2d, 0x20, 0x61, 0x20, 0x50, 0x6f, 0x73, 0x74,
+			0x2d, 0x51, 0x75, 0x61, 0x6e, 0x74, 0x75, 0x6d, 0x20, 0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x63, 0x68,
+			0x61, 0x69, 0x6e, 0x20, 0x45, 0x63, 0x6f, 0x73, 0x79, 0x73, 0x74, 0x65, 0x6d, 0x2e, 0x20, 0x48,
+			0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x57, 0x6f, 0x72, 0x6c, 0x64, 0x20, 0x74, 0x6f, 0x20, 0x61, 0x20,
+			0x42, 0x72, 0x61, 0x6e, 0x64, 0x20, 0x4e, 0x65, 0x77, 0x20, 0x47, 0x65, 0x6e, 0x65, 0x72, 0x61,
+			0x74, 0x69, 0x6f, 0x6e, 0x20, 0x6f, 0x66, 0x20, 0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x63, 0x68, 0x61,
+			0x69, 0x6e, 0x20, 0x45, 0x72, 0x61,
 		},
 		TxWitness: nil,
 	}

@@ -237,7 +237,7 @@ var MainNetParams = Params{
 	PowLimit:     mainPowLimit,
 	PowLimitBits: 0x1e01ffff, //0x207fffff,
 	//PowLimitBits:             0x1d00ffff,
-	//CoinbaseMaturity:         100,  //TODO(abe):for testing, this value will be set to 20
+	//CoinbaseMaturity:         100,
 	CoinbaseMaturity:         6,
 	SubsidyReductionInterval: 400_000,
 	TargetTimespan:           time.Second * 256 * 4000, // 14 days TODO(abe):this value may be need changed
@@ -259,21 +259,11 @@ var MainNetParams = Params{
 	MinerConfirmationWindow: 2016, //
 	// TODO(20220409): clear the deployment information
 	Deployments: [DefinedDeployments]ConsensusDeployment{
-		DeploymentTestDummy: {
-			BitNumber:  28,
-			StartTime:  1199145601, // January 1, 2008 UTC
-			ExpireTime: 1230767999, // December 31, 2008 UTC
-		},
-		DeploymentCSV: {
-			BitNumber:  0,
-			StartTime:  1462060800, // May 1st, 2016
-			ExpireTime: 1493596800, // May 1st, 2017
-		},
-		DeploymentSegwit: {
-			BitNumber:  1,
-			StartTime:  1479168000, // November 15, 2016 UTC
-			ExpireTime: 1510704000, // November 15, 2017 UTC.
-		},
+		//DeploymentTestDummy: {
+		//	BitNumber:  28,
+		//	StartTime:  1199145601, // January 1, 2008 UTC
+		//	ExpireTime: 1230767999, // December 31, 2008 UTC
+		//},
 	},
 
 	// Mempool parameters
@@ -338,16 +328,6 @@ var RegressionNetParams = Params{
 			BitNumber:  28,
 			StartTime:  0,             // Always available for vote
 			ExpireTime: math.MaxInt64, // Never expires
-		},
-		DeploymentCSV: {
-			BitNumber:  0,
-			StartTime:  0,             // Always available for vote
-			ExpireTime: math.MaxInt64, // Never expires
-		},
-		DeploymentSegwit: {
-			BitNumber:  1,
-			StartTime:  0,             // Always available for vote
-			ExpireTime: math.MaxInt64, // Never expires.
 		},
 	},
 
@@ -417,16 +397,6 @@ var TestNet3Params = Params{
 			StartTime:  1199145601, // January 1, 2008 UTC
 			ExpireTime: 1230767999, // December 31, 2008 UTC
 		},
-		DeploymentCSV: {
-			BitNumber:  0,
-			StartTime:  1456790400, // March 1st, 2016
-			ExpireTime: 1493596800, // May 1st, 2017
-		},
-		DeploymentSegwit: {
-			BitNumber:  1,
-			StartTime:  1462060800, // May 1, 2016 UTC
-			ExpireTime: 1493596800, // May 1, 2017 UTC.
-		},
 	},
 
 	// Mempool parameters
@@ -494,16 +464,6 @@ var SimNetParams = Params{
 			BitNumber:  28,
 			StartTime:  0,             // Always available for vote
 			ExpireTime: math.MaxInt64, // Never expires
-		},
-		DeploymentCSV: {
-			BitNumber:  0,
-			StartTime:  0,             // Always available for vote
-			ExpireTime: math.MaxInt64, // Never expires
-		},
-		DeploymentSegwit: {
-			BitNumber:  1,
-			StartTime:  0,             // Always available for vote
-			ExpireTime: math.MaxInt64, // Never expires.
 		},
 	},
 
