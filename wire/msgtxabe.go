@@ -310,7 +310,7 @@ func ReadTxOutAbe(r io.Reader, pver uint32, version uint32, txOut *TxOutAbe) err
 
 	//txoScript, err := ReadVarBytes(r, pver, uint32(abecryptoparam.GetTxoSerializeSizeApprox(version)), "TxoScript")
 	//	For performance, here the maxallowedlen uses constant, rather than calling funciton.
-	txoScript, err := ReadVarBytes(r, pver, abecryptoparam.TxoSerializeSizeMaxAllowed, "TxoScript")
+	txoScript, err := ReadVarBytes(r, pver, abecryptoparam.MaxAllowedTxoSize, "TxoScript")
 	if err != nil {
 		return err
 	}
@@ -411,7 +411,7 @@ func readTxInAbe(r io.Reader, pver uint32, version uint32, txIn *TxInAbe) error 
 
 	//txIn.SerialNumber, err = ReadVarBytes(r, pver, uint32(abecryptoparam.GetTxoSerializeSizeApprox(version)), "SerialNumber")
 	// For better performance, here we use constant to specify the maxallowedsize, rather than calling a function.
-	txIn.SerialNumber, err = ReadVarBytes(r, pver, abecryptoparam.SerialNumberSerializeSizeMaxAllowed, "SerialNumber")
+	txIn.SerialNumber, err = ReadVarBytes(r, pver, abecryptoparam.MaxAllowedSerialNumberSize, "SerialNumber")
 	if err != nil {
 		return err
 	}
@@ -603,7 +603,7 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 	//	TxMemo
 	//	For better performance, we use constant to specify the maxallowed size, rather than calling a function.
 	// txMemo, err := ReadVarBytes(r, pver, uint32(abepqringctparam.GetTxMemoMaxLen(msg.Version)), "TxMemo")
-	txMemo, err := ReadVarBytes(r, pver, abecryptoparam.TxMemoSerializeSizeMaxAllowed, "TxMemo")
+	txMemo, err := ReadVarBytes(r, pver, abecryptoparam.MaxAllowedTxMemoSize, "TxMemo")
 	if err != nil {
 		return err
 	}
@@ -621,7 +621,7 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 		//	TxWitness
 		//	For better performance, we use constant to specify the maxallowed size, rather than calling a function.
 		// txWitness, err := ReadVarBytes(r, pver, uint32(abepqringctparam.GetTxWitnessMaxLen(msg.Version)), "TxWitness")
-		txWitness, err := ReadVarBytes(r, pver, abecryptoparam.TxWitnessSerializeSizeMaxAllowed, "TxWitness")
+		txWitness, err := ReadVarBytes(r, pver, abecryptoparam.MaxAllowedTxWitnessSize, "TxWitness")
 		if err != nil {
 			msg.TxWitness = nil
 		}

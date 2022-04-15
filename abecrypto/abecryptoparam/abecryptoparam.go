@@ -24,10 +24,18 @@ var PQRingCTPP = pqringct.DefaultPP
 // When underlying crypto-schemes are updated, we need to check these constants, and update them when necessary.
 const (
 	//	PQRingCT, 2022.03.31
-	TxoSerializeSizeMaxAllowed          = 1048576 //1024*1024*1, 1M bytes
-	SerialNumberSerializeSizeMaxAllowed = 128     // 128 bytes
-	TxMemoSerializeSizeMaxAllowed       = 1024    // 1024 bytes
-	TxWitnessSerializeSizeMaxAllowed    = 8388608 //1024*1024*8, 8M bytes
+	MaxAllowedTxoSize = 1048576 //1024*1024*1, 1M bytes
+)
+const ( // copyed from pqringct 2022.04.15
+	MAXALLOWED                  uint32 = 4294967295 // 2^32-1
+	MaxAllowedKemCiphertextSize uint32 = 1048576    // 2^20, 1M bytes
+	MaxAllowedTxMemoSize        uint32 = 1024       // 1024 bytes
+	MaxAllowedSerialNumberSize  uint32 = 64         // 512 bits = 64 bytes
+	MaxAllowedChallengeSeedSize uint32 = 64         // use SHA512 to generate the challenge seed
+	MaxAllowedRpulpProofSize    uint32 = 8388608    // 2^23, 8M bytes
+	MaxAllowedTxWitnessSize     uint32 = 16777216   // 2^24, 16M bytes
+	MaxAllowedElrsSignatureSize uint32 = 8388608    // 2^23, 8M bytes
+	MaxAllowedTrTxInputSize     uint32 = 8388608    // 2^23, 8M bytes
 )
 
 //	The mapping between TxVersion/TxoVersion/RingVersion/ and crypto-scheme	begin
