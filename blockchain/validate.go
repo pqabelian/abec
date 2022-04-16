@@ -39,7 +39,7 @@ const (
 	// value is halved every SubsidyHalvingInterval blocks.
 	//baseSubsidy = 512 * abeutil.NeutrinoPerAbe       //TODO(osy):this value should be 400 to uniform
 	//baseSubsidy = 400 * abeutil.NeutrinoPerAbe      //TODO(abe): for testing 1,2,5,10, we adjust the subsidy from 400 to 512
-	baseSubsidy = 256 * abeutil.NeutrinoPerAbe //TODO(abe): for testing 1,2,5,10, we adjust the subsidy from 400 to 512
+	baseSubsidy = 256 * abeutil.NeutrinoPerAbe
 )
 
 var (

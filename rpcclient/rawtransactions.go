@@ -309,6 +309,7 @@ func (c *Client) CreateRawTransaction(inputs []abejson.TransactionInput,
 // of a SendRawTransactionAsync RPC invocation (or an applicable error).
 type FutureSendRawTransactionResult chan *response
 type FutureSendRawTransactionAbeResult chan *response
+
 // Receive waits for the response promised by the future and returns the result
 // of submitting the encoded transaction to the server which then relays it to
 // the network.
@@ -375,7 +376,7 @@ func (c *Client) SendRawTransactionAsync(tx *wire.MsgTx, allowHighFees bool) Fut
 		// being enforced by bitcoind.
 		var maxFeeRate int32
 		if !allowHighFees {
-			maxFeeRate = defaultMaxFeeRate
+			maxFeeRate = int32(defaultMaxFeeRate)
 		}
 		cmd = abejson.NewBitcoindSendRawTransactionCmd(txHex, maxFeeRate)
 
@@ -386,6 +387,7 @@ func (c *Client) SendRawTransactionAsync(tx *wire.MsgTx, allowHighFees bool) Fut
 
 	return c.sendCmd(cmd)
 }
+
 //TODO(abe): need to complete this function including the struct and Handler function in rpc server
 func (c *Client) SendRawTransactionAbeAsync(tx *wire.MsgTxAbe, allowHighFees bool) FutureSendRawTransactionAbeResult {
 	txHex := ""

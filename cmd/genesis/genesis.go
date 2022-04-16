@@ -136,8 +136,8 @@ func gensis() {
 	}
 	genesisBlock := wire.MsgBlockAbe{
 		Header: wire.BlockHeader{
-			Version:    1,
-			PrevBlock:  chainhash.Hash{},
+			Version:    0x10000000,
+			PrevBlock:  chainhash.ZeroHash,
 			MerkleRoot: *genesisMerkleRoot[len(genesisMerkleRoot)-1],
 			Timestamp:  currentTime,
 			Bits:       0x1e01ffff, // TODO(adjust difficult...need to estimate the speed of whole network):256s per block？

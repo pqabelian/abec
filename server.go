@@ -728,7 +728,7 @@ func (sp *serverPeer) OnGetHeaders(_ *peer.Peer, msg *wire.MsgGetHeaders) {
 // disconnected if an invalid fee filter value is provided.
 func (sp *serverPeer) OnFeeFilter(_ *peer.Peer, msg *wire.MsgFeeFilter) {
 	// Check that the passed minimum fee is a valid amount.
-	if msg.MinFee < 0 || msg.MinFee > abeutil.MaxNeutrino {
+	if msg.MinFee < 0 || msg.MinFee > int64(abeutil.MaxNeutrino) {
 		peerLog.Debugf("Peer %v sent an invalid feefilter '%v' -- "+
 			"disconnecting", sp, abeutil.Amount(msg.MinFee))
 		sp.Disconnect()

@@ -17,11 +17,11 @@ const (
 
 	//	todo: 20220327 Denote the value by uint64
 	// NeutrinoPerAbe is the number of Neutrino in one Abe (1 ABE).
-	NeutrinoPerAbe = 1e7
+	NeutrinoPerAbe = uint64(10_000_000)
 
 	// MaxAbe is the maximum transaction amount allowed in Neutrino.
 	MaxAbe = 1<<51 - 1
 
 	// MaxNeutrino is the maximum transaction amount allowed in Neutrino.
-	MaxNeutrino = 296e6 * NeutrinoPerAbe
+	MaxNeutrino = uint64(1<<51 - 1)
 )
