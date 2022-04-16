@@ -536,9 +536,5 @@ func ledgerTxoIdGen(ringHash chainhash.Hash, index uint8) []byte {
 	if err != nil {
 		return nil
 	}
-	rst, err := pqringct.Hash(w.Bytes())
-	if err != nil {
-		return nil
-	}
-	return rst
+	return chainhash.DoubleHashB(w.Bytes())
 }
