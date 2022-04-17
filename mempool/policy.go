@@ -19,7 +19,7 @@ const (
 	maxStandardTxWeight = 400000
 
 	// todo(ABE):
-	maxStandardTxSizeFull = 7000000
+	maxStandardTxSizeFull = 7000000 // 7M
 
 	// maxStandardSigScriptSize is the maximum size allowed for a
 	// transaction input signature script to be considered standard.  This

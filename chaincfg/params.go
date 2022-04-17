@@ -22,7 +22,7 @@ var (
 	// have for the main network.  It is the value 2^224 - 1.
 	// 0x1e
 	//mainPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 224), bigOne)
-	mainPowLimit = new(big.Int).Lsh(new(big.Int).SetInt64(0x01ad7f), 216)
+	mainPowLimit = new(big.Int).Lsh(new(big.Int).SetInt64(0x017c38), 208)
 	// regressionPowLimit is the highest proof of work value a block
 	// can have for the regression test network.  It is the value 2^255 - 1.
 	regressionPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 255), bigOne)
@@ -233,10 +233,10 @@ var MainNetParams = Params{
 	GenesisBlock: &genesisBlock,
 	GenesisHash:  &genesisHash,
 	PowLimit:     mainPowLimit,
-	PowLimitBits: 0x1e01ad7f, //,
+	PowLimitBits: 0x1d017c38, //,
 	//PowLimitBits:             0x1d00ffff,
 	//CoinbaseMaturity:         100,
-	CoinbaseMaturity:         6,
+	CoinbaseMaturity:         200,
 	SubsidyReductionInterval: 400_000,
 	TargetTimespan:           time.Second * 256 * 4000, // 14 days TODO(abe):this value may be need changed
 	TargetTimePerBlock:       time.Second * 256,        // 10 minutes TODO(abe): this value may be need changed, now temporary to be 3 min
