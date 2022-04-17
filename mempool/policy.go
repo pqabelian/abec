@@ -19,7 +19,7 @@ const (
 	maxStandardTxWeight = 400000
 
 	// todo(ABE):
-	maxStandardTxSizeFull = 10000000 // This is for salrs, and will change for PQRCT
+	maxStandardTxSizeFull = 7000000
 
 	// maxStandardSigScriptSize is the maximum size allowed for a
 	// transaction input signature script to be considered standard.  This
