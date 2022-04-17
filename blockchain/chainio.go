@@ -271,13 +271,13 @@ type SpentTxOutAbe struct {
 }
 
 func (spentTxo *SpentTxOutAbe) SerializeSize() int {
-	return  wire.VarIntSerializeSize(uint64(len(spentTxo.SerialNumber)))+len(spentTxo.SerialNumber)+ spentTxo.UtxoRing.SerializeSize()
+	return wire.VarIntSerializeSize(uint64(len(spentTxo.SerialNumber))) + len(spentTxo.SerialNumber) + spentTxo.UtxoRing.SerializeSize()
 }
 
 func (spentTxo *SpentTxOutAbe) Serialize(w io.Writer) error {
 
 	//	the serialNumber of spentTxo
-	err:=wire.WriteVarBytes(w,0,spentTxo.SerialNumber)
+	err := wire.WriteVarBytes(w, 0, spentTxo.SerialNumber)
 	//_, err := w.Write(spentTxo.SerialNumber[:])
 	if err != nil {
 		return err
@@ -293,7 +293,7 @@ func (spentTxo *SpentTxOutAbe) Serialize(w io.Writer) error {
 
 func (spentTxo *SpentTxOutAbe) Deserialize(r io.Reader) error {
 	var err error
-	spentTxo.SerialNumber,err=wire.ReadVarBytes(r,0,abecryptoparam.MaxAllowedSerialNumberSize,"SpentTxOutAbe.SerialNumber")
+	spentTxo.SerialNumber, err = wire.ReadVarBytes(r, 0, abecryptoparam.MaxAllowedSerialNumberSize, "SpentTxOutAbe.SerialNumber")
 	if err != nil {
 		return err
 	}
@@ -529,7 +529,10 @@ func deserializeSpendJournalEntryAbe(serialized []byte, txns []*wire.MsgTxAbe) (
 		// the associated stxo.
 		for txInIdx := len(tx.TxIns) - 1; txInIdx > -1; txInIdx-- {
 			txIn := tx.TxIns[txInIdx]
-			stxo :=
+			stxo := &SpentTxOutAbe{
+				SerialNumber: nil,
+				UtxoRing:     nil,
+			}
 			stxoIdx--
 
 			err := stxo.Deserialize(br)
@@ -538,7 +541,7 @@ func deserializeSpendJournalEntryAbe(serialized []byte, txns []*wire.MsgTxAbe) (
 					"to decode stxo for %v: %v",
 					txIn.PreviousOutPointRing, err))
 			}
-			stxos[stxoIdx]=stxo
+			stxos[stxoIdx] = stxo
 		}
 	}
 
