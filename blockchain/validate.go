@@ -781,7 +781,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, powLimit *big.Int, timeSource 
 
 	// A block must not exceed the maximum allowed block payload when
 	// serialized.
-	serializedSize := msgBlock.SerializeSize()
+	serializedSize := msgBlock.SerializeSizeStripped()
 	if serializedSize > MaxBlockBaseSize {
 		str := fmt.Sprintf("serialized block is too big - got %d, "+
 			"max %d", serializedSize, MaxBlockBaseSize)
