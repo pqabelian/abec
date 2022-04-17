@@ -175,7 +175,9 @@ func (entry *UtxoRingEntry) SerializeSize() int {
 	n = n + wire.VarIntSerializeSize(uint64(len(entry.serialNumbers)))
 
 	//	serialNumbers
-	n = n + len(entry.serialNumbers)*chainhash.HashSize
+	for i := 0; i < len(entry.serialNumbers); i++ {
+		n = n + (wire.VarIntSerializeSize(uint64(len(entry.serialNumbers[i]))) + len(entry.serialNumbers[i]))
+	}
 
 	//	ConsumingBlockHashs
 	n = n + len(entry.consumingBlockHashs)*chainhash.HashSize
@@ -247,7 +249,7 @@ func (entry *UtxoRingEntry) Serialize(w io.Writer) error {
 		return err
 	}
 	for _, serialNumber := range entry.serialNumbers {
-		_, err = w.Write(serialNumber[:])
+		err = wire.WriteVarBytes(w, 0, serialNumber)
 		if err != nil {
 			return err
 		}
@@ -355,17 +357,11 @@ func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 
 	entry.serialNumbers = make([][]byte, consumedNum)
 	//	serialNumbers
-	snSize, err := abecryptoparam.GetSerialNumberSerializeSize(entry.outPointRing.Version)
-	if err != nil {
-		return err
-	}
 	for i := uint64(0); i < consumedNum; i++ {
-		serialNumber := make([]byte, snSize)
-		_, err := io.ReadFull(r, serialNumber[:])
+		entry.serialNumbers[i], err = wire.ReadVarBytes(r, 0, abecryptoparam.MaxAllowedSerialNumberSize, "UtxoRingEntry.SerialNumber")
 		if err != nil {
 			return err
 		}
-		entry.serialNumbers[i] = serialNumber
 	}
 	//	consumingBlockHashs
 	entry.consumingBlockHashs = make([]*chainhash.Hash, consumedNum)

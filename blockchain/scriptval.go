@@ -6,7 +6,6 @@ import (
 	"github.com/abesuite/abec/abecrypto"
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
 	"math"
@@ -638,10 +637,14 @@ func ValidateTransactionScriptsAbe2(tx *abeutil.TxAbe, utxoRingView *UtxoRingVie
 	//	Collect all of the transaction inputs and required information for validation.
 	//	For each input, the authorization and authentication should be verified.
 	txIns := tx.MsgTx().TxIns
+	nullSN, err := abecryptoparam.GetNullSerialNumber(tx.MsgTx().Version)
+	if err != nil {
+		return err
+	}
 	txValItemsInput := make([]*txValidateItemInput, 0, len(txIns))
 	for txInIdx, txIn := range txIns {
 		// Skip coinbases. Redundant here.
-		if bytes.Equal(txIn.SerialNumber, chainhash.ZeroHash[:]) {
+		if bytes.Equal(txIn.SerialNumber, nullSN) {
 			continue
 		}
 

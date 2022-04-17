@@ -8,7 +8,6 @@ import (
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/chainhash"
 	"io"
-	"log"
 	"strconv"
 )
 
@@ -350,7 +349,7 @@ func (txIn *TxInAbe) String() string {
 	snLen, err := abecryptoparam.GetSerialNumberSerializeSize(txIn.PreviousOutPointRing.Version)
 	if err != nil {
 		//	todo: 202203 cannot throw err for String()
-		log.Default()
+		return err.Error()
 	}
 	strLen := 2*snLen + 1 +
 		len(txIn.PreviousOutPointRing.BlockHashs)*(2*chainhash.HashSize+1) + len(txIn.PreviousOutPointRing.OutPoints)*(2*chainhash.HashSize+2) + 1
@@ -385,7 +384,7 @@ func GetTxInSerializeSizeApprox(ringVersion uint32, ringSize int) (uint32, error
 		str := fmt.Sprintf("cannot get the block numberock number with  version %d", ringVersion)
 		return 0, messageError("readOutPointRing", str)
 	}
-	n := 1 + uint32(snSize) + // 1 byte for the length of serialNumber
+	n := uint32(VarIntSerializeSize(uint64(snSize))) + uint32(snSize) + // 1 byte for the length of serialNumber
 		4 + //	4 bytes for the ring version
 		1 + uint32(blockNum*chainhash.HashSize) + // 1 byte for the number of blocks, blockhashs
 		1 + uint32(ringSize*(chainhash.HashSize+1)) //	1 byte for ring size
