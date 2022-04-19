@@ -596,12 +596,14 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 		// Choose a payment address at random.
 		//		rand.Seed(time.Now().UnixNano())
 		//		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
-		masterAddr := m.cfg.MiningAddr
+		masterAddr := m.cfg.MiningAddrBytes
+		masterAddr = masterAddr[:len(masterAddr)-32]
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		template, err := m.g.NewBlockTemplate(masterAddr.Serialize()[1:])
+		template, err := m.g.NewBlockTemplate(masterAddr[1:]) // discard the netID
+
 		m.submitBlockLock.Unlock()
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+

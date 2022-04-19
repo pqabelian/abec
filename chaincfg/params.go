@@ -291,6 +291,7 @@ var MainNetParams = Params{
 // RegressionNetParams defines the network parameters for the regression test
 // network.  Not to be confused with the test network (version
 // 3), this network is sometimes simply called "testnet".
+// todo: not correct, maybe modify or delete in the future
 var RegressionNetParams = Params{
 	Name: "regtest",
 	Net:  wire.TestNet,
@@ -353,6 +354,7 @@ var RegressionNetParams = Params{
 // TestNet3Params defines the network parameters for the test network
 // (version 3).  Not to be confused with the regression test network, this
 // network is sometimes simply called "testnet".
+// todo: not correct, maybe modify or delete in the future
 var TestNet3Params = Params{
 	Name: "testnet3",
 	Net:  wire.TestNet3,
@@ -428,9 +430,8 @@ var TestNet3Params = Params{
 // following normal discovery rules.  This is important as otherwise it would
 // just turn into another public testnet.
 var SimNetParams = Params{
-	Name: "simnet",
-	Net:  wire.SimNet,
-	//DefaultPort: "18555",
+	Name:        "simnet",
+	Net:         wire.SimNet,
 	DefaultPort: "18888",
 	DNSSeeds:    []DNSSeed{}, // NOTE: There must NOT be any seeds.
 
@@ -439,11 +440,11 @@ var SimNetParams = Params{
 	GenesisHash:              &simNetGenesisHash,
 	PowLimit:                 simNetPowLimit,
 	PowLimitBits:             0x207fffff,
-	CoinbaseMaturity:         100,
-	SubsidyReductionInterval: 210000,
-	TargetTimespan:           time.Hour * 24 * 14, // 14 days
-	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
-	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
+	CoinbaseMaturity:         200,
+	SubsidyReductionInterval: 400_000,
+	TargetTimespan:           time.Second * 256 * 4000,
+	TargetTimePerBlock:       time.Second * 256,
+	RetargetAdjustmentFactor: 4, // 25% less, 400% more
 	ReduceMinDifficulty:      true,
 	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
 	GenerateSupported:        true,
@@ -473,19 +474,20 @@ var SimNetParams = Params{
 	Bech32HRPSegwit: "sb", // always sb for sim net
 
 	// Address encoding magics
-	PubKeyHashAddrID:        0x3f, // starts with S
-	ScriptHashAddrID:        0x7b, // starts with s
-	PrivateKeyID:            0x64, // starts with 4 (uncompressed) or F (compressed)
-	WitnessPubKeyHashAddrID: 0x19, // starts with Gg
-	WitnessScriptHashAddrID: 0x28, // starts with ?
+	PQRingCTID:              0x00, // starts with 1, TODO(abe): adjust the prefix
+	PubKeyHashAddrID:        0x00, // starts with 1
+	ScriptHashAddrID:        0x05, // starts with 3
+	PrivateKeyID:            0x80, // starts with 5 (uncompressed) or K (compressed)
+	WitnessPubKeyHashAddrID: 0x06, // starts with p2
+	WitnessScriptHashAddrID: 0x0A, // starts with 7Xh
 
 	// BIP32 hierarchical deterministic extended key magics
-	HDPrivateKeyID: [4]byte{0x04, 0x20, 0xb9, 0x00}, // starts with sprv
-	HDPublicKeyID:  [4]byte{0x04, 0x20, 0xbd, 0x3a}, // starts with spub
+	HDPrivateKeyID: [4]byte{0x04, 0x88, 0xad, 0xe4}, // starts with xprv
+	HDPublicKeyID:  [4]byte{0x04, 0x88, 0xb2, 0x1e}, // starts with xpub
 
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
-	HDCoinType: 115, // ASCII for s
+	HDCoinType: 0,
 }
 
 var (

@@ -1180,7 +1180,7 @@ func handleEstimateFee(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 func handleGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	// Respond with an error if there are no addresses to pay the
 	// created blocks to.
-	if cfg.miningAddr == nil {
+	if cfg.MiningAddr == "" {
 		return nil, &abejson.RPCError{
 			Code: abejson.ErrRPCInternal.Code,
 			Message: "No payment addresses specified " +
@@ -3990,7 +3990,7 @@ func handleSetGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	} else {
 		// Respond with an error if there are no addresses to pay the
 		// created blocks to.
-		if cfg.miningAddr == nil {
+		if cfg.MiningAddr == "" {
 			return nil, &abejson.RPCError{
 				Code: abejson.ErrRPCInternal.Code,
 				Message: "No payment addresses specified " +
