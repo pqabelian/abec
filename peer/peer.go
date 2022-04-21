@@ -16,7 +16,6 @@ import (
 	"math/rand"
 	"net"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -2012,12 +2011,6 @@ func (p *Peer) readRemoteVersionMsg() error {
 	}
 	p.flagsMtx.Unlock()
 
-	// If the user agent is not valid, return err
-	if !isValidUserAgent(p.userAgent) {
-		reason := fmt.Sprintf("new peer has invalid useragent %v", p.userAgent)
-		return errors.New(reason)
-	}
-
 	// Once the version message has been exchanged, we're able to determine
 	// if this peer knows how to encode witness data over the wire
 	// protocol. If so, then we'll switch to a decoding mode which is
@@ -2366,15 +2359,6 @@ func NewOutboundPeer(cfg *Config, addr string) (*Peer, error) {
 	}
 
 	return p, nil
-}
-
-// isValidUserAgent returns if the given useragent is valid or not.
-// Currently, valid means the useragent contains string "abec"
-func isValidUserAgent(userAgent string) bool {
-	if strings.Contains(strings.ToLower(userAgent), "abec") {
-		return true
-	}
-	return false
 }
 
 func init() {
