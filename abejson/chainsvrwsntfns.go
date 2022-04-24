@@ -8,7 +8,7 @@ const (
 	// notifications from the chain server that a block has been connected.
 	//
 	// Deprecated: Use FilteredBlockConnectedNtfnMethod instead.
-	BlockConnectedNtfnMethod = "blockconnected"
+	BlockConnectedNtfnMethod    = "blockconnected"
 	BlockAbeConnectedNtfnMethod = "blockabeconnected"
 
 	// BlockDisconnectedNtfnMethod is the legacy, deprecated method used for
@@ -16,7 +16,7 @@ const (
 	// disconnected.
 	//
 	// Deprecated: Use FilteredBlockDisconnectedNtfnMethod instead.
-	BlockDisconnectedNtfnMethod = "blockdisconnected"
+	BlockDisconnectedNtfnMethod    = "blockdisconnected"
 	BlockAbeDisconnectedNtfnMethod = "blockabedisconnected"
 
 	// FilteredBlockConnectedNtfnMethod is the new method used for
@@ -335,7 +335,7 @@ func init() {
 	MustRegisterCmd(BlockConnectedNtfnMethod, (*BlockConnectedNtfn)(nil), flags)
 	MustRegisterCmd(BlockAbeConnectedNtfnMethod, (*BlockAbeConnectedNtfn)(nil), flags)
 	MustRegisterCmd(BlockDisconnectedNtfnMethod, (*BlockDisconnectedNtfn)(nil), flags)
-	MustRegisterCmd(BlockAbeDisconnectedNtfnMethod, (*BlockDisconnectedNtfn)(nil), flags)
+	MustRegisterCmd(BlockAbeDisconnectedNtfnMethod, (*BlockAbeDisconnectedNtfn)(nil), flags)
 	MustRegisterCmd(FilteredBlockConnectedNtfnMethod, (*FilteredBlockConnectedNtfn)(nil), flags)
 	MustRegisterCmd(FilteredBlockDisconnectedNtfnMethod, (*FilteredBlockDisconnectedNtfn)(nil), flags)
 	MustRegisterCmd(RecvTxNtfnMethod, (*RecvTxNtfn)(nil), flags)
