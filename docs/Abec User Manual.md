@@ -153,7 +153,7 @@ Example:
 2022-04-16 20:28:50.862 [INF] CHAN: Loading block index...
 2022-04-16 20:28:50.862 [INF] CHAN: Chain state (height 17, hash 00000050ec9493c9f615dae1300b2f64e18220eca7bb4e17885cb87b3a9b5d2c, totaltx 19, work 150996096)
 2022-04-16 20:28:50.865 [INF] RPCS: RPC server listening on 0.0.0.0:8667
-2022-04-16 20:28:50.865 [INF] AMGR: Loaded 0 addresses from file 'C:\Users\chenshenwei\AppData\Local\Abec\data\mainnet\peers.json'
+2022-04-16 20:28:50.865 [INF] AMGR: Loaded 0 addresses from file 'C:\Users\username\AppData\Local\Abec\data\mainnet\peers.json'
 2022-04-16 20:28:50.865 [INF] CMGR: Server listening on 0.0.0.0:8666
 2022-04-16 20:28:50.865 [INF] CMGR: Server listening on [::]:8666
 ```
@@ -163,6 +163,8 @@ Example:
 Other options and their usage can be found in abec.conf.
 
 ## 4. Connect Abewallet to Abec
+
+**Notice**: For security concern, Abewallet should run on a secure machine instead of the same machine with Abec. Moreover, if you run multiple Abec, there is no need to create Abewallet for each Abec, namely one wallet is enough. You only need to add the mining address to each Abec and connect Abewallet to one of them.
 
 When you run Abewallet the first time, it will create an configuration file called *abewallet.conf*. Like Abec, it is located in the home directory of system, that is
 
