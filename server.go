@@ -1345,6 +1345,10 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 
 		// Mark the address as a known good address.
 		s.addrManager.Good(sp.NA())
+
+		// fix the peer broadcast problem
+		s.addrManager.AddNetAddress(sp.NA(), sp.NA())
+
 	}
 
 	return true
