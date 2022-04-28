@@ -1345,6 +1345,7 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 
 		// Mark the address as a known good address.
 		s.addrManager.Good(sp.NA())
+
 	}
 
 	return true
@@ -1785,7 +1786,7 @@ func (s *server) peerHandler() {
 			})
 	}
 
-	// todo(ABE): why here is "go s.connManager.Start()" rathter than "s.connManager.Start()"
+	// todo(ABE): why here is "go s.connManager.Start()" rather than "s.connManager.Start()"
 	// osy: When the node is closed, need to handle the network source, if the conn manager also close, the source will be can not control
 	go s.connManager.Start() // connect manager depending the peeraddress
 
@@ -2598,6 +2599,7 @@ func initListeners(amgr *netaddrmgr.NetAddrManager, listenAddrs []string, servic
 			host, portstr, err := net.SplitHostPort(sip)
 			if err != nil {
 				// no port, use default.
+				// todo: 20220427. if no port, then use a random port
 				host = sip
 			} else {
 				port, err := strconv.ParseUint(portstr, 10, 16)

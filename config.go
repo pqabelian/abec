@@ -1,4 +1,4 @@
-// Copyright (c) 2021 The Abelian Foundation
+// Copyright (c) 2022-2023 The Abelian Foundation
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -62,7 +62,7 @@ const (
 	defaultGenerate = false
 	//defaultGenerate              = true
 	defaultMaxOrphanTransactions = 100
-	defaultMaxOrphanTxSize       = 100000
+	defaultMaxOrphanTxSize       = 5500000 // 5 500 000, For a 5(7)-5 transferTx, the witness size could be 5244527 bytes, and the content size could 110,000 bytes
 	defaultSigCacheMaxSize       = 100000
 	sampleConfigFilename         = "sample-abec.conf"
 	defaultTxIndex               = false
@@ -689,7 +689,7 @@ func loadConfig() (*config, []string, error) {
 		len(cfg.Listeners) == 0 {
 		cfg.DisableListen = true
 	}
-	// TODO(osy): 这个地方适合局域网测试
+	// TODO(osy): This could be used to test in LAN
 	// Connect means no DNS seeding.
 	if len(cfg.ConnectPeers) > 0 {
 		cfg.DisableDNSSeed = true
