@@ -84,7 +84,6 @@ If you would like to use any other ports (in the scope (1025~65535)), for exampl
 ```
 listen=:18666
 ```
-we use addpeer to add some specific Abelian nodes so that you can connect to the Abelian mainnet.
 
 ### Peers
 
@@ -99,31 +98,35 @@ At this moment, you can add one or more of the following peers, or any other pee
 
 ```
 addpeer = 3.145.81.196:8666
-addpeer = 18.117.106.180
-addpeer = 3.66.221.224
-addpeer = 3.120.150.60
+addpeer = 18.117.106.180:8666
+addpeer = 3.66.221.224:8666
+addpeer = 3.120.150.60:8666
 ```
 
 Note that, if you do not specify the port, default port (8666) will be used.
 
 ### Broadcast your address
-With the above peer setting, you add the above peers as your fixed peer.
+With the above peer setting, you are adding the above peers as your fixed peers.
 You will not be found by other nodes, that is, your node connects only the above nodes.
-On the other side, if you want to be found by other nodes in the network (to get better connection in the network),
+On the other side, if you want to be found by other nodes in the network (to get a better connection in the network),
 you need to broadcast your address.
-- If your machine has a public net IP (e.g., 1.2.3.4), you need to you need to specify the external IP in abec.conf, like
-  ```externalip=1.2.3.4```
+- If your machine has a public net IP (e.g., 1.2.3.4), you need to specify the external IP in abec.conf, like
+  ```externalip=1.2.3.4```.
+***Note*** that if you are using the default port (say, 8666), the externalip does not need to contain the port, otherwise,
+you need to specify the port, like ```externalip=1.2.3.4:18666```.
 
 - If your node sits behind a router, and (1) the router has a public net IP and (2) the router enables upnp:
     you can just set 
 ```upnp=1```
 in the abec.conf. 
-***Note***: you need to check the log when starting, to make sure upnp is successfully established.
+***Note***: you need to check the log when starting the mining node (i.e., abec.exe), to make sure upnp is successfully established.
 
-  - If your node sits behind a router, and (1) the router has a public net IP but it does not support upnp:
-  you need to (1) specify the external IP in abec.conf, like
-    ```externalip=1.2.3.4```, and (2) set the port mapping for the listening port on the router.
-  ***Note***: If the public IP changes, you need to change it accordingly each time and restart abec.exe.
+- If your node sits behind a router, and (1) the router has a public net IP but it does not support upnp:
+you need to (1) specify the external IP in abec.conf, like
+  ```externalip=1.2.3.4```, and (2) set the port mapping for the listening port on the router.
+***Note***: 
+  - If you use a port different from 8666, the external IP needs to contain the specified port; 
+  - If the public IP changes, you need to change it accordingly each time and restart abec.exe.
 
 
 ### RPC Server
