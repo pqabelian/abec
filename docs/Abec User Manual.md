@@ -120,10 +120,10 @@ you need to broadcast your address.
 in the abec.conf. 
 ***Note***: you need to check the log when starting, to make sure upnp is successfully established.
 
-- If your node sits behind a router, and (1) the router has a public net IP but it does not support upnp:
-you need to specify the external IP in abec.conf, like
-  ```externalip=1.2.3.4```.
-***Note***: If the public IP changes, you need to change it accordingly each time and restart abec.exe.
+  - If your node sits behind a router, and (1) the router has a public net IP but it does not support upnp:
+  you need to (1) specify the external IP in abec.conf, like
+    ```externalip=1.2.3.4```, and (2) set the port mapping for the listening port on the router.
+  ***Note***: If the public IP changes, you need to change it accordingly each time and restart abec.exe.
 
 
 ### RPC Server
