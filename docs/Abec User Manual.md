@@ -1,14 +1,15 @@
-# Abec User Manual
+# ABEl User Manual
 
-The following instruction will lead you to create and run a full node and a wallet of abec.
+The following instructions will lead you to set up a full node (mining and keeping a copy of the full chain) and create an ABEL wallet.
 
-We start from abewallet first since we should create our wallet first and then use the wallet address for mining in abec.
+We start from ABEL wallet first since we need to create address by wallet and then use the address to mine.
 
 ## 1. Download Abewallet and Abec
 
-After getting a new version of **Abewallet** and **Abec** in compressed format, unzip them and store them in some folder as two separate sub-folders, for example, abel/abewallet and abel/abec, respectively.
+After getting **Abewallet** and **Abec** in compressed format, unzip them and store them in some folder, for example, abel/abewallet and abel/abec, respectively.
 
 ## 2. Create a wallet
+**Notice**: For security concern, abewallet should be created and run on a secure machine.
 
 To create a wallet,
 
@@ -19,11 +20,16 @@ To create a wallet,
 abewallet --create
 ```
 
-**Hint 1:** On Macos and Linux, you may need to run `chmod 777 xxx` if it says ` xxx: Permission denied`. Then run abewallet again. Same when launching abec later.
+**Hint 1:** On Macos and Linux, you may need to run `chmod 777 xxx` if it says ` xxx: Permission denied`. 
+Then run abewallet again. 
+Same when launching abec later.
 
-**Hint 2**: On Macos, if it says `'xxx' cannot be opened because the developer cannot be verified`, go to `System Preferences -> Security & Privacy -> General` and click `allow anyway`. Then run abewallet again. Same when launching abec later.
+**Hint 2**: On Macos, if it says `'xxx' cannot be opened because the developer cannot be verified`, 
+go to `System Preferences -> Security & Privacy -> General` and click `allow anyway`. 
+Then run abewallet again. 
+Same when launching abec later.
 
-Following the construction to create the wallet. An example is shown below.
+Here is an example.
 
 ```shell
 ./start_abewallet.sh --create
@@ -50,15 +56,19 @@ Please remember the initial address:
 00000000005a38589d86427698e3ec735335b368899ed6e0239c4285bbc4e370f4ea4e6d2ac1f1555b53f8df7c30e13d4bccc3b6d56763ec279620d9f131fb68089cb8ef18885950f84e56bf78d1780a5cac57d0888dabd669f86f85e7055afabae6a332fa000b3c6ee6a09751ce41ad7de4e...
 ```
 
-The **public passphrase** would be used when launching abewallet, and the **private passphrase** would be used to unlock the wallet (to spend money etc.). Notice that both public passphrase and private passphrase are required.
+The **public passphrase** would be used when launching abewallet, 
+and the **private passphrase** would be used to unlock the wallet (to spend money). 
+Both public passphrase and private passphrase are required and should be different.
+Please keep both passphrases safe. 
 
-Keep the **crypto version** and  **mnemonic list** in a safe place, it can be used to recover the wallet.
+Keep the **crypto version** and  **mnemonic list** in a safe place, 
+it can be used to recover the wallet in the future in case you lose your wallet or want to move your wallet to another computer.
 
 The **initial address** can be used as mining address or payment address later.
 
 ## 3. Launch Abec
 
-You should run Abec first to generate a configuration file. 
+To start running a full node, we need to run abec first to generate a configuration file.
 
 ```shell
 # Macos and Linux
@@ -67,7 +77,7 @@ You should run Abec first to generate a configuration file.
 abec
 ```
 
-Then press control+C to shutdown it.
+Then press control+C to shut down abec.
 
 You can find configuration file named *abec.conf* in **home directory** of the system. That is in
 
@@ -75,19 +85,13 @@ You can find configuration file named *abec.conf* in **home directory** of the s
 - Macos: /Users/[username]/Library/Application Support/Abec
 - Linux: /home/[username]/.abec
 
-These folders are the **configuration folders** of Abec. Some configurations are needed to be carried out as follows.
+These folders are the **configuration folders** of abec. 
+Some configurations are needed:.
 
-### Listen Ports
-In abec.conf, the default listen ports is 8666.
-If you would like to use any other ports (in the scope (1025~65535)), for example 18666, you can specify it by
-
-```
-listen=:18666
-```
 
 ### Peers
 
-In abec.conf, we use addpeer to add some specific Abelian nodes so that you can connect to the Abelian mainnet.
+In abec.conf, we use addpeer to add some specific Abelian full nodes so that you can connect to the Abelian mainnet via these nodes.
 At this moment, this is required.
 
 ```
@@ -97,65 +101,84 @@ addpeer = [IP:PORT]
 At this moment, you can add one or more of the following peers, or any other peers you know.
 
 ```
-addpeer = 3.145.81.196:8666
 addpeer = 18.117.106.180:8666
+addpeer = 3.145.81.196:8666
 addpeer = 3.66.221.224:8666
 addpeer = 3.120.150.60:8666
 ```
 
 Note that, if you do not specify the port, default port (8666) will be used.
 
+### Listen Ports
+In abec.conf, the default listen ports is 8666.
+If you would like to use any other ports (in the scope (1025~65535)), for example 18666, you can specify it by
+
+```
+listen=:18666
+```
+
 ### Broadcast your address
-With the above peer setting, you are adding the above peers as your fixed peers.
-You will not be found by other nodes, that is, your node connects only the above nodes.
-On the other side, if you want to be found by other nodes in the network (to get a better connection in the network),
-you need to broadcast your address.
-- If your machine has a public net IP (e.g., 1.2.3.4), you need to specify the external IP in abec.conf, like
-  ```externalip=1.2.3.4```.
-***Note*** that if you are using the default port (say, 8666), the externalip does not need to contain the port, otherwise,
-you need to specify the port, like ```externalip=1.2.3.4:18666```.
+In addition to the above fixed full nodes that you can connect to via addpeer, 
+you can also let other nodes know you through broadcasting your address. 
+Otherwise, your node cannot be discovered by other nodes that you do not have their addresses in your abec.conf via addpeer.
 
-- If your node sits behind a router, and (1) the router has a public net IP and (2) the router enables upnp:
-    you can just set 
-```upnp=1```
-in the abec.conf. 
-***Note***: you need to check the log when starting the mining node (i.e., abec.exe), to make sure upnp is successfully established.
+If your machine has a public net IP (e.g., 1.2.3.4), you can let other nodes by specifying the external IP in abec.conf:
 
-- If your node sits behind a router, and (1) the router has a public net IP but it does not support upnp:
-you need to (1) specify the external IP in abec.conf, like
-  ```externalip=1.2.3.4```, and (2) set the port mapping for the listening port on the router.
-***Note***: 
-  - If you use a port different from 8666, the external IP needs to contain the specified port; 
-  - If the public IP changes, you need to change it accordingly each time and restart abec.exe.
+```
+externalip=1.2.3.4
+```
+
+If you are using some other ports (e.g. 18666) rather than the default port (8666), 
+you need to specify the port as well:
+
+```
+externalip=1.2.3.4:18666
+```
+
+If your node sits behind a router, and (1) the router has a public net IP and (2) the router has upnp enabled, in abec.conf, you can set:
+
+```
+upnp=1
+```
+
+***Note***: you need to check the log in the configuration folder to make sure that upnp is successfully established.
+
+If your node sits behind a router, and 
+(1) the router has a public net IP 
+but (2) it does not support upnp, 
+you need to (1) specify the external IP in abec.conf, like externalip=1.2.3.4 as shown above, 
+and (2) set the port mapping/forwarding for the listening port on the router.
 
 
 ### RPC Server
 
-To let Abewallet connect with Abec correctly, the options rpcuser / rpcpass need to be configured. 
+To let your ABEL wallet, namely, abewallet, connect with the abec full node, we need to know the values of rpcuser and rpcpass, which are in abec.conf.
 
 ```
 rpcuser = [administrator username]
 rpcpass = [administrator password]
 ```
 
-You may keep those automatically generated rpcuser and rpcpass values unchanged, and also create two more lines, namely
+You may keep these automatically generated rpcuser and rpcpass values unchanged, and also create two more lines, namely
 
 ```
 rpclimituser = [username]
 rpclimitpass = [password]
 ```
 
-as long as the values of rpcuser and rpclimituser should be different.
+as long as the values of rpcuser and rpclimituser are different.
+
 
 ### Mining
 
-If you want to run a mining node, miningaddr option needs to be configured. Paste the initial address generated by Abewallet above.
+If you want to run the full node abec also as a mining node (which I think you do), you need to include the initial address of your ABEL wallet to the miningaddr option in the abec.conf configuration file:
 
 ```
 miningaddr = [your initial address]
 ```
 
-After finishing the configuration, we can start Abec
+
+After finishing the configuration, we can start the abec again:
 
 ```shell
 # Macos and Linux
@@ -164,7 +187,14 @@ After finishing the configuration, we can start Abec
 abec --generate
 ```
 
-The above command make Abec start mining. If you do not want to let Abec go mining, just run
+The above command makes abec start mining. If you do not want to let abec go mining, just run
+
+```shell
+# Macos and Linux
+./start_abec.sh
+# Windows
+abec
+```
 
 ```shell
 # Macos and Linux
@@ -192,11 +222,16 @@ Example:
 
 Other options and their usage can be found in abec.conf.
 
+
 ## 4. Connect Abewallet to Abec
 
-**Notice**: For security concern, Abewallet should run on a secure machine instead of the same machine with Abec. Moreover, if you run multiple Abec, there is no need to create Abewallet for each Abec, namely one wallet is enough. You only need to add the mining address to each Abec and connect Abewallet to one of them.
+**Notice**: For security concern, abewallet should be running on a secure machine instead of running on the same machine as abec. 
+If you run abec (a full node) on multiple machines, there is no need to create abewallet for each full node. 
+**One wallet is enough.** You only need to add the mining address of the same wallet to the abec.conf of each of your mining machines and connect abewallet to just **one** of them. 
+The total balance of your ABEL wallet will be automatically tallied from the Abelian blockchain.
 
-When you run Abewallet the first time, it will create an configuration file called *abewallet.conf*. Like Abec, it is located in the home directory of system, that is
+When you run abewallet the first time, the abewallet will create a configuration file called *abewallet.conf*. 
+This configuration file will be located at the home directory, namely
 
 - Windows: C:\Users\username\AppData\Local\Abewallet
 - Macos: /Users/username/Library/Application Support/Abewallet
@@ -204,40 +239,45 @@ When you run Abewallet the first time, it will create an configuration file call
 
 These folders are the **configuration folders** of Abewallet.
 
-If you want to connect Abewallet with Abec, you should first configure the abecusername and the abecpassword options in *abewallet.conf* before running abewallet. These should be the same as rpcuser and rpcpass options specified in *abec.conf*.
+If you want to connect your ABEL wallet abewallet with the abec at one of your mining machines, 
+you should first configure the abecusername and the abecpassword options in *abewallet.conf* before running abewallet. 
+They are the same as the rpcuser and rpcpass options specified in *abec.conf*.
 
 ```
 abecusername= [rpcuser]
 abecpassword= [rpcpass]
 ```
 
-In addition, in order to interact with Abewallet later (using Abectl), username and password should also be configured, (any username and password is fine)
+In addition, in order to interact with abewallet later (using abectl), username and password should also be configured, (any username and password is fine).
 
 ```
 username= [username]
 password= [password]
 ```
 
-Besides the above configuration, the other things you should do depends on whether or not Abec and Abewallet are on the same machine.
+In other words, abecusername / abecpassword (in abewallet.conf) correspond to rpcuser / rpcpassword (in abec.conf), respecitvely, and are used for establishing a secure RPC communication channel between abec and abewallet. While username / password (in abewallet.conf) will be used for establishing a secure RPC communication channel between abectl (to be introduced) and abewallet.
 
-### Abec and Abewallet are on different machine
+Besides the configuration above, you may need to do a few more configurations depending on whether or not abec and abewallet are on the same machine. But again, we do not suggest you to run both abec and abewallet on the same machine despite it is absolutely feasible to do so.
 
-If Abec and Abewallet are on different machine, you also should 
 
-- specify the ip address and port of Abec
-- Get the certificate of Abec
+### Abec and Abewallet are on different machines
 
-To **specify the ip address of Abec**, add this option in *abewallet.conf*,
+If abec (full node) and abewallet (ABEL wallet) are on different machines, we also need to
+
+- specify the ip address and port of the machine which is running the full node, abec, and
+- get the RPC certificate of the full node, abec
+
+To **specify the ip address of abec**, add the following option in *abewallet.conf*,
 
 ```
 rpcconnect= [IP:PORT]
 ```
 
-IP and PORT is the ip address and listen port of Abec. If port is not specified, it will use default port (8667). 
+IP and PORT is the ip address and listening port of abec, respectively. If a port is not specified, we presume that the mining machine abec is using the default port (8667) for the RPC communication between abec and abewallet.
 
-To **get the certificate of Abec**, you should copy *rpc.cert* from the configuration folder of Abec, and paste it into the configuration folder of Abewallet. 
+To **get the certificate of abec**, you should copy *rpc.cert* from the configuration folder of abec into the configuration folder of abewallet.
 
-After finishing these operations, run Abewallet,
+After finishing these operations, run abewallet as follows.
 
 ```shell
 # Macos and Linux
@@ -248,7 +288,8 @@ abewallet --walletpass=[your public passphrase]
 
 ### Abec and Abewallet are on the same machine
 
-Congratulations! You can run Abewallet without other operations. Abewallet will automatically detect the certificate of Abec and connect with it.
+You can run abewallet without needing any other operation. 
+Abewallet will automatically access the RPC certificate of abec and connect to it.
 
 ```shell
 # Macos and Linux
@@ -256,8 +297,6 @@ Congratulations! You can run Abewallet without other operations. Abewallet will 
 # Windows
 abewallet --walletpass=[your public passphrase]
 ```
-
-
 
 Example:
 
@@ -328,14 +367,14 @@ From the top to the bottom
 
 #### If Abectl and Abewallet are on different machine
 
-If Abectl and Abewallet are on different machine, you should also
+If Abectl and Abewallet are running on different machines, you should also
 
-- Specify the ip address and port of Abewallet
-- Get the certificate of Abewallet
+- specify the ip address and port of the machine running abewallet, and
+- get the RPC certificate of the machine running abewallet
 
-To specify the ip address and port, add `--rpcserver=[IP:PORT]`.
+To specify the ip address and port, add `--rpcserver=[IP:PORT]` while running abectl.
 
-To get the certificate of Abewallet, you should copy *rpc.cert* from the configuration folder of Abewallet, and paste it in any place in the machine which runs Abectl. Add `--rpccert=[location of cert]`.
+To get the certificate of abewallet, you should copy *rpc.cert* from the configuration folder of abewallet, and paste it in any place in the machine which runs abectl, and add `--rpccert=[location of cert]` while running abectl.
 
 **Notice**: We omit the above operations in the following description of Abectl.
 
@@ -358,6 +397,7 @@ Example:
   7
 ]
 ```
+
 
 ### 5.2 Unlock 
 
