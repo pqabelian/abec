@@ -1156,9 +1156,10 @@ func (s *server) pushPrunedBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneCh
 
 	// Fetch the raw block bytes from the database.
 	var blockBytes []byte
+	var witnessBytes [][]byte
 	err := sp.server.db.View(func(dbTx database.Tx) error {
 		var err error
-		blockBytes, err = dbTx.FetchBlock(hash)
+		blockBytes, witnessBytes, err = dbTx.FetchBlockAbe(hash)
 		return err
 	})
 	if err != nil {
@@ -1173,7 +1174,7 @@ func (s *server) pushPrunedBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneCh
 
 	// Deserialize the block.
 	var msgBlock wire.MsgBlockAbe
-	err = msgBlock.Deserialize(bytes.NewReader(blockBytes))
+	err = msgBlock.DeserializeNoWitness(bytes.NewReader(blockBytes))
 	if err != nil {
 		peerLog.Tracef("Unable to deserialize requested block hash "+
 			"%v: %v", hash, err)
@@ -1182,6 +1183,11 @@ func (s *server) pushPrunedBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneCh
 			doneChan <- struct{}{}
 		}
 		return err
+	}
+
+	txs := msgBlock.Transactions
+	for i := 0; i < len(txs); i++ {
+		txs[i].TxWitness = witnessBytes[i][chainhash.HashSize:]
 	}
 
 	msgPrunedBlock, err := wire.NewMsgBlockPrunedFromMsgBlockAbe(&msgBlock)
