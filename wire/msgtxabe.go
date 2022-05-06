@@ -105,10 +105,10 @@ func (outPointRing *OutPointRing) String() string {
 	// TxHash:index; TxHash:index; ...; serialNumber
 	//	index is at most 2 decimal digits; at this moment, only 1 decimal digits
 
-	strLen := len(outPointRing.BlockHashs)*(2*chainhash.HashSize+1) + len(outPointRing.OutPoints)*(2*chainhash.HashSize+2) + 1
+	strLen := len(outPointRing.BlockHashs)*(2*chainhash.HashSize+1+1) + len(outPointRing.OutPoints)*(2*chainhash.HashSize+1+1) + 1
 	// Version is not included in the string
 
-	buf := make([]byte, strLen, strLen+10)
+	buf := make([]byte, strLen, strLen+11)
 
 	pos := 0
 
@@ -352,7 +352,7 @@ func (txIn *TxInAbe) String() string {
 		return err.Error()
 	}
 	strLen := 2*snLen + 1 +
-		len(txIn.PreviousOutPointRing.BlockHashs)*(2*chainhash.HashSize+1) + len(txIn.PreviousOutPointRing.OutPoints)*(2*chainhash.HashSize+2) + 1
+		len(txIn.PreviousOutPointRing.BlockHashs)*(2*chainhash.HashSize+1+1) + len(txIn.PreviousOutPointRing.OutPoints)*(2*chainhash.HashSize+1+1) + 1
 
 	buf := make([]byte, strLen)
 
