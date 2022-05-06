@@ -1308,6 +1308,7 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	// if we're syncing the chain from scratch.
 	if blkHashUpdate != nil && heightUpdate != 0 {
 		peer.UpdateLastBlockHeight(heightUpdate)
+		peer.UpdateLastAnnouncedBlock(blkHashUpdate)
 		if isOrphan || sm.current() {
 			go sm.peerNotifier.UpdatePeerHeights(blkHashUpdate, heightUpdate,
 				peer)
@@ -1680,6 +1681,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		blkHeight, err := sm.chain.BlockHeightByHash(&invVects[lastBlock].Hash)
 		if err == nil {
 			peer.UpdateLastBlockHeight(blkHeight)
+			peer.UpdateLastAnnouncedBlock(&invVects[lastBlock].Hash)
 		}
 	}
 
