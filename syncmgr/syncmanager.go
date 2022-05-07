@@ -586,7 +586,7 @@ func (sm *SyncManager) handleTxMsgAbe(tmsg *txMsgAbe) {
 		return
 	}
 
-	log.Debugf("Receive tx message whose hash is %s from peer %s", tmsg.tx.MsgTx().TxHash().String(), peer)
+	// log.Debugf("Receive tx message whose hash is %s from peer %s", tmsg.tx.MsgTx().TxHash().String(), peer)
 
 	// NOTE:  BitcoinJ, and possibly other wallets, don't follow the spec of
 	// sending an inventory message and allowing the remote peer to decide
@@ -1108,7 +1108,7 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 		return
 	}
 
-	log.Debugf("Receive pruned block hash %s from peer %s", bmsg.block.Hash().String(), peer)
+	// log.Debugf("Receive pruned block hash %s from peer %s", bmsg.block.Hash().String(), peer)
 
 	// If we didn't ask for this block then the peer is misbehaving.
 	blockHash := bmsg.block.Hash()
