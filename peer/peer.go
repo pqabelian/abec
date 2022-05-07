@@ -1269,10 +1269,13 @@ out:
 					// TODO(ABE): ABE does not support filter.
 				//case wire.CmdMerkleBlock:
 				//	fallthrough
+				case wire.CmdPrunedBlock:
+					fallthrough
 				case wire.CmdTx:
 					fallthrough
 				case wire.CmdNotFound:
 					delete(pendingResponses, wire.CmdBlock)
+					delete(pendingResponses, wire.CmdPrunedBlock)
 					//delete(pendingResponses, wire.CmdMerkleBlock)
 					delete(pendingResponses, wire.CmdTx)
 					delete(pendingResponses, wire.CmdNotFound)
