@@ -1,4 +1,4 @@
-# ABEl User Manual
+# ABEL User Manual
 
 The following instructions will lead you to set up a full node (mining and keeping a copy of the full chain) and create an ABEL wallet.
 
