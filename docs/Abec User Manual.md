@@ -207,7 +207,7 @@ Example:
 
 ```shell
 ./start_abec.sh --generate
-2022-04-16 20:28:50.804 [INF] ABEC: Version 0.9.5-alpha
+2022-04-16 20:28:50.804 [INF] ABEC: Version 0.9.6
 2022-04-16 20:28:50.837 [INF] ABEC: Loading block database from 'C:\Users\username\AppData\Local\Abec\data\mainnet\blocks_ffldb'
 2022-04-16 20:28:50.848 [INF] ABEC: Block database loaded
 2022-04-16 20:28:50.862 [INF] CHAN: Loading block index...
@@ -303,7 +303,7 @@ Example:
 ```shell
 ./start_abewallet.sh --walletpass=123456
 2022-04-16 12:51:33.344 [INF] WLLT: Opened wallet
-2022-04-16 12:54:29.015 [INF] ABEW: Version 0.9.5-alpha
+2022-04-16 12:54:29.015 [INF] ABEW: Version 0.9.6
 2022-04-16 12:54:29.047 [INF] RPCS: Listening on [::1]:8665
 2022-04-16 12:54:29.047 [INF] RPCS: Listening on 127.0.0.1:8665
 2022-04-16 12:54:29.048 [INF] ABEW: Attempting RPC client connection to localhost:8667
@@ -352,8 +352,7 @@ Example:
   4508,
   2971.9892438,
   1536.0107562,
-  0,
-  7
+  0
 ]
 ```
 
@@ -363,7 +362,6 @@ From the top to the bottom
 - spendable balance
 - freezed coinbase balance
 - freezed transaction balance
-- number of blocks need to be updated. Especially, when querying the currency value after restoring the wallet, if the value is not zero, it means that the balance query is not necessarily accurate.
 
 #### If Abectl and Abewallet are on different machine
 
@@ -393,8 +391,7 @@ Example:
   4508,
   2971.9892438,
   1536.0107562,
-  0,
-  7
+  0
 ]
 ```
 
@@ -494,24 +491,10 @@ NOTE: Use the --walletpass option to configure your public passphrase.
 Do you have an existing wallet seed you want to use? (n/no/y/yes) [no]: y
 Enter the crypto version is:0
 Enter existing wallet mnemonic: biology,hazard,sudden,dignity,drop,jealous,butter,believe,answer,enter,practice,scorpion,health,tunnel,rival,vault,neutral,season,proof,must,path,steel,final,female
-Enter the restore number of address :3
+Please input the max No. of address to recover :5
 Creating the wallet...
-Please remember the initial address:
-0002000000d066f987f3061cb1def09052d14706d5f398ecf00800ad4dfdf65b24f204eee609f9f0fb1e855ff3f80ead6cfc3e973743f8bf530f25f4ca0945e2f0d04e0ee40d3cdc9bd6f789daeeb700f4c8373e0f322ccdaa010fec461bff2a0b2b3ff992b0338e04bb0cc89c068fecb4f5f576dc54bbfd236faf3ff9acde7e29f5b55092d406d6940726fd77841871f05dae336f06dab699c808ec4407830ca9b7a3e0f52e7dcc190614ebd8a8fcbf1448bc05df4bcea8fc573becfdfadc8377810621a562f70cffe06e1802eb751d46f0d72511af0ccf0317df0bf0da429c08193e7d0b0328c0d4ca070a41d2a9...
+2022-05-07 19:55:01.548 [INF] WLLT: The addresses with No. in [0, 5] have been restored.
+2022-05-07 19:55:02.282 [INF] WLLT: Opened wallet
+The wallet has been created successfully.
 ```
-
-The number of address restored depends on how many number of address you have created before.
-
-### 5.6 Refresh the wallet
-
-When recovering the wallet, the wallet balance would be inaccurate, after unlock the wallet, you can  run
-
-```shell
-# Macos and Linux
-./start_abectl.sh --rpcuser=[rpcuser] --rpcpass=[rpcpass] --wallet freshen
-# Windows
-abectl --rpcuser=[rpcuser] --rpcpass=[rpcpass] --wallet refresh
-```
-
-It would return "true" as response.
 
