@@ -358,8 +358,8 @@ func (sm *SyncManager) startSync() {
 			return
 		}
 
-		log.Infof("Syncing to block height %d (hash %s) from peer %v",
-			bestPeer.LastBlock(), bestPeer.LastAnnouncedBlock(), bestPeer.Addr())
+		log.Infof("Syncing to block height %d from peer %v",
+			bestPeer.LastBlock(), bestPeer.Addr())
 
 		// When the current height is less than a known checkpoint we
 		// can use block headers to learn about which blocks comprise
