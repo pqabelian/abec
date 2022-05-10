@@ -12,3 +12,5 @@
 *.out
 .idea/
 genesisblock.txt
+
+**/.DS_Store
