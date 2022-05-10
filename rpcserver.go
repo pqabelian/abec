@@ -1470,9 +1470,10 @@ func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 		return nil, rpcDecodeHexError(c.Hash)
 	}
 	var blkBytes []byte
+	var witnesses [][]byte
 	err = s.cfg.DB.View(func(dbTx database.Tx) error {
 		var err error
-		blkBytes, err = dbTx.FetchBlock(hash)
+		blkBytes, witnesses, err = dbTx.FetchBlockAbe(hash)
 		return err
 	})
 	if err != nil {
@@ -1493,6 +1494,12 @@ func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	if err != nil {
 		context := "Failed to deserialize block"
 		return nil, internalRPCError(err.Error(), context)
+	}
+
+	// Witness
+	txs := blk.Transactions()
+	for i := 0; i < len(txs); i++ {
+		txs[i].MsgTx().TxWitness = witnesses[i][chainhash.HashSize:]
 	}
 
 	// Get the block height from chain.
