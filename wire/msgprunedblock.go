@@ -183,6 +183,6 @@ func NewMsgBlockPrunedFromMsgBlockAbe(block *MsgBlockAbe) (*MsgPrunedBlock, erro
 	if err != nil {
 		return nil, err
 	}
-	res.TransactionHashes = append(res.WitnessHashs, witHashes[1:]...)
+	res.WitnessHashs = append(res.WitnessHashs, witHashes[1:]...)
 	return res, nil
 }
