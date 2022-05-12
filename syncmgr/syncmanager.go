@@ -1202,13 +1202,14 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	for i := 0; i < len(bmsg.block.MsgPrunedBlock().TransactionHashes); i++ {
 		txHash := bmsg.block.MsgPrunedBlock().TransactionHashes[i]
 		if sm.txMemPool.HaveTransaction(&txHash) {
-			tx, err := sm.txMemPool.FetchTransaction(&txHash)
-			if err != nil {
-				msgBlockAbe.Transactions = append(msgBlockAbe.Transactions, txmap[txHash])
-			}
+			tx, _ := sm.txMemPool.FetchTransaction(&txHash)
 			msgBlockAbe.Transactions = append(msgBlockAbe.Transactions, tx.MsgTx())
+			witnessHash := chainhash.DoubleHashH(tx.MsgTx().TxWitness)
+			msgBlockAbe.WitnessHashs = append(msgBlockAbe.WitnessHashs, &witnessHash)
 		} else {
 			msgBlockAbe.Transactions = append(msgBlockAbe.Transactions, txmap[txHash])
+			witnessHash := chainhash.DoubleHashH(txmap[txHash].TxWitness)
+			msgBlockAbe.WitnessHashs = append(msgBlockAbe.WitnessHashs, &witnessHash)
 		}
 	}
 
