@@ -23,6 +23,7 @@ var (
 	// 0x1e
 	//mainPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 224), bigOne)
 	mainPowLimit = new(big.Int).Lsh(new(big.Int).SetInt64(0x017c38), 208)
+
 	// regressionPowLimit is the highest proof of work value a block
 	// can have for the regression test network.  It is the value 2^255 - 1.
 	regressionPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 255), bigOne)
@@ -291,7 +292,6 @@ var MainNetParams = Params{
 // RegressionNetParams defines the network parameters for the regression test
 // network.  Not to be confused with the test network (version
 // 3), this network is sometimes simply called "testnet".
-// todo: not correct, maybe modify or delete in the future
 var RegressionNetParams = Params{
 	Name: "regtest",
 	Net:  wire.TestNet,
@@ -304,11 +304,11 @@ var RegressionNetParams = Params{
 	GenesisHash:              &regTestGenesisHash,
 	PowLimit:                 regressionPowLimit,
 	PowLimitBits:             0x207fffff,
-	CoinbaseMaturity:         100,
-	SubsidyReductionInterval: 150,
-	TargetTimespan:           time.Hour * 24 * 14, // 14 days
-	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
-	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
+	CoinbaseMaturity:         200,
+	SubsidyReductionInterval: 400_000,
+	TargetTimespan:           time.Second * 256 * 4000,
+	TargetTimePerBlock:       time.Second * 256,
+	RetargetAdjustmentFactor: 4, // 25% less, 400% more
 	ReduceMinDifficulty:      true,
 	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
 	GenerateSupported:        true,
@@ -335,36 +335,38 @@ var RegressionNetParams = Params{
 
 	// Human-readable part for Bech32 encoded segwit addresses, as defined in
 	// BIP 173.
-	Bech32HRPSegwit: "bcrt", // always bcrt for reg test net
+	Bech32HRPSegwit: "rb",
 
 	// Address encoding magics
-	PubKeyHashAddrID: 0x6f, // starts with m or n
-	ScriptHashAddrID: 0xc4, // starts with 2
-	PrivateKeyID:     0xef, // starts with 9 (uncompressed) or c (compressed)
+	PQRingCTID:              0x00, // starts with 1, TODO(abe): adjust the prefix
+	PubKeyHashAddrID:        0x00, // starts with 1
+	ScriptHashAddrID:        0x05, // starts with 3
+	PrivateKeyID:            0x80, // starts with 5 (uncompressed) or K (compressed)
+	WitnessPubKeyHashAddrID: 0x06, // starts with p2
+	WitnessScriptHashAddrID: 0x0A, // starts with 7Xh
 
 	// BIP32 hierarchical deterministic extended key magics
-	HDPrivateKeyID: [4]byte{0x04, 0x35, 0x83, 0x94}, // starts with tprv
-	HDPublicKeyID:  [4]byte{0x04, 0x35, 0x87, 0xcf}, // starts with tpub
+	HDPrivateKeyID: [4]byte{0x04, 0x88, 0xad, 0xe4}, // starts with xprv
+	HDPublicKeyID:  [4]byte{0x04, 0x88, 0xb2, 0x1e}, // starts with xpub
 
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
-	HDCoinType: 1,
+	HDCoinType: 0,
 }
 
 // TestNet3Params defines the network parameters for the test network
 // (version 3).  Not to be confused with the regression test network, this
 // network is sometimes simply called "testnet".
-// todo: not correct, maybe modify or delete in the future
 var TestNet3Params = Params{
 	Name: "testnet3",
 	Net:  wire.TestNet3,
 	//DefaultPort: "18333",
 	DefaultPort: "18666",
-	DNSSeeds: []DNSSeed{
-		{"testnet-seed.bitcoin.jonasschnelli.ch", true},
-		{"testnet-seed.bitcoin.schildbach.de", false},
-		{"seed.tbtc.petertodd.org", true},
-		{"testnet-seed.bluematt.me", false},
+	DNSSeeds:    []DNSSeed{
+		//{"testnet-seed.bitcoin.jonasschnelli.ch", true},
+		//{"testnet-seed.bitcoin.schildbach.de", false},
+		//{"seed.tbtc.petertodd.org", true},
+		//{"testnet-seed.bluematt.me", false},
 	},
 
 	// Chain parameters
@@ -372,11 +374,11 @@ var TestNet3Params = Params{
 	GenesisHash:              &testNet3GenesisHash,
 	PowLimit:                 testNet3PowLimit,
 	PowLimitBits:             0x1d00ffff,
-	CoinbaseMaturity:         100,
-	SubsidyReductionInterval: 210000,
-	TargetTimespan:           time.Hour * 24 * 14, // 14 days
-	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
-	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
+	CoinbaseMaturity:         200,
+	SubsidyReductionInterval: 400_000,
+	TargetTimespan:           time.Second * 256 * 4000,
+	TargetTimePerBlock:       time.Second * 256,
+	RetargetAdjustmentFactor: 4, // 25% less, 400% more
 	ReduceMinDifficulty:      true,
 	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
 	GenerateSupported:        false,
@@ -391,12 +393,12 @@ var TestNet3Params = Params{
 	//   target proof of work timespan / target proof of work spacing
 	RuleChangeActivationThreshold: 1512, // 75% of MinerConfirmationWindow
 	MinerConfirmationWindow:       2016,
-	Deployments: [DefinedDeployments]ConsensusDeployment{
-		DeploymentTestDummy: {
-			BitNumber:  28,
-			StartTime:  1199145601, // January 1, 2008 UTC
-			ExpireTime: 1230767999, // December 31, 2008 UTC
-		},
+	Deployments:                   [DefinedDeployments]ConsensusDeployment{
+		//DeploymentTestDummy: {
+		//	BitNumber:  28,
+		//	StartTime:  1199145601, // January 1, 2008 UTC
+		//	ExpireTime: 1230767999, // December 31, 2008 UTC
+		//},
 	},
 
 	// Mempool parameters
@@ -404,22 +406,23 @@ var TestNet3Params = Params{
 
 	// Human-readable part for Bech32 encoded segwit addresses, as defined in
 	// BIP 173.
-	Bech32HRPSegwit: "tb", // always tb for test net
+	Bech32HRPSegwit: "tb",
 
 	// Address encoding magics
-	PubKeyHashAddrID:        0x6f, // starts with m or n
-	ScriptHashAddrID:        0xc4, // starts with 2
-	WitnessPubKeyHashAddrID: 0x03, // starts with QW
-	WitnessScriptHashAddrID: 0x28, // starts with T7n
-	PrivateKeyID:            0xef, // starts with 9 (uncompressed) or c (compressed)
+	PQRingCTID:              0x00, // starts with 1, TODO(abe): adjust the prefix
+	PubKeyHashAddrID:        0x00, // starts with 1
+	ScriptHashAddrID:        0x05, // starts with 3
+	PrivateKeyID:            0x80, // starts with 5 (uncompressed) or K (compressed)
+	WitnessPubKeyHashAddrID: 0x06, // starts with p2
+	WitnessScriptHashAddrID: 0x0A, // starts with 7Xh
 
 	// BIP32 hierarchical deterministic extended key magics
-	HDPrivateKeyID: [4]byte{0x04, 0x35, 0x83, 0x94}, // starts with tprv
-	HDPublicKeyID:  [4]byte{0x04, 0x35, 0x87, 0xcf}, // starts with tpub
+	HDPrivateKeyID: [4]byte{0x04, 0x88, 0xad, 0xe4}, // starts with xprv
+	HDPublicKeyID:  [4]byte{0x04, 0x88, 0xb2, 0x1e}, // starts with xpub
 
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
-	HDCoinType: 1,
+	HDCoinType: 0,
 }
 
 // SimNetParams defines the network parameters for the simulation test
