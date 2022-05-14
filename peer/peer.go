@@ -122,9 +122,9 @@ type MessageListeners struct {
 	// OnBlock is invoked when a peer receives a block bitcoin message.
 	OnBlock func(p *Peer, msg *wire.MsgBlockAbe, buf []byte)
 
-	OnPrunedBlock func(p *Peer, msg *wire.MsgPrunedBlock, buf []byte)
-	OnNeedSet     func(p *Peer, msg *wire.MsgNeedSet, buf []byte)
-	//OnNeedSetResult func(p *Peer, msg *wire.MsgNeedSetResult, buf []byte)
+	OnPrunedBlock   func(p *Peer, msg *wire.MsgPrunedBlock, buf []byte)
+	OnNeedSet       func(p *Peer, msg *wire.MsgNeedSet, buf []byte)
+	OnNeedSetResult func(p *Peer, msg *wire.MsgNeedSetResult, buf []byte)
 
 	// TODO(ABE): ABE does not support filter.
 	//// OnCFilter is invoked when a peer receives a cfilter bitcoin message.
@@ -818,6 +818,10 @@ func (p *Peer) IsWitnessEnabled() bool {
 	return witnessEnabled
 }
 
+func (p *Peer) StoreNeedSetResult(msg *wire.MsgNeedSetResult) {
+	p.needsetResult.Store(msg.BlockHash, msg)
+}
+
 // PushAddrMsg sends an addr message to the connected peer using the provided
 // addresses.  This function is useful over manually sending the message via
 // QueueMessage since it automatically limits the addresses to the maximum
@@ -1503,7 +1507,9 @@ out:
 			}
 
 		case *wire.MsgNeedSetResult:
-			p.needsetResult.Store(msg.BlockHash, msg)
+			if p.cfg.Listeners.OnNeedSetResult != nil {
+				p.cfg.Listeners.OnNeedSetResult(p, msg, buf)
+			}
 
 		case *wire.MsgInv:
 			if p.cfg.Listeners.OnInv != nil {

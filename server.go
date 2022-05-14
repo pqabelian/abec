@@ -516,6 +516,7 @@ func (sp *serverPeer) OnPrunedBlock(p *peer.Peer, msg *wire.MsgPrunedBlock, buf 
 	// the block has been fully processed.
 	sp.server.syncManager.QueuePrunedBlock(prunedBlock, sp.Peer, nil)
 }
+
 func (sp *serverPeer) OnNeedSet(_ *peer.Peer, msg *wire.MsgNeedSet, buf []byte) {
 	// Convert the raw MsgBlock to a abeutil.Block which provides some
 	// convenience methods and things such as hash caching.
@@ -523,6 +524,28 @@ func (sp *serverPeer) OnNeedSet(_ *peer.Peer, msg *wire.MsgNeedSet, buf []byte) 
 	if err != nil {
 		// do nothing
 	}
+}
+
+func (sp *serverPeer) OnNeedSetResult(p *peer.Peer, msg *wire.MsgNeedSetResult, buf []byte) {
+
+	state, exists := sp.server.syncManager.PeerStates()[p]
+	if !exists {
+		peerLog.Warnf("Received pruned block message from unknown peer %s", p)
+		return
+	}
+
+	// If we didn't ask for this needset then the peer is misbehaving.
+	if _, exists = state.RequestedNeedSet()[msg.BlockHash]; !exists {
+		// Disconnect with the misbehaving peer
+		peerLog.Warnf("Got unrequested needset %v from %s -- "+
+			"disconnecting", msg.BlockHash, p.Addr())
+		p.Disconnect()
+		return
+	}
+
+	delete(state.RequestedNeedSet(), msg.BlockHash)
+
+	p.StoreNeedSetResult(msg)
 }
 
 // OnInv is invoked when a peer receives an inv message and is
@@ -1658,24 +1681,24 @@ func disconnectPeer(peerList map[int32]*serverPeer, compareFunc func(*serverPeer
 func newPeerConfig(sp *serverPeer) *peer.Config {
 	return &peer.Config{
 		Listeners: peer.MessageListeners{
-			OnVersion:     sp.OnVersion,
-			OnVerAck:      sp.OnVerAck,
-			OnTx:          sp.OnTx,
-			OnBlock:       sp.OnBlock,
-			OnPrunedBlock: sp.OnPrunedBlock,
-			OnNeedSet:     sp.OnNeedSet,
-			//OnNeedSetResult: sp.OnNeedSetResult,
-			OnInv:        sp.OnInv,
-			OnHeaders:    sp.OnHeaders,
-			OnGetData:    sp.OnGetData,
-			OnGetBlocks:  sp.OnGetBlocks,
-			OnGetHeaders: sp.OnGetHeaders,
-			OnFeeFilter:  sp.OnFeeFilter,
-			OnGetAddr:    sp.OnGetAddr,
-			OnAddr:       sp.OnAddr,
-			OnRead:       sp.OnRead,
-			OnWrite:      sp.OnWrite,
-			OnNotFound:   sp.OnNotFound,
+			OnVersion:       sp.OnVersion,
+			OnVerAck:        sp.OnVerAck,
+			OnTx:            sp.OnTx,
+			OnBlock:         sp.OnBlock,
+			OnPrunedBlock:   sp.OnPrunedBlock,
+			OnNeedSet:       sp.OnNeedSet,
+			OnNeedSetResult: sp.OnNeedSetResult,
+			OnInv:           sp.OnInv,
+			OnHeaders:       sp.OnHeaders,
+			OnGetData:       sp.OnGetData,
+			OnGetBlocks:     sp.OnGetBlocks,
+			OnGetHeaders:    sp.OnGetHeaders,
+			OnFeeFilter:     sp.OnFeeFilter,
+			OnGetAddr:       sp.OnGetAddr,
+			OnAddr:          sp.OnAddr,
+			OnRead:          sp.OnRead,
+			OnWrite:         sp.OnWrite,
+			OnNotFound:      sp.OnNotFound,
 
 			// Note: The reference client currently bans peers that send alerts
 			// not signed with its key.  We could verify against their key, but

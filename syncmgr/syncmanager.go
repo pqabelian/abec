@@ -160,10 +160,15 @@ type headerNode struct {
 // peerSyncState stores additional information that the SyncManager tracks
 // about a peer.
 type peerSyncState struct {
-	syncCandidate   bool
-	requestQueue    []*wire.InvVect
-	requestedTxns   map[chainhash.Hash]struct{}
-	requestedBlocks map[chainhash.Hash]struct{}
+	syncCandidate    bool
+	requestQueue     []*wire.InvVect
+	requestedTxns    map[chainhash.Hash]struct{}
+	requestedBlocks  map[chainhash.Hash]struct{}
+	requestedNeedSet map[chainhash.Hash]struct{}
+}
+
+func (p peerSyncState) RequestedNeedSet() map[chainhash.Hash]struct{} {
+	return p.requestedNeedSet
 }
 
 // limitAdd is a helper function for maps that require a maximum limit by
@@ -218,6 +223,10 @@ type SyncManager struct {
 
 	// An optional fee estimator.
 	feeEstimator *mempool.FeeEstimator
+}
+
+func (sm *SyncManager) PeerStates() map[*peerpkg.Peer]*peerSyncState {
+	return sm.peerStates
 }
 
 // resetHeaderState sets the headers-first mode state to values appropriate for
@@ -446,9 +455,10 @@ func (sm *SyncManager) handleNewPeerMsg(peer *peerpkg.Peer) {
 	// Initialize the peer state
 	isSyncCandidate := sm.isSyncCandidate(peer)
 	sm.peerStates[peer] = &peerSyncState{
-		syncCandidate:   isSyncCandidate,
-		requestedTxns:   make(map[chainhash.Hash]struct{}),
-		requestedBlocks: make(map[chainhash.Hash]struct{}),
+		syncCandidate:    isSyncCandidate,
+		requestedTxns:    make(map[chainhash.Hash]struct{}),
+		requestedBlocks:  make(map[chainhash.Hash]struct{}),
+		requestedNeedSet: make(map[chainhash.Hash]struct{}),
 	}
 
 	// Start syncing by choosing the best candidate if needed.
@@ -1182,6 +1192,8 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	txmap := make(map[chainhash.Hash]*wire.MsgTxAbe)
 	if len(needSet) != 0 {
 		log.Debugf("Missing %v transactions in pruned block %s from peer %s, sending needset message...", len(needSet), bmsg.block.Hash().String(), peer)
+		syncPeerState := sm.peerStates[sm.syncPeer]
+		syncPeerState.requestedNeedSet[*blockHash] = struct{}{}
 		txs, err := peer.PushNeedSetMsg(*blockHash, needSet)
 
 		if txs == nil || err != nil {
@@ -1207,8 +1219,14 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 			witnessHash := chainhash.DoubleHashH(tx.MsgTx().TxWitness)
 			msgBlockAbe.WitnessHashs = append(msgBlockAbe.WitnessHashs, &witnessHash)
 		} else {
-			msgBlockAbe.Transactions = append(msgBlockAbe.Transactions, txmap[txHash])
-			witnessHash := chainhash.DoubleHashH(txmap[txHash].TxWitness)
+			tx, ok := txmap[txHash]
+			if !ok {
+				log.Infof("Rejected block %v from %s: incorrect needsetresult", blockHash, peer)
+				peer.PushRejectMsg(wire.CmdPrunedBlock, wire.RejectInvalid, "incorrect needsetresult", blockHash, false)
+				return
+			}
+			msgBlockAbe.Transactions = append(msgBlockAbe.Transactions, tx)
+			witnessHash := chainhash.DoubleHashH(tx.TxWitness)
 			msgBlockAbe.WitnessHashs = append(msgBlockAbe.WitnessHashs, &witnessHash)
 		}
 	}
