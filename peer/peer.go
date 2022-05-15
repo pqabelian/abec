@@ -957,7 +957,7 @@ func (p *Peer) PushNeedSetMsg(blockHash chainhash.Hash, hashes []chainhash.Hash)
 	p.QueueMessage(msg, nil)
 	//	todo (ABE): No need to get the reply? if the correspoding peer does not give any reply, what will happen?
 	//	todo (ABE): how to guarantee the corresponding peer think itself to be cureent?
-	timeout := time.Tick(time.Minute * 2)
+	timeout := time.Tick(time.Second * 30)
 
 	for {
 		select {

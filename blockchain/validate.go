@@ -1049,7 +1049,7 @@ func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blo
 		// previous block.
 		blockHeight := prevNode.height + 1
 
-		coinbaseTx := block.Transactions()[0] // TODO(abe): for testing 1,2,5,10, we should adjust the checking logical
+		coinbaseTx := block.Transactions()[0]
 		err := checkSerializedHeightAbe(coinbaseTx, blockHeight)
 		if err != nil {
 			return err

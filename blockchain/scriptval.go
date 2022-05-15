@@ -689,6 +689,7 @@ func ValidateTransactionScriptsAbe2(tx *abeutil.TxAbe, utxoRingView *UtxoRingVie
 
 //	new validate function under pqringct
 // to be discussed
+// todo(20220515): should be called by mempool and blockchain
 func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingViewpoint) error {
 
 	txInLen := len(tx.MsgTx().TxIns)
