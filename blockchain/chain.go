@@ -1554,6 +1554,14 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 //
 // This function MUST be called with the chain state lock held (for writes).
 //	Abe todo
+//   1. If it is the next block of current best block (main chain)
+//     1. Check and connect block on the chain (checkConnectBlockAbe) (including witness check)
+//     2. If matches the specific height, generate new utxo rings and add them into ring view (newUtxoRingEntries)
+//     3. Update and store the new best state, block index, utxo rings and spent journal (connectBlockAbe)
+//     4. Mark the new block as valid in database
+//   2. If it is not the next block of current best block
+//     1. Log and return if worksum is smaller than main chain
+//     2. Reorganize the chain if worksum is greater than mainchain (getReorganizeNodesAbe) todo: to be checked
 func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAbe, flags BehaviorFlags) (bool, error) {
 	fastAdd := flags&BFFastAdd == BFFastAdd
 

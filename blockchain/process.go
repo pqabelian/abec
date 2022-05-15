@@ -42,7 +42,9 @@ func (b *BlockChain) blockExists(hash *chainhash.Hash) (bool, error) {
 	var exists bool
 	err := b.db.View(func(dbTx database.Tx) error {
 		var err error
+		// todo (20220515): rename to HasBlockAbe or not?
 		exists, err = dbTx.HasBlock(hash)
+		// todo (20220515): why !exist?
 		if err != nil || !exists {
 			return err
 		}
@@ -135,6 +137,13 @@ func (b *BlockChain) processOrphansAbe(hash *chainhash.Hash, flags BehaviorFlags
 // whether or not the block is an orphan.
 //
 // This function is safe for concurrent access.
+//   1. The block should not exist on main chain or side chain or an orphan
+//   2. Preliminary check on block sanity (checkBlockSanityAbe)
+//   3. The timestamp of the block should after the latest checkpoint. The difficulty should be at least the
+//      easiest one that can be adjusted since last checkpoint (in not fast add mode)
+//   4. Check if it is orphan block (if so, add it into orphan map and return)
+//   5. Connect the new block into the chain (maybeAcceptBlockAbe)
+//   6. If any orphan blocks depend on this block, accept it (processOrphansAbe) todo: to be checked
 //	todo(ABE):
 func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, flags BehaviorFlags) (bool, bool, error) {
 	b.chainLock.Lock()
