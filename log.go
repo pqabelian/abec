@@ -55,7 +55,7 @@ var (
 	adxrLog = backendLog.Logger("ADXR")
 	amgrLog = backendLog.Logger("AMGR")
 	cmgrLog = backendLog.Logger("CMGR")
-	bcdbLog = backendLog.Logger("BCDB")
+	abdbLog = backendLog.Logger("ABDB")
 	abecLog = backendLog.Logger("ABEC")
 	chanLog = backendLog.Logger("CHAN")
 	discLog = backendLog.Logger("DISC")
@@ -73,7 +73,7 @@ var (
 func init() {
 	netaddrmgr.UseLogger(amgrLog)
 	connmgr.UseLogger(cmgrLog)
-	database.UseLogger(bcdbLog)
+	database.UseLogger(abdbLog)
 	blockchain.UseLogger(chanLog)
 	indexers.UseLogger(indxLog)
 	mining.UseLogger(minrLog)
@@ -89,7 +89,7 @@ var subsystemLoggers = map[string]abelog.Logger{
 	"ADXR": adxrLog,
 	"AMGR": amgrLog,
 	"CMGR": cmgrLog,
-	"BCDB": bcdbLog,
+	"ABDB": abdbLog,
 	"ABEC": abecLog,
 	"CHAN": chanLog,
 	"DISC": discLog,

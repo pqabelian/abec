@@ -96,30 +96,30 @@ var (
 // handler goroutine blocks until the callback has completed.  Doing so will
 // result in a deadlock.
 type MessageListeners struct {
-	// OnGetAddr is invoked when a peer receives a getaddr bitcoin message.
+	// OnGetAddr is invoked when a peer receives a getaddr abelian message.
 	OnGetAddr func(p *Peer, msg *wire.MsgGetAddr)
 
-	// OnAddr is invoked when a peer receives an addr bitcoin message.
+	// OnAddr is invoked when a peer receives an addr abelian message.
 	OnAddr func(p *Peer, msg *wire.MsgAddr)
 
-	// OnPing is invoked when a peer receives a ping bitcoin message.
+	// OnPing is invoked when a peer receives a ping abelian message.
 	OnPing func(p *Peer, msg *wire.MsgPing)
 
-	// OnPong is invoked when a peer receives a pong bitcoin message.
+	// OnPong is invoked when a peer receives a pong abelian message.
 	OnPong func(p *Peer, msg *wire.MsgPong)
 
-	// OnAlert is invoked when a peer receives an alert bitcoin message.
+	// OnAlert is invoked when a peer receives an alert abelian message.
 	OnAlert func(p *Peer, msg *wire.MsgAlert)
 
 	// TODO(ABE): ABE does not support filter.
-	// OnMemPool is invoked when a peer receives a mempool bitcoin message.
+	// OnMemPool is invoked when a peer receives a mempool abelian message.
 	//OnMemPool func(p *Peer, msg *wire.MsgMemPool)
 
-	// OnTx is invoked when a peer receives a tx bitcoin message.
+	// OnTx is invoked when a peer receives a tx abelian message.
 	//	OnTx    func(p *Peer, msg *wire.MsgTx)
 	OnTx func(p *Peer, msg *wire.MsgTxAbe)
 
-	// OnBlock is invoked when a peer receives a block bitcoin message.
+	// OnBlock is invoked when a peer receives a block abelian message.
 	OnBlock func(p *Peer, msg *wire.MsgBlockAbe, buf []byte)
 
 	OnPrunedBlock   func(p *Peer, msg *wire.MsgPrunedBlock, buf []byte)
@@ -127,86 +127,86 @@ type MessageListeners struct {
 	OnNeedSetResult func(p *Peer, msg *wire.MsgNeedSetResult, buf []byte)
 
 	// TODO(ABE): ABE does not support filter.
-	//// OnCFilter is invoked when a peer receives a cfilter bitcoin message.
+	//// OnCFilter is invoked when a peer receives a cfilter abelian message.
 	//OnCFilter func(p *Peer, msg *wire.MsgCFilter)
 	//
-	//// OnCFHeaders is invoked when a peer receives a cfheaders bitcoin
+	//// OnCFHeaders is invoked when a peer receives a cfheaders abelian
 	//// message.
 	//OnCFHeaders func(p *Peer, msg *wire.MsgCFHeaders)
 	//
-	//// OnCFCheckpt is invoked when a peer receives a cfcheckpt bitcoin
+	//// OnCFCheckpt is invoked when a peer receives a cfcheckpt abelian
 	//// message.
 	//OnCFCheckpt func(p *Peer, msg *wire.MsgCFCheckpt)
 
-	// OnInv is invoked when a peer receives an inv bitcoin message.
+	// OnInv is invoked when a peer receives an inv abelian message.
 	OnInv func(p *Peer, msg *wire.MsgInv)
 
-	// OnHeaders is invoked when a peer receives a headers bitcoin message.
+	// OnHeaders is invoked when a peer receives a headers abelian message.
 	OnHeaders func(p *Peer, msg *wire.MsgHeaders)
 
-	// OnNotFound is invoked when a peer receives a notfound bitcoin
+	// OnNotFound is invoked when a peer receives a notfound abelian
 	// message.
 	OnNotFound func(p *Peer, msg *wire.MsgNotFound)
 
-	// OnGetData is invoked when a peer receives a getdata bitcoin message.
+	// OnGetData is invoked when a peer receives a getdata abelian message.
 	OnGetData func(p *Peer, msg *wire.MsgGetData)
 
-	// OnGetBlocks is invoked when a peer receives a getblocks bitcoin
+	// OnGetBlocks is invoked when a peer receives a getblocks abelian
 	// message.
 	OnGetBlocks func(p *Peer, msg *wire.MsgGetBlocks)
 
-	// OnGetHeaders is invoked when a peer receives a getheaders bitcoin
+	// OnGetHeaders is invoked when a peer receives a getheaders abelian
 	// message.
 	OnGetHeaders func(p *Peer, msg *wire.MsgGetHeaders)
 
 	// TODO(ABE): ABE does not support filter.
-	//// OnGetCFilters is invoked when a peer receives a getcfilters bitcoin
+	//// OnGetCFilters is invoked when a peer receives a getcfilters abelian
 	//// message.
 	//OnGetCFilters func(p *Peer, msg *wire.MsgGetCFilters)
 	//
 	//// OnGetCFHeaders is invoked when a peer receives a getcfheaders
-	//// bitcoin message.
+	//// abelian message.
 	//OnGetCFHeaders func(p *Peer, msg *wire.MsgGetCFHeaders)
 	//
 	//// OnGetCFCheckpt is invoked when a peer receives a getcfcheckpt
-	//// bitcoin message.
+	//// abelian message.
 	//OnGetCFCheckpt func(p *Peer, msg *wire.MsgGetCFCheckpt)
 
-	// OnFeeFilter is invoked when a peer receives a feefilter bitcoin message.
+	// OnFeeFilter is invoked when a peer receives a feefilter abelian message.
 	OnFeeFilter func(p *Peer, msg *wire.MsgFeeFilter)
 
 	// TODO(ABE): ABE does not support filter.
-	//// OnFilterAdd is invoked when a peer receives a filteradd bitcoin message.
+	//// OnFilterAdd is invoked when a peer receives a filteradd abelian message.
 	//OnFilterAdd func(p *Peer, msg *wire.MsgFilterAdd)
 	//
-	//// OnFilterClear is invoked when a peer receives a filterclear bitcoin
+	//// OnFilterClear is invoked when a peer receives a filterclear abelian
 	//// message.
 	//OnFilterClear func(p *Peer, msg *wire.MsgFilterClear)
 	//
-	//// OnFilterLoad is invoked when a peer receives a filterload bitcoin
+	//// OnFilterLoad is invoked when a peer receives a filterload abelian
 	//// message.
 	//OnFilterLoad func(p *Peer, msg *wire.MsgFilterLoad)
 	//
-	//// OnMerkleBlock  is invoked when a peer receives a merkleblock bitcoin
+	//// OnMerkleBlock  is invoked when a peer receives a merkleblock abelian
 	//// message.
 	//OnMerkleBlock func(p *Peer, msg *wire.MsgMerkleBlock)
 
-	// OnVersion is invoked when a peer receives a version bitcoin message.
+	// OnVersion is invoked when a peer receives a version abelian message.
 	// The caller may return a reject message in which case the message will
 	// be sent to the peer and the peer will be disconnected.
 	OnVersion func(p *Peer, msg *wire.MsgVersion) *wire.MsgReject
 
-	// OnVerAck is invoked when a peer receives a verack bitcoin message.
+	// OnVerAck is invoked when a peer receives a verack abelian message.
 	OnVerAck func(p *Peer, msg *wire.MsgVerAck)
 
-	// OnReject is invoked when a peer receives a reject bitcoin message.
+	// OnReject is invoked when a peer receives a reject abelian message.
 	OnReject func(p *Peer, msg *wire.MsgReject)
 
-	// OnSendHeaders is invoked when a peer receives a sendheaders bitcoin
+	// OnSendHeaders is invoked when a peer receives a sendheaders abelian
 	// message.
 	OnSendHeaders func(p *Peer, msg *wire.MsgSendHeaders)
 
-	// OnRead is invoked when a peer receives a bitcoin message.  It
+	// OnRead is invoked when a peer receives a abelian message.  It
 	// consists of the number of bytes read, the message, and whether or not
 	// an error in the read occurred.  Typically, callers will opt to use
 	// the callbacks for the specific message types, however this can be
@@ -215,7 +215,7 @@ type MessageListeners struct {
 	// not directly provide a callback.
 	OnRead func(p *Peer, bytesRead int, msg wire.Message, err error)
 
-	// OnWrite is invoked when we write a bitcoin message to a peer.  It
+	// OnWrite is invoked when we write a abelian message to a peer.  It
 	// consists of the number of bytes written, the message, and whether or
 	// not an error in the write occurred.  This can be useful for
 	// circumstances such as keeping track of server-wide byte counts.
@@ -292,7 +292,7 @@ func minUint32(a, b uint32) uint32 {
 }
 
 // newNetAddress attempts to extract the IP address and port from the passed
-// net.Addr interface and create a bitcoin NetAddress structure using that
+// net.Addr interface and create a abelian NetAddress structure using that
 // information.
 func newNetAddress(addr net.Addr, services wire.ServiceFlag) (*wire.NetAddress, error) {
 	// addr will be a net.TCPAddr when not using a proxy.
@@ -409,13 +409,13 @@ type HostToNetAddrFunc func(host string, port uint16,
 // It acts as the traffic cop between the external world and the actual
 // goroutine which writes to the network socket.
 
-// Peer provides a basic concurrent safe bitcoin peer for handling bitcoin
+// Peer provides a basic concurrent safe abelian peer for handling abelian
 // communications via the peer-to-peer protocol.  It provides full duplex
 // reading and writing, automatic handling of the initial handshake process,
 // querying of usage statistics and other information about the remote peer such
 // as its address, user agent, and protocol version, output message queuing,
 // inventory trickling, and the ability to dynamically register and unregister
-// callbacks for handling bitcoin protocol messages.
+// callbacks for handling abelian protocol messages.
 //
 // Outbound messages are typically queued via QueueMessage or QueueInventory.
 // QueueMessage is intended for all messages, including responses to data such
@@ -1011,7 +1011,7 @@ func (p *Peer) handlePingMsg(msg *wire.MsgPing) {
 	p.QueueMessage(wire.NewMsgPong(msg.Nonce), nil)
 }
 
-// handlePongMsg is invoked when a peer receives a pong bitcoin message.
+// handlePongMsg is invoked when a peer receives a pong abelian message.
 // It updates the ping statistics as required.
 // BIP0031 is implemented.
 func (p *Peer) handlePongMsg(msg *wire.MsgPong) {
@@ -1031,7 +1031,7 @@ func (p *Peer) handlePongMsg(msg *wire.MsgPong) {
 	p.statsMtx.Unlock()
 }
 
-// readMessage reads the next bitcoin message from the peer with logging.
+// readMessage reads the next abelian message from the peer with logging.
 func (p *Peer) readMessage(encoding wire.MessageEncoding) (wire.Message, []byte, error) {
 	n, msg, buf, err := wire.ReadMessageWithEncodingN(p.conn,
 		p.ProtocolVersion(), p.cfg.ChainParams.Net, encoding)
@@ -1070,7 +1070,7 @@ func (p *Peer) readMessage(encoding wire.MessageEncoding) (wire.Message, []byte,
 	return msg, buf, nil
 }
 
-// writeMessage sends a bitcoin message to the peer with logging.
+// writeMessage sends a abelian message to the peer with logging.
 func (p *Peer) writeMessage(msg wire.Message, enc wire.MessageEncoding) error {
 	// Don't do anything if we're disconnecting.
 	if atomic.LoadInt32(&p.disconnect) != 0 {
@@ -1881,14 +1881,14 @@ out:
 	}
 }
 
-// QueueMessage adds the passed bitcoin message to the peer send queue.
+// QueueMessage adds the passed abelian message to the peer send queue.
 //
 // This function is safe for concurrent access.
 func (p *Peer) QueueMessage(msg wire.Message, doneChan chan<- struct{}) {
 	p.QueueMessageWithEncoding(msg, doneChan, wire.BaseEncoding)
 }
 
-// QueueMessageWithEncoding adds the passed bitcoin message to the peer send
+// QueueMessageWithEncoding adds the passed abelian message to the peer send
 // queue. This function is identical to QueueMessage, however it allows the
 // caller to specify the wire encoding type that should be used when
 // encoding/decoding blocks and transactions.
@@ -2289,7 +2289,7 @@ func (p *Peer) WaitForDisconnect() {
 	<-p.quit
 }
 
-// newPeerBase returns a new base bitcoin peer based on the inbound flag.  This
+// newPeerBase returns a new base abelian peer based on the inbound flag.  This
 // is used by the NewInboundPeer and NewOutboundPeer functions to perform base
 // setup needed by both types of peers.
 func newPeerBase(origCfg *Config, inbound bool) *Peer {
@@ -2332,13 +2332,13 @@ func newPeerBase(origCfg *Config, inbound bool) *Peer {
 	return &p
 }
 
-// NewInboundPeer returns a new inbound bitcoin peer. Use Start to begin
+// NewInboundPeer returns a new inbound abelian peer. Use Start to begin
 // processing incoming and outgoing messages.
 func NewInboundPeer(cfg *Config) *Peer {
 	return newPeerBase(cfg, true)
 }
 
-// NewOutboundPeer returns a new outbound bitcoin peer.
+// NewOutboundPeer returns a new outbound abelian peer.
 func NewOutboundPeer(cfg *Config, addr string) (*Peer, error) {
 	p := newPeerBase(cfg, false)
 	p.addr = addr

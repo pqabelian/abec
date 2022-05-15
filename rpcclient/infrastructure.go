@@ -1489,7 +1489,7 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 	switch err := err.(type) {
 	// Parse the btcd version and cache it.
 	case nil:
-		log.Debugf("Detected btcd version: %v", info.Version)
+		log.Debugf("Detected abec version: %v", info.Version)
 		version := Btcd
 		c.backendVersion = &version
 		return *c.backendVersion, nil
@@ -1498,12 +1498,12 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 	// we actually ran into an error.
 	case *abejson.RPCError:
 		if err.Code != abejson.ErrRPCMethodNotFound.Code {
-			return 0, fmt.Errorf("unable to detect btcd version: "+
+			return 0, fmt.Errorf("unable to detect abec version: "+
 				"%v", err)
 		}
 
 	default:
-		return 0, fmt.Errorf("unable to detect btcd version: %v", err)
+		return 0, fmt.Errorf("unable to detect abec version: %v", err)
 	}
 
 	// Since the GetInfo method was not found, we assume the client is
@@ -1511,11 +1511,11 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 	// GetNetworkInfo.
 	networkInfo, err := c.GetNetworkInfo()
 	if err != nil {
-		return 0, fmt.Errorf("unable to detect bitcoind version: %v", err)
+		return 0, fmt.Errorf("unable to detect abelian version: %v", err)
 	}
 
 	// Parse the bitcoind version and cache it.
-	log.Debugf("Detected bitcoind version: %v", networkInfo.SubVersion)
+	log.Debugf("Detected abelian version: %v", networkInfo.SubVersion)
 	version := parseBitcoindVersion(networkInfo.SubVersion)
 	c.backendVersion = &version
 

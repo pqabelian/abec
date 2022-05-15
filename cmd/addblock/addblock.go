@@ -67,7 +67,7 @@ func realMain() error {
 	backendLogger := abelog.NewBackend(os.Stdout)
 	defer os.Stdout.Sync()
 	log = backendLogger.Logger("MAIN")
-	database.UseLogger(backendLogger.Logger("BCDB"))
+	database.UseLogger(backendLogger.Logger("ABDB"))
 	blockchain.UseLogger(backendLogger.Logger("CHAN"))
 	indexers.UseLogger(backendLogger.Logger("INDX"))
 

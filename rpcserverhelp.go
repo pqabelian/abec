@@ -15,7 +15,7 @@ var helpDescsEnUS = map[string]string{
 		"The levelspec can either a debug level or of the form:\n" +
 		"<subsystem>=<level>,<subsystem2>=<level2>,...\n" +
 		"The valid debug levels are trace, debug, info, warn, error, and critical.\n" +
-		"The valid subsystems are AMGR, ADXR, BCDB, BMGR, ABEC, CHAN, DISC, PEER, RPCS, SCRP, SRVR, and TXMP.\n" +
+		"The valid subsystems are AMGR, ADXR, ABDB, BMGR, ABEC, CHAN, DISC, PEER, RPCS, SCRP, SRVR, and TXMP.\n" +
 		"Finally the keyword 'show' will return a list of the available subsystems.",
 	"debuglevel-levelspec":   "The debug level(s) to use or the keyword 'show'",
 	"debuglevel--condition0": "levelspec!=show",
@@ -191,7 +191,7 @@ var helpDescsEnUS = map[string]string{
 	"softforks-bip9_softforks--desc":  "The status of any defined BIP0009 soft-fork deployments",
 
 	// UnifiedSoftForks help.
-	"unifiedsoftforks-softforks--key":   "softforks",
+	"unifiedsoftforks-softforks--key": "softforks",
 
 	// TxRawResult help.
 	"txrawresult-hex":           "Hex-encoded transaction",
@@ -687,7 +687,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getbestblock":          {(*abejson.GetBestBlockResult)(nil)},
 	"getbestblockhash":      {(*string)(nil)},
 	"getblock":              {(*string)(nil), (*abejson.GetBlockVerboseResult)(nil)},
-	"getblockabe":              {(*string)(nil), (*abejson.GetBlockAbeVerboseResult)(nil)},  //TODO(abe):after testing, this command will be replace by getblock
+	"getblockabe":           {(*string)(nil), (*abejson.GetBlockAbeVerboseResult)(nil)}, //TODO(abe):after testing, this command will be replace by getblock
 	"getblockcount":         {(*int64)(nil)},
 	"getblockhash":          {(*string)(nil)},
 	"getblockheader":        {(*string)(nil), (*abejson.GetBlockHeaderVerboseResult)(nil)},

@@ -60,7 +60,7 @@ func realMain() error {
 	backendLogger := abelog.NewBackend(os.Stdout)
 	defer os.Stdout.Sync()
 	log = backendLogger.Logger("MAIN")
-	dbLog := backendLogger.Logger("BCDB")
+	dbLog := backendLogger.Logger("ABDB")
 	dbLog.SetLevel(abelog.LevelDebug)
 	database.UseLogger(dbLog)
 
