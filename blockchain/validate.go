@@ -1611,12 +1611,10 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// expensive ECDSA signature check scripts.  Doing this last helps
 	// prevent CPU exhaustion attacks.
 	if runScripts {
-		//TODO(MUST):delete it
 		err := checkBlockScriptsAbe(block, view)
 		if err != nil {
 			return err
 		}
-
 	}
 
 	// Update the best hash for view to include this block since all of its
