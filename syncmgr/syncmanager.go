@@ -1183,10 +1183,10 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	for i := 0; i < len(bmsg.block.MsgPrunedBlock().TransactionHashes); i++ {
 		txHash := bmsg.block.MsgPrunedBlock().TransactionHashes[i]
 		if tx, err := sm.txMemPool.FetchTransaction(&txHash); err != nil {
+			needSet = append(needSet, txHash)
+		} else {
 			txhash := tx.MsgTx().TxHash()
 			txmap[txhash] = tx.MsgTx()
-		} else {
-			needSet = append(needSet, txHash)
 		}
 	}
 
