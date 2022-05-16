@@ -1,7 +1,6 @@
 package syncmgr
 
 import (
-	"bytes"
 	"container/list"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
@@ -1176,73 +1175,21 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	witHash := chainhash.DoubleHashH(bmsg.block.MsgPrunedBlock().CoinbaseTx.TxWitness)
 	msgBlockAbe.WitnessHashs[0] = &witHash
 	needSet := make([]chainhash.Hash, 0, len(bmsg.block.MsgPrunedBlock().TransactionHashes))
-	txmap := make(map[chainhash.Hash]*wire.MsgTxAbe)
 	// try to restore the block with the help of local transaction pool
 	for i := 0; i < len(bmsg.block.MsgPrunedBlock().TransactionHashes); i++ {
 		txHash := bmsg.block.MsgPrunedBlock().TransactionHashes[i]
 		if sm.txMemPool.HaveTransaction(&txHash) {
-			tx, err := sm.txMemPool.FetchTransaction(&txHash)
+			_, err := sm.txMemPool.FetchTransaction(&txHash)
 			if err != nil {
 				needSet = append(needSet, txHash)
 			}
-			// Copy the transaction in mempool to avoid the transaction
-			// disappear for something
-			copyTx := &wire.MsgTxAbe{
-				Version:   tx.MsgTx().Version,
-				TxIns:     make([]*wire.TxInAbe, 0, len(tx.MsgTx().TxIns)),
-				TxOuts:    make([]*wire.TxOutAbe, 0, len(tx.MsgTx().TxOuts)),
-				TxFee:     tx.MsgTx().TxFee,
-				TxMemo:    make([]byte, len(tx.MsgTx().TxMemo)),
-				TxWitness: make([]byte, len(tx.MsgTx().TxWitness)),
-			}
-			// TxIns
-			for index := 0; index < len(tx.MsgTx().TxIns); index++ {
-				originTxIn := tx.MsgTx().TxIns[index]
-				copyTx.TxIns = append(copyTx.TxIns, &wire.TxInAbe{
-					SerialNumber: make([]byte, len(originTxIn.SerialNumber)),
-					PreviousOutPointRing: wire.OutPointRing{
-						Version:    originTxIn.PreviousOutPointRing.Version,
-						BlockHashs: make([]*chainhash.Hash, len(originTxIn.PreviousOutPointRing.BlockHashs)),
-						OutPoints:  make([]*wire.OutPointAbe, len(originTxIn.PreviousOutPointRing.OutPoints)),
-					},
-				})
-				copy(copyTx.TxIns[index].SerialNumber, originTxIn.SerialNumber)
-				for kk := 0; kk < len(originTxIn.PreviousOutPointRing.BlockHashs); kk++ {
-					copyTx.TxIns[index].PreviousOutPointRing.BlockHashs[kk] = &chainhash.Hash{}
-					copyTx.TxIns[index].PreviousOutPointRing.BlockHashs[kk].SetBytes(originTxIn.PreviousOutPointRing.BlockHashs[kk].CloneBytes())
-				}
-				for kk := 0; kk < len(originTxIn.PreviousOutPointRing.OutPoints); kk++ {
-					copyTx.TxIns[index].PreviousOutPointRing.OutPoints[i] = &wire.OutPointAbe{
-						TxHash: chainhash.Hash{},
-						Index:  originTxIn.PreviousOutPointRing.OutPoints[i].Index,
-					}
-					copyTx.TxIns[index].PreviousOutPointRing.OutPoints[i].TxHash.SetBytes(originTxIn.PreviousOutPointRing.OutPoints[i].TxHash.CloneBytes())
-				}
-			}
-			// TxOuts
-			for index := 0; index < len(tx.MsgTx().TxOuts); index++ {
-				originTxOut := tx.MsgTx().TxOuts[index]
-				copyTx.TxOuts = append(copyTx.TxOuts, &wire.TxOutAbe{
-					Version:   originTxOut.Version,
-					TxoScript: make([]byte, len(originTxOut.TxoScript)),
-				})
-				copy(copyTx.TxOuts[index].TxoScript, originTxOut.TxoScript)
-			}
-			// TxMemo
-			copy(copyTx.TxMemo, tx.MsgTx().TxMemo)
-			// TxWitness
-			copy(copyTx.TxWitness, tx.MsgTx().TxWitness)
-			txhash := copyTx.TxHash()
-			if !bytes.Equal(tx.Hash()[:], txhash[:]) {
-				log.Errorf("Error for copy transaction in handlePrunedBlockAbe, Please check there")
-			}
-			txmap[txhash] = copyTx
 		} else {
 			needSet = append(needSet, txHash)
 		}
 	}
 
 	// wait the needsetResult
+	txmap := make(map[chainhash.Hash]*wire.MsgTxAbe)
 	if len(needSet) != 0 {
 		log.Debugf("Missing %v transactions in pruned block %s from peer %s, sending needset message...", len(needSet), bmsg.block.Hash().String(), peer)
 		syncPeerState := sm.peerStates[sm.syncPeer]
@@ -1266,15 +1213,22 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	// restore
 	for i := 0; i < len(bmsg.block.MsgPrunedBlock().TransactionHashes); i++ {
 		txHash := bmsg.block.MsgPrunedBlock().TransactionHashes[i]
-		tx, ok := txmap[txHash]
-		if !ok {
-			log.Infof("Rejected block %v from %s: incorrect needsetresult", blockHash, peer)
-			peer.PushRejectMsg(wire.CmdPrunedBlock, wire.RejectInvalid, "incorrect needsetresult", blockHash, false)
-			return
+		if sm.txMemPool.HaveTransaction(&txHash) {
+			tx, _ := sm.txMemPool.FetchTransaction(&txHash)
+			msgBlockAbe.Transactions = append(msgBlockAbe.Transactions, tx.MsgTx())
+			witnessHash := chainhash.DoubleHashH(tx.MsgTx().TxWitness)
+			msgBlockAbe.WitnessHashs = append(msgBlockAbe.WitnessHashs, &witnessHash)
+		} else {
+			tx, ok := txmap[txHash]
+			if !ok {
+				log.Infof("Rejected block %v from %s: incorrect needsetresult", blockHash, peer)
+				peer.PushRejectMsg(wire.CmdPrunedBlock, wire.RejectInvalid, "incorrect needsetresult", blockHash, false)
+				return
+			}
+			msgBlockAbe.Transactions = append(msgBlockAbe.Transactions, tx)
+			witnessHash := chainhash.DoubleHashH(tx.TxWitness)
+			msgBlockAbe.WitnessHashs = append(msgBlockAbe.WitnessHashs, &witnessHash)
 		}
-		msgBlockAbe.Transactions = append(msgBlockAbe.Transactions, tx)
-		witnessHash := chainhash.DoubleHashH(tx.TxWitness)
-		msgBlockAbe.WitnessHashs = append(msgBlockAbe.WitnessHashs, &witnessHash)
 	}
 
 	block := abeutil.NewBlockAbe(&msgBlockAbe)
