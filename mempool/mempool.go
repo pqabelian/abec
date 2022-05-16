@@ -1648,16 +1648,19 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 
 	// Verify witness and reject the transaction if
 	// any don't verify.
-	//TODO(abe):design a validation progress
-	if tx.HasWitness() { // we do not know the witness
-		err = blockchain.ValidateTransactionScriptsAbe(tx, utxoRingView)
-		if err != nil {
-			if cerr, ok := err.(blockchain.RuleError); ok {
-				return nil, nil, chainRuleError(cerr)
-			}
-			return nil, nil, err
-		}
+	if !tx.HasWitness() {
+		str := fmt.Sprintf("transaction %v has been rejected "+
+			"due to no witness", txHash)
+		return nil, nil, txRuleError(wire.RejectInvalid, str)
 	}
+	err = blockchain.ValidateTransactionScriptsAbe(tx, utxoRingView)
+	if err != nil {
+		if cerr, ok := err.(blockchain.RuleError); ok {
+			return nil, nil, chainRuleError(cerr)
+		}
+		return nil, nil, err
+	}
+
 	txD := mp.addTransactionAbe(utxoRingView, tx, bestHeight, txFee)
 
 	log.Debugf("Accepted transaction %v (pool size: %v)", txHash,

@@ -531,7 +531,7 @@ func deserializeSpendJournalEntryAbe(serialized []byte, txns []*wire.MsgTxAbe) (
 			txIn := tx.TxIns[txInIdx]
 			stxo := &SpentTxOutAbe{
 				SerialNumber: nil,
-				UtxoRing:     nil,
+				UtxoRing:     new(UtxoRingEntry),
 			}
 			stxoIdx--
 

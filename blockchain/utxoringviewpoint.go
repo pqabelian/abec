@@ -422,9 +422,9 @@ func (entry *UtxoRingEntry) Spend(serilaNumber []byte, blockHash *chainhash.Hash
 }
 
 //	normaly, the unspent serialNumber should be the last one, as this function should be called in reverse order
-func (entry *UtxoRingEntry) UnSpend(serilaNumber []byte, blockHash *chainhash.Hash) bool {
+func (entry *UtxoRingEntry) UnSpend(serialNumber []byte, blockHash *chainhash.Hash) bool {
 	for i, sn := range entry.serialNumbers {
-		if bytes.Compare(sn, serilaNumber) == 0 {
+		if bytes.Compare(sn, serialNumber) == 0 {
 			if blockHash.IsEqual(entry.consumingBlockHashs[i]) {
 				copy(entry.serialNumbers[:i], entry.serialNumbers[i+1:])
 				entry.serialNumbers = entry.serialNumbers[:len(entry.serialNumbers)-1]

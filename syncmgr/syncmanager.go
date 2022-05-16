@@ -1175,21 +1175,19 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	witHash := chainhash.DoubleHashH(bmsg.block.MsgPrunedBlock().CoinbaseTx.TxWitness)
 	msgBlockAbe.WitnessHashs[0] = &witHash
 	needSet := make([]chainhash.Hash, 0, len(bmsg.block.MsgPrunedBlock().TransactionHashes))
+	txmap := make(map[chainhash.Hash]*wire.MsgTxAbe)
 	// try to restore the block with the help of local transaction pool
 	for i := 0; i < len(bmsg.block.MsgPrunedBlock().TransactionHashes); i++ {
 		txHash := bmsg.block.MsgPrunedBlock().TransactionHashes[i]
-		if sm.txMemPool.HaveTransaction(&txHash) {
-			_, err := sm.txMemPool.FetchTransaction(&txHash)
-			if err != nil {
-				needSet = append(needSet, txHash)
-			}
+		if tx, err := sm.txMemPool.FetchTransaction(&txHash); err != nil {
+			txhash := tx.MsgTx().TxHash()
+			txmap[txhash] = tx.MsgTx()
 		} else {
 			needSet = append(needSet, txHash)
 		}
 	}
 
 	// wait the needsetResult
-	txmap := make(map[chainhash.Hash]*wire.MsgTxAbe)
 	if len(needSet) != 0 {
 		log.Debugf("Missing %v transactions in pruned block %s from peer %s, sending needset message...", len(needSet), bmsg.block.Hash().String(), peer)
 		syncPeerState := sm.peerStates[sm.syncPeer]
@@ -1213,22 +1211,15 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	// restore
 	for i := 0; i < len(bmsg.block.MsgPrunedBlock().TransactionHashes); i++ {
 		txHash := bmsg.block.MsgPrunedBlock().TransactionHashes[i]
-		if sm.txMemPool.HaveTransaction(&txHash) {
-			tx, _ := sm.txMemPool.FetchTransaction(&txHash)
-			msgBlockAbe.Transactions = append(msgBlockAbe.Transactions, tx.MsgTx())
-			witnessHash := chainhash.DoubleHashH(tx.MsgTx().TxWitness)
-			msgBlockAbe.WitnessHashs = append(msgBlockAbe.WitnessHashs, &witnessHash)
-		} else {
-			tx, ok := txmap[txHash]
-			if !ok {
-				log.Infof("Rejected block %v from %s: incorrect needsetresult", blockHash, peer)
-				peer.PushRejectMsg(wire.CmdPrunedBlock, wire.RejectInvalid, "incorrect needsetresult", blockHash, false)
-				return
-			}
-			msgBlockAbe.Transactions = append(msgBlockAbe.Transactions, tx)
-			witnessHash := chainhash.DoubleHashH(tx.TxWitness)
-			msgBlockAbe.WitnessHashs = append(msgBlockAbe.WitnessHashs, &witnessHash)
+		tx, ok := txmap[txHash]
+		if !ok {
+			log.Infof("Rejected block %v from %s: incorrect needsetresult", blockHash, peer)
+			peer.PushRejectMsg(wire.CmdPrunedBlock, wire.RejectInvalid, "incorrect needsetresult", blockHash, false)
+			return
 		}
+		msgBlockAbe.Transactions = append(msgBlockAbe.Transactions, tx)
+		witnessHash := chainhash.DoubleHashH(tx.TxWitness)
+		msgBlockAbe.WitnessHashs = append(msgBlockAbe.WitnessHashs, &witnessHash)
 	}
 
 	block := abeutil.NewBlockAbe(&msgBlockAbe)
