@@ -421,23 +421,22 @@ func (entry *UtxoRingEntry) Spend(serilaNumber []byte, blockHash *chainhash.Hash
 	// Mark the output as modified.
 }
 
-//	normaly, the unspent serialNumber should be the last one, as this function should be called in reverse order
+//	normally, the unspent serialNumber should be the last one, as this function should be called in reverse order
 func (entry *UtxoRingEntry) UnSpend(serialNumber []byte, blockHash *chainhash.Hash) bool {
 	for i, sn := range entry.serialNumbers {
-		if bytes.Compare(sn, serialNumber) == 0 {
-			if blockHash.IsEqual(entry.consumingBlockHashs[i]) {
-				copy(entry.serialNumbers[:i], entry.serialNumbers[i+1:])
-				entry.serialNumbers = entry.serialNumbers[:len(entry.serialNumbers)-1]
-
-				copy(entry.consumingBlockHashs[:i], entry.consumingBlockHashs[i+1:])
-				entry.consumingBlockHashs = entry.consumingBlockHashs[:len(entry.consumingBlockHashs)-1]
-
-				entry.packedFlags |= tfModified
-
-				return true
-			} else {
-				return false
+		if bytes.Equal(sn, serialNumber) && blockHash.IsEqual(entry.consumingBlockHashs[i]) {
+			// remove the matched serial number and the consumed block hash
+			entry.serialNumbers = append(entry.serialNumbers[:i], entry.serialNumbers[i+1:]...)
+			entry.consumingBlockHashs = append(entry.consumingBlockHashs[:i], entry.consumingBlockHashs[i+1:]...)
+			// mark modified
+			entry.packedFlags |= tfModified
+			// Check something and WARN with information when need
+			// normally, the unspent serialNumber should be the last one,
+			// as this function should be called in reverse order
+			if i != len(entry.serialNumbers)-1 {
+				log.Warnf("The UtxoRingEntry.Unspend() called with %v, but the matched serial number is not the last in UtxoRingEntry.serialNumbers", blockHash)
 			}
+			return true
 		}
 	}
 
