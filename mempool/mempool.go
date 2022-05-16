@@ -1437,6 +1437,17 @@ func (mp *TxPool) validateReplacement(tx *abeutil.Tx,
 // more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
+//   1. Tx should not exist in mempool or orphan pool
+//   2. Preliminary check on transaction sanity (CheckTransactionSanityAbe)
+//   3. Tx should not be coinbase
+//   4. Check transaction standard (if do not accept non-standard tx)
+//   5. Ensure no double spend with the transactions already in pool
+//   6. Ensure inputs should exist (outpointring must exist)
+//   7. Check each inputs (CheckTransactionInputsAbe)
+//   8. Check transaction input standard (if do not accept non-standard tx)
+//   9. Ensure the fee is not too low (or have enough priority accept free fee tx, or rate limit)
+//   10. Check the witness of the transaction (ValidateTransactionScriptsAbe)
+//   11. Add transaction into mempool
 func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit, rejectDupOrphans bool) ([]*wire.OutPointRing, *TxDescAbe, error) {
 
 	txHash := tx.Hash()
@@ -1635,7 +1646,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 			mp.cfg.Policy.FreeTxRelayLimit*10*1000)
 	}
 
-	// Verify crypto signatures for each input and reject the transaction if
+	// Verify witness and reject the transaction if
 	// any don't verify.
 	//TODO(abe):design a validation progress
 	if tx.HasWitness() { // we do not know the witness

@@ -143,8 +143,8 @@ func (b *BlockChain) processOrphansAbe(hash *chainhash.Hash, flags BehaviorFlags
 //      easiest one that can be adjusted since last checkpoint (in not fast add mode)
 //   4. Check if it is orphan block (if so, add it into orphan map and return)
 //   5. Connect the new block into the chain (maybeAcceptBlockAbe)
-//   6. If any orphan blocks depend on this block, accept it (processOrphansAbe) todo: to be checked
-//	todo(ABE):
+//   6. If any orphan blocks depend on this block, check and accept it (processOrphansAbe) todo: to be checked
+//	todo (ABE):
 func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, flags BehaviorFlags) (bool, bool, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()

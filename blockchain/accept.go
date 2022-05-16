@@ -22,7 +22,7 @@ import (
 //   4. Store the new block into database (currently the witness has not been validated)
 //   5. Add the new block into block index
 //   6. Connect new block to the chain, including reorganization and switch main chain if needed (connectBestChainAbe)
-//   7. Notify the block has been accepted
+//   7. Send NTBlockAccepted notification
 func (b *BlockChain) maybeAcceptBlockAbe(block *abeutil.BlockAbe, flags BehaviorFlags) (bool, error) {
 	// The height of this block is one more than the referenced previous
 	// block.

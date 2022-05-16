@@ -810,7 +810,8 @@ func recycleOutpointKey(key *[]byte) {
 	outpointKeyPool.Put(key)
 }
 
-//	Abe to do
+// recycleOutPointRingKey puts the provided byte slice, which should have been
+// obtained via the outpointKey function, back on the free list.
 func recycleOutPointRingKey(key *[]byte) {
 	outPointRingKeyPool.Put(key)
 }
@@ -1081,7 +1082,10 @@ func dbPutUtxoView(dbTx database.Tx, view *UtxoViewpoint) error {
 	return nil
 }
 
-//	Abe to do
+// dbPutUtxoRingView uses an existing database transaction to update the utxo ring set
+// in the database based on the provided utxo ring view contents and state.  In
+// particular, only the entries that have been marked as modified are written
+// to the database.
 func dbPutUtxoRingView(dbTx database.Tx, view *UtxoRingViewpoint) error {
 	utxoRingBucket := dbTx.Metadata().Bucket(utxoRingSetBucketName)
 
