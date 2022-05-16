@@ -430,12 +430,6 @@ func (entry *UtxoRingEntry) UnSpend(serialNumber []byte, blockHash *chainhash.Ha
 			entry.consumingBlockHashs = append(entry.consumingBlockHashs[:i], entry.consumingBlockHashs[i+1:]...)
 			// mark modified
 			entry.packedFlags |= tfModified
-			// Check something and WARN with information when need
-			// normally, the unspent serialNumber should be the last one,
-			// as this function should be called in reverse order
-			if i != len(entry.serialNumbers)-1 {
-				log.Warnf("The UtxoRingEntry.Unspend() called with %v, but the matched serial number is not the last in UtxoRingEntry.serialNumbers", blockHash)
-			}
 			return true
 		}
 	}
