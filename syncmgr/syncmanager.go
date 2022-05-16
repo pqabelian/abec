@@ -1275,23 +1275,17 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	if isOrphan {
 		// We've just received an orphan block from a peer. In order
 		// to update the height of the peer, we try to extract the
-		// block height from the scriptSig of the coinbase transaction.
-		// Extraction is only attempted if the block's version is
-		// high enough (ver 2+).
-		// todo (ABE): does abec have height stored in coinbase?
-		header := &block.MsgBlock().Header
-		if blockchain.ShouldHaveSerializedBlockHeight(header) {
-			coinbaseTx := block.Transactions()[0]
-			cbHeight, err := blockchain.ExtractCoinbaseHeightAbe(coinbaseTx)
-			if err != nil {
-				log.Warnf("Unable to extract height from "+
-					"coinbase tx: %v", err)
-			} else {
-				log.Debugf("Extracted height of %v from "+
-					"orphan block", cbHeight)
-				heightUpdate = cbHeight
-				blkHashUpdate = blockHash
-			}
+		// block height from the coinbase transaction.
+		coinbaseTx := block.Transactions()[0]
+		cbHeight, err := blockchain.ExtractCoinbaseHeightAbe(coinbaseTx)
+		if err != nil {
+			log.Warnf("Unable to extract height from "+
+				"coinbase tx: %v", err)
+		} else {
+			log.Debugf("Extracted height of %v from "+
+				"orphan block", cbHeight)
+			heightUpdate = cbHeight
+			blkHashUpdate = blockHash
 		}
 
 		orphanRoot := sm.chain.GetOrphanRoot(blockHash)
