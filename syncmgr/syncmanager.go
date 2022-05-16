@@ -656,6 +656,9 @@ func (sm *SyncManager) handleTxMsgAbe(tmsg *txMsgAbe) {
 	}
 
 	//	todo(ABE):
+	if acceptedTx == nil {
+		return
+	}
 	acceptedTxs := make([]*mempool.TxDescAbe, 1)
 	acceptedTxs[0] = acceptedTx
 	sm.peerNotifier.AnnounceNewTransactions(acceptedTxs)

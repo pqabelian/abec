@@ -186,7 +186,7 @@ func checkBlockScriptsAbe(block *abeutil.BlockAbe, utxoRingView *UtxoRingViewpoi
 	}
 
 	elapsed := time.Since(start)
-	log.Debugf("block inputs %v took %v to verify", block.Hash(), elapsed)
+	log.Debugf("Block %v took %v to verify", block.Hash(), elapsed)
 
 	// Validate successfully.
 	return nil
