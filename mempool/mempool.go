@@ -90,6 +90,9 @@ type Config struct {
 	// HashCache defines the transaction hash mid-state cache to use.
 	HashCache *txscript.HashCache
 
+	// WitnessCache defines the transaction witness cache to use.
+	WitnessCache *txscript.WitnessCache
+
 	// FeeEstimatator provides a feeEstimator. If it is not nil, the mempool
 	// records all new transactions it observes into the feeEstimator.
 	FeeEstimator *FeeEstimator
@@ -1653,7 +1656,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 			"due to no witness", txHash)
 		return nil, nil, txRuleError(wire.RejectInvalid, str)
 	}
-	err = blockchain.ValidateTransactionScriptsAbe(tx, utxoRingView)
+	err = blockchain.ValidateTransactionScriptsAbe(tx, utxoRingView, mp.cfg.WitnessCache)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
 			return nil, nil, chainRuleError(cerr)

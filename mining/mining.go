@@ -477,13 +477,14 @@ func medianAdjustedTime(chainState *blockchain.BestState, timeSource blockchain.
 // It also houses additional state required in order to ensure the templates
 // are built on top of the current best chain and adhere to the consensus rules.
 type BlkTmplGenerator struct {
-	policy      *Policy
-	chainParams *chaincfg.Params
-	txSource    TxSource
-	chain       *blockchain.BlockChain
-	timeSource  blockchain.MedianTimeSource
-	sigCache    *txscript.SigCache
-	hashCache   *txscript.HashCache
+	policy       *Policy
+	chainParams  *chaincfg.Params
+	txSource     TxSource
+	chain        *blockchain.BlockChain
+	timeSource   blockchain.MedianTimeSource
+	sigCache     *txscript.SigCache
+	hashCache    *txscript.HashCache
+	witnessCache *txscript.WitnessCache
 }
 
 // NewBlkTmplGenerator returns a new block template generator for the given
@@ -496,16 +497,18 @@ func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
 	txSource TxSource, chain *blockchain.BlockChain,
 	timeSource blockchain.MedianTimeSource,
 	sigCache *txscript.SigCache,
-	hashCache *txscript.HashCache) *BlkTmplGenerator {
+	hashCache *txscript.HashCache,
+	witnessCache *txscript.WitnessCache) *BlkTmplGenerator {
 
 	return &BlkTmplGenerator{
-		policy:      policy,
-		chainParams: params,
-		txSource:    txSource,
-		chain:       chain,
-		timeSource:  timeSource,
-		sigCache:    sigCache,
-		hashCache:   hashCache,
+		policy:       policy,
+		chainParams:  params,
+		txSource:     txSource,
+		chain:        chain,
+		timeSource:   timeSource,
+		sigCache:     sigCache,
+		hashCache:    hashCache,
+		witnessCache: witnessCache,
 	}
 }
 
@@ -759,7 +762,7 @@ mempoolLoop:
 			In particular, for each tx in mp.pool, there is an additional filed, to identify whether the tx's witness has been verified.
 			Other information, e.g., the inputs's double-spending may change, but as long as the txhash does not change, the witness does not need to verify again
 		*/
-		err = blockchain.ValidateTransactionScriptsAbe(tx, blockUtxoRings)
+		err = blockchain.ValidateTransactionScriptsAbe(tx, blockUtxoRings, g.witnessCache)
 		if err != nil {
 			log.Tracef("Skipping tx %s due to error in "+
 				"ValidateTransactionScripts: %v", tx.Hash(), err)

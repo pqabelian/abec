@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/abesuite/abec/abecrypto"
 	"github.com/abesuite/abec/abeutil"
+	"github.com/abesuite/abec/txscript"
 	"runtime"
 	"time"
 )
@@ -22,6 +23,7 @@ type txValidator struct {
 	quitChan     chan struct{}
 	resultChan   chan error
 	utxoRingView *UtxoRingViewpoint
+	witnessCache *txscript.WitnessCache
 }
 
 // sendResult sends the result of a script pair validation on the internal
@@ -43,7 +45,8 @@ out:
 	for {
 		select {
 		case txVI := <-v.validateChan:
-			err := ValidateTransactionScriptsAbe(txVI.tx, v.utxoRingView)
+			err := ValidateTransactionScriptsAbe(txVI.tx, v.utxoRingView, v.witnessCache)
+
 			v.sendResult(err)
 
 		case <-v.quitChan:
@@ -112,18 +115,23 @@ func (v *txValidator) Validate(items []*txValidateItem) error {
 
 // newTxValidator returns a new instance of txValidator to be used for
 // validating transaction scripts asynchronously.
-func newTxValidator(utxoRingView *UtxoRingViewpoint) *txValidator {
+func newTxValidator(utxoRingView *UtxoRingViewpoint, witnessCache *txscript.WitnessCache) *txValidator {
 	return &txValidator{
 		validateChan: make(chan *txValidateItem),
 		quitChan:     make(chan struct{}),
 		resultChan:   make(chan error),
 		utxoRingView: utxoRingView,
+		witnessCache: witnessCache,
 	}
 }
 
 //	new validate function under pqringct
 // to be discussed
-func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingViewpoint) error {
+func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingViewpoint, witnessCache *txscript.WitnessCache) error {
+	// If transaction witness has already been validated and stored in cache, just return.
+	if witnessCache.Exists(*tx.Hash()) {
+		return nil
+	}
 
 	txInLen := len(tx.MsgTx().TxIns)
 	abeTxInDetail := make([]*abecrypto.AbeTxInDetail, txInLen)
@@ -150,11 +158,13 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 		return ruleError(ErrScriptValidation, str)
 	}
 
+	// Add transaction into witness cache.
+	witnessCache.Add(*tx.Hash())
 	return nil
 }
 
 // checkBlockScriptsAbe validates the witness of each transaction in blocks
-func checkBlockScriptsAbe(block *abeutil.BlockAbe, utxoRingView *UtxoRingViewpoint) error {
+func checkBlockScriptsAbe(block *abeutil.BlockAbe, utxoRingView *UtxoRingViewpoint, witnessCache *txscript.WitnessCache) error {
 
 	//	Collect all transactions and required information for validation.
 	allTxs := block.Transactions()
@@ -171,6 +181,11 @@ func checkBlockScriptsAbe(block *abeutil.BlockAbe, utxoRingView *UtxoRingViewpoi
 			continue
 		}
 
+		if !allTxs[i].HasWitness() {
+			str := fmt.Sprintf("transaction %s verify failed due to no witness", allTxs[i].Hash())
+			return ruleError(ErrScriptValidation, str)
+		}
+
 		txVI := &txValidateItem{
 			txInIndex: allTxs[i].Index(),
 			tx:        allTxs[i],
@@ -180,7 +195,7 @@ func checkBlockScriptsAbe(block *abeutil.BlockAbe, utxoRingView *UtxoRingViewpoi
 
 	start := time.Now()
 
-	validator := newTxValidator(utxoRingView)
+	validator := newTxValidator(utxoRingView, witnessCache)
 	if err := validator.Validate(txValItems); err != nil {
 		return err
 	}

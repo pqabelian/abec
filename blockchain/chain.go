@@ -103,6 +103,7 @@ type BlockChain struct {
 	chainParams         *chaincfg.Params
 	timeSource          MedianTimeSource // modified when communicating with peers
 	sigCache            *txscript.SigCache
+	witnessCache        *txscript.WitnessCache
 	indexManager        IndexManager
 	hashCache           *txscript.HashCache
 
@@ -2249,6 +2250,10 @@ type Config struct {
 	// This field can be nil if the caller is not interested in using a
 	// signature cache.
 	HashCache *txscript.HashCache
+
+	// WitnessCache defines a transaction witness cache to store the already
+	// validated transactions to speed up block verification.
+	WitnessCache *txscript.WitnessCache
 }
 
 // New returns a BlockChain instance using the provided configuration details.
@@ -2293,6 +2298,7 @@ func New(config *Config) (*BlockChain, error) {
 		chainParams:         params,
 		timeSource:          config.TimeSource,
 		sigCache:            config.SigCache,
+		witnessCache:        config.WitnessCache,
 		indexManager:        config.IndexManager,
 		minRetargetTimespan: targetTimespan / adjustmentFactor,
 		maxRetargetTimespan: targetTimespan * adjustmentFactor,

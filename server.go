@@ -194,6 +194,7 @@ type server struct {
 	//	TODO:(Abelian) remove txScript, sigCache, and hashCache
 	sigCache             *txscript.SigCache
 	hashCache            *txscript.HashCache
+	witnessCache         *txscript.WitnessCache
 	rpcServer            *rpcServer
 	syncManager          *syncmgr.SyncManager
 	chain                *blockchain.BlockChain
@@ -2332,6 +2333,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		services:             services,
 		sigCache:             txscript.NewSigCache(cfg.SigCacheMaxSize),
 		hashCache:            txscript.NewHashCache(cfg.SigCacheMaxSize),
+		witnessCache:         txscript.NewWitnessCache(cfg.WitnessCacheMaxSize),
 		agentBlacklist:       agentBlacklist,
 		agentWhitelist:       agentWhitelist,
 	}
@@ -2369,6 +2371,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		Checkpoints:  checkpoints,
 		TimeSource:   s.timeSource,
 		SigCache:     s.sigCache,
+		WitnessCache: s.witnessCache,
 		IndexManager: indexManager,
 		HashCache:    s.hashCache,
 	})
@@ -2430,6 +2433,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		IsDeploymentActive: s.chain.IsDeploymentActive,
 		SigCache:           s.sigCache,
 		HashCache:          s.hashCache,
+		WitnessCache:       s.witnessCache,
 		FeeEstimator:       s.feeEstimator,
 	}
 	s.txMemPool = mempool.New(&txC)
@@ -2462,7 +2466,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	}
 	blockTemplateGenerator := mining.NewBlkTmplGenerator(&policy,
 		s.chainParams, s.txMemPool, s.chain, s.timeSource,
-		s.sigCache, s.hashCache)
+		s.sigCache, s.hashCache, s.witnessCache)
 	s.cpuMiner = cpuminer.New(&cpuminer.Config{
 		ChainParams:            chainParams,
 		BlockTemplateGenerator: blockTemplateGenerator,

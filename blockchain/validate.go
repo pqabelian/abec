@@ -1611,7 +1611,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// expensive ECDSA signature check scripts.  Doing this last helps
 	// prevent CPU exhaustion attacks.
 	if runScripts {
-		err := checkBlockScriptsAbe(block, view)
+		err := checkBlockScriptsAbe(block, view, b.witnessCache)
 		if err != nil {
 			return err
 		}

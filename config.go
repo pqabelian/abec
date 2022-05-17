@@ -64,6 +64,7 @@ const (
 	defaultMaxOrphanTransactions = 100
 	defaultMaxOrphanTxSize       = 5500000 // 5 500 000, For a 5(7)-5 transferTx, the witness size could be 5244527 bytes, and the content size could 110,000 bytes
 	defaultSigCacheMaxSize       = 100000
+	defaultWitnessCacheMaxSize   = 1000
 	sampleConfigFilename         = "sample-abec.conf"
 	defaultTxIndex               = false
 	defaultAddrIndex             = false
@@ -157,6 +158,7 @@ type config struct {
 	RPCPass              string        `short:"P" long:"rpcpass" default-mask:"-" description:"Password for RPC connections"`
 	RPCUser              string        `short:"u" long:"rpcuser" description:"Username for RPC connections"`
 	SigCacheMaxSize      uint          `long:"sigcachemaxsize" description:"The maximum number of entries in the signature verification cache"`
+	WitnessCacheMaxSize  uint          `long:"witnesscachemaxsize" description:"The maximum number of entries in the witness cache"`
 	SimNet               bool          `long:"simnet" description:"Use the simulation test network"`
 	TestNet3             bool          `long:"testnet" description:"Use the test network"`
 	TorIsolation         bool          `long:"torisolation" description:"Enable Tor stream isolation by randomizing user credentials for each connection."`
@@ -430,6 +432,7 @@ func loadConfig() (*config, []string, error) {
 		BlockPrioritySize:    mempool.DefaultBlockPrioritySize,
 		MaxOrphanTxs:         defaultMaxOrphanTransactions,
 		SigCacheMaxSize:      defaultSigCacheMaxSize,
+		WitnessCacheMaxSize:  defaultWitnessCacheMaxSize,
 		Generate:             defaultGenerate,
 		TxIndex:              defaultTxIndex,
 	}
