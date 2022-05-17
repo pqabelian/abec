@@ -174,7 +174,16 @@ func messageSummary(msg wire.Message) string {
 			msg.TxHash(), len(msg.TxIn), len(msg.TxOut),
 			formatLockTime(msg.LockTime))
 
+	case *wire.MsgTxAbe:
+		return fmt.Sprintf("hash %s, %d inputs, %d outputs",
+			msg.TxHash(), len(msg.TxIns), len(msg.TxOuts))
+
 	case *wire.MsgBlock:
+		header := &msg.Header
+		return fmt.Sprintf("hash %s, ver %d, %d tx, %s", msg.BlockHash(),
+			header.Version, len(msg.Transactions), header.Timestamp)
+
+	case *wire.MsgBlockAbe:
 		header := &msg.Header
 		return fmt.Sprintf("hash %s, ver %d, %d tx, %s", msg.BlockHash(),
 			header.Version, len(msg.Transactions), header.Timestamp)
@@ -193,6 +202,14 @@ func messageSummary(msg wire.Message) string {
 
 	case *wire.MsgGetHeaders:
 		return locatorSummary(msg.BlockLocatorHashes, &msg.HashStop)
+
+	case *wire.MsgNeedSet:
+		return fmt.Sprintf("%d tx, Block hash %s", len(msg.Hashes),
+			msg.BlockHash)
+
+	case *wire.MsgNeedSetResult:
+		return fmt.Sprintf("%d tx, Block hash %s", len(msg.Txs),
+			msg.BlockHash)
 
 	case *wire.MsgHeaders:
 		return fmt.Sprintf("num %d", len(msg.Headers))
