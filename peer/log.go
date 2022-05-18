@@ -115,6 +115,20 @@ func locatorSummary(locator []*chainhash.Hash, stopHash *chainhash.Hash) string 
 
 }
 
+// needsetSummary returns a needset as a human-readable string.
+func needsetSummary(msg *wire.MsgNeedSet) string {
+	needNum := len(msg.Hashes)
+	hashStr := ""
+	for i := 0; i < needNum; i++ {
+		hashStr += msg.Hashes[i].String()
+		if i != needNum-1 {
+			hashStr += ","
+		}
+	}
+	return fmt.Sprintf("%d transaction: %s, Block hash %s", len(msg.Hashes), hashStr,
+		msg.BlockHash)
+}
+
 // sanitizeString strips any characters which are even remotely dangerous, such
 // as html control characters, from the passed string.  It also limits it to
 // the passed maximum size, which can be 0 for unlimited.  When the string is
@@ -204,11 +218,10 @@ func messageSummary(msg wire.Message) string {
 		return locatorSummary(msg.BlockLocatorHashes, &msg.HashStop)
 
 	case *wire.MsgNeedSet:
-		return fmt.Sprintf("%d tx, Block hash %s", len(msg.Hashes),
-			msg.BlockHash)
+		return needsetSummary(msg)
 
 	case *wire.MsgNeedSetResult:
-		return fmt.Sprintf("%d tx, Block hash %s", len(msg.Txs),
+		return fmt.Sprintf("%d transaction, Block hash %s", len(msg.Txs),
 			msg.BlockHash)
 
 	case *wire.MsgHeaders:
