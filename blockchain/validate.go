@@ -1483,7 +1483,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// against all the inputs when the signature operations are out of
 	// bounds.
 	var totalFees uint64
-	for _, tx := range transactions {
+	for _, tx := range transactions[1:] {
 		err := CheckTransactionInputsAbe(tx, node.height, view,
 			b.chainParams)
 		if err != nil {
