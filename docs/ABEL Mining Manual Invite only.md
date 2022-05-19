@@ -266,8 +266,17 @@ Besides the configuration above, you may need to do a few more configurations de
 
 If abec (full node) and abewallet (ABEL wallet) are on different machines, we also need to
 
+- specify the RPC listen port of abec, and
 - specify the ip address and port of the machine which is running the full node, abec, and
 - get the RPC certificate of the full node, abec
+
+To **specify the RPC listen port of abec**, add the following option in *abec.conf*,
+
+```
+rpclisten=IP:PORT
+```
+where IP is the local net IP. 
+If there is only one local net IP, or for simplicity, it could be 0.0.0.0, which means listen PORT of all IPs.
 
 To **specify the ip address of abec**, add the following option in *abewallet.conf*,
 
