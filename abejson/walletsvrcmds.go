@@ -480,6 +480,11 @@ type ListUnspentCmd struct {
 	MaxConf   *int `jsonrpcdefault:"9999999"`
 	Addresses *[]string
 }
+type ListAllUnspentAbeCmd struct{}
+
+func NewListAllUnspentAbeCmd() *ListAllUnspentAbeCmd {
+	return &ListAllUnspentAbeCmd{}
+}
 
 type ListUnspentAbeCmd struct{}
 
@@ -824,6 +829,7 @@ func init() {
 	MustRegisterCmd("listsinceblock", (*ListSinceBlockCmd)(nil), flags)
 	MustRegisterCmd("listtransactions", (*ListTransactionsCmd)(nil), flags)
 	MustRegisterCmd("listunspent", (*ListUnspentCmd)(nil), flags)
+	MustRegisterCmd("listallutxoabe", (*ListAllUnspentAbeCmd)(nil), flags)
 	MustRegisterCmd("listunspentabe", (*ListUnspentAbeCmd)(nil), flags)
 	MustRegisterCmd("listspentbutunminedabe", (*ListSpentButUnminedAbeCmd)(nil), flags)
 	MustRegisterCmd("listspentandminedabe", (*ListSpentAndMinedAbeCmd)(nil), flags)
