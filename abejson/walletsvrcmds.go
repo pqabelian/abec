@@ -486,6 +486,12 @@ func NewListAllUnspentAbeCmd() *ListAllUnspentAbeCmd {
 	return &ListAllUnspentAbeCmd{}
 }
 
+type ListUnmaturedAbeCmd struct{}
+
+func NewListUnmaturedAbeCmd() *ListUnmaturedAbeCmd {
+	return &ListUnmaturedAbeCmd{}
+}
+
 type ListUnspentAbeCmd struct{}
 
 func NewListUnspentAbeCmd() *ListUnspentAbeCmd {
@@ -830,6 +836,7 @@ func init() {
 	MustRegisterCmd("listtransactions", (*ListTransactionsCmd)(nil), flags)
 	MustRegisterCmd("listunspent", (*ListUnspentCmd)(nil), flags)
 	MustRegisterCmd("listallutxoabe", (*ListAllUnspentAbeCmd)(nil), flags)
+	MustRegisterCmd("listunmaturedabe", (*ListUnmaturedAbeCmd)(nil), flags)
 	MustRegisterCmd("listunspentabe", (*ListUnspentAbeCmd)(nil), flags)
 	MustRegisterCmd("listspentbutunminedabe", (*ListSpentButUnminedAbeCmd)(nil), flags)
 	MustRegisterCmd("listspentandminedabe", (*ListSpentAndMinedAbeCmd)(nil), flags)
