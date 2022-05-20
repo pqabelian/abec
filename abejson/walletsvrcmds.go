@@ -481,11 +481,22 @@ type ListUnspentCmd struct {
 	Addresses *[]string
 }
 
-//TODO(abe): the utxos listed is spendable
 type ListUnspentAbeCmd struct{}
 
 func NewListUnspentAbeCmd() *ListUnspentAbeCmd {
 	return &ListUnspentAbeCmd{}
+}
+
+type ListSpentButUnminedAbeCmd struct{}
+
+func NewListSpentButUnminedAbeCmd() *ListSpentButUnminedAbeCmd {
+	return &ListSpentButUnminedAbeCmd{}
+}
+
+type ListSpentAndMinedAbeCmd struct{}
+
+func NewListSpentAndMinedAbeCmd() *ListSpentAndMinedAbeCmd {
+	return &ListSpentAndMinedAbeCmd{}
 }
 
 // NewListUnspentCmd returns a new instance which can be used to issue a
@@ -814,6 +825,8 @@ func init() {
 	MustRegisterCmd("listtransactions", (*ListTransactionsCmd)(nil), flags)
 	MustRegisterCmd("listunspent", (*ListUnspentCmd)(nil), flags)
 	MustRegisterCmd("listunspentabe", (*ListUnspentAbeCmd)(nil), flags)
+	MustRegisterCmd("listspentbutunminedabe", (*ListSpentButUnminedAbeCmd)(nil), flags)
+	MustRegisterCmd("listspentandminedabe", (*ListSpentAndMinedAbeCmd)(nil), flags)
 	MustRegisterCmd("lockunspent", (*LockUnspentCmd)(nil), flags)
 	MustRegisterCmd("move", (*MoveCmd)(nil), flags)
 	MustRegisterCmd("sendfrom", (*SendFromCmd)(nil), flags)
