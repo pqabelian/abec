@@ -533,7 +533,6 @@ func deserializeSpendJournalEntryAbe(serialized []byte, txns []*wire.MsgTxAbe) (
 				SerialNumber: nil,
 				UtxoRing:     new(UtxoRingEntry),
 			}
-			stxoIdx--
 
 			err := stxo.Deserialize(br)
 			if err != nil {
@@ -542,6 +541,7 @@ func deserializeSpendJournalEntryAbe(serialized []byte, txns []*wire.MsgTxAbe) (
 					txIn.PreviousOutPointRing, err))
 			}
 			stxos[stxoIdx] = stxo
+			stxoIdx--
 		}
 	}
 
