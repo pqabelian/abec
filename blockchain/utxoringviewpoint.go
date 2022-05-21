@@ -445,6 +445,7 @@ func (entry *UtxoRingEntry) Clone() *UtxoRingEntry {
 
 	utxoRing := UtxoRingEntry{}
 
+	utxoRing.Version = entry.Version
 	utxoRing.ringBlockHeight = entry.ringBlockHeight
 	utxoRing.outPointRing = entry.outPointRing
 	utxoRing.txOuts = entry.txOuts
@@ -806,6 +807,7 @@ func (view *UtxoRingViewpoint) connectTransaction(tx *abeutil.TxAbe, blockhash *
 		if stxos != nil {
 			// Populate the stxo details using the utxo entry.
 			stxo := new(SpentTxOutAbe)
+			stxo.SerialNumber = make([]byte, abecryptoparam.MaxAllowedSerialNumberSize)
 			copy(stxo.SerialNumber[:], txIn.SerialNumber[:])
 			stxo.UtxoRing = entry.Clone()
 
