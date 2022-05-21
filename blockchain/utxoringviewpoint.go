@@ -807,7 +807,7 @@ func (view *UtxoRingViewpoint) connectTransaction(tx *abeutil.TxAbe, blockhash *
 		if stxos != nil {
 			// Populate the stxo details using the utxo entry.
 			stxo := new(SpentTxOutAbe)
-			stxo.SerialNumber = make([]byte, abecryptoparam.MaxAllowedSerialNumberSize)
+			stxo.SerialNumber = make([]byte, len(txIn.SerialNumber))
 			copy(stxo.SerialNumber[:], txIn.SerialNumber[:])
 			stxo.UtxoRing = entry.Clone()
 
