@@ -487,7 +487,7 @@ func (entry *UtxoRingEntry) IsSame(obj *UtxoRingEntry) bool {
 	}
 
 	bufObj := bytes.NewBuffer(make([]byte, 0, objSize))
-	err = entry.Serialize(bufObj)
+	err = obj.Serialize(bufObj)
 	if err != nil {
 		return false
 	}

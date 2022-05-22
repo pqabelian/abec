@@ -774,7 +774,6 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 //   7. No duplicate transactions (same tx hash)
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkBlockHeaderSanity.
-//	todo (ABE): Abe to do
 func checkBlockSanityAbe(block *abeutil.BlockAbe, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
 	msgBlock := block.MsgBlock()
 	header := &msgBlock.Header
@@ -1375,7 +1374,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 
 	// The coinbase for the Genesis block is not spendable, so just return
 	// an error now.
-	//	todo(ABE): In ABE, he coinbase for the Genesis block is spendable.
+	//	In ABE, he coinbase for the Genesis block is spendable.
 	/*	if node.hash.IsEqual(b.chainParams.GenesisHash) {
 		str := "the coinbase for the genesis block is not spendable"
 		return ruleError(ErrMissingTxOut, str)

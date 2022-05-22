@@ -42,9 +42,7 @@ func (b *BlockChain) blockExists(hash *chainhash.Hash) (bool, error) {
 	var exists bool
 	err := b.db.View(func(dbTx database.Tx) error {
 		var err error
-		// todo (20220515): rename to HasBlockAbe or not?
 		exists, err = dbTx.HasBlock(hash)
-		// todo (20220515): why !exist?
 		if err != nil || !exists {
 			return err
 		}

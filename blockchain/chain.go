@@ -1647,7 +1647,6 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 			// was skipped, so the utxo view needs to load the referenced
 			// utxos, spend them, and add the new utxos being created by
 			// this block.
-			//			if fastAdd {
 			err := view.fetchInputUtxoRings(b.db, block)
 			if err != nil {
 				return false, err
@@ -1656,7 +1655,6 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 			if err != nil {
 				return false, err
 			}
-			//			}
 		}
 
 		//	TODO: generating new UtxoRingEntry if currentblock.height%2 = 0
