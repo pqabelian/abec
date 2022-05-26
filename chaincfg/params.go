@@ -31,7 +31,7 @@ var (
 	// testNet3PowLimit is the highest proof of work value a block
 	// can have for the test network (version 3).  It is the value
 	// 2^224 - 1.
-	testNet3PowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 224), bigOne)
+	testNet3PowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 233), bigOne)
 
 	// simNetPowLimit is the highest proof of work value a block
 	// can have for the simulation test network.  It is the value 2^255 - 1.
@@ -373,7 +373,7 @@ var TestNet3Params = Params{
 	GenesisBlock:             &testNet3GenesisBlock,
 	GenesisHash:              &testNet3GenesisHash,
 	PowLimit:                 testNet3PowLimit,
-	PowLimitBits:             0x1d00ffff,
+	PowLimitBits:             0x1e01ffff,
 	CoinbaseMaturity:         200,
 	SubsidyReductionInterval: 400_000,
 	TargetTimespan:           time.Second * 256 * 4000,
