@@ -133,6 +133,20 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 		return nil
 	}
 
+	isCB, err := tx.IsCoinBase()
+	if err != nil {
+		return err
+	}
+
+	if isCB {
+		isValid, err := abecrypto.CoinbaseTxVerify(tx.MsgTx())
+		if !isValid || err != nil {
+			str := fmt.Sprintf("coinbase transaction %s verify failed", tx.Hash())
+			return ruleError(ErrScriptValidation, str)
+		}
+		return nil
+	}
+
 	txInLen := len(tx.MsgTx().TxIns)
 	abeTxInDetail := make([]*abecrypto.AbeTxInDetail, txInLen)
 	for i := 0; i < txInLen; i++ {
@@ -172,14 +186,6 @@ func checkBlockScriptsAbe(block *abeutil.BlockAbe, utxoRingView *UtxoRingViewpoi
 	txValItems := make([]*txValidateItem, 0, numTx)
 
 	for i := 0; i < numTx; i++ {
-		// Skip coinbase transaction.
-		isCb, err := allTxs[i].IsCoinBase()
-		if err != nil {
-			return err
-		}
-		if isCb {
-			continue
-		}
 
 		if !allTxs[i].HasWitness() {
 			str := fmt.Sprintf("transaction %s verify failed due to no witness", allTxs[i].Hash())
