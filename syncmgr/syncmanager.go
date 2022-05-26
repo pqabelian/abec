@@ -1193,7 +1193,11 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	// wait the needsetResult
 	if len(needSet) != 0 {
 		log.Debugf("Missing %v transactions in pruned block %s from peer %s, sending needset message...", len(needSet), bmsg.block.Hash().String(), peer)
-		syncPeerState := sm.peerStates[sm.syncPeer]
+		syncPeerState, exists := sm.peerStates[peer]
+		if !exists {
+			log.Warnf("Received pruned block message from unknown peer %s", peer)
+			return
+		}
 		syncPeerState.requestedNeedSet[*blockHash] = struct{}{}
 		txs, err := peer.PushNeedSetMsg(*blockHash, needSet)
 
