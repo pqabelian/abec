@@ -352,7 +352,7 @@ func (txIn *TxInAbe) String() string {
 		return err.Error()
 	}
 	strLen := 2*snLen + 1 +
-		len(txIn.PreviousOutPointRing.BlockHashs)*(2*chainhash.HashSize+1+1) + len(txIn.PreviousOutPointRing.OutPoints)*(2*chainhash.HashSize+1+1) + 1
+		len(txIn.PreviousOutPointRing.BlockHashs)*(2*chainhash.HashSize+1+1) + len(txIn.PreviousOutPointRing.OutPoints)*(2*chainhash.HashSize+1+1+1) + 1
 
 	buf := make([]byte, strLen)
 
