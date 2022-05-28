@@ -242,7 +242,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, flags BehaviorFlag
 		return false, false, err
 	}
 
-	log.Debugf("Accepted block %v", blockHash)
+	log.Debugf("Accepted block %v, height %v, tx %v", blockHash, block.Height(), len(block.Transactions()))
 
 	return isMainChain, false, nil
 }
