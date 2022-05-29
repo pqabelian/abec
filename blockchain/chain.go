@@ -1498,11 +1498,23 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			}
 		}
 
+		for ringHash, _ := range viewToDel.entries {
+			ringFromStxo := view.entries[ringHash]
+			if ringFromStxo != nil {
+				if len(ringFromStxo.serialNumbers) > 0 {
+					return AssertError(fmt.Sprintf("detaching utxoRing (ringHeight = %d, outPointHash = %v) fail: the serialNumbers List should be empty, but not",
+						ringFromStxo.ringBlockHeight, ringFromStxo.outPointRing.Hash()))
+				}
+				delete(view.entries, ringHash)
+			}
+		}
+
 		// Update the database and chain state.
 		err = b.disconnectBlockAbe(n, block, view, viewToDel)
 		if err != nil {
 			return err
 		}
+
 	}
 
 	//	Abe to do
