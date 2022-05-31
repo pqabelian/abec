@@ -24,9 +24,18 @@ abewallet --create
 Then run abewallet again. 
 Same when launching abec later.
 
-**Hint 2**: On Macos, if it says `'xxx' cannot be opened because the developer cannot be verified`, 
+**Hint 2**: On Macos, if it says `'xxx' cannot be opened because the developer cannot be verified` or `'xxx' can't be opened beacause Apple cannot check it for malicious software`, 
 go to `System Preferences -> Security & Privacy -> General` and click `allow anyway`. 
 Then run abewallet again. 
+
+**Hint 3**: On Macos, if it says `'xxx' is damaged and can't be opened`, open the Terminal and run 
+
+```shell
+xattr -d com.apple.quarantine path/to/xxx
+```
+
+Then run abewallet again. 
+
 Same when launching abec later.
 
 Here is an example.
@@ -358,20 +367,15 @@ Example:
 
 ```shell
 ./start_abectl.sh --rpcuser=username --rpcpass=password --wallet getbalancesabe
-[
-  4508,
-  2971.9892438,
-  1536.0107562,
-  0
-]
+{
+  "current_time":"2022-05-31 10:03:11.3752652 +0800 CST m=+73.363288801",
+  "current_height":261,
+    "current_block_hash":"13e1a678dd1145b484f639d3818c1c4e02138ec1f7f72f2944d69387aee353c4",
+  "total_balance":57704.5035615,
+  "spendable_balance":5991.9620492,
+  "freeze_balance":51712.5415123
+}
 ```
-
-From the top to the bottom
-
-- total balance
-- spendable balance
-- freezed coinbase balance
-- freezed transaction balance
 
 #### If Abectl and Abewallet are on different machine
 
@@ -397,12 +401,14 @@ Example:
 
 ```shell
 ./start_abectl.sh --rpcuser=username --rpcpass=password --rpcserver=192.168.1.3:8665 --rpccert=/home/username/rpc.cert --wallet getbalancesabe
-[
-  4508,
-  2971.9892438,
-  1536.0107562,
-  0
-]
+{
+  "current_time":"2022-05-31 10:03:11.3752652 +0800 CST m=+73.363288801",
+  "current_height":261,
+    "current_block_hash":"13e1a678dd1145b484f639d3818c1c4e02138ec1f7f72f2944d69387aee353c4",
+  "total_balance":57704.5035615,
+  "spendable_balance":5991.9620492,
+  "freeze_balance":51712.5415123
+}
 ```
 
 
