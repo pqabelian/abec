@@ -335,8 +335,8 @@ out:
 		// Choose a payment address at random.
 		masterAddr := m.cfg.MiningAddrBytes
 
-		//
-
+		// todo: The last 32 byte is the hash used for validation, not implemented yet
+		// todo: discarding the hash and netID below should bne finished once the address is set instead of here
 		masterAddr = masterAddr[:len(masterAddr)-32]
 
 		// Create a new block template using the available transactions

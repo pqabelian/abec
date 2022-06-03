@@ -1939,6 +1939,8 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 			masterAddr = cfg.miningAddrBytes
 		}
 
+		masterAddr = masterAddr[:len(masterAddr)-32]
+
 		// Create a new block template that has a coinbase which anyone
 		// can redeem.  This is only acceptable because the returned
 		// block template doesn't include the coinbase, so the caller
@@ -1989,6 +1991,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// template if it doesn't already have one.  Since this requires
 		// mining addresses to be specified via the config, an error is
 		// returned if none have been specified.
+		// todo (ABE): maybe deleted or modified in the future
 		if !useCoinbaseValue && !template.ValidPayAddress {
 			// Choose a payment address at random.
 			payToAddr := cfg.miningAddrBytes
@@ -2088,8 +2091,9 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 		bTx := abeutil.NewTxAbe(tx)
 		resultTx := abejson.GetBlockTemplateResultTxAbe{
 			// Data: hex.EncodeToString(txBuf.Bytes()),
-			Hash: txHash.String(),
-			Fee:  template.Fees[i],
+			TxHash:      txHash.String(),
+			WitnessHash: msgBlock.WitnessHashs[i].String(),
+			Fee:         template.Fees[i],
 			//	Weight:  blockchain.GetTransactionWeight(bTx),
 			Size: int64(bTx.MsgTx().SerializeSize()),
 		}
@@ -2156,7 +2160,8 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 
 		resultTx := abejson.GetBlockTemplateResultCoinbase{
 			Data:             hex.EncodeToString(txBuf.Bytes()),
-			Hash:             tx.TxHash().String(),
+			TxHash:           tx.TxHash().String(),
+			WitnessHash:      msgBlock.WitnessHashs[0].String(),
 			Fee:              template.BlockAbe.Transactions[0].TxFee,
 			ExtraNonceOffset: offset,
 			ExtraNonceLen:    8,
@@ -2274,6 +2279,7 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 	// Extract the relevant passed capabilities and restrict the result to
 	// either a coinbase value or a coinbase transaction object depending on
 	// the request. Default to providing a coinbase transaction.
+	// todo (ABE): currently we do not support useCoinbaseValue, hence the useCoinbaseValue is always false
 	useCoinbaseValue := false
 	if request != nil {
 		var hasCoinbaseValue, hasCoinbaseTxn bool
@@ -2329,7 +2335,7 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 	// When a long poll ID was provided, this is a long poll request by the
 	// client to be notified when block template referenced by the ID should
 	// be replaced with a new one.
-	// todo (ABE)
+	// todo (ABE): long poll is not implemented yet
 	if request != nil && request.LongPollID != "" {
 		return handleGetBlockTemplateLongPoll(s, request.LongPollID,
 			useCoinbaseValue, closeChan)
@@ -2531,6 +2537,7 @@ func handleGetBlockTemplate(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	switch mode {
 	case "template":
 		return handleGetBlockTemplateRequest(s, request, closeChan)
+	// todo (ABE): proposal is not supported yet, maybe deleted or implemented in the future
 	case "proposal":
 		return handleGetBlockTemplateProposal(s, request)
 	}
