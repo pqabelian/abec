@@ -1934,6 +1934,15 @@ func (mp *TxPool) LastUpdated() time.Time {
 	return time.Unix(atomic.LoadInt64(&mp.lastUpdated), 0)
 }
 
+func (mp *TxPool) RemoveTransactionAbeByRingHash(hash chainhash.Hash) {
+	mp.mtx.Lock()
+	depend := mp.outpointsAbe[hash]
+	for _, txAbe := range depend {
+		mp.removeTransactionAbe(txAbe)
+	}
+	mp.mtx.Unlock()
+}
+
 // New returns a new memory pool for validating and storing standalone
 // transactions until they are mined into a block.
 func New(cfg *Config) *TxPool {

@@ -23,6 +23,8 @@ const (
 	// NTBlockDisconnected indicates the associated block was disconnected
 	// from the main chain.
 	NTBlockDisconnected
+
+	NTInvalidRing
 )
 
 // notificationTypeStrings is a map of notification types back to their constant
@@ -31,6 +33,7 @@ var notificationTypeStrings = map[NotificationType]string{
 	NTBlockAccepted:     "NTBlockAccepted",
 	NTBlockConnected:    "NTBlockConnected",
 	NTBlockDisconnected: "NTBlockDisconnected",
+	NTInvalidRing:       "NTInvalidRing",
 }
 
 // String returns the NotificationType in human-readable form.
@@ -47,6 +50,7 @@ func (n NotificationType) String() string {
 // 	- NTBlockAccepted:     *btcutil.Block
 // 	- NTBlockConnected:    *btcutil.Block
 // 	- NTBlockDisconnected: *btcutil.Block
+// 	- NTInvalidRing: []*chainhash.Hash
 type Notification struct {
 	Type NotificationType
 	Data interface{}

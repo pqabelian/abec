@@ -1165,8 +1165,15 @@ func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe
 	// Notify the caller that the block was disconnected from the main
 	// chain.  The caller would typically want to react with actions such as
 	// updating wallets.
+	invalidRingHashs := make([]chainhash.Hash, 0, len(viewToDel.entries))
+	for hash, _ := range viewToDel.entries {
+		invalidRingHashs = append(invalidRingHashs, hash)
+	}
 	b.chainLock.Unlock()
 	b.sendNotification(NTBlockDisconnected, block)
+	if len(invalidRingHashs) != 0 {
+		b.sendNotification(NTInvalidRing, invalidRingHashs)
+	}
 	b.chainLock.Lock()
 
 	return nil
@@ -1353,6 +1360,8 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 					ringFromStxo.ringBlockHeight, ringFromStxo.outPointRing.Hash()))
 			}
 			delete(view.entries, ringHash)
+			// TODO put the ring hash to sync manager
+			// Then the sync manager clean the mempool
 		}
 	}
 
