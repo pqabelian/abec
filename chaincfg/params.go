@@ -338,7 +338,7 @@ var RegressionNetParams = Params{
 	Bech32HRPSegwit: "rb",
 
 	// Address encoding magics
-	PQRingCTID:              0x00, // starts with 1, TODO(abe): adjust the prefix
+	PQRingCTID:              0x01, // starts with 1,
 	PubKeyHashAddrID:        0x00, // starts with 1
 	ScriptHashAddrID:        0x05, // starts with 3
 	PrivateKeyID:            0x80, // starts with 5 (uncompressed) or K (compressed)
@@ -409,7 +409,7 @@ var TestNet3Params = Params{
 	Bech32HRPSegwit: "tb",
 
 	// Address encoding magics
-	PQRingCTID:              0x00, // starts with 1, TODO(abe): adjust the prefix
+	PQRingCTID:              0x02, // starts with 1,
 	PubKeyHashAddrID:        0x00, // starts with 1
 	ScriptHashAddrID:        0x05, // starts with 3
 	PrivateKeyID:            0x80, // starts with 5 (uncompressed) or K (compressed)
@@ -477,7 +477,7 @@ var SimNetParams = Params{
 	Bech32HRPSegwit: "sb", // always sb for sim net
 
 	// Address encoding magics
-	PQRingCTID:              0x00, // starts with 1, TODO(abe): adjust the prefix
+	PQRingCTID:              0x03, // starts with 1,
 	PubKeyHashAddrID:        0x00, // starts with 1
 	ScriptHashAddrID:        0x05, // starts with 3
 	PrivateKeyID:            0x80, // starts with 5 (uncompressed) or K (compressed)

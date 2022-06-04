@@ -855,15 +855,59 @@ func loadConfig() (*config, []string, error) {
 		//	return nil, nil, err
 		//}
 		cfg.miningAddr = nil
-		cfg.miningAddrBytes, _ = hex.DecodeString(cfg.MiningAddr) // set the mining address
+		cfg.miningAddrBytes, err = hex.DecodeString(cfg.MiningAddr) // set the mining address
+		if err != nil {
+			str := "%s: Error when parsing mining address: %v"
+			fmt.Fprintln(os.Stderr, fmt.Errorf(str, funcName, err))
+			fmt.Fprintln(os.Stderr, usageMessage)
+			return nil, nil, err
+		}
 	} else {
 		if cfg.MiningAddr != "" {
-			cfg.miningAddrBytes, _ = hex.DecodeString(cfg.MiningAddr)
-			//maddr, err := abeutil.DecodeMasterAddressAbe(cfg.MiningAddr)
-			//if err == nil {
-			//	cfg.miningAddr = maddr
-			//}
+			cfg.miningAddrBytes, err = hex.DecodeString(cfg.MiningAddr)
+			if err != nil {
+				str := "%s: Error when parsing mining address: %v"
+				fmt.Fprintln(os.Stderr, fmt.Errorf(str, funcName, err))
+				fmt.Fprintln(os.Stderr, usageMessage)
+				return nil, nil, err
+			}
 		}
+	}
+
+	// Verify mining address
+	if cfg.miningAddrBytes != nil {
+		if len(cfg.miningAddrBytes) < 33 {
+			str := "%s: The length of mining address is incorrect"
+			err := fmt.Errorf(str, funcName)
+			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(os.Stderr, usageMessage)
+			return nil, nil, err
+		}
+
+		// Check netID
+		//netID := cfg.miningAddrBytes[0]
+		//if netID != activeNetParams.PQRingCTID {
+		//	str := "%s: The netID of mining address does not match the active net"
+		//	err := fmt.Errorf(str, funcName)
+		//	fmt.Fprintln(os.Stderr, err)
+		//	fmt.Fprintln(os.Stderr, usageMessage)
+		//	return nil, nil, err
+		//}
+
+		// Check verification hash
+		verifyBytes := cfg.miningAddrBytes[:len(cfg.miningAddrBytes)-32]
+		dstHash0 := cfg.miningAddrBytes[len(cfg.miningAddrBytes)-32:]
+		dstHash, _ := chainhash.NewHash(dstHash0)
+		realHash := chainhash.DoubleHashH(verifyBytes)
+		if !dstHash.IsEqual(&realHash) {
+			str := "%s: Mining address verification fails: verification hash does not match"
+			err := fmt.Errorf(str, funcName)
+			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(os.Stderr, usageMessage)
+			return nil, nil, err
+		}
+
+		cfg.miningAddrBytes = verifyBytes[1:]
 	}
 
 	// Add default port to all listener addresses if needed and remove

@@ -335,14 +335,10 @@ out:
 		// Choose a payment address at random.
 		masterAddr := m.cfg.MiningAddrBytes
 
-		// todo: The last 32 byte is the hash used for validation, not implemented yet
-		// todo: discarding the hash and netID below should bne finished once the address is set instead of here
-		masterAddr = masterAddr[:len(masterAddr)-32]
-
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		template, err := m.g.NewBlockTemplate(masterAddr[1:]) // discard the netID
+		template, err := m.g.NewBlockTemplate(masterAddr)
 		m.submitBlockLock.Unlock()
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+
@@ -593,12 +589,11 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 		//		rand.Seed(time.Now().UnixNano())
 		//		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
 		masterAddr := m.cfg.MiningAddrBytes
-		masterAddr = masterAddr[:len(masterAddr)-32]
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		template, err := m.g.NewBlockTemplate(masterAddr[1:]) // discard the netID
+		template, err := m.g.NewBlockTemplate(masterAddr)
 
 		m.submitBlockLock.Unlock()
 		if err != nil {
