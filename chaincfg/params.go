@@ -374,7 +374,7 @@ var TestNet3Params = Params{
 	GenesisHash:              &testNet3GenesisHash,
 	PowLimit:                 testNet3PowLimit,
 	PowLimitBits:             0x1e01ffff,
-	CoinbaseMaturity:         200,
+	CoinbaseMaturity:         6,
 	SubsidyReductionInterval: 400_000,
 	TargetTimespan:           time.Second * 256 * 4000,
 	TargetTimePerBlock:       time.Second * 256,
