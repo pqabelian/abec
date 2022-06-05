@@ -4145,10 +4145,13 @@ func AddWitnessForSimplifiedBlock(simplifiedBlock *wire.MsgSimplifiedBlock, txPo
 	if len(simplifiedBlock.Transactions) == 0 {
 		return nil, errors.New("there is no transactions in simplified block")
 	}
-	msgBlock.Transactions = make([]*wire.MsgTxAbe, len(simplifiedBlock.Transactions))
+	//msgBlock.Transactions = make([]*wire.MsgTxAbe, 1)
 
 	// coinbase transaction
-	msgBlock.Transactions[0] = simplifiedBlock.Coinbase
+	err := msgBlock.AddTransaction(simplifiedBlock.Coinbase)
+	if err != nil {
+		return nil, err
+	}
 
 	// transfer transaction
 	for i := 1; i < len(simplifiedBlock.Transactions); i++ {
@@ -4156,7 +4159,10 @@ func AddWitnessForSimplifiedBlock(simplifiedBlock *wire.MsgSimplifiedBlock, txPo
 		if err != nil {
 			return nil, errors.New(fmt.Sprintf("Cannot find transaction : %v", simplifiedBlock.Transactions[i].String()))
 		}
-		msgBlock.Transactions[i] = msgTx.MsgTx()
+		err = msgBlock.AddTransaction(msgTx.MsgTx())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	block := abeutil.NewBlockAbe(msgBlock)
