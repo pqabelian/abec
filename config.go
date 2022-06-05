@@ -885,14 +885,14 @@ func loadConfig() (*config, []string, error) {
 		}
 
 		// Check netID
-		//netID := cfg.miningAddrBytes[0]
-		//if netID != activeNetParams.PQRingCTID {
-		//	str := "%s: The netID of mining address does not match the active net"
-		//	err := fmt.Errorf(str, funcName)
-		//	fmt.Fprintln(os.Stderr, err)
-		//	fmt.Fprintln(os.Stderr, usageMessage)
-		//	return nil, nil, err
-		//}
+		netID := cfg.miningAddrBytes[0]
+		if netID != activeNetParams.PQRingCTID {
+			str := "%s: The netID of mining address does not match the active net"
+			err := fmt.Errorf(str, funcName)
+			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(os.Stderr, usageMessage)
+			return nil, nil, err
+		}
 
 		// Check verification hash
 		verifyBytes := cfg.miningAddrBytes[:len(cfg.miningAddrBytes)-32]

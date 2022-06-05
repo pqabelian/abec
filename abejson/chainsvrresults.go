@@ -304,8 +304,9 @@ type GetBlockTemplateResultTx struct {
 // GetBlockTemplateResultTxAbe models the transactions field of the
 // getblocktemplate command.
 type GetBlockTemplateResultTxAbe struct {
-	Data        string `json:"data"`
-	TxHash      string `json:"txhash"`
+	Data   string `json:"data"`
+	TxHash string `json:"txhash"`
+
 	WitnessHash string `json:"witnesshash"`
 	Fee         uint64 `json:"fee"`
 	Size        int64  `json:"size"`
@@ -321,6 +322,7 @@ type GetBlockTemplateResultCoinbase struct {
 	Size             int64  `json:"size"`
 	ExtraNonceOffset int64  `json:"extranonceoffset"`
 	ExtraNonceLen    int64  `json:"extranoncelen"`
+	WitnessOffset    int64  `json:"witness_offset"`
 }
 
 // GetBlockTemplateResultAux models the coinbaseaux field of the

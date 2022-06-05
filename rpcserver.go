@@ -2156,6 +2156,8 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 			return nil, err
 		}
 
+		witnessOffset := tx.SerializeSize()
+
 		resultTx := abejson.GetBlockTemplateResultCoinbase{
 			Data:             hex.EncodeToString(txBuf.Bytes()),
 			TxHash:           tx.TxHash().String(),
@@ -2163,6 +2165,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 			Fee:              template.BlockAbe.Transactions[0].TxFee,
 			ExtraNonceOffset: offset,
 			ExtraNonceLen:    8,
+			WitnessOffset:    int64(witnessOffset),
 		}
 
 		reply.CoinbaseTxn = &resultTx
@@ -2310,7 +2313,7 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 	// way to relay a found block or receive transactions to work on.
 	// However, allow this state when running in the regression test or
 	// simulation test mode.
-	if !(cfg.RegressionTest || cfg.SimNet) &&
+	if !(cfg.RegressionTest || cfg.SimNet || cfg.TestNet3) &&
 		s.cfg.ConnMgr.ConnectedCount() == 0 {
 
 		return nil, &abejson.RPCError{
@@ -4139,6 +4142,9 @@ func handleSubmitSimplifiedBlock(s *rpcServer, cmd interface{}, closeChan <-chan
 func AddWitnessForSimplifiedBlock(simplifiedBlock *wire.MsgSimplifiedBlock, txPool *mempool.TxPool) (*abeutil.BlockAbe, error) {
 	msgBlock := &wire.MsgBlockAbe{}
 	msgBlock.Header = simplifiedBlock.Header
+	if len(simplifiedBlock.Transactions) == 0 {
+		return nil, errors.New("there is no transactions in simplified block")
+	}
 	msgBlock.Transactions = make([]*wire.MsgTxAbe, len(simplifiedBlock.Transactions))
 
 	// coinbase transaction
