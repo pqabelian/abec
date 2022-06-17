@@ -129,7 +129,7 @@ out:
 			hashesPerSec = (hashesPerSec + curHashesPerSec) / 2
 			totalHashes = 0
 			if hashesPerSec != 0 {
-				log.Debugf("Hash speed: %6.0f kilohashes/s",
+				log.Infof("Hash speed: %6.0f kilohashes/s",
 					hashesPerSec/1000)
 			}
 
