@@ -140,7 +140,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getblockcount":           handleGetBlockCount,
 	"getblockhash":            handleGetBlockHash,
 	"getblockheader":          handleGetBlockHeader,
-	"getblocktemplate":        handleGetBlockTemplate,
+	//"getblocktemplate":        handleGetBlockTemplate, // TODO 20220618 disable now, would open later
 	// TODO(ABE): ABE does not support filter.
 	//"getcfilter":            handleGetCFilter,
 	//"getcfilterheader":      handleGetCFilterHeader,
@@ -2790,8 +2790,7 @@ func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	// blocks.  When the passed value is negative, use the last block the
 	// difficulty changed as the starting height.  Also make sure the
 	// starting height is not before the beginning of the chain.
-	//	todo(ABE): What is this (120)?
-	numBlocks := int32(120)
+	numBlocks := int32(400) // default 400 block to estimate network hash speed
 	if c.Blocks != nil {
 		numBlocks = int32(*c.Blocks)
 	}
