@@ -337,6 +337,9 @@ type TemplateRequest struct {
 	// "proposal".
 	Data   string `json:"data,omitempty"`
 	WorkID string `json:"workid,omitempty"`
+
+	// MiningAddr should be filled if there is 'useownaddr' in capabilities
+	MiningAddr string `json:"miningaddr,omitempty"`
 }
 
 // convertTemplateRequestField potentially converts the provided value as

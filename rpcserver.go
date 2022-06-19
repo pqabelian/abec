@@ -140,7 +140,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getblockcount":           handleGetBlockCount,
 	"getblockhash":            handleGetBlockHash,
 	"getblockheader":          handleGetBlockHeader,
-	//"getblocktemplate":        handleGetBlockTemplate, // TODO 20220618 disable now, would open later
+	"getblocktemplate":        handleGetBlockTemplate, // TODO 20220618 disable now, would open later
 	// TODO(ABE): ABE does not support filter.
 	//"getcfilter":            handleGetCFilter,
 	//"getcfilterheader":      handleGetCFilterHeader,
@@ -1906,7 +1906,7 @@ func GetExtraNonceOffset(tx *wire.MsgTxAbe) (int64, error) {
 // addresses.
 //
 // This function MUST be called with the state locked.
-func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bool) error {
+func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bool, useOwnAddr bool, miningAddr []byte) error {
 	generator := s.cfg.Generator
 	lastTxUpdate := generator.TxSource().LastUpdated()
 	if lastTxUpdate.IsZero() {
@@ -1937,6 +1937,10 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		var masterAddr []byte
 		if !useCoinbaseValue {
 			masterAddr = cfg.miningAddrBytes
+		}
+
+		if useOwnAddr {
+			masterAddr = miningAddr
 		}
 
 		// Create a new block template that has a coinbase which anyone
@@ -2191,7 +2195,7 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 	// be manually unlocked before waiting for a notification about block
 	// template changes.
 
-	if err := state.updateBlockTemplate(s, useCoinbaseValue); err != nil {
+	if err := state.updateBlockTemplate(s, useCoinbaseValue, false, nil); err != nil {
 		state.Unlock()
 		return nil, err
 	}
@@ -2254,7 +2258,7 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 	state.Lock()
 	defer state.Unlock()
 
-	if err := state.updateBlockTemplate(s, useCoinbaseValue); err != nil {
+	if err := state.updateBlockTemplate(s, useCoinbaseValue, false, nil); err != nil {
 		return nil, err
 	}
 
@@ -2270,6 +2274,31 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 	return result, nil
 }
 
+// checkMiningAddrValidity check if the given mining address is valid,
+// including checking the netID and the verify hash.
+func checkMiningAddrValidity(addr []byte) bool {
+	if len(addr) < 33 {
+		return false
+	}
+
+	// Check netID
+	netID := addr[0]
+	if netID != activeNetParams.PQRingCTID {
+		return false
+	}
+
+	// Check verification hash
+	verifyBytes := addr[:len(addr)-32]
+	dstHash0 := addr[len(addr)-32:]
+	dstHash, _ := chainhash.NewHash(dstHash0)
+	realHash := chainhash.DoubleHashH(verifyBytes)
+	if !dstHash.IsEqual(&realHash) {
+		return false
+	}
+
+	return true
+}
+
 // handleGetBlockTemplateRequest is a helper for handleGetBlockTemplate which
 // deals with generating and returning block templates to the caller.  It
 // handles both long poll requests as well as regular requests.  In addition,
@@ -2282,6 +2311,7 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 	// the request. Default to providing a coinbase transaction.
 	// todo (ABE): currently we do not support useCoinbaseValue, hence the useCoinbaseValue is always false
 	useCoinbaseValue := false
+	useOwnAddr := false
 	if request != nil {
 		var hasCoinbaseValue, hasCoinbaseTxn bool
 		for _, capability := range request.Capabilities {
@@ -2290,6 +2320,8 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 				hasCoinbaseTxn = true
 			case "coinbasevalue":
 				hasCoinbaseValue = true
+			case "useownaddr":
+				useOwnAddr = true
 			}
 		}
 
@@ -2300,13 +2332,41 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 
 	// When a coinbase transaction has been requested, respond with an error
 	// if there are no addresses to pay the created block template to.
-	if !useCoinbaseValue && (cfg.miningAddr == nil && cfg.miningAddrBytes == nil) {
+	if !useCoinbaseValue && !useOwnAddr && (cfg.miningAddr == nil && cfg.miningAddrBytes == nil) {
 		return nil, &abejson.RPCError{
 			Code: abejson.ErrRPCInternal.Code,
-			Message: "A coinbase transaction has been requested, " +
-				"but the server has not been configured with " +
+			Message: "Using mining address provided by abec, " +
+				"but abec has not been configured with " +
 				"any payment addresses via --miningaddr",
 		}
+	}
+
+	// If useownaddr is true, check if there is mining address in request
+	// also check the validity of the address
+	var miningAddrBytes []byte = nil
+	if useOwnAddr {
+		if request.MiningAddr == "" {
+			return nil, &abejson.RPCError{
+				Code: abejson.ErrRPCInternal.Code,
+				Message: "Using mining address provided by mining pool, " +
+					"but there is mining address in request",
+			}
+		}
+		miningAddrBytesAll, err := hex.DecodeString(request.MiningAddr)
+		if err != nil {
+			return nil, &abejson.RPCError{
+				Code:    abejson.ErrRPCInternal.Code,
+				Message: "Invalid mining address",
+			}
+		}
+		isValidAddr := checkMiningAddrValidity(miningAddrBytesAll)
+		if !isValidAddr {
+			return nil, &abejson.RPCError{
+				Code:    abejson.ErrRPCInternal.Code,
+				Message: "Invalid mining address",
+			}
+		}
+		miningAddrBytes = miningAddrBytesAll[1 : len(miningAddrBytesAll)-32]
 	}
 
 	// Return an error if there are no peers connected since there is no
@@ -2335,8 +2395,12 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 	// be replaced with a new one.
 	// todo (ABE): long poll is not implemented yet
 	if request != nil && request.LongPollID != "" {
-		return handleGetBlockTemplateLongPoll(s, request.LongPollID,
-			useCoinbaseValue, closeChan)
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCInternal.Code,
+			Message: "Long poll not implemented",
+		}
+		//return handleGetBlockTemplateLongPoll(s, request.LongPollID,
+		//	useCoinbaseValue, closeChan)
 	}
 
 	// Protect concurrent access when updating block templates.
@@ -2350,7 +2414,7 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 	// seconds since the last template was generated.  Otherwise, the
 	// timestamp for the existing block template is updated (and possibly
 	// the difficulty on testnet per the consesus rules).
-	if err := state.updateBlockTemplate(s, useCoinbaseValue); err != nil {
+	if err := state.updateBlockTemplate(s, useCoinbaseValue, useOwnAddr, miningAddrBytes); err != nil {
 		return nil, err
 	}
 	return state.blockTemplateResult(useCoinbaseValue, nil)
