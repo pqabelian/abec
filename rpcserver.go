@@ -140,7 +140,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getblockcount":           handleGetBlockCount,
 	"getblockhash":            handleGetBlockHash,
 	"getblockheader":          handleGetBlockHeader,
-	"getblocktemplate":        handleGetBlockTemplate, // TODO 20220618 disable now, would open later
+	//"getblocktemplate":        handleGetBlockTemplate, // TODO 20220618 disable now, would open later
 	// TODO(ABE): ABE does not support filter.
 	//"getcfilter":            handleGetCFilter,
 	//"getcfilterheader":      handleGetCFilterHeader,
