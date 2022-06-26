@@ -196,7 +196,9 @@ func NewGetBalanceCmd(account *string, minConf *int) *GetBalanceCmd {
 
 // GetBalancesCmd defines the getbalances JSON-RPC command.
 type GetBalancesCmd struct{}
-type GenerateAddressCmd struct{}
+type GenerateAddressCmd struct {
+	Num *int `jsonrpcdefault:"1"`
+}
 type GetBalancesAbeCmd struct {
 	Minconf *int `jsonrpcdefault:"1"`
 }
@@ -803,57 +805,57 @@ func init() {
 	// The commands in this file are only usable with a wallet server.
 	flags := UFWalletOnly
 
-	MustRegisterCmd("addpayee", (*AddPayeeCmd)(nil), flags)
-	MustRegisterCmd("addmultisigaddress", (*AddMultisigAddressCmd)(nil), flags)
-	MustRegisterCmd("addwitnessaddress", (*AddWitnessAddressCmd)(nil), flags)
-	MustRegisterCmd("createmultisig", (*CreateMultisigCmd)(nil), flags)
-	MustRegisterCmd("dumpprivkey", (*DumpPrivKeyCmd)(nil), flags)
-	MustRegisterCmd("encryptwallet", (*EncryptWalletCmd)(nil), flags)
+	//MustRegisterCmd("addpayee", (*AddPayeeCmd)(nil), flags)
+	//MustRegisterCmd("addmultisigaddress", (*AddMultisigAddressCmd)(nil), flags)
+	//MustRegisterCmd("addwitnessaddress", (*AddWitnessAddressCmd)(nil), flags)
+	//MustRegisterCmd("createmultisig", (*CreateMultisigCmd)(nil), flags)
+	//MustRegisterCmd("dumpprivkey", (*DumpPrivKeyCmd)(nil), flags)
+	//MustRegisterCmd("encryptwallet", (*EncryptWalletCmd)(nil), flags)
 	MustRegisterCmd("estimatesmartfee", (*EstimateSmartFeeCmd)(nil), flags)
 	MustRegisterCmd("estimatefee", (*EstimateFeeCmd)(nil), flags)
 	MustRegisterCmd("estimatepriority", (*EstimatePriorityCmd)(nil), flags)
-	MustRegisterCmd("getaccount", (*GetAccountCmd)(nil), flags)
-	MustRegisterCmd("getaccountaddress", (*GetAccountAddressCmd)(nil), flags)
-	MustRegisterCmd("getaddressesbyaccount", (*GetAddressesByAccountCmd)(nil), flags)
-	MustRegisterCmd("getbalance", (*GetBalanceCmd)(nil), flags)
-	MustRegisterCmd("getbalances", (*GetBalancesCmd)(nil), flags)
+	//MustRegisterCmd("getaccount", (*GetAccountCmd)(nil), flags)
+	//MustRegisterCmd("getaccountaddress", (*GetAccountAddressCmd)(nil), flags)
+	//MustRegisterCmd("getaddressesbyaccount", (*GetAddressesByAccountCmd)(nil), flags)
+	//MustRegisterCmd("getbalance", (*GetBalanceCmd)(nil), flags)
+	//MustRegisterCmd("getbalances", (*GetBalancesCmd)(nil), flags)
 	MustRegisterCmd("getbalancesabe", (*GetBalancesAbeCmd)(nil), flags)
 	MustRegisterCmd("getdetailedutxos", (*GetDetailedUtxosCmd)(nil), flags)
-	MustRegisterCmd("getnewaddress", (*GetNewAddressCmd)(nil), flags)
-	MustRegisterCmd("getrawchangeaddress", (*GetRawChangeAddressCmd)(nil), flags)
-	MustRegisterCmd("getreceivedbyaccount", (*GetReceivedByAccountCmd)(nil), flags)
-	MustRegisterCmd("getreceivedbyaddress", (*GetReceivedByAddressCmd)(nil), flags)
-	MustRegisterCmd("gettransaction", (*GetTransactionCmd)(nil), flags)
+	//MustRegisterCmd("getnewaddress", (*GetNewAddressCmd)(nil), flags)
+	//MustRegisterCmd("getrawchangeaddress", (*GetRawChangeAddressCmd)(nil), flags)
+	//MustRegisterCmd("getreceivedbyaccount", (*GetReceivedByAccountCmd)(nil), flags)
+	//MustRegisterCmd("getreceivedbyaddress", (*GetReceivedByAddressCmd)(nil), flags)
+	//MustRegisterCmd("gettransaction", (*GetTransactionCmd)(nil), flags)
 	MustRegisterCmd("getwalletinfo", (*GetWalletInfoCmd)(nil), flags)
-	MustRegisterCmd("importprivkey", (*ImportPrivKeyCmd)(nil), flags)
-	MustRegisterCmd("keypoolrefill", (*KeyPoolRefillCmd)(nil), flags)
-	MustRegisterCmd("listaccounts", (*ListAccountsCmd)(nil), flags)
-	MustRegisterCmd("listaddressgroupings", (*ListAddressGroupingsCmd)(nil), flags)
+	//MustRegisterCmd("importprivkey", (*ImportPrivKeyCmd)(nil), flags)
+	MustRegisterCmd("keypoolrefill", (*KeyPoolRefillCmd)(nil), flags) // TODO review it in btcwallet
+	//MustRegisterCmd("listaccounts", (*ListAccountsCmd)(nil), flags)
+	//MustRegisterCmd("listaddressgroupings", (*ListAddressGroupingsCmd)(nil), flags)
 	MustRegisterCmd("listlockunspent", (*ListLockUnspentCmd)(nil), flags)
-	MustRegisterCmd("listreceivedbyaccount", (*ListReceivedByAccountCmd)(nil), flags)
-	MustRegisterCmd("listreceivedbyaddress", (*ListReceivedByAddressCmd)(nil), flags)
+	//MustRegisterCmd("listreceivedbyaccount", (*ListReceivedByAccountCmd)(nil), flags)
+	//MustRegisterCmd("listreceivedbyaddress", (*ListReceivedByAddressCmd)(nil), flags)
 	MustRegisterCmd("listsinceblock", (*ListSinceBlockCmd)(nil), flags)
-	MustRegisterCmd("listtransactions", (*ListTransactionsCmd)(nil), flags)
-	MustRegisterCmd("listunspent", (*ListUnspentCmd)(nil), flags)
+	//MustRegisterCmd("listtransactions", (*ListTransactionsCmd)(nil), flags)
+	//MustRegisterCmd("listunspent", (*ListUnspentCmd)(nil), flags)
 	MustRegisterCmd("listallutxoabe", (*ListAllUnspentAbeCmd)(nil), flags)
 	MustRegisterCmd("listunmaturedabe", (*ListUnmaturedAbeCmd)(nil), flags)
 	MustRegisterCmd("listunspentabe", (*ListUnspentAbeCmd)(nil), flags)
 	MustRegisterCmd("listspentbutunminedabe", (*ListSpentButUnminedAbeCmd)(nil), flags)
 	MustRegisterCmd("listspentandminedabe", (*ListSpentAndMinedAbeCmd)(nil), flags)
 	MustRegisterCmd("lockunspent", (*LockUnspentCmd)(nil), flags)
-	MustRegisterCmd("move", (*MoveCmd)(nil), flags)
-	MustRegisterCmd("sendfrom", (*SendFromCmd)(nil), flags)
-	MustRegisterCmd("sendmany", (*SendManyCmd)(nil), flags)
+	MustRegisterCmd("move", (*MoveCmd)(nil), flags) // TODO
+	//MustRegisterCmd("sendfrom", (*SendFromCmd)(nil), flags)
+	//MustRegisterCmd("sendmany", (*SendManyCmd)(nil), flags)
 	MustRegisterCmd("sendtoaddressesabe", (*SendToAddressAbeCmd)(nil), flags)
 	MustRegisterCmd("generateaddressabe", (*GenerateAddressCmd)(nil), flags)
-	MustRegisterCmd("sendtoaddress", (*SendToAddressCmd)(nil), flags)
-	MustRegisterCmd("sendtopayee", (*SendToPayeesCmd)(nil), flags)
-	MustRegisterCmd("setaccount", (*SetAccountCmd)(nil), flags)
-	MustRegisterCmd("settxfee", (*SetTxFeeCmd)(nil), flags)
-	MustRegisterCmd("signmessage", (*SignMessageCmd)(nil), flags)
+	//MustRegisterCmd("sendtoaddress", (*SendToAddressCmd)(nil), flags)
+	//MustRegisterCmd("sendtopayee", (*SendToPayeesCmd)(nil), flags)
+	//MustRegisterCmd("setaccount", (*SetAccountCmd)(nil), flags)
+	MustRegisterCmd("settxfee", (*SetTxFeeCmd)(nil), flags)       // TODO
+	MustRegisterCmd("signmessage", (*SignMessageCmd)(nil), flags) // TODO
 	MustRegisterCmd("signrawtransaction", (*SignRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("walletlock", (*WalletLockCmd)(nil), flags)
 	MustRegisterCmd("walletpassphrase", (*WalletPassphraseCmd)(nil), flags)
-	MustRegisterCmd("freshen", (*FreshenCmd)(nil), flags)
+	//MustRegisterCmd("freshen", (*FreshenCmd)(nil), flags)
 	MustRegisterCmd("walletpassphrasechange", (*WalletPassphraseChangeCmd)(nil), flags)
 }
