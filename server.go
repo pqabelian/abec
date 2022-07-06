@@ -2346,8 +2346,8 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		// When txIndex is finished, uncomment the following code.
 		//indxLog.Info("Transaction index is enabled")
 		//
-		//s.txIndex = indexers.NewTxIndex(db)
-		//indexes = append(indexes, s.txIndex)
+		s.txIndex = indexers.NewTxIndex(db)
+		indexes = append(indexes, s.txIndex)
 	}
 
 	// Create an index manager if any of the optional indexes are enabled.

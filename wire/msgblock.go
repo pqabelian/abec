@@ -41,6 +41,12 @@ type TxLoc struct {
 	TxStart int
 	TxLen   int
 }
+type TxAbeLoc struct {
+	TxStart      int
+	TxLen        int
+	WitnessStart int
+	WitnessLen   int
+}
 
 // MsgBlock implements the Message interface and represents an abe
 // block message.  It is used to deliver block and transaction information in
@@ -341,7 +347,8 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 	return txLocs, nil
 }
 
-func (msg *MsgBlockAbe) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
+// DeserializeTxLoc Would be delete
+func (msg *MsgBlockAbe) DeserializeTxLoc(r *bytes.Buffer) ([]TxAbeLoc, error) {
 	fullLen := r.Len()
 
 	// At the current time, there is no difference between the wire encoding
@@ -360,20 +367,20 @@ func (msg *MsgBlockAbe) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 	// Prevent more transactions than could possibly fit into a block.
 	// It would be possible to cause memory exhaustion and panics without
 	// a sane upper bound on this count.
-	if txCount > maxTxPerBlock {
+	if txCount > maxTxPerBlockAbe {
 		str := fmt.Sprintf("too many transactions to fit into a block "+
-			"[count %d, max %d]", txCount, maxTxPerBlock)
+			"[count %d, max %d]", txCount, maxTxPerBlockAbe)
 		return nil, messageError("MsgBlock.DeserializeTxLoc", str)
 	}
 
 	// Deserialize each transaction while keeping track of its location
 	// within the byte stream.
 	msg.Transactions = make([]*MsgTxAbe, 0, txCount)
-	txLocs := make([]TxLoc, txCount)
+	txLocs := make([]TxAbeLoc, txCount)
 	for i := uint64(0); i < txCount; i++ {
 		txLocs[i].TxStart = fullLen - r.Len()
 		tx := MsgTxAbe{}
-		err := tx.Deserialize(r)
+		err := tx.DeserializeNoWitness(r)
 		if err != nil {
 			return nil, err
 		}

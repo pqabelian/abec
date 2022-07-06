@@ -194,9 +194,11 @@ type Bucket interface {
 // BlockRegion specifies a particular region of a block identified by the
 // specified hash, given an offset and length.
 type BlockRegion struct {
-	Hash   *chainhash.Hash
-	Offset uint32
-	Len    uint32
+	Hash          *chainhash.Hash
+	Offset        uint32
+	Len           uint32
+	WitnessOffset uint32
+	WitnessLen    uint32
 }
 
 // Tx represents a database transaction.  It can either by read-only or
@@ -359,6 +361,7 @@ type Tx interface {
 	// additional data copies and allows support for memory-mapped database
 	// implementations.
 	FetchBlockRegion(region *BlockRegion) ([]byte, error)
+	FetchWitnessRegion(region *BlockRegion) ([]byte, error)
 
 	// FetchBlockRegions returns the raw serialized bytes for the given
 	// block regions.

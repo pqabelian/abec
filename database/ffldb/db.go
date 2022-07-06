@@ -1330,13 +1330,13 @@ func (tx *transaction) fetchBlockRow(hash *chainhash.Hash) ([]byte, error) {
 	return blockRow, nil
 }
 func (tx *transaction) fetchWitnessRow(hash *chainhash.Hash) ([]byte, error) {
-	blockRow := tx.witnessIdxBucket.Get(hash[:])
-	if blockRow == nil {
+	witnessRow := tx.witnessIdxBucket.Get(hash[:])
+	if witnessRow == nil {
 		str := fmt.Sprintf("block %s does not exist", hash)
 		return nil, makeDbErr(database.ErrBlockNotFound, str, nil)
 	}
 
-	return blockRow, nil
+	return witnessRow, nil
 }
 
 // FetchBlockHeader returns the raw serialized bytes for the block header
@@ -1527,13 +1527,13 @@ func (tx *transaction) FetchBlocks(hashes []chainhash.Hash) ([][]byte, error) {
 // ErrBlockRegionInvalid if invalid.
 func (tx *transaction) fetchPendingRegion(region *database.BlockRegion) ([]byte, error) {
 	// Nothing to do if the block is not pending to be written on commit.
-	idx, exists := tx.pendingBlocks[*region.Hash]
+	idx, exists := tx.pendingBlocksAbe[*region.Hash]
 	if !exists {
 		return nil, nil
 	}
 
 	// Ensure the region is within the bounds of the block.
-	blockBytes := tx.pendingBlockData[idx].bytes
+	blockBytes := tx.pendingBlockAbeData[idx].bytesNoWitness
 	blockLen := uint32(len(blockBytes))
 	endOffset := region.Offset + region.Len
 	if endOffset < region.Offset || endOffset > blockLen {
@@ -1545,6 +1545,30 @@ func (tx *transaction) fetchPendingRegion(region *database.BlockRegion) ([]byte,
 
 	// Return the bytes from the pending block.
 	return blockBytes[region.Offset:endOffset:endOffset], nil
+}
+
+func (tx *transaction) fetchPendingWitnessRegion(region *database.BlockRegion) ([]byte, error) {
+	// Nothing to do if the block is not pending to be written on commit.
+	idx, exists := tx.pendingBlocksAbe[*region.Hash]
+	if !exists {
+		return nil, nil
+	}
+
+	// Ensure the region is within the bounds of the block.
+	witnesses := tx.pendingBlockAbeData[idx].bytesWitness
+	endWitnessOffset := region.WitnessOffset + region.WitnessLen
+	loc, sum := 0, uint32(0)
+	for ; loc < len(witnesses) && sum < region.WitnessOffset; loc++ {
+		sum += uint32(len(witnesses[loc]))
+	}
+	if endWitnessOffset < region.WitnessOffset || endWitnessOffset > uint32(len(witnesses[loc])) {
+		str := fmt.Sprintf("block witness %s region offset %d, length %d "+
+			"exceeds block length of %d", region.Hash,
+			region.WitnessOffset, region.WitnessLen, witnesses[loc])
+		return nil, makeDbErr(database.ErrBlockRegionInvalid, str, nil)
+	}
+	// Return the bytes from the pending block.
+	return witnesses[loc], nil
 }
 
 // FetchBlockRegion returns the raw serialized bytes for the given block region.
@@ -1582,7 +1606,7 @@ func (tx *transaction) FetchBlockRegion(region *database.BlockRegion) ([]byte, e
 
 	// When the block is pending to be written on commit return the bytes
 	// from there.
-	if tx.pendingBlocks != nil {
+	if tx.pendingBlocksAbe != nil {
 		regionBytes, err := tx.fetchPendingRegion(region)
 		if err != nil {
 			return nil, err
@@ -1612,6 +1636,51 @@ func (tx *transaction) FetchBlockRegion(region *database.BlockRegion) ([]byte, e
 	// Read the region from the appropriate disk block file.
 	regionBytes, err := tx.db.store.readBlockRegion(location, region.Offset,
 		region.Len)
+	if err != nil {
+		return nil, err
+	}
+
+	return regionBytes, nil
+}
+
+func (tx *transaction) FetchWitnessRegion(region *database.BlockRegion) ([]byte, error) {
+	// Ensure transaction state is valid.
+	if err := tx.checkClosed(); err != nil {
+		return nil, err
+	}
+
+	// When the block is pending to be written on commit return the bytes
+	// from there.
+	if tx.pendingBlocksAbe != nil {
+		witnessRegion, err := tx.fetchPendingWitnessRegion(region)
+		if err != nil {
+			return nil, err
+		}
+		if witnessRegion != nil {
+			return witnessRegion, nil
+		}
+	}
+
+	// Lookup the location of the block in the files from the block index.
+	witnessRow, err := tx.fetchWitnessRow(region.Hash)
+	if err != nil {
+		return nil, err
+	}
+	location := deserializeWitnessLoc(witnessRow)
+
+	// Ensure the region is within the bounds of the block.
+	endOffset := region.WitnessOffset + region.WitnessLen
+	if endOffset < region.WitnessOffset || endOffset > location.witnessLen {
+		str := fmt.Sprintf("block witness %s region offset %d, length %d "+
+			"exceeds block witness length of %d", region.Hash,
+			region.WitnessOffset, region.WitnessLen, location.witnessLen)
+		return nil, makeDbErr(database.ErrBlockRegionInvalid, str, nil)
+
+	}
+
+	// Read the region from the appropriate disk block file.
+	regionBytes, err := tx.db.store.readWitnessRegion(location, region.WitnessOffset,
+		region.WitnessLen)
 	if err != nil {
 		return nil, err
 	}
@@ -1678,7 +1747,7 @@ func (tx *transaction) FetchBlockRegions(regions []database.BlockRegion) ([][]by
 
 		// When the block is pending to be written on commit grab the
 		// bytes from there.
-		if tx.pendingBlocks != nil {
+		if tx.pendingBlocksAbe != nil {
 			regionBytes, err := tx.fetchPendingRegion(region)
 			if err != nil {
 				return nil, err

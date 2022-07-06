@@ -17,6 +17,11 @@ const (
 	// Size of a transaction entry.  It consists of 4 bytes block id + 4
 	// bytes offset + 4 bytes length.
 	txEntrySize = 4 + 4 + 4
+
+	// Size of a transaction entry.  It consists of 4 bytes block id + 4
+	// bytes offset + 4 bytes length + 4 bytes witness offset + 4 bytes
+	// witness len.
+	txAbeEntrySize = 4 + 4 + 4 + 4 + 4
 )
 
 var (
@@ -172,6 +177,13 @@ func putTxIndexEntry(target []byte, blockID uint32, txLoc wire.TxLoc) {
 	byteOrder.PutUint32(target[4:], uint32(txLoc.TxStart))
 	byteOrder.PutUint32(target[8:], uint32(txLoc.TxLen))
 }
+func putTxAbeIndexEntry(target []byte, blockID uint32, txLoc wire.TxAbeLoc) {
+	byteOrder.PutUint32(target, blockID)
+	byteOrder.PutUint32(target[4:], uint32(txLoc.TxStart))
+	byteOrder.PutUint32(target[8:], uint32(txLoc.TxLen))
+	byteOrder.PutUint32(target[12:], uint32(txLoc.WitnessStart))
+	byteOrder.PutUint32(target[16:], uint32(txLoc.WitnessLen))
+}
 
 // dbPutTxIndexEntry uses an existing database transaction to update the
 // transaction index given the provided serialized data that is expected to have
@@ -194,7 +206,7 @@ func dbFetchTxIndexEntry(dbTx database.Tx, txHash *chainhash.Hash) (*database.Bl
 	}
 
 	// Ensure the serialized data has enough bytes to properly deserialize.
-	if len(serializedData) < 12 {
+	if len(serializedData) < 20 {
 		return nil, database.Error{
 			ErrorCode: database.ErrCorruption,
 			Description: fmt.Sprintf("corrupt transaction index "+
@@ -217,6 +229,9 @@ func dbFetchTxIndexEntry(dbTx database.Tx, txHash *chainhash.Hash) (*database.Bl
 	copy(region.Hash[:], hash[:])
 	region.Offset = byteOrder.Uint32(serializedData[4:8])
 	region.Len = byteOrder.Uint32(serializedData[8:12])
+
+	region.WitnessOffset = byteOrder.Uint32(serializedData[12:16])
+	region.WitnessLen = byteOrder.Uint32(serializedData[16:20])
 
 	return &region, nil
 }
@@ -267,16 +282,16 @@ func dbAddTxIndexEntriesAbe(dbTx database.Tx, block *abeutil.BlockAbe, blockID u
 	// subslice to the database to be written.  This approach significantly
 	// cuts down on the number of required allocations.
 	offset := 0
-	serializedValues := make([]byte, len(block.Transactions())*txEntrySize)
+	serializedValues := make([]byte, len(block.Transactions())*txAbeEntrySize)
 	for i, tx := range block.Transactions() {
-		putTxIndexEntry(serializedValues[offset:], blockID, txLocs[i])
-		endOffset := offset + txEntrySize
+		putTxAbeIndexEntry(serializedValues[offset:], blockID, txLocs[i])
+		endOffset := offset + txAbeEntrySize
 		err := dbPutTxIndexEntry(dbTx, tx.Hash(),
 			serializedValues[offset:endOffset:endOffset])
 		if err != nil {
 			return err
 		}
-		offset += txEntrySize
+		offset += txAbeEntrySize
 	}
 
 	return nil

@@ -871,7 +871,7 @@ func createVinListAbe(mtx *wire.MsgTxAbe) []abejson.TxIn {
 
 	for i, txIn := range mtx.TxIns {
 		vinEntry := &vinList[i]
-		vinEntry.SerialNumber = string(txIn.SerialNumber)
+		vinEntry.SerialNumber = hex.EncodeToString(txIn.SerialNumber)
 
 		blockHashNum := len(txIn.PreviousOutPointRing.BlockHashs)
 		blockHashs := make([]string, blockHashNum)
@@ -1006,11 +1006,10 @@ func createTxRawResultAbe(chainParams *chaincfg.Params, mtx *wire.MsgTxAbe,
 	if err != nil {
 		return nil, err
 	}
-
 	txReply := &abejson.TxRawResultAbe{
 		Hex:      mtxHex,
 		Txid:     txHash,
-		Hash:     mtx.TxHashFull().String(),
+		Hash:     mtx.TxHash().String(),
 		Size:     int32(mtx.SerializeSize()),
 		Fullsize: int32(mtx.SerializeSizeFull()),
 		Vin:      createVinListAbe(mtx),
@@ -3017,20 +3016,35 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 
 		// Load the raw transaction bytes from the database.
 		var txBytes []byte
+		var witness []byte
 		err = s.cfg.DB.View(func(dbTx database.Tx) error {
 			var err error
 			txBytes, err = dbTx.FetchBlockRegion(blockRegion)
+			if err != nil {
+				return err
+			}
+			witness, err = dbTx.FetchWitnessRegion(blockRegion)
 			return err
 		})
 		if err != nil {
 			return nil, rpcNoTxInfoError(txHash)
 		}
 
+		// check the transaction hash
+		if len(witness) != 0 && !bytes.Equal(witness[:chainhash.HashSize], txHash[:]) {
+			return nil, rpcNoTxInfoError(txHash)
+		}
+		res := make([]byte, len(txBytes), len(txBytes)+1+len(witness))
+		copy(res, txBytes)
+		if len(witness) != 0 {
+			w := bytes.NewBuffer(res)
+			wire.WriteVarBytes(w, 0, witness[chainhash.HashSize:])
+		}
 		// When the verbose flag isn't set, simply return the serialized
 		// transaction as a hex-encoded string.  This is done here to
 		// avoid deserializing it only to reserialize it again later.
 		if !verbose {
-			return hex.EncodeToString(txBytes), nil
+			return hex.EncodeToString(res), nil
 		}
 
 		// Grab the block height.
@@ -3043,11 +3057,12 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 
 		// Deserialize the transaction
 		var msgTx wire.MsgTxAbe
-		err = msgTx.Deserialize(bytes.NewReader(txBytes))
+		err = msgTx.DeserializeNoWitness(bytes.NewReader(txBytes))
 		if err != nil {
 			context := "Failed to deserialize transaction"
 			return nil, internalRPCError(err.Error(), context)
 		}
+		msgTx.TxWitness = witness[chainhash.HashSize:]
 		mtx = &msgTx
 	} else {
 		// When the verbose flag isn't set, simply return the

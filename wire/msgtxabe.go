@@ -823,6 +823,9 @@ func (msg *MsgTxAbe) SerializeFull(w io.Writer) error {
 func (msg *MsgTxAbe) Deserialize(r io.Reader) error {
 	return msg.BtcDecode(r, 0, WitnessEncoding)
 }
+func (msg *MsgTxAbe) DeserializeNoWitness(r io.Reader) error {
+	return msg.BtcDecode(r, 0, BaseEncoding)
+}
 
 func (msg *MsgTxAbe) DeserializeFull(r io.Reader) error {
 	return msg.BtcDecode(r, 0, WitnessEncoding)

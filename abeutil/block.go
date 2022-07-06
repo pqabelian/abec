@@ -362,19 +362,20 @@ func (b *Block) TxLoc() ([]wire.TxLoc, error) {
 	return txLocs, err
 }
 
-func (b *BlockAbe) TxLoc() ([]wire.TxLoc, error) {
-	rawMsg, err := b.Bytes()
-	if err != nil {
-		return nil, err
-	}
-	rbuf := bytes.NewBuffer(rawMsg)
+func (b *BlockAbe) TxLoc() ([]wire.TxAbeLoc, error) {
+	offset, witOffset := 80+wire.VarIntSerializeSize(uint64(len(b.msgBlock.Transactions))), 8
+	txs := b.Transactions()
+	res := make([]wire.TxAbeLoc, len(txs))
+	for i := 0; i < len(txs); i++ {
+		res[i].TxStart = offset
+		txLen := txs[i].MsgTx().SerializeSize()
+		res[i].TxLen, offset = txLen, offset+txLen
 
-	var mblock wire.MsgBlockAbe
-	txLocs, err := mblock.DeserializeTxLoc(rbuf)
-	if err != nil {
-		return nil, err
+		res[i].WitnessStart = witOffset
+		witLen := chainhash.HashSize + len(txs[i].MsgTx().TxWitness)
+		res[i].WitnessLen, witOffset = witLen, witOffset+witLen+4
 	}
-	return txLocs, err
+	return res, nil
 }
 
 // Height returns the saved height of the block in the block chain.  This value
