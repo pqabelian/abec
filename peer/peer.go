@@ -16,6 +16,7 @@ import (
 	"math/rand"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -1979,6 +1980,13 @@ func (p *Peer) readRemoteVersionMsg() error {
 		return errors.New(reason)
 	}
 
+	//	check the agent to contain "abec"
+	// If the user agent is not valid, return err
+	if !isValidUserAgent(p.userAgent) {
+		reason := fmt.Sprintf("new peer has invalid useragent %v", p.userAgent)
+		return errors.New(reason)
+	}
+
 	// Detect self connections.
 	//if !allowSelfConns && sentNonces.Exists(msg.Nonce) {
 	if !allowSelfConns && sentNonces.Contains(msg.Nonce) {
@@ -2365,6 +2373,15 @@ func NewOutboundPeer(cfg *Config, addr string) (*Peer, error) {
 	}
 
 	return p, nil
+}
+
+// isValidUserAgent returns if the given useragent is valid or not.
+// Currently, valid means the useragent contains string "abec"
+func isValidUserAgent(userAgent string) bool {
+	if strings.Contains(strings.ToLower(userAgent), "abec") {
+		return true
+	}
+	return false
 }
 
 func init() {
