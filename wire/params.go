@@ -16,7 +16,8 @@ const (
 
 	//	todo: (EthashPow) BlockVersionEthashPow
 	// BlockVersionEthashPow is the block version which changed block to use EthashPoW
-	//	todo: 202207 confirm after checking the mechanism of versionbits
+	//	This causes hard-fork.
+	//	Thus, we set it to 0x20000000, while the previous (original) version is 0x10000000.
 	BlockVersionEthashPow = 0x20000000
 
 	// BlockHeightEthashPoW

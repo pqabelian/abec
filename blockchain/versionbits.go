@@ -11,18 +11,24 @@ const (
 	// version bits scheme became active.
 	vbLegacyBlockVersion = 4
 
+	// todo: (EthashPoW) revise the version mechanism
+	// All historical versions should be listed here.
+	BlockVersionInitial = 0x10000000
+	//	wire.BlockVersionEthashPow = 0x20000000
+
+	//	todo: 202207 revise the version mechanism
+	//	In the future,
 	// vbTopBits defines the bits to set in the version to signal that the
 	// version bits scheme is being used.
-	// todo: 202207 to check the mechanism
-	vbTopBits = 0x10000000
+	vbTopBits = 0x10000000 //	 todo: modify according to the AIP mechanism.
 
 	// vbTopMask is the bitmask to use to determine whether or not the
 	// version bits scheme is in use.
-	vbTopMask = 0xe0000000
+	vbTopMask = 0xe0000000 //	 todo: modify according to the AIP mechanism.
 
 	// vbNumBits is the total number of bits available for use with the
 	// version bits scheme.
-	vbNumBits = 29
+	vbNumBits = 29 //	 todo: modify according to the AIP mechanism.
 
 	// unknownVerNumToCheck is the number of previous blocks to consider
 	// when checking for a threshold of unknown block versions for the
@@ -205,20 +211,23 @@ func (b *BlockChain) calcNextBlockVersion(prevNode *blockNode) (int32, error) {
 		return int32(wire.BlockVersionEthashPow), nil
 	}
 
-	expectedVersion := uint32(vbTopBits)
-	for id := 0; id < len(b.chainParams.Deployments); id++ {
-		deployment := &b.chainParams.Deployments[id]
-		cache := &b.deploymentCaches[id]
-		checker := deploymentChecker{deployment: deployment, chain: b}
-		state, err := b.thresholdState(prevNode, checker, cache)
-		if err != nil {
-			return 0, err
-		}
-		if state == ThresholdStarted || state == ThresholdLockedIn {
-			expectedVersion |= uint32(1) << deployment.BitNumber
-		}
-	}
-	return int32(expectedVersion), nil
+	return int32(BlockVersionInitial), nil
+
+	// todo: modify according to the AIP mechanism.
+	//expectedVersion := uint32(vbTopBits)
+	//for id := 0; id < len(b.chainParams.Deployments); id++ {
+	//	deployment := &b.chainParams.Deployments[id]
+	//	cache := &b.deploymentCaches[id]
+	//	checker := deploymentChecker{deployment: deployment, chain: b}
+	//	state, err := b.thresholdState(prevNode, checker, cache)
+	//	if err != nil {
+	//		return 0, err
+	//	}
+	//	if state == ThresholdStarted || state == ThresholdLockedIn {
+	//		expectedVersion |= uint32(1) << deployment.BitNumber
+	//	}
+	//}
+	//return int32(expectedVersion), nil
 }
 
 // CalcNextBlockVersion calculates the expected version of the block after the
