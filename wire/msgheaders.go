@@ -116,10 +116,13 @@ func (msg *MsgHeaders) Command() string {
 
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
+// todo: (EthashPoW)
 func (msg *MsgHeaders) MaxPayloadLength(pver uint32) uint32 {
 	// Num headers (varInt) + max allowed headers (header length + 1 byte
 	// for the number of transactions which is always 0).
-	return MaxVarIntPayload + ((MaxBlockHeaderPayload + 1) *
+	//return MaxVarIntPayload + ((MaxBlockHeaderPayload + 1) *
+	//	MaxBlockHeadersPerMsg)
+	return MaxVarIntPayload + ((MaxBlockHeaderPayloadEthash + 1) *
 		MaxBlockHeadersPerMsg)
 }
 

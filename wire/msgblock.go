@@ -540,7 +540,13 @@ func (msg *MsgBlock) SerializeNoWitness(w io.Writer) error {
 func (msg *MsgBlock) SerializeSize() int {
 	// Block header bytes + Serialized varint size for the number of
 	// transactions.
-	n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
+	// todo: (EthashPow)
+	// n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
+	n := blockHeaderLen
+	if msg.Header.Version == int32(BlockVersionEthashPow) {
+		n = blockHeaderLenEthash
+	}
+	n += VarIntSerializeSize(uint64(len(msg.Transactions)))
 
 	for _, tx := range msg.Transactions {
 		n += tx.SerializeSize()
@@ -554,7 +560,13 @@ func (msg *MsgBlock) SerializeSize() int {
 func (msg *MsgBlock) SerializeSizeStripped() int {
 	// Block header bytes + Serialized varint size for the number of
 	// transactions.
-	n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
+	//	todo: (EthashPoW)
+	//n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
+	n := blockHeaderLen
+	if msg.Header.Version == int32(BlockVersionEthashPow) {
+		n = blockHeaderLenEthash
+	}
+	n += VarIntSerializeSize(uint64(len(msg.Transactions)))
 
 	for _, tx := range msg.Transactions {
 		n += tx.SerializeSizeStripped()
@@ -565,7 +577,13 @@ func (msg *MsgBlock) SerializeSizeStripped() int {
 func (msg *MsgBlockAbe) SerializeSizeStripped() int {
 	// Block header bytes + Serialized varint size for the number of
 	// transactions.
-	n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
+	// todo: (EthashPoW)
+	//n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
+	n := blockHeaderLen
+	if msg.Header.Version == int32(BlockVersionEthashPow) {
+		n = blockHeaderLenEthash
+	}
+	n += VarIntSerializeSize(uint64(len(msg.Transactions)))
 
 	for _, tx := range msg.Transactions {
 		n += tx.SerializeSize()
@@ -607,7 +625,13 @@ func (msg *MsgBlockAbe) Serialize(w io.Writer) error {
 func (msg *MsgBlockAbe) SerializeSize() int {
 	// Block header bytes + Serialized varint size for the number of
 	// transactions.
-	n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
+	// todo: (EthashPoW)
+	// n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
+	n := blockHeaderLen
+	if msg.Header.Version == int32(BlockVersionEthashPow) {
+		n = blockHeaderLenEthash
+	}
+	n += VarIntSerializeSize(uint64(len(msg.Transactions)))
 
 	for _, tx := range msg.Transactions {
 		n += tx.SerializeSizeFull() // to do, may remove the serializeType

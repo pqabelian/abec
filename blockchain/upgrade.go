@@ -51,6 +51,7 @@ type blockChainContext struct {
 // to the v2 bucket. The v1 bucket stores all block entries keyed by block hash,
 // whereas the v2 bucket stores the exact same values, but keyed instead by
 // block height + hash.
+//	todo: (EthashPoW) 202207 Need refactor to remove.
 func migrateBlockIndex(db database.DB) error {
 	// Hardcoded bucket names so updates to the global values do not affect
 	// old upgrades.

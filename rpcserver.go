@@ -16,6 +16,7 @@ import (
 	"github.com/abesuite/abec/blockchain/indexers"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/mempool"
 	"github.com/abesuite/abec/mining"
@@ -2450,6 +2451,10 @@ func chainErrToGBTErrString(err error) string {
 		return "bad-diffbits"
 	case blockchain.ErrUnexpectedDifficulty:
 		return "bad-diffbits"
+	case blockchain.ErrMismatchedBlockHeightWithPrevNode:
+		return "bad-height"
+	case blockchain.ErrMismatchedBlockHeightAndVersion:
+		return "bad-height-version"
 	case blockchain.ErrHighHash:
 		return "high-hash"
 	case blockchain.ErrBadMerkleRoot:
@@ -4291,7 +4296,8 @@ func verifyChain(s *rpcServer, level, depth int32) error {
 
 		// Level 1 does basic chain sanity checks.
 		if level > 0 {
-			err := blockchain.CheckBlockSanity(block,
+			// todo: (EthashPoW) 202207
+			err := blockchain.CheckBlockSanity(block, s.cfg.Ethash,
 				s.cfg.ChainParams.PowLimit, s.cfg.TimeSource)
 			if err != nil {
 				rpcsLog.Errorf("Verify is unable to validate "+
@@ -5070,6 +5076,9 @@ type rpcserverConfig struct {
 
 	// TxMemPool defines the transaction memory pool to interact with.
 	TxMemPool *mempool.TxPool
+
+	// todo: (EthashPow) 202207
+	Ethash *ethash.Ethash
 
 	// These fields allow the RPC server to interface with mining.
 	//

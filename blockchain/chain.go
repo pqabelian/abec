@@ -62,10 +62,11 @@ type orphanBlockAbe struct {
 // However, the returned snapshot must be treated as immutable since it is
 // shared by all callers.
 type BestState struct {
-	Hash      chainhash.Hash // The hash of the block.
-	Height    int32          // The height of the block.
-	Bits      uint32         // The difficulty bits of the block.
-	BlockSize uint64         // The size of the block.
+	Hash chainhash.Hash // The hash of the block.
+	// todo: (ethmining), the BlockHeader's prevBlock is set using this hash. Thus, need to set the hash based on the update situation
+	Height    int32  // The height of the block.
+	Bits      uint32 // The difficulty bits of the block.
+	BlockSize uint64 // The size of the block.
 	//	todo(ABE): ABE does not ues weight.
 	BlockWeight uint64    // The weight of the block.
 	NumTxns     uint64    // The number of txns in the block.

@@ -13,6 +13,15 @@ const (
 	// A block shall collect the Txs with the same TxVersion, so that the Txos in a block share the same version.
 	// A ring shall collect the Txos with the same version, to guarantee the ring can be processed by a corresponding crypto-scheme.
 	TxVersion = 1
+
+	//	todo: (EthashPow) BlockVersionEthashPow
+	// BlockVersionEthashPow is the block version which changed block to use EthashPoW
+	//	todo: 202207 confirm after checking the mechanism of versionbits
+	BlockVersionEthashPow = 0x20000000
+
+	// BlockHeightEthashPoW
+	// BlockHeightEthashPoW denotes the block height from which Ethash-PoW mining is applied.
+	BlockHeightEthashPoW = 50000
 )
 
 /**

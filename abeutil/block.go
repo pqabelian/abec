@@ -363,6 +363,7 @@ func (b *Block) TxLoc() ([]wire.TxLoc, error) {
 }
 
 func (b *BlockAbe) TxLoc() ([]wire.TxAbeLoc, error) {
+	//	todo: (EthashPoW) TxIndex
 	offset, witOffset := 80+wire.VarIntSerializeSize(uint64(len(b.msgBlock.Transactions))), 8
 	txs := b.Transactions()
 	res := make([]wire.TxAbeLoc, len(txs))
@@ -398,6 +399,11 @@ func (b *BlockAbe) Height() int32 {
 // SetHeight sets the height of the block in the block chain.
 func (b *BlockAbe) SetHeight(height int32) {
 	b.blockHeight = height
+
+	////	todo (ethmining): 202207
+	//if b.msgBlock != nil {
+	//	b.msgBlock.Header.Height = height
+	//}
 }
 
 // NewBlock returns a new instance of a bitcoin block given an underlying

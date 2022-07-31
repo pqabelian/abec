@@ -19,7 +19,8 @@ const (
 	// blockHdrSize is the size of a block header.  This is simply the
 	// constant from wire and is only provided here for convenience since
 	// wire.MaxBlockHeaderPayload is quite long.
-	blockHdrSize = wire.MaxBlockHeaderPayload
+	//	todo: (EthashPoW) all codes related to blockHdrSize need to be modified.
+	blockHdrSize = wire.MaxBlockHeaderPayloadEthash
 
 	// latestUtxoSetBucketVersion is the current version of the utxo set
 	// bucket that is used to track all unspent outputs.
@@ -1345,7 +1346,12 @@ func (b *BlockChain) createChainState() error {
 	genesisBlock := abeutil.NewBlockAbe(b.chainParams.GenesisBlock)
 	genesisBlock.SetHeight(0)
 	header := &genesisBlock.MsgBlock().Header
-	node := newBlockNode(header, nil)
+	//	todo: (EthashPoW)
+	node, err := newBlockNode(header, nil)
+	if err != nil {
+		return err
+	}
+
 	node.status = statusDataStored | statusValid
 	b.bestChain.SetTip(node)
 
@@ -1364,7 +1370,7 @@ func (b *BlockChain) createChainState() error {
 
 	// Create the initial the database chain state including creating the
 	// necessary index buckets and inserting the genesis block.
-	err := b.db.Update(func(dbTx database.Tx) error {
+	err = b.db.Update(func(dbTx database.Tx) error {
 		meta := dbTx.Metadata()
 
 		// Create the bucket that houses the block index data.
@@ -1488,6 +1494,7 @@ func (b *BlockChain) initChainState() error {
 		return b.createChainState()
 	}
 
+	// todo: 202207 need refactor to remove
 	if !hasBlockIndex {
 		err := migrateBlockIndex(b.db)
 		if err != nil {
@@ -1562,7 +1569,12 @@ func (b *BlockChain) initChainState() error {
 			// Initialize the block node for the block, connect it,
 			// and add it to the block index.
 			node := new(blockNode)
-			initBlockNode(node, header, parent)
+			//	todo: (EthashPoW)
+			err = initBlockNode(node, header, parent)
+			if err != nil {
+				return err
+			}
+
 			node.status = status
 			b.index.addNode(node)
 
@@ -1723,7 +1735,9 @@ func dbFetchBlockByNodeAbe(dbTx database.Tx, node *blockNode) (*abeutil.BlockAbe
 // index bucket. This overwrites the current entry if there exists one.
 func dbStoreBlockNode(dbTx database.Tx, node *blockNode) error {
 	// Serialize block data to be stored.
-	w := bytes.NewBuffer(make([]byte, 0, blockHdrSize+1))
+	//	todo: (EthashPoW) use MaxBlockHeaderPayload rather than blockHdrSize, to avoid misunderstanding
+	// w := bytes.NewBuffer(make([]byte, 0, blockHdrSize+1))
+	w := bytes.NewBuffer(make([]byte, 0, wire.MaxBlockHeaderPayloadEthash+1))
 	header := node.Header()
 	err := header.Serialize(w)
 	if err != nil {

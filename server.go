@@ -13,6 +13,7 @@ import (
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/connmgr"
+	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/mempool"
 	"github.com/abesuite/abec/mining"
@@ -199,6 +200,7 @@ type server struct {
 	syncManager          *syncmgr.SyncManager
 	chain                *blockchain.BlockChain
 	txMemPool            *mempool.TxPool
+	ethash               *ethash.Ethash // todo: (ethmining)
 	cpuMiner             *cpuminer.CPUMiner
 	modifyRebroadcastInv chan interface{}
 	newPeers             chan *serverPeer
@@ -2438,10 +2440,14 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	}
 	s.txMemPool = mempool.New(&txC)
 
+	//	todo: (EthashPoW)
+	s.ethash = ethash.New(cfg.EthashConfig)
+
 	s.syncManager, err = syncmgr.New(&syncmgr.Config{
 		PeerNotifier:       &s,
 		Chain:              s.chain,
 		TxMemPool:          s.txMemPool,
+		Ethash:             s.ethash, // todo: (EthashPoW)
 		ChainParams:        s.chainParams,
 		DisableCheckpoints: cfg.DisableCheckpoints,
 		MaxPeers:           cfg.MaxPeers,
@@ -2469,6 +2475,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		s.sigCache, s.hashCache, s.witnessCache)
 	s.cpuMiner = cpuminer.New(&cpuminer.Config{
 		ChainParams:            chainParams,
+		Ethash:                 s.ethash, // todo: (EthashPoW)
 		BlockTemplateGenerator: blockTemplateGenerator,
 		MiningAddr:             cfg.miningAddr,
 		MiningAddrBytes:        cfg.miningAddrBytes,
@@ -2574,15 +2581,17 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		}
 
 		s.rpcServer, err = newRPCServer(&rpcserverConfig{
-			Listeners:    rpcListeners,
-			StartupTime:  s.startupTime,
-			ConnMgr:      &rpcConnManager{&s},
-			SyncMgr:      &rpcSyncMgr{&s, s.syncManager},
-			TimeSource:   s.timeSource,
-			Chain:        s.chain,
-			ChainParams:  chainParams,
-			DB:           db,
-			TxMemPool:    s.txMemPool,
+			Listeners:   rpcListeners,
+			StartupTime: s.startupTime,
+			ConnMgr:     &rpcConnManager{&s},
+			SyncMgr:     &rpcSyncMgr{&s, s.syncManager},
+			TimeSource:  s.timeSource,
+			Chain:       s.chain,
+			ChainParams: chainParams,
+			DB:          db,
+			TxMemPool:   s.txMemPool,
+			// todo: (EthashPoW) 202207
+			Ethash:       s.ethash,
 			Generator:    blockTemplateGenerator,
 			CPUMiner:     s.cpuMiner,
 			TxIndex:      s.txIndex,

@@ -2,6 +2,7 @@ package mining
 
 import (
 	"container/heap"
+	"encoding/binary"
 	"fmt"
 	"github.com/abesuite/abec/abecrypto"
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
@@ -19,9 +20,10 @@ const (
 	// transaction to be considered high priority.
 	MinHighPriority = abeutil.SatoshiPerBitcoin * 144.0 / 250
 
+	//	todo: (EthashPoW) remove this constant to avoid misusing it as an exact value
 	// blockHeaderOverhead is the max number of bytes it takes to serialize
 	// a block header and max possible transaction count.
-	blockHeaderOverhead = wire.MaxBlockHeaderPayload + wire.MaxVarIntPayload
+	// blockHeaderOverhead = wire.MaxBlockHeaderPayload + wire.MaxVarIntPayload
 
 	// CoinbaseFlags is added to the coinbase script of a generated block
 	// and is used to monitor BIP16 support as well as blocks that are
@@ -56,7 +58,7 @@ type TxDescAbe struct {
 	// Added is the time when the entry was added to the source pool.
 	Added time.Time
 
-	// Height is the block height when the entry was added to the the source
+	// Height is the block height when the entry was added to the source
 	// pool.
 	Height int32
 
@@ -225,6 +227,12 @@ type BlockTemplate struct {
 	// witness has been activated, and the block contains a transaction
 	// which has witness data.
 	WitnessCommitment []byte
+
+	// todo: (EthashPoW)
+	//CoinbaseTxPart1      []byte
+	//CoinbaseTxPart2      []byte
+	//ConbaseTxWitnessHash *chainhash.Hash
+	SiblingHashes []*chainhash.Hash
 }
 
 // mergeUtxoView adds all of the entries in viewB to viewA.  The result is that
@@ -363,7 +371,7 @@ func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockH
 /*
 todo: create a coinbaseTx template, where the TxOuts, the TxFee, and TxWitness are set to be 'fake' ones, and TxMemo is set to null
 */
-func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, extraNonce uint64, txOutNum int) (*wire.MsgTxAbe, error) {
+func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, txOutNum int) (*wire.MsgTxAbe, error) {
 	//	When a new msgTx is created for a new transaction, it should use the current Txversion
 	// msgTx := wire.NewMsgTxAbe(wire.TxVersion)
 	msgTx := wire.NewMsgTxAbe(wire.TxVersion)
@@ -371,7 +379,7 @@ func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, extraNonce uint64, tx
 	//	one TxIn
 	//	For coinbase transaction, as there is no real consumed coin, the TxIn is set by particular policy,
 	//	which depends on the TxVersion
-	coinbaseTxIn, err := wire.NewStandardCoinbaseTxIn(nextBlockHeight, extraNonce, msgTx.Version)
+	coinbaseTxIn, err := wire.NewStandardCoinbaseTxIn(nextBlockHeight, msgTx.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -395,6 +403,7 @@ func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, extraNonce uint64, tx
 
 	//msgTx.TxFee = abecryptoparam.GetMaxCoinValue(msgTx.Version)
 	msgTx.TxFee = 0 // txFee will be serialized with 8bytes.
+	//	todo: 202207. This txMemo value is unnecessary. We could remove it.
 	msgTx.TxMemo = []byte{byte(msgTx.Version >> 24), byte(msgTx.Version >> 16), byte(msgTx.Version >> 8), byte(msgTx.Version)}
 	//	TxWitnessSerializeSize here is used to occupy space.
 	txWitnessSizeApprox, err := abecryptoparam.GetCbTxWitnessSerializeSizeApprox(msgTx.Version, txOutNum)
@@ -584,9 +593,9 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress []byte) (*BlockTemplate
 	// ensure the transaction is not a duplicate transaction (paying the
 	// same value to the same public key address would otherwise be an
 	// identical transaction for block version 1).
-	extraNonce := uint64(0)
+	//extraNonce := uint64(0)
 
-	coinbaseTxMsg, err := createCoinbaseTxAbeMsgTemplate(nextBlockHeight, extraNonce, 1)
+	coinbaseTxMsg, err := createCoinbaseTxAbeMsgTemplate(nextBlockHeight, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -622,6 +631,16 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress []byte) (*BlockTemplate
 
 	log.Debugf("Considering %d transactions for inclusion to new block",
 		len(sourceTxns))
+
+	//	todo: (EthashPow)
+	//	blockHeaderOverhead is the max number of bytes it takes to serialize a block header and max possible transaction count.
+	//	It is a maximum possible value, rather than an accurate value.
+	// blockHeaderOverhead := wire.MaxBlockHeaderPayload + wire.MaxVarIntPayload
+	blockHeaderOverhead := wire.MaxBlockHeaderPayload
+	if nextBlockHeight >= wire.BlockHeightEthashPoW {
+		blockHeaderOverhead = wire.MaxBlockHeaderPayloadEthash
+	}
+	blockHeaderOverhead += wire.MaxVarIntPayload
 
 mempoolLoop:
 	for _, txDesc := range sourceTxns {
@@ -826,14 +845,25 @@ mempoolLoop:
 	}
 
 	// Create a new block ready to be solved.
-	merkles := blockchain.BuildMerkleTreeStoreAbe(blockTxns, false)
+	//	todo: (EthashPoW)
+	var merkleRoot *chainhash.Hash
+	var siblingHashes []*chainhash.Hash
+
+	if nextBlockHeight >= wire.BlockHeightEthashPoW {
+		merkleRoot, siblingHashes = blockchain.BuildMerkleTreeStoreAbeEthash(blockTxns)
+	} else {
+		merkles := blockchain.BuildMerkleTreeStoreAbe(blockTxns, false)
+		merkleRoot = merkles[len(merkles)-1]
+	}
+
 	var msgBlock wire.MsgBlockAbe
 	msgBlock.Header = wire.BlockHeader{
 		Version:    nextBlockVersion,
 		PrevBlock:  best.Hash,
-		MerkleRoot: *merkles[len(merkles)-1],
+		MerkleRoot: *merkleRoot,
 		Timestamp:  ts,
 		Bits:       reqDifficulty,
+		Height:     nextBlockHeight, // todo: (EthashPow)
 	}
 	for _, tx := range blockTxns {
 		if err := msgBlock.AddTransaction(tx.MsgTx()); err != nil {
@@ -858,6 +888,7 @@ mempoolLoop:
 		Fees:            txFees,
 		Height:          nextBlockHeight,
 		ValidPayAddress: payToAddress != nil,
+		SiblingHashes:   siblingHashes, // todo: (EthashPow)
 	}, nil
 }
 
@@ -905,6 +936,25 @@ func (g *BlkTmplGenerator) UpdateBlockTimeAbe(msgBlock *wire.MsgBlockAbe) error 
 	return nil
 }
 
+func (g *BlkTmplGenerator) UpdateBlockTimeAbeEthash(blockTemplate *BlockTemplate) error {
+	// The new timestamp is potentially adjusted to ensure it comes after
+	// the median time of the last several blocks per the chain consensus
+	// rules.
+	newTime := medianAdjustedTime(g.chain.BestSnapshot(), g.timeSource)
+	blockTemplate.BlockAbe.Header.Timestamp = newTime
+
+	// Recalculate the difficulty if running on a network that requires it.
+	if g.chainParams.ReduceMinDifficulty {
+		difficulty, err := g.chain.CalcNextRequiredDifficulty(newTime)
+		if err != nil {
+			return err
+		}
+		blockTemplate.BlockAbe.Header.Bits = difficulty
+	}
+
+	return nil
+}
+
 // UpdateExtraNonce updates the extra nonce in the coinbase script of the passed
 // block by regenerating the coinbase script with the passed value and block
 // height.  It also recalculates and updates the new merkle root that results
@@ -933,17 +983,54 @@ func (g *BlkTmplGenerator) UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight
 	return nil
 }
 
-func (g *BlkTmplGenerator) UpdateExtraNonceAbe(msgBlock *wire.MsgBlockAbe, blockHeight int32, extraNonce uint64) error {
-	coinbaseTxIn, err := wire.NewStandardCoinbaseTxIn(blockHeight, extraNonce, wire.TxVersion)
-	if err != nil {
-		return err
-	}
-	msgBlock.Transactions[0].TxIns[0] = coinbaseTxIn
+func (g *BlkTmplGenerator) UpdateExtraNonceAbe(msgBlock *wire.MsgBlockAbe, extraNonce uint64) error {
+	//	todo: 202207, here, we can use an update StandardCoinbaseTxIn ?
+	//coinbaseTxIn, err := wire.NewStandardCoinbaseTxIn(blockHeight, wire.TxVersion)
+	//if err != nil {
+	//	return err
+	//}
+	//msgBlock.Transactions[0].TxIns[0] = coinbaseTxIn
+
+	//	todo: 202207, the first 8 bytes of coinbaseTx.PreviousOutPointRing.BlockHashs[1] is used to store the ExtraNonce.
+	binary.BigEndian.PutUint64(msgBlock.Transactions[0].TxIns[0].PreviousOutPointRing.BlockHashs[1][0:8], extraNonce)
 
 	// Recalculate the merkle root with the updated extra nonce.
-	block := abeutil.NewBlockAbe(msgBlock)
+	block := abeutil.NewBlockAbe(msgBlock) //	This is important. By this new block, block.Transactions() will be re-generated.
 	merkles := blockchain.BuildMerkleTreeStoreAbe(block.Transactions(), false)
 	msgBlock.Header.MerkleRoot = *merkles[len(merkles)-1]
+	return nil
+}
+
+// todo: (EthashPoW) Confirm and Optimization
+//	UpdateExtraNonceAbeEthash() updates extraNonce in the coinbaseTx of blockTemplate,
+//	which is designed to be the first 8 bytes of coinbaseTx.PreviousOutPointRing.BlockHashs[1].
+//	As a result, the siblinghashes and merkleroot are also updated accordingly.
+func (g *BlkTmplGenerator) UpdateExtraNonceAbeEthash(blockTemplate *BlockTemplate, extraNonce uint64) error {
+	//hash1 := chainhash.Hash{}
+	//binary.BigEndian.PutUint64(hash1[0:8], extraNonce)
+	//blockTemplate.BlockAbe.Transactions[0].TxIns[0].PreviousOutPointRing.BlockHashs[1] = &hash1
+
+	// the first 8 bytes of coinbaseTx.PreviousOutPointRing.BlockHashs[1] is used to store the ExtraNonce.
+	binary.BigEndian.PutUint64(blockTemplate.BlockAbe.Transactions[0].TxIns[0].PreviousOutPointRing.BlockHashs[1][0:8], extraNonce)
+
+	//	This new coinbaseTx will make the later coinbaseTx.Hash()[:] return the hash of the updated coinbaseTx.
+	coinbaseTx := abeutil.NewTxAbe(blockTemplate.BlockAbe.Transactions[0])
+
+	// Recalculate the merkle root with the updated extra nonce.
+	//	Consistent with the codes in BuildMerkleTreeStoreAbeEthash
+	tmp := make([]byte, chainhash.HashSize*2)
+	// chainhash.DoubleHashH(tx Hash || witness Hash)
+	copy(tmp[:chainhash.HashSize], coinbaseTx.Hash()[:])
+	copy(tmp[chainhash.HashSize:], coinbaseTx.WitnessHash()[:])
+
+	newCbTxHash := chainhash.ChainHash(tmp)
+
+	//	SiblingHashes update
+	blockTemplate.SiblingHashes[0] = &newCbTxHash
+
+	//	MerkleRoot update
+	blockTemplate.BlockAbe.Header.MerkleRoot = *blockchain.ComputeMerkleRootBySiblingHashes(blockTemplate.SiblingHashes)
+
 	return nil
 }
 

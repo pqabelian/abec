@@ -66,7 +66,12 @@ func (b *BlockChain) maybeAcceptBlockAbe(block *abeutil.BlockAbe, flags Behavior
 	// if the block ultimately gets connected to the main chain, it starts out
 	// on a side chain.
 	blockHeader := &block.MsgBlock().Header
-	newNode := newBlockNode(blockHeader, prevNode)
+	// todo: (EthashPoW)
+	newNode, err := newBlockNode(blockHeader, prevNode)
+	if err != nil {
+		return false, err
+	}
+
 	newNode.status = statusDataStored
 
 	b.index.AddNode(newNode)

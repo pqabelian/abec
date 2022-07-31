@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"github.com/abesuite/abec/chaincfg"
+	"github.com/abesuite/abec/wire"
 	"math"
 )
 
@@ -12,6 +13,7 @@ const (
 
 	// vbTopBits defines the bits to set in the version to signal that the
 	// version bits scheme is being used.
+	// todo: 202207 to check the mechanism
 	vbTopBits = 0x10000000
 
 	// vbTopMask is the bitmask to use to determine whether or not the
@@ -192,10 +194,17 @@ func (c deploymentChecker) Condition(node *blockNode) (bool, error) {
 // while this function accepts any block node.
 //
 // This function MUST be called with the chain state lock held (for writes).
+// todo: (EthashPoW) need to set the BlockVersionEthashPow
 func (b *BlockChain) calcNextBlockVersion(prevNode *blockNode) (int32, error) {
 	// Set the appropriate bits for each actively defined rule deployment
 	// that is either in the process of being voted on, or locked in for the
 	// activation at the next threshold window change.
+	if prevNode.height+1 >= wire.BlockHeightEthashPoW {
+		//	todo: this rule should be public known.
+		//	shall we directly defined wire.BlockVersionEthashPow as int32? to avoid type-transfer.
+		return int32(wire.BlockVersionEthashPow), nil
+	}
+
 	expectedVersion := uint32(vbTopBits)
 	for id := 0; id < len(b.chainParams.Deployments); id++ {
 		deployment := &b.chainParams.Deployments[id]

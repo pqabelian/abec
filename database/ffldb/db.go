@@ -31,7 +31,9 @@ const (
 	// blockHdrSize is the size of a block header.  This is simply the
 	// constant from wire and is only provided here for convenience since
 	// wire.MaxBlockHeaderPayload is quite long.
-	blockHdrSize = wire.MaxBlockHeaderPayload
+	//	todo: (EthashPoW)
+	//	blockHdrSize is used in two functions, and the two functions are not used by current Abelian.
+	blockHdrSize = wire.MaxBlockHeaderPayloadEthash
 
 	// blockHdrOffset defines the offsets into a block index row for the
 	// block header.
@@ -1355,6 +1357,10 @@ func (tx *transaction) fetchWitnessRow(hash *chainhash.Hash) ([]byte, error) {
 // implementations.
 //
 // This function is part of the database.Tx interface implementation.
+//	todo: (EthashPoW)
+//	blockHdrSize is not accurate for block with height < BlockHeightEthashPoW
+//	1) FetchBlockHeader <-- dbFetchHeaderByHash <-- dbFetchHeaderByHeight, which is not called by any function.
+//	2) FetchBlockHeader <-- (cmd *headersCmd) Execute, which is in abec/database/cmd/dbtool/, and will be not used normally by Abelian.
 func (tx *transaction) FetchBlockHeader(hash *chainhash.Hash) ([]byte, error) {
 	return tx.FetchBlockRegion(&database.BlockRegion{
 		Hash:   hash,
@@ -1378,6 +1384,9 @@ func (tx *transaction) FetchBlockHeader(hash *chainhash.Hash) ([]byte, error) {
 // allows support for memory-mapped database implementations.
 //
 // This function is part of the database.Tx interface implementation.
+//	todo: (EthashPoW)
+//	blockHdrSize is not accurate for block with height < BlockHeightEthashPoW
+//	1) FetchBlockHeaders <-- (cmd *headersCmd) Execute, which is in abec/database/cmd/dbtool/, and will be not used normally by Abelian.
 func (tx *transaction) FetchBlockHeaders(hashes []chainhash.Hash) ([][]byte, error) {
 	regions := make([]database.BlockRegion, len(hashes))
 	for i := range hashes {

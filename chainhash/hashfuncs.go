@@ -1,6 +1,9 @@
 package chainhash
 
-import "crypto/sha256"
+import (
+	"crypto/sha256"
+	"golang.org/x/crypto/sha3"
+)
 
 // HashB calculates hash(b) and returns the resulting bytes.
 func HashB(b []byte) []byte {
@@ -25,4 +28,11 @@ func DoubleHashB(b []byte) []byte {
 func DoubleHashH(b []byte) Hash {
 	first := sha256.Sum256(b)
 	return Hash(sha256.Sum256(first[:]))
+}
+
+// todo: (EthashPoW)
+//	ChainHash() is used where chain is required, such as block (header) hash and merkle tree.
+// We still use Hash function with 256-bit output, to be compatible with the current BlockHeader type.
+func ChainHash(b []byte) Hash {
+	return sha3.Sum256(b)
 }

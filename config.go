@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/abesuite/abec/consensus/ethash"
 	"io"
 	"net"
 	"os"
@@ -172,10 +173,14 @@ type config struct {
 	oniondial            func(string, string, time.Duration) (net.Conn, error)
 	dial                 func(string, string, time.Duration) (net.Conn, error)
 	addCheckpoints       []chaincfg.Checkpoint
-	miningAddr           abeutil.MasterAddress
-	miningAddrBytes      []byte
-	minRelayTxFee        abeutil.Amount
-	whitelists           []*net.IPNet
+	// todo: (ethmining) miningAddr vs. the above MiningAddr, need to clarify
+	miningAddr      abeutil.MasterAddress
+	miningAddrBytes []byte
+	//	todo: (EthashPoW)
+	EthashConfig          ethash.Config
+	ethashVerifyByFullDAG bool `long:"ethashVerifyByFullDAG" description:"For a mining node, use full DAG to verify EthashPow"`
+	minRelayTxFee         abeutil.Amount
+	whitelists            []*net.IPNet
 }
 
 // serviceOptions defines the configuration options for the daemon as a service on
@@ -434,6 +439,7 @@ func loadConfig() (*config, []string, error) {
 		SigCacheMaxSize:      defaultSigCacheMaxSize,
 		WitnessCacheMaxSize:  defaultWitnessCacheMaxSize,
 		Generate:             defaultGenerate,
+		EthashConfig:         ethash.DefaultCfg,
 		TxIndex:              defaultTxIndex,
 	}
 	// Service options which are only added on Windows.
@@ -842,6 +848,11 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
+	//	todo: (EthashPoW)
+	if cfg.ethashVerifyByFullDAG {
+		cfg.EthashConfig.VerifyByFullDAG = true
+	}
+
 	//	mining address
 	// TODO(abe) This part should be re-thought.
 	if cfg.Generate {
@@ -863,6 +874,10 @@ func loadConfig() (*config, []string, error) {
 			return nil, nil, err
 		}
 	} else {
+		//	todo: (EthashPoW)
+		//	when CPUMing is disabled, it is unnecessary to use FullDAG to verify the header's PoW
+		cfg.EthashConfig.VerifyByFullDAG = false
+
 		if cfg.MiningAddr != "" {
 			cfg.miningAddrBytes, err = hex.DecodeString(cfg.MiningAddr)
 			if err != nil {

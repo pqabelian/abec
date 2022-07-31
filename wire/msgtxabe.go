@@ -517,6 +517,10 @@ func (msg *MsgTxAbe) TxHash() chainhash.Hash {
 	// cause a run-time panic.
 	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSize()))
 	_ = msg.Serialize(buf)
+
+	// todo: (ethhash mining) Shall we use new Hash function
+	//	need to check what is the functionality of TxHash: OutPoint, outpoint is formalized in ring
+	//  TxHash is computed based what block it is contained in?
 	return chainhash.DoubleHashH(buf.Bytes())
 }
 
@@ -524,7 +528,24 @@ func (msg *MsgTxAbe) TxHash() chainhash.Hash {
 func (msg *MsgTxAbe) TxHashFull() chainhash.Hash {
 	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSizeFull()))
 	_ = msg.SerializeFull(buf)
+
+	// todo: (ethhash mining) Shall we use new Hash function
 	return chainhash.DoubleHashH(buf.Bytes())
+}
+
+// TxWitnessHash generates the Hash for the transaction witness.
+//	Note that we separate witness and content of hash explicitly.
+func (msg *MsgTxAbe) TxWitnessHash() *chainhash.Hash {
+	// Encode the transaction and calculate double sha256 on the result.
+	// Ignore the error returns since the only way the encode could fail
+	// is being out of memory or due to nil pointers, both of which would
+	// cause a run-time panic.
+	if msg.TxWitness == nil {
+		return nil
+	}
+
+	witnessHash := chainhash.DoubleHashH(msg.TxWitness)
+	return &witnessHash
 }
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
@@ -844,7 +865,7 @@ func NewMsgTxAbe(version uint32) *MsgTxAbe {
 	}
 }
 
-func NewStandardCoinbaseTxIn(nextBlockHeight int32, extraNonce uint64, txVersion uint32) (*TxInAbe, error) {
+func NewStandardCoinbaseTxIn(nextBlockHeight int32, txVersion uint32) (*TxInAbe, error) {
 	txIn := &TxInAbe{}
 
 	nullSn, err := abecryptoparam.GetNullSerialNumber(txVersion)
@@ -859,11 +880,17 @@ func NewStandardCoinbaseTxIn(nextBlockHeight int32, extraNonce uint64, txVersion
 	// the ring version is set the same as the transaction.
 	previousOutPointRing.Version = txVersion
 	previousOutPointRing.BlockHashs = make([]*chainhash.Hash, 3)
+
 	hash0 := chainhash.Hash{}
 	binary.BigEndian.PutUint32(hash0[0:4], uint32(nextBlockHeight))
-	hash1 := chainhash.Hash{}
-	binary.BigEndian.PutUint64(hash1[0:8], extraNonce)
+	//	todo: (EthashPoW) validity check of coinbaseTx should check this: the first 4 bytes is the block height.
+
+	//hash1 := chainhash.Hash{}
+	//binary.BigEndian.PutUint64(hash1[0:8], extraNonce)
+	hash1 := chainhash.ZeroHash
 	hash2 := chainhash.ZeroHash
+	//	todo: (EthashPoW) validity check of coinbaseTx will not check these two hashes, to leave it free
+
 	previousOutPointRing.BlockHashs[0] = &hash0
 	previousOutPointRing.BlockHashs[1] = &hash1
 	previousOutPointRing.BlockHashs[2] = &hash2

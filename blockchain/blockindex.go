@@ -6,6 +6,7 @@ package blockchain
 	next block(s)
 */
 import (
+	"fmt"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/database"
@@ -94,6 +95,10 @@ type blockNode struct {
 	timestamp  int64
 	merkleRoot chainhash.Hash
 
+	// todo: (ethmining) 202207
+	nonceExt  uint64
+	mixDigest chainhash.Hash
+
 	// status is a bit field representing the validation state of the block. The
 	// status field, unlike the other fields, may be written to and so should
 	// only be accessed using the concurrent-safe NodeStatus method on
@@ -105,7 +110,7 @@ type blockNode struct {
 // calculating the height and workSum from the respective fields on the parent.
 // This function is NOT safe for concurrent access.  It must only be called when
 // initially creating a node.
-func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *blockNode) {
+func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *blockNode) error {
 	*node = blockNode{
 		hash:       blockHeader.BlockHash(),
 		workSum:    CalcWork(blockHeader.Bits),
@@ -114,21 +119,43 @@ func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *block
 		nonce:      blockHeader.Nonce,
 		timestamp:  blockHeader.Timestamp.Unix(),
 		merkleRoot: blockHeader.MerkleRoot,
+		// todo: (EthashPow) 202207
+		height:    blockHeader.Height,
+		nonceExt:  blockHeader.NonceExt,
+		mixDigest: blockHeader.MixDigest,
 	}
 	if parent != nil {
 		node.parent = parent
 		node.height = parent.height + 1
 		node.workSum = node.workSum.Add(parent.workSum, node.workSum)
+		// todo: (EthashPow) 202207
+		if node.height >= wire.BlockHeightEthashPoW {
+			if blockHeader.Height != node.height {
+				errStr := fmt.Sprintf("Block %s has height %d, while its parent has height %d", node.hash, blockHeader.Height, parent.height)
+				return ruleError(ErrMismatchedBlockHeightWithPrevNode, errStr)
+			}
+			//	todo: when more versions appear, we need to refactor here.
+			if blockHeader.Version != int32(wire.BlockVersionEthashPow) {
+				str := fmt.Sprintf("block has height %d, it should have version %d for EthashPoW, rather than the old version %d", blockHeader.Height, int32(wire.BlockVersionEthashPow), blockHeader.Version)
+				return ruleError(ErrMismatchedBlockHeightAndVersion, str)
+			}
+		}
 	}
+
+	return nil
 }
 
 // newBlockNode returns a new block node for the given block header and parent
 // node, calculating the height and workSum from the respective fields on the
 // parent. This function is NOT safe for concurrent access.
-func newBlockNode(blockHeader *wire.BlockHeader, parent *blockNode) *blockNode {
+//	todo: (EthashPoW)
+func newBlockNode(blockHeader *wire.BlockHeader, parent *blockNode) (*blockNode, error) {
 	var node blockNode
-	initBlockNode(&node, blockHeader, parent)
-	return &node
+	err := initBlockNode(&node, blockHeader, parent)
+	if err != nil {
+		return nil, err
+	}
+	return &node, nil
 }
 
 // Header constructs a block header from the node and returns it.
@@ -147,6 +174,10 @@ func (node *blockNode) Header() wire.BlockHeader {
 		Timestamp:  time.Unix(node.timestamp, 0),
 		Bits:       node.bits,
 		Nonce:      node.nonce,
+		// todo: (ethmining) 202207
+		NonceExt:  node.nonceExt,
+		MixDigest: node.mixDigest,
+		Height:    node.height,
 	}
 }
 

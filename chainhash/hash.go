@@ -19,6 +19,7 @@ var ErrHashStrSize = fmt.Errorf("max hash string length is %v bytes", MaxHashStr
 
 // Hash is used in several of the abec messages and common structures.  It
 // typically represents the double sha256 of data.
+//	todo: (ethmining) Hash is used as a type represent of Hash fucntion with length 256 bits.
 type Hash [HashSize]byte
 
 // String returns the Hash as the hexadecimal string of the byte-reversed

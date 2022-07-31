@@ -6,6 +6,7 @@ import (
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/mempool"
 	peerpkg "github.com/abesuite/abec/peer"
@@ -200,6 +201,7 @@ type SyncManager struct {
 	started        int32
 	shutdown       int32
 	chain          *blockchain.BlockChain
+	ethash         *ethash.Ethash // todo: (ethmining)
 	txMemPool      *mempool.TxPool
 	chainParams    *chaincfg.Params
 	progressLogger *blockProgressLogger
@@ -956,7 +958,8 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
-	_, isOrphan, err := sm.chain.ProcessBlockAbe(bmsg.block, behaviorFlags)
+	//	todo (EthashPoW): 202207
+	_, isOrphan, err := sm.chain.ProcessBlockAbe(bmsg.block, sm.ethash, behaviorFlags)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
@@ -1232,7 +1235,7 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	block := abeutil.NewBlockAbe(&msgBlockAbe)
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
-	_, isOrphan, err := sm.chain.ProcessBlockAbe(block, behaviorFlags)
+	_, isOrphan, err := sm.chain.ProcessBlockAbe(block, sm.ethash, behaviorFlags)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
@@ -1941,8 +1944,8 @@ out:
 				msg.reply <- peerID
 
 			case processBlockMsgAbe:
-				_, isOrphan, err := sm.chain.ProcessBlockAbe(
-					msg.block, msg.flags)
+				//	todo (EthashPoW): 202207
+				_, isOrphan, err := sm.chain.ProcessBlockAbe(msg.block, sm.ethash, msg.flags)
 				if err != nil {
 					msg.reply <- processBlockResponse{
 						isOrphan: false,
@@ -2295,6 +2298,7 @@ func New(config *Config) (*SyncManager, error) {
 		peerNotifier:    config.PeerNotifier,
 		chain:           config.Chain,
 		txMemPool:       config.TxMemPool,
+		ethash:          config.Ethash, // todo: (EthashPoW)
 		chainParams:     config.ChainParams,
 		rejectedTxns:    make(map[chainhash.Hash]struct{}),
 		requestedTxns:   make(map[chainhash.Hash]struct{}),

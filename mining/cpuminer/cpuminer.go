@@ -7,6 +7,7 @@ import (
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/mining"
 	"github.com/abesuite/abec/wire"
 	"runtime"
@@ -17,6 +18,9 @@ import (
 const (
 	// maxNonce is the maximum value a nonce can be in a block header.
 	maxNonce = ^uint32(0) // 2^32 - 1
+
+	//	todo: (EthashPoW)
+	maxNonceExt = ^uint64(0) // 2^64 - 1
 
 	// TODO(abe): this space in abe may be not 64 bits?
 	// maxExtraNonce is the maximum value an extra nonce used in a coinbase
@@ -47,6 +51,10 @@ type Config struct {
 	// ChainParams identifies which chain parameters the cpu miner is
 	// associated with.
 	ChainParams *chaincfg.Params
+
+	//	todo: (EthashPoW)
+	//	Ethash manages the cache and dataset for EthashPoW mining.
+	Ethash *ethash.Ethash
 
 	// BlockTemplateGenerator identifies the instance to use in order to
 	// generate block templates that the miner will attempt to solve.
@@ -89,6 +97,7 @@ type CPUMiner struct {
 	sync.Mutex
 	g                 *mining.BlkTmplGenerator
 	cfg               Config
+	ethash            *ethash.Ethash // todo: (EthashPoW)
 	numWorkers        uint32
 	started           bool
 	discreteMining    bool
@@ -129,7 +138,7 @@ out:
 			hashesPerSec = (hashesPerSec + curHashesPerSec) / 2
 			totalHashes = 0
 			if hashesPerSec != 0 {
-				log.Infof("Hash speed: %6.0f kilohashes/s",
+				log.Debugf("Hash speed: %6.0f kilohashes/s",
 					hashesPerSec/1000)
 			}
 
@@ -193,6 +202,52 @@ func (m *CPUMiner) submitBlock(block *abeutil.BlockAbe) bool {
 	return true
 }
 
+//	todo: (EthashPoW)
+func (m *CPUMiner) submitBlockEthash(block *abeutil.BlockAbe) bool {
+	m.submitBlockLock.Lock()
+	defer m.submitBlockLock.Unlock()
+
+	// Ensure the block is not stale since a new block could have shown up
+	// while the solution was being found. Typically that condition is
+	// detected and all work on the stale block is halted to start work on
+	// a new block, but the check only happens periodically, so it is
+	// possible a block was found and submitted in between.
+	msgBlock := block.MsgBlock()
+	if !msgBlock.Header.PrevBlock.IsEqual(&m.g.BestSnapshot().Hash) {
+		log.Debugf("Block submitted via CPU miner with previous "+
+			"block %s is stale", msgBlock.Header.PrevBlock)
+		return false
+	}
+
+	// Process this block using the same rules as blocks coming from other
+	// nodes.  This will in turn relay it to the network like normal.
+	isOrphan, err := m.cfg.ProcessBlock(block, blockchain.BFNone)
+	if err != nil {
+		// Anything other than a rule violation is an unexpected error,
+		// so log that error as an internal error.
+		if _, ok := err.(blockchain.RuleError); !ok {
+			log.Errorf("Unexpected error while processing "+
+				"block submitted via CPU miner: %v", err)
+			return false
+		}
+
+		log.Debugf("Block submitted via CPU miner rejected: %v", err)
+		return false
+	}
+	if isOrphan {
+		log.Debugf("Block submitted via CPU miner is an orphan")
+		return false
+	}
+
+	// The block was accepted.
+
+	//	in pqringct-Abelian, the TxFee field of CoinbaseTx is used to store the invalue
+	inValue := block.MsgBlock().Transactions[0].TxFee
+	log.Infof("Block submitted via CPU miner accepted (hash %v, "+"seal Hash %v, "+"height %d, "+
+		"amount %v)", block.Hash(), ethash.SealHash(&block.MsgBlock().Header), block.Height(), abeutil.Amount(inValue))
+	return true
+}
+
 // solveBlock attempts to find some combination of a nonce, extra nonce, and
 // current timestamp which makes the passed block hash to a value less than the
 // target difficulty.  The timestamp is updated periodically and the passed
@@ -207,6 +262,7 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlockAbe, blockHeight int32,
 
 	// Choose a random extra nonce offset for this block template and
 	// worker.
+	// todo: (202207) Will multiple share the same block template? If no, the enOffset is meaningless.
 	enOffset, err := wire.RandomUint64()
 	if err != nil {
 		log.Errorf("Unexpected error while generating random "+
@@ -230,7 +286,8 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlockAbe, blockHeight int32,
 		// Update the extra nonce in the block template with the
 		// new value by regenerating the coinbase script and
 		// setting the merkle root to the new value.
-		m.g.UpdateExtraNonceAbe(msgBlock, blockHeight, extraNonce+enOffset)
+		// todo: 202207 enOffset seems meaningless
+		m.g.UpdateExtraNonceAbe(msgBlock, extraNonce+enOffset)
 
 		// Search through the entire nonce range for a solution while
 		// periodically checking for early quit and stale block
@@ -262,6 +319,9 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlockAbe, blockHeight int32,
 				}
 
 				m.g.UpdateBlockTimeAbe(msgBlock)
+				// Note that the timestamp in blockheader is in second, so that different blockheader may share the same timestamp.
+				// This seems to be the reason why we need extranonnce.
+				// todo: 202207 As long as the miner's hash speed is lower than 2^32/15 Hash, update time will produce new nonce space.
 
 			default:
 				// Non-blocking select to fall through
@@ -285,6 +345,128 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlockAbe, blockHeight int32,
 	}
 
 	return false
+}
+
+//	todo: (EthashPoW)
+func (m *CPUMiner) solveBlockEthash(blockTemplate *mining.BlockTemplate, ticker *time.Ticker, quit chan struct{}) bool {
+
+	var (
+		// Create some convenience variables.
+		header           = &blockTemplate.BlockAbe.Header
+		targetDifficulty = blockchain.CompactToBig(header.Bits)
+		dataset          = m.ethash.Dataset(header.Height)
+	)
+
+	// Choose a random extra nonce offset for this block template and worker.
+	//	Based on the design that each generateBlocks() goroutine generates its own block template and call solveBlockEthash,
+	//	i.e., no generateBlocks() goroutines share the same block template (since it is randomized algorithm),
+	//	we do not need to worry that two goroutines will scan the same hash-value space.
+	enOffset, err := wire.RandomUint64()
+	if err != nil {
+		log.Errorf("Unexpected error while generating random "+
+			"extra nonce offset: %v", err)
+		enOffset = 0
+	}
+
+	//// Create some convenience variables.
+	//header := &blockTemplate.BlockAbe.Header
+	//targetDifficulty := blockchain.CompactToBig(header.Bits)
+
+	// Initial state.
+	lastGenerated := time.Now()
+	lastTxUpdate := m.g.TxSource().LastUpdated()
+	hashesCompleted := uint64(0)
+
+	// Note that the entire extra nonce range is iterated and the offset is
+	// added relying on the fact that overflow will wrap around 0 as
+	// provided by the Go spec.
+	//	todo: optimization based on the design begin
+	//	202207 optimization:
+	//	it is unnecessary to check extraNonce < maxExtraNonce, since overflow will wrap around 0.
+
+	//for extraNonce := uint64(0); extraNonce < maxExtraNonce; extraNonce++ {
+	extraNonce := enOffset
+	rst := false
+search:
+	for {
+		//	todo: optimization based on the design
+		// Update the extra nonce in the block template with the
+		// new value by regenerating the coinbase script and
+		// setting the merkle root to the new value.
+		extraNonce++
+		m.g.UpdateExtraNonceAbeEthash(blockTemplate, extraNonce)
+
+		// compute the contentHash for current (ExtraNonce, timeStamp)
+		contentHash := blockTemplate.Block.Header.ContentHash()
+
+		// Search through the entire nonce range for a solution while
+		// periodically checking for early quit and stale block
+		// conditions along with updates to the speed monitor.
+		//	todo: optimization based on the design
+		//	it is unnecessary to check i <= maxNonceExt, since overflow will wrap around 0.
+		//for i := uint64(0); i <= maxNonceExt; i++ {
+		nonceExt := uint64(0)
+		for {
+			select {
+			case <-quit:
+				//return false
+				rst = false
+				break search
+
+			case <-ticker.C:
+				m.updateHashes <- hashesCompleted
+				hashesCompleted = 0
+
+				// The current block is stale if the best block
+				// has changed.
+				best := m.g.BestSnapshot()
+				if !header.PrevBlock.IsEqual(&best.Hash) {
+					//return false
+					rst = false
+					break search
+				}
+
+				// The current block is stale if the memory pool
+				// has been updated since the block template was
+				// generated and it has been at least one
+				// minute.
+				if lastTxUpdate != m.g.TxSource().LastUpdated() &&
+					time.Now().After(lastGenerated.Add(time.Minute)) {
+					//return false
+					rst = false
+					break search
+				}
+
+				m.g.UpdateBlockTimeAbeEthash(blockTemplate)
+
+				// TimeStamp update will cause the update of contentHash.
+				contentHash = blockTemplate.Block.Header.ContentHash()
+
+			default:
+				// Non-blocking select to fall through
+			}
+
+			// Update the nonce and test whether the nonce produce a valid header.
+			nonceExt++
+			//	Try a nonce for EthashPoW begin
+			found := ethash.TrySeal(dataset, contentHash, nonceExt, targetDifficulty, header)
+			hashesCompleted += ethash.HashPerTrySeal
+			//	Try a nonce for EthashPoW end
+
+			if found {
+				// The seal with the nonceExt is right. Yay!
+				//	 Note that the header's fields for valid seal has been set in TrySeal()
+				m.updateHashes <- hashesCompleted
+				//return true
+				rst = true
+				break search
+			}
+		}
+	}
+
+	//return false
+	runtime.KeepAlive(dataset)
+	return rst
 }
 
 // generateBlocks is a worker that is controlled by the miningWorkerController.
@@ -347,14 +529,32 @@ out:
 			continue
 		}
 
+		//	As dataset generation is slow, say about 10 minutes, we need to prepare the dataset in advance.
+		//	Such a call will generate the first dataset and the second dataset (as the future one).
+		//	Each will take 10 minutes (even in the setting without mining).
+		//	To be safe, we call this procedure 200 minutes in advance.
+		if template.Height == wire.BlockHeightEthashPoW-100 {
+			m.ethash.PrepareDatasetForUpdate()
+		}
+
 		// Attempt to solve the block.  The function will exit early
 		// with false when conditions that trigger a stale block, so
 		// a new block template can be generated.  When the return is
 		// true a solution was found, so submit the solved block.
-		if m.solveBlock(template.BlockAbe, curHeight+1, ticker, quit) {
-			block := abeutil.NewBlockAbe(template.BlockAbe)
-			m.submitBlock(block)
+		// todo: (EthashPoW)
+		if template.Height >= wire.BlockHeightEthashPoW {
+			//	todo: (EthashPoW) After BlockHeightEthashPoW is achieved, in later version, we could even remove remove the if-else.
+			if m.solveBlockEthash(template, ticker, quit) {
+				block := abeutil.NewBlockAbe(template.BlockAbe)
+				m.submitBlockEthash(block)
+			}
+		} else {
+			if m.solveBlock(template.BlockAbe, curHeight+1, ticker, quit) {
+				block := abeutil.NewBlockAbe(template.BlockAbe)
+				m.submitBlock(block)
+			}
 		}
+
 	}
 
 	m.workerWg.Done()
@@ -607,20 +807,40 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 		// with false when conditions that trigger a stale block, so
 		// a new block template can be generated.  When the return is
 		// true a solution was found, so submit the solved block.
-		if m.solveBlock(template.BlockAbe, curHeight+1, ticker, nil) {
-			block := abeutil.NewBlockAbe(template.BlockAbe)
-			m.submitBlock(block)
-			blockHashes[i] = block.Hash()
-			i++
-			if i == n {
-				log.Tracef("Generated %d blocks", i)
-				m.Lock()
-				close(m.speedMonitorQuit)
-				m.wg.Wait()
-				m.started = false
-				m.discreteMining = false
-				m.Unlock()
-				return blockHashes, nil
+		// todo: (EthashPoW)
+		if template.Height >= wire.BlockHeightEthashPoW {
+			if m.solveBlockEthash(template, ticker, nil) {
+				block := abeutil.NewBlockAbe(template.BlockAbe)
+				m.submitBlockEthash(block)
+				blockHashes[i] = block.Hash()
+				i++
+				if i == n {
+					log.Tracef("Generated %d blocks", i)
+					m.Lock()
+					close(m.speedMonitorQuit)
+					m.wg.Wait()
+					m.started = false
+					m.discreteMining = false
+					m.Unlock()
+					return blockHashes, nil
+				}
+			}
+		} else {
+			if m.solveBlock(template.BlockAbe, curHeight+1, ticker, nil) {
+				block := abeutil.NewBlockAbe(template.BlockAbe)
+				m.submitBlock(block)
+				blockHashes[i] = block.Hash()
+				i++
+				if i == n {
+					log.Tracef("Generated %d blocks", i)
+					m.Lock()
+					close(m.speedMonitorQuit)
+					m.wg.Wait()
+					m.started = false
+					m.discreteMining = false
+					m.Unlock()
+					return blockHashes, nil
+				}
 			}
 		}
 	}
@@ -632,6 +852,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 func New(cfg *Config) *CPUMiner {
 	return &CPUMiner{
 		g:                 cfg.BlockTemplateGenerator,
+		ethash:            cfg.Ethash,
 		cfg:               *cfg,
 		numWorkers:        defaultNumWorkers,
 		updateNumWorkers:  make(chan struct{}),

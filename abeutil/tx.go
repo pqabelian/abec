@@ -27,8 +27,9 @@ type Tx struct {
 }
 
 type TxAbe struct {
-	msgTx  *wire.MsgTxAbe  // Underlying MsgTx
-	txHash *chainhash.Hash // Cached transaction hash
+	msgTx         *wire.MsgTxAbe  // Underlying MsgTx
+	txHash        *chainhash.Hash // Cached transaction content hash
+	txWitnessHash *chainhash.Hash // Cached transaction witness hash
 	//	txPersistentHash	*chainhash.Hash // Cached transaction witness hash
 	//	txHasTxoDetails *bool // if the transaction has txo details
 	txHasWitness *bool // If the transaction has witness data
@@ -75,6 +76,20 @@ func (tx *TxAbe) Hash() *chainhash.Hash {
 	hash := tx.msgTx.TxHash()
 	tx.txHash = &hash
 	return &hash
+}
+
+// WitnessHash returns the hash the transaction witness.
+// This is equivalent to calling TxWitnessHash on the underlying wire.MsgTx, however it
+// caches the result so subsequent calls are more efficient.
+func (tx *TxAbe) WitnessHash() *chainhash.Hash {
+	// Return the cached hash if it has already been generated.
+	if tx.txWitnessHash != nil {
+		return tx.txWitnessHash
+	}
+
+	// Cache the hash and return it.
+	tx.txWitnessHash = tx.msgTx.TxWitnessHash()
+	return tx.txWitnessHash
 }
 
 // WitnessHash returns the witness hash (wtxid) of the transaction.  This is

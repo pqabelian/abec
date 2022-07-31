@@ -8,6 +8,7 @@ import (
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
 	"math"
@@ -74,6 +75,7 @@ func isNullOutpoint(outpoint *wire.OutPoint) bool {
 // header. Blocks with version 2 and above satisfy this criteria. See BIP0034
 // for further information.
 func ShouldHaveSerializedBlockHeight(header *wire.BlockHeader) bool {
+	// todo: (ethmining) This is a bug? we have header.Version = 1 now?
 	return header.Version >= serializedHeightVersion
 }
 
@@ -494,7 +496,8 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 // The flags modify the behavior of this function as follows:
 //  - BFNoPoWCheck: The check to ensure the block hash is less than the target
 //    difficulty is not performed.
-func checkProofOfWork(header *wire.BlockHeader, powLimit *big.Int, flags BehaviorFlags) error {
+//	//	todo: (EthashPoW)
+func checkProofOfWork(header *wire.BlockHeader, ethash *ethash.Ethash, powLimit *big.Int, flags BehaviorFlags) error {
 	// The target difficulty must be larger than zero.
 	target := CompactToBig(header.Bits)
 	if target.Sign() <= 0 {
@@ -514,12 +517,21 @@ func checkProofOfWork(header *wire.BlockHeader, powLimit *big.Int, flags Behavio
 	// to avoid proof of work checks is set.
 	if flags&BFNoPoWCheck != BFNoPoWCheck {
 		// The block hash must be less than the claimed target.
-		hash := header.BlockHash()
-		hashNum := HashToBig(&hash)
-		if hashNum.Cmp(target) > 0 {
-			str := fmt.Sprintf("block hash of %064x is higher than "+
-				"expected max of %064x", hashNum, target)
-			return ruleError(ErrHighHash, str)
+		// todo: (EthashPoW)
+		// It is necessary to use header.Version, rather than the Height as the branch condition.
+		if header.Version == int32(wire.BlockVersionEthashPow) {
+			err := ethash.VerifySeal(header, target)
+			if err != nil {
+				return err
+			}
+		} else {
+			hash := header.BlockHash()
+			hashNum := HashToBig(&hash)
+			if hashNum.Cmp(target) > 0 {
+				str := fmt.Sprintf("block hash of %064x is higher than "+
+					"expected max of %064x", hashNum, target)
+				return ruleError(ErrHighHash, str)
+			}
 		}
 	}
 
@@ -530,7 +542,7 @@ func checkProofOfWork(header *wire.BlockHeader, powLimit *big.Int, flags Behavio
 // difficulty is in min/max range and that the block hash is less than the
 // target difficulty as claimed.
 func CheckProofOfWork(block *abeutil.Block, powLimit *big.Int) error {
-	return checkProofOfWork(&block.MsgBlock().Header, powLimit, BFNone)
+	return checkProofOfWork(&block.MsgBlock().Header, nil, powLimit, BFNone)
 }
 
 // CountSigOps returns the number of signature operations for all transaction
@@ -619,11 +631,13 @@ func CountP2SHSigOps(tx *abeutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint)
 //   3. Ensure the timestamp is not too far in the future
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkProofOfWork.
-func checkBlockHeaderSanity(header *wire.BlockHeader, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
+//	todo: (EthashPoW)
+func checkBlockHeaderSanity(header *wire.BlockHeader, ethash *ethash.Ethash, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
 	// Ensure the proof of work bits in the block header is in min/max range
 	// and the block hash is less than the target value described by the
 	// bits.
-	err := checkProofOfWork(header, powLimit, flags)
+	//	todo: (EthashPoW)
+	err := checkProofOfWork(header, ethash, powLimit, flags)
 	if err != nil {
 		return err
 	}
@@ -660,7 +674,7 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, powLimit *big.Int, timeSou
 func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
 	msgBlock := block.MsgBlock()
 	header := &msgBlock.Header
-	err := checkBlockHeaderSanity(header, powLimit, timeSource, flags)
+	err := checkBlockHeaderSanity(header, nil, powLimit, timeSource, flags)
 	if err != nil {
 		return err
 	}
@@ -774,10 +788,12 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 //   7. No duplicate transactions (same tx hash)
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkBlockHeaderSanity.
-func checkBlockSanityAbe(block *abeutil.BlockAbe, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
+//	todo: (EthashPoW)
+func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
 	msgBlock := block.MsgBlock()
 	header := &msgBlock.Header
-	err := checkBlockHeaderSanity(header, powLimit, timeSource, flags)
+	//	todo: (EthashPoW)
+	err := checkBlockHeaderSanity(header, ethash, powLimit, timeSource, flags)
 	if err != nil {
 		return err
 	}
@@ -846,13 +862,24 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, powLimit *big.Int, timeSource 
 	// checks.  Bitcoind builds the tree here and checks the merkle root
 	// after the following checks, but there is no reason not to check the
 	// merkle root matches here.
-	merkles := BuildMerkleTreeStoreAbe(block.Transactions(), false)
-	calculatedMerkleRoot := merkles[len(merkles)-1]
-	if !header.MerkleRoot.IsEqual(calculatedMerkleRoot) {
-		str := fmt.Sprintf("block merkle root is invalid - block "+
-			"header indicates %v, but calculated value is %v",
-			header.MerkleRoot, calculatedMerkleRoot)
-		return ruleError(ErrBadMerkleRoot, str)
+	// todo: (EthashPoW) use the optimized BuildMerkleTreeStoreAbeEthash()
+	if header.Version == int32(wire.BlockVersionEthashPow) {
+		calculatedMerkleRoot, _ := BuildMerkleTreeStoreAbeEthash(block.Transactions())
+		if !header.MerkleRoot.IsEqual(calculatedMerkleRoot) {
+			str := fmt.Sprintf("block merkle root is invalid - block "+
+				"header indicates %v, but calculated value is %v",
+				header.MerkleRoot, calculatedMerkleRoot)
+			return ruleError(ErrBadMerkleRoot, str)
+		}
+	} else {
+		merkles := BuildMerkleTreeStoreAbe(block.Transactions(), false)
+		calculatedMerkleRoot := merkles[len(merkles)-1]
+		if !header.MerkleRoot.IsEqual(calculatedMerkleRoot) {
+			str := fmt.Sprintf("block merkle root is invalid - block "+
+				"header indicates %v, but calculated value is %v",
+				header.MerkleRoot, calculatedMerkleRoot)
+			return ruleError(ErrBadMerkleRoot, str)
+		}
 	}
 
 	// Check for duplicate transactions.  This check will be fairly quick
@@ -872,8 +899,9 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, powLimit *big.Int, timeSource 
 	return nil
 }
 
-func CheckBlockSanity(block *abeutil.BlockAbe, powLimit *big.Int, timeSource MedianTimeSource) error {
-	return checkBlockSanityAbe(block, powLimit, timeSource, BFNone)
+// todo: (EthashPoW) 202207
+func CheckBlockSanity(block *abeutil.BlockAbe, ethash *ethash.Ethash, powLimit *big.Int, timeSource MedianTimeSource) error {
+	return checkBlockSanityAbe(block, ethash, powLimit, timeSource, BFNone)
 }
 
 // ExtractCoinbaseHeight attempts to extract the height of the block from the
@@ -1016,6 +1044,21 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 	// The height of this block is one more than the referenced previous
 	// block.
 	blockHeight := prevNode.height + 1
+	// todo:(EthashPoW)
+	//	This is VERY necessary.
+	//	Now, the blockHeight of block/node is set, we can check the whether the header.Height and header.Version are set correctly.
+	//	This will prevent an updated Abelian node from accepting an old-version block.
+	if blockHeight >= wire.BlockHeightEthashPoW {
+		if header.Height != blockHeight {
+			str := fmt.Sprintf("block has height %d while its prevNode has height %d", header.Height, prevNode.height)
+			return ruleError(ErrMismatchedBlockHeightWithPrevNode, str)
+		}
+		//	todo: when more versions appear, we need to refactor here.
+		if header.Version != int32(wire.BlockVersionEthashPow) {
+			str := fmt.Sprintf("block has height %d, it should have version %d for EthashPoW, rather than the old version %d", header.Height, int32(wire.BlockVersionEthashPow), header.Version)
+			return ruleError(ErrMismatchedBlockHeightAndVersion, str)
+		}
+	}
 
 	// Ensure chain matches up to predetermined checkpoints.
 	blockHash := header.BlockHash()
@@ -1646,7 +1689,16 @@ func (b *BlockChain) CheckConnectBlockTemplateAbe(block *abeutil.BlockAbe) error
 		return ruleError(ErrPrevBlockNotBest, str)
 	}
 
-	err := checkBlockSanityAbe(block, b.chainParams.PowLimit, b.timeSource, flags)
+	//	todo: (EthashPoW)
+	if header.Height != tip.height+1 {
+		str := fmt.Sprintf("the height of block (template) must be 1 greater than that of the current chain tip %v (%d), "+
+			"instead got %d", tip.hash, tip.height, header.Height)
+		return ruleError(ErrMismatchedBlockHeightWithPrevNode, str)
+	}
+
+	//	todo: (EthashPoW)
+	//	for flags = BFNoPoWCheck, PoW will not be checked, we set ethash = nil
+	err := checkBlockSanityAbe(block, nil, b.chainParams.PowLimit, b.timeSource, flags)
 	if err != nil {
 		return err
 	}
@@ -1660,6 +1712,11 @@ func (b *BlockChain) CheckConnectBlockTemplateAbe(block *abeutil.BlockAbe) error
 	// is not needed and thus extra work can be avoided.
 	view := NewUtxoRingViewpoint()
 	view.SetBestHash(&tip.hash)
-	newNode := newBlockNode(&header, tip)
+	//	todo: (EthashPoW)
+	newNode, err := newBlockNode(&header, tip)
+	if err != nil {
+		return err
+	}
+
 	return b.checkConnectBlockAbe(newNode, block, view, nil)
 }
