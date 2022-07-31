@@ -512,6 +512,24 @@ func NewListSpentAndMinedAbeCmd() *ListSpentAndMinedAbeCmd {
 	return &ListSpentAndMinedAbeCmd{}
 }
 
+type ListConfirmedTxsCmd struct{}
+
+func NewListConfirmedTxsCmd() *ListConfirmedTxsCmd {
+	return &ListConfirmedTxsCmd{}
+}
+
+type ListUnconfirmedTxsCmd struct{}
+
+func NewListUnconfirmedTxsCmd() *ListUnconfirmedTxsCmd {
+	return &ListUnconfirmedTxsCmd{}
+}
+
+type ListInvalidTxsCmd struct{}
+
+func NewListInvalidTxsCmd() *ListInvalidTxsCmd {
+	return &ListInvalidTxsCmd{}
+}
+
 // NewListUnspentCmd returns a new instance which can be used to issue a
 // listunspent JSON-RPC command.
 //
@@ -842,6 +860,9 @@ func init() {
 	MustRegisterCmd("listunspentabe", (*ListUnspentAbeCmd)(nil), flags)
 	MustRegisterCmd("listspentbutunminedabe", (*ListSpentButUnminedAbeCmd)(nil), flags)
 	MustRegisterCmd("listspentandminedabe", (*ListSpentAndMinedAbeCmd)(nil), flags)
+	MustRegisterCmd("listconfirmedtxs", (*ListConfirmedTxsCmd)(nil), flags)
+	MustRegisterCmd("listunconfirmedtxs", (*ListUnconfirmedTxsCmd)(nil), flags)
+	MustRegisterCmd("listinvalidtxs", (*ListInvalidTxsCmd)(nil), flags)
 	MustRegisterCmd("lockunspent", (*LockUnspentCmd)(nil), flags)
 	MustRegisterCmd("move", (*MoveCmd)(nil), flags) // TODO
 	//MustRegisterCmd("sendfrom", (*SendFromCmd)(nil), flags)
