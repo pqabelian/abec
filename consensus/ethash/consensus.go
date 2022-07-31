@@ -117,8 +117,8 @@ func (ethash *Ethash) Dataset(blockHeight int32) *dataset {
 }
 
 //	TrySeal() tris nonce to test whether the nonce generates a valid sealHash which lies in the scope specified by target,
-//	i.e., satisfying the consensus rules defined VerifySeal().
-//	If the input nonce is valid, the block header will be updated, i.e., setting the MixDigest and NonceExt.
+//	i.e., satisfying the consensus rules defined by VerifySeal().
+//	If the input nonce is valid, the block header will be updated, i.e., the MixDigest and NonceExt are set.
 //	To enable multiple calls on TrySeal() to use the same "dataset *dataset", this function takes "dataset *dataset" as an input,
 //	so that the miner can obtain a "dataset *dataset" by calling (ethash *Ethash) Dataset(blockHeight int32) and then call this function.
 //	To avoid the unnecessary computation of contentHash, this function takes contentHash as input,
@@ -161,9 +161,9 @@ func TrySeal(dataset *dataset, contentHash chainhash.Hash, nonceExt uint64, targ
 	return false
 }
 
-//	Two hashes are called per TrySeal.
 //	There are two hashes in one TrySeal (actually in hashimoto()), one for naive hash, and one on input the mixDigest computed from DAG.
 //	While the later one takes much more time than the former one, we only count the later one for hash rate.
+//	Or, in other words, the hast times means the number of tried nonce.
 const HashPerTrySeal = 1 //2
 
 //	SealHash() returns the sealHash of the input block header.
