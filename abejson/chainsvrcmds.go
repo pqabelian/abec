@@ -561,7 +561,7 @@ func NewGetNetTotalsCmd() *GetNetTotalsCmd {
 
 // GetNetworkHashPSCmd defines the getnetworkhashps JSON-RPC command.
 type GetNetworkHashPSCmd struct {
-	Blocks *int `jsonrpcdefault:"400"`
+	Blocks *int `jsonrpcdefault:"200"`
 	Height *int `jsonrpcdefault:"-1"`
 }
 
