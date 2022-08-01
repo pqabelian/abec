@@ -10,6 +10,7 @@ import (
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
@@ -1733,13 +1734,13 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 		// Log information about how the block is forking the chain.
 		fork := b.bestChain.FindFork(node)
 		if fork.hash.IsEqual(parentHash) {
-			log.Infof("FORK: Block %v forks the chain at height %d"+
+			log.Infof("FORK: Block %v (seal hash %v) forks the chain at height %d"+
 				"/block %v, but does not cause a reorganize",
-				node.hash, fork.height, fork.hash)
+				node.hash, ethash.SealHash(&block.MsgBlock().Header), fork.height, fork.hash)
 		} else {
-			log.Infof("EXTEND FORK: Block %v extends a side chain "+
+			log.Infof("EXTEND FORK: Block %v (seal hash %v) extends a side chain "+
 				"which forks the chain at height %d/block %v",
-				node.hash, fork.height, fork.hash)
+				node.hash, ethash.SealHash(&block.MsgBlock().Header), fork.height, fork.hash)
 		}
 
 		return false, nil
@@ -1755,7 +1756,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 	detachNodes, attachNodes := b.getReorganizeNodesAbe(node)
 
 	// Reorganize the chain.
-	log.Infof("REORGANIZE: Block %v is causing a reorganize.", node.hash)
+	log.Infof("REORGANIZE: Block %v (seal hash %v) is causing a reorganize.", node.hash, ethash.SealHash(&block.MsgBlock().Header))
 	err := b.reorganizeChainAbe(detachNodes, attachNodes)
 
 	// Either getReorganizeNodes or reorganizeChain could have made unsaved

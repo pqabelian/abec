@@ -170,6 +170,10 @@ const HashPerTrySeal = 1 //2
 //	The algorithm codes are consistent with the codes in hashimoto().
 //	This algorithm is used only where sealHash is needed independently, for example, for display.
 func SealHash(header *wire.BlockHeader) chainhash.Hash {
+	if header == nil || header.Version <= wire.BlockVersionEthashPow {
+		return chainhash.InvalidHash
+	}
+
 	// Combine contentHash + nonce into a 64 byte seed
 	contentHash := header.ContentHash()
 

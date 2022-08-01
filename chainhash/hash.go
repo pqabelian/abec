@@ -12,6 +12,14 @@ const HashSize = 32
 const MaxHashStringSize = HashSize * 2
 
 var ZeroHash Hash
+var InvalidHash Hash
+
+func init() {
+	for i := 0; i < HashSize; i++ {
+		ZeroHash[i] = 0
+		InvalidHash[i] = 0xFF
+	}
+}
 
 // ErrHashStrSize describes an error that indicates the caller specified a hash
 // string that has too many characters.

@@ -75,7 +75,9 @@ type blockNode struct {
 	// parent is the parent block for this node.
 	parent *blockNode
 
-	// hash is the double sha 256 of the block.
+	//	todo: (EthashPoW)
+	// hash is the double sha 256 of the block for BlockVersionInitial,
+	//	while beging chainhash.ChainHash (actually SHA3-256) for the block.
 	hash chainhash.Hash
 
 	// workSum is the total amount of work in the chain up to and including
@@ -95,7 +97,7 @@ type blockNode struct {
 	timestamp  int64
 	merkleRoot chainhash.Hash
 
-	// todo: (ethmining) 202207
+	// todo: (EthashPoW) 202207
 	nonceExt  uint64
 	mixDigest chainhash.Hash
 
@@ -131,7 +133,7 @@ func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *block
 		// todo: (EthashPow) 202207
 		if node.height >= wire.BlockHeightEthashPoW {
 			if blockHeader.Height != node.height {
-				errStr := fmt.Sprintf("Block %s has height %d, while its parent has height %d", node.hash, blockHeader.Height, parent.height)
+				errStr := fmt.Sprintf("Block %v has height %d, while its parent has height %d", node.hash, blockHeader.Height, parent.height)
 				return ruleError(ErrMismatchedBlockHeightWithPrevNode, errStr)
 			}
 			//	todo: when more versions appear, we need to refactor here.

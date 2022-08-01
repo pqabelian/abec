@@ -145,7 +145,7 @@ func (b *BlockChain) processOrphansAbe(hash *chainhash.Hash, flags BehaviorFlags
 //   6. If any orphan blocks depend on this block, check and accept it (processOrphansAbe) todo: to be checked
 //	todo (ABE):
 //	todo (EthashPoW): 202207
-func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, flags BehaviorFlags) (bool, bool, error) {
+func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.Ethash, flags BehaviorFlags) (bool, bool, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
 
@@ -172,7 +172,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethash *ethash.Eth
 
 	// Perform preliminary sanity checks on the block and its transactions.
 	//	todo (EthashPoW): 202207
-	err = checkBlockSanityAbe(block, ethash, b.chainParams.PowLimit, b.timeSource, flags)
+	err = checkBlockSanityAbe(block, ethashObj, b.chainParams.PowLimit, b.timeSource, flags)
 	if err != nil {
 		return false, false, err
 	}
@@ -224,7 +224,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethash *ethash.Eth
 		return false, false, err
 	}
 	if !prevHashExists {
-		log.Infof("Adding orphan block %v with parent %v", blockHash, prevHash)
+		log.Infof("Adding orphan block %v (seal hash %v) with parent %v", blockHash, ethash.SealHash(&block.MsgBlock().Header), prevHash)
 		b.addOrphanBlock(block)
 
 		return false, true, nil
@@ -245,7 +245,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethash *ethash.Eth
 		return false, false, err
 	}
 
-	log.Debugf("Accepted block %v, height %v, tx %v", blockHash, block.Height(), len(block.Transactions()))
+	log.Debugf("Accepted block %v (seal hash %v), height %v, tx %v", blockHash, ethash.SealHash(&block.MsgBlock().Header), block.Height(), len(block.Transactions()))
 
 	return isMainChain, false, nil
 }
