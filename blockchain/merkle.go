@@ -309,8 +309,8 @@ func BuildMerkleTreeStoreAbeEthash(transactions []*abeutil.TxAbe) (merkleRoot *c
 	rstSiblingHashes[0] = merkles[0]
 	locSibling++
 
-	numInLevel := nextPoT // the number of nodes in the current level
 	leftest := 0          //	the index of the leftest nodes in the current level
+	numInLevel := nextPoT // the number of nodes in the current level
 	for leftest+1 < arraySize {
 		rstSiblingHashes[locSibling] = merkles[leftest+1]
 		locSibling++
