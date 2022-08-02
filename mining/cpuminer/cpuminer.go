@@ -803,6 +803,10 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 			continue
 		}
 
+		if template.Height == wire.BlockHeightEthashPoW-100 {
+			m.ethash.PrepareDatasetForUpdate()
+		}
+
 		// Attempt to solve the block.  The function will exit early
 		// with false when conditions that trigger a stale block, so
 		// a new block template can be generated.  When the return is
