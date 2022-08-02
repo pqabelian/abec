@@ -197,8 +197,8 @@ func (m *CPUMiner) submitBlock(block *abeutil.BlockAbe) bool {
 
 	//	in pqringct-Abelian, the TxFee field of CoinbaseTx is used to store the invalue
 	inValue := block.MsgBlock().Transactions[0].TxFee
-	log.Infof("Block submitted via CPU miner accepted (hash %s, "+"height %d, "+
-		"amount %v)", block.Hash(), block.Height(), abeutil.Amount(inValue))
+	log.Infof("Block submitted via CPU miner accepted (hash %v, seal hash %v, "+"height %d, "+
+		"amount %v)", block.Hash(), ethash.SealHash(&block.MsgBlock().Header), block.Height(), abeutil.Amount(inValue))
 	return true
 }
 
@@ -397,7 +397,7 @@ search:
 		m.g.UpdateExtraNonceAbeEthash(blockTemplate, extraNonce)
 
 		// compute the contentHash for current (ExtraNonce, timeStamp)
-		contentHash := blockTemplate.Block.Header.ContentHash()
+		contentHash := blockTemplate.BlockAbe.Header.ContentHash()
 
 		// Search through the entire nonce range for a solution while
 		// periodically checking for early quit and stale block
@@ -440,7 +440,7 @@ search:
 				m.g.UpdateBlockTimeAbeEthash(blockTemplate)
 
 				// TimeStamp update will cause the update of contentHash.
-				contentHash = blockTemplate.Block.Header.ContentHash()
+				contentHash = blockTemplate.BlockAbe.Header.ContentHash()
 
 			default:
 				// Non-blocking select to fall through
