@@ -12,6 +12,17 @@ const (
 	vbLegacyBlockVersion = 4
 
 	// todo: (EthashPoW) revise the version mechanism
+	//	todo: (block version upgrade mechainism (initial) design)
+	//	The initial version is int32(0x10000000).
+	//	We use the left 12 bits for hard-fork upgrade, and will use the remaining 20 bits for soft-fork update.
+	//	Actually, block version is defined as int32, we will alwasy set the leftest bit to be 0,
+	//	and only use the 11 bits for hard fork.
+	//	Further, like a tree, the hard fork version will be
+	//	0x20000000, 0x30000000, ..., 0x70000000,
+	//	0x71000000, 0x72000000, ..., 0x7F000000,
+	//	0x7F100000, 0x7F200000, ..., 0x7FF00000.
+	//	Note that hard-forks will be not so many.
+	//	If necessary, we may use versions such as 0x31000000, ... 0x3F000000.
 	// All historical versions should be listed here.
 	BlockVersionInitial = 0x10000000
 	//	wire.BlockVersionEthashPow = 0x20000000
