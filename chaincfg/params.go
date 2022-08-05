@@ -221,6 +221,7 @@ var MainNetParams = Params{
 	DefaultPort: "8666",
 	// TODO: this DNSSeed principle will be learned
 	DNSSeeds: []DNSSeed{
+		{"dnsseed.theabelian.net", false},
 		/*		{"seed.bitcoin.sipa.be", true},
 				{"dnsseed.bluematt.me", true},
 				{"dnsseed.bitcoin.dashjr.org", false},
