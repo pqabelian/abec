@@ -980,7 +980,7 @@ func init() {
 	MustRegisterCmd("getblockhash", (*GetBlockHashCmd)(nil), flags)
 	MustRegisterCmd("getblockheader", (*GetBlockHeaderCmd)(nil), flags)
 	MustRegisterCmd("getblockstats", (*GetBlockStatsCmd)(nil), flags)
-	MustRegisterCmd("getblocktemplate", (*GetBlockTemplateCmd)(nil), flags)
+	//MustRegisterCmd("getblocktemplate", (*GetBlockTemplateCmd)(nil), flags)
 	// TODO(ABE): ABE does not support filter.
 	//MustRegisterCmd("getcfilter", (*GetCFilterCmd)(nil), flags)
 	//MustRegisterCmd("getcfilterheader", (*GetCFilterHeaderCmd)(nil), flags)
