@@ -216,7 +216,7 @@ func (b *BlockChain) calcNextBlockVersion(prevNode *blockNode) (int32, error) {
 	// Set the appropriate bits for each actively defined rule deployment
 	// that is either in the process of being voted on, or locked in for the
 	// activation at the next threshold window change.
-	if prevNode.height+1 >= wire.BlockHeightEthashPoW {
+	if prevNode != nil && prevNode.height+1 >= wire.BlockHeightEthashPoW {
 		//	todo: this rule should be public known.
 		//	shall we directly defined wire.BlockVersionEthashPow as int32? to avoid type-transfer.
 		return int32(wire.BlockVersionEthashPow), nil
@@ -293,6 +293,7 @@ func (b *BlockChain) warnUnknownRuleActivations(node *blockNode) error {
 // blocks have unexpected versions.
 //
 // This function MUST be called with the chain state lock held (for writes)
+// TODO
 func (b *BlockChain) warnUnknownVersions(node *blockNode) error {
 	// Nothing to do if already warned.
 	if b.unknownVersionsWarned {
