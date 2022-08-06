@@ -1982,8 +1982,8 @@ func (p *Peer) readRemoteVersionMsg() error {
 
 	//	check the agent to contain "abec"
 	// If the user agent is not valid, return err
-	if !isValidUserAgent(p.userAgent) {
-		reason := fmt.Sprintf("new peer has invalid useragent %v", p.userAgent)
+	if !isValidUserAgent(msg.UserAgent) {
+		reason := fmt.Sprintf("new peer has invalid useragent %v", msg.UserAgent)
 		return errors.New(reason)
 	}
 
