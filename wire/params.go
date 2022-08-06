@@ -22,7 +22,7 @@ const (
 
 	// BlockHeightEthashPoW
 	// BlockHeightEthashPoW denotes the block height from which Ethash-PoW mining is applied.
-	BlockHeightEthashPoW = 50000
+	BlockHeightEthashPoW = 52000
 )
 
 /**

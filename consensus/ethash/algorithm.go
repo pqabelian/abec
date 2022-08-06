@@ -41,6 +41,7 @@ const (
 	cacheInitBytes     = 5 * (1 << 24) // Bytes in cache at genesis
 	cacheGrowthBytes   = 1 << 18       //	1 << 17       // Cache growth per epoch
 	epochLength        = 4000          //2000 // Blocks per epoch
+	//epochLength = 200 //2000 // Blocks per epoch
 
 	mixBytes       = 128 // Width of mix
 	hashBytes      = 64  // Hash length in bytes
