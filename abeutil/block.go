@@ -363,8 +363,12 @@ func (b *Block) TxLoc() ([]wire.TxLoc, error) {
 }
 
 func (b *BlockAbe) TxLoc() ([]wire.TxAbeLoc, error) {
-	//	todo: (EthashPoW) TxIndex
-	offset, witOffset := 80+wire.VarIntSerializeSize(uint64(len(b.msgBlock.Transactions))), 8
+	var offset, witOffset int
+	if b.msgBlock.Header.Version == int32(wire.BlockVersionEthashPow) {
+		offset, witOffset = 120+wire.VarIntSerializeSize(uint64(len(b.msgBlock.Transactions))), 8
+	} else {
+		offset, witOffset = 80+wire.VarIntSerializeSize(uint64(len(b.msgBlock.Transactions))), 8
+	}
 	txs := b.Transactions()
 	res := make([]wire.TxAbeLoc, len(txs))
 	for i := 0; i < len(txs); i++ {
