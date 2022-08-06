@@ -2,9 +2,11 @@ package ethash
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/wire"
 	"golang.org/x/crypto/sha3"
 	"math/big"
 	"runtime"
@@ -143,7 +145,7 @@ func TestHashimoto(t *testing.T) {
 	contentHash := chainhash.ChainHash([]byte("test"))
 
 	//epoch := 1
-	epoch := 512
+	epoch := 1
 	cache := ethash.cache(epoch)
 	size := datasetSize(epoch)
 
@@ -153,11 +155,11 @@ func TestHashimoto(t *testing.T) {
 	fmt.Println("Time for loading dataset:", elpased)
 
 	start = time.Now()
-	for i := 0; i < 100; i++ {
+	for i := uint64(0); i < 100; i++ {
 
-		digestFull, sealHashFull := hashimotoFull(dataset.dataset, contentHash, uint64(i))
+		digestFull, sealHashFull := hashimotoFull(dataset.dataset, contentHash, i)
 
-		digest, sealHash := hashimotoLight(size, cache.cache, contentHash, uint64(i))
+		digest, sealHash := hashimotoLight(size, cache.cache, contentHash, i)
 
 		if bytes.Compare(digestFull, digest) != 0 {
 			fmt.Println("mismatched disgest on i:", i)
@@ -168,21 +170,35 @@ func TestHashimoto(t *testing.T) {
 		}
 	}
 
-	fmt.Println("Time for 10000 Full Hash and light hash:", time.Since(start))
+	fmt.Println("Time for 100 Full Hash and light hash:", time.Since(start))
 
+	start = time.Now()
 	for i := uint64(10000001); i < uint64(10000009); i++ {
-		fmt.Println("i:", i)
-		start = time.Now()
-		hashimotoFull(dataset.dataset, contentHash, i)
-		elpased = time.Since(start)
-		fmt.Println("Time for one Full Hash:", elpased)
-
-		start = time.Now()
+		//fmt.Println("i:", i)
 		hashimotoLight(size, cache.cache, contentHash, i)
-		elpased = time.Since(start)
-		fmt.Println("Time for one Light Hash:", elpased)
-
 	}
+	elpased = time.Since(start)
+	fmt.Println("Time for 10000000 Light Hash:", elpased)
+
+	start = time.Now()
+	for i := uint64(10000001); i < uint64(10000009); i++ {
+		//fmt.Println("i:", i)
+		hashimotoFull(dataset.dataset, contentHash, i)
+	}
+	elpased = time.Since(start)
+	fmt.Println("Time for 10000000 Full Hash:", elpased)
+
+	start = time.Now()
+	for i := uint64(10000001); i < uint64(10000009); i++ {
+		//fmt.Println("i:", i)
+		seedTmp := make([]byte, chainhash.HashSize+8)
+		copy(seedTmp, contentHash[:])
+		binary.LittleEndian.PutUint64(seedTmp[chainhash.HashSize:], i)
+
+		chainhash.DoubleHashH(seedTmp)
+	}
+	elpased = time.Since(start)
+	fmt.Println("Time for 10000000 DoubleHash:", elpased)
 
 	runtime.KeepAlive(dataset)
 	runtime.KeepAlive(cache)
@@ -210,6 +226,16 @@ func TestSHA3(t *testing.T) {
 		hash512 := sha3.Sum512(test_text[:i])
 		fmt.Println("{ ", i, ", \"", hex.EncodeToString(hash256[:]), "\", \"", hex.EncodeToString(hash512[:]), "\" }")
 	}
+}
+
+func TestSHA3_keccak(t *testing.T) {
+	input := []byte("the seed string for cache and dataset")
+	fmt.Println(len(input))
+	hash := sha3.Sum256(input[:])
+	fmt.Println(input[:])
+	str := hex.EncodeToString(hash[:])
+
+	fmt.Println(str)
 }
 
 func TestCacheSizesGenerate(t *testing.T) {
@@ -330,3 +356,101 @@ func calcDatasetSizeEth(epoch int) uint64 {
 //	fmt.Println("datasetSizes[i]:", datasetSizes[i])
 //	fmt.Println("datasetSizesEth[diff+2*i]:", datasetSizesEth[diff+2*i])
 //}
+
+func TestCachandDataSetSize(t *testing.T) {
+	for i := 0; i < 2048; i++ {
+		fmt.Println("{", i, ",", cacheSize(i), ",", datasetSize(i), "},")
+	}
+
+	for i := 10240; i < 10243; i++ {
+		fmt.Println("{", i, ",", cacheSize(i), ",", datasetSize(i), "},")
+	}
+}
+
+func TestGenerateEthashSeed(t *testing.T) {
+	i := 0
+	hash := ethashSeed(i)
+	fmt.Println(hex.EncodeToString(hash))
+	fmt.Println("{", i, ",", "\"", hex.EncodeToString(ethashSeed(i)), "\"},")
+
+	i = 1
+	fmt.Println("{", i, ",", "\"", hex.EncodeToString(ethashSeed(i)), "\"},")
+
+	i = 2
+	fmt.Println("{", i, ",", "\"", hex.EncodeToString(ethashSeed(i)), "\"},")
+
+	i = 10
+	fmt.Println("{", i, ",", "\"", hex.EncodeToString(ethashSeed(i)), "\"},")
+
+	i = 11
+	fmt.Println("{", i, ",", "\"", hex.EncodeToString(ethashSeed(i)), "\"},")
+
+	i = 101
+	fmt.Println("{", i, ",", "\"", hex.EncodeToString(ethashSeed(i)), "\"},")
+
+	i = 102
+	fmt.Println("{", i, ",", "\"", hex.EncodeToString(ethashSeed(i)), "\"},")
+
+	i = 2047
+	fmt.Println("{", i, ",", "\"", hex.EncodeToString(ethashSeed(i)), "\"},")
+	i = 2048
+	fmt.Println("{", i, ",", "\"", hex.EncodeToString(ethashSeed(i)), "\"},")
+	i = 2049
+	fmt.Println("{", i, ",", "\"", hex.EncodeToString(ethashSeed(i)), "\"},")
+
+	i = 10239
+	fmt.Println("{", i, ",", "\"", hex.EncodeToString(ethashSeed(i)), "\"},")
+
+	i = 10240
+	fmt.Println("{", i, ",", "\"", hex.EncodeToString(ethashSeed(i)), "\"},")
+}
+
+func TestCache(t *testing.T) {
+	epoch := 2047
+	size := cacheSize(epoch)
+	seed := ethashSeed(epoch)
+	cache := make([]uint32, size/4)
+	generateCache(cache, epoch, seed)
+	buf := make([]byte, size)
+
+	j := 0
+	for i := uint64(0); i < size/4; i++ {
+		buf[j+3] = byte(cache[i])
+		buf[j+2] = byte(cache[i] >> 8)
+		buf[j+1] = byte(cache[i] >> 16)
+		buf[j] = byte(cache[i] >> 24)
+
+		j += 4
+	}
+
+	hash := sha3.Sum256(buf)
+
+	fmt.Println(hex.EncodeToString(hash[:]))
+
+}
+
+func TestLightCache(t *testing.T) {
+	hashBytes, err := hex.DecodeString("2a8de2adf89af77358250bf908bf04ba94a6e8c3ba87775564a41d269a05e4ce")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	contentHash, err := chainhash.NewHash(hashBytes)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(hex.EncodeToString(contentHash[:]))
+	nonce := uint64(0x5656565656565656)
+	epoch := (50000 - wire.BlockHeightEthashPoW) / epochLength
+
+	size := cacheSize(epoch)
+	seed := ethashSeed(epoch)
+	cache := make([]uint32, size/4)
+	generateCache(cache, epoch, seed)
+
+	digest, sealhash := hashimotoLight(size, cache, *contentHash, nonce)
+
+	fmt.Println(hex.EncodeToString(digest))
+	fmt.Println(hex.EncodeToString(sealhash[:]))
+
+}
