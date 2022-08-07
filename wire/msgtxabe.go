@@ -852,7 +852,7 @@ func (msg *MsgTxAbe) DeserializeFull(r io.Reader) error {
 	return msg.BtcDecode(r, 0, WitnessEncoding)
 }
 
-// NewMsgTx returns a new bitcoin tx message that conforms to the Message
+// NewMsgTxAbe returns a new bitcoin tx message that conforms to the Message
 // interface.  The return instance has a default version of TxVersion and there
 // are no transaction inputs or outputs.  Also, the lock time is set to zero
 // to indicate the transaction is valid immediately as opposed to some time in

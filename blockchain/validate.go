@@ -1114,11 +1114,14 @@ func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blo
 		blockHeight := prevNode.height + 1
 
 		coinbaseTx := block.Transactions()[0]
-		err := checkSerializedHeightAbe(coinbaseTx, blockHeight)
+		err = checkSerializedHeightAbe(coinbaseTx, blockHeight)
 		if err != nil {
 			return err
 		}
-
+		err = checkStandardCoinbaseTxIn(coinbaseTx.MsgTx(), block.Hash(), blockHeight, wire.TxVersion)
+		if err != nil {
+			return err
+		}
 		// If segwit is active, then we'll need to fully validate the
 		// new witness commitment for adherence to the rules.
 		//	todo(ABE): if witness commitment is implemented, here needs check?
@@ -1149,6 +1152,49 @@ func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blo
 	}
 
 	return nil
+}
+func checkStandardCoinbaseTxIn(coinbaseTx *wire.MsgTxAbe, blockHash *chainhash.Hash, blockHeight int32, txVersion uint32) error {
+	// one input
+	if len(coinbaseTx.TxIns) != 1 {
+		str := fmt.Sprintf("the coinbase transaction in block %s has %d input", blockHash, len(coinbaseTx.TxIns))
+		return ruleError(ErrTooManyTxInputs, str)
+	}
+	// null serial number
+	nullSn, err := abecryptoparam.GetNullSerialNumber(txVersion)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(coinbaseTx.TxIns[0].SerialNumber, nullSn) {
+		str := fmt.Sprintf("the serial number in coinbase transaction in block %s is not zero", blockHash)
+		return ruleError(ErrBadTxInput, str)
+	}
+	// version, block hash in Ring
+	if coinbaseTx.TxIns[0].PreviousOutPointRing.Version != txVersion {
+		str := fmt.Sprintf("the version should be in coinbase transaction in block %s", blockHash)
+		return ruleError(ErrBadTxInput, str)
+	}
+	if len(coinbaseTx.TxIns[0].PreviousOutPointRing.BlockHashs) != 0 {
+		if binary.BigEndian.Uint32(coinbaseTx.TxIns[0].PreviousOutPointRing.BlockHashs[0][:4]) != uint32(blockHeight) {
+			str := fmt.Sprintf("the height should be in coinbase transaction in block %s", blockHash)
+			return ruleError(ErrBadTxInput, str)
+		}
+	}
+	// one outpoint and empty data
+	if len(coinbaseTx.TxIns[0].PreviousOutPointRing.OutPoints) != 1 {
+		str := fmt.Sprintf("the consumed outpoint in coinbase transaction in block %s is %d", blockHash, len(coinbaseTx.TxIns[0].PreviousOutPointRing.OutPoints))
+		return ruleError(ErrBadTxInput, str)
+	}
+	if !coinbaseTx.TxIns[0].PreviousOutPointRing.OutPoints[0].TxHash.IsEqual(&chainhash.ZeroHash) {
+		str := fmt.Sprintf("the consumed outpoint in coinbase transaction in block %s shoudle be empty", blockHash)
+		return ruleError(ErrBadTxInput, str)
+	}
+	if coinbaseTx.TxIns[0].PreviousOutPointRing.OutPoints[0].Index != 0 {
+		str := fmt.Sprintf("the consumed outpoint in coinbase transaction in block %s shoudle be empty", blockHash)
+		return ruleError(ErrBadTxInput, str)
+	}
+
+	return nil
+
 }
 
 // checkBIP0030 ensures blocks do not contain duplicate transactions which

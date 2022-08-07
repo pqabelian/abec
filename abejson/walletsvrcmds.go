@@ -856,10 +856,10 @@ func init() {
 	//MustRegisterCmd("listtransactions", (*ListTransactionsCmd)(nil), flags)
 	//MustRegisterCmd("listunspent", (*ListUnspentCmd)(nil), flags)
 	MustRegisterCmd("listallutxoabe", (*ListAllUnspentAbeCmd)(nil), flags)
-	MustRegisterCmd("listunmaturedabe", (*ListUnmaturedAbeCmd)(nil), flags)
-	MustRegisterCmd("listunspentabe", (*ListUnspentAbeCmd)(nil), flags)
-	MustRegisterCmd("listspentbutunminedabe", (*ListSpentButUnminedAbeCmd)(nil), flags)
-	MustRegisterCmd("listspentandminedabe", (*ListSpentAndMinedAbeCmd)(nil), flags)
+	MustRegisterCmd("listimmaturetxoabe", (*ListUnmaturedAbeCmd)(nil), flags)
+	MustRegisterCmd("listmaturetxoabe", (*ListUnspentAbeCmd)(nil), flags)
+	MustRegisterCmd("listunconfirmedtxoabe", (*ListSpentButUnminedAbeCmd)(nil), flags)
+	MustRegisterCmd("listconfirmedtxoabe", (*ListSpentAndMinedAbeCmd)(nil), flags)
 	MustRegisterCmd("listconfirmedtxs", (*ListConfirmedTxsCmd)(nil), flags)
 	MustRegisterCmd("listunconfirmedtxs", (*ListUnconfirmedTxsCmd)(nil), flags)
 	MustRegisterCmd("listinvalidtxs", (*ListInvalidTxsCmd)(nil), flags)
@@ -876,7 +876,7 @@ func init() {
 	MustRegisterCmd("signmessage", (*SignMessageCmd)(nil), flags) // TODO
 	MustRegisterCmd("signrawtransaction", (*SignRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("walletlock", (*WalletLockCmd)(nil), flags)
-	MustRegisterCmd("walletpassphrase", (*WalletPassphraseCmd)(nil), flags)
+	MustRegisterCmd("walletunlock", (*WalletPassphraseCmd)(nil), flags)
 	//MustRegisterCmd("freshen", (*FreshenCmd)(nil), flags)
 	MustRegisterCmd("walletpassphrasechange", (*WalletPassphraseChangeCmd)(nil), flags)
 }
