@@ -168,7 +168,7 @@ rpcuser = [administrator username]
 rpcpass = [administrator password]
 ```
 
-You may keep these automatically generated rpcuser and rpcpass values unchanged, and also create two more lines, namely
+You could also create two more lines according to the instruction, namely
 
 ```
 rpclimituser = [username]
@@ -253,18 +253,19 @@ you should first configure the abecusername and the abecpassword options in *abe
 They are the same as the rpcuser and rpcpass options specified in *abec.conf*.
 
 ```
-abecusername= [rpcuser]
-abecpassword= [rpcpass]
+abecrpcuser= [rpcuser in abec.conf]
+abecrpcpass= [rpcpass in abec.conf]
 ```
 
 In addition, in order to interact with abewallet later (using abectl), username and password should also be configured, (any username and password is fine).
 
 ```
-username= [username]
-password= [password]
+rpcuser= [username]
+rpcpass= [password]
 ```
 
-In other words, abecusername / abecpassword (in abewallet.conf) correspond to rpcuser / rpcpassword (in abec.conf), respecitvely, and are used for establishing a secure RPC communication channel between abec and abewallet. While username / password (in abewallet.conf) will be used for establishing a secure RPC communication channel between abectl (to be introduced) and abewallet.
+In other words, abecrpcuser / abecrpcpass (in abewallet.conf) correspond to rpcuser / rpcpass (in abec.conf), respecitvely, and are used for establishing a secure RPC communication channel between abec and abewallet. 
+While rpcuser / rpcpass (in abewallet.conf) will be used for establishing a secure RPC communication channel between abectl (to be introduced) and abewallet.
 
 Besides the configuration above, you may need to do a few more configurations depending on whether or not abec and abewallet are on the same machine. But again, we do not suggest you to run both abec and abewallet on the same machine despite it is absolutely feasible to do so.
 
@@ -418,9 +419,9 @@ Before you send transactions or generate new address, you should unlock the wall
 
 ```shell
 # Macos and Linux
-./start_abectl.sh --rpcuser=[rpcuser] --rpcpass=[rpcpass] --wallet walletpassphrase [your private passphrase] [timeout]
+./start_abectl.sh --rpcuser=[rpc username] --rpcpass=[rpc password] --wallet unlockwallet [private passphrase] [timeout]
 # Windows
-abectl --rpcuser=[rpcuser] --rpcpass=[rpcpass] --wallet walletpassphrase [your private passphrase] [timeout]
+abectl --rpcuser=[rpc username] --rpcpass=[rpc password] --wallet unlockwallet [private passphrase] [timeout]
 ```
 
 **NOTE**: The unit of timeout is second.
@@ -428,10 +429,10 @@ abectl --rpcuser=[rpcuser] --rpcpass=[rpcpass] --wallet walletpassphrase [your p
 Example:
 
 ```shell
-./start_abectl.sh --rpcuser=[rpcuser] --rpcpass=[rpcpass] --wallet walletpassphrase 123456 240
+./start_abectl.sh --rpcuser=[rpcuser] --rpcpass=[rpcpass] --wallet unlockwallet 123456 240
 ```
 
-This means unlock the wallet with passphrase 123456 for  240 seconds.
+This means unlock the wallet with private passphrase 123456 for 240 seconds.
 
 ### 5.3 Generate new address
 
