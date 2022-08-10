@@ -430,27 +430,31 @@ func TestCache(t *testing.T) {
 }
 
 func TestLightCache(t *testing.T) {
-	hashBytes, err := hex.DecodeString("2a8de2adf89af77358250bf908bf04ba94a6e8c3ba87775564a41d269a05e4ce")
+	blockheight := 585005
+
+	hashBytes, err := hex.DecodeString("53a005f209a4dc013f022a5078c6b38ced76e767a30367ff64725f23ec652a9f")
 	if err != nil {
 		fmt.Println(err)
 	}
-
 	contentHash, err := chainhash.NewHash(hashBytes)
 	if err != nil {
 		fmt.Println(err)
 	}
 	fmt.Println(hex.EncodeToString(contentHash[:]))
-	nonce := uint64(0x5656565656565656)
-	epoch := (50000 - wire.BlockHeightEthashPoW) / epochLength
 
-	size := cacheSize(epoch)
+	epoch := (blockheight - wire.BlockHeightEthashPoW) / epochLength
+
+	catcheSize := cacheSize(epoch)
 	seed := ethashSeed(epoch)
-	cache := make([]uint32, size/4)
+	cache := make([]uint32, catcheSize/4)
 	generateCache(cache, epoch, seed)
 
-	digest, sealhash := hashimotoLight(size, cache, *contentHash, nonce)
+	datasetSize := datasetSize(epoch)
 
-	fmt.Println(hex.EncodeToString(digest))
-	fmt.Println(hex.EncodeToString(sealhash[:]))
+	nonce := uint64(0xd337f82001e992c5)
+	digest, sealhash := hashimotoLight(datasetSize, cache, *contentHash, nonce)
+
+	fmt.Println("mix hash:", hex.EncodeToString(digest))
+	fmt.Println("final hash:", hex.EncodeToString(sealhash[:]))
 
 }
