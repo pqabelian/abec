@@ -42,6 +42,7 @@ const (
 	//cacheGrowthBytes   = 1 << 18       //	1 << 17       // Cache growth per epoch
 	//epochLength        = 4000          //2000 // Blocks per epoch
 
+	//	The Ethash rules:
 	//	Before epochThreshold, the size of cache/dataset increases dramatically, then normal.
 	//	As a result, the size of AbelEthash epoch 8 will equal the Ethash epoch 512, then
 	//	the size of AbelEthash epoch 8+k will equal the Ethash epoch 512+2k,

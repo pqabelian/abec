@@ -14,6 +14,7 @@ import (
 	"time"
 )
 
+//	the original parameter of EthashPoW
 const (
 	datasetInitBytesEth   = 1 << 30 // Bytes in dataset at genesis
 	datasetGrowthBytesEth = 1 << 23 //	1 << 23       // dataset growth per epoch
