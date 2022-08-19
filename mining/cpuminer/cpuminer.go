@@ -65,6 +65,9 @@ type Config struct {
 	MiningAddr      abeutil.MasterAddress
 	MiningAddrBytes []byte
 
+	// HashRateWatermark defines the watermark, and when the hashrate of CPU mining is lower than this watermark, a warning will be triggered.
+	HashRateWatermark int
+
 	// ProcessBlock defines the function to call with any solved blocks.
 	// It typically must run the provided block through the same set of
 	// rules and handling as any other block coming from the network.
@@ -121,6 +124,8 @@ func (m *CPUMiner) speedMonitor() {
 	ticker := time.NewTicker(time.Second * hpsUpdateSecs)
 	defer ticker.Stop()
 
+	hashesPerSecWatermark := float64(1000 * m.cfg.HashRateWatermark)
+
 out:
 	for {
 		select {
@@ -137,6 +142,12 @@ out:
 			}
 			hashesPerSec = (hashesPerSec + curHashesPerSec) / 2
 			totalHashes = 0
+
+			if hashesPerSec < hashesPerSecWatermark {
+				log.Warnf("Hash speed: %6.0f kilohashes/s, LOWER than the hash rate watermark %d kilohashes/s",
+					hashesPerSec/1000, m.cfg.HashRateWatermark)
+			}
+
 			if hashesPerSec != 0 {
 				log.Debugf("Hash speed: %6.0f kilohashes/s",
 					hashesPerSec/1000)
