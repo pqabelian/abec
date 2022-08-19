@@ -2,6 +2,7 @@ package ethash
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -596,8 +597,9 @@ func TestCache(t *testing.T) {
 }
 
 func TestLightCache(t *testing.T) {
-	blockheight := 585005
+	blockheight := 589006
 
+	nonce := uint64(0xd337f82001e992c5)
 	hashBytes, err := hex.DecodeString("53a005f209a4dc013f022a5078c6b38ced76e767a30367ff64725f23ec652a9f")
 	if err != nil {
 		fmt.Println(err)
@@ -617,11 +619,55 @@ func TestLightCache(t *testing.T) {
 
 	datasetSize := datasetSize(epoch)
 
-	nonce := uint64(0xd337f82001e992c5)
 	digest, sealhash := hashimotoLight(datasetSize, cache, *contentHash, nonce)
 
 	fmt.Println("mix hash:", hex.EncodeToString(digest))
 	fmt.Println("final hash:", hex.EncodeToString(sealhash[:]))
+
+}
+
+func TestCacheContent(t *testing.T) {
+	epoch := 1
+	cacheSize := cacheSize(epoch)
+	seed := ethashSeed(epoch)
+	cache := make([]uint32, cacheSize/4)
+	generateCache(cache, epoch, seed)
+
+	sizeBig := new(big.Int).SetInt64(int64(cacheSize / 4))
+	for i := 0; i < 100; i++ {
+		index, err := rand.Int(rand.Reader, sizeBig)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		fmt.Println("i=", i, cache[index.Int64()])
+	}
+
+	for i := 0; i < 10; i++ {
+		fmt.Println("i=", i, cache[i], "-i", cache[len(cache)-1-i])
+	}
+
+	ethash := New(DefaultCfg)
+	dataset := ethash.dataset(epoch, false)
+	dsSize := datasetSize(epoch)
+
+	if dsSize/4 != uint64(len(dataset.dataset)) {
+		fmt.Println("wrong dataset size")
+	}
+
+	sizeBig = new(big.Int).SetInt64(int64(dsSize / 4))
+	for i := 0; i < 100; i++ {
+		index, err := rand.Int(rand.Reader, sizeBig)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		fmt.Println("i=", i, dataset.dataset[index.Int64()])
+	}
+
+	for i := 0; i < 10; i++ {
+		fmt.Println("i=", i, dataset.dataset[i], "-i", dataset.dataset[len(dataset.dataset)-1-i])
+	}
 
 }
 
