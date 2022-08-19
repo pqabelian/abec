@@ -144,7 +144,7 @@ out:
 			totalHashes = 0
 
 			if hashesPerSec < hashesPerSecWatermark {
-				log.Warnf("Hash speed: %6.0f kilohashes/s, LOWER than the hash rate watermark %d kilohashes/s",
+				log.Warnf("Hash speed: %6.0f kilohashes/s, LOWER than the hash rate watermark (%d kilohashes/s)",
 					hashesPerSec/1000, m.cfg.HashRateWatermark)
 			}
 
