@@ -125,6 +125,7 @@ func (m *CPUMiner) speedMonitor() {
 	defer ticker.Stop()
 
 	hashesPerSecWatermark := float64(1000 * m.cfg.HashRateWatermark)
+	minuteTicker := 0
 
 out:
 	for {
@@ -143,8 +144,17 @@ out:
 			hashesPerSec = (hashesPerSec + curHashesPerSec) / 2
 			totalHashes = 0
 
+			minuteTicker++
+			if minuteTicker == 12 {
+				//	2 minutes based on (ticker, hpsUpdateSecs)
+				log.Infof("Hash speed: %6.0f kilohashes/s",
+					hashesPerSec/1000)
+
+				minuteTicker = 0
+			}
+
 			if hashesPerSec < hashesPerSecWatermark {
-				log.Warnf("Hash speed: %6.0f kilohashes/s, LOWER than the hash rate watermark (%d kilohashes/s)",
+				log.Warnf("WARNING!!! Hash speed: %6.0f kilohashes/s, LOWER than the hash rate watermark (%d kilohashes/s)",
 					hashesPerSec/1000, m.cfg.HashRateWatermark)
 			}
 
