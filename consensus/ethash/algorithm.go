@@ -47,8 +47,8 @@ const (
 	//	As a result, the size of AbelEthash epoch 8 will equal the Ethash epoch 512, then
 	//	the size of AbelEthash epoch 8+k will equal the Ethash epoch 512+2k,
 	//	since the (normal) growth-bytes of ABelEthash double that of Ethash.
+	//epochLength              = 4000    // 	2000    // Blocks per epoch
 	epochThreshold           = 8
-	epochLength              = 4000    // 	2000    // Blocks per epoch
 	datasetInitBytes         = 1 << 30 // 	1G, Bytes in dataset at genesis
 	datasetGrowthBytesFast   = 1 << 29 //	512M, dataset growth per epoch, before epochThreshold
 	datasetGrowthBytesNormal = 1 << 24 //	16M, (1 << 23 //	8M) 	//	dataset growth per epoch, after epochThreshold and normal

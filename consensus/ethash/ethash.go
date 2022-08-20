@@ -414,6 +414,10 @@ type Config struct {
 
 	//	VerifyWithFullDAG allows user to set whether to use full DAG to verify
 	VerifyByFullDAG bool
+	//	BlockHeightStart specifies the block height from which epoch is computed.
+	BlockHeightStart int32
+	// EpochLength specifies the epoch length.
+	EpochLength int32
 }
 
 // Ethash is the data manager, on which the Abelian-Ethash proof-of-work consensus is build.

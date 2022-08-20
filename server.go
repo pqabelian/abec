@@ -2441,6 +2441,8 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	s.txMemPool = mempool.New(&txC)
 
 	//	todo: (EthashPoW)
+	cfg.EthashConfig.BlockHeightStart = s.chainParams.BlockHeightEthashPoW
+	cfg.EthashConfig.EpochLength = s.chainParams.EthashEpochLength
 	s.ethash = ethash.New(cfg.EthashConfig)
 
 	s.syncManager, err = syncmgr.New(&syncmgr.Config{

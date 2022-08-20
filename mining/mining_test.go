@@ -23,7 +23,9 @@ func TestBlkTmplGenerator_UpdateExtraNonceAbe(t *testing.T) {
 }
 
 func TestBlkTmplGenerator_NewBlockTemplate_UpdateExtraNonceAbe(t *testing.T) {
-	nextBlockHeight := int32(wire.BlockHeightEthashPoW)
+	BlockHeightEthashPoW := 56000
+
+	nextBlockHeight := int32(BlockHeightEthashPoW)
 	payToAddress, err := hex.DecodeString(payToAddressStr)
 	payToAddress = payToAddress[:len(payToAddress)-32]
 	payToAddress = payToAddress[1:]
@@ -43,7 +45,7 @@ func TestBlkTmplGenerator_NewBlockTemplate_UpdateExtraNonceAbe(t *testing.T) {
 	blockTxns = append(blockTxns, coinbaseTx)
 
 	blockHeaderOverhead := wire.MaxBlockHeaderPayload
-	if nextBlockHeight >= wire.BlockHeightEthashPoW {
+	if nextBlockHeight >= int32(BlockHeightEthashPoW) {
 		blockHeaderOverhead = wire.MaxBlockHeaderPayloadEthash
 	}
 	blockHeaderOverhead += wire.MaxVarIntPayload
@@ -77,7 +79,7 @@ func TestBlkTmplGenerator_NewBlockTemplate_UpdateExtraNonceAbe(t *testing.T) {
 	var merkleRoot *chainhash.Hash
 	var siblingHashes []*chainhash.Hash
 
-	if nextBlockHeight >= wire.BlockHeightEthashPoW {
+	if nextBlockHeight >= int32(BlockHeightEthashPoW) {
 		merkleRoot, siblingHashes = blockchain.BuildMerkleTreeStoreAbeEthash(blockTxns)
 	} else {
 		merkles := blockchain.BuildMerkleTreeStoreAbe(blockTxns, false)

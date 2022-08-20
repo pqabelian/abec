@@ -17,8 +17,10 @@ var DefaultCfg = Config{
 	DatasetsOnDisk:   3, // to support rollback of the chain, which may cause the epoch change, we store 3 datasets on disk.
 	DatasetsLockMmap: false,
 
-	PowMode:         ModeNormal,
-	VerifyByFullDAG: false, //	only when mining and is specified explicitly, it could be true.
+	PowMode:          ModeNormal,
+	VerifyByFullDAG:  false, //	only when mining and is specified explicitly, it could be true.
+	BlockHeightStart: 0,
+	EpochLength:      4000,
 }
 
 //	init() initialize the CacheDir and DatasetDir

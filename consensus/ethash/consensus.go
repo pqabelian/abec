@@ -24,9 +24,9 @@ var (
 //	epoch() packages the computation of epoch.
 //	To be efficient, when calling this function inside ethash package, we directly use the computation rather than call this function.
 //	todo: make exported if necessary
-func epoch(blockHeight int32) int {
-	return int((blockHeight - wire.BlockHeightEthashPoW) / epochLength)
-}
+//func epoch(blockHeight int32) int {
+//	return int((blockHeight - wire.BlockHeightEthashPoW) / epochLength)
+//}
 
 // VerifySeal checks whether a block(header) satisfies the PoW difficulty requirements,
 // either using the usual ethash cache for it, or alternatively using a full DAG to make it faster.
@@ -48,7 +48,7 @@ func (ethash *Ethash) VerifySeal(header *wire.BlockHeader, target *big.Int) erro
 	}
 
 	//epoch := epoch(header.Height)
-	epoch := int((header.Height - wire.BlockHeightEthashPoW) / epochLength)
+	epoch := int((header.Height - ethash.config.BlockHeightStart) / ethash.config.EpochLength)
 
 	// Recompute the digest and PoW values
 	var (
@@ -112,7 +112,7 @@ func (ethash *Ethash) VerifySeal(header *wire.BlockHeader, target *big.Int) erro
 //	This function takes blockHeight as input, since the epoch and dataset mechanism are defined in ethash, and do not need to be known by the caller.
 func (ethash *Ethash) Dataset(blockHeight int32) *dataset {
 	//epoch := epoch(blockHeight)
-	epoch := int((blockHeight - wire.BlockHeightEthashPoW) / epochLength)
+	epoch := int((blockHeight - ethash.config.BlockHeightStart) / ethash.config.EpochLength)
 	return ethash.dataset(epoch, false)
 }
 

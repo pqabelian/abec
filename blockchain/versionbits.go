@@ -216,7 +216,7 @@ func (b *BlockChain) calcNextBlockVersion(prevNode *blockNode) (int32, error) {
 	// Set the appropriate bits for each actively defined rule deployment
 	// that is either in the process of being voted on, or locked in for the
 	// activation at the next threshold window change.
-	if prevNode != nil && prevNode.height+1 >= wire.BlockHeightEthashPoW {
+	if prevNode != nil && prevNode.height+1 >= b.chainParams.BlockHeightEthashPoW {
 		//	todo: this rule should be public known.
 		//	shall we directly defined wire.BlockVersionEthashPow as int32? to avoid type-transfer.
 		return int32(wire.BlockVersionEthashPow), nil

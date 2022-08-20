@@ -1347,7 +1347,7 @@ func (b *BlockChain) createChainState() error {
 	genesisBlock.SetHeight(0)
 	header := &genesisBlock.MsgBlock().Header
 	//	todo: (EthashPoW)
-	node, err := newBlockNode(header, nil)
+	node, err := b.newBlockNode(header, nil)
 	if err != nil {
 		return err
 	}
@@ -1570,7 +1570,7 @@ func (b *BlockChain) initChainState() error {
 			// and add it to the block index.
 			node := new(blockNode)
 			//	todo: (EthashPoW)
-			err = initBlockNode(node, header, parent)
+			err = b.initBlockNode(node, header, parent)
 			if err != nil {
 				return err
 			}

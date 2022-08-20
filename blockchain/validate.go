@@ -1048,7 +1048,7 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 	//	This is VERY necessary.
 	//	Now, the blockHeight of block/node is set, we can check the whether the header.Height and header.Version are set correctly.
 	//	This will prevent an updated Abelian node from accepting an old-version block.
-	if blockHeight >= wire.BlockHeightEthashPoW {
+	if blockHeight >= b.chainParams.BlockHeightEthashPoW {
 		if header.Height != blockHeight {
 			str := fmt.Sprintf("block has height %d while its prevNode has height %d", header.Height, prevNode.height)
 			return ruleError(ErrMismatchedBlockHeightWithPrevNode, str)
@@ -1759,7 +1759,7 @@ func (b *BlockChain) CheckConnectBlockTemplateAbe(block *abeutil.BlockAbe) error
 	view := NewUtxoRingViewpoint()
 	view.SetBestHash(&tip.hash)
 	//	todo: (EthashPoW)
-	newNode, err := newBlockNode(&header, tip)
+	newNode, err := b.newBlockNode(&header, tip)
 	if err != nil {
 		return err
 	}

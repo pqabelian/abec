@@ -112,7 +112,7 @@ type blockNode struct {
 // calculating the height and workSum from the respective fields on the parent.
 // This function is NOT safe for concurrent access.  It must only be called when
 // initially creating a node.
-func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *blockNode) error {
+func (b *BlockChain) initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *blockNode) error {
 	*node = blockNode{
 		hash:       blockHeader.BlockHash(),
 		workSum:    CalcWork(blockHeader.Bits),
@@ -131,7 +131,7 @@ func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *block
 		node.height = parent.height + 1
 		node.workSum = node.workSum.Add(parent.workSum, node.workSum)
 		// todo: (EthashPow) 202207
-		if node.height >= wire.BlockHeightEthashPoW {
+		if node.height >= b.chainParams.BlockHeightEthashPoW {
 			if blockHeader.Height != node.height {
 				errStr := fmt.Sprintf("Block %v has height %d, while its parent has height %d", node.hash, blockHeader.Height, parent.height)
 				return ruleError(ErrMismatchedBlockHeightWithPrevNode, errStr)
@@ -151,9 +151,9 @@ func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *block
 // node, calculating the height and workSum from the respective fields on the
 // parent. This function is NOT safe for concurrent access.
 //	todo: (EthashPoW)
-func newBlockNode(blockHeader *wire.BlockHeader, parent *blockNode) (*blockNode, error) {
+func (b *BlockChain) newBlockNode(blockHeader *wire.BlockHeader, parent *blockNode) (*blockNode, error) {
 	var node blockNode
-	err := initBlockNode(&node, blockHeader, parent)
+	err := b.initBlockNode(&node, blockHeader, parent)
 	if err != nil {
 		return nil, err
 	}

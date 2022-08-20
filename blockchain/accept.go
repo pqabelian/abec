@@ -67,7 +67,7 @@ func (b *BlockChain) maybeAcceptBlockAbe(block *abeutil.BlockAbe, flags Behavior
 	// on a side chain.
 	blockHeader := &block.MsgBlock().Header
 	// todo: (EthashPoW)
-	newNode, err := newBlockNode(blockHeader, prevNode)
+	newNode, err := b.newBlockNode(blockHeader, prevNode)
 	if err != nil {
 		return false, err
 	}

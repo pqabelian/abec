@@ -637,7 +637,7 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress []byte) (*BlockTemplate
 	//	It is a maximum possible value, rather than an accurate value.
 	// blockHeaderOverhead := wire.MaxBlockHeaderPayload + wire.MaxVarIntPayload
 	blockHeaderOverhead := wire.MaxBlockHeaderPayload
-	if nextBlockHeight >= wire.BlockHeightEthashPoW {
+	if nextBlockHeight >= g.chainParams.BlockHeightEthashPoW {
 		blockHeaderOverhead = wire.MaxBlockHeaderPayloadEthash
 	}
 	blockHeaderOverhead += wire.MaxVarIntPayload
@@ -849,7 +849,7 @@ mempoolLoop:
 	var merkleRoot *chainhash.Hash
 	var siblingHashes []*chainhash.Hash
 
-	if nextBlockHeight >= wire.BlockHeightEthashPoW {
+	if nextBlockHeight >= g.chainParams.BlockHeightEthashPoW {
 		merkleRoot, siblingHashes = blockchain.BuildMerkleTreeStoreAbeEthash(blockTxns)
 	} else {
 		merkles := blockchain.BuildMerkleTreeStoreAbe(blockTxns, false)

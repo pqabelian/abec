@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
 	"golang.org/x/crypto/sha3"
 	"math/big"
 	"runtime"
@@ -597,6 +596,9 @@ func TestCache(t *testing.T) {
 }
 
 func TestLightCache(t *testing.T) {
+	BlockHeightEthashPoW := 56000
+	epochLength := 4000
+
 	blockheight := 589006
 
 	nonce := uint64(0xd337f82001e992c5)
@@ -610,7 +612,7 @@ func TestLightCache(t *testing.T) {
 	}
 	fmt.Println(hex.EncodeToString(contentHash[:]))
 
-	epoch := (blockheight - wire.BlockHeightEthashPoW) / epochLength
+	epoch := (blockheight - BlockHeightEthashPoW) / epochLength
 
 	catcheSize := cacheSize(epoch)
 	seed := ethashSeed(epoch)

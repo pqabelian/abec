@@ -211,6 +211,13 @@ type Params struct {
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
 	HDCoinType uint32
+
+	// BlockHeightEthashPoW
+	// BlockHeightEthashPoW specifies the block height from which Ethash-PoW mining is applied.
+	BlockHeightEthashPoW int32
+
+	// EthashEpochLength specifies the epoch length of EthashPoW.
+	EthashEpochLength int32
 }
 
 // MainNetParams defines the network parameters for the main network.
@@ -288,6 +295,13 @@ var MainNetParams = Params{
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
 	HDCoinType: 0,
+
+	// BlockHeightEthashPoW
+	// BlockHeightEthashPoW specifies the block height from which Ethash-PoW mining is applied.
+	BlockHeightEthashPoW: 56000,
+
+	// EthashEpochLength specifies the epoch length of EthashPoW.
+	EthashEpochLength: 4000,
 }
 
 // RegressionNetParams defines the network parameters for the regression test
@@ -353,6 +367,12 @@ var RegressionNetParams = Params{
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
 	HDCoinType: 0,
+
+	// BlockHeightEthashPoW
+	// BlockHeightEthashPoW specifies the block height from which Ethash-PoW mining is applied.
+	BlockHeightEthashPoW: 6000,
+	// EthashEpochLength specifies the epoch length of EthashPoW.
+	EthashEpochLength: 200,
 }
 
 // TestNet3Params defines the network parameters for the test network
@@ -363,7 +383,7 @@ var TestNet3Params = Params{
 	Net:  wire.TestNet3,
 	//DefaultPort: "18333",
 	DefaultPort: "18666",
-	DNSSeeds:    []DNSSeed{
+	DNSSeeds: []DNSSeed{
 		//{"testnet-seed.bitcoin.jonasschnelli.ch", true},
 		//{"testnet-seed.bitcoin.schildbach.de", false},
 		//{"seed.tbtc.petertodd.org", true},
@@ -394,7 +414,7 @@ var TestNet3Params = Params{
 	//   target proof of work timespan / target proof of work spacing
 	RuleChangeActivationThreshold: 1512, // 75% of MinerConfirmationWindow
 	MinerConfirmationWindow:       2016,
-	Deployments:                   [DefinedDeployments]ConsensusDeployment{
+	Deployments: [DefinedDeployments]ConsensusDeployment{
 		//DeploymentTestDummy: {
 		//	BitNumber:  28,
 		//	StartTime:  1199145601, // January 1, 2008 UTC
@@ -424,6 +444,12 @@ var TestNet3Params = Params{
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
 	HDCoinType: 0,
+
+	// BlockHeightEthashPoW
+	// BlockHeightEthashPoW specifies the block height from which Ethash-PoW mining is applied.
+	BlockHeightEthashPoW: 6000,
+	// EthashEpochLength specifies the epoch length of EthashPoW.
+	EthashEpochLength: 200,
 }
 
 // SimNetParams defines the network parameters for the simulation test
@@ -492,6 +518,12 @@ var SimNetParams = Params{
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
 	HDCoinType: 0,
+
+	// BlockHeightEthashPoW
+	// BlockHeightEthashPoW specifies the block height from which Ethash-PoW mining is applied.
+	BlockHeightEthashPoW: 6000,
+	// EthashEpochLength specifies the epoch length of EthashPoW.
+	EthashEpochLength: 200,
 }
 
 var (

@@ -554,7 +554,7 @@ out:
 		//	Such a call will generate the first dataset and the second dataset (as the future one).
 		//	Each will take 10 minutes (even in the setting without mining).
 		//	To be safe, we call this procedure 200 minutes in advance.
-		if template.Height == wire.BlockHeightEthashPoW-100 {
+		if template.Height == m.cfg.ChainParams.BlockHeightEthashPoW-100 {
 			m.ethash.PrepareDatasetForUpdate()
 		}
 
@@ -563,7 +563,7 @@ out:
 		// a new block template can be generated.  When the return is
 		// true a solution was found, so submit the solved block.
 		// todo: (EthashPoW)
-		if template.Height >= wire.BlockHeightEthashPoW {
+		if template.Height >= m.cfg.ChainParams.BlockHeightEthashPoW {
 			//	todo: (EthashPoW) After BlockHeightEthashPoW is achieved, in later version, we could even remove remove the if-else.
 			if m.solveBlockEthash(template, ticker, quit) {
 				block := abeutil.NewBlockAbe(template.BlockAbe)
@@ -824,7 +824,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 			continue
 		}
 
-		if template.Height == wire.BlockHeightEthashPoW-100 {
+		if template.Height == m.cfg.ChainParams.BlockHeightEthashPoW-100 {
 			m.ethash.PrepareDatasetForUpdate()
 		}
 
@@ -833,7 +833,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 		// a new block template can be generated.  When the return is
 		// true a solution was found, so submit the solved block.
 		// todo: (EthashPoW)
-		if template.Height >= wire.BlockHeightEthashPoW {
+		if template.Height >= m.cfg.ChainParams.BlockHeightEthashPoW {
 			if m.solveBlockEthash(template, ticker, nil) {
 				block := abeutil.NewBlockAbe(template.BlockAbe)
 				m.submitBlockEthash(block)
