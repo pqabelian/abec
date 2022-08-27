@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/abesuite/abec/consensus/ethash"
 	"os"
 	"path/filepath"
 
@@ -67,6 +68,7 @@ var (
 	srvrLog = backendLog.Logger("SRVR")
 	syncLog = backendLog.Logger("SYNC")
 	txmpLog = backendLog.Logger("TXMP")
+	ethhLog = backendLog.Logger("ETHH")
 )
 
 // Initialize package-global logger variables.
@@ -82,6 +84,7 @@ func init() {
 	txscript.UseLogger(scrpLog)
 	syncmgr.UseLogger(syncLog)
 	mempool.UseLogger(txmpLog)
+	ethash.UseLogger(ethhLog)
 }
 
 // subsystemLoggers maps each subsystem identifier to its associated logger.
@@ -101,6 +104,7 @@ var subsystemLoggers = map[string]abelog.Logger{
 	"SRVR": srvrLog,
 	"SYNC": syncLog,
 	"TXMP": txmpLog,
+	"ETHH": ethhLog,
 }
 
 // initLogRotator initializes the logging rotater to write logs to logFile and
