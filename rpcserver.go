@@ -4403,6 +4403,13 @@ func handleVersion(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 			Minor:         jsonrpcSemverMinor,
 			Patch:         jsonrpcSemverPatch,
 		},
+		"abec": {
+			VersionString: version(),
+			Major:         uint32(appMajor),
+			Minor:         uint32(appMinor),
+			Patch:         uint32(appPatch),
+			Prerelease:    appPreRelease,
+		},
 	}
 	return result, nil
 }
