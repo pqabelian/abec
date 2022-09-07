@@ -463,6 +463,11 @@ search:
 				// TimeStamp update will cause the update of contentHash.
 				contentHash = blockTemplate.BlockAbe.Header.ContentHash()
 
+				//	UpdateBlockTimeAbeEthash() may update header.Bits, depending on m.cfg.ChainParams.ReduceMinDifficulty
+				if m.cfg.ChainParams.ReduceMinDifficulty {
+					targetDifficulty = blockchain.CompactToBig(header.Bits)
+				}
+				
 			default:
 				// Non-blocking select to fall through
 			}
