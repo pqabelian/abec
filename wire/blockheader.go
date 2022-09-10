@@ -113,6 +113,15 @@ func (h *BlockHeader) ContentHash() chainhash.Hash {
 	return chainhash.ChainHash(buf.Bytes())
 }
 
+func (h *BlockHeader) ContentHashExcludeTime() chainhash.Hash {
+
+	buf := bytes.NewBuffer(make([]byte, 0, blockHeaderContentLen))
+
+	_ = writeElements(buf, h.Version, &h.PrevBlock, &h.MerkleRoot, h.Bits, h.Height)
+
+	return chainhash.ChainHash(buf.Bytes())
+}
+
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 // See Deserialize for decoding block headers stored to disk, such as in a

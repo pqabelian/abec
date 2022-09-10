@@ -373,6 +373,15 @@ type GetBlockTemplateResult struct {
 	RejectReasion string   `json:"reject-reason,omitempty"`
 }
 
+type GetWorkResult struct {
+	MinerID           string `json:"minerid"`
+	JobID             string `json:"jobid"`
+	ContentHash       string `json:"contenthash"`
+	ExtraNonce        uint16 `json:"extranonce"`
+	ExtraNonceBitsNum int8   `json:"extranoncebitsnum"`
+	TargetBoundary    string `json:"targetboundary"`
+}
+
 // GetMempoolEntryResult models the data returned from the getmempoolentry's
 // fee field
 
@@ -714,13 +723,13 @@ type GetMiningInfoResult struct {
 	TestNet            bool    `json:"testnet"`
 }
 
-// GetWorkResult models the data from the getwork command.
-type GetWorkResult struct {
-	Data     string `json:"data"`
-	Hash1    string `json:"hash1"`
-	Midstate string `json:"midstate"`
-	Target   string `json:"target"`
-}
+//// GetWorkResult models the data from the getwork command.
+//type GetWorkResult struct {
+//	Data     string `json:"data"`
+//	Hash1    string `json:"hash1"`
+//	Midstate string `json:"midstate"`
+//	Target   string `json:"target"`
+//}
 
 // InfoChainResult models the data returned by the chain server getinfo command.
 type InfoChainResult struct {

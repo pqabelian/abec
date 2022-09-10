@@ -389,23 +389,23 @@ func (r FutureGetWorkSubmit) Receive() (bool, error) {
 	return accepted, nil
 }
 
-// GetWorkSubmitAsync returns an instance of a type that can be used to get the
-// result of the RPC at some future time by invoking the Receive function on the
-// returned instance.
+//// GetWorkSubmitAsync returns an instance of a type that can be used to get the
+//// result of the RPC at some future time by invoking the Receive function on the
+//// returned instance.
+////
+//// See GetWorkSubmit for the blocking version and more details.
+//func (c *Client) GetWorkSubmitAsync(data string) FutureGetWorkSubmit {
+//	cmd := abejson.NewGetWorkCmd(&data)
+//	return c.sendCmd(cmd)
+//}
 //
-// See GetWorkSubmit for the blocking version and more details.
-func (c *Client) GetWorkSubmitAsync(data string) FutureGetWorkSubmit {
-	cmd := abejson.NewGetWorkCmd(&data)
-	return c.sendCmd(cmd)
-}
-
-// GetWorkSubmit submits a block header which is a solution to previously
-// requested data and returns whether or not the solution was accepted.
-//
-// See GetWork to request data to work on.
-func (c *Client) GetWorkSubmit(data string) (bool, error) {
-	return c.GetWorkSubmitAsync(data).Receive()
-}
+//// GetWorkSubmit submits a block header which is a solution to previously
+//// requested data and returns whether or not the solution was accepted.
+////
+//// See GetWork to request data to work on.
+//func (c *Client) GetWorkSubmit(data string) (bool, error) {
+//	return c.GetWorkSubmitAsync(data).Receive()
+//}
 
 // FutureSubmitBlockResult is a future promise to deliver the result of a
 // SubmitBlockAsync RPC invocation (or an applicable error).

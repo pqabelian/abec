@@ -692,6 +692,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getblockhash":          {(*string)(nil)},
 	"getblockheader":        {(*string)(nil), (*abejson.GetBlockHeaderVerboseResult)(nil)},
 	"getblocktemplate":      {(*abejson.GetBlockTemplateResult)(nil), (*string)(nil), nil},
+	"getwork":               {(*abejson.GetWorkResult)(nil), (*string)(nil), nil},
 	"getblockchaininfo":     {(*abejson.GetBlockChainInfoResult)(nil)},
 	"getcfilter":            {(*string)(nil)},
 	"getcfilterheader":      {(*string)(nil)},

@@ -18,6 +18,7 @@ import (
 	"github.com/abesuite/abec/mempool"
 	"github.com/abesuite/abec/mining"
 	"github.com/abesuite/abec/mining/cpuminer"
+	"github.com/abesuite/abec/mining/externalminer"
 	"github.com/abesuite/abec/netaddrmgr"
 	"github.com/abesuite/abec/peer"
 	"github.com/abesuite/abec/syncmgr"
@@ -202,6 +203,7 @@ type server struct {
 	txMemPool            *mempool.TxPool
 	ethash               *ethash.Ethash // todo: (ethmining)
 	cpuMiner             *cpuminer.CPUMiner
+	externalMiner        *externalminer.ExternalMiner
 	modifyRebroadcastInv chan interface{}
 	newPeers             chan *serverPeer
 	donePeers            chan *serverPeer
@@ -2059,6 +2061,11 @@ func (s *server) Start() {
 	if cfg.Generate {
 		s.cpuMiner.Start() //if the config contains mining flag, then start mining
 	}
+
+	//	Start the external miner is external generation is enabled.
+	if cfg.ExternalGenerate {
+		s.externalMiner.Start()
+	}
 }
 
 // Stop gracefully shuts down the server by stopping and disconnecting all
@@ -2074,6 +2081,9 @@ func (s *server) Stop() error {
 
 	// Stop the CPU miner if needed
 	s.cpuMiner.Stop()
+
+	// Stop the external mining if needed
+	s.externalMiner.Stop()
 
 	// Shutdown the RPC server if it's not disabled.
 	if !cfg.DisableRPC {
@@ -2487,6 +2497,17 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		IsCurrent:              s.syncManager.IsCurrent,
 	})
 
+	s.externalMiner = externalminer.New(&externalminer.Config{
+		ChainParams:            chainParams,
+		Ethash:                 s.ethash,
+		BlockTemplateGenerator: blockTemplateGenerator,
+		MiningAddr:             cfg.miningAddr,
+		MiningAddrBytes:        cfg.miningAddrBytes,
+		ProcessBlock:           s.syncManager.ProcessBlock,
+		ConnectedCount:         s.ConnectedCount,
+		IsCurrent:              s.syncManager.IsCurrent,
+	})
+
 	// Only setup a function to return new addresses to connect to when
 	// not running in connect-only mode.  The simulation network is always
 	// in connect-only mode since it is only intended to connect to
@@ -2594,11 +2615,12 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 			DB:          db,
 			TxMemPool:   s.txMemPool,
 			// todo: (EthashPoW) 202207
-			Ethash:       s.ethash,
-			Generator:    blockTemplateGenerator,
-			CPUMiner:     s.cpuMiner,
-			TxIndex:      s.txIndex,
-			FeeEstimator: s.feeEstimator,
+			Ethash:        s.ethash,
+			Generator:     blockTemplateGenerator,
+			CPUMiner:      s.cpuMiner,
+			ExternalMiner: s.externalMiner,
+			TxIndex:       s.txIndex,
+			FeeEstimator:  s.feeEstimator,
 		})
 		if err != nil {
 			return nil, err

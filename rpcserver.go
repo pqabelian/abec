@@ -21,6 +21,7 @@ import (
 	"github.com/abesuite/abec/mempool"
 	"github.com/abesuite/abec/mining"
 	"github.com/abesuite/abec/mining/cpuminer"
+	"github.com/abesuite/abec/mining/externalminer"
 	"github.com/abesuite/abec/peer"
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
@@ -142,6 +143,9 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getblockhash":            handleGetBlockHash,
 	"getblockheader":          handleGetBlockHeader,
 	//"getblocktemplate":        handleGetBlockTemplate, // TODO 20220618 disable now, would open later
+	"getwork": handleGetWork,
+	//"submitwork":     handleSubmitWork,
+	//"submithashrate": handleSubmitHashRate,
 	// TODO(ABE): ABE does not support filter.
 	//"getcfilter":            handleGetCFilter,
 	//"getcfilterheader":      handleGetCFilterHeader,
@@ -238,10 +242,10 @@ var rpcUnimplemented = map[string]struct{}{
 	"getchaintips":     {},
 	"getmempoolentry":  {},
 	"getnetworkinfo":   {},
-	"getwork":          {},
-	"invalidateblock":  {},
-	"preciousblock":    {},
-	"reconsiderblock":  {},
+	//"getwork":          {},
+	"invalidateblock": {},
+	"preciousblock":   {},
+	"reconsiderblock": {},
 }
 
 // Commands that are available to a limited user
@@ -2612,6 +2616,86 @@ func handleGetBlockTemplate(s *rpcServer, cmd interface{}, closeChan <-chan stru
 		Code:    abejson.ErrRPCInvalidParameter,
 		Message: "Invalid mode",
 	}
+}
+
+// handleGetBlockTemplate implements the getblocktemplate command.
+func handleGetWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	fmt.Println("handleGetWork called")
+	c := cmd.(*abejson.GetWorkCmd)
+	request := c.Request
+
+	if request == nil {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCInvalidParameter,
+			Message: "nil Request",
+		}
+	}
+
+	//	When external mining is not enabled, respond with an error
+	if cfg.ExternalGenerate == false {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCInternal.Code,
+			Message: "GetWorkRequest is requested, but the external mining is not enabled",
+		}
+	}
+
+	// Return an error if there are no peers connected since there is no
+	// way to relay a found block or receive transactions to work on.
+	// However, allow this state when running in the regression test or
+	// simulation test mode.
+	if !(cfg.RegressionTest || cfg.SimNet || cfg.TestNet3) &&
+		s.cfg.ConnMgr.ConnectedCount() == 0 {
+
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCClientNotConnected,
+			Message: "No peer connected",
+		}
+	}
+
+	currentHeight := s.cfg.Chain.BestSnapshot().Height
+	if currentHeight != 0 && !s.cfg.SyncMgr.IsCurrent() {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCClientInInitialDownload,
+			Message: "Abec is downloading blocks...",
+		}
+	}
+
+	getWorkReq := &externalminer.GetWorkReq{
+		Params: &externalminer.GetWorkReqParams{
+			CurrentJobId: request.CurrentJobID,
+		},
+		Result: make(chan *externalminer.Job, 1),
+		Err:    make(chan error, 1),
+	}
+
+	s.cfg.ExternalMiner.HandleGetWorkReq(getWorkReq)
+
+	job, err := <-getWorkReq.Result, <-getWorkReq.Err
+	if err != nil {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCGetWorkFailError,
+			Message: err.Error(),
+		}
+	}
+
+	minerId := request.MinerID
+	if minerId == "" {
+		//	the worker has not been assigned an ID, will use the first jobId as the workerId
+		minerId = job.Id()
+	}
+
+	//	encode the targetBoundary to a hash value
+	targetBytes := make([]byte, chainhash.HashSize)
+	targetBytes = job.TargetBoundary.FillBytes(targetBytes)
+
+	return &abejson.GetWorkResult{
+		MinerID:           minerId,
+		JobID:             job.Id(),
+		ContentHash:       hex.EncodeToString(job.ContentHash[:]),
+		ExtraNonce:        job.ExtraNonce,
+		ExtraNonceBitsNum: 16,
+		TargetBoundary:    hex.EncodeToString(targetBytes),
+	}, nil
 }
 
 // TODO(ABE): ABE does not support filter.
@@ -5092,8 +5176,9 @@ type rpcserverConfig struct {
 	// Generator produces block templates and the CPUMiner solves them using
 	// the CPU.  CPU mining is typically only useful for test purposes when
 	// doing regression or simulation testing.
-	Generator *mining.BlkTmplGenerator
-	CPUMiner  *cpuminer.CPUMiner
+	Generator     *mining.BlkTmplGenerator
+	CPUMiner      *cpuminer.CPUMiner
+	ExternalMiner *externalminer.ExternalMiner
 
 	// These fields define any optional indexes the RPC server can make use
 	// of to provide additional data when queried.

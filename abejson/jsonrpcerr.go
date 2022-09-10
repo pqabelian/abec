@@ -83,6 +83,9 @@ const (
 	ErrRPCUtxoRingInvalidRingSize       RPCErrorCode = -102
 	ErrRPCUtxoRingNoInfoError           RPCErrorCode = -103
 	ErrRPCUtxoRingMismatchedInfoError   RPCErrorCode = -104
+
+	//	getworkRelated error code
+	ErrRPCGetWorkFailError RPCErrorCode = -201
 )
 
 // Errors that are specific to btcd.

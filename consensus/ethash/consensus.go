@@ -190,6 +190,36 @@ func SealHash(header *wire.BlockHeader) chainhash.Hash {
 	return chainhash.ChainHash(append(seed[:], header.MixDigest[:]...))
 }
 
+//	VerifySealFast() perform a quick verification on whether (nonceExt, mixDigest) forms a seal of contextHash with respect to target.
+//	This algorithm is used to check the validity of nonceExt at a low cost, to prevent DOS attack.
+func VerifySealFast(contentHash chainhash.Hash, nonceExt uint64, mixDigest chainhash.Hash, target *big.Int) bool {
+	// Combine contentHash + nonce into a 64 byte seed
+	seedTmp := make([]byte, chainhash.HashSize+8)
+	copy(seedTmp, contentHash[:])
+	binary.LittleEndian.PutUint64(seedTmp[chainhash.HashSize:], nonceExt)
+
+	// we use the standard SHA3-512, rather than LegacyKeccak512
+	// seed = crypto.Keccak512(seed)
+	//seed := make([]byte, 64)
+	seed := sha3.Sum512(seedTmp)
+	//copy(seed, hashTmp[:])
+
+	sealHash := chainhash.ChainHash(append(seed[:], mixDigest[:]...))
+
+	//	Optimization: directly copy the codes of hashToBig() here, rather call the function hashToBig(),
+	//	since TrySeal() will be called in very frequently in mining.
+	//	This part codes must match with that in VerifySeal().
+	for i := 0; i < chainhash.HashSize/2; i++ {
+		sealHash[i], sealHash[chainhash.HashSize-1-i] = sealHash[chainhash.HashSize-1-i], sealHash[i]
+	}
+	if new(big.Int).SetBytes(sealHash[:]).Cmp(target) <= 0 {
+		return true
+	}
+
+	return false
+
+}
+
 // hashToBig converts a chainhash.Hash into a big.Int that can be used to perform math comparisons.
 //	Note that the input is a chainhash.Hash ([32]byte) rather than a pointer,
 //	the reverse in this function will not affect the content of the caller.

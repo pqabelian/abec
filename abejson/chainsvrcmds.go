@@ -405,6 +405,34 @@ func NewGetBlockTemplateCmd(request *TemplateRequest) *GetBlockTemplateCmd {
 	}
 }
 
+// TemplateRequest is a request object as defined in BIP22
+// (https://en.bitcoin.it/wiki/BIP_0022), it is optionally provided as an
+// pointer argument to GetBlockTemplateCmd.
+type GetWorkRequest struct {
+	// Optional long polling.
+	//	At this moment, getWork does not support longpoll.
+	// LongPollID string `json:"longpollid,omitempty"`
+
+	MinerID      string `json:"minerid,omitempty"`
+	CurrentJobID string `json:"cuttentjobid,omitempty"`
+}
+
+// GetBlockTemplateCmd defines the getblocktemplate JSON-RPC command.
+type GetWorkCmd struct {
+	Request *GetWorkRequest
+}
+
+// NewGetBlockTemplateCmd returns a new instance which can be used to issue a
+// getblocktemplate JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewGetWorkCmd(request *GetWorkRequest) *GetWorkCmd {
+	return &GetWorkCmd{
+		Request: request,
+	}
+}
+
 // TODO(ABE): ABE does not support filter.
 /*// GetCFilterCmd defines the getcfilter JSON-RPC command.
 type GetCFilterCmd struct {
@@ -673,21 +701,21 @@ func NewGetTxOutSetInfoCmd() *GetTxOutSetInfoCmd {
 	return &GetTxOutSetInfoCmd{}
 }
 
-// GetWorkCmd defines the getwork JSON-RPC command.
-type GetWorkCmd struct {
-	Data *string
-}
-
-// NewGetWorkCmd returns a new instance which can be used to issue a getwork
-// JSON-RPC command.
+//// GetWorkCmd defines the getwork JSON-RPC command.
+//type GetWorkCmd struct {
+//	Data *string
+//}
 //
-// The parameters which are pointers indicate they are optional.  Passing nil
-// for optional parameters will use the default value.
-func NewGetWorkCmd(data *string) *GetWorkCmd {
-	return &GetWorkCmd{
-		Data: data,
-	}
-}
+//// NewGetWorkCmd returns a new instance which can be used to issue a getwork
+//// JSON-RPC command.
+////
+//// The parameters which are pointers indicate they are optional.  Passing nil
+//// for optional parameters will use the default value.
+//func NewGetWorkCmd(data *string) *GetWorkCmd {
+//	return &GetWorkCmd{
+//		Data: data,
+//	}
+//}
 
 // HelpCmd defines the help JSON-RPC command.
 type HelpCmd struct {
@@ -982,6 +1010,7 @@ func init() {
 	MustRegisterCmd("getblockstats", (*GetBlockStatsCmd)(nil), flags)
 	//MustRegisterCmd("getblocktemplate", (*GetBlockTemplateCmd)(nil), flags)
 	// TODO(ABE): ABE does not support filter.
+	MustRegisterCmd("getwork", (*GetWorkCmd)(nil), flags)
 	//MustRegisterCmd("getcfilter", (*GetCFilterCmd)(nil), flags)
 	//MustRegisterCmd("getcfilterheader", (*GetCFilterHeaderCmd)(nil), flags)
 	MustRegisterCmd("getchaintips", (*GetChainTipsCmd)(nil), flags)
@@ -1003,7 +1032,7 @@ func init() {
 	MustRegisterCmd("gettxout", (*GetTxOutCmd)(nil), flags)
 	MustRegisterCmd("gettxoutproof", (*GetTxOutProofCmd)(nil), flags)
 	MustRegisterCmd("gettxoutsetinfo", (*GetTxOutSetInfoCmd)(nil), flags)
-	MustRegisterCmd("getwork", (*GetWorkCmd)(nil), flags)
+	//	MustRegisterCmd("getwork", (*GetWorkCmd)(nil), flags)
 	MustRegisterCmd("help", (*HelpCmd)(nil), flags)
 	MustRegisterCmd("invalidateblock", (*InvalidateBlockCmd)(nil), flags)
 	MustRegisterCmd("ping", (*PingCmd)(nil), flags)

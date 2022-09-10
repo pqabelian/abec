@@ -60,7 +60,8 @@ const (
 	blockMaxWeightMin           = 4000
 	blockMaxWeightMax           = blockchain.MaxBlockWeight - 4000
 	// todo(abe):
-	defaultGenerate = false
+	defaultGenerate         = false
+	defaultExternalGenerate = false
 	//defaultGenerate              = true
 	defaultHashRateWatermark     = 10
 	defaultMaxOrphanTransactions = 100
@@ -124,6 +125,7 @@ type config struct {
 	EthashVerifyByFullDAG bool          `long:"ethashverifybyfulldag" description:"For a mining node, use full DAG to verify EthashPow"`
 	Generate              bool          `long:"generate" description:"Generate (mine) ABEs using the CPU"`
 	HashRateWatermark     int           `long:"hashratewatermark" description:"Watermark of CPU mining hashrate that will trigger a warning."`
+	ExternalGenerate      bool          `long:"externalgenerate" description:"Generate (mine) ABEs using the external miners"`
 	FreeTxRelayLimit      float64       `long:"limitfreerelay" description:"Limit relay of transactions with no transaction fee to the given amount in thousands of bytes per minute"`
 	Listeners             []string      `long:"listen" description:"Add an interface/port to listen for connections (default all interfaces port: 8333, testnet: 18333)"`
 	LogDir                string        `long:"logdir" description:"Directory to log output."`
@@ -441,6 +443,7 @@ func loadConfig() (*config, []string, error) {
 		SigCacheMaxSize:      defaultSigCacheMaxSize,
 		WitnessCacheMaxSize:  defaultWitnessCacheMaxSize,
 		Generate:             defaultGenerate,
+		ExternalGenerate:     defaultExternalGenerate,
 		HashRateWatermark:    defaultHashRateWatermark,
 		EthashConfig:         ethash.DefaultCfg,
 		TxIndex:              defaultTxIndex,
@@ -858,7 +861,7 @@ func loadConfig() (*config, []string, error) {
 
 	//	mining address
 	// TODO(abe) This part should be re-thought.
-	if cfg.Generate {
+	if cfg.Generate || cfg.ExternalGenerate {
 		//				ConfigTest(&cfg)
 		//maddr, err := abeutil.DecodeMasterAddressAbe(cfg.MiningAddr)
 		//if err != nil {
