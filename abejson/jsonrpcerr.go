@@ -85,7 +85,11 @@ const (
 	ErrRPCUtxoRingMismatchedInfoError   RPCErrorCode = -104
 
 	//	getworkRelated error code
-	ErrRPCGetWorkFailError RPCErrorCode = -201
+	ErrRPCGetWorkFailError    RPCErrorCode = -201
+	ErrRPCSubmitWorkError     RPCErrorCode = -202
+	ErrRPCSubmitHashRateError RPCErrorCode = -203
+	ErrRPCExteralminerStop    RPCErrorCode = -204
+	ErrRPCHashEncodeError     RPCErrorCode = -205
 )
 
 // Errors that are specific to btcd.

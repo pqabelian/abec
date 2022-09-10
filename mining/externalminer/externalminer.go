@@ -88,11 +88,11 @@ type ExternalMiner struct {
 	activeBlockTemplates    map[string]*SharedBlockTemplate //	shardBlockTemplateId as the key
 	activeJobs              map[string]*Job                 // jobId as the key
 	activeBlockTemplateJobs map[string]map[string]struct{}  // sharedBlockTemplateId --> jobIds
-	workerHashRates         map[string]*WorkerHashRate
+	minerHashRates          map[string]*MinerHashRate
 
 	getWorkCh        chan *GetWorkReq
-	submitWorkCh     chan *submitWorkReq
-	submitHashRateCh chan *submitHashRateReq
+	submitWorkCh     chan *SubmitWorkReq
+	submitHashRateCh chan *SubmitHashRateReq
 
 	queryHashRate chan float64
 }
@@ -113,24 +113,24 @@ out:
 		// Periodic updates from the workers with how many hashes they
 		// have performed.
 		case submitHashRateReq := <-m.submitHashRateCh:
-			workerHashRate, ok := m.workerHashRates[submitHashRateReq.params.MinerId]
+			workerHashRate, ok := m.minerHashRates[submitHashRateReq.Params.MinerId]
 			if !ok {
-				newWorkerHashRate := &WorkerHashRate{
-					MinerId:    submitHashRateReq.params.MinerId,
-					HashRate:   submitHashRateReq.params.HashRate,
+				newWorkerHashRate := &MinerHashRate{
+					MinerId:    submitHashRateReq.Params.MinerId,
+					HashRate:   submitHashRateReq.Params.HashRate,
 					UpdateTime: time.Now(),
 				}
-				m.workerHashRates[newWorkerHashRate.MinerId] = newWorkerHashRate
+				m.minerHashRates[newWorkerHashRate.MinerId] = newWorkerHashRate
 			} else {
-				workerHashRate.HashRate = (workerHashRate.HashRate + submitHashRateReq.params.HashRate) / 2
+				workerHashRate.HashRate = (workerHashRate.HashRate + submitHashRateReq.Params.HashRate) / 2
 				workerHashRate.UpdateTime = time.Now()
 			}
 
 		// Time to update the hash rate of the external miner, which is actually contributed by the workers
 		case <-ticker.C:
-			toDelWorkerId := make([]string, 0, len(m.workerHashRates))
+			toDelWorkerId := make([]string, 0, len(m.minerHashRates))
 			hashRate = float64(0)
-			for workerId, workerHashRate := range m.workerHashRates {
+			for workerId, workerHashRate := range m.minerHashRates {
 
 				if time.Since(workerHashRate.UpdateTime).Seconds() > hpsValidSecs {
 					//	the worker has not update its hash rate for more than hpsValidSecs seconds
@@ -141,7 +141,7 @@ out:
 			}
 
 			for i := 0; i < len(toDelWorkerId); i++ {
-				delete(m.workerHashRates, toDelWorkerId[i])
+				delete(m.minerHashRates, toDelWorkerId[i])
 			}
 
 			hpsDisplayCtr++
@@ -309,28 +309,28 @@ out:
 			}
 
 		case submitWorkReq := <-m.submitWorkCh:
-			job, ok := m.activeJobs[submitWorkReq.params.JobId]
+			job, ok := m.activeJobs[submitWorkReq.Params.JobId]
 			if !ok {
 				err := errors.New("the target job is not in the active job set")
-				submitWorkReq.err <- err
-			} else if bytes.Compare(submitWorkReq.params.ContentHash[:], job.ContentHash[:]) != 0 {
+				submitWorkReq.Err <- err
+			} else if bytes.Compare(submitWorkReq.Params.ContentHash[:], job.ContentHash[:]) != 0 {
 				err := errors.New("the content hash does not match that of the corresponding active job")
-				submitWorkReq.err <- err
-			} else if submitWorkReq.params.ExtraNonce != job.ExtraNonce {
+				submitWorkReq.Err <- err
+			} else if submitWorkReq.Params.ExtraNonce != job.ExtraNonce {
 				err := errors.New("the extraNonce does not match that of the corresponding active job")
-				submitWorkReq.err <- err
-			} else if ethash.VerifySealFast(submitWorkReq.params.ContentHash, submitWorkReq.params.Nonce, submitWorkReq.params.MixDigest, job.TargetBoundary) == true {
+				submitWorkReq.Err <- err
+			} else if ethash.VerifySealFast(submitWorkReq.Params.ContentHash, submitWorkReq.Params.Nonce, submitWorkReq.Params.MixDigest, job.TargetBoundary) == true {
 				//	check the validity of (nonce, mixDigest) to prevent DOS attack
-				job.SharedBlockTemplate.BlockTemplate.BlockAbe.Header.NonceExt = submitWorkReq.params.Nonce
-				job.SharedBlockTemplate.BlockTemplate.BlockAbe.Header.MixDigest = submitWorkReq.params.MixDigest
+				job.SharedBlockTemplate.BlockTemplate.BlockAbe.Header.NonceExt = submitWorkReq.Params.Nonce
+				job.SharedBlockTemplate.BlockTemplate.BlockAbe.Header.MixDigest = submitWorkReq.Params.MixDigest
 				block := abeutil.NewBlockAbe(job.SharedBlockTemplate.BlockTemplate.BlockAbe)
 				//	exterminer is implemented after the EthashPoW is implemented. For simplicity, we only call submitBlockEthash().
 				m.submitBlockEthash(block)
-				//	even if m.submitBlockEthash(block) return false, for external miner, the submitWorkReq submits a valid solution.
-				submitWorkReq.err <- nil
+				//	even if m.submitBlockEthash(block) return false, for external miner, the SubmitWorkReq submits a valid solution.
+				submitWorkReq.Err <- nil
 			} else {
 				err := errors.New("the (nonce, mixDigest) does not match the target boundary of the corresponding active job")
-				submitWorkReq.err <- err
+				submitWorkReq.Err <- err
 			}
 
 		case <-ticker.C:
@@ -377,7 +377,7 @@ out:
 	m.activeBlockTemplates = nil
 	m.activeJobs = nil
 	m.activeBlockTemplateJobs = nil
-	m.workerHashRates = nil
+	m.minerHashRates = nil
 
 	// stop the speed monitor since
 	close(m.speedMonitorQuit)
@@ -444,15 +444,15 @@ func (m *ExternalMiner) Start() {
 	}
 
 	m.getWorkCh = make(chan *GetWorkReq)
-	m.submitWorkCh = make(chan *submitWorkReq)
-	m.submitHashRateCh = make(chan *submitHashRateReq)
+	m.submitWorkCh = make(chan *SubmitWorkReq)
+	m.submitHashRateCh = make(chan *SubmitHashRateReq)
 	m.queryHashRate = make(chan float64)
 
 	m.latestBlockTemplate = nil
 	m.activeBlockTemplates = make(map[string]*SharedBlockTemplate)
 	m.activeJobs = make(map[string]*Job)
 	m.activeBlockTemplateJobs = make(map[string]map[string]struct{})
-	m.workerHashRates = make(map[string]*WorkerHashRate)
+	m.minerHashRates = make(map[string]*MinerHashRate)
 
 	m.quit = make(chan struct{})
 	m.speedMonitorQuit = make(chan struct{})
@@ -517,6 +517,14 @@ func (m *ExternalMiner) HashRate() float64 {
 
 func (m *ExternalMiner) HandleGetWorkReq(req *GetWorkReq) {
 	m.getWorkCh <- req
+}
+
+func (m *ExternalMiner) HandleSubmitWorkReq(req *SubmitWorkReq) {
+	m.submitWorkCh <- req
+}
+
+func (m *ExternalMiner) HandleSubmitHashRateReq(req *SubmitHashRateReq) {
+	m.submitHashRateCh <- req
 }
 
 // New returns a new instance of a CPU miner for the provided configuration.

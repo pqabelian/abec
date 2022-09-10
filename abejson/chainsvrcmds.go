@@ -433,6 +433,52 @@ func NewGetWorkCmd(request *GetWorkRequest) *GetWorkCmd {
 	}
 }
 
+type SubmitWorkRequest struct {
+	MinerID     string `json:"minerid,omitempty"`
+	JobId       string `json:"jobid"`
+	ContentHash string `json:"contenthash"`
+	ExtraNonce  uint16 `json:"extranonce"` // todo: string?
+	Nonce       uint64 `json:"nonce"`      // todo: string? 48bit?
+	MixDigest   string `json:"mixdigest"`
+}
+
+// GetBlockTemplateCmd defines the getblocktemplate JSON-RPC command.
+type SubmitWorkCmd struct {
+	Request *SubmitWorkRequest
+}
+
+// NewGetBlockTemplateCmd returns a new instance which can be used to issue a
+// getblocktemplate JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewSubmitWorkCmd(request *SubmitWorkRequest) *SubmitWorkCmd {
+	return &SubmitWorkCmd{
+		Request: request,
+	}
+}
+
+type SubmitHashRateRequest struct {
+	MinerID  string  `json:"minerid"`
+	HashRate float64 `json:"hashrate"`
+}
+
+// GetBlockTemplateCmd defines the getblocktemplate JSON-RPC command.
+type SubmitHashRateCmd struct {
+	Request *SubmitHashRateRequest
+}
+
+// NewGetBlockTemplateCmd returns a new instance which can be used to issue a
+// getblocktemplate JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewSubmitHashRateCmd(request *SubmitHashRateRequest) *SubmitHashRateCmd {
+	return &SubmitHashRateCmd{
+		Request: request,
+	}
+}
+
 // TODO(ABE): ABE does not support filter.
 /*// GetCFilterCmd defines the getcfilter JSON-RPC command.
 type GetCFilterCmd struct {
@@ -1011,6 +1057,8 @@ func init() {
 	//MustRegisterCmd("getblocktemplate", (*GetBlockTemplateCmd)(nil), flags)
 	// TODO(ABE): ABE does not support filter.
 	MustRegisterCmd("getwork", (*GetWorkCmd)(nil), flags)
+	MustRegisterCmd("submitwork", (*SubmitWorkCmd)(nil), flags)
+	MustRegisterCmd("submithashrate", (*SubmitHashRateCmd)(nil), flags)
 	//MustRegisterCmd("getcfilter", (*GetCFilterCmd)(nil), flags)
 	//MustRegisterCmd("getcfilterheader", (*GetCFilterHeaderCmd)(nil), flags)
 	MustRegisterCmd("getchaintips", (*GetChainTipsCmd)(nil), flags)

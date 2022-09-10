@@ -143,9 +143,9 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getblockhash":            handleGetBlockHash,
 	"getblockheader":          handleGetBlockHeader,
 	//"getblocktemplate":        handleGetBlockTemplate, // TODO 20220618 disable now, would open later
-	"getwork": handleGetWork,
-	//"submitwork":     handleSubmitWork,
-	//"submithashrate": handleSubmitHashRate,
+	"getwork":        handleGetWork,
+	"submitwork":     handleSubmitWork,
+	"submithashrate": handleSubmitHashRate,
 	// TODO(ABE): ABE does not support filter.
 	//"getcfilter":            handleGetCFilter,
 	//"getcfilterheader":      handleGetCFilterHeader,
@@ -2695,6 +2695,139 @@ func handleGetWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		ExtraNonce:        job.ExtraNonce,
 		ExtraNonceBitsNum: 16,
 		TargetBoundary:    hex.EncodeToString(targetBytes),
+	}, nil
+}
+
+// handleGetBlockTemplate implements the getblocktemplate command.
+func handleSubmitWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*abejson.SubmitWorkCmd)
+	request := c.Request
+
+	if request == nil {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCInvalidParameter,
+			Message: "nil Request",
+		}
+	}
+
+	//	When external mining is not enabled, respond with an error
+	if cfg.ExternalGenerate == false {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCInternal.Code,
+			Message: "GetWorkRequest is requested, but the external mining is not enabled",
+		}
+	}
+
+	if !s.cfg.ExternalMiner.IsMining() {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCExteralminerStop,
+			Message: "external mining is stopped",
+		}
+	}
+
+	contentHashBytes, err := hex.DecodeString(request.ContentHash)
+	if err != nil {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCHashEncodeError,
+			Message: "fail to convert the submitted contenthash to a chainhash.Hash object",
+		}
+	}
+	contentHash, err := chainhash.NewHash(contentHashBytes)
+	if err != nil {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCHashEncodeError,
+			Message: "fail to convert the submitted contenthash to a chainhash.Hash object",
+		}
+	}
+
+	mixDigestBytes, err := hex.DecodeString(request.MixDigest)
+	if err != nil {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCHashEncodeError,
+			Message: "fail to convert the submitted mixdigest to a chainhash.Hash object",
+		}
+	}
+	mixDigest, err := chainhash.NewHash(mixDigestBytes)
+	if err != nil {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCHashEncodeError,
+			Message: "fail to convert the submitted mixdigest to a chainhash.Hash object",
+		}
+	}
+
+	submitWorkReq := &externalminer.SubmitWorkReq{
+		Params: &externalminer.SubmitWorkReqParams{
+			JobId:       request.JobId,
+			ContentHash: *contentHash,
+			ExtraNonce:  request.ExtraNonce,
+			Nonce:       request.Nonce,
+			MixDigest:   *mixDigest,
+		},
+		Err: make(chan error, 1),
+	}
+
+	s.cfg.ExternalMiner.HandleSubmitWorkReq(submitWorkReq)
+
+	err = <-submitWorkReq.Err
+	if err != nil {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCSubmitWorkError,
+			Message: err.Error(),
+		}
+	}
+
+	return &abejson.SubmitWorkResult{
+		Result: "Submitted solution is accepted by the external miner",
+	}, nil
+}
+
+// handleGetBlockTemplate implements the getblocktemplate command.
+func handleSubmitHashRate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*abejson.SubmitHashRateCmd)
+	request := c.Request
+
+	if request == nil {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCInvalidParameter,
+			Message: "nil Request",
+		}
+	}
+
+	//	When external mining is not enabled, respond with an error
+	if cfg.ExternalGenerate == false {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCInternal.Code,
+			Message: "GetWorkRequest is requested, but the external mining is not enabled",
+		}
+	}
+
+	if !s.cfg.ExternalMiner.IsMining() {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCExteralminerStop,
+			Message: "external mining is stopped",
+		}
+	}
+
+	submitHashRateReq := &externalminer.SubmitHashRateReq{
+		Params: &externalminer.SubmitHashRateReqParams{
+			MinerId:  request.MinerID,
+			HashRate: request.HashRate,
+		},
+		Err: make(chan error, 1),
+	}
+
+	s.cfg.ExternalMiner.HandleSubmitHashRateReq(submitHashRateReq)
+
+	err := <-submitHashRateReq.Err
+	if err != nil {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCSubmitHashRateError,
+			Message: err.Error(),
+		}
+	}
+
+	return &abejson.SubmitHashRateResult{
+		Result: "Submitted hash rate is accepted by the external miner",
 	}, nil
 }
 

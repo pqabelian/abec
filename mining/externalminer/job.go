@@ -84,12 +84,12 @@ type GetWorkReqParams struct {
 	CurrentJobId string
 }
 
-type submitWorkReq struct {
-	params *submitWorkReqParams
-	err    chan error
+type SubmitWorkReq struct {
+	Params *SubmitWorkReqParams
+	Err    chan error
 }
 
-type submitWorkReqParams struct {
+type SubmitWorkReqParams struct {
 	JobId       string
 	ContentHash chainhash.Hash
 	ExtraNonce  uint16
@@ -97,17 +97,17 @@ type submitWorkReqParams struct {
 	MixDigest   chainhash.Hash //	to prevent DOS attack
 }
 
-type submitHashRateReq struct {
-	params *submitHashRateReqParams
-	err    chan error
+type SubmitHashRateReq struct {
+	Params *SubmitHashRateReqParams
+	Err    chan error
 }
 
-type submitHashRateReqParams struct {
+type SubmitHashRateReqParams struct {
 	MinerId  string
 	HashRate float64
 }
 
-type WorkerHashRate struct {
+type MinerHashRate struct {
 	MinerId    string
 	HashRate   float64
 	UpdateTime time.Time

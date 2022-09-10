@@ -382,6 +382,14 @@ type GetWorkResult struct {
 	TargetBoundary    string `json:"targetboundary"`
 }
 
+type SubmitWorkResult struct {
+	Result string `json:"result"`
+}
+
+type SubmitHashRateResult struct {
+	Result string `json:"result"`
+}
+
 // GetMempoolEntryResult models the data returned from the getmempoolentry's
 // fee field
 
