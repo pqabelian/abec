@@ -90,6 +90,7 @@ const (
 	ErrRPCSubmitHashRateError RPCErrorCode = -203
 	ErrRPCExteralminerStop    RPCErrorCode = -204
 	ErrRPCHashEncodeError     RPCErrorCode = -205
+	ErrRPCIntegerEncodeError  RPCErrorCode = -206
 )
 
 // Errors that are specific to btcd.

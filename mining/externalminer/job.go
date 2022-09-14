@@ -40,6 +40,8 @@ func (sharedTemplate *SharedBlockTemplate) EraseCachedId() {
 
 type Job struct {
 	SharedBlockTemplate *SharedBlockTemplate
+	Epoch               int
+	EpochSeed           []byte
 	HeaderTimeStamp     time.Time //	As the SharedBlockTemplate may be shared by multiple Jobs and the timeStamp may be modified, Job uses HeaderTimeStamp to store its timeStamp in header.
 	ContentHash         chainhash.Hash
 	ExtraNonce          uint16
@@ -48,9 +50,11 @@ type Job struct {
 	id                  string // cache (ContentHash, ExtraNonce) as the identifier for the job
 }
 
-func NewJob(sharedTemplate *SharedBlockTemplate, headerTimestamp time.Time, contentHash chainhash.Hash, extraNonce uint16, targetBoundary *big.Int, distributedTime time.Time) *Job {
+func NewJob(sharedTemplate *SharedBlockTemplate, epoch int, epochSeed []byte, headerTimestamp time.Time, contentHash chainhash.Hash, extraNonce uint16, targetBoundary *big.Int, distributedTime time.Time) *Job {
 	return &Job{
 		SharedBlockTemplate: sharedTemplate,
+		Epoch:               epoch,
+		EpochSeed:           epochSeed,
 		HeaderTimeStamp:     headerTimestamp,
 		ContentHash:         contentHash,
 		ExtraNonce:          extraNonce,

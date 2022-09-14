@@ -405,21 +405,14 @@ func NewGetBlockTemplateCmd(request *TemplateRequest) *GetBlockTemplateCmd {
 	}
 }
 
-// TemplateRequest is a request object as defined in BIP22
-// (https://en.bitcoin.it/wiki/BIP_0022), it is optionally provided as an
-// pointer argument to GetBlockTemplateCmd.
-type GetWorkRequest struct {
+// GetBlockTemplateCmd defines the getblocktemplate JSON-RPC command.
+type GetWorkCmd struct {
 	// Optional long polling.
 	//	At this moment, getWork does not support longpoll.
 	// LongPollID string `json:"longpollid,omitempty"`
 
-	MinerID      string `json:"minerid,omitempty"`
-	CurrentJobID string `json:"cuttentjobid,omitempty"`
-}
-
-// GetBlockTemplateCmd defines the getblocktemplate JSON-RPC command.
-type GetWorkCmd struct {
-	Request *GetWorkRequest
+	MinerId      string `json:"minerid,omitempty"`
+	CurrentJobId string `json:"cuttentjobid,omitempty"`
 }
 
 // NewGetBlockTemplateCmd returns a new instance which can be used to issue a
@@ -427,24 +420,19 @@ type GetWorkCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewGetWorkCmd(request *GetWorkRequest) *GetWorkCmd {
+func NewGetWorkCmd(minerId string, currentJobId string) *GetWorkCmd {
 	return &GetWorkCmd{
-		Request: request,
+		MinerId:      minerId,
+		CurrentJobId: currentJobId,
 	}
-}
-
-type SubmitWorkRequest struct {
-	MinerID     string `json:"minerid,omitempty"`
-	JobId       string `json:"jobid"`
-	ContentHash string `json:"contenthash"`
-	ExtraNonce  uint16 `json:"extranonce"` // todo: string?
-	Nonce       uint64 `json:"nonce"`      // todo: string? 48bit?
-	MixDigest   string `json:"mixdigest"`
 }
 
 // GetBlockTemplateCmd defines the getblocktemplate JSON-RPC command.
 type SubmitWorkCmd struct {
-	Request *SubmitWorkRequest
+	MinerId   string `json:"minerid,omitempty"`
+	JobId     string `json:"jobid"`
+	Nonce     string `json:"hex string of nonce"`
+	MixDigest string `json:"mixdigest"`
 }
 
 // NewGetBlockTemplateCmd returns a new instance which can be used to issue a
@@ -452,20 +440,19 @@ type SubmitWorkCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewSubmitWorkCmd(request *SubmitWorkRequest) *SubmitWorkCmd {
+func NewSubmitWorkCmd(minerId string, jobId string, nonce string, mixDigest string) *SubmitWorkCmd {
 	return &SubmitWorkCmd{
-		Request: request,
+		MinerId:   minerId,
+		JobId:     minerId,
+		Nonce:     nonce,
+		MixDigest: mixDigest,
 	}
-}
-
-type SubmitHashRateRequest struct {
-	MinerID  string  `json:"minerid"`
-	HashRate float64 `json:"hashrate"`
 }
 
 // GetBlockTemplateCmd defines the getblocktemplate JSON-RPC command.
 type SubmitHashRateCmd struct {
-	Request *SubmitHashRateRequest
+	MinerId  string  `json:"minerid"`
+	HashRate float64 `json:"hashrate"`
 }
 
 // NewGetBlockTemplateCmd returns a new instance which can be used to issue a
@@ -473,9 +460,10 @@ type SubmitHashRateCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewSubmitHashRateCmd(request *SubmitHashRateRequest) *SubmitHashRateCmd {
+func NewSubmitHashRateCmd(minerId string, hashRate float64) *SubmitHashRateCmd {
 	return &SubmitHashRateCmd{
-		Request: request,
+		MinerId:  minerId,
+		HashRate: hashRate,
 	}
 }
 

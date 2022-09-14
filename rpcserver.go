@@ -2622,14 +2622,6 @@ func handleGetBlockTemplate(s *rpcServer, cmd interface{}, closeChan <-chan stru
 func handleGetWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	fmt.Println("handleGetWork called")
 	c := cmd.(*abejson.GetWorkCmd)
-	request := c.Request
-
-	if request == nil {
-		return nil, &abejson.RPCError{
-			Code:    abejson.ErrRPCInvalidParameter,
-			Message: "nil Request",
-		}
-	}
 
 	//	When external mining is not enabled, respond with an error
 	if cfg.ExternalGenerate == false {
@@ -2662,7 +2654,7 @@ func handleGetWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 
 	getWorkReq := &externalminer.GetWorkReq{
 		Params: &externalminer.GetWorkReqParams{
-			CurrentJobId: request.CurrentJobID,
+			CurrentJobId: c.CurrentJobId,
 		},
 		Result: make(chan *externalminer.Job, 1),
 		Err:    make(chan error, 1),
@@ -2678,9 +2670,9 @@ func handleGetWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		}
 	}
 
-	minerId := request.MinerID
+	minerId := c.MinerId
 	if minerId == "" {
-		//	the worker has not been assigned an ID, will use the first jobId as the workerId
+		//	the miner has not been assigned an ID, will use the first jobId as the minerId
 		minerId = job.Id()
 	}
 
@@ -2689,8 +2681,10 @@ func handleGetWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 	targetBytes = job.TargetBoundary.FillBytes(targetBytes)
 
 	return &abejson.GetWorkResult{
-		MinerID:           minerId,
-		JobID:             job.Id(),
+		MinerId:           minerId,
+		JobId:             job.Id(),
+		Epoch:             job.Epoch,
+		EpochSeed:         hex.EncodeToString(job.EpochSeed),
 		ContentHash:       hex.EncodeToString(job.ContentHash[:]),
 		ExtraNonce:        job.ExtraNonce,
 		ExtraNonceBitsNum: 16,
@@ -2701,14 +2695,6 @@ func handleGetWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 // handleGetBlockTemplate implements the getblocktemplate command.
 func handleSubmitWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.SubmitWorkCmd)
-	request := c.Request
-
-	if request == nil {
-		return nil, &abejson.RPCError{
-			Code:    abejson.ErrRPCInvalidParameter,
-			Message: "nil Request",
-		}
-	}
 
 	//	When external mining is not enabled, respond with an error
 	if cfg.ExternalGenerate == false {
@@ -2725,22 +2711,7 @@ func handleSubmitWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 		}
 	}
 
-	contentHashBytes, err := hex.DecodeString(request.ContentHash)
-	if err != nil {
-		return nil, &abejson.RPCError{
-			Code:    abejson.ErrRPCHashEncodeError,
-			Message: "fail to convert the submitted contenthash to a chainhash.Hash object",
-		}
-	}
-	contentHash, err := chainhash.NewHash(contentHashBytes)
-	if err != nil {
-		return nil, &abejson.RPCError{
-			Code:    abejson.ErrRPCHashEncodeError,
-			Message: "fail to convert the submitted contenthash to a chainhash.Hash object",
-		}
-	}
-
-	mixDigestBytes, err := hex.DecodeString(request.MixDigest)
+	mixDigestBytes, err := hex.DecodeString(c.MixDigest)
 	if err != nil {
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCHashEncodeError,
@@ -2755,13 +2726,19 @@ func handleSubmitWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 		}
 	}
 
+	nonce, err := strconv.ParseUint(c.Nonce, 10, 64)
+	if err != nil {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCIntegerEncodeError,
+			Message: "fail to convert the submitted nonce to uint64",
+		}
+	}
+
 	submitWorkReq := &externalminer.SubmitWorkReq{
 		Params: &externalminer.SubmitWorkReqParams{
-			JobId:       request.JobId,
-			ContentHash: *contentHash,
-			ExtraNonce:  request.ExtraNonce,
-			Nonce:       request.Nonce,
-			MixDigest:   *mixDigest,
+			JobId:     c.JobId,
+			Nonce:     nonce,
+			MixDigest: *mixDigest,
 		},
 		Err: make(chan error, 1),
 	}
@@ -2783,16 +2760,6 @@ func handleSubmitWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 
 // handleGetBlockTemplate implements the getblocktemplate command.
 func handleSubmitHashRate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	c := cmd.(*abejson.SubmitHashRateCmd)
-	request := c.Request
-
-	if request == nil {
-		return nil, &abejson.RPCError{
-			Code:    abejson.ErrRPCInvalidParameter,
-			Message: "nil Request",
-		}
-	}
-
 	//	When external mining is not enabled, respond with an error
 	if cfg.ExternalGenerate == false {
 		return nil, &abejson.RPCError{
@@ -2808,10 +2775,11 @@ func handleSubmitHashRate(s *rpcServer, cmd interface{}, closeChan <-chan struct
 		}
 	}
 
+	c := cmd.(*abejson.SubmitHashRateCmd)
 	submitHashRateReq := &externalminer.SubmitHashRateReq{
 		Params: &externalminer.SubmitHashRateReqParams{
-			MinerId:  request.MinerID,
-			HashRate: request.HashRate,
+			MinerId:  c.MinerId,
+			HashRate: c.HashRate,
 		},
 		Err: make(chan error, 1),
 	}

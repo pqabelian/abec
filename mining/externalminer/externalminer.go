@@ -83,6 +83,8 @@ type ExternalMiner struct {
 
 	//	todo: getwork
 	latestBlockTemplate     *SharedBlockTemplate
+	latestEpoch             int
+	latestEpochSeed         []byte
 	latestContentHash       chainhash.Hash                  //	used to track the latestBlockTemplate's contentHash
 	latestExtraNonce        uint16                          //	used to track the latestExtraNonce for the jobs that are sharing the latestContentHash
 	activeBlockTemplates    map[string]*SharedBlockTemplate //	shardBlockTemplateId as the key
@@ -274,6 +276,9 @@ out:
 							generateNewJob = false
 						} else {
 							m.latestBlockTemplate = NewSharedBlockTemplate(newTemplate)
+							m.latestEpoch = int((m.latestBlockTemplate.BlockTemplate.BlockAbe.Header.Height - m.cfg.ChainParams.BlockHeightEthashPoW) / m.cfg.ChainParams.EthashEpochLength)
+							m.latestEpochSeed = ethash.EthashSeed(m.latestEpoch)
+
 							m.activeBlockTemplates[m.latestBlockTemplate.Id()] = m.latestBlockTemplate
 							m.activeBlockTemplateJobs[m.latestBlockTemplate.Id()] = make(map[string]struct{})
 							generateNewJob = true
@@ -298,7 +303,7 @@ out:
 						}
 						targetBoundary := blockchain.CompactToBig(m.latestBlockTemplate.BlockTemplate.BlockAbe.Header.Bits)
 
-						newJob := NewJob(m.latestBlockTemplate, m.latestBlockTemplate.BlockTemplate.BlockAbe.Header.Timestamp, m.latestContentHash, m.latestExtraNonce, targetBoundary, time.Now())
+						newJob := NewJob(m.latestBlockTemplate, m.latestEpoch, m.latestEpochSeed, m.latestBlockTemplate.BlockTemplate.BlockAbe.Header.Timestamp, m.latestContentHash, m.latestExtraNonce, targetBoundary, time.Now())
 						m.activeJobs[newJob.Id()] = newJob
 						m.activeBlockTemplateJobs[newJob.SharedBlockTemplate.Id()][newJob.Id()] = struct{}{}
 

@@ -374,8 +374,10 @@ type GetBlockTemplateResult struct {
 }
 
 type GetWorkResult struct {
-	MinerID           string `json:"minerid"`
-	JobID             string `json:"jobid"`
+	MinerId           string `json:"minerid"`
+	JobId             string `json:"jobid"`
+	Epoch             int    `json:"epoch"`
+	EpochSeed         string `json:"epochseed"`
 	ContentHash       string `json:"contenthash"`
 	ExtraNonce        uint16 `json:"extranonce"`
 	ExtraNonceBitsNum int8   `json:"extranoncebitsnum"`
