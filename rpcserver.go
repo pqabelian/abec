@@ -2681,7 +2681,6 @@ func handleGetWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 	targetBytes = job.TargetBoundary.FillBytes(targetBytes)
 
 	return &abejson.GetWorkResult{
-		MinerId:           minerId,
 		JobId:             job.Id(),
 		Epoch:             job.Epoch,
 		EpochSeed:         hex.EncodeToString(job.EpochSeed),
@@ -2778,7 +2777,7 @@ func handleSubmitHashRate(s *rpcServer, cmd interface{}, closeChan <-chan struct
 	c := cmd.(*abejson.SubmitHashRateCmd)
 	submitHashRateReq := &externalminer.SubmitHashRateReq{
 		Params: &externalminer.SubmitHashRateReqParams{
-			MinerId:  c.MinerId,
+			Id:       c.Id,
 			HashRate: c.HashRate,
 		},
 		Err: make(chan error, 1),
@@ -5003,6 +5002,7 @@ func (s *rpcServer) jsonRPCRead(w http.ResponseWriter, r *http.Request, isAdmin 
 		rpcsLog.Errorf("Failed to marshal reply: %v", err)
 		return
 	}
+	fmt.Println(msg)
 
 	// Write the response.
 	err = s.writeHTTPResponseHeaders(r, w.Header(), http.StatusOK, buf)
@@ -5303,6 +5303,7 @@ func newRPCServer(config *rpcserverConfig) (*rpcServer, error) {
 	if cfg.RPCUser != "" && cfg.RPCPass != "" {
 		login := cfg.RPCUser + ":" + cfg.RPCPass
 		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
+		fmt.Println(auth)
 		rpc.authsha = sha256.Sum256([]byte(auth))
 	}
 	if cfg.RPCLimitUser != "" && cfg.RPCLimitPass != "" {

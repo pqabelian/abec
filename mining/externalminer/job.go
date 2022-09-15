@@ -107,12 +107,12 @@ type SubmitHashRateReq struct {
 }
 
 type SubmitHashRateReqParams struct {
-	MinerId  string
+	Id       string
 	HashRate float64
 }
 
-type MinerHashRate struct {
-	MinerId    string
+type WorkerHashRate struct {
+	Id         string
 	HashRate   float64
 	UpdateTime time.Time
 }

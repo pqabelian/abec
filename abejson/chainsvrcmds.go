@@ -410,9 +410,7 @@ type GetWorkCmd struct {
 	// Optional long polling.
 	//	At this moment, getWork does not support longpoll.
 	// LongPollID string `json:"longpollid,omitempty"`
-
-	MinerId      string `json:"minerid,omitempty"`
-	CurrentJobId string `json:"cuttentjobid,omitempty"`
+	CurrentJobId string `json:"currentjobid,omitempty"`
 }
 
 // NewGetBlockTemplateCmd returns a new instance which can be used to issue a
@@ -420,16 +418,14 @@ type GetWorkCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewGetWorkCmd(minerId string, currentJobId string) *GetWorkCmd {
+func NewGetWorkCmd(currentJobId string) *GetWorkCmd {
 	return &GetWorkCmd{
-		MinerId:      minerId,
 		CurrentJobId: currentJobId,
 	}
 }
 
 // GetBlockTemplateCmd defines the getblocktemplate JSON-RPC command.
 type SubmitWorkCmd struct {
-	MinerId   string `json:"minerid,omitempty"`
 	JobId     string `json:"jobid"`
 	Nonce     string `json:"hex string of nonce"`
 	MixDigest string `json:"mixdigest"`
@@ -440,10 +436,9 @@ type SubmitWorkCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewSubmitWorkCmd(minerId string, jobId string, nonce string, mixDigest string) *SubmitWorkCmd {
+func NewSubmitWorkCmd(jobId string, nonce string, mixDigest string) *SubmitWorkCmd {
 	return &SubmitWorkCmd{
-		MinerId:   minerId,
-		JobId:     minerId,
+		JobId:     jobId,
 		Nonce:     nonce,
 		MixDigest: mixDigest,
 	}
@@ -451,7 +446,7 @@ func NewSubmitWorkCmd(minerId string, jobId string, nonce string, mixDigest stri
 
 // GetBlockTemplateCmd defines the getblocktemplate JSON-RPC command.
 type SubmitHashRateCmd struct {
-	MinerId  string  `json:"minerid"`
+	Id       string  `json:"id"` // hashRateId
 	HashRate float64 `json:"hashrate"`
 }
 
@@ -460,9 +455,9 @@ type SubmitHashRateCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewSubmitHashRateCmd(minerId string, hashRate float64) *SubmitHashRateCmd {
+func NewSubmitHashRateCmd(id string, hashRate float64) *SubmitHashRateCmd {
 	return &SubmitHashRateCmd{
-		MinerId:  minerId,
+		Id:       id,
 		HashRate: hashRate,
 	}
 }

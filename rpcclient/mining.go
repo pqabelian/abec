@@ -358,7 +358,7 @@ func (r FutureGetWork) Receive() (*abejson.GetWorkResult, error) {
 func (c *Client) GetWorkAsync() FutureGetWork {
 	//cmd := abejson.NewGetWorkCmd(nil)
 	//	todo: Abelian does not support this type of getWork, and this will be cleaned.
-	cmd := abejson.NewGetWorkCmd("", "")
+	cmd := abejson.NewGetWorkCmd("")
 	return c.sendCmd(cmd)
 }
 

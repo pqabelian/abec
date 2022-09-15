@@ -90,7 +90,7 @@ type ExternalMiner struct {
 	activeBlockTemplates    map[string]*SharedBlockTemplate //	shardBlockTemplateId as the key
 	activeJobs              map[string]*Job                 // jobId as the key
 	activeBlockTemplateJobs map[string]map[string]struct{}  // sharedBlockTemplateId --> jobIds
-	minerHashRates          map[string]*MinerHashRate
+	workerHashRates         map[string]*WorkerHashRate
 
 	getWorkCh        chan *GetWorkReq
 	submitWorkCh     chan *SubmitWorkReq
@@ -115,14 +115,14 @@ out:
 		// Periodic updates from the workers with how many hashes they
 		// have performed.
 		case submitHashRateReq := <-m.submitHashRateCh:
-			workerHashRate, ok := m.minerHashRates[submitHashRateReq.Params.MinerId]
+			workerHashRate, ok := m.workerHashRates[submitHashRateReq.Params.Id]
 			if !ok {
-				newWorkerHashRate := &MinerHashRate{
-					MinerId:    submitHashRateReq.Params.MinerId,
+				newWorkerHashRate := &WorkerHashRate{
+					Id:         submitHashRateReq.Params.Id,
 					HashRate:   submitHashRateReq.Params.HashRate,
 					UpdateTime: time.Now(),
 				}
-				m.minerHashRates[newWorkerHashRate.MinerId] = newWorkerHashRate
+				m.workerHashRates[newWorkerHashRate.Id] = newWorkerHashRate
 			} else {
 				workerHashRate.HashRate = (workerHashRate.HashRate + submitHashRateReq.Params.HashRate) / 2
 				workerHashRate.UpdateTime = time.Now()
@@ -130,9 +130,9 @@ out:
 
 		// Time to update the hash rate of the external miner, which is actually contributed by the workers
 		case <-ticker.C:
-			toDelWorkerId := make([]string, 0, len(m.minerHashRates))
+			toDelWorkerId := make([]string, 0, len(m.workerHashRates))
 			hashRate = float64(0)
-			for workerId, workerHashRate := range m.minerHashRates {
+			for workerId, workerHashRate := range m.workerHashRates {
 
 				if time.Since(workerHashRate.UpdateTime).Seconds() > hpsValidSecs {
 					//	the worker has not update its hash rate for more than hpsValidSecs seconds
@@ -143,7 +143,7 @@ out:
 			}
 
 			for i := 0; i < len(toDelWorkerId); i++ {
-				delete(m.minerHashRates, toDelWorkerId[i])
+				delete(m.workerHashRates, toDelWorkerId[i])
 			}
 
 			hpsDisplayCtr++
@@ -382,7 +382,7 @@ out:
 	m.activeBlockTemplates = nil
 	m.activeJobs = nil
 	m.activeBlockTemplateJobs = nil
-	m.minerHashRates = nil
+	m.workerHashRates = nil
 
 	// stop the speed monitor since
 	close(m.speedMonitorQuit)
@@ -457,7 +457,7 @@ func (m *ExternalMiner) Start() {
 	m.activeBlockTemplates = make(map[string]*SharedBlockTemplate)
 	m.activeJobs = make(map[string]*Job)
 	m.activeBlockTemplateJobs = make(map[string]map[string]struct{})
-	m.minerHashRates = make(map[string]*MinerHashRate)
+	m.workerHashRates = make(map[string]*WorkerHashRate)
 
 	m.quit = make(chan struct{})
 	m.speedMonitorQuit = make(chan struct{})

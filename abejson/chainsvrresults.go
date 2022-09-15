@@ -374,7 +374,6 @@ type GetBlockTemplateResult struct {
 }
 
 type GetWorkResult struct {
-	MinerId           string `json:"minerid"`
 	JobId             string `json:"jobid"`
 	Epoch             int    `json:"epoch"`
 	EpochSeed         string `json:"epochseed"`
