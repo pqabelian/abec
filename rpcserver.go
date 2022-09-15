@@ -2670,12 +2670,6 @@ func handleGetWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		}
 	}
 
-	minerId := c.MinerId
-	if minerId == "" {
-		//	the miner has not been assigned an ID, will use the first jobId as the minerId
-		minerId = job.Id()
-	}
-
 	//	encode the targetBoundary to a hash value
 	targetBytes := make([]byte, chainhash.HashSize)
 	targetBytes = job.TargetBoundary.FillBytes(targetBytes)
@@ -5002,7 +4996,6 @@ func (s *rpcServer) jsonRPCRead(w http.ResponseWriter, r *http.Request, isAdmin 
 		rpcsLog.Errorf("Failed to marshal reply: %v", err)
 		return
 	}
-	fmt.Println(msg)
 
 	// Write the response.
 	err = s.writeHTTPResponseHeaders(r, w.Header(), http.StatusOK, buf)
