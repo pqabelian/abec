@@ -149,7 +149,7 @@ out:
 			hpsDisplayCtr++
 			if hpsDisplayCtr == hpsDisplayPeriod {
 				//	2 minutes based on (ticker, hpsUpdateSecs)
-				log.Infof("Hash speed: %6.0f kilohashes/s",
+				log.Infof("External Hash speed: %6.0f kilohashes/s",
 					hashRate/1000)
 
 				hpsDisplayCtr = 0
