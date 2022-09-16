@@ -102,7 +102,7 @@ type ExternalMiner struct {
 // speedMonitor handles tracking the number of hashes per second the mining
 // process is performing.  It must be run as a goroutine.
 func (m *ExternalMiner) speedMonitor() {
-	log.Infof("External miner speed monitor started")
+	log.Tracef("External miner speed monitor started")
 
 	hashRate := float64(0)
 	hpsDisplayCtr := 0
@@ -174,7 +174,7 @@ out:
 //
 // It must be run as a goroutine.
 func (m *ExternalMiner) miningWorkerController() {
-	log.Infof("External miner miningWorkerController started")
+	log.Tracef("External miner miningWorkerController started")
 
 	ticker := time.NewTicker(time.Second * jobValiditySecs)
 	defer ticker.Stop()

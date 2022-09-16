@@ -7,6 +7,7 @@ package main
 import (
 	"fmt"
 	"github.com/abesuite/abec/consensus/ethash"
+	"github.com/abesuite/abec/mining/externalminer"
 	"os"
 	"path/filepath"
 
@@ -80,6 +81,7 @@ func init() {
 	indexers.UseLogger(indxLog)
 	mining.UseLogger(minrLog)
 	cpuminer.UseLogger(minrLog)
+	externalminer.UseLogger(minrLog)
 	peer.UseLogger(peerLog)
 	txscript.UseLogger(scrpLog)
 	syncmgr.UseLogger(syncLog)
