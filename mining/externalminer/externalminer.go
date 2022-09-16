@@ -263,7 +263,7 @@ out:
 						}
 					}
 
-					generateNewJob := false
+					blockTemplateReady := true
 					if generateNewTemplate {
 						// Choose a payment address at random.
 						masterAddr := m.cfg.MiningAddrBytes
@@ -273,22 +273,26 @@ out:
 						// include in the block.
 						newTemplate, err := m.g.NewBlockTemplate(masterAddr)
 						if err != nil {
+							log.Debugf("Fail to re-generate external miner's latest blocktemplate")
+							
 							getWorkReq.Err <- err
 							getWorkReq.Result <- nil
-							generateNewJob = false
+							blockTemplateReady = false
 						} else {
+							log.Debugf("external miner's latest blocktemplate is re-generated successfully")
+
 							m.latestBlockTemplate = NewSharedBlockTemplate(newTemplate)
 							m.latestEpoch = int((m.latestBlockTemplate.BlockTemplate.BlockAbe.Header.Height - m.cfg.ChainParams.BlockHeightEthashPoW) / m.cfg.ChainParams.EthashEpochLength)
 							m.latestEpochSeed = ethash.EthashSeed(m.latestEpoch)
 
 							m.activeBlockTemplates[m.latestBlockTemplate.Id()] = m.latestBlockTemplate
 							m.activeBlockTemplateJobs[m.latestBlockTemplate.Id()] = make(map[string]struct{})
-							generateNewJob = true
+							blockTemplateReady = true
 						}
 					}
 					m.submitBlockLock.Unlock()
 
-					if generateNewJob == true {
+					if blockTemplateReady == true {
 						//	new job based on the latestBlockTemplate
 						contentHash := m.latestBlockTemplate.BlockTemplate.BlockAbe.Header.ContentHash()
 						if bytes.Compare(contentHash[:], m.latestContentHash[:]) != 0 {
