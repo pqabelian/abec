@@ -320,13 +320,7 @@ out:
 			if !ok {
 				err := errors.New("the target job is not in the active job set")
 				submitWorkReq.Err <- err
-			} else if bytes.Compare(submitWorkReq.Params.ContentHash[:], job.ContentHash[:]) != 0 {
-				err := errors.New("the content hash does not match that of the corresponding active job")
-				submitWorkReq.Err <- err
-			} else if submitWorkReq.Params.ExtraNonce != job.ExtraNonce {
-				err := errors.New("the extraNonce does not match that of the corresponding active job")
-				submitWorkReq.Err <- err
-			} else if ethash.VerifySealFast(submitWorkReq.Params.ContentHash, submitWorkReq.Params.Nonce, submitWorkReq.Params.MixDigest, job.TargetBoundary) == true {
+			} else if ethash.VerifySealFast(job.ContentHash, submitWorkReq.Params.Nonce, submitWorkReq.Params.MixDigest, job.TargetBoundary) == true {
 				//	check the validity of (nonce, mixDigest) to prevent DOS attack
 				job.SharedBlockTemplate.BlockTemplate.BlockAbe.Header.NonceExt = submitWorkReq.Params.Nonce
 				job.SharedBlockTemplate.BlockTemplate.BlockAbe.Header.MixDigest = submitWorkReq.Params.MixDigest

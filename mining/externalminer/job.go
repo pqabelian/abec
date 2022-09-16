@@ -94,11 +94,11 @@ type SubmitWorkReq struct {
 }
 
 type SubmitWorkReqParams struct {
-	JobId       string
-	ContentHash chainhash.Hash
-	ExtraNonce  uint16
-	Nonce       uint64
-	MixDigest   chainhash.Hash //	to prevent DOS attack
+	JobId string
+	//ContentHash chainhash.Hash
+	//ExtraNonce  uint16
+	Nonce     uint64
+	MixDigest chainhash.Hash //	to prevent DOS attack
 }
 
 type SubmitHashRateReq struct {
