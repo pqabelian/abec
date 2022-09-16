@@ -427,7 +427,7 @@ func NewGetWorkCmd(currentJobId string) *GetWorkCmd {
 // GetBlockTemplateCmd defines the getblocktemplate JSON-RPC command.
 type SubmitWorkCmd struct {
 	JobId     string `json:"jobid"`
-	Nonce     string `json:"hex string of nonce"`
+	Nonce     string `json:"nonce"`
 	MixDigest string `json:"mixdigest"`
 }
 
