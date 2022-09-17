@@ -274,7 +274,7 @@ out:
 						newTemplate, err := m.g.NewBlockTemplate(masterAddr)
 						if err != nil {
 							log.Debugf("Fail to re-generate external miner's latest blocktemplate")
-							
+
 							getWorkReq.Err <- err
 							getWorkReq.Result <- nil
 							blockTemplateReady = false
@@ -311,6 +311,11 @@ out:
 
 						newJob := NewJob(m.latestBlockTemplate, m.latestEpoch, m.latestEpochSeed, m.latestBlockTemplate.BlockTemplate.BlockAbe.Header.Timestamp, m.latestContentHash, m.latestExtraNonce, targetBoundary, time.Now())
 						m.activeJobs[newJob.Id()] = newJob
+
+						_, ok := m.activeBlockTemplateJobs[newJob.SharedBlockTemplate.Id()]
+						if !ok {
+							m.activeBlockTemplateJobs[newJob.SharedBlockTemplate.Id()] = make(map[string]struct{})
+						}
 						m.activeBlockTemplateJobs[newJob.SharedBlockTemplate.Id()][newJob.Id()] = struct{}{}
 
 						getWorkReq.Err <- nil
