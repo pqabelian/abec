@@ -185,6 +185,7 @@ type config struct {
 	miningAddrBytes []byte
 	minRelayTxFee   abeutil.Amount
 	whitelists      []*net.IPNet
+	WorkingDir      string `long:"workingdir" description:"Working directory"`
 }
 
 // serviceOptions defines the configuration options for the daemon as a service on
@@ -485,6 +486,14 @@ func loadConfig() (*config, []string, error) {
 			fmt.Fprintln(os.Stderr, err)
 		}
 		os.Exit(0)
+	}
+
+	// Change working directory if needed.
+	if preCfg.WorkingDir != "" {
+		err := os.Chdir(preCfg.WorkingDir)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	// Load additional config from file.
