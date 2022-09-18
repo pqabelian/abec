@@ -5296,7 +5296,7 @@ func newRPCServer(config *rpcserverConfig) (*rpcServer, error) {
 	if cfg.RPCUser != "" && cfg.RPCPass != "" {
 		login := cfg.RPCUser + ":" + cfg.RPCPass
 		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
-		fmt.Println(auth)
+		// fmt.Println(auth)
 		rpc.authsha = sha256.Sum256([]byte(auth))
 	}
 	if cfg.RPCLimitUser != "" && cfg.RPCLimitPass != "" {

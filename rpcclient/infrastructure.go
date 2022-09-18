@@ -1275,7 +1275,7 @@ func dial(config *ConnConfig) (*websocket.Conn, error) {
 	}
 	login := user + ":" + pass
 	auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
-	fmt.Println(auth)
+	// fmt.Println(auth)
 	requestHeader := make(http.Header)
 	requestHeader.Add("Authorization", auth)
 
