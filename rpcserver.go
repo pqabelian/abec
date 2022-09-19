@@ -2620,14 +2620,14 @@ func handleGetBlockTemplate(s *rpcServer, cmd interface{}, closeChan <-chan stru
 
 // handleGetBlockTemplate implements the getblocktemplate command.
 func handleGetWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	fmt.Println("handleGetWork called")
 	c := cmd.(*abejson.GetWorkCmd)
+	//fmt.Println("handleGetWork called, with currentjobid=", c.CurrentJobId)
 
 	//	When external mining is not enabled, respond with an error
 	if cfg.ExternalGenerate == false {
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCInternal.Code,
-			Message: "GetWorkRequest is requested, but the external mining is not enabled",
+			Message: "GetWork is requested, but the external mining is not enabled",
 		}
 	}
 
@@ -2674,14 +2674,15 @@ func handleGetWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 	targetBytes := make([]byte, chainhash.HashSize)
 	targetBytes = job.TargetBoundary.FillBytes(targetBytes)
 
+	//fmt.Println("new job: jobid= ", job.Id(), "target boundary:", hex.EncodeToString(targetBytes))
 	return &abejson.GetWorkResult{
 		JobId:             job.Id(),
 		Epoch:             job.Epoch,
-		EpochSeed:         hex.EncodeToString(job.EpochSeed),
-		ContentHash:       hex.EncodeToString(job.ContentHash[:]),
+		EpochSeed:         "0x" + hex.EncodeToString(job.EpochSeed),
+		ContentHash:       "0x" + hex.EncodeToString(job.ContentHash[:]),
 		ExtraNonce:        job.ExtraNonce,
 		ExtraNonceBitsNum: 16,
-		TargetBoundary:    hex.EncodeToString(targetBytes),
+		TargetBoundary:    "0x" + hex.EncodeToString(targetBytes),
 	}, nil
 }
 
@@ -2689,23 +2690,27 @@ func handleGetWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 func handleSubmitWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.SubmitWorkCmd)
 
+	rpcsLog.Infof("handleSubmitWork: handleSubmitWork called, with jobid=", c.JobId, "nonce=", c.Nonce, "mixDigest=", c.MixDigest)
 	//	When external mining is not enabled, respond with an error
 	if cfg.ExternalGenerate == false {
+		rpcsLog.Infof("handleSubmitWork: handleSubmitWork is called, but external mining is not enabled")
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCInternal.Code,
-			Message: "GetWorkRequest is requested, but the external mining is not enabled",
+			Message: "handleSubmitWork: SubmitWork is requested, but the external mining is not enabled",
 		}
 	}
 
 	if !s.cfg.ExternalMiner.IsMining() {
+		rpcsLog.Infof("handleSubmitWork: handleSubmitWork is called, but external mining is stopped")
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCExteralminerStop,
 			Message: "external mining is stopped",
 		}
 	}
 
-	mixDigestBytes, err := hex.DecodeString(c.MixDigest)
+	mixDigestBytes, err := hex.DecodeString(strings.TrimPrefix(c.MixDigest, "0x"))
 	if err != nil {
+		rpcsLog.Infof("handleSubmitWork: fail to convert the submitted mixdigest to a chainhash.Hash object")
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCHashEncodeError,
 			Message: "fail to convert the submitted mixdigest to a chainhash.Hash object",
@@ -2713,19 +2718,22 @@ func handleSubmitWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 	}
 	mixDigest, err := chainhash.NewHash(mixDigestBytes)
 	if err != nil {
+		rpcsLog.Infof("handleSubmitWork: fail to convert the submitted mixdigest to a chainhash.Hash object")
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCHashEncodeError,
 			Message: "fail to convert the submitted mixdigest to a chainhash.Hash object",
 		}
 	}
 
-	nonce, err := strconv.ParseUint(c.Nonce, 10, 64)
+	nonceBytes, err := hex.DecodeString(strings.TrimPrefix(c.Nonce, "0x"))
 	if err != nil {
+		rpcsLog.Infof("handleSubmitWork: fail to convert the submitted mixdigest to a chainhash.Hash object")
 		return nil, &abejson.RPCError{
-			Code:    abejson.ErrRPCIntegerEncodeError,
-			Message: "fail to convert the submitted nonce to uint64",
+			Code:    abejson.ErrRPCHashEncodeError,
+			Message: "fail to convert the submitted nonce to a hex bytes",
 		}
 	}
+	nonce := new(big.Int).SetBytes(nonceBytes).Uint64()
 
 	submitWorkReq := &externalminer.SubmitWorkReq{
 		Params: &externalminer.SubmitWorkReqParams{
@@ -2740,12 +2748,14 @@ func handleSubmitWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 
 	err = <-submitWorkReq.Err
 	if err != nil {
+		rpcsLog.Infof("handleSubmitWork: error is returned by external miner manager: ", err.Error())
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCSubmitWorkError,
 			Message: err.Error(),
 		}
 	}
 
+	rpcsLog.Infof("handleSubmitWork: the submitted solution is accepted by the external miner manager")
 	return &abejson.SubmitWorkResult{
 		Result: "Submitted solution is accepted by the external miner",
 	}, nil
