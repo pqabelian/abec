@@ -334,8 +334,10 @@ out:
 				job.SharedBlockTemplate.BlockTemplate.BlockAbe.Header.NonceExt = submitWorkReq.Params.Nonce
 				job.SharedBlockTemplate.BlockTemplate.BlockAbe.Header.MixDigest = submitWorkReq.Params.MixDigest
 				block := abeutil.NewBlockAbe(job.SharedBlockTemplate.BlockTemplate.BlockAbe)
-				//	exterminer is implemented after the EthashPoW is implemented. For simplicity, we only call submitBlockEthash().
-				m.submitBlockEthash(block)
+				//	externalminer is implemented after the EthashPoW is implemented. For simplicity, we only call submitBlockEthash().
+				if m.submitBlockEthash(block) == false {
+					log.Infof("The (nonce, mixDigest) submitted to external miner is valid to the corresponding active job, but it is not accepted by the blockchain due to some reason.")
+				}
 				//	even if m.submitBlockEthash(block) return false, for external miner, the SubmitWorkReq submits a valid solution.
 				submitWorkReq.Err <- nil
 			} else {
@@ -405,7 +407,8 @@ func (m *ExternalMiner) submitBlockEthash(block *abeutil.BlockAbe) bool {
 	// possible a block was found and submitted in between.
 	msgBlock := block.MsgBlock()
 	if !msgBlock.Header.PrevBlock.IsEqual(&m.g.BestSnapshot().Hash) {
-		log.Debugf("Block submitted via external miner with previous "+
+		//	As block-submission related information is important, we set it to be Info rather than debug-info.
+		log.Infof("Block submitted via external miner with previous "+
 			"block %s is stale", msgBlock.Header.PrevBlock)
 		return false
 	}
@@ -417,16 +420,16 @@ func (m *ExternalMiner) submitBlockEthash(block *abeutil.BlockAbe) bool {
 		// Anything other than a rule violation is an unexpected error,
 		// so log that error as an internal error.
 		if _, ok := err.(blockchain.RuleError); !ok {
-			log.Errorf("Unexpected error while processing "+
+			log.Infof("Unexpected error while processing "+
 				"block submitted via external miner: %v", err)
 			return false
 		}
 
-		log.Debugf("Block submitted via external miner rejected: %v", err)
+		log.Infof("Block submitted via external miner rejected: %v", err)
 		return false
 	}
 	if isOrphan {
-		log.Debugf("Block submitted via external miner is an orphan")
+		log.Infof("Block submitted via external miner is an orphan")
 		return false
 	}
 
