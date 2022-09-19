@@ -2690,18 +2690,18 @@ func handleGetWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 func handleSubmitWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.SubmitWorkCmd)
 
-	rpcsLog.Infof("handleSubmitWork: handleSubmitWork called, with jobid=", c.JobId, "nonce=", c.Nonce, "mixDigest=", c.MixDigest)
+	rpcsLog.Infof("handleSubmitWork called, with jobid=%s, nonce=%s, mixDigest=%s", c.JobId, c.Nonce, c.MixDigest)
 	//	When external mining is not enabled, respond with an error
 	if cfg.ExternalGenerate == false {
-		rpcsLog.Infof("handleSubmitWork: handleSubmitWork is called, but external mining is not enabled")
+		rpcsLog.Infof("handleSubmitWork is called, but external mining is not enabled")
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCInternal.Code,
-			Message: "handleSubmitWork: SubmitWork is requested, but the external mining is not enabled",
+			Message: "handleSubmitWork is requested, but the external mining is not enabled",
 		}
 	}
 
 	if !s.cfg.ExternalMiner.IsMining() {
-		rpcsLog.Infof("handleSubmitWork: handleSubmitWork is called, but external mining is stopped")
+		rpcsLog.Infof("handleSubmitWork is called, but external mining is stopped")
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCExteralminerStop,
 			Message: "external mining is stopped",
@@ -2710,7 +2710,7 @@ func handleSubmitWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 
 	mixDigestBytes, err := hex.DecodeString(strings.TrimPrefix(c.MixDigest, "0x"))
 	if err != nil {
-		rpcsLog.Infof("handleSubmitWork: fail to convert the submitted mixdigest to a chainhash.Hash object")
+		rpcsLog.Infof("handleSubmitWork fails to convert the submitted mixdigest to a chainhash.Hash object")
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCHashEncodeError,
 			Message: "fail to convert the submitted mixdigest to a chainhash.Hash object",
@@ -2718,7 +2718,7 @@ func handleSubmitWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 	}
 	mixDigest, err := chainhash.NewHash(mixDigestBytes)
 	if err != nil {
-		rpcsLog.Infof("handleSubmitWork: fail to convert the submitted mixdigest to a chainhash.Hash object")
+		rpcsLog.Infof("handleSubmitWork fails to convert the submitted mixdigest to a chainhash.Hash object")
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCHashEncodeError,
 			Message: "fail to convert the submitted mixdigest to a chainhash.Hash object",
@@ -2727,7 +2727,7 @@ func handleSubmitWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 
 	nonceBytes, err := hex.DecodeString(strings.TrimPrefix(c.Nonce, "0x"))
 	if err != nil {
-		rpcsLog.Infof("handleSubmitWork: fail to convert the submitted mixdigest to a chainhash.Hash object")
+		rpcsLog.Infof("handleSubmitWork fails to convert the submitted mixdigest to a chainhash.Hash object")
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCHashEncodeError,
 			Message: "fail to convert the submitted nonce to a hex bytes",
@@ -2748,14 +2748,14 @@ func handleSubmitWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 
 	err = <-submitWorkReq.Err
 	if err != nil {
-		rpcsLog.Infof("handleSubmitWork: error is returned by external miner manager: ", err.Error())
+		rpcsLog.Infof("handleSubmitWork receives an error returned by external miner manager: ", err.Error())
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCSubmitWorkError,
 			Message: err.Error(),
 		}
 	}
 
-	rpcsLog.Infof("handleSubmitWork: the submitted solution is accepted by the external miner manager")
+	rpcsLog.Infof("handleSubmitWork has the submitted solution accepted by the external miner manager")
 	return &abejson.SubmitWorkResult{
 		Result: "Submitted solution is accepted by the external miner",
 	}, nil
@@ -2767,7 +2767,7 @@ func handleSubmitHashRate(s *rpcServer, cmd interface{}, closeChan <-chan struct
 	if cfg.ExternalGenerate == false {
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCInternal.Code,
-			Message: "GetWorkRequest is requested, but the external mining is not enabled",
+			Message: "SubmitHashRate is requested, but the external mining is not enabled",
 		}
 	}
 
