@@ -10,7 +10,7 @@ import (
 	"github.com/cryptosuite/pqringct"
 )
 
-//// abecrypto -> abepqringct -> pqringct
+// // abecrypto -> abepqringct -> pqringct
 // pqringctCryptoAddressGen() generates cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, by calling pqringct's key-generation functions and encapsed the keys.
 // cryptoScheme is set as a parameter, since the map between CryptoScheme and the real crypto-scheme (here is pqringct) is coded by abecryptoparam.
 func pqringctCryptoAddressGen(pp *pqringct.PublicParameter, seed []byte,
@@ -68,10 +68,15 @@ func pqringctCryptoAddressGen(pp *pqringct.PublicParameter, seed []byte,
 	return cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, nil
 }
 
+func pqringctCryptoAddressSize(pp *pqringct.PublicParameter) uint32 {
+	return uint32(4 + pqringct.GetAddressPublicKeySerializeSize(pp) + pqringct.GetValuePublicKeySerializeSize(pp))
+}
+
 // The caller needs to fill the Version, TxIns, TxFee fileds for coinbaseTxMsgTemplate,
 // this function will fill the TxOuts and TxWitness fields.
 // The cryptoScheme here is used only for double-check.
 // The TxMemo filed could be modified as needed, as the TxWitness does not depend on the TxMemo.
+//
 //	todo: TxMemo should be authenticated by witness, otherwise, the miner can modify the TxMemo?
 //	Or, in our design, TxMemo is not guaranteed to be claimed by the transfer transaction issuer.
 func pqringctCoinbaseTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptoparam.CryptoScheme, abeTxOutputDescs []*AbeTxOutputDesc, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {

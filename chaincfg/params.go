@@ -197,6 +197,7 @@ type Params struct {
 	Bech32HRPSegwit string
 
 	// Address encoding magics
+	AbelAddressNetId        byte
 	PQRingCTID              byte // First byte of a PQRingCT address
 	PubKeyHashAddrID        byte // First byte of a P2PKH address
 	ScriptHashAddrID        byte // First byte of a P2SH address
@@ -281,6 +282,7 @@ var MainNetParams = Params{
 	Bech32HRPSegwit: "bc", // always bc for main net
 
 	// Address encoding magics
+	AbelAddressNetId:        0x00,
 	PQRingCTID:              0x00, // starts with 1, TODO(abe): adjust the prefix
 	PubKeyHashAddrID:        0x00, // starts with 1
 	ScriptHashAddrID:        0x05, // starts with 3
@@ -353,6 +355,7 @@ var RegressionNetParams = Params{
 	Bech32HRPSegwit: "rb",
 
 	// Address encoding magics
+	AbelAddressNetId:        0x01,
 	PQRingCTID:              0x01, // starts with 1,
 	PubKeyHashAddrID:        0x00, // starts with 1
 	ScriptHashAddrID:        0x05, // starts with 3
@@ -430,6 +433,7 @@ var TestNet3Params = Params{
 	Bech32HRPSegwit: "tb",
 
 	// Address encoding magics
+	AbelAddressNetId:        0x02,
 	PQRingCTID:              0x02, // starts with 1,
 	PubKeyHashAddrID:        0x00, // starts with 1
 	ScriptHashAddrID:        0x05, // starts with 3
@@ -504,6 +508,7 @@ var SimNetParams = Params{
 	Bech32HRPSegwit: "sb", // always sb for sim net
 
 	// Address encoding magics
+	AbelAddressNetId:        0x03,
 	PQRingCTID:              0x03, // starts with 1,
 	PubKeyHashAddrID:        0x00, // starts with 1
 	ScriptHashAddrID:        0x05, // starts with 3
@@ -521,7 +526,7 @@ var SimNetParams = Params{
 
 	// BlockHeightEthashPoW
 	// BlockHeightEthashPoW specifies the block height from which Ethash-PoW mining is applied.
-	BlockHeightEthashPoW: 6000,
+	BlockHeightEthashPoW: 300,
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength: 200,
 }

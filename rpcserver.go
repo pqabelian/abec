@@ -337,7 +337,7 @@ func rpcNoTxInfoError(txHash *chainhash.Hash) *abejson.RPCError {
 			txHash))
 }
 
-//	todo(ABE):
+// todo(ABE):
 func rpcUtxoRingInvalidBlockNumInRingError(blockHashNum int, blockNumPerRingGroupParam int) *abejson.RPCError {
 	return abejson.NewRPCError(abejson.ErrRPCUtxoRingInvalidBlockNumInRing,
 		fmt.Sprintf("Argument must be %d (not %d)",
@@ -547,6 +547,7 @@ func messageToHex(msg wire.Message) (string, error) {
 }
 
 // handleCreateRawTransaction handles createrawtransaction commands.
+//
 //	todo(ABE):
 func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.CreateRawTransactionCmd)
@@ -835,6 +836,7 @@ func witnessToHex(witness wire.TxWitness) []string {
 
 // createVinList returns a slice of JSON objects for the inputs of the passed
 // transaction.
+//
 //	todo(ABE):
 func createVinList(mtx *wire.MsgTx) []abejson.Vin {
 	// Coinbase transactions only have a single txin by definition.
@@ -902,6 +904,7 @@ func createVinListAbe(mtx *wire.MsgTxAbe) []abejson.TxIn {
 
 // createVoutList returns a slice of JSON objects for the outputs of the passed
 // transaction.
+//
 //	todo(ABE)
 func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap map[string]struct{}) []abejson.Vout {
 	voutList := make([]abejson.Vout, 0, len(mtx.TxOut))
@@ -1002,7 +1005,7 @@ func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 	return txReply, nil
 }
 
-//	todo(ABE.MUST)
+// todo(ABE.MUST)
 func createTxRawResultAbe(chainParams *chaincfg.Params, mtx *wire.MsgTxAbe,
 	txHash string, blkHeader *wire.BlockHeader, blkHash string,
 	blkHeight int32, chainHeight int32) (*abejson.TxRawResultAbe, error) {
@@ -1039,6 +1042,7 @@ func createTxRawResultAbe(chainParams *chaincfg.Params, mtx *wire.MsgTxAbe,
 }
 
 // handleDecodeRawTransaction handles decoderawtransaction commands.
+//
 //	todo(ABE):
 func handleDecodeRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.DecodeRawTransactionCmd)
@@ -1110,6 +1114,7 @@ func handleDecodeRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-ch
 }
 
 // handleDecodeScript handles decodescript commands.
+//
 //	todo(ABE): ABE does not use/support this?
 func handleDecodeScript(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.DecodeScriptCmd)
@@ -1184,7 +1189,7 @@ func handleEstimateFee(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 func handleGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	// Respond with an error if there are no addresses to pay the
 	// created blocks to.
-	if cfg.MiningAddr == "" {
+	if len(cfg.miningAddrs) == 0 {
 		return nil, &abejson.RPCError{
 			Code: abejson.ErrRPCInternal.Code,
 			Message: "No payment addresses specified " +
@@ -1816,7 +1821,7 @@ func (state *gbtWorkState) NotifyMempoolTx(lastUpdated time.Time) {
 	}()
 }
 
-//	todo(ABE):
+// todo(ABE):
 func (state *gbtWorkState) NotifyMempoolTxAbe(lastUpdated time.Time) {
 	go func() {
 		state.Lock()
@@ -1938,13 +1943,14 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// Choose a payment address at random if the caller requests a
 		// full coinbase as opposed to only the pertinent details needed
 		// to create their own coinbase.
-		var masterAddr []byte
+		var payToAddr []byte
 		if !useCoinbaseValue {
-			masterAddr = cfg.miningAddrBytes
+			rand.Seed(time.Now().UnixNano())
+			payToAddr = cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))].CryptoAddress()
 		}
 
 		if useOwnAddr {
-			masterAddr = miningAddr
+			payToAddr = miningAddr
 		}
 
 		// Create a new block template that has a coinbase which anyone
@@ -1952,7 +1958,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// block template doesn't include the coinbase, so the caller
 		// will ultimately create their own coinbase which pays to the
 		// appropriate address(es).
-		blkTemplate, err := generator.NewBlockTemplate(masterAddr)
+		blkTemplate, err := generator.NewBlockTemplate(payToAddr)
 		if err != nil {
 			return internalRPCError("Failed to create new block "+
 				"template: "+err.Error(), "")
@@ -2000,7 +2006,8 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// todo (ABE): maybe deleted or modified in the future
 		if !useCoinbaseValue && !template.ValidPayAddress {
 			// Choose a payment address at random.
-			payToAddr := cfg.miningAddrBytes
+			rand.Seed(time.Now().UnixNano())
+			payToAddr := cfg.miningAddrs[rand.Intn(len(cfg.MiningAddrs))].CryptoAddress()
 
 			// Update the block coinbase output of the template to
 			// pay to the randomly selected payment address.
@@ -2336,7 +2343,7 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 
 	// When a coinbase transaction has been requested, respond with an error
 	// if there are no addresses to pay the created block template to.
-	if !useCoinbaseValue && !useOwnAddr && (cfg.miningAddr == nil && cfg.miningAddrBytes == nil) {
+	if !useCoinbaseValue && !useOwnAddr && len(cfg.miningAddrs) == 0 {
 		return nil, &abejson.RPCError{
 			Code: abejson.ErrRPCInternal.Code,
 			Message: "Using mining address provided by abec, " +
@@ -4045,6 +4052,7 @@ func handlePing(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 //}
 
 // handleSendRawTransaction implements the sendrawtransaction command.
+//
 //	todo(ABE): done and need clear
 func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.SendRawTransactionCmd)
@@ -4273,7 +4281,7 @@ func handleSetGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	} else {
 		// Respond with an error if there are no addresses to pay the
 		// created blocks to.
-		if cfg.MiningAddr == "" {
+		if len(cfg.miningAddrs) == 0 {
 			return nil, &abejson.RPCError{
 				Code: abejson.ErrRPCInternal.Code,
 				Message: "No payment addresses specified " +
@@ -4718,7 +4726,7 @@ func (s *rpcServer) NotifyNewTransactions(txns []*mempool.TxDesc) {
 	}
 }
 
-//	todo(ABE):
+// todo(ABE):
 func (s *rpcServer) NotifyNewTransactionsAbe(txns []*mempool.TxDescAbe) {
 	for _, txD := range txns {
 		// Notify websocket clients about mempool transactions.

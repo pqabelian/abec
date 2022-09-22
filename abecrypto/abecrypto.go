@@ -117,6 +117,16 @@ func CryptoAddressKeyGen(seed []byte, cryptoScheme abecryptoparam.CryptoScheme) 
 	//return nil, nil, nil, nil, nil
 }
 
+func GetCryptoAddressSerializeSize(cryptoScheme abecryptoparam.CryptoScheme) uint32 {
+	switch cryptoScheme {
+	case abecryptoparam.CryptoSchemePQRingCT:
+		return pqringctCryptoAddressSize(abecryptoparam.PQRingCTPP)
+
+	default:
+		return 0
+	}
+}
+
 func CoinbaseTxGen(abeTxOutputDescs []*AbeTxOutputDesc, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 	cryptoScheme, err := abecryptoparam.GetCryptoSchemeByTxVersion(coinbaseTxMsgTemplate.Version)
 	if err != nil {

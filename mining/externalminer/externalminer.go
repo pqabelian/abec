@@ -9,6 +9,7 @@ import (
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/mining"
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -36,8 +37,8 @@ type Config struct {
 
 	// MiningAddr is a master addresses to use for the generated blocks.
 	// Each generated block will use derived address from the master address.
-	MiningAddr      abeutil.MasterAddress
-	MiningAddrBytes []byte
+	MiningAddrs []abeutil.AbelAddress
+	//MiningAddrBytes []byte
 
 	// HashRateWatermark defines the watermark, and when the hashrate of CPU mining is lower than this watermark, a warning will be triggered.
 	// HashRateWatermark int
@@ -266,12 +267,13 @@ out:
 					blockTemplateReady := true
 					if generateNewTemplate {
 						// Choose a payment address at random.
-						masterAddr := m.cfg.MiningAddrBytes
+						rand.Seed(time.Now().UnixNano())
+						payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))].CryptoAddress()
 
 						// Create a new block template using the available transactions
 						// in the memory pool as a source of transactions to potentially
 						// include in the block.
-						newTemplate, err := m.g.NewBlockTemplate(masterAddr)
+						newTemplate, err := m.g.NewBlockTemplate(payToAddr)
 						if err != nil {
 							log.Debugf("Fail to re-generate external miner's latest blocktemplate")
 

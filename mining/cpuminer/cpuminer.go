@@ -10,6 +10,7 @@ import (
 	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/mining"
 	"github.com/abesuite/abec/wire"
+	"math/rand"
 	"runtime"
 	"sync"
 	"time"
@@ -62,8 +63,8 @@ type Config struct {
 
 	// MiningAddr is a master addresses to use for the generated blocks.
 	// Each generated block will use derived address from the master address.
-	MiningAddr      abeutil.MasterAddress
-	MiningAddrBytes []byte
+	MiningAddrs []abeutil.AbelAddress
+	// MiningAddrBytes []byte
 
 	// HashRateWatermark defines the watermark, and when the hashrate of CPU mining is lower than this watermark, a warning will be triggered.
 	HashRateWatermark int
@@ -223,7 +224,7 @@ func (m *CPUMiner) submitBlock(block *abeutil.BlockAbe) bool {
 	return true
 }
 
-//	todo: (EthashPoW)
+// todo: (EthashPoW)
 func (m *CPUMiner) submitBlockEthash(block *abeutil.BlockAbe) bool {
 	m.submitBlockLock.Lock()
 	defer m.submitBlockLock.Unlock()
@@ -368,7 +369,7 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlockAbe, blockHeight int32,
 	return false
 }
 
-//	todo: (EthashPoW)
+// todo: (EthashPoW)
 func (m *CPUMiner) solveBlockEthash(blockTemplate *mining.BlockTemplate, ticker *time.Ticker, quit chan struct{}) bool {
 
 	var (
@@ -467,7 +468,7 @@ search:
 				if m.cfg.ChainParams.ReduceMinDifficulty {
 					targetDifficulty = blockchain.CompactToBig(header.Bits)
 				}
-				
+
 			default:
 				// Non-blocking select to fall through
 			}
@@ -541,12 +542,13 @@ out:
 		}
 
 		// Choose a payment address at random.
-		masterAddr := m.cfg.MiningAddrBytes
+		rand.Seed(time.Now().UnixNano())
+		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))].CryptoAddress()
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		template, err := m.g.NewBlockTemplate(masterAddr)
+		template, err := m.g.NewBlockTemplate(payToAddr)
 		m.submitBlockLock.Unlock()
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+
@@ -814,12 +816,14 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 		// Choose a payment address at random.
 		//		rand.Seed(time.Now().UnixNano())
 		//		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
-		masterAddr := m.cfg.MiningAddrBytes
+
+		rand.Seed(time.Now().UnixNano())
+		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))].CryptoAddress()
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		template, err := m.g.NewBlockTemplate(masterAddr)
+		template, err := m.g.NewBlockTemplate(payToAddr)
 
 		m.submitBlockLock.Unlock()
 		if err != nil {

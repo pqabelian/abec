@@ -8,7 +8,6 @@ import (
 	"bufio"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/abesuite/abec/consensus/ethash"
@@ -131,7 +130,7 @@ type config struct {
 	LogDir                string        `long:"logdir" description:"Directory to log output."`
 	MaxOrphanTxs          int           `long:"maxorphantx" description:"Max number of orphan transactions to keep in memory"`
 	MaxPeers              int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
-	MiningAddr            string        `long:"miningaddr" description:"Specify a master address to use for generated blocks -- A master address is required if the generate option is set"`
+	MiningAddrs           []string      `long:"miningaddr" description:"Add the specified payment address to the list of addresses to use for generated blocks -- At least one address is required if the generate or externalgenerate option is set"`
 	MinRelayTxFee         uint64        `long:"minrelaytxfee" description:"The minimum transaction fee in Neutrino/kB to be considered a non-zero fee."`
 	DisableBanning        bool          `long:"nobanning" description:"Disable banning of misbehaving peers"`
 	NoCFilters            bool          `long:"nocfilters" description:"Disable committed filtering (CF) support"`
@@ -181,11 +180,11 @@ type config struct {
 	dial                  func(string, string, time.Duration) (net.Conn, error)
 	addCheckpoints        []chaincfg.Checkpoint
 	// todo: (ethmining) miningAddr vs. the above MiningAddr, need to clarify
-	miningAddr      abeutil.MasterAddress
-	miningAddrBytes []byte
-	minRelayTxFee   abeutil.Amount
-	whitelists      []*net.IPNet
-	WorkingDir      string `long:"workingdir" description:"Working directory"`
+	miningAddrs []abeutil.AbelAddress
+	//miningAddrBytes []byte
+	minRelayTxFee abeutil.Amount
+	whitelists    []*net.IPNet
+	WorkingDir    string `long:"workingdir" description:"Working directory"`
 }
 
 // serviceOptions defines the configuration options for the daemon as a service on
@@ -408,10 +407,10 @@ func newConfigParser(cfg *config, so *serviceOptions, options flags.Options) *fl
 // line options.
 //
 // The configuration proceeds as follows:
-// 	1) Start with a default config with sane settings
-// 	2) Pre-parse the command line to check for an alternative config file
-// 	3) Load configuration file overwriting defaults with any specified options
-// 	4) Parse CLI options and overwrite/add any specified options
+//  1. Start with a default config with sane settings
+//  2. Pre-parse the command line to check for an alternative config file
+//  3. Load configuration file overwriting defaults with any specified options
+//  4. Parse CLI options and overwrite/add any specified options
 //
 // The above results in abec functioning properly without any config settings
 // while still allowing the user to override settings with config files and
@@ -868,77 +867,77 @@ func loadConfig() (*config, []string, error) {
 		cfg.EthashConfig.VerifyByFullDAG = true
 	}
 
+	// Check mining addresses are valid and saved parsed versions.
+	cfg.miningAddrs = make([]abeutil.AbelAddress, 0, len(cfg.MiningAddrs))
+	for i, addrStr := range cfg.MiningAddrs {
+		abelAddr, err := abeutil.DecodeAbelAddress(addrStr)
+		if err != nil {
+			err := fmt.Errorf("%d -th mining address failed to decode: %v", i, err)
+			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(os.Stderr, usageMessage)
+			return nil, nil, err
+		}
+		if !abelAddr.IsForNet(activeNetParams.Params) {
+			err := fmt.Errorf("%d -th mining address is on the wrong network", i)
+			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(os.Stderr, usageMessage)
+			return nil, nil, err
+		}
+		cfg.miningAddrs = append(cfg.miningAddrs, abelAddr)
+	}
+
 	//	mining address
 	// TODO(abe) This part should be re-thought.
 	if cfg.Generate || cfg.ExternalGenerate {
-		//				ConfigTest(&cfg)
-		//maddr, err := abeutil.DecodeMasterAddressAbe(cfg.MiningAddr)
-		//if err != nil {
-		//	str := "%s: the generate flag is set. Mining address '%s' failed to decode: %v"
-		//	err := fmt.Errorf(str, funcName, cfg.MiningAddr, err)
-		//	fmt.Fprintln(os.Stderr, err)
-		//	fmt.Fprintln(os.Stderr, usageMessage)
-		//	return nil, nil, err
-		//}
-		cfg.miningAddr = nil
-		cfg.miningAddrBytes, err = hex.DecodeString(cfg.MiningAddr) // set the mining address
-		if err != nil {
-			str := "%s: Error when parsing mining address: %v"
-			fmt.Fprintln(os.Stderr, fmt.Errorf(str, funcName, err))
+		if len(cfg.MiningAddrs) == 0 {
+			str := "%s: the generate/externalgenerate flag is set, but there are no mining " +
+				"addresses specified "
+			err := fmt.Errorf(str, funcName)
+			fmt.Fprintln(os.Stderr, err)
 			fmt.Fprintln(os.Stderr, usageMessage)
 			return nil, nil, err
 		}
 	} else {
-		//	todo: (EthashPoW)
-		//	when CPUMing is disabled, it is unnecessary to use FullDAG to verify the header's PoW
+		//	(EthashPoW)
+		//	when CPU Ming is disabled, it is unnecessary to use FullDAG to verify the header's PoW
 		cfg.EthashConfig.VerifyByFullDAG = false
-
-		if cfg.MiningAddr != "" {
-			cfg.miningAddrBytes, err = hex.DecodeString(cfg.MiningAddr)
-			if err != nil {
-				str := "%s: Error when parsing mining address: %v"
-				fmt.Fprintln(os.Stderr, fmt.Errorf(str, funcName, err))
-				fmt.Fprintln(os.Stderr, usageMessage)
-				return nil, nil, err
-			}
-		}
 	}
 
-	// Verify mining address
-	if cfg.miningAddrBytes != nil {
-		if len(cfg.miningAddrBytes) < 33 {
-			str := "%s: The length of mining address is incorrect"
-			err := fmt.Errorf(str, funcName)
-			fmt.Fprintln(os.Stderr, err)
-			fmt.Fprintln(os.Stderr, usageMessage)
-			return nil, nil, err
-		}
-
-		// Check netID
-		netID := cfg.miningAddrBytes[0]
-		if netID != activeNetParams.PQRingCTID {
-			str := "%s: The netID of mining address does not match the active net"
-			err := fmt.Errorf(str, funcName)
-			fmt.Fprintln(os.Stderr, err)
-			fmt.Fprintln(os.Stderr, usageMessage)
-			return nil, nil, err
-		}
-
-		// Check verification hash
-		verifyBytes := cfg.miningAddrBytes[:len(cfg.miningAddrBytes)-32]
-		dstHash0 := cfg.miningAddrBytes[len(cfg.miningAddrBytes)-32:]
-		dstHash, _ := chainhash.NewHash(dstHash0)
-		realHash := chainhash.DoubleHashH(verifyBytes)
-		if !dstHash.IsEqual(&realHash) {
-			str := "%s: Mining address verification fails: verification hash does not match"
-			err := fmt.Errorf(str, funcName)
-			fmt.Fprintln(os.Stderr, err)
-			fmt.Fprintln(os.Stderr, usageMessage)
-			return nil, nil, err
-		}
-
-		cfg.miningAddrBytes = verifyBytes[1:]
-	}
+	//// Verify mining address
+	//if cfg.miningAddrBytes != nil {
+	//	if len(cfg.miningAddrBytes) < 33 {
+	//		str := "%s: The length of mining address is incorrect"
+	//		err := fmt.Errorf(str, funcName)
+	//		fmt.Fprintln(os.Stderr, err)
+	//		fmt.Fprintln(os.Stderr, usageMessage)
+	//		return nil, nil, err
+	//	}
+	//
+	//	// Check netID
+	//	netID := cfg.miningAddrBytes[0]
+	//	if netID != activeNetParams.PQRingCTID {
+	//		str := "%s: The netID of mining address does not match the active net"
+	//		err := fmt.Errorf(str, funcName)
+	//		fmt.Fprintln(os.Stderr, err)
+	//		fmt.Fprintln(os.Stderr, usageMessage)
+	//		return nil, nil, err
+	//	}
+	//
+	//	// Check verification hash
+	//	verifyBytes := cfg.miningAddrBytes[:len(cfg.miningAddrBytes)-32]
+	//	dstHash0 := cfg.miningAddrBytes[len(cfg.miningAddrBytes)-32:]
+	//	dstHash, _ := chainhash.NewHash(dstHash0)
+	//	realHash := chainhash.DoubleHashH(verifyBytes)
+	//	if !dstHash.IsEqual(&realHash) {
+	//		str := "%s: Mining address verification fails: verification hash does not match"
+	//		err := fmt.Errorf(str, funcName)
+	//		fmt.Fprintln(os.Stderr, err)
+	//		fmt.Fprintln(os.Stderr, usageMessage)
+	//		return nil, nil, err
+	//	}
+	//
+	//	cfg.miningAddrBytes = verifyBytes[1:]
+	//}
 
 	// Add default port to all listener addresses if needed and remove
 	// duplicate addresses.

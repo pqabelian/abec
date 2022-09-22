@@ -954,6 +954,7 @@ func (s *server) relayTransactions(txns []*mempool.TxDescAbe) {
 // both websocket and getblocktemplate long poll clients of the passed
 // transactions.  This function should be called whenever new transactions
 // are added to the mempool.
+//
 //	todo(ABE):
 func (s *server) AnnounceNewTransactions(txns []*mempool.TxDescAbe) {
 	// Generate and relay inventory vectors for all newly accepted
@@ -969,6 +970,7 @@ func (s *server) AnnounceNewTransactions(txns []*mempool.TxDescAbe) {
 
 // Transaction has one confirmation on the main chain. Now we can mark it as no
 // longer needing rebroadcasting.
+//
 //	todo(ABE):
 func (s *server) TransactionConfirmed(tx *abeutil.TxAbe) {
 	// Rebroadcasting is only necessary when the RPC server is active.
@@ -1038,6 +1040,7 @@ func (s *server) pushNeedSetResultMsg(sp *serverPeer, blockHash chainhash.Hash,
 
 // pushBlockMsg sends a block message for the provided block hash to the
 // connected peer.  An error is returned if the block hash is not known.
+//
 //	todo(ABE):
 func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
 	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
@@ -2489,23 +2492,23 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		ChainParams:            chainParams,
 		Ethash:                 s.ethash, // todo: (EthashPoW)
 		BlockTemplateGenerator: blockTemplateGenerator,
-		MiningAddr:             cfg.miningAddr,
-		MiningAddrBytes:        cfg.miningAddrBytes,
-		HashRateWatermark:      cfg.HashRateWatermark,
-		ProcessBlock:           s.syncManager.ProcessBlock,
-		ConnectedCount:         s.ConnectedCount,
-		IsCurrent:              s.syncManager.IsCurrent,
+		MiningAddrs:            cfg.miningAddrs,
+		//MiningAddrBytes:        cfg.miningAddrBytes,
+		HashRateWatermark: cfg.HashRateWatermark,
+		ProcessBlock:      s.syncManager.ProcessBlock,
+		ConnectedCount:    s.ConnectedCount,
+		IsCurrent:         s.syncManager.IsCurrent,
 	})
 
 	s.externalMiner = externalminer.New(&externalminer.Config{
 		ChainParams:            chainParams,
 		Ethash:                 s.ethash,
 		BlockTemplateGenerator: blockTemplateGenerator,
-		MiningAddr:             cfg.miningAddr,
-		MiningAddrBytes:        cfg.miningAddrBytes,
-		ProcessBlock:           s.syncManager.ProcessBlock,
-		ConnectedCount:         s.ConnectedCount,
-		IsCurrent:              s.syncManager.IsCurrent,
+		MiningAddrs:            cfg.miningAddrs,
+		//MiningAddrBytes:        cfg.miningAddrBytes,
+		ProcessBlock:   s.syncManager.ProcessBlock,
+		ConnectedCount: s.ConnectedCount,
+		IsCurrent:      s.syncManager.IsCurrent,
 	})
 
 	// Only setup a function to return new addresses to connect to when
