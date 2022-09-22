@@ -194,10 +194,10 @@ func NewGetBalanceCmd(account *string, minConf *int) *GetBalanceCmd {
 	}
 }
 
-type AddressNumberCmd struct{}
+type AddressMaxSequenceNumberCmd struct{}
 
-func NewAddressCmd() *AddressNumberCmd {
-	return &AddressNumberCmd{}
+func NewAddressCmd() *AddressMaxSequenceNumberCmd {
+	return &AddressMaxSequenceNumberCmd{}
 }
 
 // GetBalancesCmd defines the getbalances JSON-RPC command.
@@ -875,7 +875,7 @@ func init() {
 	//MustRegisterCmd("sendmany", (*SendManyCmd)(nil), flags)
 	MustRegisterCmd("sendtoaddressesabe", (*SendToAddressAbeCmd)(nil), flags)
 	MustRegisterCmd("generateaddressabe", (*GenerateAddressCmd)(nil), flags)
-	MustRegisterCmd("addressnumber", (*AddressNumberCmd)(nil), flags)
+	MustRegisterCmd("addressmaxsequencenumber", (*AddressMaxSequenceNumberCmd)(nil), flags)
 	//MustRegisterCmd("sendtoaddress", (*SendToAddressCmd)(nil), flags)
 	//MustRegisterCmd("sendtopayee", (*SendToPayeesCmd)(nil), flags)
 	//MustRegisterCmd("setaccount", (*SetAccountCmd)(nil), flags)

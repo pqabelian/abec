@@ -132,7 +132,7 @@ type GetBlockAbeVerboseResult struct {
 	PreviousHash string           `json:"previousblockhash"`
 	NextHash     string           `json:"nextblockhash,omitempty"`
 	ContentHash  string           `json:"contenthash,omitempty"`
-	MixDigest    string           `json:"mindigest,omitempty"`
+	MixDigest    string           `json:"mixdigest,omitempty"`
 	SealHash     string           `json:"sealhash,omitempty"`
 }
 
@@ -161,7 +161,7 @@ type GetBlockVerboseTxResult struct {
 	NextHash      string        `json:"nextblockhash,omitempty"`
 }
 
-//TODO(abe)
+// TODO(abe)
 type GetBlockAbeVerboseTxResult struct {
 	Hash          string        `json:"hash"`
 	Confirmations int64         `json:"confirmations"`
@@ -336,6 +336,7 @@ type GetBlockTemplateResultAux struct {
 
 // GetBlockTemplateResult models the data returned from the getblocktemplate
 // command.
+//
 //	todo(ABE):
 type GetBlockTemplateResult struct {
 	// CoinbaseAux is optional.  One of
@@ -495,6 +496,7 @@ type GetPeerInfoResult struct {
 // GetRawMempoolVerboseResult models the data returned from the getrawmempool
 // command when the verbose flag is set.  When the verbose flag is not set,
 // getrawmempool returns an array of transaction hashes.
+//
 //	todo(ABE): ABE does not use virtual size and weight, while just use size and fullsize
 //	todo(ABE): ABE does not allow dependdence on transactions not in block
 type GetRawMempoolVerboseResult struct {
@@ -521,6 +523,7 @@ type ScriptPubKeyResult struct {
 }
 
 // GetTxOutResult models the data from the gettxout command.
+//
 //	todo(ABE): ABE does not support 'GetTxOutCmd', as it seems that this command is to get Txo from transactions in mempool and utxo of main chain.
 type GetTxOutResult struct {
 	BestBlock     string             `json:"bestblock"`
@@ -557,6 +560,7 @@ type ScriptSig struct {
 // Vin models parts of the tx data.  It is defined separately since
 // getrawtransaction, decoderawtransaction, and searchrawtransaction use the
 // same structure.
+//
 //	todo(ABE):
 type Vin struct {
 	Coinbase  string     `json:"coinbase"`
@@ -758,6 +762,7 @@ type InfoChainResult struct {
 }
 
 // TxRawResult models the data from the getrawtransaction command.
+//
 //	todo(ABE):
 type TxRawResult struct {
 	Hex           string `json:"hex"`
@@ -812,6 +817,7 @@ type SearchRawTransactionsResult struct {
 }
 
 // TxRawDecodeResult models the data from the decoderawtransaction command.
+//
 //	todo(ABE):
 type TxRawDecodeResult struct {
 	Txid     string `json:"txid"`
