@@ -131,6 +131,9 @@ type GetBlockAbeVerboseResult struct {
 	Difficulty   float64          `json:"difficulty"`
 	PreviousHash string           `json:"previousblockhash"`
 	NextHash     string           `json:"nextblockhash,omitempty"`
+	ContentHash  string           `json:"contenthash,omitempty"`
+	MixDigest    string           `json:"mindigest,omitempty"`
+	SealHash     string           `json:"sealhash,omitempty"`
 }
 
 // GetBlockVerboseTxResult models the data from the getblock command when the

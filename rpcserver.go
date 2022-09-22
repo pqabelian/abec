@@ -1548,9 +1548,12 @@ func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 		Fullsize: int32(blk.MsgBlock().SerializeSize()),
 		//StrippedSize:  int32(blk.MsgBlock().SerializeSizeStripped()),
 		//Weight:        int32(blockchain.GetBlockWeight(blk)),
-		Bits:       strconv.FormatInt(int64(blockHeader.Bits), 16),
-		Difficulty: getDifficultyRatio(blockHeader.Bits, params),
-		NextHash:   nextHashString,
+		Bits:        strconv.FormatInt(int64(blockHeader.Bits), 16),
+		Difficulty:  getDifficultyRatio(blockHeader.Bits, params),
+		NextHash:    nextHashString,
+		ContentHash: blockHeader.ContentHash().String(),
+		MixDigest:   blockHeader.MixDigest.String(),
+		SealHash:    ethash.SealHash(blockHeader).String(),
 	}
 
 	if *c.Verbosity == 1 {
