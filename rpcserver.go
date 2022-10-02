@@ -1946,8 +1946,12 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// Choose a payment address at random if the caller requests a
 		// full coinbase as opposed to only the pertinent details needed
 		// to create their own coinbase.
+		if !useOwnAddr && len(cfg.miningAddrs) == 0 {
+			return internalRPCError("Failed to create new block "+
+				"template: cannot find mining address in abec configuration", "")
+		}
 		var payToAddr []byte
-		if !useCoinbaseValue {
+		if !useOwnAddr && !useCoinbaseValue {
 			rand.Seed(time.Now().UnixNano())
 			payToAddr = cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))].CryptoAddress()
 		}
