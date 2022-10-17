@@ -958,16 +958,19 @@ func (p *Peer) PushNeedSetMsg(blockHash chainhash.Hash, hashes []chainhash.Hash)
 	p.QueueMessage(msg, nil)
 	//	todo (ABE): No need to get the reply? if the correspoding peer does not give any reply, what will happen?
 	//	todo (ABE): how to guarantee the corresponding peer think itself to be cureent?
-	timeout := time.Tick(time.Second * 30)
+	timeoutTimer := time.NewTimer(time.Second * 30)
+	defer timeoutTimer.Stop()
+	txTicker := time.NewTicker(time.Second)
+	defer txTicker.Stop()
 
 	for {
 		select {
-		case <-timeout:
+		case <-timeoutTimer.C:
 			p.Disconnect()
 			return nil, errors.New("time out")
 		case <-p.quit:
 			return nil, errors.New("peer disconnected")
-		default:
+		case <-txTicker.C:
 			if response, ok := p.needsetResult.LoadAndDelete(blockHash); ok {
 				res := response.(*wire.MsgNeedSetResult)
 				return res.Txs, nil
