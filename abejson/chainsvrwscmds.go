@@ -41,6 +41,9 @@ type NotifyNewTransactionsCmd struct {
 	Verbose *bool `jsonrpcdefault:"false"`
 }
 
+type NotifyTransactionCmd struct {
+}
+
 // NewNotifyNewTransactionsCmd returns a new instance which can be used to issue
 // a notifynewtransactions JSON-RPC command.
 //
@@ -50,6 +53,9 @@ func NewNotifyNewTransactionsCmd(verbose *bool) *NotifyNewTransactionsCmd {
 	return &NotifyNewTransactionsCmd{
 		Verbose: verbose,
 	}
+}
+func NewNotifyTransactionCmd(verbose *bool) *NotifyTransactionCmd {
+	return &NotifyTransactionCmd{}
 }
 
 // SessionCmd defines the session JSON-RPC command.
@@ -201,7 +207,7 @@ func NewRescanCmd(beginBlock string, addresses []string, outPoints []OutPoint, e
 		EndBlock:   endBlock,
 	}
 }
-func NewRescanAbeCmd(beginBlock string,endBlock *string) *RescanAbeCmd {
+func NewRescanAbeCmd(beginBlock string, endBlock *string) *RescanAbeCmd {
 	return &RescanAbeCmd{
 		BeginBlock: beginBlock,
 		EndBlock:   endBlock,
@@ -234,6 +240,7 @@ func init() {
 	MustRegisterCmd("loadtxfilter", (*LoadTxFilterCmd)(nil), flags)
 	MustRegisterCmd("notifyblocks", (*NotifyBlocksCmd)(nil), flags)
 	MustRegisterCmd("notifynewtransactions", (*NotifyNewTransactionsCmd)(nil), flags)
+	MustRegisterCmd("notifytransaction", (*NotifyTransactionCmd)(nil), flags)
 	MustRegisterCmd("notifyreceived", (*NotifyReceivedCmd)(nil), flags)
 	MustRegisterCmd("notifyspent", (*NotifySpentCmd)(nil), flags)
 	MustRegisterCmd("session", (*SessionCmd)(nil), flags)

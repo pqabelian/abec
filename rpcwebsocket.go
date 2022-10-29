@@ -149,7 +149,7 @@ out:
 	for {
 		select {
 		case n, ok := <-in: // take a notification
-			if !ok {       // it means that finished
+			if !ok { // it means that finished
 				// Sender closed input channel.
 				break out
 			}
@@ -160,7 +160,7 @@ out:
 			select {
 			case skipQueue <- n:
 			default:
-				q = append(q, n)   // wait
+				q = append(q, n) // wait
 				dequeue = out
 				skipQueue = nil
 				next = q[0]
@@ -238,7 +238,7 @@ func (m *wsNotificationManager) NotifyMempoolTx(tx *abeutil.Tx, isNew bool) {
 	}
 }
 
-//	Abe to do
+// Abe to do
 func (m *wsNotificationManager) NotifyMempoolTxAbe(tx *abeutil.TxAbe, isNew bool) {
 	n := &notificationTxAcceptedByMempoolAbe{
 		isNew: isNew,
@@ -464,6 +464,7 @@ func (m *wsNotificationManager) NotifyMempoolTxAbe(tx *abeutil.TxAbe, isNew bool
 //}
 
 //	todo(ABE):
+//
 // Notification types
 type notificationBlockConnected abeutil.BlockAbe
 type notificationBlockDisconnected abeutil.BlockAbe
@@ -473,7 +474,7 @@ type notificationTxAcceptedByMempool struct {
 	tx    *abeutil.Tx
 }
 
-//	todo (ABE):
+// todo (ABE):
 type notificationTxAcceptedByMempoolAbe struct {
 	isNew bool
 	tx    *abeutil.TxAbe
@@ -507,6 +508,7 @@ type notificationUnregisterNewMempoolTxs wsClient
 
 // notificationHandler reads notifications and control messages from the queue
 // handler and processes one at a time.
+//
 //	TODO(ABE, MUST):
 func (m *wsNotificationManager) notificationHandler() {
 	// clients is a map of all currently connected websocket clients.
@@ -602,7 +604,7 @@ out:
 
 			case *notificationTxAcceptedByMempoolAbe:
 				if n.isNew && len(txNotifications) != 0 {
-					m.notifyForNewTxAbe(txNotifications, n.tx)
+					//m.notifyForNewTxAbe(txNotifications, n.tx)
 				}
 
 				//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
@@ -766,6 +768,7 @@ func (m *wsNotificationManager) UnregisterBlockUpdates(wsc *wsClient) {
 
 // notifyBlockConnected notifies websocket clients that have registered for
 // block updates when a block is connected to the main chain.
+//
 //	todo(ABE):
 func (*wsNotificationManager) notifyBlockConnected(clients map[chan struct{}]*wsClient,
 	block *abeutil.Block) {
@@ -804,6 +807,7 @@ func (*wsNotificationManager) notifyBlockConnectedAbe(clients map[chan struct{}]
 // notifyBlockDisconnected notifies websocket clients that have registered for
 // block updates when a block is disconnected from the main chain (due to a
 // reorganize).
+//
 //	ToDo(ABE)
 func (*wsNotificationManager) notifyBlockDisconnected(clients map[chan struct{}]*wsClient, block *abeutil.Block) {
 	// Skip notification creation if no clients have requested block
@@ -941,100 +945,100 @@ func (m *wsNotificationManager) UnregisterNewMempoolTxsUpdates(wsc *wsClient) {
 // notifyForNewTx notifies websocket clients that have registered for updates
 // when a new transaction is added to the memory pool.
 //	todo(ABE.MUST):
-func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClient, tx *abeutil.Tx) {
-	txHashStr := tx.Hash().String()
-	mtx := tx.MsgTx()
-
-	var amount int64
-	for _, txOut := range mtx.TxOut {
-		amount += txOut.Value
-	}
-
-	ntfn := abejson.NewTxAcceptedNtfn(txHashStr, abeutil.Amount(amount).ToABE())
-	marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
-	if err != nil {
-		rpcsLog.Errorf("Failed to marshal tx notification: %s", err.Error())
-		return
-	}
-
-	var verboseNtfn *abejson.TxAcceptedVerboseNtfn
-	var marshalledJSONVerbose []byte
-	for _, wsc := range clients {
-		if wsc.verboseTxUpdates {
-			if marshalledJSONVerbose != nil {
-				wsc.QueueNotification(marshalledJSONVerbose)
-				continue
-			}
-
-			net := m.server.cfg.ChainParams
-			rawTx, err := createTxRawResult(net, mtx, txHashStr, nil,
-				"", 0, 0)
-			if err != nil {
-				return
-			}
-
-			verboseNtfn = abejson.NewTxAcceptedVerboseNtfn(*rawTx)
-			marshalledJSONVerbose, err = abejson.MarshalCmd(nil,
-				verboseNtfn)
-			if err != nil {
-				rpcsLog.Errorf("Failed to marshal verbose tx "+
-					"notification: %s", err.Error())
-				return
-			}
-			wsc.QueueNotification(marshalledJSONVerbose)
-		} else {
-			wsc.QueueNotification(marshalledJSON)
-		}
-	}
-}
+//func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClient, tx *abeutil.Tx) {
+//	txHashStr := tx.Hash().String()
+//	mtx := tx.MsgTx()
+//
+//	var amount int64
+//	for _, txOut := range mtx.TxOut {
+//		amount += txOut.Value
+//	}
+//
+//	ntfn := abejson.NewTxAcceptedNtfn(txHashStr, abeutil.Amount(amount).ToABE())
+//	marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
+//	if err != nil {
+//		rpcsLog.Errorf("Failed to marshal tx notification: %s", err.Error())
+//		return
+//	}
+//
+//	var verboseNtfn *abejson.TxAcceptedVerboseNtfn
+//	var marshalledJSONVerbose []byte
+//	for _, wsc := range clients {
+//		if wsc.verboseTxUpdates {
+//			if marshalledJSONVerbose != nil {
+//				wsc.QueueNotification(marshalledJSONVerbose)
+//				continue
+//			}
+//
+//			net := m.server.cfg.ChainParams
+//			rawTx, err := createTxRawResult(net, mtx, txHashStr, nil,
+//				"", 0, 0)
+//			if err != nil {
+//				return
+//			}
+//
+//			verboseNtfn = abejson.NewTxAcceptedVerboseNtfn(*rawTx)
+//			marshalledJSONVerbose, err = abejson.MarshalCmd(nil,
+//				verboseNtfn)
+//			if err != nil {
+//				rpcsLog.Errorf("Failed to marshal verbose tx "+
+//					"notification: %s", err.Error())
+//				return
+//			}
+//			wsc.QueueNotification(marshalledJSONVerbose)
+//		} else {
+//			wsc.QueueNotification(marshalledJSON)
+//		}
+//	}
+//}
 // TODO 20210609 this API need to be re-think
-func (m *wsNotificationManager) notifyForNewTxAbe(clients map[chan struct{}]*wsClient, tx *abeutil.TxAbe) {
-	txHashStr := tx.Hash().String()
-	mtx := tx.MsgTx()
-
-	var amount int64
-	//for _, txOut := range mtx.TxOuts {
-		//amount += txOut.ValueScript
-	//}
-
-	ntfn := abejson.NewTxAcceptedNtfn(txHashStr, abeutil.Amount(amount).ToABE())
-	marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
-	if err != nil {
-		rpcsLog.Errorf("Failed to marshal tx notification: %s", err.Error())
-		return
-	}
-
-	var verboseNtfn *abejson.TxAcceptedVerboseNtfnAbe
-	var marshalledJSONVerbose []byte
-	for _, wsc := range clients {
-		if wsc.verboseTxUpdates {
-			if marshalledJSONVerbose != nil {
-				wsc.QueueNotification(marshalledJSONVerbose)
-				continue
-			}
-
-			net := m.server.cfg.ChainParams
-			//	todo(ABE.must)
-			rawTx, err := createTxRawResultAbe(net, mtx, txHashStr, nil,
-				"", 0, 0)
-			if err != nil {
-				return
-			}
-
-			verboseNtfn = abejson.NewTxAcceptedVerboseNtfnAbe(*rawTx)
-			marshalledJSONVerbose, err = abejson.MarshalCmd(nil,
-				verboseNtfn)
-			if err != nil {
-				rpcsLog.Errorf("Failed to marshal verbose tx "+
-					"notification: %s", err.Error())
-				return
-			}
-			wsc.QueueNotification(marshalledJSONVerbose)
-		} else {
-			wsc.QueueNotification(marshalledJSON)
-		}
-	}
-}
+//func (m *wsNotificationManager) notifyForNewTxAbe(clients map[chan struct{}]*wsClient, tx *abeutil.TxAbe) {
+//	txHashStr := tx.Hash().String()
+//	mtx := tx.MsgTx()
+//
+//	var amount int64
+//	//for _, txOut := range mtx.TxOuts {
+//		//amount += txOut.ValueScript
+//	//}
+//
+//	ntfn := abejson.NewTxAcceptedNtfn(txHashStr, abeutil.Amount(amount).ToABE())
+//	marshalledJSON, err := abejson.MarshalCmd(nil, ntfn)
+//	if err != nil {
+//		rpcsLog.Errorf("Failed to marshal tx notification: %s", err.Error())
+//		return
+//	}
+//
+//	var verboseNtfn *abejson.TxAcceptedVerboseNtfnAbe
+//	var marshalledJSONVerbose []byte
+//	for _, wsc := range clients {
+//		if wsc.verboseTxUpdates {
+//			if marshalledJSONVerbose != nil {
+//				wsc.QueueNotification(marshalledJSONVerbose)
+//				continue
+//			}
+//
+//			net := m.server.cfg.ChainParams
+//			//	todo(ABE.must)
+//			rawTx, err := createTxRawResultAbe(net, mtx, txHashStr, nil,
+//				"", 0, 0)
+//			if err != nil {
+//				return
+//			}
+//
+//			verboseNtfn = abejson.NewTxAcceptedVerboseNtfnAbe(*rawTx)
+//			marshalledJSONVerbose, err = abejson.MarshalCmd(nil,
+//				verboseNtfn)
+//			if err != nil {
+//				rpcsLog.Errorf("Failed to marshal verbose tx "+
+//					"notification: %s", err.Error())
+//				return
+//			}
+//			wsc.QueueNotification(marshalledJSONVerbose)
+//		} else {
+//			wsc.QueueNotification(marshalledJSON)
+//		}
+//	}
+//}
 
 // RegisterSpentRequests requests a notification when each of the passed
 // outpoints is confirmed spent (contained in a block connected to the main
@@ -1126,6 +1130,7 @@ func (m *wsNotificationManager) notifyForNewTxAbe(clients map[chan struct{}]*wsC
 //}
 
 // txHexString returns the serialized transaction encoded in hexadecimal.
+//
 //	todo(ABE)
 func txHexString(tx *wire.MsgTx) string {
 	buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
@@ -1143,6 +1148,7 @@ func txHexStringAbe(tx *wire.MsgTxAbe) string {
 
 // blockDetails creates a BlockDetails struct to include in btcws notifications
 // from a block and a transaction's block index.
+//
 //	todo(ABE):
 func blockDetails(block *abeutil.Block, txIndex int) *abejson.BlockDetails {
 	if block == nil {
@@ -2794,95 +2800,178 @@ var ErrRescanReorg = abejson.RPCError{
 // handler erroring.  Clients must handle this by finding a block still in
 // the chain (perhaps from a rescanprogress notification) to resume their
 // rescan.
+//
 //	todo(ABE): handleRescan seems not work well. ABE does not supprt it at this moment.
-//func handleRescan(wsc *wsClient, icmd interface{}) (interface{}, error) {
-//	cmd, ok := icmd.(*abejson.RescanCmd)
-//	if !ok {
-//		return nil, abejson.ErrRPCInternal
-//	}
 //
-//	outpoints := make([]*wire.OutPoint, 0, len(cmd.OutPoints))
-//	for i := range cmd.OutPoints {
-//		cmdOutpoint := &cmd.OutPoints[i]
-//		//	todo(ABE): blockHash seem to be txHash
-//		blockHash, err := chainhash.NewHashFromStr(cmdOutpoint.Hash)
+//	func handleRescan(wsc *wsClient, icmd interface{}) (interface{}, error) {
+//		cmd, ok := icmd.(*abejson.RescanCmd)
+//		if !ok {
+//			return nil, abejson.ErrRPCInternal
+//		}
+//
+//		outpoints := make([]*wire.OutPoint, 0, len(cmd.OutPoints))
+//		for i := range cmd.OutPoints {
+//			cmdOutpoint := &cmd.OutPoints[i]
+//			//	todo(ABE): blockHash seem to be txHash
+//			blockHash, err := chainhash.NewHashFromStr(cmdOutpoint.Hash)
+//			if err != nil {
+//				return nil, rpcDecodeHexError(cmdOutpoint.Hash)
+//			}
+//			outpoint := wire.NewOutPoint(blockHash, cmdOutpoint.Index)
+//			outpoints = append(outpoints, outpoint)
+//		}
+//
+//		numAddrs := len(cmd.Addresses)
+//		if numAddrs == 1 {
+//			rpcsLog.Info("Beginning rescan for 1 address")
+//		} else {
+//			rpcsLog.Infof("Beginning rescan for %d addresses", numAddrs)
+//		}
+//
+//		// Build lookup maps.
+//		lookups := rescanKeys{
+//			addrs:   map[string]struct{}{},
+//			unspent: map[wire.OutPoint]struct{}{},
+//		}
+//		for _, addrStr := range cmd.Addresses {
+//			lookups.addrs[addrStr] = struct{}{}
+//		}
+//		for _, outpoint := range outpoints {
+//			lookups.unspent[*outpoint] = struct{}{}
+//		}
+//
+//		chain := wsc.server.cfg.Chain
+//
+//		minBlockHash, err := chainhash.NewHashFromStr(cmd.BeginBlock)
 //		if err != nil {
-//			return nil, rpcDecodeHexError(cmdOutpoint.Hash)
+//			return nil, rpcDecodeHexError(cmd.BeginBlock)
 //		}
-//		outpoint := wire.NewOutPoint(blockHash, cmdOutpoint.Index)
-//		outpoints = append(outpoints, outpoint)
-//	}
-//
-//	numAddrs := len(cmd.Addresses)
-//	if numAddrs == 1 {
-//		rpcsLog.Info("Beginning rescan for 1 address")
-//	} else {
-//		rpcsLog.Infof("Beginning rescan for %d addresses", numAddrs)
-//	}
-//
-//	// Build lookup maps.
-//	lookups := rescanKeys{
-//		addrs:   map[string]struct{}{},
-//		unspent: map[wire.OutPoint]struct{}{},
-//	}
-//	for _, addrStr := range cmd.Addresses {
-//		lookups.addrs[addrStr] = struct{}{}
-//	}
-//	for _, outpoint := range outpoints {
-//		lookups.unspent[*outpoint] = struct{}{}
-//	}
-//
-//	chain := wsc.server.cfg.Chain
-//
-//	minBlockHash, err := chainhash.NewHashFromStr(cmd.BeginBlock)
-//	if err != nil {
-//		return nil, rpcDecodeHexError(cmd.BeginBlock)
-//	}
-//	minBlock, err := chain.BlockHeightByHash(minBlockHash)
-//	if err != nil {
-//		return nil, &abejson.RPCError{
-//			Code:    abejson.ErrRPCBlockNotFound,
-//			Message: "Error getting block: " + err.Error(),
-//		}
-//	}
-//
-//	maxBlock := int32(math.MaxInt32)
-//	if cmd.EndBlock != nil {
-//		maxBlockHash, err := chainhash.NewHashFromStr(*cmd.EndBlock)
-//		if err != nil {
-//			return nil, rpcDecodeHexError(*cmd.EndBlock)
-//		}
-//		maxBlock, err = chain.BlockHeightByHash(maxBlockHash)
+//		minBlock, err := chain.BlockHeightByHash(minBlockHash)
 //		if err != nil {
 //			return nil, &abejson.RPCError{
 //				Code:    abejson.ErrRPCBlockNotFound,
 //				Message: "Error getting block: " + err.Error(),
 //			}
 //		}
+//
+//		maxBlock := int32(math.MaxInt32)
+//		if cmd.EndBlock != nil {
+//			maxBlockHash, err := chainhash.NewHashFromStr(*cmd.EndBlock)
+//			if err != nil {
+//				return nil, rpcDecodeHexError(*cmd.EndBlock)
+//			}
+//			maxBlock, err = chain.BlockHeightByHash(maxBlockHash)
+//			if err != nil {
+//				return nil, &abejson.RPCError{
+//					Code:    abejson.ErrRPCBlockNotFound,
+//					Message: "Error getting block: " + err.Error(),
+//				}
+//			}
+//		}
+//
+//		var (
+//			lastBlock     *abeutil.Block
+//			lastBlockHash *chainhash.Hash
+//		)
+//		if len(lookups.addrs) != 0 || len(lookups.unspent) != 0 {
+//			// With all the arguments parsed, we'll execute our chunked rescan
+//			// which will notify the clients of any address deposits or output
+//			// spends.
+//			lastBlock, lastBlockHash, err = scanBlockChunks(
+//				wsc, cmd, &lookups, minBlock, maxBlock, chain,
+//			)
+//			if err != nil {
+//				return nil, err
+//			}
+//
+//			// If the last block is nil, then this means that the client
+//			// disconnected mid-rescan. As a result, we don't need to send
+//			// anything back to them.
+//			if lastBlock == nil {
+//				return nil, nil
+//			}
+//		} else {
+//			rpcsLog.Infof("Skipping rescan as client has no addrs/utxos")
+//
+//			// If we didn't actually do a rescan, then we'll give the
+//			// client our best known block within the final rescan finished
+//			// notification.
+//			chainTip := chain.BestSnapshot()
+//			lastBlockHash = &chainTip.Hash
+//			lastBlock, err = chain.BlockByHash(lastBlockHash)
+//			if err != nil {
+//				return nil, &abejson.RPCError{
+//					Code:    abejson.ErrRPCBlockNotFound,
+//					Message: "Error getting block: " + err.Error(),
+//				}
+//			}
+//		}
+//
+//		// Notify websocket client of the finished rescan.  Due to how btcd
+//		// asynchronously queues notifications to not block calling code,
+//		// there is no guarantee that any of the notifications created during
+//		// rescan (such as rescanprogress, recvtx and redeemingtx) will be
+//		// received before the rescan RPC returns.  Therefore, another method
+//		// is needed to safely inform clients that all rescan notifications have
+//		// been sent.
+//		n := abejson.NewRescanFinishedNtfn(
+//			lastBlockHash.String(), lastBlock.Height(),
+//			lastBlock.MsgBlock().Header.Timestamp.Unix(),
+//		)
+//		if mn, err := abejson.MarshalCmd(nil, n); err != nil {
+//			rpcsLog.Errorf("Failed to marshal rescan finished "+
+//				"notification: %v", err)
+//		} else {
+//			// The rescan is finished, so we don't care whether the client
+//			// has disconnected at this point, so discard error.
+//			_ = wsc.QueueNotification(mn)
+//		}
+//
+//		rpcsLog.Info("Finished rescan")
+//		return nil, nil
 //	}
 //
-//	var (
-//		lastBlock     *abeutil.Block
-//		lastBlockHash *chainhash.Hash
-//	)
-//	if len(lookups.addrs) != 0 || len(lookups.unspent) != 0 {
-//		// With all the arguments parsed, we'll execute our chunked rescan
-//		// which will notify the clients of any address deposits or output
-//		// spends.
-//		lastBlock, lastBlockHash, err = scanBlockChunks(
-//			wsc, cmd, &lookups, minBlock, maxBlock, chain,
-//		)
-//		if err != nil {
-//			return nil, err
+// TODO(abe): in abelian, we want to use rescan to finish the sync process, i.e. send block to client
+//
+//	func handleRescanAbe(wsc *wsClient, icmd interface{}) (interface{}, error) {
+//		cmd, ok := icmd.(*abejson.RescanAbeCmd)
+//		if !ok {
+//			return nil, abejson.ErrRPCInternal
 //		}
 //
-//		// If the last block is nil, then this means that the client
-//		// disconnected mid-rescan. As a result, we don't need to send
-//		// anything back to them.
-//		if lastBlock == nil {
-//			return nil, nil
+//		chain := wsc.server.cfg.Chain
+//
+//		minBlockHash, err := chainhash.NewHashFromStr(cmd.BeginBlock)
+//		if err != nil {
+//			return nil, rpcDecodeHexError(cmd.BeginBlock)
 //		}
-//	} else {
+//		minBlock, err := chain.BlockHeightByHash(minBlockHash)
+//		if err != nil {
+//			return nil, &abejson.RPCError{
+//				Code:    abejson.ErrRPCBlockNotFound,
+//				Message: "Error getting block: " + err.Error(),
+//			}
+//		}
+//
+//		maxBlock := int32(math.MaxInt32)
+//		if cmd.EndBlock != nil {
+//			maxBlockHash, err := chainhash.NewHashFromStr(*cmd.EndBlock)
+//			if err != nil {
+//				return nil, rpcDecodeHexError(*cmd.EndBlock)
+//			}
+//			maxBlock, err = chain.BlockHeightByHash(maxBlockHash)
+//			if err != nil {
+//				return nil, &abejson.RPCError{
+//					Code:    abejson.ErrRPCBlockNotFound,
+//					Message: "Error getting block: " + err.Error(),
+//				}
+//			}
+//		}
+//
+//		var (
+//			lastBlock     *abeutil.Block
+//			lastBlockHash *chainhash.Hash
+//		)
 //		rpcsLog.Infof("Skipping rescan as client has no addrs/utxos")
 //
 //		// If we didn't actually do a rescan, then we'll give the
@@ -2897,109 +2986,30 @@ var ErrRescanReorg = abejson.RPCError{
 //				Message: "Error getting block: " + err.Error(),
 //			}
 //		}
-//	}
 //
-//	// Notify websocket client of the finished rescan.  Due to how btcd
-//	// asynchronously queues notifications to not block calling code,
-//	// there is no guarantee that any of the notifications created during
-//	// rescan (such as rescanprogress, recvtx and redeemingtx) will be
-//	// received before the rescan RPC returns.  Therefore, another method
-//	// is needed to safely inform clients that all rescan notifications have
-//	// been sent.
-//	n := abejson.NewRescanFinishedNtfn(
-//		lastBlockHash.String(), lastBlock.Height(),
-//		lastBlock.MsgBlock().Header.Timestamp.Unix(),
-//	)
-//	if mn, err := abejson.MarshalCmd(nil, n); err != nil {
-//		rpcsLog.Errorf("Failed to marshal rescan finished "+
-//			"notification: %v", err)
-//	} else {
-//		// The rescan is finished, so we don't care whether the client
-//		// has disconnected at this point, so discard error.
-//		_ = wsc.QueueNotification(mn)
-//	}
-//
-//	rpcsLog.Info("Finished rescan")
-//	return nil, nil
-//}
-// TODO(abe): in abelian, we want to use rescan to finish the sync process, i.e. send block to client
-//func handleRescanAbe(wsc *wsClient, icmd interface{}) (interface{}, error) {
-//	cmd, ok := icmd.(*abejson.RescanAbeCmd)
-//	if !ok {
-//		return nil, abejson.ErrRPCInternal
-//	}
-//
-//	chain := wsc.server.cfg.Chain
-//
-//	minBlockHash, err := chainhash.NewHashFromStr(cmd.BeginBlock)
-//	if err != nil {
-//		return nil, rpcDecodeHexError(cmd.BeginBlock)
-//	}
-//	minBlock, err := chain.BlockHeightByHash(minBlockHash)
-//	if err != nil {
-//		return nil, &abejson.RPCError{
-//			Code:    abejson.ErrRPCBlockNotFound,
-//			Message: "Error getting block: " + err.Error(),
+//		// Notify websocket client of the finished rescan.  Due to how btcd
+//		// asynchronously queues notifications to not block calling code,
+//		// there is no guarantee that any of the notifications created during
+//		// rescan (such as rescanprogress, recvtx and redeemingtx) will be
+//		// received before the rescan RPC returns.  Therefore, another method
+//		// is needed to safely inform clients that all rescan notifications have
+//		// been sent.
+//		n := abejson.NewRescanFinishedNtfn(
+//			lastBlockHash.String(), lastBlock.Height(),
+//			lastBlock.MsgBlock().Header.Timestamp.Unix(),
+//		)
+//		if mn, err := abejson.MarshalCmd(nil, n); err != nil {
+//			rpcsLog.Errorf("Failed to marshal rescan finished "+
+//				"notification: %v", err)
+//		} else {
+//			// The rescan is finished, so we don't care whether the client
+//			// has disconnected at this point, so discard error.
+//			_ = wsc.QueueNotification(mn)
 //		}
+//
+//		rpcsLog.Info("Finished rescan")
+//		return nil, nil
 //	}
-//
-//	maxBlock := int32(math.MaxInt32)
-//	if cmd.EndBlock != nil {
-//		maxBlockHash, err := chainhash.NewHashFromStr(*cmd.EndBlock)
-//		if err != nil {
-//			return nil, rpcDecodeHexError(*cmd.EndBlock)
-//		}
-//		maxBlock, err = chain.BlockHeightByHash(maxBlockHash)
-//		if err != nil {
-//			return nil, &abejson.RPCError{
-//				Code:    abejson.ErrRPCBlockNotFound,
-//				Message: "Error getting block: " + err.Error(),
-//			}
-//		}
-//	}
-//
-//	var (
-//		lastBlock     *abeutil.Block
-//		lastBlockHash *chainhash.Hash
-//	)
-//	rpcsLog.Infof("Skipping rescan as client has no addrs/utxos")
-//
-//	// If we didn't actually do a rescan, then we'll give the
-//	// client our best known block within the final rescan finished
-//	// notification.
-//	chainTip := chain.BestSnapshot()
-//	lastBlockHash = &chainTip.Hash
-//	lastBlock, err = chain.BlockByHash(lastBlockHash)
-//	if err != nil {
-//		return nil, &abejson.RPCError{
-//			Code:    abejson.ErrRPCBlockNotFound,
-//			Message: "Error getting block: " + err.Error(),
-//		}
-//	}
-//
-//	// Notify websocket client of the finished rescan.  Due to how btcd
-//	// asynchronously queues notifications to not block calling code,
-//	// there is no guarantee that any of the notifications created during
-//	// rescan (such as rescanprogress, recvtx and redeemingtx) will be
-//	// received before the rescan RPC returns.  Therefore, another method
-//	// is needed to safely inform clients that all rescan notifications have
-//	// been sent.
-//	n := abejson.NewRescanFinishedNtfn(
-//		lastBlockHash.String(), lastBlock.Height(),
-//		lastBlock.MsgBlock().Header.Timestamp.Unix(),
-//	)
-//	if mn, err := abejson.MarshalCmd(nil, n); err != nil {
-//		rpcsLog.Errorf("Failed to marshal rescan finished "+
-//			"notification: %v", err)
-//	} else {
-//		// The rescan is finished, so we don't care whether the client
-//		// has disconnected at this point, so discard error.
-//		_ = wsc.QueueNotification(mn)
-//	}
-//
-//	rpcsLog.Info("Finished rescan")
-//	return nil, nil
-//}
 func init() {
 	wsHandlers = wsHandlersBeforeInit
 }

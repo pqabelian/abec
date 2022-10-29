@@ -61,6 +61,7 @@ const (
 	// TxAcceptedNtfnMethod is the method used for notifications from the
 	// chain server that a transaction has been accepted into the mempool.
 	TxAcceptedNtfnMethod = "txaccepted"
+	TxRollbackNtfnMethod = "txrollback"
 
 	// TxAcceptedVerboseNtfnMethod is the method used for notifications from
 	// the chain server that a transaction has been accepted into the
@@ -278,19 +279,32 @@ func NewRescanProgressNtfn(hash string, height int32, time int64) *RescanProgres
 // TxAcceptedNtfn defines the txaccepted JSON-RPC notification.
 type TxAcceptedNtfn struct {
 	TxID   string
-	Amount float64
+	Height int32
 }
 
 // NewTxAcceptedNtfn returns a new instance which can be used to issue a
 // txaccepted JSON-RPC notification.
-func NewTxAcceptedNtfn(txHash string, amount float64) *TxAcceptedNtfn {
+func NewTxAcceptedNtfn(txHash string, height int32) *TxAcceptedNtfn {
 	return &TxAcceptedNtfn{
 		TxID:   txHash,
-		Amount: amount,
+		Height: height,
+	}
+}
+
+type TxRollbackNtfn struct {
+	TxID   string
+	Height int32
+}
+
+func NewTxRollbackNtfn(txHash string, height int32) *TxRollbackNtfn {
+	return &TxRollbackNtfn{
+		TxID:   txHash,
+		Height: height,
 	}
 }
 
 // TxAcceptedVerboseNtfn defines the txacceptedverbose JSON-RPC notification.
+//
 //	todo(ABE):
 type TxAcceptedVerboseNtfn struct {
 	RawTx TxRawResult
@@ -302,6 +316,7 @@ type TxAcceptedVerboseNtfnAbe struct {
 
 // NewTxAcceptedVerboseNtfn returns a new instance which can be used to issue a
 // txacceptedverbose JSON-RPC notification.
+//
 //	todo(ABE):
 func NewTxAcceptedVerboseNtfn(rawTx TxRawResult) *TxAcceptedVerboseNtfn {
 	return &TxAcceptedVerboseNtfn{
@@ -344,6 +359,7 @@ func init() {
 	//MustRegisterCmd(RescanFinishedNtfnMethod, (*RescanFinishedNtfn)(nil), flags)
 	//MustRegisterCmd(RescanProgressNtfnMethod, (*RescanProgressNtfn)(nil), flags)
 	MustRegisterCmd(TxAcceptedNtfnMethod, (*TxAcceptedNtfn)(nil), flags)
+	MustRegisterCmd(TxRollbackNtfnMethod, (*TxRollbackNtfn)(nil), flags)
 	MustRegisterCmd(TxAcceptedVerboseNtfnMethod, (*TxAcceptedVerboseNtfn)(nil), flags)
 	MustRegisterCmd(RelevantTxAcceptedNtfnMethod, (*RelevantTxAcceptedNtfn)(nil), flags)
 }
