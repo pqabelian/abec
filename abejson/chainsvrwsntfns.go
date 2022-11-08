@@ -62,6 +62,7 @@ const (
 	// chain server that a transaction has been accepted into the mempool.
 	TxAcceptedNtfnMethod = "txaccepted"
 	TxRollbackNtfnMethod = "txrollback"
+	TxInvalidNtfnMethod  = "txinvalid"
 
 	// TxAcceptedVerboseNtfnMethod is the method used for notifications from
 	// the chain server that a transaction has been accepted into the
@@ -303,6 +304,18 @@ func NewTxRollbackNtfn(txHash string, height int32) *TxRollbackNtfn {
 	}
 }
 
+type TxInvalidNtfn struct {
+	TxID   string
+	Height int32
+}
+
+func NewTxInvalidNtfn(txHash string, height int32) *TxInvalidNtfn {
+	return &TxInvalidNtfn{
+		TxID:   txHash,
+		Height: height,
+	}
+}
+
 // TxAcceptedVerboseNtfn defines the txacceptedverbose JSON-RPC notification.
 //
 //	todo(ABE):
@@ -360,6 +373,7 @@ func init() {
 	//MustRegisterCmd(RescanProgressNtfnMethod, (*RescanProgressNtfn)(nil), flags)
 	MustRegisterCmd(TxAcceptedNtfnMethod, (*TxAcceptedNtfn)(nil), flags)
 	MustRegisterCmd(TxRollbackNtfnMethod, (*TxRollbackNtfn)(nil), flags)
+	MustRegisterCmd(TxInvalidNtfnMethod, (*TxInvalidNtfn)(nil), flags)
 	MustRegisterCmd(TxAcceptedVerboseNtfnMethod, (*TxAcceptedVerboseNtfn)(nil), flags)
 	MustRegisterCmd(RelevantTxAcceptedNtfnMethod, (*RelevantTxAcceptedNtfn)(nil), flags)
 }
