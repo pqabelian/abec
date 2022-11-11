@@ -1039,9 +1039,9 @@ func init() {
 	MustRegisterCmd("getblockstats", (*GetBlockStatsCmd)(nil), flags)
 	MustRegisterCmd("getblocktemplate", (*GetBlockTemplateCmd)(nil), flags)
 	// TODO(ABE): ABE does not support filter.
-	MustRegisterCmd("getwork", (*GetWorkCmd)(nil), flags)
-	MustRegisterCmd("submitwork", (*SubmitWorkCmd)(nil), flags)
-	MustRegisterCmd("submithashrate", (*SubmitHashRateCmd)(nil), flags)
+	//MustRegisterCmd("getwork", (*GetWorkCmd)(nil), flags) // todo: 2022.11.11 disable (getwork, submitwork, submithashrate) APIs
+	//MustRegisterCmd("submitwork", (*SubmitWorkCmd)(nil), flags)
+	//MustRegisterCmd("submithashrate", (*SubmitHashRateCmd)(nil), flags)
 	//MustRegisterCmd("getcfilter", (*GetCFilterCmd)(nil), flags)
 	//MustRegisterCmd("getcfilterheader", (*GetCFilterHeaderCmd)(nil), flags)
 	MustRegisterCmd("getchaintips", (*GetChainTipsCmd)(nil), flags)
