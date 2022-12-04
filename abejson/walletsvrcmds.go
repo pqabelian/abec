@@ -536,6 +536,16 @@ func NewListInvalidTxsCmd() *ListInvalidTxsCmd {
 	return &ListInvalidTxsCmd{}
 }
 
+type TxStatusCmd struct {
+	TxHash string
+}
+
+func NewTxStatusCmd(hash string) *TxStatusCmd {
+	return &TxStatusCmd{
+		TxHash: hash,
+	}
+}
+
 // NewListUnspentCmd returns a new instance which can be used to issue a
 // listunspent JSON-RPC command.
 //
@@ -869,6 +879,7 @@ func init() {
 	MustRegisterCmd("listconfirmedtxs", (*ListConfirmedTxsCmd)(nil), flags)
 	MustRegisterCmd("listunconfirmedtxs", (*ListUnconfirmedTxsCmd)(nil), flags)
 	MustRegisterCmd("listinvalidtxs", (*ListInvalidTxsCmd)(nil), flags)
+	MustRegisterCmd("transactionstatus", (*TxStatusCmd)(nil), flags)
 	MustRegisterCmd("lockunspent", (*LockUnspentCmd)(nil), flags)
 	MustRegisterCmd("move", (*MoveCmd)(nil), flags) // TODO
 	//MustRegisterCmd("sendfrom", (*SendFromCmd)(nil), flags)
