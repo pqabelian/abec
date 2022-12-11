@@ -373,7 +373,7 @@ var RegressionNetParams = Params{
 
 	// BlockHeightEthashPoW
 	// BlockHeightEthashPoW specifies the block height from which Ethash-PoW mining is applied.
-	BlockHeightEthashPoW: 6000,
+	BlockHeightEthashPoW: 300,
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength: 200,
 }
@@ -451,7 +451,7 @@ var TestNet3Params = Params{
 
 	// BlockHeightEthashPoW
 	// BlockHeightEthashPoW specifies the block height from which Ethash-PoW mining is applied.
-	BlockHeightEthashPoW: 9000,
+	BlockHeightEthashPoW: 300,
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength: 200,
 }
