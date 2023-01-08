@@ -506,6 +506,16 @@ func NewListUnspentAbeCmd() *ListUnspentAbeCmd {
 	return &ListUnspentAbeCmd{}
 }
 
+type ListUnspentCoinbaseAbeCmd struct{
+	HeightStart *int64
+	HeightEnd *int64
+	CoinbaseFlag *bool
+}
+
+func NewListUnspentCoinbaseAbeCmd() *ListUnspentCoinbaseAbeCmd {
+	return &ListUnspentCoinbaseAbeCmd{}
+}
+
 type ListSpentButUnminedAbeCmd struct{}
 
 func NewListSpentButUnminedAbeCmd() *ListSpentButUnminedAbeCmd {
@@ -874,6 +884,7 @@ func init() {
 	MustRegisterCmd("listallutxoabe", (*ListAllUnspentAbeCmd)(nil), flags)
 	MustRegisterCmd("listimmaturetxoabe", (*ListUnmaturedAbeCmd)(nil), flags)
 	MustRegisterCmd("listmaturetxoabe", (*ListUnspentAbeCmd)(nil), flags)
+	MustRegisterCmd("listmaturecoinbasetxoabe", (*ListUnspentCoinbaseAbeCmd)(nil), flags)
 	MustRegisterCmd("listunconfirmedtxoabe", (*ListSpentButUnminedAbeCmd)(nil), flags)
 	MustRegisterCmd("listconfirmedtxoabe", (*ListSpentAndMinedAbeCmd)(nil), flags)
 	MustRegisterCmd("listconfirmedtxs", (*ListConfirmedTxsCmd)(nil), flags)
