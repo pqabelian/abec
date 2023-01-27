@@ -51,7 +51,7 @@ const (
 	defaultFreeTxRelayLimit     = 15.0
 	defaultTrickleInterval      = peer.DefaultTrickleInterval
 	defaultBlockMinSize         = 0
-	defaultBlockMaxSize         = 750000
+	defaultBlockMaxSize         = 8000000
 	defaultBlockMinWeight       = 0
 	defaultBlockMaxWeight       = 3000000
 	blockMaxSizeMin             = 1000
