@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/abesuite/abec/consensus/ethash"
+	"github.com/abesuite/abec/wire"
 	"io"
 	"net"
 	"os"
@@ -950,8 +951,8 @@ func loadConfig() (*config, []string, error) {
 		activeNetParams.rpcPort)
 
 	// Only allow TLS to be disabled if the RPC is bound to localhost
-	// addresses.
-	if !cfg.DisableRPC && cfg.DisableTLS {
+	// addresses or is not mainnet.
+	if activeNetParams.Net == wire.MainNet && !cfg.DisableRPC && cfg.DisableTLS {
 		allowedTLSListeners := map[string]struct{}{
 			"localhost": {},
 			"127.0.0.1": {},

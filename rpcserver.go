@@ -2401,10 +2401,12 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 	}
 
 	currentHeight := s.cfg.Chain.BestSnapshot().Height
-	if currentHeight != 0 && !s.cfg.SyncMgr.IsCurrent() {
-		return nil, &abejson.RPCError{
-			Code:    abejson.ErrRPCClientInInitialDownload,
-			Message: "Abec is downloading blocks...",
+	if s.cfg.ChainParams.Net == wire.MainNet {
+		if currentHeight != 0 && !s.cfg.SyncMgr.IsCurrent() {
+			return nil, &abejson.RPCError{
+				Code:    abejson.ErrRPCClientInInitialDownload,
+				Message: "Abec is downloading blocks...",
+			}
 		}
 	}
 

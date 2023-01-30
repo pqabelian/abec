@@ -115,6 +115,14 @@ type CPUMiner struct {
 	quit              chan struct{}
 }
 
+// isDevNet returns if the current net is developer net
+func (m *CPUMiner) isDevNet() bool {
+	if m.cfg.ChainParams.Net == wire.MainNet {
+		return false
+	}
+	return true
+}
+
 // speedMonitor handles tracking the number of hashes per second the mining
 // process is performing.  It must be run as a goroutine.
 func (m *CPUMiner) speedMonitor() {
@@ -523,7 +531,7 @@ out:
 		// Wait until there is a connection to at least one other peer
 		// since there is no way to relay a found block or receive
 		// transactions to work on when there are no connected peers.
-		if m.cfg.ConnectedCount() == 0 {
+		if m.cfg.ConnectedCount() == 0 && !m.isDevNet() {
 			time.Sleep(time.Second)
 			continue
 		}
