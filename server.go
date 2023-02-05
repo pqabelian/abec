@@ -375,10 +375,10 @@ func (sp *serverPeer) addBanScore(persistent, transient uint32, reason string) b
 				sp)
 			sp.server.BanPeer(sp)
 			sp.Disconnect()
-			return false
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 // hasServices returns whether or not the provided advertised service flags have
