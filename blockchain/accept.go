@@ -55,6 +55,7 @@ func (b *BlockChain) maybeAcceptBlockAbe(block *abeutil.BlockAbe, flags Behavior
 	// expensive connection logic.  It also has some other nice properties
 	// such as making blocks that never become part of the main chain or
 	// blocks that fail to connect available for further analysis.
+	// todo (prune): store block based on node type
 	err = b.db.Update(func(dbTx database.Tx) error {
 		return dbStoreBlockAbe(dbTx, block)
 	})

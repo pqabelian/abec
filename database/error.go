@@ -125,6 +125,10 @@ const (
 
 	// numErrorCodes is the maximum error code number used in tests.
 	numErrorCodes
+
+	// ErrWitnessNotFound indicates the witness of a block with the provided
+	// hash does not exist in the database.
+	ErrWitnessNotFound
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.

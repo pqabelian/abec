@@ -1470,6 +1470,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 
 	return blockReply, nil
 }
+
 func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.GetBlockAbeCmd)
 
@@ -1506,9 +1507,11 @@ func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	}
 
 	// Witness
-	txs := blk.Transactions()
-	for i := 0; i < len(txs); i++ {
-		txs[i].MsgTx().TxWitness = witnesses[i][chainhash.HashSize:]
+	if witnesses != nil {
+		txs := blk.Transactions()
+		for i := 0; i < len(txs); i++ {
+			txs[i].MsgTx().TxWitness = witnesses[i][chainhash.HashSize:]
+		}
 	}
 
 	// Get the block height from chain.

@@ -44,6 +44,7 @@ func deserializeWriteRow(writeRow []byte) (uint32, uint32, error) {
 
 // reconcileDB reconciles the metadata with the flat block files on disk.  It
 // will also initialize the underlying database if the create flag is set.
+// todo (prune): depend on the node type
 func reconcileDB(pdb *db, create bool) (database.DB, error) {
 	// Perform initial internal bucket and value creation during database
 	// creation.

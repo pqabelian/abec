@@ -150,6 +150,7 @@ type config struct {
 	Proxy                 string        `long:"proxy" description:"Connect via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
 	ProxyPass             string        `long:"proxypass" default-mask:"-" description:"Password for proxy server"`
 	ProxyUser             string        `long:"proxyuser" description:"Username for proxy server"`
+	PrunedNode            bool          `long:"prunednode" description:"Do not keep the unnecessary witness data"`
 	RegressionTest        bool          `long:"regtest" description:"Use the regression test network"`
 	RejectNonStd          bool          `long:"rejectnonstd" description:"Reject non-standard transactions regardless of the default settings for the active network."`
 	RejectReplacement     bool          `long:"rejectreplacement" description:"Reject transactions that attempt to replace existing transactions within the mempool through the Replace-By-Fee (RBF) signaling policy."`
@@ -167,6 +168,7 @@ type config struct {
 	RPCUser               string        `short:"u" long:"rpcuser" description:"Username for RPC connections"`
 	SigCacheMaxSize       uint          `long:"sigcachemaxsize" description:"The maximum number of entries in the signature verification cache"`
 	WitnessCacheMaxSize   uint          `long:"witnesscachemaxsize" description:"The maximum number of entries in the witness cache"`
+	WitnessKept           int           `long:"witnesskept" description:"If the prunednode is set, this flag indicates how many block witness should be kept"`
 	SimNet                bool          `long:"simnet" description:"Use the simulation test network"`
 	TestNet3              bool          `long:"testnet" description:"Use the test network"`
 	TorIsolation          bool          `long:"torisolation" description:"Enable Tor stream isolation by randomizing user credentials for each connection."`

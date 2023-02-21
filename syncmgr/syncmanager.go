@@ -285,34 +285,20 @@ func (sm *SyncManager) startSync() {
 		return
 	}
 
-	// Once the segwit soft-fork package has activated, we only
-	// want to sync from peers which are witness enabled to ensure
-	// that we fully validate all blockchain data.
-	//	todo(ABE): for btcd, the segwit enables some nodes to not provide witness.
-	//	todo (ABE): For ABE, it's normal for nodes not to provide witness.
-	//	todo (ABE): for ABE, most nodes do not provide witness. Witness are provided only when the block is announced.
-	/*	segwitActive, err := sm.chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
-		if err != nil {
-			log.Errorf("Unable to query for segwit soft-fork state: %v", err)
-			return
-		}*/
-
 	best := sm.chain.BestSnapshot()
 	var higherPeers, equalPeers []*peerpkg.Peer
 	for peer, state := range sm.peerStates {
 		if !state.syncCandidate {
 			continue
 		}
-		// todo(ABE): In ABE, should the peers have this option?
-		/*		if segwitActive && !peer.IsWitnessEnabled() {
-				log.Debugf("peer %v not witness enabled, skipping", peer)
-				continue
-			}*/
 
 		if !peer.IsWitnessEnabled() {
 			log.Debugf("peer %v not witness enabled, skipping", peer)
 			continue
 		}
+
+		// todo (prune): choose sync peer based on current height and node type
+		// todo (prune): also need to skip the node without witness we need
 
 		// Remove sync candidate peers that are no longer candidates due
 		// to passing their latest known block.  NOTE: The < is
@@ -414,6 +400,7 @@ func (sm *SyncManager) startSync() {
 
 // isSyncCandidate returns whether or not the peer is a candidate to consider
 // syncing from.
+// todo (prune)
 func (sm *SyncManager) isSyncCandidate(peer *peerpkg.Peer) bool {
 	// Typically a peer is not a candidate for sync if it's not a full node,
 	// however regression test is special in that the regression tool is
@@ -1819,6 +1806,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		requestQueue[0] = nil
 		requestQueue = requestQueue[1:]
 
+		// todo (prune): modify the request inv type according to the node type
 		switch iv.Type {
 		case wire.InvTypeWitnessBlock:
 			fallthrough

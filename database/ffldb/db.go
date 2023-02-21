@@ -1331,11 +1331,12 @@ func (tx *transaction) fetchBlockRow(hash *chainhash.Hash) ([]byte, error) {
 
 	return blockRow, nil
 }
+
 func (tx *transaction) fetchWitnessRow(hash *chainhash.Hash) ([]byte, error) {
 	witnessRow := tx.witnessIdxBucket.Get(hash[:])
 	if witnessRow == nil {
-		str := fmt.Sprintf("block %s does not exist", hash)
-		return nil, makeDbErr(database.ErrBlockNotFound, str, nil)
+		str := fmt.Sprintf("witness of block %s does not exist", hash)
+		return nil, makeDbErr(database.ErrWitnessNotFound, str, nil)
 	}
 
 	return witnessRow, nil
@@ -1470,18 +1471,22 @@ func (tx *transaction) FetchBlockAbe(hash *chainhash.Hash) ([]byte, [][]byte, er
 		return nil, nil, err
 	}
 
-	// Lookup the location of the block in the files from the block index.
+	// Lookup the location of the witness in the files from the witness index.
+	// In prune settings, error is ok, just return nil witness data.
 	witnessRow, err := tx.fetchWitnessRow(hash)
-	if err != nil {
-		return nil, nil, err
+	if err != nil || witnessRow == nil {
+		log.Tracef("Fetch witness row err: %v", err)
+		return blockBytes, nil, nil
 	}
 	witLocation := deserializeWitnessLoc(witnessRow)
 
 	// Read the block from the appropriate location.  The function also
 	// performs a checksum over the data to detect data corruption.
 	witnesses, err := tx.db.store.readWitness(hash, witLocation)
+	// todo (prune): maybe we need to delete the witness index if we cannot read it.
 	if err != nil {
-		return nil, nil, err
+		log.Tracef("Read witness err: %v", err)
+		return blockBytes, nil, nil
 	}
 
 	return blockBytes, witnesses, nil

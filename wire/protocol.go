@@ -11,32 +11,42 @@ const (
 	// ProtocolVersion is the latest protocol version this package supports.
 	ProtocolVersion uint32 = 1
 
-/*	// FeeFilterVersion is the protocol version which added a new
-	// feefilter message.
-	FeeFilterVersion uint32 = 70013*/
+	/*	// FeeFilterVersion is the protocol version which added a new
+		// feefilter message.
+		FeeFilterVersion uint32 = 70013*/
 )
 
-// ServiceFlag identifies services supported by a bitcoin peer.
+// ServiceFlag identifies services supported by an abec peer.
 type ServiceFlag uint64
 
 const (
-	// SFNodeNetwork is a flag used to indicate a peer is a full node.
+	// SFNodeNetwork is a flag used to indicate a peer is a full node (without witness).
 	SFNodeNetwork ServiceFlag = 1 << iota
 
 	// SFNodeGetUTXO is a flag used to indicate a peer supports the
-	// getutxos and utxos commands (BIP0064).
+	// getutxos and utxos commands.
 	SFNodeGetUTXO
 
 	// SFNodeWitness is a flag used to indicate a peer supports blocks
-	// and transactions including witness data (BIP0144).
+	// and transactions including witness data.
 	SFNodeWitness
+
+	// SFNodePruned is a flag used to indicate a peer which has pruned witness data
+	// before the last checkpoint.
+	SFNodePruned
+
+	// SFNodePartiallyPruned is a flag used to indicate a peer which has pruned
+	// witness data partially. SFNodePruned includes SFNodePartiallyPruned.
+	SFNodePartiallyPruned
 )
 
 // Map of service flags back to their constant names for pretty printing.
 var sfStrings = map[ServiceFlag]string{
-	SFNodeNetwork: "SFNodeNetwork",
-	SFNodeGetUTXO: "SFNodeGetUTXO",
-	SFNodeWitness: "SFNodeWitness",
+	SFNodeNetwork:         "SFNodeNetwork",
+	SFNodeGetUTXO:         "SFNodeGetUTXO",
+	SFNodeWitness:         "SFNodeWitness",
+	SFNodePruned:          "SFNodePruned",
+	SFNodePartiallyPruned: "SFNodePartiallyPruned",
 }
 
 // orderedSFStrings is an ordered list of service flags from highest to
@@ -45,6 +55,8 @@ var orderedSFStrings = []ServiceFlag{
 	SFNodeNetwork,
 	SFNodeGetUTXO,
 	SFNodeWitness,
+	SFNodePruned,
+	SFNodePartiallyPruned,
 }
 
 // String returns the ServiceFlag in human-readable form.

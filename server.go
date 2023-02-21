@@ -41,6 +41,7 @@ const (
 
 	// defaultRequiredServices describes the default services that are
 	// required to be supported by outbound peers.
+	// todo (prune): is this service flag enough?
 	defaultRequiredServices = wire.SFNodeNetwork
 
 	// defaultTargetOutbound is the default number of outbound peers to target.
@@ -1145,9 +1146,14 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 		return err
 	}
 
-	txs := msgBlock.Transactions
-	for i := 0; i < len(txs); i++ {
-		txs[i].TxWitness = witnesses[i][chainhash.HashSize:]
+	if witnesses != nil {
+		txs := msgBlock.Transactions
+		for i := 0; i < len(txs); i++ {
+			txs[i].TxWitness = witnesses[i][chainhash.HashSize:]
+		}
+	} else {
+		// If there is no witness available, set encoding to base encoding.
+		encoding = wire.BaseEncoding
 	}
 
 	// Once we have fetched data wait for any previous operation to finish.
@@ -1220,9 +1226,11 @@ func (s *server) pushPrunedBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneCh
 		return err
 	}
 
-	txs := msgBlock.Transactions
-	for i := 0; i < len(txs); i++ {
-		txs[i].TxWitness = witnessBytes[i][chainhash.HashSize:]
+	if witnessBytes != nil {
+		txs := msgBlock.Transactions
+		for i := 0; i < len(txs); i++ {
+			txs[i].TxWitness = witnessBytes[i][chainhash.HashSize:]
+		}
 	}
 
 	msgPrunedBlock, err := wire.NewMsgBlockPrunedFromMsgBlockAbe(&msgBlock)
@@ -2305,7 +2313,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	db database.DB, chainParams *chaincfg.Params,
 	interrupt <-chan struct{}) (*server, error) {
 
-	// todo (abe): which service should we keep? need discuss
+	// todo (prune): service flag based on node type
 	services := defaultServices
 
 	amgr := netaddrmgr.New(cfg.DataDir, abecLookup)
