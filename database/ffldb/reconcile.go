@@ -42,6 +42,19 @@ func deserializeWriteRow(writeRow []byte) (uint32, uint32, error) {
 	return fileNum, fileOffset, nil
 }
 
+// serializeUint32 serialize the uint32 value.
+func serializeUint32(num uint32) []byte {
+	var serializedRow [4]byte
+	byteOrder.PutUint32(serializedRow[0:4], num)
+	return serializedRow[:]
+}
+
+// deserializeUint32 deserializes the uint32 value.
+func deserializeUint32(num []byte) uint32 {
+	res := byteOrder.Uint32(num[0:4])
+	return res
+}
+
 // reconcileDB reconciles the metadata with the flat block files on disk.  It
 // will also initialize the underlying database if the create flag is set.
 // todo (prune): depend on the node type

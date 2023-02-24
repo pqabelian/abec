@@ -76,6 +76,8 @@ var (
 	//	todo(ABE):
 	utxoRingSetBucketName = []byte("utxoringset")
 
+	deletedWitnessFileBucketName = []byte("deletedwitnessfile")
+
 	// byteOrder is the preferred byte order used for serializing numeric
 	// fields for storage in the database.
 	byteOrder = binary.LittleEndian
@@ -1447,6 +1449,13 @@ func (b *BlockChain) createChainState() error {
 			return err
 		}
 
+		// Create the bucket that houses the meta infos of deleted witness file,
+		// including file size and deleted time.
+		_, err = meta.CreateBucket(deletedWitnessFileBucketName)
+		if err != nil {
+			return err
+		}
+
 		// Save the genesis block to the block index database.
 		err = dbStoreBlockNode(dbTx, node)
 		if err != nil {
@@ -1479,9 +1488,11 @@ func (b *BlockChain) initChainState() error {
 	// Determine the state of the chain database. We may need to initialize
 	// everything from scratch or upgrade certain buckets.
 	var initialized, hasBlockIndex bool
+	var hasDeletedWitnessFileBucket bool
 	err := b.db.View(func(dbTx database.Tx) error {
 		initialized = dbTx.Metadata().Get(chainStateKeyName) != nil
 		hasBlockIndex = dbTx.Metadata().Bucket(blockIndexBucketName) != nil
+		hasDeletedWitnessFileBucket = dbTx.Metadata().Bucket(deletedWitnessFileBucketName) != nil
 		return nil
 	})
 	if err != nil {
@@ -1499,6 +1510,20 @@ func (b *BlockChain) initChainState() error {
 		err := migrateBlockIndex(b.db)
 		if err != nil {
 			return nil
+		}
+	}
+
+	if !hasDeletedWitnessFileBucket {
+		// Create the bucket that houses the meta infos of deleted witness file,
+		// including the file num, file size and deleted time.
+		log.Infof("Adding new index for deleted witness file...")
+		err = b.db.Update(func(dbTx database.Tx) error {
+			meta := dbTx.Metadata()
+			_, err = meta.CreateBucket(deletedWitnessFileBucketName)
+			return err
+		})
+		if err != nil {
+			return err
 		}
 	}
 

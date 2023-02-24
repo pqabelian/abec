@@ -1206,10 +1206,13 @@ func scanBlockFiles(dbPath string) (int, uint32) {
 		fileLen)
 	return lastFile, fileLen
 }
-func scanWitnessFiles(dbPath string) (int, uint32) {
+
+func scanWitnessFiles(dbPath string, startIdx int) (int, uint32) {
 	lastFile := -1
 	fileLen := uint32(0)
-	for i := 0; ; i++ {
+
+	log.Tracef("Scan from witness file #%d", startIdx)
+	for i := startIdx; ; i++ {
 		filePath := witnessFilePath(dbPath, uint32(i))
 		st, err := os.Stat(filePath)
 		if err != nil {
@@ -1236,11 +1239,6 @@ func newBlockStore(basePath string, network wire.AbelianNet) *blockStore {
 		fileNum = 0
 		fileOff = 0
 	}
-	witnessFileNum, witnessFileOff := scanWitnessFiles(basePath)
-	if witnessFileNum == -1 {
-		witnessFileNum = 0
-		witnessFileOff = 0
-	}
 
 	store := &blockStore{
 		network:          network,
@@ -1259,11 +1257,6 @@ func newBlockStore(basePath string, network wire.AbelianNet) *blockStore {
 			curFileNum: uint32(fileNum),
 			curOffset:  fileOff,
 		},
-		writeCursorForWitness: &writeCursor{
-			curFile:    &lockableFile{},
-			curFileNum: uint32(witnessFileNum),
-			curOffset:  witnessFileOff,
-		},
 	}
 	store.openFileFunc = store.openFile
 	store.openWriteFileFunc = store.openWriteFile
@@ -1273,4 +1266,44 @@ func newBlockStore(basePath string, network wire.AbelianNet) *blockStore {
 	store.openWriteWitnessFileFunc = store.openWriteWitnessFile
 	store.deleteWitnessFileFunc = store.deleteWitnessFile
 	return store
+}
+
+func fetchMinWitnessFileNum(pdb *db) (int, error) {
+	hasMinWitnessFileNum := true
+	var minWitnessFileNum []byte
+	_ = pdb.View(func(tx database.Tx) error {
+		minWitnessFileNum = tx.Metadata().Get(minWitnessFileNumKeyName)
+		if minWitnessFileNum == nil {
+			hasMinWitnessFileNum = false
+		}
+		return nil
+	})
+
+	if !hasMinWitnessFileNum {
+		log.Infof("Creating min witness file num key...")
+		err := addMinWitnessFileNumKey(pdb.cache.ldb)
+		return 0, err
+	}
+
+	return int(deserializeUint32(minWitnessFileNum)), nil
+}
+
+func initWitnessCursor(basePath string, pdb *db) error {
+	minIdx, err := fetchMinWitnessFileNum(pdb)
+	if err != nil {
+		return err
+	}
+
+	witnessFileNum, witnessFileOff := scanWitnessFiles(basePath, minIdx)
+	if witnessFileNum == -1 {
+		witnessFileNum = 0
+		witnessFileOff = 0
+	}
+
+	pdb.store.writeCursorForWitness = &writeCursor{
+		curFile:    &lockableFile{},
+		curFileNum: uint32(witnessFileNum),
+		curOffset:  witnessFileOff,
+	}
+	return nil
 }

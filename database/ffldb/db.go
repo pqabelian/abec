@@ -75,6 +75,10 @@ var (
 	// location.
 	writeLocKeyName        = []byte("ffldb-writeloc")
 	writeLocWitnessKeyName = []byte("ffldb-writeloc-witness")
+
+	// minWitnessFileNumKeyName is the key used to store the number of witness file
+	// that should be scan from.
+	minWitnessFileNumKeyName = []byte("ffldb-minwitnessfilenum")
 )
 
 // Common error strings.
@@ -2291,6 +2295,8 @@ func initDB(ldb *leveldb.DB) error {
 		serializeWriteRow(0, 0))
 	batch.Put(bucketizedKey(metadataBucketID, writeLocWitnessKeyName),
 		serializeWriteRow(0, 0))
+	batch.Put(bucketizedKey(metadataBucketID, minWitnessFileNumKeyName),
+		serializeUint32(0))
 
 	// Create block index bucket and set the current bucket id.
 	//
@@ -2307,6 +2313,23 @@ func initDB(ldb *leveldb.DB) error {
 	// Write everything as a single batch.
 	if err := ldb.Write(batch, nil); err != nil {
 		str := fmt.Sprintf("failed to initialize metadata database: %v",
+			err)
+		return convertErr(str, err)
+	}
+
+	return nil
+}
+
+// addMinWitnessFileNumKey creates the minwitnessfilenumkey in meta data.
+func addMinWitnessFileNumKey(ldb *leveldb.DB) error {
+
+	batch := new(leveldb.Batch)
+	batch.Put(bucketizedKey(metadataBucketID, minWitnessFileNumKeyName),
+		serializeUint32(0))
+
+	// Write everything as a single batch.
+	if err := ldb.Write(batch, nil); err != nil {
+		str := fmt.Sprintf("failed to add min witnessfilenumkey: %v",
 			err)
 		return convertErr(str, err)
 	}
@@ -2353,6 +2376,10 @@ func openDB(dbPath string, network wire.AbelianNet, create bool) (database.DB, e
 	store := newBlockStore(dbPath, network)
 	cache := newDbCache(ldb, store, defaultCacheSize, defaultFlushSecs)
 	pdb := &db{store: store, cache: cache}
+	err = initWitnessCursor(dbPath, pdb)
+	if err != nil {
+		return nil, err
+	}
 
 	// Perform any reconciliation needed between the block and metadata as
 	// well as database initialization, if needed.
