@@ -1245,14 +1245,23 @@ func (tx *transaction) StoreBlockAbe(block *abeutil.BlockAbe) error {
 	}
 
 	txs := block.Transactions()
-	witnesses := make([][]byte, len(txs))
-	var witness []byte
-	for i := 0; i < len(txs); i++ {
-		txHash := txs[i].Hash()
-		witness = txs[i].MsgTx().TxWitness
-		witnesses[i] = make([]byte, chainhash.HashSize+len(witness))
-		copy(witnesses[i][:chainhash.HashSize], txHash[:])
-		copy(witnesses[i][chainhash.HashSize:], witness[:])
+	// Check if the block has witness. No witness is allowed when node is a fully pruned node.
+	witnessExist := false
+	if txs[0].HasWitness() {
+		witnessExist = true
+	}
+
+	var witnesses [][]byte = nil
+	if witnessExist {
+		witnesses = make([][]byte, len(txs))
+		var witness []byte
+		for i := 0; i < len(txs); i++ {
+			txHash := txs[i].Hash()
+			witness = txs[i].MsgTx().TxWitness
+			witnesses[i] = make([]byte, chainhash.HashSize+len(witness))
+			copy(witnesses[i][:chainhash.HashSize], txHash[:])
+			copy(witnesses[i][chainhash.HashSize:], witness[:])
+		}
 	}
 
 	// Add the block to be stored to the list of pending blocks to store
@@ -1490,6 +1499,35 @@ func (tx *transaction) FetchBlockAbe(hash *chainhash.Hash) ([]byte, [][]byte, er
 	}
 
 	return blockBytes, witnesses, nil
+}
+
+func (tx *transaction) FetchBlockNoWitness(hash *chainhash.Hash) ([]byte, error) {
+	// Ensure transaction state is valid.
+	if err := tx.checkClosed(); err != nil {
+		return nil, err
+	}
+
+	// When the block is pending to be written on commit return the bytes
+	// from there.
+	if idx, exists := tx.pendingBlocks[*hash]; exists {
+		return tx.pendingBlockAbeData[idx].bytesNoWitness, nil
+	}
+
+	// Lookup the location of the block in the files from the block index.
+	blockRow, err := tx.fetchBlockRow(hash)
+	if err != nil {
+		return nil, err
+	}
+	location := deserializeBlockLoc(blockRow)
+
+	// Read the block from the appropriate location.  The function also
+	// performs a checksum over the data to detect data corruption.
+	blockBytes, err := tx.db.store.readBlock(hash, location)
+	if err != nil {
+		return nil, err
+	}
+
+	return blockBytes, nil
 }
 
 // FetchBlocks returns the raw serialized bytes for the blocks identified by the
@@ -1914,7 +1952,10 @@ func (tx *transaction) writePendingAndCommit() error {
 			return err
 		}
 
-		// witness
+		// Write witnesses if exist.
+		if blockData.bytesWitness == nil {
+			continue
+		}
 		wLocation, err := tx.db.store.writeWitness(blockData.bytesWitness)
 		if err != nil {
 			rollback()

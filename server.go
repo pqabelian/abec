@@ -1120,7 +1120,11 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 	var witnesses [][]byte
 	err := sp.server.db.View(func(dbTx database.Tx) error {
 		var err error
-		blockBytes, witnesses, err = dbTx.FetchBlockAbe(hash)
+		if encoding == wire.BaseEncoding {
+			blockBytes, err = dbTx.FetchBlockNoWitness(hash)
+		} else {
+			blockBytes, witnesses, err = dbTx.FetchBlockAbe(hash)
+		}
 		return err
 	})
 	if err != nil {

@@ -3235,8 +3235,8 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 			if err != nil {
 				return err
 			}
-			witness, err = dbTx.FetchWitnessRegion(blockRegion)
-			return err
+			witness, _ = dbTx.FetchWitnessRegion(blockRegion)
+			return nil
 		})
 		if err != nil {
 			return nil, rpcNoTxInfoError(txHash)
@@ -3274,7 +3274,9 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 			context := "Failed to deserialize transaction"
 			return nil, internalRPCError(err.Error(), context)
 		}
-		msgTx.TxWitness = witness[chainhash.HashSize:]
+		if len(witness) != 0 {
+			msgTx.TxWitness = witness[chainhash.HashSize:]
+		}
 		mtx = &msgTx
 	} else {
 		// When the verbose flag isn't set, simply return the

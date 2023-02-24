@@ -316,6 +316,7 @@ type Tx interface {
 	// implementations.
 	FetchBlock(hash *chainhash.Hash) ([]byte, error)
 	FetchBlockAbe(hash *chainhash.Hash) ([]byte, [][]byte, error)
+	FetchBlockNoWitness(hash *chainhash.Hash) ([]byte, error)
 
 	// FetchBlocks returns the raw serialized bytes for the blocks
 	// identified by the given hashes.  The raw bytes are in the format
