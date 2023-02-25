@@ -197,6 +197,7 @@ func limitAdd(m map[chainhash.Hash]struct{}, hash chainhash.Hash, limit int) {
 // chain is in sync, the SyncManager handles incoming block and header
 // notifications and relays announcements of new blocks to peers.
 type SyncManager struct {
+	fullNode       bool
 	peerNotifier   PeerNotifier
 	started        int32
 	shutdown       int32
@@ -292,13 +293,13 @@ func (sm *SyncManager) startSync() {
 			continue
 		}
 
-		if !peer.IsWitnessEnabled() {
-			log.Debugf("peer %v not witness enabled, skipping", peer)
+		witnessNeeded := true
+		if !sm.fullNode && sm.nextCheckpoint != nil {
+			witnessNeeded = false
+		}
+		if !peer.MaybeSyncPeer(best.Height, witnessNeeded) {
 			continue
 		}
-
-		// todo (prune): choose sync peer based on current height and node type
-		// todo (prune): also need to skip the node without witness we need
 
 		// Remove sync candidate peers that are no longer candidates due
 		// to passing their latest known block.  NOTE: The < is
@@ -1455,6 +1456,7 @@ func (sm *SyncManager) fetchHeaderBlocks() {
 			// witness data in the blocks.
 			// todo(ABE): for ABE, even for WitnessEnabled peer, we may do not want receive the witness
 			//	todo(ABE): for blocks before checkpoint, we do not need to check the transactions' witness
+			// todo (prune)
 			if sm.syncPeer.IsWitnessEnabled() {
 				iv.Type = wire.InvTypeWitnessBlock
 			}
@@ -1744,6 +1746,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 			//	todo (ABE): (1) as an received reply for GetBlocks request
 			//	todo (ABE): (2) some miner announce its new found block candidate
 			//	todo (ABE): (3) in the pushBlockMsg of getData of the syning peer, the peer may send a invMsg with its latest block
+			// todo (prune)
 			if !peer.IsWitnessEnabled() && iv.Type == wire.InvTypeBlock {
 				continue
 			}
@@ -1846,6 +1849,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 
 				// If the peer is capable, request the txn
 				// including all witness data.
+				// todo (prune)
 				if peer.IsWitnessEnabled() {
 					iv.Type = wire.InvTypeWitnessTx
 				}
@@ -2283,6 +2287,7 @@ func (sm *SyncManager) Pause() chan<- struct{} {
 // block, tx, and inv updates.
 func New(config *Config) (*SyncManager, error) {
 	sm := SyncManager{
+		fullNode:        config.FullNode,
 		peerNotifier:    config.PeerNotifier,
 		chain:           config.Chain,
 		txMemPool:       config.TxMemPool,

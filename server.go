@@ -2471,6 +2471,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	s.ethash = ethash.New(cfg.EthashConfig)
 
 	s.syncManager, err = syncmgr.New(&syncmgr.Config{
+		FullNode:           !cfg.PrunedNode && !cfg.PartiallyPrunedNode,
 		PeerNotifier:       &s,
 		Chain:              s.chain,
 		TxMemPool:          s.txMemPool,

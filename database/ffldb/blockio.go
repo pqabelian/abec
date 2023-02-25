@@ -1271,13 +1271,16 @@ func newBlockStore(basePath string, network wire.AbelianNet) *blockStore {
 func fetchMinWitnessFileNum(pdb *db) (int, error) {
 	hasMinWitnessFileNum := true
 	var minWitnessFileNum []byte
-	_ = pdb.View(func(tx database.Tx) error {
+	err := pdb.View(func(tx database.Tx) error {
 		minWitnessFileNum = tx.Metadata().Get(minWitnessFileNumKeyName)
 		if minWitnessFileNum == nil {
 			hasMinWitnessFileNum = false
 		}
 		return nil
 	})
+	if err != nil {
+		return 0, err
+	}
 
 	if !hasMinWitnessFileNum {
 		log.Infof("Creating min witness file num key...")
