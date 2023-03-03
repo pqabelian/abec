@@ -506,9 +506,9 @@ func NewListUnspentAbeCmd() *ListUnspentAbeCmd {
 	return &ListUnspentAbeCmd{}
 }
 
-type ListUnspentCoinbaseAbeCmd struct{
-	HeightStart *int64
-	HeightEnd *int64
+type ListUnspentCoinbaseAbeCmd struct {
+	HeightStart  *int64
+	HeightEnd    *int64
 	CoinbaseFlag *bool
 }
 
@@ -581,6 +581,16 @@ func NewLockUnspentCmd(unlock bool, transactions []TransactionInput) *LockUnspen
 	return &LockUnspentCmd{
 		Unlock:       unlock,
 		Transactions: transactions,
+	}
+}
+
+type GetTxHashFromReqeustCmd struct {
+	RequestHashStr string
+}
+
+func NewGetTxHashFromReqeustCmd(requestHashStr string) *GetTxHashFromReqeustCmd {
+	return &GetTxHashFromReqeustCmd{
+		RequestHashStr: requestHashStr,
 	}
 }
 
@@ -892,6 +902,7 @@ func init() {
 	MustRegisterCmd("listinvalidtxs", (*ListInvalidTxsCmd)(nil), flags)
 	MustRegisterCmd("transactionstatus", (*TxStatusCmd)(nil), flags)
 	MustRegisterCmd("lockunspent", (*LockUnspentCmd)(nil), flags)
+	MustRegisterCmd("gettxhashfromreqeust", (*GetTxHashFromReqeustCmd)(nil), flags)
 	MustRegisterCmd("move", (*MoveCmd)(nil), flags) // TODO
 	//MustRegisterCmd("sendfrom", (*SendFromCmd)(nil), flags)
 	//MustRegisterCmd("sendmany", (*SendManyCmd)(nil), flags)
