@@ -1150,14 +1150,11 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 		return err
 	}
 
-	if witnesses != nil {
+	if len(witnesses) != 0 {
 		txs := msgBlock.Transactions
 		for i := 0; i < len(txs); i++ {
 			txs[i].TxWitness = witnesses[i][chainhash.HashSize:]
 		}
-	} else {
-		// If there is no witness available, set encoding to base encoding.
-		encoding = wire.BaseEncoding
 	}
 
 	// Once we have fetched data wait for any previous operation to finish.

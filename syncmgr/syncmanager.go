@@ -211,12 +211,13 @@ type SyncManager struct {
 	quit           chan struct{}
 
 	// These fields should only be accessed from the blockHandler thread
-	rejectedTxns     map[chainhash.Hash]struct{}
-	requestedTxns    map[chainhash.Hash]struct{}
-	requestedBlocks  map[chainhash.Hash]struct{}
-	syncPeer         *peerpkg.Peer
-	peerStates       map[*peerpkg.Peer]*peerSyncState
-	lastProgressTime time.Time
+	rejectedTxns        map[chainhash.Hash]struct{}
+	requestedTxns       map[chainhash.Hash]struct{}
+	requestedBlocks     map[chainhash.Hash]struct{}
+	syncFailedAddresses map[string]time.Time
+	syncPeer            *peerpkg.Peer
+	peerStates          map[*peerpkg.Peer]*peerSyncState
+	lastProgressTime    time.Time
 
 	// The following fields are used for headers-first mode.
 	headersFirstMode bool
@@ -276,6 +277,39 @@ func (sm *SyncManager) findNextHeaderCheckpoint(height int32) *chaincfg.Checkpoi
 	return nextCheckpoint
 }
 
+func (sm *SyncManager) MaybeSyncPeer(p *peerpkg.Peer, witnessNeeded bool) bool {
+	if !witnessNeeded {
+		return true
+	}
+	if !p.IsWitnessEnabled() {
+		log.Debugf("peer %v not witness enabled, skipping", p)
+		return false
+	}
+
+	if !p.IsWitnessPruned() {
+		return true
+	}
+
+	// If the peer is witness pruned and has not been synced with,
+	// try to sync with it. If the peer is flagged (fail to sync),
+	// it can be chosen again after 10 minutes.
+	lastSyncTime, ok := sm.syncFailedAddresses[p.Addr()]
+	if !ok {
+		log.Debugf("peer %v is witness pruned, try to sync with it", p)
+		return true
+	}
+
+	if lastSyncTime.Add(time.Minute * 10).Before(time.Now()) {
+		log.Debugf("peer %v is witness pruned, try to sync with it after 10 minutes", p)
+		delete(sm.syncFailedAddresses, p.Addr())
+		return true
+	}
+	log.Debugf("peer %v is witness pruned and we failed to sync with it just now, "+
+		"skipping", p)
+	return false
+
+}
+
 // startSync will choose the best peer among the available candidate peers to
 // download/sync the blockchain from.  When syncing is already running, it
 // simply returns.  It also examines the candidates for any which are no longer
@@ -297,7 +331,7 @@ func (sm *SyncManager) startSync() {
 		if !sm.fullNode && sm.nextCheckpoint != nil {
 			witnessNeeded = false
 		}
-		if !peer.MaybeSyncPeer(best.Height, witnessNeeded) {
+		if !sm.MaybeSyncPeer(peer, witnessNeeded) {
 			continue
 		}
 
@@ -575,6 +609,18 @@ func (sm *SyncManager) updateSyncPeer(dcSyncPeer bool) {
 
 	sm.syncPeer = nil
 	sm.startSync()
+}
+
+func (sm *SyncManager) addSyncFailedIPs(addr string) {
+	newSyncFailedAddresses := make(map[string]time.Time)
+	for address, t := range sm.syncFailedAddresses {
+		if t.Add(time.Minute * 10).Before(time.Now()) {
+			newSyncFailedAddresses[address] = t
+		}
+	}
+
+	newSyncFailedAddresses[addr] = time.Now()
+	sm.syncFailedAddresses = newSyncFailedAddresses
 }
 
 // handleTxMsgAbe handles transaction messages from all peers.
@@ -953,9 +999,15 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 		// rejected as opposed to something actually going wrong, so log
 		// it as such.  Otherwise, something really did go wrong, so log
 		// it as an actual error.
-		if _, ok := err.(blockchain.RuleError); ok {
+		if err0, ok := err.(blockchain.RuleError); ok {
 			log.Infof("Rejected block %v from %s: %v", blockHash,
 				peer, err)
+			if err0.ErrorCode == blockchain.ErrWitnessMissing {
+				sm.addSyncFailedIPs(peer.Addr())
+				log.Infof("Disconnecting and changing sync peer...")
+				sm.updateSyncPeer(true)
+				return
+			}
 		} else {
 			log.Errorf("Failed to process block %v: %v",
 				blockHash, err)
@@ -1456,8 +1508,12 @@ func (sm *SyncManager) fetchHeaderBlocks() {
 			// witness data in the blocks.
 			// todo(ABE): for ABE, even for WitnessEnabled peer, we may do not want receive the witness
 			//	todo(ABE): for blocks before checkpoint, we do not need to check the transactions' witness
-			// todo (prune)
-			if sm.syncPeer.IsWitnessEnabled() {
+			// todo (prune): ok
+			witnessNeeded := true
+			if !sm.fullNode && sm.nextCheckpoint != nil {
+				witnessNeeded = false
+			}
+			if witnessNeeded {
 				iv.Type = wire.InvTypeWitnessBlock
 			}
 
@@ -2287,21 +2343,22 @@ func (sm *SyncManager) Pause() chan<- struct{} {
 // block, tx, and inv updates.
 func New(config *Config) (*SyncManager, error) {
 	sm := SyncManager{
-		fullNode:        config.FullNode,
-		peerNotifier:    config.PeerNotifier,
-		chain:           config.Chain,
-		txMemPool:       config.TxMemPool,
-		ethash:          config.Ethash, // todo: (EthashPoW)
-		chainParams:     config.ChainParams,
-		rejectedTxns:    make(map[chainhash.Hash]struct{}),
-		requestedTxns:   make(map[chainhash.Hash]struct{}),
-		requestedBlocks: make(map[chainhash.Hash]struct{}),
-		peerStates:      make(map[*peerpkg.Peer]*peerSyncState),
-		progressLogger:  newBlockProgressLogger("Processed", log),
-		msgChan:         make(chan interface{}, config.MaxPeers*3),
-		headerList:      list.New(),
-		quit:            make(chan struct{}),
-		feeEstimator:    config.FeeEstimator,
+		fullNode:            config.FullNode,
+		peerNotifier:        config.PeerNotifier,
+		chain:               config.Chain,
+		txMemPool:           config.TxMemPool,
+		ethash:              config.Ethash, // todo: (EthashPoW)
+		chainParams:         config.ChainParams,
+		rejectedTxns:        make(map[chainhash.Hash]struct{}),
+		requestedTxns:       make(map[chainhash.Hash]struct{}),
+		requestedBlocks:     make(map[chainhash.Hash]struct{}),
+		syncFailedAddresses: make(map[string]time.Time),
+		peerStates:          make(map[*peerpkg.Peer]*peerSyncState),
+		progressLogger:      newBlockProgressLogger("Processed", log),
+		msgChan:             make(chan interface{}, config.MaxPeers*3),
+		headerList:          list.New(),
+		quit:                make(chan struct{}),
+		feeEstimator:        config.FeeEstimator,
 	}
 
 	best := sm.chain.BestSnapshot()

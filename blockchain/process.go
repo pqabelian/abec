@@ -170,6 +170,19 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.
 		return false, false, ruleError(ErrDuplicateBlock, str)
 	}
 
+	// Check whether witness is available or not if we are not in fast add mode.
+	if !fastAdd {
+		numTx := len(block.MsgBlock().Transactions)
+		if numTx == 0 {
+			return false, false, ruleError(ErrNoTransactions, "block does not contain "+
+				"any transactions")
+		}
+		if !block.Transactions()[0].HasWitness() {
+			return false, false, ruleError(ErrWitnessMissing, "block does not contain "+
+				"any witness")
+		}
+	}
+
 	// Perform preliminary sanity checks on the block and its transactions.
 	//	todo (EthashPoW): 202207
 	err = checkBlockSanityAbe(block, ethashObj, b.chainParams.PowLimit, b.timeSource, flags)

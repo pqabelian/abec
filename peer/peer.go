@@ -454,7 +454,6 @@ type Peer struct {
 	verAckReceived       bool
 	witnessEnabled       bool
 	witnessPruned        bool
-	lastHeightSyncFailed int32
 
 	wireEncoding wire.MessageEncoding
 
@@ -827,36 +826,6 @@ func (p *Peer) IsWitnessPruned() bool {
 	p.flagsMtx.Unlock()
 
 	return witnessPruned
-}
-
-func (p *Peer) MaybeSyncPeer(currentHeight int32, witnessNeeded bool) bool {
-	if !witnessNeeded {
-		return true
-	}
-	if !p.IsWitnessEnabled() {
-		log.Debugf("peer %v not witness enabled, skipping", p)
-		return false
-	}
-
-	if !p.IsWitnessPruned() {
-		return true
-	}
-
-	// If the peer is witness pruned and has not been synced with,
-	// try to sync with it. If the peer is flagged (fail to sync),
-	// try to sync with it after 100 blocks.
-	if p.lastHeightSyncFailed == 0 {
-		log.Debugf("peer %v is witness pruned, try to sync with it", p)
-		return true
-	}
-	if p.lastHeightSyncFailed+100 <= currentHeight {
-		log.Debugf("peer %v is witness pruned and we failed to sync with it at height %v, current height is %v, "+
-			"try to sync with it", p, p.lastHeightSyncFailed, currentHeight)
-		return true
-	}
-	log.Debugf("peer %v is witness pruned and we failed to sync with it at height %v, current height is %v, "+
-		"skipping", p, p.lastHeightSyncFailed, currentHeight)
-	return false
 }
 
 func (p *Peer) StoreNeedSetResult(msg *wire.MsgNeedSetResult) {

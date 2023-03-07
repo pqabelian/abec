@@ -229,6 +229,9 @@ const (
 	// current chain tip. This is not a block validation rule, but is required
 	// for block proposals submitted via getblocktemplate RPC.
 	ErrPrevBlockNotBest
+
+	// ErrWitnessMissing indicates that the witness of the block is missing.
+	ErrWitnessMissing
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
@@ -278,6 +281,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrPreviousBlockUnknown:              "ErrPreviousBlockUnknown",
 	ErrInvalidAncestorBlock:              "ErrInvalidAncestorBlock",
 	ErrPrevBlockNotBest:                  "ErrPrevBlockNotBest",
+	ErrWitnessMissing:                    "ErrWitnessMissing",
 }
 
 // String returns the ErrorCode as a human-readable name.
