@@ -182,6 +182,25 @@ func GetCryptoAddressSerializeSize(cryptoScheme abecryptoparam.CryptoScheme) uin
 	}
 }
 
+// CryptoAddressCheck checks the length of input cryptoAddress.
+func CryptoAddressCheck(cryptoAddress []byte) (ok bool, hints string) {
+	if len(cryptoAddress) < 4 {
+		return false, "incorrect length of cryptoAddress: < 4"
+	}
+
+	cryptoscheme := cryptoAddress[0]
+	cryptoscheme |= cryptoAddress[1]
+	cryptoscheme |= cryptoAddress[2]
+	cryptoscheme |= cryptoAddress[3]
+
+	expectedLen := GetCryptoAddressSerializeSize(abecryptoparam.CryptoScheme(cryptoscheme))
+	if uint32(len(cryptoAddress)) != expectedLen {
+		return false, "incorrect length of cryptoAddress"
+	}
+
+	return true, ""
+}
+
 func CoinbaseTxGen(abeTxOutputDescs []*AbeTxOutputDesc, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 	cryptoScheme, err := abecryptoparam.GetCryptoSchemeByTxVersion(coinbaseTxMsgTemplate.Version)
 	if err != nil {
