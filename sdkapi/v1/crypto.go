@@ -29,6 +29,12 @@ func CryptoAddressKeyGen(cryptoAddressKeySeed []byte) (retCryptoAddress []byte, 
 	return abecrypto.CryptoAddressKeyGenFromSeed(cryptoAddressKeySeed)
 }
 
+// CryptoAddressCheck checks wthether the given cryptoAddress is valid (in format).
+// When the result is false, the hints will give the reasons why it is invalid.
+func CryptoAddressCheck(cryptoAddress []byte) (bl bool, hints string) {
+	return abecrypto.CryptoAddressCheck(cryptoAddress)
+}
+
 /*
 *
 ToDo: At this moment (2023.03.03), serializedTxOut is actually txoScript (which user obtains by RPC API).
