@@ -36,6 +36,14 @@ type AbelAddress interface {
 	CryptoAddress() []byte
 
 	// IsForNet returns whether or not the address is associated with the passed Abelian network.
+	// Each abec net (such as mainnet, testnet) has a chaincfg.Params instance object,
+	// where particular parameters (such as genesis block, block-reward etc.) are set.
+	// One of these parameters is AbelAddressNetId, which is used to specify the address that the abec will recognize.
+	// Actually, in abec, only the mining module needs to decode a (user side) address to a cryptoAddress.
+	// If we remove or disable mining module in abec,
+	// then	(1) the concept of AbelAddress should not appear in abec;
+	//		(2) the AbelAddressNetId parameter is not needed either;
+	//		(3) the outside modules, such as wallet, only need to package cryptoAddress to any user-side address as they need.
 	IsForNet(*chaincfg.Params) bool
 }
 
