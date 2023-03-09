@@ -59,6 +59,7 @@ func ExtractCoinValueFromSerializedTxOut(serializedTxOut []byte, cryptoVsk []byt
 	if err != nil {
 		return 0, err
 	}
+	cryptoAddress = append([]byte{0, 0, 0, byte(abecryptoparam.CryptoSchemePQRingCT)}, cryptoAddress...)
 	bl, value, err := abecrypto.TxoCoinReceive(abeTxo, cryptoAddress, cryptoVsk)
 	if err != nil {
 		return 0, err
