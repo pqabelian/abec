@@ -72,3 +72,7 @@ func ExtractCoinValueFromSerializedTxOut(serializedTxOut []byte, cryptoVsk []byt
 	return value, nil
 
 }
+
+func ExtractCoinAddressFromCryptoAddress(cryptoAddress []byte) ([]byte, error) {
+	return abecrypto.ExtractCoinAddressFromCryptoAddress(cryptoAddress)
+}

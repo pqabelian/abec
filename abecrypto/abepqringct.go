@@ -163,6 +163,30 @@ func pqringctCryptoAddressSize(pp *pqringct.PublicParameter) uint32 {
 	return uint32(4 + pqringct.GetAddressPublicKeySerializeSize(pp) + pqringct.GetValuePublicKeySerializeSize(pp))
 }
 
+func pqringctExtractCoinAddressFromCryptoAddress(pp *pqringct.PublicParameter, cryptoAddress []byte, cryptoScheme abecryptoparam.CryptoScheme) (
+	coinAddress []byte,
+	err error) {
+	cryptoscheme := cryptoAddress[0]
+	cryptoscheme |= cryptoAddress[1]
+	cryptoscheme |= cryptoAddress[2]
+	cryptoscheme |= cryptoAddress[3]
+	if abecryptoparam.CryptoScheme(cryptoscheme) != cryptoScheme {
+		return nil, errors.New("pqringctExtractCoinAddressFromCryptoAddress: unmatched cryptoScheme for cryptoAddress")
+	}
+
+	if uint32(len(cryptoAddress)) != pqringctCryptoAddressSize(abecryptoparam.PQRingCTPP) {
+		return nil, errors.New("pqringctExtractCoinAddressFromCryptoAddress: input cryptoAddress has a wrong length")
+	}
+
+	//	 In the implementation of PQRingCT, the addressPublicKey is used as coinAddress.
+	//	Here we directly code based on the design.
+	apkLen := pqringct.GetAddressPublicKeySerializeSize(pp)
+	coinAddress = make([]byte, 0, apkLen)
+	copy(coinAddress, cryptoAddress[4:4+apkLen])
+
+	return coinAddress, nil
+}
+
 // The caller needs to fill the Version, TxIns, TxFee fileds for coinbaseTxMsgTemplate,
 // this function will fill the TxOuts and TxWitness fields.
 // The cryptoScheme here is used only for double-check.

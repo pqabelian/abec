@@ -182,10 +182,10 @@ func GetCryptoAddressSerializeSize(cryptoScheme abecryptoparam.CryptoScheme) uin
 	}
 }
 
-// CryptoAddressCheck checks the length of input cryptoAddress.
-func CryptoAddressCheck(cryptoAddress []byte) (ok bool, hints string) {
+// ExtractCryptoSchemeFromCryptoAddress extracts cryptoScheme from cryptoAddress
+func ExtractCryptoSchemeFromCryptoAddress(cryptoAddress []byte) (cryptoScheme abecryptoparam.CryptoScheme, err error) {
 	if len(cryptoAddress) < 4 {
-		return false, "incorrect length of cryptoAddress: < 4"
+		return 0, errors.New("incorrect length of cryptoAddress when calling ExtractCryptoSchemeFromCryptoAddress")
 	}
 
 	cryptoscheme := cryptoAddress[0]
@@ -193,12 +193,52 @@ func CryptoAddressCheck(cryptoAddress []byte) (ok bool, hints string) {
 	cryptoscheme |= cryptoAddress[2]
 	cryptoscheme |= cryptoAddress[3]
 
-	expectedLen := GetCryptoAddressSerializeSize(abecryptoparam.CryptoScheme(cryptoscheme))
+	return abecryptoparam.CryptoScheme(cryptoscheme), nil
+}
+
+// CryptoAddressCheck checks the length of input cryptoAddress.
+func CryptoAddressCheck(cryptoAddress []byte) (ok bool, hints string) {
+	//if len(cryptoAddress) < 4 {
+	//	return false, "incorrect length of cryptoAddress: < 4"
+	//}
+	//
+	//cryptoscheme := cryptoAddress[0]
+	//cryptoscheme |= cryptoAddress[1]
+	//cryptoscheme |= cryptoAddress[2]
+	//cryptoscheme |= cryptoAddress[3]
+
+	cryptoscheme, err := ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
+	if err != nil {
+		return false, "can not extract cryptoscheme from cryptoAddress"
+	}
+
+	expectedLen := GetCryptoAddressSerializeSize(cryptoscheme)
 	if uint32(len(cryptoAddress)) != expectedLen {
 		return false, "incorrect length of cryptoAddress"
 	}
 
 	return true, ""
+}
+
+// ExtractCoinAddressFromCryptoAddress is implemented for only the designs where coinAddress is a part of cryptoAddress,
+// such as CryptoSchemePQRingCT.
+func ExtractCoinAddressFromCryptoAddress(cryptoAddress []byte) ([]byte, error) {
+	cryptoScheme, err := ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	var coinAddr []byte
+	switch cryptoScheme {
+	case abecryptoparam.CryptoSchemePQRingCT:
+		coinAddr, err = pqringctExtractCoinAddressFromCryptoAddress(abecryptoparam.PQRingCTPP, cryptoAddress, cryptoScheme)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.New("unsupported cryptoScheme version")
+	}
+	return coinAddr, nil
 }
 
 func CoinbaseTxGen(abeTxOutputDescs []*AbeTxOutputDesc, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
