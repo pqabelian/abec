@@ -181,7 +181,7 @@ func pqringctExtractCoinAddressFromCryptoAddress(pp *pqringct.PublicParameter, c
 	//	 In the implementation of PQRingCT, the addressPublicKey is used as coinAddress.
 	//	Here we directly code based on the design.
 	apkLen := pqringct.GetAddressPublicKeySerializeSize(pp)
-	coinAddress = make([]byte, 0, apkLen)
+	coinAddress = make([]byte, apkLen)
 	copy(coinAddress, cryptoAddress[4:4+apkLen])
 
 	return coinAddress, nil
