@@ -19,6 +19,9 @@ const (
 // ServiceFlag identifies services supported by an abec peer.
 type ServiceFlag uint64
 
+// MaxReservedWitness is the max number of block witness reserved by normal node.
+const MaxReservedWitness = 4000
+
 const (
 	// SFNodeNetwork is a flag used to indicate a peer is a full node (without witness).
 	SFNodeNetwork ServiceFlag = 1 << iota
@@ -31,22 +34,33 @@ const (
 	// and transactions including witness data.
 	SFNodeWitness
 
-	// SFNodePruned is a flag used to indicate a peer which has pruned witness data
+	// SFNodeSemi is a flag used to indicate a peer which has pruned witness data
 	// before the last checkpoint.
-	SFNodePruned
+	SFNodeSemi
 
-	// SFNodePartiallyPruned is a flag used to indicate a peer which has pruned
-	// witness data partially. SFNodePruned includes SFNodePartiallyPruned.
-	SFNodePartiallyPruned
+	// SFNodeNormal is a flag used to indicate a peer which has pruned
+	// witness data partially (MaxReservedWitness)
+	SFNodeNormal
+)
+
+// TrustLevel is the level of trust for other nodes.
+type TrustLevel uint64
+
+const (
+	TrustLevelLow TrustLevel = iota
+
+	TrustLevelMedium
+
+	TrustLevelHigh
 )
 
 // Map of service flags back to their constant names for pretty printing.
 var sfStrings = map[ServiceFlag]string{
-	SFNodeNetwork:         "SFNodeNetwork",
-	SFNodeGetUTXO:         "SFNodeGetUTXO",
-	SFNodeWitness:         "SFNodeWitness",
-	SFNodePruned:          "SFNodePruned",
-	SFNodePartiallyPruned: "SFNodePartiallyPruned",
+	SFNodeNetwork: "SFNodeNetwork",
+	SFNodeGetUTXO: "SFNodeGetUTXO",
+	SFNodeWitness: "SFNodeWitness",
+	SFNodeSemi:    "SFNodeSemi",
+	SFNodeNormal:  "SFNodeNormal",
 }
 
 // orderedSFStrings is an ordered list of service flags from highest to
@@ -55,8 +69,8 @@ var orderedSFStrings = []ServiceFlag{
 	SFNodeNetwork,
 	SFNodeGetUTXO,
 	SFNodeWitness,
-	SFNodePruned,
-	SFNodePartiallyPruned,
+	SFNodeSemi,
+	SFNodeNormal,
 }
 
 // String returns the ServiceFlag in human-readable form.

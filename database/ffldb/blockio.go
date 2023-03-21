@@ -189,6 +189,7 @@ type blockLocation struct {
 	fileOffset   uint32
 	blockLen     uint32
 }
+
 type witnessLocation struct {
 	witnessFileNum uint32
 	fileOffset     uint32
@@ -213,6 +214,7 @@ func deserializeBlockLoc(serializedLoc []byte) blockLocation {
 		blockLen:     byteOrder.Uint32(serializedLoc[8:12]),
 	}
 }
+
 func deserializeWitnessLoc(serializedLoc []byte) witnessLocation {
 	// The serialized block location format is:
 	//
@@ -240,6 +242,7 @@ func serializeBlockLoc(loc blockLocation) []byte {
 	byteOrder.PutUint32(serializedData[8:12], loc.blockLen)
 	return serializedData[:]
 }
+
 func serializeWitnessLoc(loc witnessLocation) []byte {
 	// The serialized block location format is:
 	//
@@ -282,6 +285,7 @@ func (s *blockStore) openWriteFile(fileNum uint32) (filer, error) {
 
 	return file, nil
 }
+
 func (s *blockStore) openWriteWitnessFile(fileNum uint32) (filer, error) {
 	// The current block file needs to be read-write so it is possible to
 	// append to it.  Also, it shouldn't be part of the least recently used
@@ -348,6 +352,7 @@ func (s *blockStore) openFile(fileNum uint32) (*lockableFile, error) {
 
 	return blockFile, nil
 }
+
 func (s *blockStore) openWitnessFile(fileNum uint32) (*lockableFile, error) {
 	// Open the appropriate file as read-only.
 	filePath := witnessFilePath(s.basePath, fileNum)
@@ -405,6 +410,7 @@ func (s *blockStore) deleteFile(fileNum uint32) error {
 
 	return nil
 }
+
 func (s *blockStore) deleteWitnessFile(fileNum uint32) error {
 	filePath := witnessFilePath(s.basePath, fileNum)
 	if err := os.Remove(filePath); err != nil {
@@ -542,6 +548,7 @@ func (s *blockStore) writeData(data []byte, fieldName string) error {
 
 	return nil
 }
+
 func (s *blockStore) writeDataWitness(data []byte, fieldName string) error {
 	wc := s.writeCursorForWitness
 	n, err := wc.curFile.file.WriteAt(data, int64(wc.curOffset))
@@ -993,6 +1000,7 @@ func (s *blockStore) syncBlocks() error {
 
 	return nil
 }
+
 func (s *blockStore) syncWitness() error {
 	wc := s.writeCursorForWitness
 	wc.RLock()
