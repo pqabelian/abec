@@ -50,20 +50,21 @@ type OutPointAbe struct {
 	TxHash chainhash.Hash
 	Index  uint8 //	due to the large size of post-quantum crypto primitives, ABE will limit the number of outputs of each transaction
 
-	id *OutPointId // cached OutPointId
+	outPointId *OutPointId // cached OutPointId
 }
 
 func (outPoint *OutPointAbe) OutPointId() OutPointId {
-	if outPoint.id != nil {
-		return *outPoint.id
+	if outPoint.outPointId == nil {
+		// cache the outPointId
+
+		opId := OutPointId{}
+		copy(opId[:], outPoint.TxHash[:])
+		opId[chainhash.HashSize] = outPoint.Index
+
+		outPoint.outPointId = &opId
 	}
 
-	id := OutPointId{}
-	copy(id[:], outPoint.TxHash[:])
-	id[chainhash.HashSize] = outPoint.Index
-
-	outPoint.id = &id
-	return *outPoint.id
+	return *outPoint.outPointId
 }
 
 // String returns the OutPoint in the human-readable form "hash:index".
