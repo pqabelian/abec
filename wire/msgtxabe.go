@@ -171,20 +171,17 @@ func (outPointRing *OutPointRing) Hash() chainhash.Hash {
 	return chainhash.DoubleHashH(buf.Bytes())
 }
 
+// RingId() return outPoing.Hash() as the ringId.
 func (outPointRing *OutPointRing) RingId() RingId {
-	// Return the cached hash if it has already been generated.
-	if outPointRing.ringId != nil {
-		return *outPointRing.ringId
+	if outPointRing.ringId == nil {
+		// cache the ringId
+		// we use Hash() as the RingId
+		hash := outPointRing.Hash()
+		ringId := RingId(hash)
+		outPointRing.ringId = &ringId
 	}
 
-	//buf := bytes.NewBuffer(make([]byte, 0, outPointRing.SerializeSize()))
-	//_ = WriteOutPointRing(buf, 0, outPointRing.Version, outPointRing)
-	//hash := chainhash.DoubleHashH(buf.Bytes())
-
-	hash := outPointRing.Hash()
-	ringId := RingId(hash)
-
-	outPointRing.ringId = &ringId
+	// Return the cached hash if it has already been generated.
 	return *outPointRing.ringId
 }
 
@@ -503,6 +500,12 @@ func (txIn *TxInAbe) RingMemberHash() chainhash.Hash {
 //				limited by TxRingSize
 //	TxFee = 0
 //	todo: For coinbase transaction, there is an additional function that returns the bytes in [blockhashs[2]] and later OutPoints
+
+// TxId is used as unique identifier for MsgTx, as well as for abeutil.Tx,
+// which contains some additional helper information.
+// In particular, we use TxHash() (without witness) as TxId.
+// and in logic, we should use (TxId,Index) to denote the OutPoint.
+type TxId chainhash.Hash
 
 type MsgTxAbe struct {
 	Version uint32
