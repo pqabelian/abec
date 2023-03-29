@@ -191,6 +191,7 @@ type config struct {
 	miningAddrs []abeutil.AbelAddress
 	//miningAddrBytes []byte
 	minRelayTxFee abeutil.Amount
+	nodeType      wire.NodeType
 	serviceFlag   wire.ServiceFlag
 	trustLevel    wire.TrustLevel
 	whitelists    []*net.IPNet
@@ -596,10 +597,13 @@ func loadConfig() (*config, []string, error) {
 
 	// Check node type.
 	if cfg.NodeType == "fullnode" {
+		cfg.nodeType = wire.FullNode
 		cfg.serviceFlag = wire.SFNodeNetwork | wire.SFNodeWitness
 	} else if cfg.NodeType == "semifullnode" {
+		cfg.nodeType = wire.SemifullNode
 		cfg.serviceFlag = wire.SFNodeNetwork | wire.SFNodeSemi
 	} else if cfg.NodeType == "normalnode" {
+		cfg.nodeType = wire.NormalNode
 		cfg.serviceFlag = wire.SFNodeNetwork | wire.SFNodeNormal
 	} else {
 		return nil, nil, errors.New("nodetype should be fullnode or semifullnode or normalnode")

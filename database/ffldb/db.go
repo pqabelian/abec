@@ -79,6 +79,14 @@ var (
 	// minWitnessFileNumKeyName is the key used to store the number of witness file
 	// that should be scan from.
 	minWitnessFileNumKeyName = []byte("ffldb-minwitnessfilenum")
+
+	// nodeTypeKeyName is the key used to store the node type.
+	// 0: full node, 1: semifull node, 2: normal node
+	nodeTypeKeyName = []byte("ffldb-nodetype")
+
+	// trustLevelKeyName is the key used to store the trust level.
+	// 0: high, 1: medium, 2: low
+	trustLevelKeyName = []byte("ffldb-trustlevel")
 )
 
 // Common error strings.
@@ -2297,6 +2305,8 @@ func initDB(ldb *leveldb.DB) error {
 		serializeWriteRow(0, 0))
 	batch.Put(bucketizedKey(metadataBucketID, minWitnessFileNumKeyName),
 		serializeUint32(0))
+	batch.Put(bucketizedKey(metadataBucketID, nodeTypeKeyName),
+		serializeUint32(0))
 
 	// Create block index bucket and set the current bucket id.
 	//
@@ -2339,7 +2349,8 @@ func addMinWitnessFileNumKey(ldb *leveldb.DB) error {
 
 // openDB opens the database at the provided path.  database.ErrDbDoesNotExist
 // is returned if the database doesn't exist and the create flag is not set.
-func openDB(dbPath string, network wire.AbelianNet, create bool) (database.DB, error) {
+func openDB(dbPath string, network wire.AbelianNet, nodeType wire.NodeType, trustLevel wire.TrustLevel,
+	create bool) (database.DB, error) {
 	// Error if the database doesn't exist and the create flag is not set.
 	metadataDbPath := filepath.Join(dbPath, metadataDbName)
 	dbExists := fileExists(metadataDbPath)

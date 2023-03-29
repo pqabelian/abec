@@ -43,6 +43,17 @@ const (
 	SFNodeNormal
 )
 
+// NodeType is the type of node.
+type NodeType uint64
+
+const (
+	FullNode NodeType = iota
+
+	SemifullNode
+
+	NormalNode
+)
+
 // TrustLevel is the level of trust for other nodes.
 type TrustLevel uint64
 

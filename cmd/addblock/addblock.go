@@ -22,6 +22,7 @@ var (
 )
 
 // loadBlockDB opens the block database and returns a handle to it.
+// todo (prune): modify database.Open
 func loadBlockDB() (database.DB, error) {
 	// The database name is based on the database type.
 	dbName := blockDbNamePrefix + "_" + cfg.DbType
