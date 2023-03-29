@@ -49,6 +49,12 @@ func (txoRing *TxoRing) TxOuts() []*wire.TxOutAbe {
 	return txoRing.txOuts
 }
 
+// RingId() returns the underlying outPointRing's RingId as its RingId.
+// This is compatible the existing implementaion where txoRing.outPointRing.Hash() is used as the key for map.
+func (txoRing *TxoRing) RingId() wire.RingId {
+	return txoRing.outPointRing.RingId()
+}
+
 func (txoRing *TxoRing) SerializeSize() int {
 
 	//	utxoRingHeaderCode
@@ -259,7 +265,7 @@ func NewTxoRing(version uint32, ringBlockHeight int32, blockhashs []*chainhash.H
 // BuildTxoRings apply a chain-rule to organize the Txos of input blocks to TxoRings.
 // Todo: (view *UtxoRingViewpoint) newUtxoRingEntries should call BuildTxoRings, then package the resulting TxoRings to UtxoRingEnrties, which include the status informaiton of TxoRing.
 // We leave the refactoring of (view *UtxoRingViewpoint) newUtxoRingEntries to later work, after BuildTxoRings is tested to work well.
-func BuildTxoRings(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.BlockAbe) (txoRings map[chainhash.Hash]*TxoRing, err error) {
+func BuildTxoRings(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.BlockAbe) (txoRings map[wire.RingId]*TxoRing, err error) {
 	//blockNum := blockNumPerRingGroup
 
 	if blockNumPerRingGroup < 1 {
@@ -359,26 +365,29 @@ func BuildTxoRings(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.
 		return nil, err
 	}
 
-	rstTxoRings := make(map[chainhash.Hash]*TxoRing, len(cbTxoRings)+len(trTxoRings))
+	rstTxoRings := make(map[wire.RingId]*TxoRing, len(cbTxoRings)+len(trTxoRings))
 
 	for _, txoRing := range cbTxoRings {
-		ringHash := txoRing.outPointRing.Hash()
-		if _, ok := rstTxoRings[ringHash]; ok {
+		//ringHash := txoRing.outPointRing.Hash()
+		ringId := txoRing.RingId()
+		if _, ok := rstTxoRings[ringId]; ok {
 			return nil, AssertError(fmt.Sprintf("BuildTxoRings: Found a hash collision when calling BuildTxoRings with blocks (hash %v, ringHeight %d)",
 				blockhashStr, ringBlockHeight))
 		} else {
-			rstTxoRings[ringHash] = txoRing
+			rstTxoRings[ringId] = txoRing
 		}
 	}
 	for _, txoRing := range trTxoRings {
-		ringHash := txoRing.outPointRing.Hash()
-		if _, ok := rstTxoRings[ringHash]; ok {
+		//ringHash := txoRing.outPointRing.Hash()
+		ringId := txoRing.RingId()
+		if _, ok := rstTxoRings[ringId]; ok {
 			return nil, AssertError(fmt.Sprintf("BuildTxoRings: Found a hash collision when calling BuildTxoRings with blocks (hash %v, ringHeight %d)",
 				blockhashStr, ringBlockHeight))
 		} else {
-			rstTxoRings[ringHash] = txoRing
+			rstTxoRings[ringId] = txoRing
 		}
 	}
+
 	return rstTxoRings, nil
 
 }
