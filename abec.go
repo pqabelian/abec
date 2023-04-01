@@ -9,6 +9,7 @@ import (
 	"github.com/abesuite/abec/blockchain/indexers"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/limits"
+	"github.com/abesuite/abec/wire"
 	"net"
 	"net/http"
 	"os"
@@ -264,6 +265,30 @@ func loadBlockDB() (database.DB, error) {
 			return nil, err
 		}
 	}
+
+	var nodeType wire.NodeType
+	var trustLevel wire.TrustLevel
+	err = db.View(func(dbTx database.Tx) error {
+		var err error
+		nodeType, err = dbTx.FetchNodeType()
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	err = db.View(func(dbTx database.Tx) error {
+		var err error
+		trustLevel, err = dbTx.FetchTrustLevel()
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	abecLog.Infof("Node type: %v", nodeType.String())
+	abecLog.Infof("Trust level: %v", trustLevel.String())
+	cfg.nodeType = nodeType
+	cfg.trustLevel = trustLevel
 
 	abecLog.Info("Block database loaded")
 	return db, nil

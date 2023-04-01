@@ -3,6 +3,7 @@ package ffldb
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
@@ -1998,6 +1999,28 @@ func (tx *transaction) writePendingAndCommit() error {
 	return tx.db.cache.commitTx(tx)
 }
 
+// FetchNodeType fetch node type from meta data.
+func (tx *transaction) FetchNodeType() (wire.NodeType, error) {
+	var nodeType []byte
+	nodeType = tx.Metadata().Get(nodeTypeKeyName)
+	if nodeType == nil {
+		return 0, errors.New("node type does not exist")
+	}
+
+	return wire.NodeType(deserializeUint32(nodeType)), nil
+}
+
+// FetchTrustLevel fetch trust level from meta data.
+func (tx *transaction) FetchTrustLevel() (wire.TrustLevel, error) {
+	var trustLevel []byte
+	trustLevel = tx.Metadata().Get(trustLevelKeyName)
+	if trustLevel == nil {
+		return 0, errors.New("trust level does not exist")
+	}
+
+	return wire.TrustLevel(deserializeUint32(trustLevel)), nil
+}
+
 // Commit commits all changes that have been made to the root metadata bucket
 // and all of its sub-buckets to the database cache which is periodically synced
 // to persistent storage.  In addition, it commits all new blocks directly to
@@ -2295,7 +2318,7 @@ func fileExists(name string) bool {
 
 // initDB creates the initial buckets and values used by the package.  This is
 // mainly in a separate function for testing purposes.
-func initDB(ldb *leveldb.DB) error {
+func initDB(ldb *leveldb.DB, nodeType wire.NodeType, trustLevel wire.TrustLevel) error {
 	// The starting block file write cursor location is file num 0, offset
 	// 0.
 	batch := new(leveldb.Batch)
@@ -2306,7 +2329,9 @@ func initDB(ldb *leveldb.DB) error {
 	batch.Put(bucketizedKey(metadataBucketID, minWitnessFileNumKeyName),
 		serializeUint32(0))
 	batch.Put(bucketizedKey(metadataBucketID, nodeTypeKeyName),
-		serializeUint32(0))
+		serializeUint32(uint32(nodeType)))
+	batch.Put(bucketizedKey(metadataBucketID, trustLevelKeyName),
+		serializeUint32(uint32(trustLevel)))
 
 	// Create block index bucket and set the current bucket id.
 	//
@@ -2340,6 +2365,76 @@ func addMinWitnessFileNumKey(ldb *leveldb.DB) error {
 	// Write everything as a single batch.
 	if err := ldb.Write(batch, nil); err != nil {
 		str := fmt.Sprintf("failed to add min witnessfilenumkey: %v",
+			err)
+		return convertErr(str, err)
+	}
+
+	return nil
+}
+
+// nodeTypeExist check whether node type exist in database.
+func nodeTypeExist(pdb *db) (bool, error) {
+	hasNodeType := true
+	var nodeType []byte
+	err := pdb.View(func(tx database.Tx) error {
+		nodeType = tx.Metadata().Get(nodeTypeKeyName)
+		if nodeType == nil {
+			hasNodeType = false
+		}
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+
+	return hasNodeType, nil
+}
+
+// trustLevelExist check whether trust level exist in database.
+func trustLevelExist(pdb *db) (bool, error) {
+	hasTrustLevel := true
+	var trustLevel []byte
+	err := pdb.View(func(tx database.Tx) error {
+		trustLevel = tx.Metadata().Get(trustLevelKeyName)
+		if trustLevel == nil {
+			hasTrustLevel = false
+		}
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+
+	return hasTrustLevel, nil
+}
+
+// addNodeTypeKey add nodeType in meta data.
+func addNodeTypeKey(ldb *leveldb.DB, nodeType wire.NodeType) error {
+
+	batch := new(leveldb.Batch)
+	batch.Put(bucketizedKey(metadataBucketID, nodeTypeKeyName),
+		serializeUint32(uint32(nodeType)))
+
+	// Write everything as a single batch.
+	if err := ldb.Write(batch, nil); err != nil {
+		str := fmt.Sprintf("failed to add node type key: %v",
+			err)
+		return convertErr(str, err)
+	}
+
+	return nil
+}
+
+// addTrustLevelKey add trustLevel in meta data.
+func addTrustLevelKey(ldb *leveldb.DB, trustLevel wire.TrustLevel) error {
+
+	batch := new(leveldb.Batch)
+	batch.Put(bucketizedKey(metadataBucketID, trustLevelKeyName),
+		serializeUint32(uint32(trustLevel)))
+
+	// Write everything as a single batch.
+	if err := ldb.Write(batch, nil); err != nil {
+		str := fmt.Sprintf("failed to add trust level key: %v",
 			err)
 		return convertErr(str, err)
 	}
@@ -2394,5 +2489,5 @@ func openDB(dbPath string, network wire.AbelianNet, nodeType wire.NodeType, trus
 
 	// Perform any reconciliation needed between the block and metadata as
 	// well as database initialization, if needed.
-	return reconcileDB(pdb, create)
+	return reconcileDB(pdb, nodeType, trustLevel, create)
 }

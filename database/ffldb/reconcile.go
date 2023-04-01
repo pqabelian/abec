@@ -3,6 +3,7 @@ package ffldb
 import (
 	"fmt"
 	"github.com/abesuite/abec/database"
+	"github.com/abesuite/abec/wire"
 	"hash/crc32"
 )
 
@@ -58,11 +59,35 @@ func deserializeUint32(num []byte) uint32 {
 // reconcileDB reconciles the metadata with the flat block files on disk.  It
 // will also initialize the underlying database if the create flag is set.
 // todo (prune): depend on the node type
-func reconcileDB(pdb *db, create bool) (database.DB, error) {
+func reconcileDB(pdb *db, nodeType wire.NodeType, trustLevel wire.TrustLevel, create bool) (database.DB, error) {
 	// Perform initial internal bucket and value creation during database
 	// creation.
 	if create {
-		if err := initDB(pdb.cache.ldb); err != nil {
+		if err := initDB(pdb.cache.ldb, nodeType, trustLevel); err != nil {
+			return nil, err
+		}
+	}
+
+	// Compatible with old version of abec.
+	hasNodeType, err := nodeTypeExist(pdb)
+	if err != nil {
+		return nil, err
+	}
+	if !hasNodeType {
+		log.Info("Adding node type in database...")
+		err := addNodeTypeKey(pdb.cache.ldb, wire.FullNode)
+		if err != nil {
+			return nil, err
+		}
+	}
+	hasTrustLevel, err := trustLevelExist(pdb)
+	if err != nil {
+		return nil, err
+	}
+	if !hasTrustLevel {
+		log.Info("Adding trust level in database...")
+		err := addTrustLevelKey(pdb.cache.ldb, wire.TrustLevelMedium)
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -70,7 +95,7 @@ func reconcileDB(pdb *db, create bool) (database.DB, error) {
 	// Load the current write cursor position from the metadata.
 	var curFileNum, curOffset uint32
 	var curWitnessFileNum, curWitnessOffset uint32
-	err := pdb.View(func(tx database.Tx) error {
+	err = pdb.View(func(tx database.Tx) error {
 		// For block
 		writeRow := tx.Metadata().Get(writeLocKeyName)
 		if writeRow == nil {

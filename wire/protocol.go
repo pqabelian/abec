@@ -54,6 +54,24 @@ const (
 	NormalNode
 )
 
+const DefaultNodeType = NormalNode
+
+// Map of node type back to their constant names for pretty printing.
+var ntStrings = map[NodeType]string{
+	FullNode:     "FullNode",
+	SemifullNode: "SemifullNode",
+	NormalNode:   "NormalNode",
+}
+
+// String returns the NodeType in human-readable form.
+func (n NodeType) String() string {
+	res, ok := ntStrings[n]
+	if !ok {
+		return "Unknown"
+	}
+	return res
+}
+
 // TrustLevel is the level of trust for other nodes.
 type TrustLevel uint64
 
@@ -64,6 +82,24 @@ const (
 
 	TrustLevelHigh
 )
+
+const DefaultTrustLevel = TrustLevelHigh
+
+// Map of trust level back to their constant names for pretty printing.
+var tlStrings = map[TrustLevel]string{
+	TrustLevelHigh:   "High",
+	TrustLevelMedium: "Medium",
+	TrustLevelLow:    "Low",
+}
+
+// String returns the TrustLevel in human-readable form.
+func (t TrustLevel) String() string {
+	res, ok := tlStrings[t]
+	if !ok {
+		return "Unknown"
+	}
+	return res
+}
 
 // Map of service flags back to their constant names for pretty printing.
 var sfStrings = map[ServiceFlag]string{

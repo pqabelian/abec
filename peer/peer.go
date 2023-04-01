@@ -2035,8 +2035,8 @@ func (p *Peer) readRemoteVersionMsg() error {
 	if p.services&wire.SFNodeWitness == wire.SFNodeWitness {
 		p.witnessEnabled = true
 	}
-	if (p.services&wire.SFNodePruned == wire.SFNodePruned) ||
-		(p.services&wire.SFNodePartiallyPruned == wire.SFNodePartiallyPruned) {
+	if (p.services&wire.SFNodeSemi == wire.SFNodeSemi) ||
+		(p.services&wire.SFNodeNormal == wire.SFNodeNormal) {
 		p.witnessPruned = true
 	}
 	p.flagsMtx.Unlock()

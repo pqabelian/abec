@@ -6,6 +6,7 @@ package database
 import (
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/wire"
 )
 
 // Cursor represents a cursor over key/value pairs and nested buckets of a
@@ -391,6 +392,9 @@ type Tx interface {
 	// additional data copies and allows support for memory-mapped database
 	// implementations.
 	FetchBlockRegions(regions []BlockRegion) ([][]byte, error)
+
+	FetchNodeType() (wire.NodeType, error)
+	FetchTrustLevel() (wire.TrustLevel, error)
 
 	// ******************************************************************
 	// Methods related to both atomic metadata storage and block storage.
