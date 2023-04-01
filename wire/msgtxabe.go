@@ -349,6 +349,7 @@ func WriteTxOutAbe(w io.Writer, pver uint32, version uint32, txOut *TxOutAbe) er
 // ReadTxOutAbe reads the next sequence of bytes from r as a transaction input
 // (TxInAbe).
 func ReadTxOutAbe(r io.Reader, pver uint32, version uint32, txOut *TxOutAbe) error {
+	//	todo: 2023.03.31 this read does not exactly match the corresponding write operation.
 	err := readElement(r, &txOut.Version)
 	if err != nil {
 		return err
