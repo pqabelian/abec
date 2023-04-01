@@ -182,6 +182,12 @@ func GetCryptoAddressSerializeSize(cryptoScheme abecryptoparam.CryptoScheme) uin
 	}
 }
 
+// GetCryptoAddressSerializeSizeMax returns the max of all possible CryptoAddressSerializeSizes
+func GetCryptoAddressSerializeSizeMax() uint32 {
+	// todo: when multiple cryptoSchemes are supported, we need to return the max one.
+	return pqringctCryptoAddressSize(abecryptoparam.PQRingCTPP)
+}
+
 // ExtractCryptoSchemeFromCryptoAddress extracts cryptoScheme from cryptoAddress
 func ExtractCryptoSchemeFromCryptoAddress(cryptoAddress []byte) (cryptoScheme abecryptoparam.CryptoScheme, err error) {
 	if len(cryptoAddress) < 4 {
