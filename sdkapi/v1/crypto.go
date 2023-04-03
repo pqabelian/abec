@@ -29,10 +29,10 @@ func CryptoAddressKeyGen(cryptoAddressKeySeed []byte) (retCryptoAddress []byte, 
 	return abecrypto.CryptoAddressKeyGenFromSeed(cryptoAddressKeySeed)
 }
 
-// CryptoAddressCheck checks wthether the given cryptoAddress is valid (in format).
+// CheckCryptoAddress checks whether the given cryptoAddress is valid (in format).
 // When the result is false, the hints will give the reasons why it is invalid.
-func CryptoAddressCheck(cryptoAddress []byte) (bl bool, hints string) {
-	return abecrypto.CryptoAddressCheck(cryptoAddress)
+func CheckCryptoAddress(cryptoAddress []byte) (valid bool, hints string) {
+	return abecrypto.CheckCryptoAddress(cryptoAddress)
 }
 
 /*

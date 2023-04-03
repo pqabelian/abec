@@ -563,6 +563,11 @@ func (msg *MsgTxAbe) IsCoinBase() (bool, error) {
 	return true, nil
 }
 
+// TxId return TxHash().
+func (msg *MsgTxAbe) TxId() TxId {
+	return TxId(msg.TxHash())
+}
+
 // TxHash generates the Hash for the transaction without witness.
 func (msg *MsgTxAbe) TxHash() chainhash.Hash {
 	// Encode the transaction and calculate double sha256 on the result.

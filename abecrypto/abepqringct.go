@@ -163,19 +163,135 @@ func pqringctCryptoAddressSize(pp *pqringct.PublicParameter) uint32 {
 	return uint32(4 + pqringct.GetAddressPublicKeySerializeSize(pp) + pqringct.GetValuePublicKeySerializeSize(pp))
 }
 
-func pqringctExtractCoinAddressFromCryptoAddress(pp *pqringct.PublicParameter, cryptoAddress []byte, cryptoScheme abecryptoparam.CryptoScheme) (
-	coinAddress []byte,
-	err error) {
+func pqringctCheckCryptoAddress(pp *pqringct.PublicParameter, cryptoScheme abecryptoparam.CryptoScheme, cryptoAddress []byte) (valid bool, hints string) {
+	if len(cryptoAddress) < 4 {
+		hints := fmt.Sprintf("pqringctCheckCryptoAddress: invalid length of cryptoAddress: %d", len(cryptoAddress))
+		return false, hints
+	}
+
 	cryptoscheme := cryptoAddress[0]
 	cryptoscheme |= cryptoAddress[1]
 	cryptoscheme |= cryptoAddress[2]
 	cryptoscheme |= cryptoAddress[3]
 	if abecryptoparam.CryptoScheme(cryptoscheme) != cryptoScheme {
-		return nil, errors.New("pqringctExtractCoinAddressFromCryptoAddress: unmatched cryptoScheme for cryptoAddress")
+		hints := fmt.Sprintf("pqringctCheckCryptoAddress: invalid length of cryptoAddress: %d vs %d", abecryptoparam.CryptoScheme(cryptoscheme), cryptoScheme)
+		return false, hints
 	}
 
-	if uint32(len(cryptoAddress)) != pqringctCryptoAddressSize(abecryptoparam.PQRingCTPP) {
-		return nil, errors.New("pqringctExtractCoinAddressFromCryptoAddress: input cryptoAddress has a wrong length")
+	expectedCryptoAddressSize := pqringctCryptoAddressSize(pp)
+	if uint32(len(cryptoAddress)) != expectedCryptoAddressSize {
+		hints := fmt.Sprintf("pqringctCheckCryptoAddress: invalid length of cryptoAddress: %d vs expected %d", len(cryptoAddress), expectedCryptoAddressSize)
+		return false, hints
+	}
+
+	return true, ""
+}
+
+func pqringctVerifyCryptoAddressSpsnsk(pp *pqringct.PublicParameter, cryptoScheme abecryptoparam.CryptoScheme, cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk []byte) (valid bool, hints string) {
+
+	//	check CryptoAddress
+	if validTmp, hintsTmp := pqringctCheckCryptoAddress(pp, cryptoScheme, cryptoAddress); !validTmp {
+		return false, hintsTmp
+	}
+
+	//	check the cryptoScheme in Spsk and Snsk.
+	//	Note that pqringctCheckCryptoAddress has check that the cryptoScheme in cryptoAddress matches the input cryptoScheme.
+	if len(cryptoSpsk) < 4 {
+		hints := fmt.Sprintf("pqringctVerifyCryptoAddressSpsnsk: invalid length of cryptoSpsk: %d", len(cryptoSpsk))
+		return false, hints
+	}
+	cryptoSchemeInSpsk := cryptoSpsk[0]
+	cryptoSchemeInSpsk |= cryptoSpsk[1]
+	cryptoSchemeInSpsk |= cryptoSpsk[2]
+	cryptoSchemeInSpsk |= cryptoSpsk[3]
+
+	if abecryptoparam.CryptoScheme(cryptoSchemeInSpsk) != cryptoScheme {
+		hints := fmt.Sprintf("pqringctVerifyCryptoAddressSpsnsk: unmacthed cryptoScheme in cryptoSpsk and cryptoAddress: %d vs %d", abecryptoparam.CryptoScheme(cryptoSchemeInSpsk), cryptoScheme)
+		return false, hints
+	}
+
+	if len(cryptoSnsk) < 4 {
+		hints := fmt.Sprintf("pqringctVerifyCryptoAddressSpsnsk: invalid length of cryptoSnsk: %d", len(cryptoSnsk))
+		return false, hints
+	}
+	cryptoSchemeInSnsk := cryptoSnsk[0]
+	cryptoSchemeInSnsk |= cryptoSnsk[1]
+	cryptoSchemeInSnsk |= cryptoSnsk[2]
+	cryptoSchemeInSnsk |= cryptoSnsk[3]
+
+	if abecryptoparam.CryptoScheme(cryptoSchemeInSnsk) != cryptoScheme {
+		hints := fmt.Sprintf("pqringctVerifyCryptoAddressSpsnsk: unmacthed cryptoScheme in cryptoSpsk and cryptoAddress: %d vs %d", abecryptoparam.CryptoScheme(cryptoSchemeInSnsk), cryptoScheme)
+		return false, hints
+	}
+
+	// extract underlying keys and verify them
+	apkLen := pqringct.GetAddressPublicKeySerializeSize(pp)
+	serializedAPk := make([]byte, apkLen)
+	copy(serializedAPk, cryptoAddress[4:4+apkLen])
+
+	serializedASksp := make([]byte, len(cryptoSpsk)-4)
+	copy(serializedASksp, cryptoSpsk[4:])
+
+	serializedASksn := make([]byte, len(cryptoSnsk)-4)
+	copy(serializedASksn, cryptoSnsk[4:])
+
+	return pqringct.AddressKeyVerify(pp, serializedAPk, serializedASksp, serializedASksn)
+
+}
+
+func pqringctVerifyCryptoAddressVsk(pp *pqringct.PublicParameter, cryptoScheme abecryptoparam.CryptoScheme, cryptoAddress []byte, cryptoVsk []byte) (valid bool, hints string) {
+
+	//	check CryptoAddress
+	if validTmp, hintsTmp := pqringctCheckCryptoAddress(pp, cryptoScheme, cryptoAddress); !validTmp {
+		return false, hintsTmp
+	}
+
+	//	check the cryptoScheme in cryptoVsk.
+	//	Note that pqringctCheckCryptoAddress has check that the cryptoScheme in cryptoAddress matches the input cryptoScheme.
+	if len(cryptoVsk) < 4 {
+		hints := fmt.Sprintf("pqringctVerifyCryptoAddressVsk: invalid length of cryptoVsk: %d", len(cryptoVsk))
+		return false, hints
+	}
+	cryptoSchemeInVsk := cryptoVsk[0]
+	cryptoSchemeInVsk |= cryptoVsk[1]
+	cryptoSchemeInVsk |= cryptoVsk[2]
+	cryptoSchemeInVsk |= cryptoVsk[3]
+
+	if abecryptoparam.CryptoScheme(cryptoSchemeInVsk) != cryptoScheme {
+		hints := fmt.Sprintf("pqringctVerifyCryptoAddressVsk: unmacthed cryptoScheme in cryptoVsk and cryptoAddress: %d vs %d", abecryptoparam.CryptoScheme(cryptoSchemeInVsk), cryptoScheme)
+		return false, hints
+	}
+
+	// extract underlying keys and verify them
+	apkLen := pqringct.GetAddressPublicKeySerializeSize(pp)
+	serializedVPk := make([]byte, len(cryptoAddress)-(4+apkLen))
+	copy(serializedVPk, cryptoAddress[4+apkLen:])
+
+	serializedVsk := make([]byte, len(cryptoVsk)-4)
+	copy(serializedVsk, cryptoVsk[4:])
+
+	return pqringct.ValueKeyVerify(pp, serializedVPk, serializedVsk)
+
+}
+
+func pqringctExtractCoinAddressFromCryptoAddress(pp *pqringct.PublicParameter, cryptoAddress []byte, cryptoScheme abecryptoparam.CryptoScheme) (
+	coinAddress []byte,
+	err error) {
+	//cryptoscheme := cryptoAddress[0]
+	//cryptoscheme |= cryptoAddress[1]
+	//cryptoscheme |= cryptoAddress[2]
+	//cryptoscheme |= cryptoAddress[3]
+	//if abecryptoparam.CryptoScheme(cryptoscheme) != cryptoScheme {
+	//	return nil, errors.New("pqringctExtractCoinAddressFromCryptoAddress: unmatched cryptoScheme for cryptoAddress")
+	//}
+	//
+	//if uint32(len(cryptoAddress)) != pqringctCryptoAddressSize(abecryptoparam.PQRingCTPP) {
+	//	return nil, errors.New("pqringctExtractCoinAddressFromCryptoAddress: input cryptoAddress has a wrong length")
+	//}
+
+	//	check CryptoAddress
+	if validTmp, hintsTmp := pqringctCheckCryptoAddress(pp, cryptoScheme, cryptoAddress); !validTmp {
+		return nil, errors.New(hintsTmp)
 	}
 
 	//	 In the implementation of PQRingCT, the addressPublicKey is used as coinAddress.
@@ -300,10 +416,13 @@ func pqringctCoinbaseTxVerify(pp *pqringct.PublicParameter, coinbaseTx *wire.Msg
 	return true, nil
 }
 
-// The caller needs to fill the Version, TxIns, TxFee, TxMemo fields of transferTxMsgTemplate
-// This function will fill the serialNumbers in TxIns, and the TxOuts and TxWitness fields of transferTxMsgTemplate, and return it as the result
-// The parameter cryptoScheme here is redundant at this moment and works for ony double-check.
-// In the future, when the version of input ring is different from the ring of TxVersion/TxoVersion, the two corresponding cryptoSchemes should be set as parameter here.
+// The caller needs to fill the Version, TxIns, TxFee, TxMemo fields of transferTxMsgTemplate.
+// This function will fill the serialNumbers in TxIns, and the TxOuts and TxWitness fields of transferTxMsgTemplate, and return it as the result.
+// The parameter cryptoScheme here is obtained by the caller from TxVersion, which causes this function is called. Now it is redundant at this moment and works for ony double-check.
+// In the future, when the version of input ring is different from the ring of TxVersion/TxoVersion,
+// the two corresponding cryptoSchemes will be extracted here and further decides the TxGen algorithms.
+//
+//	Refer to wire.param for the details.
 func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptoparam.CryptoScheme, abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxOutputDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 	inputNum := len(abeTxInputDescs)
 	outputNum := len(abeTxOutputDescs)
