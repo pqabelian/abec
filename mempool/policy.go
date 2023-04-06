@@ -80,11 +80,10 @@ func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee abeutil.Amoun
 func calcMinRequiredTxRelayFeeAbe(serializedSize int64, minRelayTxFee abeutil.Amount) uint64 {
 	// Calculate the minimum fee for a transaction to be allowed into the
 	// mempool and relayed by scaling the base fee (which is the minimum
-	// free transaction relay fee).  minTxRelayFee is in Neutrino/100kB so
-	// multiply by serializedSize (which is in bytes) and divide by 100000 to
+	// free transaction relay fee).  minTxRelayFee is in Neutrino/kB so
+	// multiply by serializedSize (which is in bytes) and divide by 1000 to
 	// get minimum Neutrino.
-
-	minFee := (uint64(serializedSize) * uint64(minRelayTxFee)) / 100000
+	minFee := (uint64(serializedSize) * uint64(minRelayTxFee)) / 1000
 
 	if minFee == 0 && minRelayTxFee > 0 {
 		minFee = uint64(minRelayTxFee)
@@ -142,7 +141,7 @@ func checkInputsStandard(tx *abeutil.Tx, utxoView *blockchain.UtxoViewpoint) err
 	return nil
 }
 
-// Abe to do
+//	Abe to do
 func checkInputsStandardAbe(tx *abeutil.TxAbe, utxoRingView *blockchain.UtxoRingViewpoint) error {
 	// NOTE: The reference implementation also does a coinbase check here,
 	// but coinbases have already been rejected prior to calling this
