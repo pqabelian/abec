@@ -72,6 +72,18 @@ func (n NodeType) String() string {
 	return res
 }
 
+func (n NodeType) IsFullNode() bool {
+	return n == FullNode
+}
+
+func (n NodeType) IsSemifullNode() bool {
+	return n == SemifullNode
+}
+
+func (n NodeType) IsNormalNode() bool {
+	return n == NormalNode
+}
+
 // TrustLevel is the level of trust for other nodes.
 type TrustLevel uint64
 

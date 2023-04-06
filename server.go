@@ -2315,7 +2315,8 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	interrupt <-chan struct{}) (*server, error) {
 
 	// todo (prune): service flag based on node type
-	services := defaultServices
+	// done
+	services := cfg.serviceFlag
 
 	amgr := netaddrmgr.New(cfg.DataDir, abecLookup)
 
@@ -2468,7 +2469,8 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	s.ethash = ethash.New(cfg.EthashConfig)
 
 	s.syncManager, err = syncmgr.New(&syncmgr.Config{
-		FullNode:           !cfg.PrunedNode && !cfg.PartiallyPrunedNode,
+		NodeType:           cfg.nodeType,
+		TrustLevel:         cfg.trustLevel,
 		PeerNotifier:       &s,
 		Chain:              s.chain,
 		TxMemPool:          s.txMemPool,

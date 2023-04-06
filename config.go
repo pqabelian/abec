@@ -153,8 +153,6 @@ type config struct {
 	Proxy                 string        `long:"proxy" description:"Connect via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
 	ProxyPass             string        `long:"proxypass" default-mask:"-" description:"Password for proxy server"`
 	ProxyUser             string        `long:"proxyuser" description:"Username for proxy server"`
-	PartiallyPrunedNode   bool          `long:"partiallyprunednode" description:"Only keep the witness data of fixed number (default: 1000)"`
-	PrunedNode            bool          `long:"prunednode" description:"Only keep the witness data after the last checkpoint"`
 	RegressionTest        bool          `long:"regtest" description:"Use the regression test network"`
 	RejectNonStd          bool          `long:"rejectnonstd" description:"Reject non-standard transactions regardless of the default settings for the active network."`
 	RejectReplacement     bool          `long:"rejectreplacement" description:"Reject transactions that attempt to replace existing transactions within the mempool through the Replace-By-Fee (RBF) signaling policy."`
