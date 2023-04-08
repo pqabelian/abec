@@ -277,23 +277,71 @@ func (sm *SyncManager) findNextHeaderCheckpoint(height int32) *chaincfg.Checkpoi
 	return nextCheckpoint
 }
 
-func (sm *SyncManager) MaybeSyncPeer(p *peerpkg.Peer, witnessNeeded bool) bool {
+func (sm *SyncManager) MaybeSyncPeer(p *peerpkg.Peer) bool {
+	// If peer is a full node.
+	if p.Services()&wire.SFNodeWitness == wire.SFNodeWitness {
+		return true
+	}
+
+	bestSnapShot := sm.chain.BestSnapshot()
+	currentHeight := bestSnapShot.Height
+
+	if p.LastBlock() < currentHeight {
+		log.Debugf("peer %v height %v is lower than our height %v, skipping", p, p.LastBlock(), currentHeight)
+		return false
+	}
+
+	witnessNeeded := false
+	if sm.trustLevel == wire.TrustLevelLow {
+		witnessNeeded = true
+	}
+
+	if sm.nodeType.IsFullNode() {
+		witnessNeeded = true
+	} else if sm.nodeType.IsSemifullNode() {
+		if sm.nextCheckpoint == nil {
+			witnessNeeded = true
+		}
+	} else {
+		// Normal node.
+		if sm.trustLevel == wire.TrustLevelMedium {
+			if sm.nextCheckpoint == nil || currentHeight+wire.MaxReservedWitness >= p.LastBlock() {
+				witnessNeeded = true
+			}
+		} else {
+			// Trust level high.
+			if currentHeight+wire.MaxReservedWitness >= p.LastBlock() {
+				witnessNeeded = true
+			}
+		}
+	}
+
 	if !witnessNeeded {
 		return true
 	}
+
 	if !p.IsWitnessEnabled() {
 		log.Debugf("peer %v not witness enabled, skipping", p)
 		return false
 	}
 
-	if !p.IsWitnessPruned() {
-		return true
+	peerHasWitness := false
+	if p.Services()&wire.SFNodeSemi == wire.SFNodeSemi {
+		if sm.nextCheckpoint == nil {
+			peerHasWitness = true
+		}
+	} else {
+		// Normal node
+		if currentHeight+wire.MaxReservedWitness >= p.LastBlock() {
+			peerHasWitness = true
+		}
 	}
 
-	log.Debugf("peer %v is witness pruned, "+
-		"skipping", p)
-	return false
-
+	if !peerHasWitness {
+		log.Debugf("peer %v does not have witness of height %v, skipping", p, currentHeight+1)
+		return false
+	}
+	return true
 }
 
 // startSync will choose the best peer among the available candidate peers to
@@ -313,14 +361,6 @@ func (sm *SyncManager) startSync() {
 			continue
 		}
 
-		witnessNeeded := true
-		if !sm.nodeType.IsFullNode() && sm.nextCheckpoint != nil {
-			witnessNeeded = false
-		}
-		if !sm.MaybeSyncPeer(peer, witnessNeeded) {
-			continue
-		}
-
 		// Remove sync candidate peers that are no longer candidates due
 		// to passing their latest known block.  NOTE: The < is
 		// intentional as opposed to <=.  While technically the peer
@@ -329,6 +369,10 @@ func (sm *SyncManager) startSync() {
 		// the case where both are at 0 such as during regression test.
 		if peer.LastBlock() < best.Height {
 			state.syncCandidate = false
+			continue
+		}
+
+		if !sm.MaybeSyncPeer(peer) {
 			continue
 		}
 

@@ -453,7 +453,6 @@ type Peer struct {
 	sendHeadersPreferred bool   // peer sent a sendheaders message
 	verAckReceived       bool
 	witnessEnabled       bool
-	witnessPruned        bool
 
 	wireEncoding wire.MessageEncoding
 
@@ -818,14 +817,6 @@ func (p *Peer) IsWitnessEnabled() bool {
 	p.flagsMtx.Unlock()
 
 	return witnessEnabled
-}
-
-func (p *Peer) IsWitnessPruned() bool {
-	p.flagsMtx.Lock()
-	witnessPruned := p.witnessPruned
-	p.flagsMtx.Unlock()
-
-	return witnessPruned
 }
 
 func (p *Peer) StoreNeedSetResult(msg *wire.MsgNeedSetResult) {
@@ -2034,10 +2025,6 @@ func (p *Peer) readRemoteVersionMsg() error {
 	// transactions, or not.
 	if p.services&wire.SFNodeWitness == wire.SFNodeWitness {
 		p.witnessEnabled = true
-	}
-	if (p.services&wire.SFNodeSemi == wire.SFNodeSemi) ||
-		(p.services&wire.SFNodeNormal == wire.SFNodeNormal) {
-		p.witnessPruned = true
 	}
 	p.flagsMtx.Unlock()
 
