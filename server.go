@@ -654,6 +654,9 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 		}
 		if err != nil {
 			notFound.AddInvVect(iv)
+			if iv.Type == wire.InvTypeWitnessBlock {
+				break
+			}
 
 			// When there is a failure fetching the final entry
 			// and the done channel was sent in due to there
@@ -873,6 +876,9 @@ func (sp *serverPeer) OnNotFound(p *peer.Peer, msg *wire.MsgNotFound) {
 			numBlocks++
 		case wire.InvTypeWitnessBlock:
 			numBlocks++
+			peerLog.Debugf("Witness block %s notfound message from %s, disconnecting...", inv.Hash.String(), sp)
+			sp.Disconnect()
+			return
 		case wire.InvTypeTx:
 			numTxns++
 		case wire.InvTypeWitnessTx:
@@ -1121,7 +1127,7 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 	err := sp.server.db.View(func(dbTx database.Tx) error {
 		var err error
 		if encoding == wire.BaseEncoding {
-			blockBytes, err = dbTx.FetchBlockNoWitness(hash)
+			blockBytes, err = dbTx.FetchBlockWithoutWitness(hash)
 		} else {
 			blockBytes, witnesses, err = dbTx.FetchBlockAbe(hash)
 		}
@@ -1175,6 +1181,10 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 		dc = doneChan // and the dc is nil means that do not finish the request
 	}
 	//	todo (ABE): as the block is fetched from database, the witness may not be included. If so, regardless of encoding, no witness is provided.
+	if encoding == wire.WitnessEncoding && !msgBlock.HasWitness() {
+		peerLog.Debugf("Peer %v request witness block %v but we do not have witness", sp, hash.String())
+		return errors.New("witness block not found")
+	}
 	sp.QueueMessageWithEncoding(&msgBlock, dc, encoding)
 
 	// When the peer requests the final block that was advertised in

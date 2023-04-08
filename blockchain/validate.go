@@ -1454,7 +1454,8 @@ func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *
 //   5. Ensure the block fee in coinbase is not larger than block reward plus tx fee
 //   6. Validate the witness of each transaction (if after the checkpoint)
 //   7. Set new best height for utxo ring view
-func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockAbe, view *UtxoRingViewpoint, stxos *[]*SpentTxOutAbe) error {
+func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockAbe, view *UtxoRingViewpoint, stxos *[]*SpentTxOutAbe,
+	mandatoryWitnessCheck bool) error {
 	// If the side chain blocks end up in the database, a call to
 	// CheckBlockSanity should be done here in case a previous version
 	// allowed a block that is no longer valid.  However, since the
@@ -1623,9 +1624,12 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// optimization because running the scripts is the most time consuming
 	// portion of block handling.
 	checkpoint := b.LatestCheckpoint()
-	runScripts := true
-	if checkpoint != nil && node.height <= checkpoint.Height {
-		runScripts = false
+	witnessCheck := true
+	if !mandatoryWitnessCheck && checkpoint != nil && node.height <= checkpoint.Height {
+		witnessCheck = false
+	}
+	if !block.Transactions()[0].HasWitness() {
+		witnessCheck = false
 	}
 
 	// Blocks created after the BIP0016 activation time need to have the
@@ -1698,7 +1702,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// transactions are actually allowed to spend the coins by running the
 	// expensive ECDSA signature check scripts.  Doing this last helps
 	// prevent CPU exhaustion attacks.
-	if runScripts {
+	if witnessCheck {
 		err := checkBlockScriptsAbe(block, view, b.witnessCache)
 		if err != nil {
 			return err
@@ -1764,5 +1768,5 @@ func (b *BlockChain) CheckConnectBlockTemplateAbe(block *abeutil.BlockAbe) error
 		return err
 	}
 
-	return b.checkConnectBlockAbe(newNode, block, view, nil)
+	return b.checkConnectBlockAbe(newNode, block, view, nil, false)
 }

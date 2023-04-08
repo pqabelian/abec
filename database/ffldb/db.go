@@ -1514,7 +1514,7 @@ func (tx *transaction) FetchBlockAbe(hash *chainhash.Hash) ([]byte, [][]byte, er
 	return blockBytes, witnesses, nil
 }
 
-func (tx *transaction) FetchBlockNoWitness(hash *chainhash.Hash) ([]byte, error) {
+func (tx *transaction) FetchBlockWithoutWitness(hash *chainhash.Hash) ([]byte, error) {
 	// Ensure transaction state is valid.
 	if err := tx.checkClosed(); err != nil {
 		return nil, err

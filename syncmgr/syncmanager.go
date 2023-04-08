@@ -277,6 +277,37 @@ func (sm *SyncManager) findNextHeaderCheckpoint(height int32) *chaincfg.Checkpoi
 	return nextCheckpoint
 }
 
+func (sm *SyncManager) WitnessNeeded(p *peerpkg.Peer) bool {
+	if sm.trustLevel == wire.TrustLevelLow {
+		return true
+	}
+
+	bestSnapShot := sm.chain.BestSnapshot()
+	currentHeight := bestSnapShot.Height
+
+	if sm.nodeType.IsFullNode() {
+		return true
+	} else if sm.nodeType.IsSemifullNode() {
+		if sm.nextCheckpoint == nil {
+			return true
+		}
+	} else {
+		// Normal node.
+		if sm.trustLevel == wire.TrustLevelMedium {
+			if sm.nextCheckpoint == nil || currentHeight+wire.MaxReservedWitness >= p.LastBlock() {
+				return true
+			}
+		} else {
+			// Trust level high.
+			if currentHeight+wire.MaxReservedWitness >= p.LastBlock() {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 func (sm *SyncManager) MaybeSyncPeer(p *peerpkg.Peer) bool {
 	// If peer is a full node.
 	if p.Services()&wire.SFNodeWitness == wire.SFNodeWitness {
@@ -291,30 +322,7 @@ func (sm *SyncManager) MaybeSyncPeer(p *peerpkg.Peer) bool {
 		return false
 	}
 
-	witnessNeeded := false
-	if sm.trustLevel == wire.TrustLevelLow {
-		witnessNeeded = true
-	}
-
-	if sm.nodeType.IsFullNode() {
-		witnessNeeded = true
-	} else if sm.nodeType.IsSemifullNode() {
-		if sm.nextCheckpoint == nil {
-			witnessNeeded = true
-		}
-	} else {
-		// Normal node.
-		if sm.trustLevel == wire.TrustLevelMedium {
-			if sm.nextCheckpoint == nil || currentHeight+wire.MaxReservedWitness >= p.LastBlock() {
-				witnessNeeded = true
-			}
-		} else {
-			// Trust level high.
-			if currentHeight+wire.MaxReservedWitness >= p.LastBlock() {
-				witnessNeeded = true
-			}
-		}
-	}
+	witnessNeeded := sm.WitnessNeeded(p)
 
 	if !witnessNeeded {
 		return true
@@ -1008,10 +1016,25 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 	delete(state.requestedBlocks, *blockHash)
 	delete(sm.requestedBlocks, *blockHash)
 
+	witnessNeeded := sm.WitnessNeeded(peer)
+	if witnessNeeded {
+		numTx := len(bmsg.block.MsgBlock().Transactions)
+		if numTx == 0 {
+			log.Infof("Rejected block %v from %s: block without any transactions", blockHash, peer)
+			peer.Disconnect()
+			return
+		}
+		if !bmsg.block.Transactions()[0].HasWitness() {
+			log.Infof("Rejected block %v from %s: block without witness", blockHash, peer)
+			peer.Disconnect()
+			return
+		}
+	}
+
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
 	//	todo (EthashPoW): 202207
-	_, isOrphan, err := sm.chain.ProcessBlockAbe(bmsg.block, sm.ethash, behaviorFlags)
+	_, isOrphan, err := sm.chain.ProcessBlockAbe(bmsg.block, sm.ethash, behaviorFlags, sm.trustLevel == wire.TrustLevelLow)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
@@ -1287,7 +1310,7 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	block := abeutil.NewBlockAbe(&msgBlockAbe)
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
-	_, isOrphan, err := sm.chain.ProcessBlockAbe(block, sm.ethash, behaviorFlags)
+	_, isOrphan, err := sm.chain.ProcessBlockAbe(block, sm.ethash, behaviorFlags, sm.trustLevel == wire.TrustLevelLow)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
@@ -1521,10 +1544,7 @@ func (sm *SyncManager) fetchHeaderBlocks() {
 			// todo(ABE): for ABE, even for WitnessEnabled peer, we may do not want receive the witness
 			//	todo(ABE): for blocks before checkpoint, we do not need to check the transactions' witness
 			// todo (prune): ok
-			witnessNeeded := true
-			if !sm.nodeType.IsFullNode() && sm.nextCheckpoint != nil {
-				witnessNeeded = false
-			}
+			witnessNeeded := sm.WitnessNeeded(sm.syncPeer)
 			if witnessNeeded {
 				iv.Type = wire.InvTypeWitnessBlock
 			}
@@ -1877,7 +1897,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		requestQueue[0] = nil
 		requestQueue = requestQueue[1:]
 
-		// todo (prune): modify the request inv type according to the node type
+		// todo (prune): ok modify the request inv type according to the node type
 		switch iv.Type {
 		case wire.InvTypeWitnessBlock:
 			fallthrough
@@ -1888,7 +1908,8 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 				limitAdd(sm.requestedBlocks, iv.Hash, maxRequestedBlocks)
 				limitAdd(state.requestedBlocks, iv.Hash, maxRequestedBlocks)
 
-				if peer.IsWitnessEnabled() {
+				witnessNeeded := sm.WitnessNeeded(sm.syncPeer)
+				if witnessNeeded {
 					iv.Type = wire.InvTypeWitnessBlock
 				}
 
@@ -2005,7 +2026,7 @@ out:
 
 			case processBlockMsgAbe:
 				//	todo (EthashPoW): 202207
-				_, isOrphan, err := sm.chain.ProcessBlockAbe(msg.block, sm.ethash, msg.flags)
+				_, isOrphan, err := sm.chain.ProcessBlockAbe(msg.block, sm.ethash, msg.flags, sm.trustLevel == wire.TrustLevelLow)
 				if err != nil {
 					msg.reply <- processBlockResponse{
 						isOrphan: false,

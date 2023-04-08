@@ -112,7 +112,7 @@ func (b *BlockChain) processOrphansAbe(hash *chainhash.Hash, flags BehaviorFlags
 			i--
 
 			// Potentially accept the block into the block chain.
-			_, err := b.maybeAcceptBlockAbe(orphan.block, flags)
+			_, err := b.maybeAcceptBlockAbe(orphan.block, flags, false)
 			if err != nil {
 				return err
 			}
@@ -145,7 +145,8 @@ func (b *BlockChain) processOrphansAbe(hash *chainhash.Hash, flags BehaviorFlags
 //   6. If any orphan blocks depend on this block, check and accept it (processOrphansAbe) todo: to be checked
 //	todo (ABE):
 //	todo (EthashPoW): 202207
-func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.Ethash, flags BehaviorFlags) (bool, bool, error) {
+func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.Ethash, flags BehaviorFlags,
+	mandatoryWitnessCheck bool) (bool, bool, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
 
@@ -168,19 +169,6 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.
 	if _, exists := b.orphansAbe[*blockHash]; exists {
 		str := fmt.Sprintf("already have block (orphan) %v", blockHash)
 		return false, false, ruleError(ErrDuplicateBlock, str)
-	}
-
-	// Check whether witness is available or not if we are not in fast add mode.
-	if !fastAdd {
-		numTx := len(block.MsgBlock().Transactions)
-		if numTx == 0 {
-			return false, false, ruleError(ErrNoTransactions, "block does not contain "+
-				"any transactions")
-		}
-		if !block.Transactions()[0].HasWitness() {
-			return false, false, ruleError(ErrWitnessMissing, "block does not contain "+
-				"any witness")
-		}
 	}
 
 	// Perform preliminary sanity checks on the block and its transactions.
@@ -245,7 +233,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.
 
 	// The block has passed all context independent checks and appears sane
 	// enough to potentially accept it into the block chain.
-	isMainChain, err := b.maybeAcceptBlockAbe(block, flags)
+	isMainChain, err := b.maybeAcceptBlockAbe(block, flags, mandatoryWitnessCheck)
 	if err != nil {
 		return false, false, err
 	}

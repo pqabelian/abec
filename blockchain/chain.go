@@ -1427,7 +1427,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			// In the case the block is determined to be invalid due to a
 			// rule violation, mark it as invalid and mark all of its
 			// descendants as having an invalid ancestor.
-			err = b.checkConnectBlockAbe(n, block, view, nil)
+			err = b.checkConnectBlockAbe(n, block, view, nil, false)
 			if err != nil {
 				if _, ok := err.(RuleError); ok {
 					b.index.SetStatusFlags(n, statusValidateFailed)
@@ -1623,7 +1623,8 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 //     1. Log and return if worksum is smaller than main chain (we do not check the inputs and witness)
 //     2. Find detachNodes and attachNode (getReorganizeNodesAbe)
 //     3. Reorganize the chain (reorganizeChainAbe)
-func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAbe, flags BehaviorFlags) (bool, error) {
+func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAbe, flags BehaviorFlags,
+	mandatoryWitnessCheck bool) (bool, error) {
 	fastAdd := flags&BFFastAdd == BFFastAdd
 
 	flushIndexState := func() {
@@ -1651,7 +1652,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 		view.SetBestHash(parentHash)
 		stxos := make([]*SpentTxOutAbe, 0, countSpentOutputsAbe(block))
 		if !fastAdd {
-			err := b.checkConnectBlockAbe(node, block, view, &stxos)
+			err := b.checkConnectBlockAbe(node, block, view, &stxos, mandatoryWitnessCheck)
 			if err == nil {
 				b.index.SetStatusFlags(node, statusValid)
 			} else if _, ok := err.(RuleError); ok {
