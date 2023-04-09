@@ -510,6 +510,11 @@ func (txIn *TxInAbe) RingMemberHash() chainhash.Hash {
 // and in logic, we should use (TxId,Index) to denote the OutPoint.
 type TxId chainhash.Hash
 
+func (txId *TxId) String() string {
+	hash := chainhash.Hash(*txId)
+	return hash.String()
+}
+
 type MsgTxAbe struct {
 	Version uint32
 	TxIns   []*TxInAbe
