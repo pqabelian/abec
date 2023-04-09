@@ -13,259 +13,10 @@ import (
 	"sort"
 )
 
-// TxoRing is a key concept in Abelian
-type TxoRing struct {
-	Version         uint32
-	ringBlockHeight int32
-	outPointRing    *wire.OutPointRing
-	txOuts          []*wire.TxOutAbe
-	isCoinbase      bool
-}
-
-// errDeserialize signifies that a problem was encountered when deserializing
-// data.
-type errTxoRingDeserialize string
-
-// Error implements the error interface.
-func (e errTxoRingDeserialize) Error() string {
-	return string(e)
-}
-
-func (txoRing *TxoRing) IsCoinBase() bool {
-	return txoRing.isCoinbase
-}
-
-// BlockHeight returns the height of the block containing the output.
-func (txoRing *TxoRing) RingBlockHeight() int32 {
-	return txoRing.ringBlockHeight
-}
-
-// OutPointRing returns the height of the OutPointRing.
-func (txoRing *TxoRing) OutPointRing() *wire.OutPointRing {
-	return txoRing.outPointRing
-}
-
-func (txoRing *TxoRing) TxOuts() []*wire.TxOutAbe {
-	return txoRing.txOuts
-}
-
-// RingId() returns the underlying outPointRing's RingId as its RingId.
-// This is compatible the existing implementaion where txoRing.outPointRing.Hash() is used as the key for map.
-func (txoRing *TxoRing) RingId() wire.RingId {
-	return txoRing.outPointRing.RingId()
-}
-
-func (txoRing *TxoRing) SerializeSize() int {
-
-	//	utxoRingHeaderCode
-	//	blockHeight and IsCoinBase
-	txoRingHeaderCode := uint64(txoRing.RingBlockHeight()) << 1
-	if txoRing.IsCoinBase() {
-		txoRingHeaderCode |= 0x01
-	}
-
-	n := wire.VarIntSerializeSize(txoRingHeaderCode)
-
-	//	version
-	n = n + wire.VarIntSerializeSize(uint64(txoRing.Version))
-
-	//	outPointRing
-	n = n + txoRing.outPointRing.SerializeSize()
-
-	//	txOuts
-	n = n + wire.VarIntSerializeSize(uint64(len(txoRing.txOuts)))
-	for _, txOut := range txoRing.txOuts {
-		n = n + txOut.SerializeSize()
-	}
-
-	return n
-}
-
-func (txoRing *TxoRing) Serialize(w io.Writer) error {
-	//	utxoRingHeaderCode
-	//	blockHeight and IsCoinBase
-	utxoRingHeaderCode := uint64(txoRing.RingBlockHeight()) << 1
-	if txoRing.IsCoinBase() {
-		utxoRingHeaderCode |= 0x01
-	}
-	err := wire.WriteVarInt(w, 0, utxoRingHeaderCode)
-	if err != nil {
-		return err
-	}
-
-	//	Version
-	err = wire.WriteVarInt(w, 0, uint64(txoRing.Version))
-	if err != nil {
-		return err
-	}
-
-	//	OutPointRing
-	err = wire.WriteOutPointRing(w, 0, txoRing.Version, txoRing.outPointRing)
-	if err != nil {
-		return err
-	}
-
-	//	txOuts
-	if len(txoRing.txOuts) != len(txoRing.outPointRing.OutPoints) {
-		return AssertError(fmt.Sprintf("TxoRing.Serialize: The size of txOuts does not match the number of OutPoints"))
-	}
-	err = wire.WriteVarInt(w, 0, uint64(len(txoRing.txOuts)))
-	if err != nil {
-		return err
-	}
-
-	for _, txOut := range txoRing.txOuts {
-		err = wire.WriteTxOutAbe(w, 0, txoRing.Version, txOut)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (txoRing *TxoRing) Deserialize(r io.Reader) error {
-	//	utxoRingHeaderCode
-	//	blockHeight and IsCoinBase
-	utxoRingHeaderCode, err := wire.ReadVarInt(r, 0)
-	if err != nil {
-		return err
-	}
-	isCoinBase := utxoRingHeaderCode&0x01 != 0
-	ringBlockHeight := int32(utxoRingHeaderCode >> 1)
-
-	txoRing.ringBlockHeight = ringBlockHeight
-	txoRing.isCoinbase = isCoinBase
-
-	//	Version
-	version, err := wire.ReadVarInt(r, 0)
-	if err != nil {
-		return err
-	}
-	txoRing.Version = uint32(version)
-
-	//	OutPointRing
-	txoRing.outPointRing = &wire.OutPointRing{}
-	err = wire.ReadOutPointRing(r, 0, txoRing.Version, txoRing.outPointRing)
-	if err != nil {
-		return err
-	}
-
-	//	TxOuts
-	ringSize, err := wire.ReadVarInt(r, 0)
-	if err != nil {
-		return err
-	}
-	expectedRingSize, err := wire.GetTxoRingSizeByRingVersion(txoRing.Version)
-	if err != nil {
-		return err
-	}
-	if ringSize > uint64(expectedRingSize) {
-		return errTxoRingDeserialize("The TxoRing to be deseralized has a ring size greater than the allowed max value")
-	}
-	if ringSize != uint64(len(txoRing.outPointRing.OutPoints)) {
-		return errTxoRingDeserialize("The TxoRing to be deseralized has a ring size does not match the size in OutPointRing")
-	}
-
-	txoRing.txOuts = make([]*wire.TxOutAbe, ringSize)
-	for i := uint64(0); i < ringSize; i++ {
-		txOut := wire.TxOutAbe{}
-		err = wire.ReadTxOutAbe(r, 0, txoRing.Version, &txOut)
-		if err != nil {
-			return err
-		}
-		txoRing.txOuts[i] = &txOut
-	}
-
-	return nil
-}
-
-// Clone returns a shallow copy of the utxo entry.
-func (txoRing *TxoRing) Clone() *TxoRing {
-	if txoRing == nil {
-		return nil
-	}
-
-	rstTxoRing := TxoRing{}
-
-	rstTxoRing.Version = txoRing.Version
-	rstTxoRing.ringBlockHeight = txoRing.ringBlockHeight
-	rstTxoRing.outPointRing = txoRing.outPointRing
-	rstTxoRing.txOuts = txoRing.txOuts
-	rstTxoRing.isCoinbase = txoRing.isCoinbase
-	//	all the above are invariant contents for TxoRing, so we use shallow copy
-
-	return &rstTxoRing
-}
-
-func (txoRing *TxoRing) IsSame(obj *TxoRing) bool {
-	if txoRing == nil {
-		if obj == nil {
-			return true
-		} else {
-			return false
-		}
-	}
-
-	entrySize := txoRing.SerializeSize()
-	objSize := obj.SerializeSize()
-	if entrySize != objSize {
-		return false
-	}
-
-	bufEntry := bytes.NewBuffer(make([]byte, 0, entrySize))
-	err := txoRing.Serialize(bufEntry)
-	if err != nil {
-		return false
-	}
-
-	bufObj := bytes.NewBuffer(make([]byte, 0, objSize))
-	err = obj.Serialize(bufObj)
-	if err != nil {
-		return false
-	}
-
-	if !bytes.Equal(bufEntry.Bytes(), bufObj.Bytes()) {
-		return false
-	}
-
-	return true
-}
-
-func NewTxoRing(version uint32, ringBlockHeight int32, blockhashs []*chainhash.Hash, ringMemberTxos []*RingMemberTxo, isCoinBase bool) (*TxoRing, error) {
-
-	ringSize := len(ringMemberTxos)
-	if ringSize == 0 {
-		return nil, nil
-	}
-
-	txoRing := &TxoRing{
-		Version:         version,
-		ringBlockHeight: ringBlockHeight,
-	}
-
-	outPoints := make([]*wire.OutPointAbe, ringSize)
-	txOuts := make([]*wire.TxOutAbe, ringSize)
-	for i := 0; i < ringSize; i++ {
-		outPoints[i] = ringMemberTxos[i].outPoint
-		txOuts[i] = ringMemberTxos[i].txOut
-		if txOuts[i].Version != version {
-			return nil, errors.New("NewTxoRing: the TXOS to be in a ring do not have the same version")
-		}
-	}
-
-	txoRing.outPointRing = wire.NewOutPointRing(version, blockhashs, outPoints)
-	txoRing.txOuts = txOuts
-
-	txoRing.isCoinbase = isCoinBase
-
-	return txoRing, nil
-}
-
 // BuildTxoRings apply a chain-rule to organize the Txos of input blocks to TxoRings.
 // Todo: (view *UtxoRingViewpoint) newUtxoRingEntries should call BuildTxoRings, then package the resulting TxoRings to UtxoRingEnrties, which include the status informaiton of TxoRing.
 // We leave the refactoring of (view *UtxoRingViewpoint) newUtxoRingEntries to later work, after BuildTxoRings is tested to work well.
-func BuildTxoRings(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.BlockAbe) (txoRings map[wire.RingId]*TxoRing, err error) {
+func BuildTxoRings(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.BlockAbe) (txoRings map[wire.RingId]*wire.TxoRing, err error) {
 	//blockNum := blockNumPerRingGroup
 
 	if blockNumPerRingGroup < 1 {
@@ -283,8 +34,8 @@ func BuildTxoRings(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.
 	}
 
 	ringBlockHeight := blocks[blockNumPerRingGroup-1].Height()
-	for i := blockNumPerRingGroup - 1; i >= 0; i++ {
-		if blocks[i].Height() != ringBlockHeight-int32(i) {
+	for i := blockNumPerRingGroup - 1; i >= 0; i-- {
+		if blocks[i].Height() != ringBlockHeight-(int32(blockNumPerRingGroup)-1-int32(i)) {
 			return nil, AssertError("NewUtxoRingEntriesFromBlocks: the input blocks should have successive height")
 		}
 	}
@@ -365,7 +116,7 @@ func BuildTxoRings(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.
 		return nil, err
 	}
 
-	rstTxoRings := make(map[wire.RingId]*TxoRing, len(cbTxoRings)+len(trTxoRings))
+	rstTxoRings := make(map[wire.RingId]*wire.TxoRing, len(cbTxoRings)+len(trTxoRings))
 
 	for _, txoRing := range cbTxoRings {
 		//ringHash := txoRing.outPointRing.Hash()
@@ -396,7 +147,7 @@ func BuildTxoRings(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.
 // This is a helper function of BuildTxoRings().
 // Here txoRingSize is set as an input parameter, to avoid using the global parameter TxoRingSize.
 // txoRingSize is set by the caller which may decides the value of txoRingSize based on the wire/protocol version.
-func buildTxoRingsFromTxos(ringMemberTxos []*RingMemberTxo, ringBlockHeight int32, blockhashs []*chainhash.Hash, txoRingSize int, isCoinBase bool) (txoRings []*TxoRing, err error) {
+func buildTxoRingsFromTxos(ringMemberTxos []*RingMemberTxo, ringBlockHeight int32, blockhashs []*chainhash.Hash, txoRingSize int, isCoinBase bool) (txoRings []*wire.TxoRing, err error) {
 
 	if len(ringMemberTxos) == 0 {
 		return nil, errors.New("buildTxoRingsFromTxos: the input ringMemberTxos is empty")
@@ -432,7 +183,7 @@ func buildTxoRingsFromTxos(ringMemberTxos []*RingMemberTxo, ringBlockHeight int3
 	}
 
 	//rstTxoRings := make(map[chainhash.Hash]*TxoRing)
-	rstTxoRings := make([]*TxoRing, 0, normalRingNum+2) // the final actual length of rstTxoRings could be normalRingNum, normalRingNum+1, or normalRingNum+2
+	rstTxoRings := make([]*wire.TxoRing, 0, normalRingNum+2) // the final actual length of rstTxoRings could be normalRingNum, normalRingNum+1, or normalRingNum+2
 
 	for i := 0; i < normalRingNum; i++ {
 		// rings with size txoRingSize
@@ -1757,6 +1508,36 @@ func (view *UtxoRingViewpoint) NewUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 	}
 
 	return nil
+}
+
+func NewTxoRing(version uint32, ringBlockHeight int32, blockhashs []*chainhash.Hash, ringMemberTxos []*RingMemberTxo, isCoinBase bool) (*wire.TxoRing, error) {
+
+	ringSize := len(ringMemberTxos)
+	if ringSize == 0 {
+		return nil, nil
+	}
+
+	txoRing := &wire.TxoRing{
+		Version:         version,
+		RingBlockHeight: ringBlockHeight,
+	}
+
+	outPoints := make([]*wire.OutPointAbe, ringSize)
+	txOuts := make([]*wire.TxOutAbe, ringSize)
+	for i := 0; i < ringSize; i++ {
+		outPoints[i] = ringMemberTxos[i].outPoint
+		txOuts[i] = ringMemberTxos[i].txOut
+		if txOuts[i].Version != version {
+			return nil, errors.New("NewTxoRing: the TXOS to be in a ring do not have the same version")
+		}
+	}
+
+	txoRing.OutPointRing = wire.NewOutPointRing(version, blockhashs, outPoints)
+	txoRing.TxOuts = txOuts
+
+	txoRing.IsCoinbase = isCoinBase
+
+	return txoRing, nil
 }
 
 type RingMemberTxo struct {

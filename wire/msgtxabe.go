@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/chainhash"
@@ -974,6 +975,207 @@ func ExtractCoinbaseHeight(coinbaseTx *MsgTxAbe) int32 {
 	blockhash0 := coinbaseTx.TxIns[0].PreviousOutPointRing.BlockHashs[0]
 	blockHeight := int32(binary.BigEndian.Uint32(blockhash0[0:4]))
 	return blockHeight
+}
+
+// TxoRing is a key concept in Abelian
+type TxoRing struct {
+	Version         uint32
+	RingBlockHeight int32
+	OutPointRing    *OutPointRing
+	TxOuts          []*TxOutAbe
+	IsCoinbase      bool
+}
+
+// errDeserialize signifies that a problem was encountered when deserializing
+// data.
+type errTxoRingDeserialize string
+
+// Error implements the error interface.
+func (e errTxoRingDeserialize) Error() string {
+	return string(e)
+}
+
+// RingId() returns the underlying outPointRing's RingId as its RingId.
+// This is compatible the existing implementaion where txoRing.outPointRing.Hash() is used as the key for map.
+func (txoRing *TxoRing) RingId() RingId {
+	return txoRing.OutPointRing.RingId()
+}
+
+func (txoRing *TxoRing) SerializeSize() int {
+
+	//	utxoRingHeaderCode
+	//	blockHeight and IsCoinBase
+	txoRingHeaderCode := uint64(txoRing.RingBlockHeight) << 1
+	if txoRing.IsCoinbase {
+		txoRingHeaderCode |= 0x01
+	}
+
+	n := VarIntSerializeSize(txoRingHeaderCode)
+
+	//	version
+	n = n + VarIntSerializeSize(uint64(txoRing.Version))
+
+	//	outPointRing
+	n = n + txoRing.OutPointRing.SerializeSize()
+
+	//	txOuts
+	n = n + VarIntSerializeSize(uint64(len(txoRing.TxOuts)))
+	for _, txOut := range txoRing.TxOuts {
+		n = n + txOut.SerializeSize()
+	}
+
+	return n
+}
+
+func (txoRing *TxoRing) Serialize(w io.Writer) error {
+	//	utxoRingHeaderCode
+	//	blockHeight and IsCoinBase
+	utxoRingHeaderCode := uint64(txoRing.RingBlockHeight) << 1
+	if txoRing.IsCoinbase {
+		utxoRingHeaderCode |= 0x01
+	}
+	err := WriteVarInt(w, 0, utxoRingHeaderCode)
+	if err != nil {
+		return err
+	}
+
+	//	Version
+	err = WriteVarInt(w, 0, uint64(txoRing.Version))
+	if err != nil {
+		return err
+	}
+
+	//	OutPointRing
+	err = WriteOutPointRing(w, 0, txoRing.Version, txoRing.OutPointRing)
+	if err != nil {
+		return err
+	}
+
+	//	txOuts
+	if len(txoRing.TxOuts) != len(txoRing.OutPointRing.OutPoints) {
+		return errors.New("TxoRing.Serialize: The size of txOuts does not match the number of OutPoints")
+	}
+	err = WriteVarInt(w, 0, uint64(len(txoRing.TxOuts)))
+	if err != nil {
+		return err
+	}
+
+	for _, txOut := range txoRing.TxOuts {
+		err = WriteTxOutAbe(w, 0, txoRing.Version, txOut)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (txoRing *TxoRing) Deserialize(r io.Reader) error {
+	//	utxoRingHeaderCode
+	//	blockHeight and IsCoinBase
+	utxoRingHeaderCode, err := ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	isCoinBase := utxoRingHeaderCode&0x01 != 0
+	ringBlockHeight := int32(utxoRingHeaderCode >> 1)
+
+	txoRing.RingBlockHeight = ringBlockHeight
+	txoRing.IsCoinbase = isCoinBase
+
+	//	Version
+	version, err := ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	txoRing.Version = uint32(version)
+
+	//	OutPointRing
+	txoRing.OutPointRing = &OutPointRing{}
+	err = ReadOutPointRing(r, 0, txoRing.Version, txoRing.OutPointRing)
+	if err != nil {
+		return err
+	}
+
+	//	TxOuts
+	ringSize, err := ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	expectedRingSize, err := GetTxoRingSizeByRingVersion(txoRing.Version)
+	if err != nil {
+		return err
+	}
+	if ringSize > uint64(expectedRingSize) {
+		return errTxoRingDeserialize("The TxoRing to be deseralized has a ring size greater than the allowed max value")
+	}
+	if ringSize != uint64(len(txoRing.OutPointRing.OutPoints)) {
+		return errTxoRingDeserialize("The TxoRing to be deseralized has a ring size does not match the size in OutPointRing")
+	}
+
+	txoRing.TxOuts = make([]*TxOutAbe, ringSize)
+	for i := uint64(0); i < ringSize; i++ {
+		txOut := TxOutAbe{}
+		err = ReadTxOutAbe(r, 0, txoRing.Version, &txOut)
+		if err != nil {
+			return err
+		}
+		txoRing.TxOuts[i] = &txOut
+	}
+
+	return nil
+}
+
+// Clone returns a shallow copy of the utxo entry.
+func (txoRing *TxoRing) Clone() *TxoRing {
+	if txoRing == nil {
+		return nil
+	}
+
+	rstTxoRing := TxoRing{}
+
+	rstTxoRing.Version = txoRing.Version
+	rstTxoRing.RingBlockHeight = txoRing.RingBlockHeight
+	rstTxoRing.OutPointRing = txoRing.OutPointRing
+	rstTxoRing.TxOuts = txoRing.TxOuts
+	rstTxoRing.IsCoinbase = txoRing.IsCoinbase
+	//	all the above are invariant contents for TxoRing, so we use shallow copy
+
+	return &rstTxoRing
+}
+
+func (txoRing *TxoRing) IsSame(obj *TxoRing) bool {
+	if txoRing == nil {
+		if obj == nil {
+			return true
+		} else {
+			return false
+		}
+	}
+
+	entrySize := txoRing.SerializeSize()
+	objSize := obj.SerializeSize()
+	if entrySize != objSize {
+		return false
+	}
+
+	bufEntry := bytes.NewBuffer(make([]byte, 0, entrySize))
+	err := txoRing.Serialize(bufEntry)
+	if err != nil {
+		return false
+	}
+
+	bufObj := bytes.NewBuffer(make([]byte, 0, objSize))
+	err = obj.Serialize(bufObj)
+	if err != nil {
+		return false
+	}
+
+	if !bytes.Equal(bufEntry.Bytes(), bufObj.Bytes()) {
+		return false
+	}
+
+	return true
 }
 
 //func (txOut *TxOutAbe) Serialize(w io.Writer) error {

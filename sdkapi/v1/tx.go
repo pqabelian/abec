@@ -47,7 +47,7 @@ type TxRequestOutputDesc struct {
 type TxRequestInputDesc struct {
 	ringId *wire.RingId // txoRing identifier
 	//txoList []*wire.TxOutAbe
-	txoRing *blockchain.TxoRing
+	txoRing *wire.TxoRing
 	sidx    uint8 // spend which one
 }
 
@@ -180,7 +180,7 @@ func readTxRequestInputDesc(r io.Reader, txRequestInputDesc *TxRequestInputDesc)
 	//}
 
 	//	txoRing
-	txoRing := &blockchain.TxoRing{}
+	txoRing := &wire.TxoRing{}
 	err = txoRing.Deserialize(r)
 	if err != nil {
 		return err
@@ -355,8 +355,8 @@ func deserializeTransferTxRequestDesc(serializedTxRequestDesc []byte) (*Transfer
 	if count != 0 {
 		Outputs = make([]*TxRequestOutputDesc, count)
 		for i := uint64(0); i < count; i++ {
-			txRequestOutputDesc := TxRequestOutputDesc{}
-			err = readTxRequestOutputDesc(r, &txRequestOutputDesc)
+			Outputs[i] = &TxRequestOutputDesc{}
+			err = readTxRequestOutputDesc(r, Outputs[i])
 			if err != nil {
 				return nil, err
 			}
@@ -385,12 +385,108 @@ func deserializeTransferTxRequestDesc(serializedTxRequestDesc []byte) (*Transfer
 	}, nil
 }
 
-func BuildTransferTxRequestDescFromTxoRings(outPointsToSpend []*OutPoint, serializedTxoRings [][]byte, txRequestOutputDescs []*TxRequestOutputDesc, txFee uint64, txMemo []byte) (serializedTxRequestDesc []byte, err error) {
-	panic("implement me")
-	return nil, nil
+func BuildTransferTxRequestDescFromTxoRings(
+	outPointsToSpend []*OutPoint,
+	serializedTxoRings [][]byte,
+	txRequestOutputDescs []*TxRequestOutputDesc,
+	txFee uint64,
+	txMemo []byte,
+) (serializedTxRequestDesc []byte, err error) {
+	inputNum := len(outPointsToSpend)
+	if inputNum == 0 {
+		return nil, errors.New("BuildTransferTxRequestDesc: input outPointsToSpend is empty")
+	}
+
+	if len(serializedTxoRings) != inputNum {
+		return nil, errors.New("BuildTransferTxRequestDesc: input outPointsToSpend's number is unmatched with txo ring")
+	}
+
+	outputNum := len(txRequestOutputDescs)
+	if outputNum == 0 {
+		return nil, errors.New("BuildTransferTxRequestDesc: input txRequestOutputDescs is empty")
+	}
+
+	// assembly input and check its sanctity
+	txRequestInputDescs := make([]*TxRequestInputDesc, inputNum)
+	seenTxInOutpoints := make(map[wire.OutPointId]*TxRequestInputDesc, inputNum)
+	for i := 0; i < inputNum; i++ {
+		txRequestInputDescs[i] = &TxRequestInputDesc{ringId: nil}
+		// this nil will be used to check whether the corresponding TxoRing
+
+		opId := outPointsToSpend[i].OutPointId()
+		if _, ok := seenTxInOutpoints[opId]; ok {
+			return nil, errors.New("BuildTransferTxRequestDesc: outPointsToSpend contains repeated OutPoint")
+		}
+		seenTxInOutpoints[opId] = txRequestInputDescs[i]
+	}
+
+	txoRings := make([]*wire.TxoRing, inputNum)
+	for i := 0; i < len(serializedTxoRings); i++ {
+		txoRings[i] = &wire.TxoRing{}
+		err = txoRings[i].Deserialize(bytes.NewReader(serializedTxoRings[i]))
+		if err != nil {
+			return nil, err
+		}
+		ringId := txoRings[i].RingId()
+		matched := false
+		for opIndex, outPoint := range txoRings[i].OutPointRing.OutPoints {
+			opId := outPoint.OutPointId()
+			txRequestInputDesc, ok := seenTxInOutpoints[opId]
+			if !ok {
+				continue
+			}
+			matched = true
+			//	the outPoint is one of the outPointsToSpend
+			if txRequestInputDesc.ringId != nil {
+				// It has been set previously
+				return nil, errors.New("BuildTransferTxRequestDesc: there are repeated OutPoint (TxId, Index) in the rings")
+			}
+
+			seenTxInOutpoints[opId].ringId = &wire.RingId{}
+			copy(seenTxInOutpoints[opId].ringId[:], ringId[:])
+			seenTxInOutpoints[opId].txoRing = txoRings[i]
+			seenTxInOutpoints[opId].sidx = uint8(opIndex) //	The Ring Rule will makes sure opIndex is in the scope of uint8
+		}
+		if !matched {
+			return nil, errors.New("BuildTransferTxRequestDesc: there is unmatched OutPoint (TxId, Index) and txoRing")
+		}
+	}
+
+	//	check whether all outPoint has been matched the corresponding TxoRing
+	for i := 0; i < inputNum; i++ {
+		if txRequestInputDescs[i].ringId == nil {
+			return nil, errors.New("BuildTransferTxRequestDesc: at least one of the input OutPoing can not find the corresponding TxoRing")
+		}
+	}
+
+	trTxRequestDesc := &TransferTxRequestDesc{
+		TxRequestInputDescs:  txRequestInputDescs,
+		TxRequestOutputDescs: txRequestOutputDescs,
+		TxFee:                txFee,
+		TxMemo:               txMemo,
+	}
+
+	serializedTxRequestDesc, err = serializeTransferTxRequestDesc(trTxRequestDesc)
+	if err != nil {
+		return nil, err
+	}
+
+	return serializedTxRequestDesc, nil
+
 }
 
-func BuildTransferTxRequestDescFromBlocks(outPointsToSpend []*OutPoint, serializedBlocksForRingGroup [][]byte, txRequestOutputDescs []*TxRequestOutputDesc, txFee uint64, txMemo []byte) (serializedTxRequestDesc []byte, err error) {
+// BuildTransferTxRequestDescFromBlocks build from
+// 1. some input specified by outPointToSpend, the relevant txo ring would be included in blocks specified by serializedBlocksForRingGroup
+// 2. some output specified by txRequestOutputDescs,
+// 3. transaction fee specified by txFee,
+// 4. transaction memo specified by txMemo
+func BuildTransferTxRequestDescFromBlocks(
+	outPointsToSpend []*OutPoint,
+	serializedBlocksForRingGroup [][]byte,
+	txRequestOutputDescs []*TxRequestOutputDesc,
+	txFee uint64,
+	txMemo []byte,
+) (serializedTxRequestDesc []byte, err error) {
 	inputNum := len(outPointsToSpend)
 	if inputNum == 0 {
 		return nil, errors.New("BuildTransferTxRequestDesc: input outPointsToSpend is empty")
@@ -399,6 +495,12 @@ func BuildTransferTxRequestDescFromBlocks(outPointsToSpend []*OutPoint, serializ
 	outputNum := len(txRequestOutputDescs)
 	if outputNum == 0 {
 		return nil, errors.New("BuildTransferTxRequestDesc: input txRequestOutputDescs is empty")
+	}
+	cryptoAddressMaxSize := abecrypto.GetCryptoAddressSerializeSizeMax()
+	for i := 0; i < outputNum; i++ {
+		if uint32(len(txRequestOutputDescs[i].cryptoAddress)) > cryptoAddressMaxSize {
+			return nil, errors.New("BuildTransferTxRequestDesc: crypto address in txRequestOutputDescs is wrong size")
+		}
 	}
 
 	blockNum := len(serializedBlocksForRingGroup)
@@ -420,10 +522,12 @@ func BuildTransferTxRequestDescFromBlocks(outPointsToSpend []*OutPoint, serializ
 		//	assume the blocks are valid blocks in ledger, include:
 		// (1) the Header contains its height. Based on this, we explicitly set the height of Block.
 		blocks[i].SetHeight(blocks[i].MsgBlock().Header.Height)
+		fmt.Printf("deserialized the block in height %d\n", blocks[i].Height())
 	}
 
+	// According to the first block the identity the version and txo ring size rule
 	startBlockHeight := blocks[0].Height()
-	blockNumPerRingGroup := wire.GetTxoRingSizeByBlockHeight(startBlockHeight)
+	blockNumPerRingGroup := wire.GetBlockNumPerRingGroupByBlockHeight(startBlockHeight)
 	ringSize := wire.GetTxoRingSizeByBlockHeight(startBlockHeight)
 
 	for i := 1; i < blockNum; i++ {
@@ -432,7 +536,7 @@ func BuildTransferTxRequestDescFromBlocks(outPointsToSpend []*OutPoint, serializ
 			return nil, errors.New("BuildTransferTxRequestDesc: the heights of input serializedBlocksForRingGroup are not successive")
 		}
 
-		if wire.GetTxoRingSizeByBlockHeight(height) != blockNumPerRingGroup {
+		if wire.GetBlockNumPerRingGroupByBlockHeight(height) != blockNumPerRingGroup {
 			return nil, errors.New("BuildTransferTxRequestDesc: input serializedBlocksForRingGroup imply different blockNumPerRingGroup")
 		}
 
@@ -452,8 +556,7 @@ func BuildTransferTxRequestDescFromBlocks(outPointsToSpend []*OutPoint, serializ
 		txRequestInputDescs[i] = &TxRequestInputDesc{ringId: nil}
 		// this nil will be used to check whether the corresponding TxoRing
 
-		outPoint := *outPointsToSpend[i]
-		opId := outPoint.OutPointId()
+		opId := outPointsToSpend[i].OutPointId()
 		if _, ok := outPointToTxRequestInputDescMap[opId]; ok {
 			return nil, errors.New("BuildTransferTxRequestDesc: outPointsToSpend contains repeated OutPoint")
 		} else {
@@ -461,8 +564,7 @@ func BuildTransferTxRequestDescFromBlocks(outPointsToSpend []*OutPoint, serializ
 			//	later txRequestInputDescs[i] will be fetched from the map, then be set and put back
 		}
 	}
-
-	groupNum := blockNum % int(blockNumPerRingGroup)
+	groupNum := blockNum / int(blockNumPerRingGroup)
 	for i := 0; i < groupNum; i++ {
 		txoRings, err := blockchain.BuildTxoRings(int(blockNumPerRingGroup), int(ringSize), blocks[i*int(blockNumPerRingGroup):(i+1)*int(blockNumPerRingGroup)])
 		if err != nil {
@@ -470,21 +572,22 @@ func BuildTransferTxRequestDescFromBlocks(outPointsToSpend []*OutPoint, serializ
 		}
 
 		for ringId, txoRing := range txoRings {
-			for opIndex, outPoint := range txoRing.OutPointRing().OutPoints {
+			for opIndex, outPoint := range txoRing.OutPointRing.OutPoints {
 				opId := outPoint.OutPointId()
 				if txRequestInputDesc, ok := outPointToTxRequestInputDescMap[opId]; ok {
 					//	the outPoint is one of the outPointsToSpend
 					if txRequestInputDesc.ringId != nil {
 						// It has been set previously
-						return nil, errors.New("BuildTransferTxRequestDesc: there are repeated OutPoint (TxId, Index) in the rings")
+						return nil, fmt.Errorf("BuildTransferTxRequestDesc: there are repeated OutPoint (%s, %d) in the rings",
+							txRequestInputDesc.txoRing.OutPointRing.OutPoints[txRequestInputDesc.sidx].TxHash,
+							txRequestInputDesc.txoRing.OutPointRing.OutPoints[txRequestInputDesc.sidx].Index,
+						)
 					}
 
-					txRequestInputDesc.ringId = &ringId
-					txRequestInputDesc.txoRing = txoRing
-					txRequestInputDesc.sidx = uint8(opIndex) //	The Ring Rule will makes sure opIndex is in the scope of uint8
-
-					//	to be safe, put txRequestInputDesc back
-					outPointToTxRequestInputDescMap[opId] = txRequestInputDesc
+					outPointToTxRequestInputDescMap[opId].ringId = &wire.RingId{}
+					copy(outPointToTxRequestInputDescMap[opId].ringId[:], ringId[:])
+					outPointToTxRequestInputDescMap[opId].txoRing = txoRing
+					outPointToTxRequestInputDescMap[opId].sidx = uint8(opIndex) //	The Ring Rule will makes sure opIndex is in the scope of uint8
 				}
 			}
 		}
@@ -493,7 +596,11 @@ func BuildTransferTxRequestDescFromBlocks(outPointsToSpend []*OutPoint, serializ
 	//	check whether all outPoint has found the corresponding TxoRing
 	for i := 0; i < inputNum; i++ {
 		if txRequestInputDescs[i].ringId == nil {
-			return nil, errors.New("BuildTransferTxRequestDesc: at least one of the input OutPoing can not find the corresponding TxoRing")
+			return nil, fmt.Errorf("BuildTransferTxRequestDesc: at least one of the input OutPoing such as OutPoint[%d] = (%s,%d) can not find the corresponding TxoRing",
+				i,
+				chainhash.Hash(*outPointsToSpend[i].TxId).String(),
+				outPointsToSpend[i].Index,
+			)
 		}
 	}
 
@@ -504,16 +611,17 @@ func BuildTransferTxRequestDescFromBlocks(outPointsToSpend []*OutPoint, serializ
 		TxMemo:               txMemo,
 	}
 
-	serialzedTxRequestDesc, err := serializeTransferTxRequestDesc(trTxRequestDesc)
+	serializedTxRequestDesc, err = serializeTransferTxRequestDesc(trTxRequestDesc)
 	if err != nil {
 		return nil, err
 	}
 
-	return serialzedTxRequestDesc, nil
+	return serializedTxRequestDesc, nil
 }
 
+// CreateTransferTx would use the result called by BuildTransferTxRequestDescFromBlocks or BuildTransferTxRequestDescFromTxoRings as the unsigned transaction
+// and the cryptoKeys should be matched in order for the input in unsigned transaction
 func CreateTransferTx(serializedTransferTxRequestDesc []byte, cryptoKeys []*CryptoKey) (serializedTxFull []byte, txId *TxId, err error) {
-
 	txRequestDesc, err := deserializeTransferTxRequestDesc(serializedTransferTxRequestDesc)
 	if err != nil {
 		return nil, nil, err
@@ -536,7 +644,9 @@ func CreateTransferTx(serializedTransferTxRequestDesc []byte, cryptoKeys []*Cryp
 			return nil, nil, errors.New(hints)
 		}
 
-		ok, value, err := abecrypto.TxoCoinReceive(txRequestInputDesc.txoRing.TxOuts()[txRequestInputDesc.sidx], cryptoKey.cryptoAddress, cryptoKey.cryptoVsk)
+		copyedVskBytes := make([]byte, len(cryptoKey.cryptoVsk))
+		copy(copyedVskBytes, cryptoKey.cryptoVsk)
+		ok, value, err := abecrypto.TxoCoinReceive(txRequestInputDesc.txoRing.TxOuts[txRequestInputDesc.sidx], cryptoKey.cryptoAddress, copyedVskBytes)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -545,7 +655,16 @@ func CreateTransferTx(serializedTransferTxRequestDesc []byte, cryptoKeys []*Cryp
 			return nil, nil, errors.New(errStr)
 		}
 
-		abeTxInputDescs[i] = abecrypto.NewAbeTxInputDescWithFullRing(txRequestInputDesc.ringId, txRequestInputDesc.txoRing, txRequestInputDesc.sidx, cryptoKey.cryptoAddress, cryptoKey.cryptoSpsk, cryptoKey.cryptoSnsk, cryptoKey.cryptoVsk, value)
+		abeTxInputDescs[i] = abecrypto.NewAbeTxInputDescWithFullRing(
+			txRequestInputDesc.ringId,
+			txRequestInputDesc.txoRing,
+			txRequestInputDesc.sidx,
+			cryptoKey.cryptoAddress,
+			cryptoKey.cryptoSpsk,
+			cryptoKey.cryptoSnsk,
+			cryptoKey.cryptoVsk,
+			value, // amount in txo as input
+		)
 	}
 
 	//	abeTxOutputDescs []*AbeTxOutputDesc
