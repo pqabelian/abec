@@ -69,6 +69,11 @@ type CryptoKey struct {
 // being chainHash.Hash or string
 type TxId wire.TxId
 
+func (txId *TxId) String() string {
+	wtxId := wire.TxId(*txId)
+	return wtxId.String()
+}
+
 // NewOutPointFromTxIdStr assumes the input txIdStr was obtained by "(hash chainHash.Hash) String()" function
 func NewOutPointFromTxIdStr(txIdStr string, index uint8) (*OutPoint, error) {
 	txHash, err := chainhash.NewHashFromStr(txIdStr)
