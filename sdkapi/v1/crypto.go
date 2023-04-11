@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"bytes"
 	"errors"
 	"github.com/abesuite/abec/abecrypto"
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
@@ -21,7 +22,7 @@ func GetCryptoSchemeByTxVersion(txVersion uint32) (CryptoScheme, error) {
 * CryptoAddressKeySeedGen generates a cryptoAddressKeySeed for current cryptoScheme, say PQRingCT.
  */
 func CryptoAddressKeySeedGen() (cryptoAddressKeySeed []byte, err error) {
-	cryptoScheme := abecryptoparam.CryptoSchemePQRingCT
+	cryptoScheme := abecryptoparam.GetCurrentCryptoScheme()
 	return abecrypto.CryptoAddressKeySeedGen(cryptoScheme)
 }
 
@@ -49,10 +50,16 @@ ToDo: At this moment (2023.03.03), serializedTxOut is actually txoScript (which 
 In later version, we need to modify the RPC API to provide serializedTxOut.
 */
 func ExtractCoinAddressFromSerializedTxOut(serializedTxOut []byte) ([]byte, error) {
-	cryptoSchem := abecryptoparam.CryptoSchemePQRingCT
-	txoScript := serializedTxOut
-	// todo: by deserialize
-	return abecrypto.ExtractCoinAddressFromTxoScript(txoScript, cryptoSchem)
+	abeTxo := &wire.TxOutAbe{}
+	err := wire.ReadTxOutAbe(bytes.NewReader(serializedTxOut), 0, 1, abeTxo)
+	if err != nil {
+		return nil, err
+	}
+	cryptoSchema, err := abecryptoparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
+	if err != nil {
+		return nil, err
+	}
+	return abecrypto.ExtractCoinAddressFromTxoScript(abeTxo.TxoScript, cryptoSchema)
 }
 
 /*
@@ -61,13 +68,20 @@ ToDo: At this moment (2023.03.03), serializedTxOut is actually txoScript (which 
 In later version, we need to modify the RPC API to provide serializedTxOut.
 */
 func ExtractCoinValueFromSerializedTxOut(serializedTxOut []byte, cryptoVsk []byte) (uint64, error) {
-	// todo: by deserialize
-	abeTxo := &wire.TxOutAbe{Version: wire.TxVersion, TxoScript: serializedTxOut}
-	cryptoAddress, err := ExtractCoinAddressFromSerializedTxOut(serializedTxOut)
+	abeTxo := &wire.TxOutAbe{}
+	err := wire.ReadTxOutAbe(bytes.NewReader(serializedTxOut), 0, 1, abeTxo)
 	if err != nil {
 		return 0, err
 	}
-	cryptoAddress = append([]byte{0, 0, 0, byte(abecryptoparam.CryptoSchemePQRingCT)}, cryptoAddress...)
+	cryptoSchema, err := abecryptoparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
+	if err != nil {
+		return 0, err
+	}
+	cryptoAddress, err := abecrypto.ExtractCoinAddressFromTxoScript(abeTxo.TxoScript, cryptoSchema)
+	if err != nil {
+		return 0, err
+	}
+	cryptoAddress = append([]byte{0, 0, 0, byte(cryptoSchema)}, cryptoAddress...)
 	bl, value, err := abecrypto.TxoCoinReceive(abeTxo, cryptoAddress, cryptoVsk)
 	if err != nil {
 		return 0, err
