@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/mining/externalminer"
+	"github.com/abesuite/abec/witnessmgr"
 	"os"
 	"path/filepath"
 
@@ -70,6 +71,7 @@ var (
 	syncLog = backendLog.Logger("SYNC")
 	txmpLog = backendLog.Logger("TXMP")
 	ethhLog = backendLog.Logger("ETHH")
+	wmgrLog = backendLog.Logger("WMGR")
 )
 
 // Initialize package-global logger variables.
@@ -87,6 +89,7 @@ func init() {
 	syncmgr.UseLogger(syncLog)
 	mempool.UseLogger(txmpLog)
 	ethash.UseLogger(ethhLog)
+	witnessmgr.UseLogger(wmgrLog)
 }
 
 // subsystemLoggers maps each subsystem identifier to its associated logger.
@@ -107,6 +110,7 @@ var subsystemLoggers = map[string]abelog.Logger{
 	"SYNC": syncLog,
 	"TXMP": txmpLog,
 	"ETHH": ethhLog,
+	"WMGR": wmgrLog,
 }
 
 // initLogRotator initializes the logging rotater to write logs to logFile and
