@@ -94,19 +94,19 @@ func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
 	}
 	bestHeight := bestState.Height
 
-	fileNum, err := wm.chain.FileNumBetweenHeight(uint32(height), uint32(bestHeight))
+	fileNumReserved, err := wm.chain.FileNumBetweenHeight(uint32(height), uint32(bestHeight))
 	if err != nil {
 		return err
 	}
 
-	if len(fileNum) == 0 {
+	if len(fileNumReserved) == 0 {
 		return nil
 	}
 
 	// Calculate prune range.
 	fileNumPruned := make([]uint32, 0)
 	var currentNum uint32 = 0
-	for _, num := range fileNum {
+	for _, num := range fileNumReserved {
 		var i uint32
 		for i = currentNum; i != num; i++ {
 			fileNumPruned = append(fileNumPruned, i)
@@ -114,7 +114,42 @@ func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
 		currentNum = i + 1
 	}
 
-	// todo: prune file
+	// Fetch witness file info.
+	fileInfo, err := wm.chain.FetchWitnessFileInfo(fileNumPruned)
+	if err != nil {
+		return err
+	}
+	if len(fileInfo) == 0 {
+		log.Infof("No witness file can be pruned")
+		return nil
+	}
 
+	// Save delete history first.
+	err = wm.chain.StoreDeleteHistory(fileInfo)
+	if err != nil {
+		return err
+	}
+
+	// Update minWitnessFileNum.
+	minWitnessFileNum := fileNumReserved[len(fileNumReserved)-1]
+	for i := len(fileNumReserved) - 2; i >= 0; i-- {
+		if fileNumReserved[i]+1 != minWitnessFileNum {
+			break
+		}
+		minWitnessFileNum = fileNumReserved[i]
+	}
+	err = wm.chain.UpdateMinWitnessFileNum(minWitnessFileNum)
+	if err != nil {
+		return err
+	}
+
+	// Prune witness files.
+	deleted, err := wm.chain.PruneWitnessFile(fileNumPruned)
+	if err != nil {
+		return err
+	}
+	for _, deletedFile := range deleted {
+		log.Infof("Successfully delete witness file %v", deletedFile)
+	}
 	return nil
 }

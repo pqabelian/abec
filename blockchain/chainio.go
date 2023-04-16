@@ -11,6 +11,7 @@ import (
 	"github.com/abesuite/abec/wire"
 	"io"
 	"math/big"
+	"os"
 	"sort"
 	"sync"
 	"time"
@@ -688,10 +689,10 @@ func dbRemoveSpendJournalEntry(dbTx database.Tx, blockHash *chainhash.Hash) erro
 	return spendBucket.Delete(blockHash[:])
 }
 
-func serializeDeletedHistory(filesize uint32, deletedTime int64) []byte {
-	res := make([]byte, 12)
-	byteOrder.PutUint32(res[0:4], filesize)
-	byteOrder.PutUint64(res[4:12], uint64(deletedTime))
+func serializeDeletedHistory(filesize int64, deletedTime int64) []byte {
+	res := make([]byte, 16)
+	byteOrder.PutUint64(res[0:8], uint64(filesize))
+	byteOrder.PutUint64(res[8:16], uint64(deletedTime))
 	return res[:]
 }
 
@@ -703,7 +704,7 @@ func serializeUint32(num uint32) []byte {
 }
 
 // dbPutDeletedHistory put the history of deleted witness file into database.
-func dbPutDeletedHistory(dbTx database.Tx, num uint32, filesize uint32, deletedTime int64) error {
+func dbPutDeletedHistory(dbTx database.Tx, num uint32, filesize int64, deletedTime int64) error {
 	deletedWitnessFileBucket := dbTx.Metadata().Bucket(deletedWitnessFileBucketName)
 	serialized := serializeDeletedHistory(filesize, deletedTime)
 	return deletedWitnessFileBucket.Put(serializeUint32(num), serialized)
@@ -1924,12 +1925,19 @@ func (b *BlockChain) BlockByHashAbe(hash *chainhash.Hash) (*abeutil.BlockAbe, er
 	return block, err
 }
 
+// dbFetchFileNumByHashes fetch the file num that stores the block witness.
 func dbFetchFileNumByHashes(dbTx database.Tx, hashes []*chainhash.Hash) ([]uint32, error) {
-	res, err := dbTx.FetchWitnessFileNum(hashes)
-	if err != nil {
-		return nil, err
-	}
-	return res, nil
+	return dbTx.FetchWitnessFileNum(hashes)
+}
+
+// dbPruneWitnessFile prune the specified witness files.
+func dbPruneWitnessFile(dbTx database.Tx, fileNumPruned []uint32) ([]string, error) {
+	return dbTx.DeleteWitnessFiles(fileNumPruned)
+}
+
+// dbFetchWitnessFileInfo fetch the concrete info of witness files.
+func dbFetchWitnessFileInfo(dbTx database.Tx, fileNumPruned []uint32) (map[uint32]os.FileInfo, error) {
+	return dbTx.FetchWitnessFileInfo(fileNumPruned)
 }
 
 // FileNumBetweenHeight fetch the corresponding file num that stores the block witness between
@@ -1962,4 +1970,76 @@ func (b *BlockChain) FileNumBetweenHeight(startHeight uint32, endHeight uint32) 
 
 	sort.Slice(res, func(i, j int) bool { return res[i] < res[j] })
 	return res, nil
+}
+
+// PruneWitnessFile prune the witness files specified as well as update minWitnessFileNum.
+func (b *BlockChain) PruneWitnessFile(fileNumPruned []uint32) ([]string, error) {
+	if len(fileNumPruned) == 0 {
+		return nil, nil
+	}
+
+	var deleted []string
+	err := b.db.Update(func(dbTx database.Tx) error {
+		var err error
+		deleted, err = dbPruneWitnessFile(dbTx, fileNumPruned)
+		return err
+	})
+	return deleted, err
+}
+
+// UpdateMinWitnessFileNum update the minWitnessFileNum if needed.
+func (b *BlockChain) UpdateMinWitnessFileNum(num uint32) error {
+	var currentNum uint32
+	err := b.db.View(func(dbTx database.Tx) error {
+		// Update minWitnessFileNum first.
+		var err error
+		currentNum, err = dbTx.FetchMinWitnessFileNum()
+		return err
+	})
+	if err != nil {
+		return err
+	}
+
+	if num > currentNum {
+		err := b.db.Update(func(dbTx database.Tx) error {
+			// Update minWitnessFileNum first.
+			var err error
+			err = dbTx.StoreMinWitnessFileNum(num)
+			return err
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// FetchWitnessFileInfo fetch the concrete info of witness files.
+func (b *BlockChain) FetchWitnessFileInfo(fileNumPruned []uint32) (map[uint32]os.FileInfo, error) {
+	if len(fileNumPruned) == 0 {
+		return nil, nil
+	}
+
+	var fileInfos map[uint32]os.FileInfo
+	err := b.db.View(func(dbTx database.Tx) error {
+		var err error
+		fileInfos, err = dbFetchWitnessFileInfo(dbTx, fileNumPruned)
+		return err
+	})
+	return fileInfos, err
+}
+
+// StoreDeleteHistory store the information of witness file that will be deleted.
+func (b *BlockChain) StoreDeleteHistory(fileInfos map[uint32]os.FileInfo) error {
+	err := b.db.Update(func(dbTx database.Tx) error {
+		var err error
+		for num, fileInfo := range fileInfos {
+			err = dbPutDeletedHistory(dbTx, num, fileInfo.Size(), time.Now().Unix())
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return err
 }

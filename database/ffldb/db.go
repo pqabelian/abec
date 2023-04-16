@@ -1586,7 +1586,7 @@ func (tx *transaction) FetchBlocks(hashes []chainhash.Hash) ([][]byte, error) {
 }
 
 // FetchWitnessFileNum fetch the corresponding file num of blocks.
-// The result has not been deduplicated.
+// The result has not been deduplicated and is not sorted.
 func (tx *transaction) FetchWitnessFileNum(hashes []*chainhash.Hash) ([]uint32, error) {
 	// Ensure transaction state is valid.
 	if err := tx.checkClosed(); err != nil {
@@ -1607,6 +1607,47 @@ func (tx *transaction) FetchWitnessFileNum(hashes []*chainhash.Hash) ([]uint32, 
 		witLocation := deserializeWitnessLoc(witnessRow)
 
 		res = append(res, witLocation.witnessFileNum)
+	}
+
+	return res, nil
+}
+
+// FetchWitnessFileInfo fetch the information of witness file.
+func (tx *transaction) FetchWitnessFileInfo(fileNum []uint32) (map[uint32]os.FileInfo, error) {
+	// Ensure transaction state is valid.
+	if err := tx.checkClosed(); err != nil {
+		return nil, err
+	}
+
+	res := make(map[uint32]os.FileInfo)
+	for _, num := range fileNum {
+		filePath := witnessFilePath(tx.db.store.basePath, num)
+		fileState, err := os.Stat(filePath)
+		if err != nil {
+			log.Tracef("Open %v error: %v", filePath, err)
+			continue
+		}
+		res[num] = fileState
+	}
+
+	return res, nil
+}
+
+// DeleteWitnessFiles delete the witness files of specified file num.
+func (tx *transaction) DeleteWitnessFiles(fileNum []uint32) ([]string, error) {
+	// Ensure transaction state is valid.
+	if err := tx.checkClosed(); err != nil {
+		return nil, err
+	}
+
+	res := make([]string, 0)
+	for _, num := range fileNum {
+		filePath := witnessFilePath(tx.db.store.basePath, num)
+		if err := os.Remove(filePath); err != nil {
+			log.Tracef("Fail to remove %v", filePath)
+			continue
+		}
+		res = append(res, filePath)
 	}
 
 	return res, nil

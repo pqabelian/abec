@@ -7,6 +7,7 @@ import (
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
+	"os"
 )
 
 // Cursor represents a cursor over key/value pairs and nested buckets of a
@@ -320,6 +321,8 @@ type Tx interface {
 	FetchBlockWithoutWitness(hash *chainhash.Hash) ([]byte, error)
 
 	FetchWitnessFileNum(hashes []*chainhash.Hash) ([]uint32, error)
+	FetchWitnessFileInfo(fileNum []uint32) (map[uint32]os.FileInfo, error)
+	DeleteWitnessFiles(fileNum []uint32) ([]string, error)
 
 	// FetchBlocks returns the raw serialized bytes for the blocks
 	// identified by the given hashes.  The raw bytes are in the format
