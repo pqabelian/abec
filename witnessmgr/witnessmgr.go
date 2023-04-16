@@ -1,6 +1,7 @@
 package witnessmgr
 
 import (
+	"errors"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/wire"
@@ -19,7 +20,7 @@ type Config struct {
 }
 
 // WitnessManager is used to control the storage of witness.
-// It will automatically delete the witness file if the node
+// It will automatically prune the witness file if the node
 // is not a full node.
 type WitnessManager struct {
 	nodeType   wire.NodeType
@@ -39,6 +40,17 @@ func New(config *Config) (*WitnessManager, error) {
 		wm.chain.Subscribe(wm.handleBlockchainNotification)
 	}
 
+	if wm.nodeType == wire.SemifullNode {
+		lastCheckpoint := wm.chain.LatestCheckpoint()
+		if lastCheckpoint != nil {
+			log.Infof("Start pruning witness data before height %v, please do not shut down abec", lastCheckpoint.Height)
+			err := wm.pruneWitnessBeforeHeight(lastCheckpoint.Height)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	return &wm, nil
 }
 
@@ -56,13 +68,53 @@ func (wm *WitnessManager) handleBlockchainNotification(notification *blockchain.
 
 		currentHeight := block.Height()
 		if currentHeight%deleteInterval == 0 {
-			wm.startDeleteOperation()
+			witnessKeptStartHeight := currentHeight - wire.MaxReservedWitness
+			if witnessKeptStartHeight <= 0 {
+				return
+			}
+			log.Infof("Start pruning witness data before height %v, please do not shut down abec", witnessKeptStartHeight)
+			err := wm.pruneWitnessBeforeHeight(witnessKeptStartHeight)
+			if err != nil {
+				log.Errorf("Fail to prune witness data: %v", err)
+			}
 		}
-
 	}
 }
 
-// todo
-func (wm *WitnessManager) startDeleteOperation() {
+// pruneWitnessBeforeHeight keep the witness file after certain height (include)
+// and prune other witness file.
+func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
+	if height <= 0 {
+		return nil
+	}
 
+	bestState := wm.chain.BestSnapshot()
+	if bestState == nil {
+		return errors.New("unable to fetch best state")
+	}
+	bestHeight := bestState.Height
+
+	fileNum, err := wm.chain.FileNumBetweenHeight(uint32(height), uint32(bestHeight))
+	if err != nil {
+		return err
+	}
+
+	if len(fileNum) == 0 {
+		return nil
+	}
+
+	// Calculate prune range.
+	fileNumPruned := make([]uint32, 0)
+	var currentNum uint32 = 0
+	for _, num := range fileNum {
+		var i uint32
+		for i = currentNum; i != num; i++ {
+			fileNumPruned = append(fileNumPruned, i)
+		}
+		currentNum = i + 1
+	}
+
+	// todo: prune file
+
+	return nil
 }

@@ -319,6 +319,8 @@ type Tx interface {
 	FetchBlockAbe(hash *chainhash.Hash) ([]byte, [][]byte, error)
 	FetchBlockWithoutWitness(hash *chainhash.Hash) ([]byte, error)
 
+	FetchWitnessFileNum(hashes []*chainhash.Hash) ([]uint32, error)
+
 	// FetchBlocks returns the raw serialized bytes for the blocks
 	// identified by the given hashes.  The raw bytes are in the format
 	// returned by Serialize on a wire.MsgBlock.
@@ -395,6 +397,9 @@ type Tx interface {
 
 	FetchNodeType() (wire.NodeType, error)
 	FetchTrustLevel() (wire.TrustLevel, error)
+
+	FetchMinWitnessFileNum() (uint32, error)
+	StoreMinWitnessFileNum(num uint32) error
 
 	// ******************************************************************
 	// Methods related to both atomic metadata storage and block storage.

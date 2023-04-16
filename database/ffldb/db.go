@@ -1585,6 +1585,33 @@ func (tx *transaction) FetchBlocks(hashes []chainhash.Hash) ([][]byte, error) {
 	return blocks, nil
 }
 
+// FetchWitnessFileNum fetch the corresponding file num of blocks.
+// The result has not been deduplicated.
+func (tx *transaction) FetchWitnessFileNum(hashes []*chainhash.Hash) ([]uint32, error) {
+	// Ensure transaction state is valid.
+	if err := tx.checkClosed(); err != nil {
+		return nil, err
+	}
+
+	res := make([]uint32, 0)
+
+	for _, hash := range hashes {
+
+		// Lookup the location of the witness in the files from the witness index.
+		// If there is error, maybe the newest block has not been written into database,
+		// just continue.
+		witnessRow, err := tx.fetchWitnessRow(hash)
+		if err != nil || witnessRow == nil {
+			continue
+		}
+		witLocation := deserializeWitnessLoc(witnessRow)
+
+		res = append(res, witLocation.witnessFileNum)
+	}
+
+	return res, nil
+}
+
 // fetchPendingRegion attempts to fetch the provided region from any block which
 // are pending to be written on commit.  It will return nil for the byte slice
 // when the region references a block which is not pending.  When the region
@@ -2019,6 +2046,25 @@ func (tx *transaction) FetchTrustLevel() (wire.TrustLevel, error) {
 	}
 
 	return wire.TrustLevel(deserializeUint32(trustLevel)), nil
+}
+
+// FetchMinWitnessFileNum fetch the minimum file number of
+// the last consecutive witness files.
+func (tx *transaction) FetchMinWitnessFileNum() (uint32, error) {
+	var res []byte
+	res = tx.Metadata().Get(minWitnessFileNumKeyName)
+	if res == nil {
+		return 0, errors.New("minWitnessFileNum does not exist")
+	}
+
+	return deserializeUint32(res), nil
+}
+
+// StoreMinWitnessFileNum put the minimum file number of
+// the last consecutive witness files into database.
+func (tx *transaction) StoreMinWitnessFileNum(num uint32) error {
+	err := tx.Metadata().Put(minWitnessFileNumKeyName, serializeUint32(num))
+	return err
 }
 
 // Commit commits all changes that have been made to the root metadata bucket

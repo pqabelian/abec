@@ -11,6 +11,7 @@ import (
 	"github.com/abesuite/abec/wire"
 	"io"
 	"math/big"
+	"sort"
 	"sync"
 	"time"
 )
@@ -76,6 +77,8 @@ var (
 	//	todo(ABE):
 	utxoRingSetBucketName = []byte("utxoringset")
 
+	// deletedWitnessFileBucketName is the name of the db key used to store
+	// the delete history of witness files.
 	deletedWitnessFileBucketName = []byte("deletedwitnessfile")
 
 	// byteOrder is the preferred byte order used for serializing numeric
@@ -683,6 +686,27 @@ func dbPutSpendJournalEntryAbe(dbTx database.Tx, blockHash *chainhash.Hash, stxo
 func dbRemoveSpendJournalEntry(dbTx database.Tx, blockHash *chainhash.Hash) error {
 	spendBucket := dbTx.Metadata().Bucket(spendJournalBucketName)
 	return spendBucket.Delete(blockHash[:])
+}
+
+func serializeDeletedHistory(filesize uint32, deletedTime int64) []byte {
+	res := make([]byte, 12)
+	byteOrder.PutUint32(res[0:4], filesize)
+	byteOrder.PutUint64(res[4:12], uint64(deletedTime))
+	return res[:]
+}
+
+// serializeUint32 serialize the uint32 value.
+func serializeUint32(num uint32) []byte {
+	var serializedRow [4]byte
+	byteOrder.PutUint32(serializedRow[0:4], num)
+	return serializedRow[:]
+}
+
+// dbPutDeletedHistory put the history of deleted witness file into database.
+func dbPutDeletedHistory(dbTx database.Tx, num uint32, filesize uint32, deletedTime int64) error {
+	deletedWitnessFileBucket := dbTx.Metadata().Bucket(deletedWitnessFileBucketName)
+	serialized := serializeDeletedHistory(filesize, deletedTime)
+	return deletedWitnessFileBucket.Put(serializeUint32(num), serialized)
 }
 
 // -----------------------------------------------------------------------------
@@ -1898,4 +1922,44 @@ func (b *BlockChain) BlockByHashAbe(hash *chainhash.Hash) (*abeutil.BlockAbe, er
 		return err
 	})
 	return block, err
+}
+
+func dbFetchFileNumByHashes(dbTx database.Tx, hashes []*chainhash.Hash) ([]uint32, error) {
+	res, err := dbTx.FetchWitnessFileNum(hashes)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+// FileNumBetweenHeight fetch the corresponding file num that stores the block witness between
+// startHeight and endHeight. The result has been deduplicated and sorted (positive order).
+func (b *BlockChain) FileNumBetweenHeight(startHeight uint32, endHeight uint32) ([]uint32, error) {
+	hashes := make([]*chainhash.Hash, 0)
+	for i := startHeight; i <= endHeight; i++ {
+		blkHash := b.bestChain.nodeByHeight(int32(i))
+		hashes = append(hashes, &blkHash.hash)
+	}
+
+	var fileNum []uint32
+	err := b.db.View(func(dbTx database.Tx) error {
+		var err error
+		fileNum, err = dbFetchFileNumByHashes(dbTx, hashes)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	fileNumMap := make(map[uint32]struct{})
+	res := make([]uint32, 0)
+	for _, num := range fileNum {
+		if _, ok := fileNumMap[num]; !ok {
+			res = append(res, num)
+			fileNumMap[num] = struct{}{}
+		}
+	}
+
+	sort.Slice(res, func(i, j int) bool { return res[i] < res[j] })
+	return res, nil
 }

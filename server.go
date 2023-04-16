@@ -24,6 +24,7 @@ import (
 	"github.com/abesuite/abec/syncmgr"
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
+	"github.com/abesuite/abec/witnessmgr"
 	"math"
 	"net"
 	"runtime"
@@ -200,6 +201,7 @@ type server struct {
 	witnessCache         *txscript.WitnessCache
 	rpcServer            *rpcServer
 	syncManager          *syncmgr.SyncManager
+	witnessManager       *witnessmgr.WitnessManager
 	chain                *blockchain.BlockChain
 	txMemPool            *mempool.TxPool
 	ethash               *ethash.Ethash // todo: (ethmining)
@@ -2489,6 +2491,15 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		DisableCheckpoints: cfg.DisableCheckpoints,
 		MaxPeers:           cfg.MaxPeers,
 		FeeEstimator:       s.feeEstimator,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	s.witnessManager, err = witnessmgr.New(&witnessmgr.Config{
+		NodeType:   cfg.nodeType,
+		TrustLevel: cfg.trustLevel,
+		Chain:      s.chain,
 	})
 	if err != nil {
 		return nil, err
