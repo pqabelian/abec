@@ -401,8 +401,12 @@ type Tx interface {
 	FetchNodeType() (wire.NodeType, error)
 	FetchTrustLevel() (wire.TrustLevel, error)
 
-	FetchMinWitnessFileNum() (uint32, error)
-	StoreMinWitnessFileNum(num uint32) error
+	FetchMinConsecutiveWitnessFileNum() (uint32, error)
+	StoreMinConsecutiveWitnessFileNum(num uint32) error
+
+	FetchMinExistingWitnessFileNum() (uint32, error)
+	StoreMinExistingWitnessFileNum(num uint32) error
+	UpdateMinExistingWitnessFileNum() error
 
 	// ******************************************************************
 	// Methods related to both atomic metadata storage and block storage.

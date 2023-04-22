@@ -501,7 +501,7 @@ func deserializeSpendJournalEntry(serialized []byte, txns []*wire.MsgTx) ([]Spen
 	return stxos, nil
 }
 
-//	Abe to do
+// Abe to do
 func deserializeSpendJournalEntryAbe(serialized []byte, txns []*wire.MsgTxAbe) ([]*SpentTxOutAbe, error) {
 	// Calculate the total number of stxos.
 	var numStxos int
@@ -634,7 +634,7 @@ func dbFetchSpendJournalEntry(dbTx database.Tx, block *abeutil.Block) ([]SpentTx
 	return stxos, nil
 }
 
-//Abe to do
+// Abe to do
 func dbFetchSpendJournalEntryAbe(dbTx database.Tx, block *abeutil.BlockAbe) ([]*SpentTxOutAbe, error) {
 	// Exclude the coinbase transaction since it can't spend anything.
 	spendBucket := dbTx.Metadata().Bucket(spendJournalBucketName)
@@ -890,7 +890,7 @@ func serializeUtxoEntry(entry *UtxoEntry) ([]byte, error) {
 	return serialized, nil
 }
 
-//	Abe to do
+// Abe to do
 func serializeUtxoRingEntry(entry *UtxoRingEntry) ([]byte, error) {
 
 	buf := bytes.NewBuffer(make([]byte, 0, entry.SerializeSize()))
@@ -939,7 +939,7 @@ func deserializeUtxoEntry(serialized []byte) (*UtxoEntry, error) {
 	return entry, nil
 }
 
-//	todo(ABE):
+// todo(ABE):
 func deserializeUtxoRingEntry(serialized []byte) (*UtxoRingEntry, error) {
 
 	entry := UtxoRingEntry{}
@@ -1029,7 +1029,7 @@ func dbFetchUtxoEntry(dbTx database.Tx, outpoint wire.OutPoint) (*UtxoEntry, err
 	return entry, nil
 }
 
-//	todo(ABE):
+// todo(ABE):
 func dbFetchUtxoRingEntry(dbTx database.Tx, outPointRingHash chainhash.Hash) (*UtxoRingEntry, error) {
 	// Fetch the unspent transaction output information for the passed
 	// transaction output.  Return nil when there is no entry.
@@ -1154,7 +1154,7 @@ func dbPutUtxoRingView(dbTx database.Tx, view *UtxoRingViewpoint) error {
 	return nil
 }
 
-//	Abe add
+// Abe add
 func dbRemoveUtxoRingView(dbTx database.Tx, view *UtxoRingViewpoint) error {
 	utxoRingBucket := dbTx.Metadata().Bucket(utxoRingSetBucketName)
 
@@ -1821,7 +1821,7 @@ func dbStoreBlock(dbTx database.Tx, block *abeutil.Block) error {
 	return dbTx.StoreBlock(block)
 }
 
-//	Abe to do
+// Abe to do
 func dbStoreBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe) error {
 	hasBlock, err := dbTx.HasBlock(block.Hash())
 	if err != nil {
@@ -1846,6 +1846,7 @@ func blockIndexKey(blockHash *chainhash.Hash, blockHeight uint32) []byte {
 // BlockByHeight returns the block at the given height in the main chain.
 //
 // This function is safe for concurrent access.
+//
 //	todo(ABE):
 func (b *BlockChain) BlockByHeightBTCD(blockHeight int32) (*abeutil.Block, error) {
 	// Lookup the block height in the best chain.
@@ -1987,13 +1988,12 @@ func (b *BlockChain) PruneWitnessFile(fileNumPruned []uint32) ([]string, error) 
 	return deleted, err
 }
 
-// UpdateMinWitnessFileNum update the minWitnessFileNum if needed.
-func (b *BlockChain) UpdateMinWitnessFileNum(num uint32) error {
+// UpdateMinConsecutiveWitnessFileNum update the minConsecutiveWitnessFileNum if needed.
+func (b *BlockChain) UpdateMinConsecutiveWitnessFileNum(num uint32) error {
 	var currentNum uint32
 	err := b.db.View(func(dbTx database.Tx) error {
-		// Update minWitnessFileNum first.
 		var err error
-		currentNum, err = dbTx.FetchMinWitnessFileNum()
+		currentNum, err = dbTx.FetchMinConsecutiveWitnessFileNum()
 		return err
 	})
 	if err != nil {
@@ -2002,9 +2002,8 @@ func (b *BlockChain) UpdateMinWitnessFileNum(num uint32) error {
 
 	if num > currentNum {
 		err := b.db.Update(func(dbTx database.Tx) error {
-			// Update minWitnessFileNum first.
 			var err error
-			err = dbTx.StoreMinWitnessFileNum(num)
+			err = dbTx.StoreMinConsecutiveWitnessFileNum(num)
 			return err
 		})
 		if err != nil {
@@ -2012,6 +2011,27 @@ func (b *BlockChain) UpdateMinWitnessFileNum(num uint32) error {
 		}
 	}
 	return nil
+}
+
+// FetchMinExistingWitnessFileNum fetch the existing witness file num.
+func (b *BlockChain) FetchMinExistingWitnessFileNum() (uint32, error) {
+	var currentNum uint32
+	err := b.db.View(func(dbTx database.Tx) error {
+		var err error
+		currentNum, err = dbTx.FetchMinExistingWitnessFileNum()
+		return err
+	})
+	return currentNum, err
+}
+
+// StoreMinExistingWitnessFileNum store the minExistingWitnessFileNum.
+func (b *BlockChain) StoreMinExistingWitnessFileNum(num uint32) error {
+	err := b.db.Update(func(dbTx database.Tx) error {
+		var err error
+		err = dbTx.StoreMinExistingWitnessFileNum(num)
+		return err
+	})
+	return err
 }
 
 // FetchWitnessFileInfo fetch the concrete info of witness files.
@@ -2040,6 +2060,14 @@ func (b *BlockChain) StoreDeleteHistory(fileInfos map[uint32]os.FileInfo) error 
 			}
 		}
 		return nil
+	})
+	return err
+}
+
+// UpdateMinExistingWitnessFileNum update min existing witness file num automatically.
+func (b *BlockChain) UpdateMinExistingWitnessFileNum() error {
+	err := b.db.Update(func(dbTx database.Tx) error {
+		return dbTx.UpdateMinExistingWitnessFileNum()
 	})
 	return err
 }

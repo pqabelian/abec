@@ -1029,8 +1029,8 @@ func (s *blockStore) syncWitness() error {
 // were partially written.
 //
 // There are effectively two scenarios to consider here:
-//   1) Transient write failures from which recovery is possible
-//   2) More permanent failures such as hard disk death and/or removal
+//  1. Transient write failures from which recovery is possible
+//  2. More permanent failures such as hard disk death and/or removal
 //
 // In either case, the write cursor will be repositioned to the old block file
 // offset regardless of any other errors that occur while attempting to undo
@@ -1276,11 +1276,11 @@ func newBlockStore(basePath string, network wire.AbelianNet) *blockStore {
 	return store
 }
 
-func fetchMinWitnessFileNum(pdb *db) (int, error) {
+func fetchMinConsecutiveWitnessFileNum(pdb *db) (int, error) {
 	hasMinWitnessFileNum := true
 	var minWitnessFileNum []byte
 	err := pdb.View(func(tx database.Tx) error {
-		minWitnessFileNum = tx.Metadata().Get(minWitnessFileNumKeyName)
+		minWitnessFileNum = tx.Metadata().Get(minConsecutiveWitnessFileNumKeyName)
 		if minWitnessFileNum == nil {
 			hasMinWitnessFileNum = false
 		}
@@ -1291,8 +1291,31 @@ func fetchMinWitnessFileNum(pdb *db) (int, error) {
 	}
 
 	if !hasMinWitnessFileNum {
-		log.Infof("Creating min witness file num key...")
-		err := addMinWitnessFileNumKey(pdb.cache.ldb)
+		log.Infof("Creating min consecutive witness file num key...")
+		err := addMinConsecutiveWitnessFileNumKey(pdb.cache.ldb)
+		return 0, err
+	}
+
+	return int(deserializeUint32(minWitnessFileNum)), nil
+}
+
+func fetchMinExistingWitnessFileNum(pdb *db) (int, error) {
+	hasMinWitnessFileNum := true
+	var minWitnessFileNum []byte
+	err := pdb.View(func(tx database.Tx) error {
+		minWitnessFileNum = tx.Metadata().Get(minExistingWitnessFileNumKeyName)
+		if minWitnessFileNum == nil {
+			hasMinWitnessFileNum = false
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	if !hasMinWitnessFileNum {
+		log.Infof("Creating min existing witness file num key...")
+		err := addMinExistingWitnessFileNumKey(pdb.cache.ldb)
 		return 0, err
 	}
 
@@ -1300,7 +1323,12 @@ func fetchMinWitnessFileNum(pdb *db) (int, error) {
 }
 
 func initWitnessCursor(basePath string, pdb *db) error {
-	minIdx, err := fetchMinWitnessFileNum(pdb)
+	minIdx, err := fetchMinConsecutiveWitnessFileNum(pdb)
+	if err != nil {
+		return err
+	}
+
+	_, err = fetchMinExistingWitnessFileNum(pdb)
 	if err != nil {
 		return err
 	}

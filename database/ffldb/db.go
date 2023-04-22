@@ -77,9 +77,13 @@ var (
 	writeLocKeyName        = []byte("ffldb-writeloc")
 	writeLocWitnessKeyName = []byte("ffldb-writeloc-witness")
 
-	// minWitnessFileNumKeyName is the key used to store the number of witness file
+	// minConsecutiveWitnessFileNumKeyName is the key used to store the witness file num
 	// that should be scan from.
-	minWitnessFileNumKeyName = []byte("ffldb-minwitnessfilenum")
+	minConsecutiveWitnessFileNumKeyName = []byte("ffldb-minconsecutivewitnessfilenum")
+
+	// minExistingWitnessFileNumKeyName is the key used to store the minimum witness file
+	// that still exists (which means have not been deleted).
+	minExistingWitnessFileNumKeyName = []byte("ffldb-minexistingwitnessfilenum")
 
 	// nodeTypeKeyName is the key used to store the node type.
 	// 0: full node, 1: semifull node, 2: normal node
@@ -1311,7 +1315,7 @@ func (tx *transaction) HasBlock(hash *chainhash.Hash) (bool, error) {
 	return tx.hasBlock(hash), nil
 }
 
-//	todo(ABE):
+// todo(ABE):
 func (tx *transaction) HasBlockAbe(hash *chainhash.Hash) (bool, error) {
 	// Ensure transaction state is valid.
 	if err := tx.checkClosed(); err != nil {
@@ -1380,6 +1384,7 @@ func (tx *transaction) fetchWitnessRow(hash *chainhash.Hash) ([]byte, error) {
 // implementations.
 //
 // This function is part of the database.Tx interface implementation.
+//
 //	todo: (EthashPoW)
 //	blockHdrSize is not accurate for block with height < BlockHeightEthashPoW
 //	1) FetchBlockHeader <-- dbFetchHeaderByHash <-- dbFetchHeaderByHeight, which is not called by any function.
@@ -1407,6 +1412,7 @@ func (tx *transaction) FetchBlockHeader(hash *chainhash.Hash) ([]byte, error) {
 // allows support for memory-mapped database implementations.
 //
 // This function is part of the database.Tx interface implementation.
+//
 //	todo: (EthashPoW)
 //	blockHdrSize is not accurate for block with height < BlockHeightEthashPoW
 //	1) FetchBlockHeaders <-- (cmd *headersCmd) Execute, which is in abec/database/cmd/dbtool/, and will be not used normally by Abelian.
@@ -1614,10 +1620,6 @@ func (tx *transaction) FetchWitnessFileNum(hashes []*chainhash.Hash) ([]uint32, 
 
 // FetchWitnessFileInfo fetch the information of witness file.
 func (tx *transaction) FetchWitnessFileInfo(fileNum []uint32) (map[uint32]os.FileInfo, error) {
-	// Ensure transaction state is valid.
-	if err := tx.checkClosed(); err != nil {
-		return nil, err
-	}
 
 	res := make(map[uint32]os.FileInfo)
 	for _, num := range fileNum {
@@ -1635,10 +1637,6 @@ func (tx *transaction) FetchWitnessFileInfo(fileNum []uint32) (map[uint32]os.Fil
 
 // DeleteWitnessFiles delete the witness files of specified file num.
 func (tx *transaction) DeleteWitnessFiles(fileNum []uint32) ([]string, error) {
-	// Ensure transaction state is valid.
-	if err := tx.checkClosed(); err != nil {
-		return nil, err
-	}
 
 	res := make([]string, 0)
 	for _, num := range fileNum {
@@ -2089,23 +2087,60 @@ func (tx *transaction) FetchTrustLevel() (wire.TrustLevel, error) {
 	return wire.TrustLevel(deserializeUint32(trustLevel)), nil
 }
 
-// FetchMinWitnessFileNum fetch the minimum file number of
+// FetchMinConsecutiveWitnessFileNum fetch the minimum file number of
 // the last consecutive witness files.
-func (tx *transaction) FetchMinWitnessFileNum() (uint32, error) {
+func (tx *transaction) FetchMinConsecutiveWitnessFileNum() (uint32, error) {
 	var res []byte
-	res = tx.Metadata().Get(minWitnessFileNumKeyName)
+	res = tx.Metadata().Get(minConsecutiveWitnessFileNumKeyName)
 	if res == nil {
-		return 0, errors.New("minWitnessFileNum does not exist")
+		return 0, errors.New("min consecutive witness file num does not exist")
 	}
 
 	return deserializeUint32(res), nil
 }
 
-// StoreMinWitnessFileNum put the minimum file number of
+// StoreMinConsecutiveWitnessFileNum put the minimum file number of
 // the last consecutive witness files into database.
-func (tx *transaction) StoreMinWitnessFileNum(num uint32) error {
-	err := tx.Metadata().Put(minWitnessFileNumKeyName, serializeUint32(num))
+func (tx *transaction) StoreMinConsecutiveWitnessFileNum(num uint32) error {
+	err := tx.Metadata().Put(minConsecutiveWitnessFileNumKeyName, serializeUint32(num))
 	return err
+}
+
+// FetchMinExistingWitnessFileNum fetch the minimum file number of
+// existing witness files.
+func (tx *transaction) FetchMinExistingWitnessFileNum() (uint32, error) {
+	var res []byte
+	res = tx.Metadata().Get(minExistingWitnessFileNumKeyName)
+	if res == nil {
+		return 0, errors.New("min existing witness file num does not exist")
+	}
+
+	return deserializeUint32(res), nil
+}
+
+// StoreMinExistingWitnessFileNum put the minimum file number of
+// existing witness files into database.
+func (tx *transaction) StoreMinExistingWitnessFileNum(num uint32) error {
+	err := tx.Metadata().Put(minExistingWitnessFileNumKeyName, serializeUint32(num))
+	return err
+}
+
+func (tx *transaction) UpdateMinExistingWitnessFileNum() error {
+	currentNum, err := tx.FetchMinExistingWitnessFileNum()
+	if err != nil {
+		return err
+	}
+
+	var i uint32
+	for i = currentNum; i < tx.db.store.writeCursorForWitness.curFileNum; i++ {
+		filePath := witnessFilePath(tx.db.store.basePath, i)
+		_, err := os.Stat(filePath)
+		if err == nil {
+			break
+		}
+	}
+
+	return tx.StoreMinExistingWitnessFileNum(i)
 }
 
 // Commit commits all changes that have been made to the root metadata bucket
@@ -2413,7 +2448,9 @@ func initDB(ldb *leveldb.DB, nodeType wire.NodeType, trustLevel wire.TrustLevel)
 		serializeWriteRow(0, 0))
 	batch.Put(bucketizedKey(metadataBucketID, writeLocWitnessKeyName),
 		serializeWriteRow(0, 0))
-	batch.Put(bucketizedKey(metadataBucketID, minWitnessFileNumKeyName),
+	batch.Put(bucketizedKey(metadataBucketID, minConsecutiveWitnessFileNumKeyName),
+		serializeUint32(0))
+	batch.Put(bucketizedKey(metadataBucketID, minExistingWitnessFileNumKeyName),
 		serializeUint32(0))
 	batch.Put(bucketizedKey(metadataBucketID, nodeTypeKeyName),
 		serializeUint32(uint32(nodeType)))
@@ -2442,16 +2479,33 @@ func initDB(ldb *leveldb.DB, nodeType wire.NodeType, trustLevel wire.TrustLevel)
 	return nil
 }
 
-// addMinWitnessFileNumKey creates the minwitnessfilenumkey in meta data.
-func addMinWitnessFileNumKey(ldb *leveldb.DB) error {
+// addMinConsecutiveWitnessFileNumKey creates the minconsecutivewitnessfilenumkey in meta data.
+func addMinConsecutiveWitnessFileNumKey(ldb *leveldb.DB) error {
 
 	batch := new(leveldb.Batch)
-	batch.Put(bucketizedKey(metadataBucketID, minWitnessFileNumKeyName),
+	batch.Put(bucketizedKey(metadataBucketID, minConsecutiveWitnessFileNumKeyName),
 		serializeUint32(0))
 
 	// Write everything as a single batch.
 	if err := ldb.Write(batch, nil); err != nil {
-		str := fmt.Sprintf("failed to add min witnessfilenumkey: %v",
+		str := fmt.Sprintf("failed to add min consecutive witness file num key: %v",
+			err)
+		return convertErr(str, err)
+	}
+
+	return nil
+}
+
+// addMinExistingWitnessFileNumKey creates the minexistingwitnessfilenumkey in meta data.
+func addMinExistingWitnessFileNumKey(ldb *leveldb.DB) error {
+
+	batch := new(leveldb.Batch)
+	batch.Put(bucketizedKey(metadataBucketID, minExistingWitnessFileNumKeyName),
+		serializeUint32(0))
+
+	// Write everything as a single batch.
+	if err := ldb.Write(batch, nil); err != nil {
+		str := fmt.Sprintf("failed to add min existing witness file num key: %v",
 			err)
 		return convertErr(str, err)
 	}

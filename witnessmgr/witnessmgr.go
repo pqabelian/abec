@@ -103,15 +103,23 @@ func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
 		return nil
 	}
 
-	// Calculate prune range.
+	// Calculate prune range, starting from min existing witness file num.
 	fileNumPruned := make([]uint32, 0)
-	var currentNum uint32 = 0
+	minExistingWitnessFileNum, err := wm.chain.FetchMinExistingWitnessFileNum()
+	if err != nil {
+		return err
+	}
+	var currentNum uint32 = minExistingWitnessFileNum
 	for _, num := range fileNumReserved {
 		var i uint32
 		for i = currentNum; i != num; i++ {
 			fileNumPruned = append(fileNumPruned, i)
 		}
 		currentNum = i + 1
+	}
+	if len(fileNumPruned) == 0 {
+		log.Infof("No witness file can be pruned")
+		return nil
 	}
 
 	// Fetch witness file info.
@@ -124,13 +132,15 @@ func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
 		return nil
 	}
 
-	// Save delete history first.
+	// Save delete info to database, including file size and delete time.
 	err = wm.chain.StoreDeleteHistory(fileInfo)
 	if err != nil {
 		return err
 	}
 
-	// Update minWitnessFileNum.
+	// Update min consecutive witness file num first in case the delete process
+	// is interrupted. Even if the delete process is interrupted accidentally later,
+	// the witness file scan process when abec is launched can still work fine.
 	minWitnessFileNum := fileNumReserved[len(fileNumReserved)-1]
 	for i := len(fileNumReserved) - 2; i >= 0; i-- {
 		if fileNumReserved[i]+1 != minWitnessFileNum {
@@ -138,12 +148,12 @@ func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
 		}
 		minWitnessFileNum = fileNumReserved[i]
 	}
-	err = wm.chain.UpdateMinWitnessFileNum(minWitnessFileNum)
+	err = wm.chain.UpdateMinConsecutiveWitnessFileNum(minWitnessFileNum)
 	if err != nil {
 		return err
 	}
 
-	// Prune witness files.
+	// Prune witness files, this may take a while.
 	deleted, err := wm.chain.PruneWitnessFile(fileNumPruned)
 	if err != nil {
 		return err
@@ -151,5 +161,8 @@ func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
 	for _, deletedFile := range deleted {
 		log.Infof("Successfully delete witness file %v", deletedFile)
 	}
-	return nil
+
+	// Update min existing witness file.
+	err = wm.chain.UpdateMinExistingWitnessFileNum()
+	return err
 }
