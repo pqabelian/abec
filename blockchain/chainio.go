@@ -2001,6 +2001,7 @@ func (b *BlockChain) UpdateMinConsecutiveWitnessFileNum(num uint32) error {
 	}
 
 	if num > currentNum {
+		log.Debugf("Update min consecutive witness file num from %v to %v", currentNum, num)
 		err := b.db.Update(func(dbTx database.Tx) error {
 			var err error
 			err = dbTx.StoreMinConsecutiveWitnessFileNum(num)
@@ -2009,6 +2010,8 @@ func (b *BlockChain) UpdateMinConsecutiveWitnessFileNum(num uint32) error {
 		if err != nil {
 			return err
 		}
+	} else {
+		log.Debugf("Remain min consecutive witness file num %v (new num: %v)", currentNum, num)
 	}
 	return nil
 }

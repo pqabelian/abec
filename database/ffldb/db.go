@@ -1641,10 +1641,16 @@ func (tx *transaction) DeleteWitnessFiles(fileNum []uint32) ([]string, error) {
 	res := make([]string, 0)
 	for _, num := range fileNum {
 		filePath := witnessFilePath(tx.db.store.basePath, num)
-		if err := os.Remove(filePath); err != nil {
-			log.Tracef("Fail to remove %v", filePath)
+		fileState, err := os.Stat(filePath)
+		if err != nil {
+			log.Debugf("Fail to delete %v: %v", filePath, err)
 			continue
 		}
+		if err := os.Remove(filePath); err != nil {
+			log.Debugf("Fail to delete %v: %v", filePath, err)
+			continue
+		}
+		log.Debugf("Successfully delete %v (Size: %v)", filePath, fileState.Size())
 		res = append(res, filePath)
 	}
 
@@ -2140,6 +2146,7 @@ func (tx *transaction) UpdateMinExistingWitnessFileNum() error {
 		}
 	}
 
+	log.Debugf("Update min existing witness file num from %v to %v", currentNum, i)
 	return tx.StoreMinExistingWitnessFileNum(i)
 }
 
