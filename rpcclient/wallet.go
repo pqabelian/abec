@@ -345,6 +345,17 @@ func (r FutureLockUnspentResult) Receive() error {
 	return err
 }
 
+type FutureGetTxHashFromRequestResult chan *response
+
+func (r FutureGetTxHashFromRequestResult) Receive() (string, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return "", err
+	}
+	txHash, err := chainhash.NewHash(res)
+	return txHash.String(), err
+}
+
 // LockUnspentAsync returns an instance of a type that can be used to get the
 // result of the RPC at some future time by invoking the Receive function on the
 // returned instance.
@@ -359,6 +370,11 @@ func (c *Client) LockUnspentAsync(unlock bool, ops []*wire.OutPoint) FutureLockU
 		}
 	}
 	cmd := abejson.NewLockUnspentCmd(unlock, outputs)
+	return c.sendCmd(cmd)
+}
+
+func (c *Client) GetTxHashFromRequestAsync(requestHash string) FutureGetTxHashFromRequestResult {
+	cmd := abejson.NewGetTxHashFromReqeustCmd(requestHash)
 	return c.sendCmd(cmd)
 }
 
@@ -381,6 +397,10 @@ func (c *Client) LockUnspentAsync(unlock bool, ops []*wire.OutPoint) FutureLockU
 // avoid confusion for those who are already familiar with the lockunspent RPC.
 func (c *Client) LockUnspent(unlock bool, ops []*wire.OutPoint) error {
 	return c.LockUnspentAsync(unlock, ops).Receive()
+}
+
+func (c *Client) GetTxHashFromRequest(requestHash string) (string, error) {
+	return c.GetTxHashFromRequestAsync(requestHash).Receive()
 }
 
 // FutureListLockUnspentResult is a future promise to deliver the result of a
