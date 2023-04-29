@@ -5,6 +5,7 @@ import (
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/wire"
+	"sync"
 )
 
 const (
@@ -26,6 +27,7 @@ type WitnessManager struct {
 	nodeType   wire.NodeType
 	trustLevel wire.TrustLevel
 	chain      *blockchain.BlockChain
+	deleteLock sync.Mutex
 }
 
 // New constructs a new WitnessManager.
@@ -84,6 +86,12 @@ func (wm *WitnessManager) handleBlockchainNotification(notification *blockchain.
 // pruneWitnessBeforeHeight keep the witness file after certain height (include)
 // and prune other witness file.
 func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
+	if !wm.deleteLock.TryLock() {
+		log.Infof("Witness deleting process is ongoing, skip")
+		return nil
+	}
+	defer wm.deleteLock.Unlock()
+
 	if height <= 0 {
 		return nil
 	}
