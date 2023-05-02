@@ -299,7 +299,9 @@ func (sm *SyncManager) WitnessNeeded(p *peerpkg.Peer) bool {
 			}
 		} else {
 			// Trust level high.
-			if currentHeight+wire.MaxReservedWitness >= p.LastBlock() {
+			lastBlockHeight := p.LastBlock()
+			log.Debugf("Current height: %v, last block height of peer: %v", currentHeight, lastBlockHeight)
+			if currentHeight+wire.MaxReservedWitness >= lastBlockHeight {
 				return true
 			}
 		}
@@ -1026,7 +1028,7 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 			return
 		}
 		if !bmsg.block.Transactions()[0].HasWitness() {
-			log.Infof("Rejected block %v from %s: block without witness", blockHash, peer)
+			log.Infof("Rejected block %v from %s: block without witness but we need it", blockHash, peer)
 			peer.Disconnect()
 			return
 		}
