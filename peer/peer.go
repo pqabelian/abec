@@ -472,6 +472,7 @@ type Peer struct {
 	timeConnected time.Time
 	//	todo(ABE): did not understand startHeight well yet
 	startingHeight     int32
+	announcedHeight    int32
 	lastBlock          int32
 	lastAnnouncedBlock *chainhash.Hash
 	lastPingNonce      uint64    // Set to nonce if we have a pending ping.
@@ -508,6 +509,17 @@ func (p *Peer) UpdateLastBlockHeight(newHeight int32) {
 	log.Tracef("Updating last block height of peer %v from %v to %v",
 		p.addr, p.lastBlock, newHeight)
 	p.lastBlock = newHeight
+	p.statsMtx.Unlock()
+}
+
+// UpdateAnnouncedHeight updates the latest block
+// which peer announced it has.
+// This function is safe for concurrent access.
+func (p *Peer) UpdateAnnouncedHeight(newHeight int32) {
+	p.statsMtx.Lock()
+	log.Tracef("Updating announced height of peer %v from %v to %v",
+		p.addr, p.announcedHeight, newHeight)
+	p.announcedHeight = newHeight
 	p.statsMtx.Unlock()
 }
 
@@ -718,6 +730,17 @@ func (p *Peer) LastBlock() int32 {
 	p.statsMtx.RUnlock()
 
 	return lastBlock
+}
+
+// AnnouncedHeight returns the latest height
+// the peer announced.
+// This function is safe for concurrent access.
+func (p *Peer) AnnouncedHeight() int32 {
+	p.statsMtx.RLock()
+	announcedHeight := p.announcedHeight
+	p.statsMtx.RUnlock()
+
+	return announcedHeight
 }
 
 // LastSend returns the last send time of the peer.
@@ -2010,6 +2033,7 @@ func (p *Peer) readRemoteVersionMsg() error {
 	// Updating a bunch of stats including block based stats, and the
 	// peer's time offset.
 	p.statsMtx.Lock()
+	p.announcedHeight = msg.LastBlock
 	p.lastBlock = msg.LastBlock
 	p.startingHeight = msg.LastBlock
 	p.timeOffset = msg.Timestamp.Unix() - time.Now().Unix()
@@ -2177,10 +2201,10 @@ func (p *Peer) writeLocalVersionMsg() error {
 // peer. The events should occur in the following order, otherwise an error is
 // returned:
 //
-//   1. Remote peer sends their version.
-//   2. We send our version.
-//   3. We send our verack.
-//   4. Remote peer sends their verack.
+//  1. Remote peer sends their version.
+//  2. We send our version.
+//  3. We send our verack.
+//  4. Remote peer sends their verack.
 func (p *Peer) negotiateInboundProtocol() error {
 	if err := p.readRemoteVersionMsg(); err != nil {
 		return err
@@ -2202,10 +2226,10 @@ func (p *Peer) negotiateInboundProtocol() error {
 // peer. The events should occur in the following order, otherwise an error is
 // returned:
 //
-//   1. We send our version.
-//   2. Remote peer sends their version.
-//   3. Remote peer sends their verack.
-//   4. We send our verack.
+//  1. We send our version.
+//  2. Remote peer sends their version.
+//  3. Remote peer sends their verack.
+//  4. We send our verack.
 func (p *Peer) negotiateOutboundProtocol() error {
 	if err := p.writeLocalVersionMsg(); err != nil {
 		return err

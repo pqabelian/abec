@@ -294,14 +294,12 @@ func (sm *SyncManager) WitnessNeeded(p *peerpkg.Peer) bool {
 	} else {
 		// Normal node.
 		if sm.trustLevel == wire.TrustLevelMedium {
-			if sm.nextCheckpoint == nil || currentHeight+wire.MaxReservedWitness >= p.LastBlock() {
+			if sm.nextCheckpoint == nil || currentHeight+wire.MaxReservedWitness >= p.AnnouncedHeight() {
 				return true
 			}
 		} else {
 			// Trust level high.
-			lastBlockHeight := p.LastBlock()
-			log.Debugf("Current height: %v, last block height of peer: %v", currentHeight, lastBlockHeight)
-			if currentHeight+wire.MaxReservedWitness >= lastBlockHeight {
+			if currentHeight+wire.MaxReservedWitness >= p.AnnouncedHeight() {
 				return true
 			}
 		}
@@ -1147,6 +1145,9 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 	// if we're syncing the chain from scratch.
 	if blkHashUpdate != nil && heightUpdate != 0 {
 		peer.UpdateLastBlockHeight(heightUpdate)
+		if heightUpdate > peer.AnnouncedHeight() {
+			peer.UpdateAnnouncedHeight(heightUpdate)
+		}
 		if isOrphan || sm.current() {
 			go sm.peerNotifier.UpdatePeerHeights(blkHashUpdate, heightUpdate,
 				peer)
@@ -1417,6 +1418,9 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	// if we're syncing the chain from scratch.
 	if blkHashUpdate != nil && heightUpdate != 0 {
 		peer.UpdateLastBlockHeight(heightUpdate)
+		if heightUpdate > peer.AnnouncedHeight() {
+			peer.UpdateAnnouncedHeight(heightUpdate)
+		}
 		//peer.UpdateLastAnnouncedBlock(blkHashUpdate)
 		if isOrphan || sm.current() {
 			go sm.peerNotifier.UpdatePeerHeights(blkHashUpdate, heightUpdate,
@@ -1792,6 +1796,9 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		blkHeight, err := sm.chain.BlockHeightByHash(&invVects[lastBlock].Hash)
 		if err == nil {
 			peer.UpdateLastBlockHeight(blkHeight)
+			if blkHeight > peer.AnnouncedHeight() {
+				peer.UpdateAnnouncedHeight(blkHeight)
+			}
 			//peer.UpdateLastAnnouncedBlock(&invVects[lastBlock].Hash)
 		}
 	}

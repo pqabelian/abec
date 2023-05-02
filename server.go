@@ -1304,6 +1304,9 @@ func (s *server) handleUpdatePeerHeights(state *peerState, umsg updatePeerHeight
 		if *latestBlkHash == *umsg.newHash {
 			sp.UpdateLastBlockHeight(umsg.newHeight)
 			sp.UpdateLastAnnouncedBlock(nil)
+			if umsg.newHeight > sp.AnnouncedHeight() {
+				sp.UpdateAnnouncedHeight(umsg.newHeight)
+			}
 		}
 	})
 }
