@@ -961,6 +961,7 @@ func (sm *SyncManager) current() bool {
 //}
 
 //	todo(ABE):
+//
 // handleBlockMsgAbe handles block messages from all peers.
 func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 	peer := bmsg.peer
@@ -1028,6 +1029,23 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 			log.Infof("Rejected block %v from %s: block without witness", blockHash, peer)
 			peer.Disconnect()
 			return
+		}
+	}
+
+	// todo (prune): delete it later, for debug convenience
+	if witnessNeeded {
+		log.Debugf("We need witness for block %v and it contains witness", blockHash)
+	} else {
+		numTx := len(bmsg.block.MsgBlock().Transactions)
+		if numTx == 0 {
+			log.Infof("Rejected block %v from %s: block without any transactions", blockHash, peer)
+			peer.Disconnect()
+			return
+		}
+		if !bmsg.block.Transactions()[0].HasWitness() {
+			log.Debugf("We do not need witness for block %v and it does not contain witness", blockHash)
+		} else {
+			log.Debugf("We do not need witness for block %v and it contains witness", blockHash)
 		}
 	}
 
@@ -2066,6 +2084,7 @@ out:
 // handleBlockchainNotification handles notifications from blockchain.  It does
 // things such as request orphan block parents and relay accepted blocks to
 // connected peers.
+//
 //	todo (ABE):
 func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Notification) {
 	switch notification.Type {

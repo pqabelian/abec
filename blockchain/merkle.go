@@ -92,7 +92,7 @@ func HashMerkleBranchesEthash(left *chainhash.Hash, right *chainhash.Hash) *chai
 //
 // The above stored as a linear array is as follows:
 //
-// 	[h1 h2 h3 h4 h12 h34 root]
+//	[h1 h2 h3 h4 h12 h34 root]
 //
 // As the above shows, the merkle root is always the last element in the array.
 //
@@ -178,7 +178,7 @@ func BuildMerkleTreeStore(transactions []*abeutil.Tx, witness bool) []*chainhash
 //
 // The above stored as a linear array is as follows:
 //
-// 	[h1 h2 h3 h4 h12 h34 root]
+//	[h1 h2 h3 h4 h12 h34 root]
 //
 // As the above shows, the merkle root is always the last element in the array.
 //
@@ -194,6 +194,7 @@ func BuildMerkleTreeStore(transactions []*abeutil.Tx, witness bool) []*chainhash
 // also presents an additional case wherein the wtxid of the coinbase transaction
 // is the zeroHash.
 // todo (ABE): parameter witness needed? -> (20220406)no
+//
 //	todo: 202207 Why return the all the hashes, rather than the roothash?
 func BuildMerkleTreeStoreAbe(transactions []*abeutil.TxAbe, witness bool) []*chainhash.Hash {
 	// Calculate how many entries are required to hold the binary merkle
@@ -208,7 +209,7 @@ func BuildMerkleTreeStoreAbe(transactions []*abeutil.TxAbe, witness bool) []*cha
 		// chainhash.DoubleHashH(tx Hash || witness Hash)
 		// todo (ethminming): there is a bug, since for extraNonce update, the tx.txHash has been cached, it is inconsist with the update coinbaseTx.
 		copy(tmp[:chainhash.HashSize], tx.Hash()[:])
-		copy(tmp[chainhash.HashSize:], chainhash.DoubleHashB(tx.MsgTx().TxWitness))
+		copy(tmp[chainhash.HashSize:], tx.WitnessHash()[:])
 		tHash := chainhash.DoubleHashH(tmp)
 		merkles[i] = &tHash
 	}
@@ -251,6 +252,7 @@ func BuildMerkleTreeStoreAbe(transactions []*abeutil.TxAbe, witness bool) []*cha
 //	Then, we build the merkle tree using chainhash.ChainHash.
 //	In summary, (EthashPoW) as the merkle tree enables the transactions to be chained into the chain,
 //	we use ChainHash to build the merkle tree.
+//
 // todo: (EthashPoW)
 func BuildMerkleTreeStoreAbeEthash(transactions []*abeutil.TxAbe) (merkleRoot *chainhash.Hash, siblingHashes []*chainhash.Hash) {
 	if len(transactions) == 0 {

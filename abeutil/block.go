@@ -37,7 +37,7 @@ type Block struct {
 	txnsGenerated            bool            // ALL wrapped transactions generated
 }
 
-//	Abe to do
+// Abe to do
 type BlockAbe struct {
 	msgBlock                 *wire.MsgBlockAbe // Underlying MsgBlock
 	serializedBlock          []byte            // Serialized bytes for the block
@@ -48,7 +48,7 @@ type BlockAbe struct {
 	txnsGenerated            bool              // ALL wrapped transactions generated
 }
 
-//	Abe to do
+// Abe to do
 type PrunedBlock struct {
 	msgPrunedBlock        *wire.MsgPrunedBlock // Underlying MsgBlock
 	serializedPrunedBlock []byte               // Serialized bytes for the block
@@ -57,7 +57,7 @@ type PrunedBlock struct {
 	txnsGenerated         bool                 // ALL wrapped transactions generated
 }
 
-//	Abe to do
+// Abe to do
 type NeedSet struct {
 	msgNeedSet        *wire.MsgNeedSet // Underlying MsgBlock
 	serializedNeedSet []byte           // Serialized bytes for the block
@@ -68,7 +68,7 @@ func (b *NeedSet) MsgNeedSet() *wire.MsgNeedSet {
 	return b.msgNeedSet
 }
 
-//	Abe to do
+// Abe to do
 type NeedSetResult struct {
 	msgNeedSetResult        *wire.MsgNeedSetResult // Underlying MsgBlock
 	serializedNeedSetResult []byte                 // Serialized bytes for the block
@@ -85,7 +85,7 @@ func (b *Block) MsgBlock() *wire.MsgBlock {
 	return b.msgBlock
 }
 
-//	Abe to do
+// Abe to do
 func (b *BlockAbe) MsgBlock() *wire.MsgBlockAbe {
 	// Return the cached block.
 	return b.msgBlock
@@ -209,7 +209,7 @@ func (b *Block) Hash() *chainhash.Hash {
 	return &hash
 }
 
-//	Abe to do
+// Abe to do
 func (b *BlockAbe) Hash() *chainhash.Hash {
 	// Return the cached block hash if it has already been generated.
 	if b.blockHash != nil {
@@ -297,7 +297,7 @@ func (b *Block) Transactions() []*Tx {
 	return b.transactions
 }
 
-//	Abe to do
+// Abe to do
 func (b *BlockAbe) Transactions() []*TxAbe {
 	// Return transactions if they have ALL already been generated.  This
 	// flag is necessary because the wrapped transactions are lazily
@@ -317,6 +317,9 @@ func (b *BlockAbe) Transactions() []*TxAbe {
 		if tx == nil {
 			newTx := NewTxAbe(b.msgBlock.Transactions[i])
 			newTx.SetIndex(i)
+			if !newTx.HasWitness() {
+				newTx.txWitnessHash = b.msgBlock.WitnessHashs[i]
+			}
 			b.transactions[i] = newTx
 		}
 	}
