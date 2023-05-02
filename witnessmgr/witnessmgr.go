@@ -102,15 +102,18 @@ func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
 	}
 	bestHeight := bestState.Height
 
+	// Calculate the file number that stores the witness of block between height and bestHeight,
+	// which should be reserved.
 	fileNumReserved, err := wm.chain.FileNumBetweenHeight(uint32(height), uint32(bestHeight))
 	if err != nil {
 		return err
 	}
 
 	if len(fileNumReserved) == 0 {
+		log.Infof("No witness file should be reserved, skip")
 		return nil
 	}
-	log.Debugf("Reserving witness files between height %v and %v: %v", height, bestHeight, fileNumReserved)
+	log.Debugf("Reserved witness files between height %v and %v: %v", height, bestHeight, fileNumReserved)
 
 	// Calculate prune range, starting from min existing witness file num.
 	fileNumPruned := make([]uint32, 0)
@@ -127,10 +130,10 @@ func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
 		currentNum = i + 1
 	}
 	if len(fileNumPruned) == 0 {
-		log.Infof("No witness file can be pruned")
+		log.Infof("No witness file can be pruned, skip")
 		return nil
 	}
-	log.Debugf("Pruned witness files between height %v and %v: %v", height, bestHeight, fileNumPruned)
+	log.Debugf("No longer needed witness files between height %v and %v: %v", height, bestHeight, fileNumPruned)
 
 	// Fetch witness file info, this process will also filter some files that do not exist.
 	fileInfo, err := wm.chain.FetchWitnessFileInfo(fileNumPruned)
@@ -146,7 +149,8 @@ func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
 		realFileNumPruned = append(realFileNumPruned, num)
 	}
 
-	// Save delete info to database, including file size and delete time.
+	// Save delete info to database, including file size and delete time,
+	// these information may be useful in the future.
 	err = wm.chain.StoreDeleteHistory(fileInfo)
 	if err != nil {
 		return err
@@ -155,14 +159,14 @@ func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
 	// Update min consecutive witness file num first in case the delete process
 	// is interrupted. Even if the delete process is interrupted accidentally later,
 	// the witness file scan process when abec is launched can still work fine.
-	minWitnessFileNum := fileNumReserved[len(fileNumReserved)-1]
+	minConsecutiveWitnessFileNum := fileNumReserved[len(fileNumReserved)-1]
 	for i := len(fileNumReserved) - 2; i >= 0; i-- {
-		if fileNumReserved[i]+1 != minWitnessFileNum {
+		if fileNumReserved[i]+1 != minConsecutiveWitnessFileNum {
 			break
 		}
-		minWitnessFileNum = fileNumReserved[i]
+		minConsecutiveWitnessFileNum = fileNumReserved[i]
 	}
-	err = wm.chain.UpdateMinConsecutiveWitnessFileNum(minWitnessFileNum)
+	err = wm.chain.UpdateMinConsecutiveWitnessFileNum(minConsecutiveWitnessFileNum)
 	if err != nil {
 		return err
 	}

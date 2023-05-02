@@ -19,6 +19,12 @@ require (
 )
 
 require (
+	github.com/cryptosuite/kyber-go v0.0.2-alpha // indirect
+	github.com/cryptosuite/liboqs-go v0.9.5-alpha // indirect
+	github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db // indirect
+)
+
+require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/edsrzf/mmap-go v1.1.0
 	github.com/hashicorp/golang-lru v0.5.4

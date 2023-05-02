@@ -1926,8 +1926,8 @@ func (b *BlockChain) BlockByHashAbe(hash *chainhash.Hash) (*abeutil.BlockAbe, er
 	return block, err
 }
 
-// dbFetchFileNumByHashes fetch the file num that stores the block witness.
-func dbFetchFileNumByHashes(dbTx database.Tx, hashes []*chainhash.Hash) ([]uint32, error) {
+// dbFetchWitnessFileNumByHashes fetch the file num that stores the block witness.
+func dbFetchWitnessFileNumByHashes(dbTx database.Tx, hashes []*chainhash.Hash) ([]uint32, error) {
 	return dbTx.FetchWitnessFileNum(hashes)
 }
 
@@ -1950,16 +1950,18 @@ func (b *BlockChain) FileNumBetweenHeight(startHeight uint32, endHeight uint32) 
 		hashes = append(hashes, &blkHash.hash)
 	}
 
+	// Fetch witness file number of each block by hashes.
 	var fileNum []uint32
 	err := b.db.View(func(dbTx database.Tx) error {
 		var err error
-		fileNum, err = dbFetchFileNumByHashes(dbTx, hashes)
+		fileNum, err = dbFetchWitnessFileNumByHashes(dbTx, hashes)
 		return err
 	})
 	if err != nil {
 		return nil, err
 	}
 
+	// Deduplicate file number.
 	fileNumMap := make(map[uint32]struct{})
 	res := make([]uint32, 0)
 	for _, num := range fileNum {
@@ -1969,6 +1971,7 @@ func (b *BlockChain) FileNumBetweenHeight(startHeight uint32, endHeight uint32) 
 		}
 	}
 
+	//  Sort the file number.
 	sort.Slice(res, func(i, j int) bool { return res[i] < res[j] })
 	return res, nil
 }
