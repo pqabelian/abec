@@ -74,6 +74,13 @@ func (txId *TxId) String() string {
 	return wtxId.String()
 }
 
+type TxoRingMember struct {
+	ringId *wire.RingId // txoRing identifier
+	//txoList []*wire.TxOutAbe
+	txoRing *wire.TxoRing
+	idx     uint8 // member index in ring
+}
+
 // NewOutPointFromTxIdStr assumes the input txIdStr was obtained by "(hash chainHash.Hash) String()" function
 func NewOutPointFromTxIdStr(txIdStr string, index uint8) (*OutPoint, error) {
 	txHash, err := chainhash.NewHashFromStr(txIdStr)
@@ -699,4 +706,133 @@ func CreateTransferTx(serializedTransferTxRequestDesc []byte, cryptoKeys []*Cryp
 	trTxId := TxId(transferTxMsg.TxId())
 
 	return buf.Bytes(), &trTxId, nil
+}
+
+func GenerateCoinSerialNumber(
+	outPoints []*OutPoint,
+	serializedBlocksForRingGroup [][]byte,
+	cryptoKeys []*CryptoKey) (serialNumbers [][]byte, err error) {
+
+	coinNum := len(outPoints)
+	if coinNum == 0 {
+		return nil, errors.New("GenerateCoinSerialNumber: input outPoints is empty")
+	}
+
+	if coinNum != len(cryptoKeys) {
+		return nil, errors.New("GenerateCoinSerialNumber: the number of input keys does not match the number of outPoints")
+	}
+
+	blockNum := len(serializedBlocksForRingGroup)
+
+	if blockNum == 0 {
+		return nil, errors.New("GenerateCoinSerialNumber: input serializedBlocksForRingGroup is empty")
+	}
+
+	blocks := make([]*abeutil.BlockAbe, blockNum)
+	for i := 0; i < blockNum; i++ {
+		// todo: to confirm
+		//	For example, in the function, blockNoWitness is used.
+		//	We need to clarify these functions.
+		blocks[i], err = abeutil.NewBlockFromBytesAbe(serializedBlocksForRingGroup[i])
+		if err != nil {
+			return nil, err
+		}
+
+		//	assume the blocks are valid blocks in ledger, include:
+		// (1) the Header contains its height. Based on this, we explicitly set the height of Block.
+		blocks[i].SetHeight(blocks[i].MsgBlock().Header.Height)
+		fmt.Printf("deserialized the block in height %d\n", blocks[i].Height())
+	}
+
+	// According to the first block the identity the version and txo ring size rule
+	startBlockHeight := blocks[0].Height()
+	blockNumPerRingGroup := wire.GetBlockNumPerRingGroupByBlockHeight(startBlockHeight)
+	ringSize := wire.GetTxoRingSizeByBlockHeight(startBlockHeight)
+
+	for i := 1; i < blockNum; i++ {
+		height := blocks[i].Height()
+		if height != startBlockHeight+int32(i) {
+			return nil, errors.New("GenerateCoinSerialNumber: the heights of input serializedBlocksForRingGroup are not successive")
+		}
+
+		if wire.GetBlockNumPerRingGroupByBlockHeight(height) != blockNumPerRingGroup {
+			return nil, errors.New("GenerateCoinSerialNumber: input serializedBlocksForRingGroup imply different blockNumPerRingGroup")
+		}
+
+		if wire.GetTxoRingSizeByBlockHeight(height) != ringSize {
+			return nil, errors.New("GenerateCoinSerialNumber: input serializedBlocksForRingGroup imply different RingSize")
+		}
+	}
+
+	if blockNum%int(blockNumPerRingGroup) != 0 {
+		return nil, errors.New("GenerateCoinSerialNumber: the blocks in input serializedBlocksForRingGroup cannot be divided into groups completely")
+	}
+
+	txoRingMembers := make([]*TxoRingMember, coinNum)
+
+	outPointToTxoRingMemberMap := make(map[wire.OutPointId]*TxoRingMember, coinNum)
+	for i := 0; i < coinNum; i++ {
+		txoRingMembers[i] = &TxoRingMember{ringId: nil}
+		// this nil will be used to check whether the corresponding TxoRing
+
+		opId := outPoints[i].OutPointId()
+		if _, ok := outPointToTxoRingMemberMap[opId]; ok {
+			return nil, errors.New("GenerateCoinSerialNumber: outPoints contains repeated OutPoint")
+		} else {
+			outPointToTxoRingMemberMap[opId] = txoRingMembers[i]
+			//	later txoRingMembers[i] will be fetched from the map, then be set and put back
+		}
+	}
+	groupNum := blockNum / int(blockNumPerRingGroup)
+	for i := 0; i < groupNum; i++ {
+		txoRings, err := blockchain.BuildTxoRings(int(blockNumPerRingGroup), int(ringSize), blocks[i*int(blockNumPerRingGroup):(i+1)*int(blockNumPerRingGroup)])
+		if err != nil {
+			return nil, err
+		}
+
+		for ringId, txoRing := range txoRings {
+			for opIndex, outPoint := range txoRing.OutPointRing.OutPoints {
+				opId := outPoint.OutPointId()
+				if txoRingMember, ok := outPointToTxoRingMemberMap[opId]; ok {
+					//	the outPoint is one of the outPointsToSpend
+					if txoRingMember.ringId != nil {
+						// It has been set previously
+						return nil, fmt.Errorf("GenerateCoinSerialNumber: there are repeated OutPoint (%s, %d) in the rings",
+							txoRingMember.txoRing.OutPointRing.OutPoints[txoRingMember.idx].TxHash,
+							txoRingMember.txoRing.OutPointRing.OutPoints[txoRingMember.idx].Index,
+						)
+					}
+
+					outPointToTxoRingMemberMap[opId].ringId = &wire.RingId{}
+					copy(outPointToTxoRingMemberMap[opId].ringId[:], ringId[:])
+					outPointToTxoRingMemberMap[opId].txoRing = txoRing
+					outPointToTxoRingMemberMap[opId].idx = uint8(opIndex) //	The Ring Rule will make sure opIndex is in the scope of uint8
+				}
+			}
+		}
+	}
+
+	//	check whether all outPoint has found the corresponding TxoRing
+	for i := 0; i < coinNum; i++ {
+		if txoRingMembers[i].ringId == nil {
+			return nil, fmt.Errorf("GenerateCoinSerialNumber: at least one of the input OutPoing such as OutPoint[%d] = (%s,%d) can not find the corresponding TxoRing",
+				i,
+				chainhash.Hash(*outPoints[i].TxId).String(),
+				outPoints[i].Index,
+			)
+		}
+	}
+
+	serialNumbers = make([][]byte, coinNum)
+	for i := 0; i < coinNum; i++ {
+		txOut := txoRingMembers[i].txoRing.TxOuts[txoRingMembers[i].idx]
+		serialNumbers[i], err = abecrypto.TxoCoinSerialNumberGen(txOut,
+			chainhash.Hash(*txoRingMembers[i].ringId),
+			txoRingMembers[i].idx, cryptoKeys[i].cryptoSnsk)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return serialNumbers, nil
 }
