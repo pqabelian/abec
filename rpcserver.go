@@ -143,9 +143,9 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getblockhash":            handleGetBlockHash,
 	"getblockheader":          handleGetBlockHeader,
 	"getblocktemplate":        handleGetBlockTemplate,
-	//"getwork":                 handleGetWork,	// todo: 2022.11.11 disable (getwork, submitwork, submithashrate) APIs
-	//"submitwork":              handleSubmitWork,
-	//"submithashrate":          handleSubmitHashRate,
+	"getwork":                 handleGetWork,
+	"submitwork":              handleSubmitWork,
+	"submithashrate":          handleSubmitHashRate,
 	// TODO(ABE): ABE does not support filter.
 	//"getcfilter":            handleGetCFilter,
 	//"getcfilterheader":      handleGetCFilterHeader,
