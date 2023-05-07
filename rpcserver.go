@@ -5094,9 +5094,9 @@ func (s *rpcServer) Start() {
 		for _, listener := range s.cfg.Listeners {
 			s.wg.Add(1)
 			go func(listener net.Listener) {
-				rpcsLog.Infof("RPC server for getwork listening on %s", listener.Addr())
+				rpcsLog.Infof("RPC server getwork listening on %s (TLS %s)", listener.Addr(), "off")
 				httpServer.Serve(listener)
-				rpcsLog.Tracef("RPC listener for getwork done for %s", listener.Addr())
+				rpcsLog.Tracef("RPC listener getwork done for %s", listener.Addr())
 				s.wg.Done()
 			}(listener)
 		}
@@ -5166,7 +5166,11 @@ func (s *rpcServer) Start() {
 	for _, listener := range s.cfg.Listeners {
 		s.wg.Add(1)
 		go func(listener net.Listener) {
-			rpcsLog.Infof("RPC server listening on %s", listener.Addr())
+			tlsState := "on"
+			if cfg.DisableTLS {
+				tlsState = "off"
+			}
+			rpcsLog.Infof("RPC server listening on %s (TLS %s)", listener.Addr(), tlsState)
 			httpServer.Serve(listener)
 			rpcsLog.Tracef("RPC listener done for %s", listener.Addr())
 			s.wg.Done()
