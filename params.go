@@ -7,6 +7,7 @@ import (
 
 // activeNetParams is a pointer to the parameters specific to the
 // currently active network.
+//
 //	todo(ABE):
 var activeNetParams = &mainNetParams
 
@@ -16,7 +17,8 @@ var activeNetParams = &mainNetParams
 // network and test networks.
 type params struct {
 	*chaincfg.Params
-	rpcPort string
+	rpcPort        string
+	rpcPortGetWork string
 }
 
 // mainNetParams contains parameters specific to the main network
@@ -28,7 +30,8 @@ type params struct {
 var mainNetParams = params{
 	Params: &chaincfg.MainNetParams,
 	//rpcPort: "8334",
-	rpcPort: "8667",
+	rpcPort:        "8667",
+	rpcPortGetWork: "8668",
 }
 
 // TODO: To build a test net or not?
@@ -39,7 +42,8 @@ var mainNetParams = params{
 var regressionNetParams = params{
 	Params: &chaincfg.RegressionNetParams,
 	//rpcPort: "18334",
-	rpcPort: "18667",
+	rpcPort:        "18667",
+	rpcPortGetWork: "18668",
 }
 
 // testNet3Params contains parameters specific to the test network (version 3)
@@ -48,7 +52,8 @@ var regressionNetParams = params{
 var testNet3Params = params{
 	Params: &chaincfg.TestNet3Params,
 	//rpcPort: "18334",
-	rpcPort: "18667",
+	rpcPort:        "18667",
+	rpcPortGetWork: "18668",
 }
 
 // simNetParams contains parameters specific to the simulation test network
@@ -56,7 +61,8 @@ var testNet3Params = params{
 var simNetParams = params{
 	Params: &chaincfg.SimNetParams,
 	//rpcPort: "18556",
-	rpcPort: "18889",
+	rpcPort:        "18889",
+	rpcPortGetWork: "18890",
 }
 
 // netName returns the name used when referring to a network.  At the
