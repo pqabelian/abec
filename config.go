@@ -762,6 +762,7 @@ func loadConfig() (*config, []string, error) {
 
 	if cfg.EnableGetWorkRPC {
 		abecLog.Infof("RPC server for getwork is enabled")
+		cfg.ExternalGenerate = true
 	}
 
 	// Default RPC to listen on localhost only.
