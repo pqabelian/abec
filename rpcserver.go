@@ -962,7 +962,7 @@ func createVoutListAbe(mtx *wire.MsgTxAbe, chainParams *chaincfg.Params) []abejs
 
 		var voutEntry abejson.TxOutAbe
 		voutEntry.N = uint8(i)
-		buffer := bytes.NewBuffer(make([]byte, txOut.SerializeSize()))
+		buffer := bytes.NewBuffer(make([]byte, 0, txOut.SerializeSize()))
 		_ = wire.WriteTxOutAbe(buffer, 0, mtx.Version, txOut)
 		voutEntry.TxoScript = hex.EncodeToString(buffer.Bytes())
 
