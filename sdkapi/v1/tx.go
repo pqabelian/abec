@@ -534,7 +534,6 @@ func BuildTransferTxRequestDescFromBlocks(
 		//	assume the blocks are valid blocks in ledger, include:
 		// (1) the Header contains its height. Based on this, we explicitly set the height of Block.
 		blocks[i].SetHeight(blocks[i].MsgBlock().Header.Height)
-		fmt.Printf("deserialized the block in height %d\n", blocks[i].Height())
 	}
 
 	// According to the first block the identity the version and txo ring size rule
@@ -741,7 +740,6 @@ func GenerateCoinSerialNumber(
 		//	assume the blocks are valid blocks in ledger, include:
 		// (1) the Header contains its height. Based on this, we explicitly set the height of Block.
 		blocks[i].SetHeight(blocks[i].MsgBlock().Header.Height)
-		fmt.Printf("deserialized the block in height %d\n", blocks[i].Height())
 	}
 
 	// According to the first block the identity the version and txo ring size rule
