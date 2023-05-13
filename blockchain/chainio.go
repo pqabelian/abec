@@ -1641,7 +1641,7 @@ func (b *BlockChain) initChainState() error {
 		b.bestChain.SetTip(tip)
 
 		// Load the raw block bytes for the best block.
-		blockBytes, err := dbTx.FetchBlock(&state.hash)
+		blockBytes, _, err := dbTx.FetchBlockAbe(&state.hash)
 		if err != nil {
 			return err
 		}
