@@ -42,7 +42,6 @@ const (
 
 	// defaultRequiredServices describes the default services that are
 	// required to be supported by outbound peers.
-	// todo (prune): is this service flag enough?
 	defaultRequiredServices = wire.SFNodeNetwork
 
 	// defaultTargetOutbound is the default number of outbound peers to target.
@@ -2329,8 +2328,6 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	db database.DB, chainParams *chaincfg.Params,
 	interrupt <-chan struct{}) (*server, error) {
 
-	// todo (prune): service flag based on node type
-	// done
 	services := cfg.serviceFlag
 
 	amgr := netaddrmgr.New(cfg.DataDir, abecLookup)

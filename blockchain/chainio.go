@@ -1758,7 +1758,6 @@ func dbFetchBlockByNode(dbTx database.Tx, node *blockNode) (*abeutil.Block, erro
 	return block, nil
 }
 
-// todo (prune): ok
 func dbFetchBlockByNodeAbe(dbTx database.Tx, node *blockNode) (*abeutil.BlockAbe, error) {
 	// Load the raw block bytes from the database.
 	blockBytes, witnesses, err := dbTx.FetchBlockAbe(&node.hash)

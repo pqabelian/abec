@@ -473,7 +473,6 @@ func (sm *SyncManager) startSync() {
 
 // isSyncCandidate returns whether or not the peer is a candidate to consider
 // syncing from.
-// todo (prune)
 func (sm *SyncManager) isSyncCandidate(peer *peerpkg.Peer) bool {
 	// Typically a peer is not a candidate for sync if it's not a full node,
 	// however regression test is special in that the regression tool is
@@ -1032,7 +1031,7 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 		}
 	}
 
-	// todo (prune): delete it later, for debug convenience
+	// Just for debug convenience.
 	if witnessNeeded {
 		log.Debugf("We need witness for block %v and it contains witness", blockHash)
 	} else {
@@ -1567,7 +1566,6 @@ func (sm *SyncManager) fetchHeaderBlocks() {
 			// witness data in the blocks.
 			// todo(ABE): for ABE, even for WitnessEnabled peer, we may do not want receive the witness
 			//	todo(ABE): for blocks before checkpoint, we do not need to check the transactions' witness
-			// todo (prune): ok
 			witnessNeeded := sm.WitnessNeeded(sm.syncPeer)
 			if witnessNeeded {
 				iv.Type = wire.InvTypeWitnessBlock
@@ -1861,7 +1859,6 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 			//	todo (ABE): (1) as an received reply for GetBlocks request
 			//	todo (ABE): (2) some miner announce its new found block candidate
 			//	todo (ABE): (3) in the pushBlockMsg of getData of the syning peer, the peer may send a invMsg with its latest block
-			// todo (prune)
 			if !peer.IsWitnessEnabled() && iv.Type == wire.InvTypeBlock {
 				continue
 			}
@@ -1924,7 +1921,6 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		requestQueue[0] = nil
 		requestQueue = requestQueue[1:]
 
-		// todo (prune): ok modify the request inv type according to the node type
 		switch iv.Type {
 		case wire.InvTypeWitnessBlock:
 			fallthrough
@@ -1965,7 +1961,6 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 
 				// If the peer is capable, request the txn
 				// including all witness data.
-				// todo (prune)
 				if peer.IsWitnessEnabled() {
 					iv.Type = wire.InvTypeWitnessTx
 				}

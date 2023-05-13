@@ -16,13 +16,13 @@ import (
 // their documentation for how the flags modify their behavior.
 //
 // This function MUST be called with the chain state lock held (for writes).
-//   1. Ensure the block has previous block (not an orphan) and the previous block should be valid
-//   2. Set height for new block
-//   3. Check the sanity of block context (checkBlockContextAbe)
-//   4. Store the new block into database (currently the witness has not been validated)
-//   5. Add the new block into block index
-//   6. Connect new block to the chain, including reorganization and switch main chain if needed (connectBestChainAbe)
-//   7. Send NTBlockAccepted notification
+//  1. Ensure the block has previous block (not an orphan) and the previous block should be valid
+//  2. Set height for new block
+//  3. Check the sanity of block context (checkBlockContextAbe)
+//  4. Store the new block into database (currently the witness has not been validated)
+//  5. Add the new block into block index
+//  6. Connect new block to the chain, including reorganization and switch main chain if needed (connectBestChainAbe)
+//  7. Send NTBlockAccepted notification
 func (b *BlockChain) maybeAcceptBlockAbe(block *abeutil.BlockAbe, flags BehaviorFlags, mandatoryWitnessCheck bool) (bool, error) {
 	// The height of this block is one more than the referenced previous
 	// block.
@@ -55,7 +55,6 @@ func (b *BlockChain) maybeAcceptBlockAbe(block *abeutil.BlockAbe, flags Behavior
 	// expensive connection logic.  It also has some other nice properties
 	// such as making blocks that never become part of the main chain or
 	// blocks that fail to connect available for further analysis.
-	// todo (prune): store block based on node type
 	err = b.db.Update(func(dbTx database.Tx) error {
 		return dbStoreBlockAbe(dbTx, block)
 	})

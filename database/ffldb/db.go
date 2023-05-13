@@ -1511,7 +1511,6 @@ func (tx *transaction) FetchBlockAbe(hash *chainhash.Hash) ([]byte, [][]byte, er
 	// Read the block from the appropriate location.  The function also
 	// performs a checksum over the data to detect data corruption.
 	witnesses, err := tx.db.store.readWitness(hash, witLocation)
-	// todo (prune): maybe we need to delete the witness index if we cannot read it.
 	if err != nil {
 		log.Tracef("Read witness err: %v", err)
 		return blockBytes, nil, nil
