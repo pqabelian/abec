@@ -200,6 +200,18 @@ func NewAddressCmd() *AddressMaxSequenceNumberCmd {
 	return &AddressMaxSequenceNumberCmd{}
 }
 
+type AddressRangeCmd struct {
+	Start uint64
+	End   uint64
+}
+
+func NewAddressRangeCmd(start uint64, end uint64) *AddressRangeCmd {
+	return &AddressRangeCmd{
+		Start: start,
+		End:   end,
+	}
+}
+
 // GetBalancesCmd defines the getbalances JSON-RPC command.
 type GetBalancesCmd struct{}
 type GenerateAddressCmd struct {
@@ -909,6 +921,7 @@ func init() {
 	MustRegisterCmd("sendtoaddressesabe", (*SendToAddressAbeCmd)(nil), flags)
 	MustRegisterCmd("generateaddressabe", (*GenerateAddressCmd)(nil), flags)
 	MustRegisterCmd("addressmaxsequencenumber", (*AddressMaxSequenceNumberCmd)(nil), flags)
+	MustRegisterCmd("addressrange", (*AddressRangeCmd)(nil), flags)
 	//MustRegisterCmd("sendtoaddress", (*SendToAddressCmd)(nil), flags)
 	//MustRegisterCmd("sendtopayee", (*SendToPayeesCmd)(nil), flags)
 	//MustRegisterCmd("setaccount", (*SetAccountCmd)(nil), flags)
