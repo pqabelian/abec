@@ -536,28 +536,36 @@ func BuildTransferTxRequestDescFromBlocks(
 		blocks[i].SetHeight(blocks[i].MsgBlock().Header.Height)
 	}
 
-	// According to the first block the identity the version and txo ring size rule
-	startBlockHeight := blocks[0].Height()
-	blockNumPerRingGroup := wire.GetBlockNumPerRingGroupByBlockHeight(startBlockHeight)
-	ringSize := wire.GetTxoRingSizeByBlockHeight(startBlockHeight)
+	blockIdx := 0
+	for blockIdx < blockNum {
+		// According to the first block the identity the version and txo ring size rule
+		startBlockHeight := blocks[blockIdx].Height()
+		blockNumPerRingGroup := wire.GetBlockNumPerRingGroupByBlockHeight(startBlockHeight)
+		ringSize := wire.GetTxoRingSizeByBlockHeight(startBlockHeight)
 
-	for i := 1; i < blockNum; i++ {
-		height := blocks[i].Height()
-		if height != startBlockHeight+int32(i) {
-			return nil, errors.New("BuildTransferTxRequestDesc: the heights of input serializedBlocksForRingGroup are not successive")
+		if startBlockHeight%int32(blockNumPerRingGroup) != 0 {
+			return nil, errors.New("GenerateCoinSerialNumber: the blocks in input serializedBlocksForRingGroup cannot be divided into groups accurately")
 		}
 
-		if wire.GetBlockNumPerRingGroupByBlockHeight(height) != blockNumPerRingGroup {
-			return nil, errors.New("BuildTransferTxRequestDesc: input serializedBlocksForRingGroup imply different blockNumPerRingGroup")
+		if blockIdx+int(blockNumPerRingGroup)-1 >= blockNum {
+			return nil, errors.New("GenerateCoinSerialNumber: the blocks in input serializedBlocksForRingGroup cannot be divided into groups completely")
 		}
 
-		if wire.GetTxoRingSizeByBlockHeight(height) != ringSize {
-			return nil, errors.New("BuildTransferTxRequestDesc: input serializedBlocksForRingGroup imply different RingSize")
-		}
-	}
+		for i := 0; i < int(blockNumPerRingGroup); i++ {
+			height := blocks[blockIdx+i].Height()
+			if height != startBlockHeight+int32(i) {
+				return nil, errors.New("BuildTransferTxRequestDesc: the heights of input serializedBlocksForRingGroup are not successive")
+			}
 
-	if blockNum%int(blockNumPerRingGroup) != 0 {
-		return nil, errors.New("BuildTransferTxRequestDesc: the blocks in input serializedBlocksForRingGroup cannot be divided into groups completely")
+			if wire.GetBlockNumPerRingGroupByBlockHeight(height) != blockNumPerRingGroup {
+				return nil, errors.New("BuildTransferTxRequestDesc: input serializedBlocksForRingGroup imply different blockNumPerRingGroup")
+			}
+
+			if wire.GetTxoRingSizeByBlockHeight(height) != ringSize {
+				return nil, errors.New("BuildTransferTxRequestDesc: input serializedBlocksForRingGroup imply different RingSize")
+			}
+		}
+		blockIdx += int(blockNumPerRingGroup)
 	}
 
 	txRequestInputDescs := make([]*TxRequestInputDesc, inputNum)
@@ -575,9 +583,15 @@ func BuildTransferTxRequestDescFromBlocks(
 			//	later txRequestInputDescs[i] will be fetched from the map, then be set and put back
 		}
 	}
-	groupNum := blockNum / int(blockNumPerRingGroup)
-	for i := 0; i < groupNum; i++ {
-		txoRings, err := blockchain.BuildTxoRings(int(blockNumPerRingGroup), int(ringSize), blocks[i*int(blockNumPerRingGroup):(i+1)*int(blockNumPerRingGroup)])
+
+	blockIdx = 0
+	for blockIdx < blockNum {
+		// According to the first block the identity the version and txo ring size rule
+		startBlockHeight := blocks[blockIdx].Height()
+		blockNumPerRingGroup := wire.GetBlockNumPerRingGroupByBlockHeight(startBlockHeight)
+		ringSize := wire.GetTxoRingSizeByBlockHeight(startBlockHeight)
+
+		txoRings, err := blockchain.BuildTxoRings(int(blockNumPerRingGroup), int(ringSize), blocks[blockIdx:blockIdx+int(blockNumPerRingGroup)])
 		if err != nil {
 			return nil, err
 		}
@@ -602,6 +616,8 @@ func BuildTransferTxRequestDescFromBlocks(
 				}
 			}
 		}
+
+		blockIdx += int(blockNumPerRingGroup)
 	}
 
 	//	check whether all outPoint has found the corresponding TxoRing
@@ -742,28 +758,37 @@ func GenerateCoinSerialNumber(
 		blocks[i].SetHeight(blocks[i].MsgBlock().Header.Height)
 	}
 
-	// According to the first block the identity the version and txo ring size rule
-	startBlockHeight := blocks[0].Height()
-	blockNumPerRingGroup := wire.GetBlockNumPerRingGroupByBlockHeight(startBlockHeight)
-	ringSize := wire.GetTxoRingSizeByBlockHeight(startBlockHeight)
+	// whether all block height is valid
+	blockIdx := 0
+	for blockIdx < blockNum {
+		// According to the first block the identity the version and txo ring size rule
+		startBlockHeight := blocks[blockIdx].Height()
+		blockNumPerRingGroup := wire.GetBlockNumPerRingGroupByBlockHeight(startBlockHeight)
+		ringSize := wire.GetTxoRingSizeByBlockHeight(startBlockHeight)
 
-	for i := 1; i < blockNum; i++ {
-		height := blocks[i].Height()
-		if height != startBlockHeight+int32(i) {
-			return nil, errors.New("GenerateCoinSerialNumber: the heights of input serializedBlocksForRingGroup are not successive")
+		if startBlockHeight%int32(blockNumPerRingGroup) != 0 {
+			return nil, errors.New("GenerateCoinSerialNumber: the blocks in input serializedBlocksForRingGroup cannot be divided into groups accurately")
 		}
 
-		if wire.GetBlockNumPerRingGroupByBlockHeight(height) != blockNumPerRingGroup {
-			return nil, errors.New("GenerateCoinSerialNumber: input serializedBlocksForRingGroup imply different blockNumPerRingGroup")
+		if blockIdx+int(blockNumPerRingGroup)-1 >= blockNum {
+			return nil, errors.New("GenerateCoinSerialNumber: the blocks in input serializedBlocksForRingGroup cannot be divided into groups completely")
 		}
 
-		if wire.GetTxoRingSizeByBlockHeight(height) != ringSize {
-			return nil, errors.New("GenerateCoinSerialNumber: input serializedBlocksForRingGroup imply different RingSize")
-		}
-	}
+		for i := 0; i < int(blockNumPerRingGroup); i++ {
+			height := blocks[blockIdx+i].Height()
+			if height != startBlockHeight+int32(i) {
+				return nil, errors.New("GenerateCoinSerialNumber: the heights of input serializedBlocksForRingGroup are not successive")
+			}
 
-	if blockNum%int(blockNumPerRingGroup) != 0 {
-		return nil, errors.New("GenerateCoinSerialNumber: the blocks in input serializedBlocksForRingGroup cannot be divided into groups completely")
+			if wire.GetBlockNumPerRingGroupByBlockHeight(height) != blockNumPerRingGroup {
+				return nil, errors.New("GenerateCoinSerialNumber: input serializedBlocksForRingGroup imply different blockNumPerRingGroup")
+			}
+
+			if wire.GetTxoRingSizeByBlockHeight(height) != ringSize {
+				return nil, errors.New("GenerateCoinSerialNumber: input serializedBlocksForRingGroup imply different RingSize")
+			}
+		}
+		blockIdx += int(blockNumPerRingGroup)
 	}
 
 	txoRingMembers := make([]*TxoRingMember, coinNum)
@@ -781,9 +806,15 @@ func GenerateCoinSerialNumber(
 			//	later txoRingMembers[i] will be fetched from the map, then be set and put back
 		}
 	}
-	groupNum := blockNum / int(blockNumPerRingGroup)
-	for i := 0; i < groupNum; i++ {
-		txoRings, err := blockchain.BuildTxoRings(int(blockNumPerRingGroup), int(ringSize), blocks[i*int(blockNumPerRingGroup):(i+1)*int(blockNumPerRingGroup)])
+
+	blockIdx = 0
+	for blockIdx < blockNum {
+		// According to the first block the identity the version and txo ring size rule
+		startBlockHeight := blocks[blockIdx].Height()
+		blockNumPerRingGroup := wire.GetBlockNumPerRingGroupByBlockHeight(startBlockHeight)
+		ringSize := wire.GetTxoRingSizeByBlockHeight(startBlockHeight)
+
+		txoRings, err := blockchain.BuildTxoRings(int(blockNumPerRingGroup), int(ringSize), blocks[blockIdx:blockIdx+int(blockNumPerRingGroup)])
 		if err != nil {
 			return nil, err
 		}
@@ -808,6 +839,8 @@ func GenerateCoinSerialNumber(
 				}
 			}
 		}
+
+		blockIdx += int(blockNumPerRingGroup)
 	}
 
 	//	check whether all outPoint has found the corresponding TxoRing
