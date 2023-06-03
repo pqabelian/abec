@@ -125,7 +125,7 @@ var rpcHandlers map[string]commandHandler
 var rpcHandlersBeforeInit = map[string]commandHandler{
 	"addnode": handleAddNode,
 	//	todo(ABE.MUST)
-	"createrawtransaction":    handleCreateRawTransaction,
+	"createrawtransaction":    handleCreateRawTransactionAbe,
 	"createrawtransactionAbe": handleCreateRawTransactionAbe,
 	"debuglevel":              handleDebugLevel,
 	"decoderawtransaction":    handleDecodeRawTransaction,
@@ -136,7 +136,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getaddednodeinfo":        handleGetAddedNodeInfo,
 	"getbestblock":            handleGetBestBlock,
 	"getbestblockhash":        handleGetBestBlockHash,
-	"getblock":                handleGetBlock,
+	"getblock":                handleGetBlockAbe,
 	"getblockabe":             handleGetBlockAbe, //TODO(abe):after testing, this command will be replace by getblock
 	"getblockchaininfo":       handleGetBlockChainInfo,
 	"getblockcount":           handleGetBlockCount,
@@ -173,7 +173,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	//	todo(ABE.MUST): However, in ABE, each address is one-time (by stealth address), it does not make sense to search by address.
 	//	todo(ABE.MUST): ABE provides txoIndex which support searching by Txo(txid,index).
 	//	"searchrawtransactions": handleSearchRawTransactions,
-	"sendrawtransaction":    handleSendRawTransaction,
+	"sendrawtransaction":    handleSendRawTransactionAbe,
 	"sendrawtransactionabe": handleSendRawTransactionAbe,
 	"setgenerate":           handleSetGenerate,
 	"stop":                  handleStop,
