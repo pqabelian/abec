@@ -752,6 +752,8 @@ type InfoChainResult struct {
 	Version         int32   `json:"version"`
 	ProtocolVersion int32   `json:"protocolversion"`
 	Blocks          int32   `json:"blocks"`
+	BestBlockHash   string  `json:"bestblockhash"`
+	WorkSum         string  `json:"worksum"`
 	TimeOffset      int64   `json:"timeoffset"`
 	Connections     int32   `json:"connections"`
 	Proxy           string  `json:"proxy"`
