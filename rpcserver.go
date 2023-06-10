@@ -143,9 +143,9 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getblockhash":            handleGetBlockHash,
 	"getblockheader":          handleGetBlockHeader,
 	"getblocktemplate":        handleGetBlockTemplate,
-	//"getwork":                 handleGetWork,	// todo: 2022.11.11 disable (getwork, submitwork, submithashrate) APIs
-	//"submitwork":              handleSubmitWork,
-	//"submithashrate":          handleSubmitHashRate,
+	"getwork":                 handleGetWork,
+	"submitwork":              handleSubmitWork,
+	"submithashrate":          handleSubmitHashRate,
 	// TODO(ABE): ABE does not support filter.
 	//"getcfilter":            handleGetCFilter,
 	//"getcfilterheader":      handleGetCFilterHeader,
@@ -2957,6 +2957,8 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		Version:         int32(1000000*appMajor + 10000*appMinor + 100*appPatch),
 		ProtocolVersion: int32(maxProtocolVersion),
 		Blocks:          best.Height,
+		BestBlockHash:   best.Hash.String(),
+		WorkSum:         s.cfg.Chain.BestChainWorkSum().String(),
 		TimeOffset:      int64(s.cfg.TimeSource.Offset().Seconds()),
 		Connections:     s.cfg.ConnMgr.ConnectedCount(),
 		Proxy:           cfg.Proxy,
@@ -4700,14 +4702,14 @@ func (s *rpcServer) writeHTTPResponseHeaders(req *http.Request, headers http.Hea
 // Stop is used by server.go to stop the rpc listener.
 func (s *rpcServer) Stop() error {
 	if atomic.AddInt32(&s.shutdown, 1) != 1 {
-		rpcsLog.Infof("RPC server is already in the process of shutting down")
+		rpcsLog.Infof("RPC server %s is already in the process of shutting down", s.cfg.Alias)
 		return nil
 	}
-	rpcsLog.Warnf("RPC server shutting down")
+	rpcsLog.Warnf("RPC server %s shutting down", s.cfg.Alias)
 	for _, listener := range s.cfg.Listeners {
 		err := listener.Close()
 		if err != nil {
-			rpcsLog.Errorf("Problem shutting down rpc: %v", err)
+			rpcsLog.Errorf("Problem shutting down rpc %s: %v", s.cfg.Alias, err)
 			return err
 		}
 	}
@@ -4715,7 +4717,7 @@ func (s *rpcServer) Stop() error {
 	s.ntfnMgr.WaitForShutdown()
 	close(s.quit)
 	s.wg.Wait()
-	rpcsLog.Infof("RPC server shutdown complete")
+	rpcsLog.Infof("RPC server %s shutdown complete", s.cfg.Alias)
 	return nil
 }
 
@@ -5000,6 +5002,16 @@ func (s *rpcServer) jsonRPCRead(w http.ResponseWriter, r *http.Request, isAdmin 
 			}
 		}()
 
+		// Check if it is getwork methods if the server is getwork server.
+		if s.cfg.Alias == "getwork" {
+			if request.Method != "getwork" && request.Method != "submitwork" && request.Method != "submithashrate" {
+				jsonErr = &abejson.RPCError{
+					Code:    abejson.ErrRPCMethodNotFound.Code,
+					Message: "Getwork RPC only supports method getwork, submitwork and submithashrate",
+				}
+			}
+		}
+
 		// Check if the user is limited and set error if method unauthorized
 		if !isAdmin {
 			if _, ok := rpcLimited[request.Method]; !ok {
@@ -5053,6 +5065,53 @@ func jsonAuthFail(w http.ResponseWriter) {
 
 // Start is used by server.go to start the rpc listener.
 func (s *rpcServer) Start() {
+	if s.cfg.Alias == "getwork" {
+		// Only setup http listeners if is getwork RPC server.
+		if atomic.AddInt32(&s.started, 1) != 1 {
+			return
+		}
+
+		rpcsLog.Trace("Starting getwork RPC server")
+		rpcServeMux := http.NewServeMux()
+		httpServer := &http.Server{
+			Handler: rpcServeMux,
+
+			// Timeout connections which don't complete the initial
+			// handshake within the allowed timeframe.
+			ReadTimeout: time.Second * rpcAuthTimeoutSeconds,
+		}
+		rpcServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Connection", "close")
+			w.Header().Set("Content-Type", "application/json")
+			r.Close = true
+
+			// Limit the number of connections to max allowed.
+			if s.limitConnections(w, r.RemoteAddr) {
+				return
+			}
+
+			// Keep track of the number of connected clients.
+			s.incrementClients()
+			defer s.decrementClients()
+
+			// Read and respond to the request.
+			s.jsonRPCRead(w, r, true)
+		})
+
+		for _, listener := range s.cfg.Listeners {
+			s.wg.Add(1)
+			go func(listener net.Listener) {
+				rpcsLog.Infof("RPC server getwork listening on %s (TLS %s)", listener.Addr(), "off")
+				httpServer.Serve(listener)
+				rpcsLog.Tracef("RPC listener getwork done for %s", listener.Addr())
+				s.wg.Done()
+			}(listener)
+		}
+
+		s.ntfnMgr.Start()
+		return
+	}
+
 	if atomic.AddInt32(&s.started, 1) != 1 {
 		return
 	}
@@ -5114,7 +5173,11 @@ func (s *rpcServer) Start() {
 	for _, listener := range s.cfg.Listeners {
 		s.wg.Add(1)
 		go func(listener net.Listener) {
-			rpcsLog.Infof("RPC server listening on %s", listener.Addr())
+			tlsState := "on"
+			if cfg.DisableTLS {
+				tlsState = "off"
+			}
+			rpcsLog.Infof("RPC server listening on %s (TLS %s)", listener.Addr(), tlsState)
 			httpServer.Serve(listener)
 			rpcsLog.Tracef("RPC listener done for %s", listener.Addr())
 			s.wg.Done()
@@ -5313,6 +5376,9 @@ type rpcserverConfig struct {
 	// The fee estimator keeps track of how long transactions are left in
 	// the mempool before they are mined into blocks.
 	FeeEstimator *mempool.FeeEstimator
+
+	// Alias is the name for the rpc server.
+	Alias string
 }
 
 // newRPCServer returns a new instance of the rpcServer struct.

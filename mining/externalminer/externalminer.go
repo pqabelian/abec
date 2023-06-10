@@ -136,7 +136,7 @@ out:
 			for workerId, workerHashRate := range m.workerHashRates {
 
 				if time.Since(workerHashRate.UpdateTime).Seconds() > hpsValidSecs {
-					//	the worker has not update its hash rate for more than hpsValidSecs seconds
+					//	the worker has not updated its hash rate for more than hpsValidSecs seconds
 					toDelWorkerId = append(toDelWorkerId, workerId)
 				} else {
 					hashRate += workerHashRate.HashRate

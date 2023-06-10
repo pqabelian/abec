@@ -43,6 +43,7 @@ func NewAddNodeCmd(addr string, subCmd AddNodeSubCmd) *AddNodeCmd {
 
 // TransactionInput represents the inputs to a transaction.  Specifically a
 // transaction hash and output number pair.
+//
 //	todo(ABE):
 type TransactionInput struct {
 	Txid string `json:"txid"`
@@ -54,9 +55,9 @@ type OutPointAbe struct {
 	Index uint8  `json:"index"`
 }
 
-//	todo(ABE): Do we separate the chainsrvcmds.go and chainsrvresults.go?
-//	e.g. TransactionInput in chainsrvcmds.go and Vin in chainsrvresults.go
-//	for ABE, OutPointRingAbe is used in both chainsrvcmds.go and chainsrvresults.go
+// todo(ABE): Do we separate the chainsrvcmds.go and chainsrvresults.go?
+// e.g. TransactionInput in chainsrvcmds.go and Vin in chainsrvresults.go
+// for ABE, OutPointRingAbe is used in both chainsrvcmds.go and chainsrvresults.go
 type OutPointRing struct {
 	Version    uint32        `json:"version"`
 	BlockHashs []string      `json:"blockhashs"`
@@ -73,6 +74,7 @@ type TransactionOutputAbe struct {
 }
 
 // CreateRawTransactionCmd defines the createrawtransaction JSON-RPC command.
+//
 //	todo(ABE):
 type CreateRawTransactionCmd struct {
 	Inputs   []TransactionInput
@@ -80,7 +82,7 @@ type CreateRawTransactionCmd struct {
 	LockTime *int64
 }
 
-//TODO(abe): the type of txfee may need to change to a pointer point to float64
+// TODO(abe): the type of txfee may need to change to a pointer point to float64
 type CreateRawTransactionCmdAbe struct {
 	Inputs  []TransactionInputAbe
 	Outputs []TransactionOutputAbe `jsonrpcusage:"{\"address\":\"amount\",...}"` // TODO: without value just a script
@@ -139,6 +141,7 @@ func NewFundRawTransactionCmd(serializedTx []byte, opts FundRawTransactionOpts, 
 }
 
 // DecodeRawTransactionCmd defines the decoderawtransaction JSON-RPC command.
+//
 //	todo(ABE):
 type DecodeRawTransactionCmd struct {
 	HexTx string
@@ -660,7 +663,6 @@ func NewGetRawMempoolCmd(verbose *bool) *GetRawMempoolCmd {
 }
 
 // GetRawTransactionCmd defines the getrawtransaction JSON-RPC command.
-//
 type GetRawTransactionCmd struct {
 	Txid    string
 	Verbose *bool `jsonrpcdefault:"false"`
@@ -679,6 +681,7 @@ func NewGetRawTransactionCmd(txHash string, verbose *bool) *GetRawTransactionCmd
 }
 
 // GetTxOutCmd defines the gettxout JSON-RPC command.
+//
 //	todo(ABE): ABE does not support 'GetTxOutCmd', as it seems that this command is to get Txo from transactions in mempool and utxo of main chain.
 type GetTxOutCmd struct {
 	Txid           string
@@ -1038,10 +1041,10 @@ func init() {
 	MustRegisterCmd("getblockheader", (*GetBlockHeaderCmd)(nil), flags)
 	MustRegisterCmd("getblockstats", (*GetBlockStatsCmd)(nil), flags)
 	MustRegisterCmd("getblocktemplate", (*GetBlockTemplateCmd)(nil), flags)
+	MustRegisterCmd("getwork", (*GetWorkCmd)(nil), flags)
+	MustRegisterCmd("submitwork", (*SubmitWorkCmd)(nil), flags)
+	MustRegisterCmd("submithashrate", (*SubmitHashRateCmd)(nil), flags)
 	// TODO(ABE): ABE does not support filter.
-	//MustRegisterCmd("getwork", (*GetWorkCmd)(nil), flags) // todo: 2022.11.11 disable (getwork, submitwork, submithashrate) APIs
-	//MustRegisterCmd("submitwork", (*SubmitWorkCmd)(nil), flags)
-	//MustRegisterCmd("submithashrate", (*SubmitHashRateCmd)(nil), flags)
 	//MustRegisterCmd("getcfilter", (*GetCFilterCmd)(nil), flags)
 	//MustRegisterCmd("getcfilterheader", (*GetCFilterHeaderCmd)(nil), flags)
 	MustRegisterCmd("getchaintips", (*GetChainTipsCmd)(nil), flags)
@@ -1063,7 +1066,6 @@ func init() {
 	MustRegisterCmd("gettxout", (*GetTxOutCmd)(nil), flags)
 	MustRegisterCmd("gettxoutproof", (*GetTxOutProofCmd)(nil), flags)
 	MustRegisterCmd("gettxoutsetinfo", (*GetTxOutSetInfoCmd)(nil), flags)
-	//	MustRegisterCmd("getwork", (*GetWorkCmd)(nil), flags)
 	MustRegisterCmd("help", (*HelpCmd)(nil), flags)
 	MustRegisterCmd("invalidateblock", (*InvalidateBlockCmd)(nil), flags)
 	MustRegisterCmd("ping", (*PingCmd)(nil), flags)
