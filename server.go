@@ -1122,12 +1122,14 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
 	testLog.Infof("Send block %s to peer %s", hash, sp.Addr())
 	var msgBlock = &wire.MsgBlockAbe{}
+	var msg wire.Message
 	msgCacheKey := fmt.Sprintf("block_%s", hash)
 	value, ok := s.communicationCache.Load(msgCacheKey)
 	if wrapMessage, hit := value.(*wire.WrappedMessage); ok && hit {
 		testLog.Infof("Hit cache with %s when sending block to peer %s", hash, sp.Addr())
 		wrapMessage.Use()
 		msgBlock = wrapMessage.Message.(*wire.MsgBlockAbe)
+		msg = wrapMessage
 	} else {
 		// Fetch the raw block bytes from the database.
 		var blockBytes []byte
@@ -1166,6 +1168,7 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 		wrappedBlockMsg := wire.WrapMessage(msgBlock)
 		wrappedBlockMsg.Use()
 		s.communicationCache.Store(msgCacheKey, wrappedBlockMsg)
+		msg = wrappedBlockMsg
 		testLog.Infof("Cache block with %s when sending block to peer %s", hash, sp.Addr())
 	}
 
@@ -1187,7 +1190,7 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 		dc = doneChan // and the dc is nil means that do not finish the request
 	}
 	//	todo (ABE): as the block is fetched from database, the witness may not be included. If so, regardless of encoding, no witness is provided.
-	sp.QueueMessageWithEncoding(msgBlock, dc, encoding)
+	sp.QueueMessageWithEncoding(msg, dc, encoding)
 
 	// When the peer requests the final block that was advertised in
 	// response to a getblocks message which requested more blocks than
@@ -1737,17 +1740,18 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			// other implementations' alert messages, we will not relay theirs.
 			OnAlert: nil,
 		},
-		NewestBlock:       sp.newestBlock,
-		HostToNetAddress:  sp.server.addrManager.HostToNetAddress,
-		Proxy:             cfg.Proxy,
-		UserAgentName:     userAgentName,
-		UserAgentVersion:  userAgentVersion,
-		UserAgentComments: cfg.UserAgentComments,
-		ChainParams:       sp.server.chainParams,
-		Services:          sp.server.services,
-		DisableRelayTx:    cfg.BlocksOnly,
-		ProtocolVersion:   peer.MaxProtocolVersion,
-		TrickleInterval:   cfg.TrickleInterval,
+		NewestBlock:        sp.newestBlock,
+		HostToNetAddress:   sp.server.addrManager.HostToNetAddress,
+		Proxy:              cfg.Proxy,
+		UserAgentName:      userAgentName,
+		UserAgentVersion:   userAgentVersion,
+		UserAgentComments:  cfg.UserAgentComments,
+		ChainParams:        sp.server.chainParams,
+		Services:           sp.server.services,
+		DisableRelayTx:     cfg.BlocksOnly,
+		ProtocolVersion:    peer.MaxProtocolVersion,
+		TrickleInterval:    cfg.TrickleInterval,
+		CommunicationCache: &sp.server.communicationCache,
 	}
 }
 

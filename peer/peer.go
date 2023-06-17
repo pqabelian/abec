@@ -281,6 +281,8 @@ type Config struct {
 	// TrickleInterval is the duration of the ticker which trickles down the
 	// inventory to a peer.
 	TrickleInterval time.Duration
+
+	CommunicationCache *sync.Map
 }
 
 // minUint32 is a helper function to return the minimum of two uint32s.
@@ -2334,15 +2336,16 @@ func newPeerBase(origCfg *Config, inbound bool) *Peer {
 		outputQueue:    make(chan outMsg, outputBufferSize),
 		sendQueue:      make(chan outMsg, 1), // nonblocking sync
 		//needsetResult:   ,
-		sendDoneQueue:   make(chan struct{}, 1), // nonblocking sync
-		outputInvChan:   make(chan *wire.InvVect, outputBufferSize),
-		inQuit:          make(chan struct{}),
-		queueQuit:       make(chan struct{}),
-		outQuit:         make(chan struct{}),
-		quit:            make(chan struct{}),
-		cfg:             cfg, // Copy so caller can't mutate.
-		services:        cfg.Services,
-		protocolVersion: cfg.ProtocolVersion,
+		sendDoneQueue:      make(chan struct{}, 1), // nonblocking sync
+		outputInvChan:      make(chan *wire.InvVect, outputBufferSize),
+		inQuit:             make(chan struct{}),
+		queueQuit:          make(chan struct{}),
+		outQuit:            make(chan struct{}),
+		quit:               make(chan struct{}),
+		cfg:                cfg, // Copy so caller can't mutate.
+		services:           cfg.Services,
+		protocolVersion:    cfg.ProtocolVersion,
+		communicationCache: cfg.CommunicationCache,
 	}
 	return &p
 }
