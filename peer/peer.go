@@ -1955,16 +1955,16 @@ func (p *Peer) QueueMessageWithEncoding(msg wire.Message, doneChan chan<- struct
 		if doneChan != nil {
 			go func() {
 				doneChan <- struct{}{}
-				if wrappedMsg, ok := msg.(*wire.WrappedMessage); ok {
-					log.Infof("message block hash %s has handled \n", wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash())
-					wrappedMsg.Done()
-					log.Infof("release held cached block %s when sending block, current count %d\n", wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash(), wrappedMsg.Count())
-					if wrappedMsg.CanDelete() {
-						log.Infof("Delete cached block %s\n", wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash())
-						p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message))
-					}
-				}
 			}()
+		}
+		if wrappedMsg, ok := msg.(*wire.WrappedMessage); ok {
+			log.Infof("message block hash %s has handled \n", wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash())
+			wrappedMsg.Done()
+			log.Infof("release held cached block %s when sending block, current count %d\n", wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash(), wrappedMsg.Count())
+			if wrappedMsg.CanDelete() {
+				log.Infof("Delete cached block %s\n", wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash())
+				p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message))
+			}
 		}
 		return
 	}
