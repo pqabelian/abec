@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/abesuite/abec/chainhash"
 	"io"
+	"sync"
 	"unicode/utf8"
 )
 
@@ -253,7 +254,7 @@ func discardInput(r io.Reader, n uint32) {
 // information and returns the number of bytes written.    This function is the
 // same as WriteMessage except it also returns the number of bytes written.
 func WriteMessageN(w io.Writer, msg Message, pver uint32, btcnet AbelianNet) (int, error) {
-	return WriteMessageWithEncodingN(w, msg, pver, btcnet, BaseEncoding)
+	return WriteMessageWithEncodingN(w, msg, pver, btcnet, BaseEncoding, nil)
 }
 
 // WriteMessage writes a bitcoin Message to w including the necessary header
@@ -272,7 +273,7 @@ func WriteMessage(w io.Writer, msg Message, pver uint32, btcnet AbelianNet) erro
 // to specify the message encoding format to be used when serializing wire
 // messages.
 func WriteMessageWithEncodingN(w io.Writer, msg Message, pver uint32,
-	btcnet AbelianNet, encoding MessageEncoding) (int, error) {
+	btcnet AbelianNet, encoding MessageEncoding, cache *sync.Map) (int, error) {
 	//
 	//switch msg.(type) {
 	//case *MsgBlockAbe:
@@ -292,14 +293,37 @@ func WriteMessageWithEncodingN(w io.Writer, msg Message, pver uint32,
 	}
 	copy(command[:], []byte(cmd))
 
-	// Encode the message payload.
-	var bw bytes.Buffer
-	err := msg.BtcEncode(&bw, pver, encoding)
-	if err != nil {
-		return totalBytes, err
+	var payload []byte
+	var lenp int
+	wrapped := false
+	if wrappedMsg, ok := msg.(*WrappedMessage); ok {
+		wrapped = true
+		if !wrappedMsg.Cached() {
+			log.Infof("Cache block %s to bytes when sending block \n", wrappedMsg.Message.(*MsgBlockAbe).BlockHash())
+			wrappedMsg.Cache(pver, encoding)
+		}
+		log.Infof("Use cached block bytes %s when sending block \n", wrappedMsg.Message.(*MsgBlockAbe).BlockHash())
+		payload = wrappedMsg.Bytes()
+		lenp = len(payload)
+		defer func() {
+			wrappedMsg.Done()
+			if wrappedMsg.CanDelete() {
+				log.Infof("Delete cached block %s\n", wrappedMsg.Message.(*MsgBlockAbe).BlockHash())
+				cache.Delete(WrapMsgKey(wrappedMsg.Message))
+			}
+		}()
 	}
-	payload := bw.Bytes()
-	lenp := len(payload)
+
+	if !wrapped {
+		// Encode the message payload.
+		var bw bytes.Buffer
+		err := msg.BtcEncode(&bw, pver, encoding)
+		if err != nil {
+			return totalBytes, err
+		}
+		payload = bw.Bytes()
+		lenp = len(payload)
+	}
 
 	// Enforce maximum overall message payload.
 	if lenp > MaxMessagePayload {

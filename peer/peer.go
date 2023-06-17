@@ -484,7 +484,8 @@ type Peer struct {
 	sendDoneQueue chan struct{}
 	outputInvChan chan *wire.InvVect
 
-	needsetResult sync.Map
+	needsetResult      sync.Map
+	communicationCache *sync.Map
 
 	inQuit    chan struct{}
 	queueQuit chan struct{}
@@ -1099,7 +1100,7 @@ func (p *Peer) writeMessage(msg wire.Message, enc wire.MessageEncoding) error {
 	log.Tracef("%v", newLogClosure(func() string {
 		var buf bytes.Buffer
 		_, err := wire.WriteMessageWithEncodingN(&buf, msg, p.ProtocolVersion(),
-			p.cfg.ChainParams.Net, enc)
+			p.cfg.ChainParams.Net, enc, p.communicationCache)
 		if err != nil {
 			return err.Error()
 		}
@@ -1108,7 +1109,7 @@ func (p *Peer) writeMessage(msg wire.Message, enc wire.MessageEncoding) error {
 
 	// Write the message to the peer.
 	n, err := wire.WriteMessageWithEncodingN(p.conn, msg,
-		p.ProtocolVersion(), p.cfg.ChainParams.Net, enc)
+		p.ProtocolVersion(), p.cfg.ChainParams.Net, enc, p.communicationCache)
 	//fmt.Printf("send a %s to peer:%v\n", msg.Command(), p.addr)
 	//switch msg.(type) {
 	//case *wire.MsgInv:
@@ -1809,6 +1810,8 @@ out:
 				p.lastPingNonce = m.Nonce
 				p.lastPingTime = time.Now()
 				p.statsMtx.Unlock()
+			case *wire.MsgBlockAbe:
+				log.Errorf("[TEST]send block message to %s: %v", p, m.Header.Height)
 			}
 
 			p.stallControl <- stallControlMsg{sccSendMessage, msg.msg}
@@ -1816,8 +1819,8 @@ out:
 			err := p.writeMessage(msg.msg, msg.encoding)
 			if err != nil {
 				p.Disconnect()
-				if p.shouldLogWriteError(err) {
-					log.Errorf("Failed to send message to "+
+				if true {
+					log.Errorf("[TEST]Failed to send message to "+
 						"%s: %v", p, err)
 				}
 				if msg.doneChan != nil {
@@ -2177,10 +2180,10 @@ func (p *Peer) writeLocalVersionMsg() error {
 // peer. The events should occur in the following order, otherwise an error is
 // returned:
 //
-//   1. Remote peer sends their version.
-//   2. We send our version.
-//   3. We send our verack.
-//   4. Remote peer sends their verack.
+//  1. Remote peer sends their version.
+//  2. We send our version.
+//  3. We send our verack.
+//  4. Remote peer sends their verack.
 func (p *Peer) negotiateInboundProtocol() error {
 	if err := p.readRemoteVersionMsg(); err != nil {
 		return err
@@ -2202,10 +2205,10 @@ func (p *Peer) negotiateInboundProtocol() error {
 // peer. The events should occur in the following order, otherwise an error is
 // returned:
 //
-//   1. We send our version.
-//   2. Remote peer sends their version.
-//   3. Remote peer sends their verack.
-//   4. We send our verack.
+//  1. We send our version.
+//  2. Remote peer sends their version.
+//  3. Remote peer sends their verack.
+//  4. We send our verack.
 func (p *Peer) negotiateOutboundProtocol() error {
 	if err := p.writeLocalVersionMsg(); err != nil {
 		return err

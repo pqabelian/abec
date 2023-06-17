@@ -220,6 +220,8 @@ type server struct {
 	timeSource           blockchain.MedianTimeSource
 	services             wire.ServiceFlag
 
+	communicationCache sync.Map
+
 	// The following fields are used for optional indexes.  They will be nil
 	// if the associated index is not enabled.  These fields are set during
 	// initial creation of the server and never changed afterwards, so they
@@ -1115,43 +1117,56 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan cha
 	return nil
 }
 
+// server.cache wire.Message + []byte
 func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
 	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
+	testLog.Infof("Send block %s to peer %s", hash, sp.Addr())
+	var msgBlock *wire.MsgBlockAbe
+	msgCacheKey := fmt.Sprintf("block_%s", hash)
+	value, ok := s.communicationCache.Load(msgCacheKey)
+	if wrapMessage, hit := value.(*wire.WrappedMessage); ok && hit {
+		testLog.Infof("Hit cache with %s when sending block to peer %s", hash, sp.Addr())
+		wrapMessage.Use()
+		msgBlock = wrapMessage.Message.(*wire.MsgBlockAbe)
+	} else {
+		// Fetch the raw block bytes from the database.
+		var blockBytes []byte
+		var witnesses [][]byte
+		err := sp.server.db.View(func(dbTx database.Tx) error {
+			var err error
+			blockBytes, witnesses, err = dbTx.FetchBlockAbe(hash)
+			return err
+		})
+		if err != nil {
+			peerLog.Tracef("Unable to fetch requested block hash %v: %v",
+				hash, err)
 
-	// Fetch the raw block bytes from the database.
-	var blockBytes []byte
-	var witnesses [][]byte
-	err := sp.server.db.View(func(dbTx database.Tx) error {
-		var err error
-		blockBytes, witnesses, err = dbTx.FetchBlockAbe(hash)
-		return err
-	})
-	if err != nil {
-		peerLog.Tracef("Unable to fetch requested block hash %v: %v",
-			hash, err)
-
-		if doneChan != nil {
-			doneChan <- struct{}{}
+			if doneChan != nil {
+				doneChan <- struct{}{}
+			}
+			return err
 		}
-		return err
-	}
 
-	// Deserialize the block.
-	var msgBlock wire.MsgBlockAbe
-	err = msgBlock.DeserializeNoWitness(bytes.NewReader(blockBytes))
-	if err != nil {
-		peerLog.Tracef("Unable to deserialize requested block hash "+
-			"%v: %v", hash, err)
+		// Deserialize the block.
+		err = msgBlock.DeserializeNoWitness(bytes.NewReader(blockBytes))
+		if err != nil {
+			peerLog.Tracef("Unable to deserialize requested block hash "+
+				"%v: %v", hash, err)
 
-		if doneChan != nil {
-			doneChan <- struct{}{}
+			if doneChan != nil {
+				doneChan <- struct{}{}
+			}
+			return err
 		}
-		return err
-	}
 
-	txs := msgBlock.Transactions
-	for i := 0; i < len(txs); i++ {
-		txs[i].TxWitness = witnesses[i][chainhash.HashSize:]
+		txs := msgBlock.Transactions
+		for i := 0; i < len(txs); i++ {
+			txs[i].TxWitness = witnesses[i][chainhash.HashSize:]
+		}
+		wrappedBlockMsg := wire.WrapMessage(msgBlock)
+		wrappedBlockMsg.Use()
+		s.communicationCache.Store(msgCacheKey, wrappedBlockMsg)
+		testLog.Infof("Cache block with %s when sending block to peer %s", hash, sp.Addr())
 	}
 
 	// Once we have fetched data wait for any previous operation to finish.
@@ -1172,7 +1187,7 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 		dc = doneChan // and the dc is nil means that do not finish the request
 	}
 	//	todo (ABE): as the block is fetched from database, the witness may not be included. If so, regardless of encoding, no witness is provided.
-	sp.QueueMessageWithEncoding(&msgBlock, dc, encoding)
+	sp.QueueMessageWithEncoding(msgBlock, dc, encoding)
 
 	// When the peer requests the final block that was advertised in
 	// response to a getblocks message which requested more blocks than
@@ -2385,6 +2400,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		witnessCache:         txscript.NewWitnessCache(cfg.WitnessCacheMaxSize),
 		agentBlacklist:       agentBlacklist,
 		agentWhitelist:       agentWhitelist,
+		communicationCache:   sync.Map{},
 	}
 
 	// Create the transaction index if needed.
