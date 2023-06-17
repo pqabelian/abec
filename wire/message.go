@@ -274,28 +274,9 @@ func WriteMessage(w io.Writer, msg Message, pver uint32, btcnet AbelianNet) erro
 // messages.
 func WriteMessageWithEncodingN(w io.Writer, msg Message, pver uint32,
 	btcnet AbelianNet, encoding MessageEncoding, cache *sync.Map) (int, error) {
-	//
-	//switch msg.(type) {
-	//case *MsgBlockAbe:
-	//	fmt.Println("sending a block message to peer")
-	//case *MsgTxAbe:
-	//	fmt.Println("sending a tx message to peer")
-	//}
-	totalBytes := 0
-
-	// Enforce max command size.
-	var command [CommandSize]byte
-	cmd := msg.Command()
-	if len(cmd) > CommandSize {
-		str := fmt.Sprintf("command [%s] is too long [max %v]",
-			cmd, CommandSize)
-		return totalBytes, messageError("WriteMessage", str)
-	}
-	copy(command[:], []byte(cmd))
-
+	wrapped := false
 	var payload []byte
 	var lenp int
-	wrapped := false
 	if wrappedMsg, ok := msg.(*WrappedMessage); ok {
 		wrapped = true
 		if !wrappedMsg.Cached() {
@@ -314,6 +295,18 @@ func WriteMessageWithEncodingN(w io.Writer, msg Message, pver uint32,
 			}
 		}()
 	}
+
+	totalBytes := 0
+
+	// Enforce max command size.
+	var command [CommandSize]byte
+	cmd := msg.Command()
+	if len(cmd) > CommandSize {
+		str := fmt.Sprintf("command [%s] is too long [max %v]",
+			cmd, CommandSize)
+		return totalBytes, messageError("WriteMessage", str)
+	}
+	copy(command[:], []byte(cmd))
 
 	if !wrapped {
 		// Encode the message payload.

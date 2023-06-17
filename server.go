@@ -1121,15 +1121,13 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan cha
 func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
 	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
 	testLog.Infof("Send block %s to peer %s", hash, sp.Addr())
-	var msgBlock = &wire.MsgBlockAbe{}
 	var msg wire.Message
 	msgCacheKey := fmt.Sprintf("block_%s", hash)
 	value, ok := s.communicationCache.Load(msgCacheKey)
-	if wrapMessage, hit := value.(*wire.WrappedMessage); ok && hit {
-		testLog.Infof("Hit cache with %s when sending block to peer %s, current reference %d", hash, sp.Addr(), wrapMessage.Count())
-		wrapMessage.Use()
-		msgBlock = wrapMessage.Message.(*wire.MsgBlockAbe)
-		msg = wrapMessage
+	if wrappedMessage, hit := value.(*wire.WrappedMessage); ok && hit {
+		testLog.Infof("Hit cache with %s when sending block to peer %s, current reference %d", hash, sp.Addr(), wrappedMessage.Count())
+		wrappedMessage.Use()
+		msg = wrappedMessage
 	} else {
 		// Fetch the raw block bytes from the database.
 		var blockBytes []byte
@@ -1149,6 +1147,7 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 			return err
 		}
 
+		var msgBlock wire.MsgBlockAbe
 		// Deserialize the block.
 		err = msgBlock.DeserializeNoWitness(bytes.NewReader(blockBytes))
 		if err != nil {
@@ -1165,9 +1164,9 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 		for i := 0; i < len(txs); i++ {
 			txs[i].TxWitness = witnesses[i][chainhash.HashSize:]
 		}
-		wrappedBlockMsg := wire.WrapMessage(msgBlock)
-		wrappedBlockMsg.Use()
+		wrappedBlockMsg := wire.WrapMessage(&msgBlock)
 		s.communicationCache.Store(msgCacheKey, wrappedBlockMsg)
+		wrappedBlockMsg.Use()
 		msg = wrappedBlockMsg
 		testLog.Infof("Cache block with %s when sending block to peer %s", hash, sp.Addr())
 	}
