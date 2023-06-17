@@ -1126,7 +1126,7 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 	msgCacheKey := fmt.Sprintf("block_%s", hash)
 	value, ok := s.communicationCache.Load(msgCacheKey)
 	if wrapMessage, hit := value.(*wire.WrappedMessage); ok && hit {
-		testLog.Infof("Hit cache with %s when sending block to peer %s", hash, sp.Addr())
+		testLog.Infof("Hit cache with %s when sending block to peer %s, current reference %d", hash, sp.Addr(), wrapMessage.Count())
 		wrapMessage.Use()
 		msgBlock = wrapMessage.Message.(*wire.MsgBlockAbe)
 		msg = wrapMessage
