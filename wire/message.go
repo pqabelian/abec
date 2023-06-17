@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/abesuite/abec/chainhash"
 	"io"
-	"sync"
 	"unicode/utf8"
 )
 
@@ -254,7 +253,7 @@ func discardInput(r io.Reader, n uint32) {
 // information and returns the number of bytes written.    This function is the
 // same as WriteMessage except it also returns the number of bytes written.
 func WriteMessageN(w io.Writer, msg Message, pver uint32, btcnet AbelianNet) (int, error) {
-	return WriteMessageWithEncodingN(w, msg, pver, btcnet, BaseEncoding, nil)
+	return WriteMessageWithEncodingN(w, msg, pver, btcnet, BaseEncoding)
 }
 
 // WriteMessage writes a bitcoin Message to w including the necessary header
@@ -273,7 +272,7 @@ func WriteMessage(w io.Writer, msg Message, pver uint32, btcnet AbelianNet) erro
 // to specify the message encoding format to be used when serializing wire
 // messages.
 func WriteMessageWithEncodingN(w io.Writer, msg Message, pver uint32,
-	btcnet AbelianNet, encoding MessageEncoding, cache *sync.Map) (int, error) {
+	btcnet AbelianNet, encoding MessageEncoding) (int, error) {
 	wrapped := false
 	var payload []byte
 	var lenp int
