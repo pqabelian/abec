@@ -63,8 +63,12 @@ func (m *WrappedMessage) Cache(pver uint32, encoding MessageEncoding) {
 
 	m.cacheMu.Lock()
 	defer m.cacheMu.Unlock()
+	if m.cached {
+		return
+	}
 	m.buf = &bytes.Buffer{}
 	m.BtcEncode(m.buf, pver, encoding)
+	m.cached = true
 }
 
 func WrapMessage(msg Message) *WrappedMessage {
