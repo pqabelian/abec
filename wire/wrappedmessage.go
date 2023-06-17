@@ -47,6 +47,11 @@ func (m *WrappedMessage) CanDelete() bool {
 	defer m.mu.RUnlock()
 	return m.counter == 0
 }
+func (m *WrappedMessage) Count() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.counter
+}
 
 func (m *WrappedMessage) Cached() bool {
 	return m.cached
