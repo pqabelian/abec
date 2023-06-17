@@ -1121,7 +1121,7 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan cha
 func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
 	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
 	testLog.Infof("Send block %s to peer %s", hash, sp.Addr())
-	var msgBlock *wire.MsgBlockAbe
+	var msgBlock = &wire.MsgBlockAbe{}
 	msgCacheKey := fmt.Sprintf("block_%s", hash)
 	value, ok := s.communicationCache.Load(msgCacheKey)
 	if wrapMessage, hit := value.(*wire.WrappedMessage); ok && hit {
