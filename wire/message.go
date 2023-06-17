@@ -286,14 +286,6 @@ func WriteMessageWithEncodingN(w io.Writer, msg Message, pver uint32,
 		log.Infof("Use cached block bytes %s when sending block \n", wrappedMsg.Message.(*MsgBlockAbe).BlockHash())
 		payload = wrappedMsg.Bytes()
 		lenp = len(payload)
-		defer func() {
-			wrappedMsg.Done()
-			log.Infof("release held cached block %s when sending block, current count %d\n", wrappedMsg.Message.(*MsgBlockAbe).BlockHash(), wrappedMsg.Count())
-			if wrappedMsg.CanDelete() {
-				log.Infof("Delete cached block %s\n", wrappedMsg.Message.(*MsgBlockAbe).BlockHash())
-				cache.Delete(WrapMsgKey(wrappedMsg.Message))
-			}
-		}()
 	}
 
 	totalBytes := 0
