@@ -88,6 +88,9 @@ func WrapMsgKey(msg Message) string {
 	case "block":
 		blockMsg := msg.(*MsgBlockAbe)
 		return fmt.Sprintf("block_%s", blockMsg.BlockHash())
+	case "tx":
+		txMsg := msg.(*MsgTxAbe)
+		return fmt.Sprintf("tx_%s", txMsg.TxHash())
 	default:
 		return ""
 	}

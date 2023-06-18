@@ -1083,11 +1083,19 @@ func (p *Peer) writeMessage(msg wire.Message, enc wire.MessageEncoding) error {
 	defer func() {
 		// whether err or not, down the reference
 		if wrappedMsg, ok := msg.(*wire.WrappedMessage); ok {
-			log.Infof("message block hash %s has handled \n", wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash())
+			var hash chainhash.Hash
+			switch wrappedMsg.Message.(type) {
+			case *wire.MsgBlockAbe:
+				hash = wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash()
+				log.Infof("message block hash %s has handled \n", hash)
+			case *wire.MsgTxAbe:
+				hash = wrappedMsg.Message.(*wire.MsgTxAbe).TxHash()
+				log.Infof("message tx hash %s has handled \n", hash)
+			}
 			wrappedMsg.Done()
-			log.Infof("release held cached block %s when sending block, current count %d\n", wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash(), wrappedMsg.Count())
+			log.Infof("release held cached block/tx %s when sending block, current count %d\n", hash, wrappedMsg.Count())
 			if wrappedMsg.CanDelete() {
-				log.Infof("Delete cached block %s\n", wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash())
+				log.Infof("Delete cached message whose hash is %s\n", hash)
 				p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message))
 			}
 		}
@@ -1771,11 +1779,19 @@ out:
 			msg.doneChan <- struct{}{}
 		}
 		if wrappedMsg, ok := msg.msg.(*wire.WrappedMessage); ok {
-			log.Infof("message block hash %s has handled \n", wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash())
+			var hash chainhash.Hash
+			switch wrappedMsg.Message.(type) {
+			case *wire.MsgBlockAbe:
+				hash = wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash()
+				log.Infof("message block hash %s has handled \n", hash)
+			case *wire.MsgTxAbe:
+				hash = wrappedMsg.Message.(*wire.MsgTxAbe).TxHash()
+				log.Infof("message tx hash %s has handled \n", hash)
+			}
 			wrappedMsg.Done()
-			log.Infof("release held cached block %s when sending block, current count %d\n", wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash(), wrappedMsg.Count())
+			log.Infof("release held cached block/tx %s when sending block, current count %d\n", hash, wrappedMsg.Count())
 			if wrappedMsg.CanDelete() {
-				log.Infof("Delete cached block %s\n", wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash())
+				log.Infof("Delete cached message whose hash is %s\n", hash)
 				p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message))
 			}
 		}
@@ -1788,11 +1804,19 @@ cleanup:
 				msg.doneChan <- struct{}{}
 			}
 			if wrappedMsg, ok := msg.msg.(*wire.WrappedMessage); ok {
-				log.Infof("message block hash %s has handled \n", wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash())
+				var hash chainhash.Hash
+				switch wrappedMsg.Message.(type) {
+				case *wire.MsgBlockAbe:
+					hash = wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash()
+					log.Infof("message block hash %s has handled \n", hash)
+				case *wire.MsgTxAbe:
+					hash = wrappedMsg.Message.(*wire.MsgTxAbe).TxHash()
+					log.Infof("message tx hash %s has handled \n", hash)
+				}
 				wrappedMsg.Done()
-				log.Infof("release held cached block %s when sending block, current count %d\n", wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash(), wrappedMsg.Count())
+				log.Infof("release held cached block/tx %s when sending block, current count %d\n", hash, wrappedMsg.Count())
 				if wrappedMsg.CanDelete() {
-					log.Infof("Delete cached block %s\n", wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash())
+					log.Infof("Delete cached message whose hash is %s\n", hash)
 					p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message))
 				}
 			}
@@ -1892,11 +1916,19 @@ cleanup:
 			}
 			// whether err or not, down the reference
 			if wrappedMsg, ok := msg.msg.(*wire.WrappedMessage); ok {
-				log.Infof("message block hash %s has handled \n", wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash())
+				var hash chainhash.Hash
+				switch wrappedMsg.Message.(type) {
+				case *wire.MsgBlockAbe:
+					hash = wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash()
+					log.Infof("message block hash %s has handled \n", hash)
+				case *wire.MsgTxAbe:
+					hash = wrappedMsg.Message.(*wire.MsgTxAbe).TxHash()
+					log.Infof("message tx hash %s has handled \n", hash)
+				}
 				wrappedMsg.Done()
-				log.Infof("release held cached block %s when sending block, current count %d\n", wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash(), wrappedMsg.Count())
+				log.Infof("release held cached block/tx %s when sending block, current count %d\n", hash, wrappedMsg.Count())
 				if wrappedMsg.CanDelete() {
-					log.Infof("Delete cached block %s\n", wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash())
+					log.Infof("Delete cached message whose hash is %s\n", hash)
 					p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message))
 				}
 			}
@@ -1958,11 +1990,19 @@ func (p *Peer) QueueMessageWithEncoding(msg wire.Message, doneChan chan<- struct
 			}()
 		}
 		if wrappedMsg, ok := msg.(*wire.WrappedMessage); ok {
-			log.Infof("message block hash %s has handled \n", wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash())
+			var hash chainhash.Hash
+			switch wrappedMsg.Message.(type) {
+			case *wire.MsgBlockAbe:
+				hash = wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash()
+				log.Infof("message block hash %s has handled \n", hash)
+			case *wire.MsgTxAbe:
+				hash = wrappedMsg.Message.(*wire.MsgTxAbe).TxHash()
+				log.Infof("message tx hash %s has handled \n", hash)
+			}
 			wrappedMsg.Done()
-			log.Infof("release held cached block %s when sending block, current count %d\n", wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash(), wrappedMsg.Count())
+			log.Infof("release held cached block/tx %s when sending block, current count %d\n", hash, wrappedMsg.Count())
 			if wrappedMsg.CanDelete() {
-				log.Infof("Delete cached block %s\n", wrappedMsg.Message.(*wire.MsgBlockAbe).BlockHash())
+				log.Infof("Delete cached message whose hash is %s\n", hash)
 				p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message))
 			}
 		}

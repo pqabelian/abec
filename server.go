@@ -993,18 +993,33 @@ func (s *server) TransactionConfirmed(tx *abeutil.TxAbe) {
 func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
 	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
 
-	// Attempt to fetch the requested transaction from the pool.  A
-	// call could be made to check for existence first, but simply trying
-	// to fetch a missing transaction results in the same behavior.
-	tx, err := s.txMemPool.FetchTransaction(hash)
-	if err != nil {
-		peerLog.Tracef("Unable to fetch tx %v from transaction "+
-			"pool: %v", hash, err)
+	testLog.Infof("Send tx %s to peer %s", hash, sp.Addr())
+	var msg wire.Message
+	msgCacheKey := fmt.Sprintf("tx_%s", hash)
+	value, ok := s.communicationCache.Load(msgCacheKey)
+	if wrappedMessage, hit := value.(*wire.WrappedMessage); ok && hit {
+		testLog.Infof("Hit cache with %s when sending block to peer %s, current reference %d", hash, sp.Addr(), wrappedMessage.Count())
+		wrappedMessage.Use()
+		msg = wrappedMessage
+	} else {
+		// Attempt to fetch the requested transaction from the pool.  A
+		// call could be made to check for existence first, but simply trying
+		// to fetch a missing transaction results in the same behavior.
+		tx, err := s.txMemPool.FetchTransaction(hash)
+		if err != nil {
+			peerLog.Tracef("Unable to fetch tx %v from transaction "+
+				"pool: %v", hash, err)
 
-		if doneChan != nil {
-			doneChan <- struct{}{}
+			if doneChan != nil {
+				doneChan <- struct{}{}
+			}
+			return err
 		}
-		return err
+		wrappedTxMsg := wire.WrapMessage(tx.MsgTx())
+		s.communicationCache.Store(msgCacheKey, wrappedTxMsg)
+		wrappedTxMsg.Use()
+		msg = wrappedTxMsg
+		testLog.Infof("Cache tx with %s when sending tx to peer %s", hash, sp.Addr())
 	}
 
 	// Once we have fetched data wait for any previous operation to finish.
@@ -1012,7 +1027,7 @@ func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<-
 		<-waitChan
 	}
 
-	sp.QueueMessageWithEncoding(tx.MsgTx(), doneChan, encoding)
+	sp.QueueMessageWithEncoding(msg, doneChan, encoding)
 
 	return nil
 }
