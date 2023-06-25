@@ -16,6 +16,7 @@ import (
 	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/mempool"
+	"github.com/abesuite/abec/mempool/rotator"
 	"github.com/abesuite/abec/mining"
 	"github.com/abesuite/abec/mining/cpuminer"
 	"github.com/abesuite/abec/mining/externalminer"
@@ -26,6 +27,8 @@ import (
 	"github.com/abesuite/abec/wire"
 	"math"
 	"net"
+	"os"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strconv"
@@ -239,6 +242,10 @@ type server struct {
 	// agentWhitelist is a list of whitelisted user agent substrings, no
 	// whitelisting will be applied if the list is empty or nil.
 	agentWhitelist []string
+
+	// txCacheRotator is one of the logging outputs.  It should be closed on
+	// application shutdown.
+	txCacheRotator *rotator.Rotator
 }
 
 // serverPeer extends the peer to maintain state shared by the server and
@@ -2110,6 +2117,26 @@ func (s *server) Start() {
 	if cfg.ExternalGenerate {
 		s.externalMiner.Start()
 	}
+
+	if cfg.AllowDiskCacheTx {
+		cacheTxFileName := filepath.Join(cfg.CacheTxDir, defaultCacheTxFilename)
+		logDir, _ := filepath.Split(cacheTxFileName)
+
+		// clean dirty data if shut down unexpectedly
+		os.RemoveAll(cfg.CacheTxDir)
+		err := os.MkdirAll(logDir, 0700)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to create transaction cache directory: %v\n", err)
+			os.Exit(1)
+		}
+		r, err := rotator.New(cacheTxFileName, 10*1024, 0)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to create file rotator: %v\n", err)
+			os.Exit(1)
+		}
+
+		s.txCacheRotator = r
+	}
 }
 
 // Stop gracefully shuts down the server by stopping and disconnecting all
@@ -2518,9 +2545,11 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		HashCache:          s.hashCache,
 		WitnessCache:       s.witnessCache,
 		FeeEstimator:       s.feeEstimator,
+		AllowDiskCacheTx:   cfg.AllowDiskCacheTx,
+		TxCacheRotator:     s.txCacheRotator,
+		CacheTxFileName:    filepath.Join(cfg.CacheTxDir, defaultCacheTxFilename),
 	}
 	s.txMemPool = mempool.New(&txC)
-
 	//	todo: (EthashPoW)
 	cfg.EthashConfig.BlockHeightStart = s.chainParams.BlockHeightEthashPoW
 	cfg.EthashConfig.EpochLength = s.chainParams.EthashEpochLength

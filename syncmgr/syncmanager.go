@@ -622,7 +622,7 @@ func (sm *SyncManager) handleTxMsgAbe(tmsg *txMsgAbe) {
 	// Process the transaction to include validation, insertion in the
 	// memory pool, orphan handling, etc.
 	acceptedTx, err := sm.txMemPool.ProcessTransactionAbe(tmsg.tx,
-		true, true, mempool.Tag(peer.ID()))
+		true, true, mempool.Tag(peer.ID()), false)
 
 	// Remove transaction from request maps. Either the mempool/chain
 	// already knows about it and as such we shouldn't have any more
@@ -901,6 +901,7 @@ func (sm *SyncManager) current() bool {
 //}
 
 //	todo(ABE):
+//
 // handleBlockMsgAbe handles block messages from all peers.
 func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 	peer := bmsg.peer
@@ -1985,6 +1986,7 @@ out:
 // handleBlockchainNotification handles notifications from blockchain.  It does
 // things such as request orphan block parents and relay accepted blocks to
 // connected peers.
+//
 //	todo (ABE):
 func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Notification) {
 	switch notification.Type {

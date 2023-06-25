@@ -132,6 +132,15 @@ func abecMain(serverChan chan<- *server) error {
 		server.WaitForShutdown()
 		srvrLog.Infof("Server shutdown complete")
 	}()
+	if cfg.AllowDiskCacheTx {
+		defer func() {
+			if server.txCacheRotator != nil {
+				server.txCacheRotator.Close()
+			}
+			// Clear the transaction cache file
+			os.RemoveAll(cfg.CacheTxDir)
+		}()
+	}
 	server.Start() //Start the p2p server
 	if serverChan != nil {
 		serverChan <- server

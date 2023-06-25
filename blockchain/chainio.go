@@ -495,7 +495,7 @@ func deserializeSpendJournalEntry(serialized []byte, txns []*wire.MsgTx) ([]Spen
 	return stxos, nil
 }
 
-//	Abe to do
+// Abe to do
 func deserializeSpendJournalEntryAbe(serialized []byte, txns []*wire.MsgTxAbe) ([]*SpentTxOutAbe, error) {
 	// Calculate the total number of stxos.
 	var numStxos int
@@ -628,7 +628,7 @@ func dbFetchSpendJournalEntry(dbTx database.Tx, block *abeutil.Block) ([]SpentTx
 	return stxos, nil
 }
 
-//Abe to do
+// Abe to do
 func dbFetchSpendJournalEntryAbe(dbTx database.Tx, block *abeutil.BlockAbe) ([]*SpentTxOutAbe, error) {
 	// Exclude the coinbase transaction since it can't spend anything.
 	spendBucket := dbTx.Metadata().Bucket(spendJournalBucketName)
@@ -863,7 +863,7 @@ func serializeUtxoEntry(entry *UtxoEntry) ([]byte, error) {
 	return serialized, nil
 }
 
-//	Abe to do
+// Abe to do
 func serializeUtxoRingEntry(entry *UtxoRingEntry) ([]byte, error) {
 
 	buf := bytes.NewBuffer(make([]byte, 0, entry.SerializeSize()))
@@ -912,7 +912,7 @@ func deserializeUtxoEntry(serialized []byte) (*UtxoEntry, error) {
 	return entry, nil
 }
 
-//	todo(ABE):
+// todo(ABE):
 func deserializeUtxoRingEntry(serialized []byte) (*UtxoRingEntry, error) {
 
 	entry := UtxoRingEntry{}
@@ -1002,7 +1002,7 @@ func dbFetchUtxoEntry(dbTx database.Tx, outpoint wire.OutPoint) (*UtxoEntry, err
 	return entry, nil
 }
 
-//	todo(ABE):
+// todo(ABE):
 func dbFetchUtxoRingEntry(dbTx database.Tx, outPointRingHash chainhash.Hash) (*UtxoRingEntry, error) {
 	// Fetch the unspent transaction output information for the passed
 	// transaction output.  Return nil when there is no entry.
@@ -1127,7 +1127,7 @@ func dbPutUtxoRingView(dbTx database.Tx, view *UtxoRingViewpoint) error {
 	return nil
 }
 
-//	Abe add
+// Abe add
 func dbRemoveUtxoRingView(dbTx database.Tx, view *UtxoRingViewpoint) error {
 	utxoRingBucket := dbTx.Metadata().Bucket(utxoRingSetBucketName)
 
@@ -1768,7 +1768,7 @@ func dbStoreBlock(dbTx database.Tx, block *abeutil.Block) error {
 	return dbTx.StoreBlock(block)
 }
 
-//	Abe to do
+// Abe to do
 func dbStoreBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe) error {
 	hasBlock, err := dbTx.HasBlock(block.Hash())
 	if err != nil {
@@ -1793,6 +1793,7 @@ func blockIndexKey(blockHash *chainhash.Hash, blockHeight uint32) []byte {
 // BlockByHeight returns the block at the given height in the main chain.
 //
 // This function is safe for concurrent access.
+//
 //	todo(ABE):
 func (b *BlockChain) BlockByHeightBTCD(blockHeight int32) (*abeutil.Block, error) {
 	// Lookup the block height in the best chain.

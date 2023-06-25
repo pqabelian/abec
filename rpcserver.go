@@ -4087,7 +4087,7 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 
 	// Use 0 for the tag to represent local node.
 	tx := abeutil.NewTxAbe(&msgTx)
-	acceptedTx, err := s.cfg.TxMemPool.ProcessTransactionAbe(tx, false, false, 0)
+	acceptedTx, err := s.cfg.TxMemPool.ProcessTransactionAbe(tx, false, false, 0, false)
 	if err != nil {
 		// When the error is a rule error, it means the transaction was
 		// simply rejected as opposed to something actually going wrong,
@@ -4190,7 +4190,7 @@ func handleSendRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-chan
 
 	// Use 0 for the tag to represent local node.
 	tx := abeutil.NewTxAbe(&msgTx)
-	acceptedTx, err := s.cfg.TxMemPool.ProcessTransactionAbe(tx, false, false, 0)
+	acceptedTx, err := s.cfg.TxMemPool.ProcessTransactionAbe(tx, false, false, 0, false)
 	if err != nil {
 		// When the error is a rule error, it means the transaction was
 		// simply rejected as opposed to something actually going wrong,
