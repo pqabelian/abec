@@ -2117,26 +2117,6 @@ func (s *server) Start() {
 	if cfg.ExternalGenerate {
 		s.externalMiner.Start()
 	}
-
-	if cfg.AllowDiskCacheTx {
-		cacheTxFileName := filepath.Join(cfg.CacheTxDir, defaultCacheTxFilename)
-		logDir, _ := filepath.Split(cacheTxFileName)
-
-		// clean dirty data if shut down unexpectedly
-		os.RemoveAll(cfg.CacheTxDir)
-		err := os.MkdirAll(logDir, 0700)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to create transaction cache directory: %v\n", err)
-			os.Exit(1)
-		}
-		r, err := rotator.New(cacheTxFileName, 10*1024, 0)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to create file rotator: %v\n", err)
-			os.Exit(1)
-		}
-
-		s.txCacheRotator = r
-	}
 }
 
 // Stop gracefully shuts down the server by stopping and disconnecting all
@@ -2519,6 +2499,25 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 			mempool.DefaultEstimateFeeMinRegisteredBlocks)
 	}
 
+	if cfg.AllowDiskCacheTx {
+		cacheTxFileName := filepath.Join(cfg.CacheTxDir, defaultCacheTxFilename)
+		logDir, _ := filepath.Split(cacheTxFileName)
+
+		// clean dirty data if shut down unexpectedly
+		os.RemoveAll(cfg.CacheTxDir)
+		err := os.MkdirAll(logDir, 0700)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to create transaction cache directory: %v\n", err)
+			os.Exit(1)
+		}
+		r, err := rotator.New(cacheTxFileName, 1*1024, 0)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to create file rotator: %v\n", err)
+			os.Exit(1)
+		}
+
+		s.txCacheRotator = r
+	}
 	txC := mempool.Config{
 		Policy: mempool.Policy{
 			DisableRelayPriority: cfg.NoRelayPriority,

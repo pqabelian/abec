@@ -126,7 +126,7 @@ func (r *Rotator) Write(p []byte) (n int, err error) {
 	n, _ = r.out.Write(p)
 	r.size += int64(n)
 
-	if r.size >= r.threshold && len(p) > 0 && p[len(p)-1] == '\n' {
+	if r.size >= r.threshold && len(p) > 0 {
 		err := r.rotate()
 		if err != nil {
 			return 0, err
@@ -152,7 +152,7 @@ func (r *Rotator) RotatedRolled() (int, int, error) {
 		return 0, 0, err
 	}
 
-	minNum := 0
+	minNum := 1
 	maxNum := 0
 	for _, name := range existing {
 		parts := strings.Split(name, ".")

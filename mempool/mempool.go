@@ -224,6 +224,9 @@ type TxPool struct {
 	orphansByPrevAbe map[chainhash.Hash]map[string]map[chainhash.Hash]*abeutil.TxAbe // corresponding to btc's orphansByPrev //TODO type transfer??? []byte -> string
 
 	diskTxCaching bool
+
+	loadCachedTxMu  sync.Mutex
+	loadingCachedTx bool
 }
 
 // Ensure the TxPool type implements the mining.TxSource interface.
@@ -610,6 +613,14 @@ func (mp *TxPool) isTransactionInPoolAbe(hash *chainhash.Hash) bool {
 	return false
 }
 
+func (mp *TxPool) isCachedInPoolAbe(hash *chainhash.Hash) bool {
+	if _, exists := mp.cachedTxHashs[*hash]; exists {
+		return true
+	}
+
+	return false
+}
+
 // IsTransactionInPool returns whether or not the passed transaction already
 // exists in the main pool.
 //
@@ -745,6 +756,8 @@ func (mp *TxPool) RemoveTransactionAbe(tx *abeutil.TxAbe) {
 	mp.mtx.Lock()
 	mp.removeTransactionAbe(tx)
 	mp.mtx.Unlock()
+
+	go mp.loadDiskTx()
 }
 
 // RemoveDoubleSpends removes all transactions which spend outputs spent by the
@@ -816,14 +829,10 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 		// write to transaction cache rotator
 		// [transaction_size] [transaction_content]
 		txContent := buff.Bytes()
-		size := make([]byte, 8)
-		binary.LittleEndian.PutUint64(size, uint64(len(txContent)))
-		_, err := mp.cfg.TxCacheRotator.Write(size)
-		if err != nil {
-			log.Warnf("Fail to cache transaction %s using disk", tx.Hash())
-			return txD
-		}
-		_, err = mp.cfg.TxCacheRotator.Write(txContent)
+		content := make([]byte, 8+len(txContent))
+		binary.LittleEndian.PutUint64(content, uint64(len(txContent)))
+		copy(content[8:], txContent)
+		_, err := mp.cfg.TxCacheRotator.Write(content)
 		if err != nil {
 			log.Warnf("Fail to cache transaction %s using disk", tx.Hash())
 			return txD
@@ -928,20 +937,33 @@ func (mp *TxPool) checkPoolDoubleSpendAbe(tx *abeutil.TxAbe) error {
 	return nil
 }
 func (mp *TxPool) loadDiskTx() {
+	if mp.loadingCachedTx || len(mp.poolAbe) >= MaxTransactionInMemoryNum {
+		return
+	}
+	mp.loadCachedTxMu.Lock()
+	if mp.loadingCachedTx {
+		mp.loadCachedTxMu.Unlock()
+		return
+	}
+	mp.loadingCachedTx = true
+	mp.loadCachedTxMu.Unlock()
+	defer func() {
+		mp.loadingCachedTx = false
+	}()
 	minNum, maxNum, err := mp.cfg.TxCacheRotator.RotatedRolled()
 	if err != nil {
 		log.Warnf("Unable to load cached transaction: %v", err)
 		return
 	}
-	if minNum == 0 && minNum == maxNum {
-		log.Infof("No file to load cached transaction: %v", err)
+	if minNum > maxNum {
+		log.Infof("No file to load cached transaction")
 		return
 	}
 
 	var f *os.File
 	// every time, all transaction in one file would be loaded
-	for i := minNum; i < maxNum && len(mp.poolAbe) < MaxTransactionInMemoryNum; i++ {
-		rotatedName := fmt.Sprintf("%s.%d", mp.cfg.CacheTxFileName, i+1)
+	for i := minNum; i <= maxNum && len(mp.poolAbe) < MaxTransactionInMemoryNum; i++ {
+		rotatedName := fmt.Sprintf("%s.%d", mp.cfg.CacheTxFileName, i)
 		f, err = os.OpenFile(rotatedName, os.O_RDONLY, 0644)
 		if err != nil {
 			return
@@ -1570,7 +1592,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	// orphans flag is set.  This check is intended to be a quick check to
 	// weed out duplicates.
 	if mp.isTransactionInPoolAbe(txHash) || (rejectDupOrphans &&
-		mp.isOrphanInPoolAbe(txHash)) {
+		mp.isOrphanInPoolAbe(txHash)) || (!fromDiskCache && mp.isCachedInPoolAbe(txHash)) {
 
 		str := fmt.Sprintf("already have transaction %v", txHash)
 		return nil, nil, txRuleError(wire.RejectDuplicate, str)
@@ -2069,6 +2091,7 @@ func New(cfg *Config) *TxPool {
 		outpoints:      make(map[wire.OutPoint]*abeutil.Tx),
 
 		poolAbe:          make(map[chainhash.Hash]*TxDescAbe),
+		cachedTxHashs:    make(map[chainhash.Hash]struct{}),
 		orphansAbe:       make(map[chainhash.Hash]*orphanTxAbe),
 		outpointsAbe:     make(map[chainhash.Hash]map[string]*abeutil.TxAbe),
 		orphansByPrevAbe: make(map[chainhash.Hash]map[string]map[chainhash.Hash]*abeutil.TxAbe),
