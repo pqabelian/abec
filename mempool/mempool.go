@@ -756,8 +756,6 @@ func (mp *TxPool) RemoveTransactionAbe(tx *abeutil.TxAbe) {
 	mp.mtx.Lock()
 	mp.removeTransactionAbe(tx)
 	mp.mtx.Unlock()
-
-	go mp.loadDiskTx()
 }
 
 // RemoveDoubleSpends removes all transactions which spend outputs spent by the
@@ -804,6 +802,15 @@ func (mp *TxPool) RemoveDoubleSpendsAbe(tx *abeutil.TxAbe) {
 //
 // This function MUST be called with the mempool lock held (for writes).
 func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, tx *abeutil.TxAbe, height int32, fee uint64, fromDiskCache bool) *TxDescAbe {
+	// To avoid that transaction always is cached in disk after triggering cache transaction,
+	// when the transaction in mempool is less than MinTransactionInMemoryNum, we would load
+	// transactions stored in disk
+	// When the transaction is loaded from disk, ignore this mechanism to avoid repeat
+	if !fromDiskCache && mp.cfg.AllowDiskCacheTx && mp.diskTxCaching && len(mp.poolAbe) <= MinTransactionInMemoryNum {
+		// issue signal load transaction from cache file
+		go mp.loadDiskTx()
+	}
+
 	// Add the transaction to the pool and mark the referenced outpoints
 	// as spent by the pool.
 	txD := &TxDescAbe{
@@ -821,6 +828,7 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 	// transaction would be stored in disk
 	// When the transaction is loaded from disk, ignore this mechanism
 	if !fromDiskCache && mp.cfg.AllowDiskCacheTx && len(mp.poolAbe) >= MaxTransactionInMemoryNum {
+		log.Infof("save transaction %s into disk", tx.Hash())
 		mp.diskTxCaching = true
 		// store this transation into disk
 		buff := &bytes.Buffer{}
@@ -832,26 +840,17 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 		content := make([]byte, 8+len(txContent))
 		binary.LittleEndian.PutUint64(content, uint64(len(txContent)))
 		copy(content[8:], txContent)
-		_, err := mp.cfg.TxCacheRotator.Write(content)
-		if err != nil {
-			log.Warnf("Fail to cache transaction %s using disk", tx.Hash())
+		if _, err := mp.cfg.TxCacheRotator.Write(content); err == nil {
+			log.Infof("successful to save transaction %s into disk, current mempool:%d, current cached in disk:%d", tx.Hash(), len(mp.poolAbe), len(mp.cachedTxHashs))
+			mp.cachedTxHashs[*tx.Hash()] = struct{}{}
 			return txD
 		}
-		mp.cachedTxHashs[*tx.Hash()] = struct{}{}
-		return txD
-	}
-
-	// To avoid that transaction always is cached in disk after triggering cache transaction,
-	// when the transaction in mempool is less than MinTransactionInMemoryNum, we would load
-	// transactions stored in disk
-	// When the transaction is loaded from disk, ignore this mechanism to avoid repeat
-	if !fromDiskCache && mp.cfg.AllowDiskCacheTx && mp.diskTxCaching && len(mp.poolAbe) <= MinTransactionInMemoryNum {
-		// issue signal load transaction from cache file
-		go mp.loadDiskTx()
+		log.Warnf("Fail to cache transaction %s using disk, save it at memory", tx.Hash())
 	}
 
 	mp.poolAbe[*tx.Hash()] = txD
 	if fromDiskCache {
+		log.Infof("successful to load transaction %s from disk, current mempool:%d", tx.Hash(), len(mp.poolAbe))
 		delete(mp.cachedTxHashs, *tx.Hash())
 	}
 
@@ -942,27 +941,32 @@ func (mp *TxPool) loadDiskTx() {
 	}
 	mp.loadCachedTxMu.Lock()
 	if mp.loadingCachedTx {
+		log.Infof("other goroutine has set it, return")
 		mp.loadCachedTxMu.Unlock()
 		return
 	}
 	mp.loadingCachedTx = true
 	mp.loadCachedTxMu.Unlock()
+	log.Infof("successfully set it, loading some transactions from disk")
 	defer func() {
 		mp.loadingCachedTx = false
+		log.Infof("finish loading some transactions from disk, set loadingCachedTx=false")
 	}()
 	minNum, maxNum, err := mp.cfg.TxCacheRotator.RotatedRolled()
 	if err != nil {
-		log.Warnf("Unable to load cached transaction: %v", err)
+		log.Errorf("Unable to load cached transaction: %v", err)
 		return
 	}
 	if minNum > maxNum {
 		log.Infof("No file to load cached transaction")
 		return
 	}
+	log.Infof("loading some transactions from %s.%d to %s.%d", mp.cfg.CacheTxFileName, minNum, mp.cfg.CacheTxFileName, maxNum)
 
 	var f *os.File
 	// every time, all transaction in one file would be loaded
 	for i := minNum; i <= maxNum && len(mp.poolAbe) < MaxTransactionInMemoryNum; i++ {
+		log.Infof("loading some transactions from %s.%d", mp.cfg.CacheTxFileName, i)
 		rotatedName := fmt.Sprintf("%s.%d", mp.cfg.CacheTxFileName, i)
 		f, err = os.OpenFile(rotatedName, os.O_RDONLY, 0644)
 		if err != nil {
@@ -988,12 +992,14 @@ func (mp *TxPool) loadDiskTx() {
 				break
 			}
 			tx := abeutil.NewTxAbe(msgTx)
+			log.Infof("load transaction %s from file %s", msgTx.TxHash(), rotatedName)
 			_, err = mp.ProcessTransactionAbe(tx, false, false, 0, true)
 			if err != nil {
 				break
 			}
 		}
 		f.Close()
+		log.Infof("finish loading transactions from file %s, remove it...", rotatedName)
 		os.Remove(rotatedName)
 		f = nil
 	}
