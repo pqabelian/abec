@@ -49,10 +49,10 @@ const (
 	// MaxTransactionInMemoryNum is the maximum number of  transaction that
 	// can be stored in memory.
 	// The transaction would the stored in disk when the pool has no memory
-	MaxTransactionInMemoryNum = 100
+	MaxTransactionInMemoryNum = 20
 	// MinTransactionInMemoryNum is the minimum number of transaction that
 	// the memory pool would load transaction cached in disk
-	MinTransactionInMemoryNum = 20
+	MinTransactionInMemoryNum = 3
 )
 
 // Tag represents an identifier to use for tagging orphan transactions.  The
