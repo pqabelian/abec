@@ -1003,6 +1003,9 @@ func (mp *TxPool) loadDiskTx() {
 		os.Remove(rotatedName)
 		f = nil
 	}
+	if len(mp.poolAbe) < MaxTransactionInMemoryNum {
+		mp.diskTxCaching = false
+	}
 }
 
 // signalsReplacement determines if a transaction is signaling that it can be
