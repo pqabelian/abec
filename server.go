@@ -2510,7 +2510,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 			fmt.Fprintf(os.Stderr, "failed to create transaction cache directory: %v\n", err)
 			os.Exit(1)
 		}
-		r, err := rotator.New(cacheTxFileName, 1*1024, 0)
+		r, err := rotator.New(cacheTxFileName, 0, 0)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to create file rotator: %v\n", err)
 			os.Exit(1)

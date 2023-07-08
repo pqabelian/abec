@@ -49,7 +49,7 @@ const (
 	// MaxTransactionInMemoryNum is the maximum number of  transaction that
 	// can be stored in memory.
 	// The transaction would the stored in disk when the pool has no memory
-	MaxTransactionInMemoryNum = 20
+	MaxTransactionInMemoryNum = 5
 	// MinTransactionInMemoryNum is the minimum number of transaction that
 	// the memory pool would load transaction cached in disk
 	MinTransactionInMemoryNum = 3
@@ -223,10 +223,8 @@ type TxPool struct {
 	outpointsAbe     map[chainhash.Hash]map[string]*abeutil.TxAbe                    //TODO(abe):why use two layers map                 //	corresponding to btc's outpoints, using hash rather then TxIn as the key for map
 	orphansByPrevAbe map[chainhash.Hash]map[string]map[chainhash.Hash]*abeutil.TxAbe // corresponding to btc's orphansByPrev //TODO type transfer??? []byte -> string
 
-	diskTxCaching bool
-
-	loadCachedTxMu  sync.Mutex
-	loadingCachedTx bool
+	txMonitorMu  sync.Mutex
+	txMonitoring bool
 }
 
 // Ensure the TxPool type implements the mining.TxSource interface.
@@ -802,15 +800,6 @@ func (mp *TxPool) RemoveDoubleSpendsAbe(tx *abeutil.TxAbe) {
 //
 // This function MUST be called with the mempool lock held (for writes).
 func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, tx *abeutil.TxAbe, height int32, fee uint64, fromDiskCache bool) *TxDescAbe {
-	// To avoid that transaction always is cached in disk after triggering cache transaction,
-	// when the transaction in mempool is less than MinTransactionInMemoryNum, we would load
-	// transactions stored in disk
-	// When the transaction is loaded from disk, ignore this mechanism to avoid repeat
-	if !fromDiskCache && mp.cfg.AllowDiskCacheTx && mp.diskTxCaching && len(mp.poolAbe) <= MinTransactionInMemoryNum {
-		// issue signal load transaction from cache file
-		go mp.loadDiskTx()
-	}
-
 	// Add the transaction to the pool and mark the referenced outpoints
 	// as spent by the pool.
 	txD := &TxDescAbe{
@@ -829,7 +818,14 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 	// When the transaction is loaded from disk, ignore this mechanism
 	if !fromDiskCache && mp.cfg.AllowDiskCacheTx && len(mp.poolAbe) >= MaxTransactionInMemoryNum {
 		log.Infof("save transaction %s into disk", tx.Hash())
-		mp.diskTxCaching = true
+		// To avoid that transaction always is cached in disk after triggering cache transaction,
+		// when the transaction in mempool is less than MinTransactionInMemoryNum, we would load
+		// transactions stored in disk
+		// When the transaction is loaded from disk, ignore this mechanism to avoid repeat
+		if !mp.txMonitoring {
+			go mp.txMonitor()
+		}
+
 		// store this transation into disk
 		buff := &bytes.Buffer{}
 		tx.MsgTx().SerializeFull(buff)
@@ -841,8 +837,8 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 		binary.LittleEndian.PutUint64(content, uint64(len(txContent)))
 		copy(content[8:], txContent)
 		if _, err := mp.cfg.TxCacheRotator.Write(content); err == nil {
-			log.Infof("successful to save transaction %s into disk, current mempool:%d, current cached in disk:%d", tx.Hash(), len(mp.poolAbe), len(mp.cachedTxHashs))
 			mp.cachedTxHashs[*tx.Hash()] = struct{}{}
+			log.Infof("successful to save transaction %s into disk, current mempool:%d, current cached in disk:%d", tx.Hash(), len(mp.poolAbe), len(mp.cachedTxHashs))
 			return txD
 		}
 		log.Warnf("Fail to cache transaction %s using disk, save it at memory", tx.Hash())
@@ -935,76 +931,94 @@ func (mp *TxPool) checkPoolDoubleSpendAbe(tx *abeutil.TxAbe) error {
 
 	return nil
 }
-func (mp *TxPool) loadDiskTx() {
-	if mp.loadingCachedTx || len(mp.poolAbe) >= MaxTransactionInMemoryNum {
+func (mp *TxPool) txMonitor() {
+	if mp.txMonitoring {
 		return
 	}
-	mp.loadCachedTxMu.Lock()
-	if mp.loadingCachedTx {
-		log.Infof("other goroutine has set it, return")
-		mp.loadCachedTxMu.Unlock()
+	mp.txMonitorMu.Lock()
+	if mp.txMonitoring {
+		mp.txMonitorMu.Unlock()
 		return
 	}
-	mp.loadingCachedTx = true
-	mp.loadCachedTxMu.Unlock()
-	log.Infof("successfully set it, loading some transactions from disk")
+	mp.txMonitoring = true
+	mp.txMonitorMu.Unlock()
+	log.Infof("start monitor transaction number in mempool")
 	defer func() {
-		mp.loadingCachedTx = false
-		log.Infof("finish loading some transactions from disk, set loadingCachedTx=false")
+		mp.txMonitorMu.Lock()
+		mp.txMonitoring = false
+		mp.txMonitorMu.Unlock()
+		log.Infof("stop monitor transaction number in mempool")
 	}()
-	minNum, maxNum, err := mp.cfg.TxCacheRotator.RotatedRolled()
-	if err != nil {
-		log.Errorf("Unable to load cached transaction: %v", err)
-		return
-	}
-	if minNum > maxNum {
-		log.Infof("No file to load cached transaction")
-		return
-	}
-	log.Infof("loading some transactions from %s.%d to %s.%d", mp.cfg.CacheTxFileName, minNum, mp.cfg.CacheTxFileName, maxNum)
+	//duration := 5 * time.Minute
+	duration := 10 * time.Second
+	timer := time.NewTicker(duration)
+	for {
+		select {
+		case <-timer.C:
+			log.Infof("transaction in mempool:%d, cached in disk:%d", len(mp.poolAbe), len(mp.cachedTxHashs))
+			if len(mp.poolAbe) >= MaxTransactionInMemoryNum {
+				continue
+			}
+			log.Infof("loading transactions from disk...")
+			minNum, maxNum, err := mp.cfg.TxCacheRotator.RotatedRolled()
+			if err != nil {
+				log.Errorf("Unable to load cached transaction: %v", err)
+				return
+			}
+			if minNum > maxNum {
+				log.Infof("No cached transaction can be loaded.")
+				return
+			}
+			log.Infof("loading some transactions from %s.%d to %s.%d", mp.cfg.CacheTxFileName, minNum, mp.cfg.CacheTxFileName, maxNum)
 
-	var f *os.File
-	// every time, all transaction in one file would be loaded
-	for i := minNum; i <= maxNum && len(mp.poolAbe) < MaxTransactionInMemoryNum; i++ {
-		log.Infof("loading some transactions from %s.%d", mp.cfg.CacheTxFileName, i)
-		rotatedName := fmt.Sprintf("%s.%d", mp.cfg.CacheTxFileName, i)
-		f, err = os.OpenFile(rotatedName, os.O_RDONLY, 0644)
-		if err != nil {
-			return
+			var f *os.File
+			i := minNum
+			for ; i <= maxNum && len(mp.poolAbe) < MaxTransactionInMemoryNum; i++ {
+				log.Infof("loading some transactions from %s.%d", mp.cfg.CacheTxFileName, i)
+				rotatedName := fmt.Sprintf("%s.%d", mp.cfg.CacheTxFileName, i)
+				f, err = os.OpenFile(rotatedName, os.O_RDONLY, 0644)
+				if err != nil {
+					continue
+				}
+				size := make([]byte, 8)
+				for {
+					// [transaction_size] [transaction_content]
+					_, err = f.Read(size)
+					if err != nil {
+						break
+					}
+					contentSize := binary.LittleEndian.Uint64(size)
+					content := make([]byte, contentSize)
+					_, err = f.Read(content)
+					if err != nil {
+						break
+					}
+					buffer := bytes.NewBuffer(content)
+					msgTx := &wire.MsgTxAbe{}
+					err = msgTx.DeserializeFull(buffer)
+					if err != nil {
+						break
+					}
+					tx := abeutil.NewTxAbe(msgTx)
+					log.Infof("load transaction %s from file %s", msgTx.TxHash(), rotatedName)
+					_, err = mp.ProcessTransactionAbe(tx, false, false, 0, true)
+					if err != nil {
+						break
+					}
+				}
+				f.Close()
+				log.Infof("finish loading transactions from file %s, remove it...", rotatedName)
+				os.Remove(rotatedName)
+				f = nil
+			}
+			if i > maxNum {
+				log.Infof("No cached transaction can be loaded.")
+				return
+			}
+
+			timer.Reset(duration)
+		default:
 		}
-		size := make([]byte, 8)
-		for {
-			// [transaction_size] [transaction_content]
-			_, err = f.Read(size)
-			if err != nil {
-				break
-			}
-			contentSize := binary.LittleEndian.Uint64(size)
-			content := make([]byte, contentSize)
-			_, err = f.Read(content)
-			if err != nil {
-				break
-			}
-			buffer := bytes.NewBuffer(content)
-			msgTx := &wire.MsgTxAbe{}
-			err = msgTx.DeserializeFull(buffer)
-			if err != nil {
-				break
-			}
-			tx := abeutil.NewTxAbe(msgTx)
-			log.Infof("load transaction %s from file %s", msgTx.TxHash(), rotatedName)
-			_, err = mp.ProcessTransactionAbe(tx, false, false, 0, true)
-			if err != nil {
-				break
-			}
-		}
-		f.Close()
-		log.Infof("finish loading transactions from file %s, remove it...", rotatedName)
-		os.Remove(rotatedName)
-		f = nil
-	}
-	if len(mp.poolAbe) < MaxTransactionInMemoryNum {
-		mp.diskTxCaching = false
 	}
 }
 
