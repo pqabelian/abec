@@ -49,10 +49,7 @@ const (
 	// MaxTransactionInMemoryNum is the maximum number of  transaction that
 	// can be stored in memory.
 	// The transaction would the stored in disk when the pool has no memory
-	MaxTransactionInMemoryNum = 5
-	// MinTransactionInMemoryNum is the minimum number of transaction that
-	// the memory pool would load transaction cached in disk
-	MinTransactionInMemoryNum = 3
+	MaxTransactionInMemoryNum = 20
 )
 
 // Tag represents an identifier to use for tagging orphan transactions.  The
@@ -949,8 +946,7 @@ func (mp *TxPool) txMonitor() {
 		mp.txMonitorMu.Unlock()
 		log.Infof("stop monitor transaction number in mempool")
 	}()
-	//duration := 5 * time.Minute
-	duration := 10 * time.Second
+	duration := 5 * time.Minute
 	timer := time.NewTicker(duration)
 	for {
 		select {
