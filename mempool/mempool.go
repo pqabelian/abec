@@ -45,12 +45,12 @@ const (
 	// can be evicted from the mempool when accepting a transaction
 	// replacement.
 	MaxReplacementEvictions = 100
-
-	// MaxTransactionInMemoryNum is the maximum number of  transaction that
-	// can be stored in memory.
-	// The transaction would the stored in disk when the pool has no memory
-	MaxTransactionInMemoryNum = 20
 )
+
+// MaxTransactionInMemoryNum is the maximum number of  transaction that
+// can be stored in memory.
+// The transaction would the stored in disk when the pool has no memory
+var MaxTransactionInMemoryNum = 100
 
 // Tag represents an identifier to use for tagging orphan transactions.  The
 // caller may choose any scheme it desires, however it is common to use peer IDs

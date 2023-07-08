@@ -6,9 +6,12 @@ package main
 
 import (
 	"fmt"
+	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/blockchain/indexers"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/limits"
+	"github.com/abesuite/abec/mempool"
+	"github.com/shirou/gopsutil/v3/mem"
 	"net"
 	"net/http"
 	"os"
@@ -115,6 +118,23 @@ func abecMain(serverChan chan<- *server) error {
 		}
 
 		return nil
+	}
+
+	// check the memory
+	v, err := mem.VirtualMemory()
+	if err != nil {
+		abecLog.Warnf("fail to acquire system info %v, use the default memory configuration", err)
+	} else {
+		if v.Total > 8*1024*1024*1024 {
+			blockchain.MaxOrphanBlocks = 40
+			mempool.MaxTransactionInMemoryNum = 400
+		} else if v.Total > 8*1024*1024*1024 {
+			blockchain.MaxOrphanBlocks = 20
+			mempool.MaxTransactionInMemoryNum = 200
+		} else {
+			blockchain.MaxOrphanBlocks = 10
+			mempool.MaxTransactionInMemoryNum = 100
+		}
 	}
 
 	// Create P2P server and start it.
