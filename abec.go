@@ -286,7 +286,7 @@ func loadBlockDB() (database.DB, error) {
 	}
 
 	abecLog.Infof("Node type: %v", nodeType.String())
-	abecLog.Infof("Trust level: %v", trustLevel.String())
+	//abecLog.Infof("Trust level: %v", trustLevel.String())
 	cfg.nodeType = nodeType
 	cfg.trustLevel = trustLevel
 
