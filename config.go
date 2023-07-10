@@ -71,7 +71,7 @@ const (
 	sampleConfigFilename         = "sample-abec.conf"
 	defaultTxIndex               = false
 	defaultAddrIndex             = false
-	defaultAllowDiskCacheTx      = false
+	defaultAllowDiskCacheTx      = true
 	defaultCacheTxDirname        = "txcaches"
 	defaultCacheTxFilename       = "txcache.abe"
 )

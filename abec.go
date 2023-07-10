@@ -125,7 +125,13 @@ func abecMain(serverChan chan<- *server) error {
 	if err != nil {
 		abecLog.Warnf("fail to acquire system info %v, use the default memory configuration", err)
 	} else {
-		if v.Total >= 8*1024*1024*1024 {
+		if v.Total >= 32*1024*1024*1024 {
+			blockchain.MaxOrphanBlocks = 160
+			mempool.MaxTransactionInMemoryNum = 1600
+		} else if v.Total >= 16*1024*1024*1024 {
+			blockchain.MaxOrphanBlocks = 80
+			mempool.MaxTransactionInMemoryNum = 800
+		} else if v.Total >= 8*1024*1024*1024 {
 			blockchain.MaxOrphanBlocks = 40
 			mempool.MaxTransactionInMemoryNum = 400
 		} else if v.Total >= 4*1024*1024*1024 {
