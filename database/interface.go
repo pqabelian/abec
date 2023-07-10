@@ -408,6 +408,9 @@ type Tx interface {
 	StoreMinExistingWitnessFileNum(num uint32) error
 	UpdateMinExistingWitnessFileNum() error
 
+	FetchWitnessServiceHeight() (uint32, error)
+	StoreWitnessServiceHeight(num uint32) error
+
 	// ******************************************************************
 	// Methods related to both atomic metadata storage and block storage.
 	// ******************************************************************

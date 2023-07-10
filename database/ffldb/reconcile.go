@@ -90,6 +90,17 @@ func reconcileDB(pdb *db, nodeType wire.NodeType, trustLevel wire.TrustLevel, cr
 			return nil, err
 		}
 	}
+	hasWitnessServiceHeight, err := witnessServiceHeightExist(pdb)
+	if err != nil {
+		return nil, err
+	}
+	if !hasWitnessServiceHeight {
+		log.Info("Adding witness service height in database...")
+		err := addWitnessServiceHeight(pdb.cache.ldb, 0)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// Load the current write cursor position from the metadata.
 	var curFileNum, curOffset uint32

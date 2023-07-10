@@ -92,6 +92,9 @@ var (
 	// trustLevelKeyName is the key used to store the trust level.
 	// 0: high, 1: medium, 2: low
 	trustLevelKeyName = []byte("ffldb-trustlevel")
+
+	// witnessServiceHeightKeyName is the key used to store the min height of witness stored by the node.
+	witnessServiceHeightKeyName = []byte("ffldb-witnessserviceheight")
 )
 
 // Common error strings.
@@ -2149,6 +2152,23 @@ func (tx *transaction) UpdateMinExistingWitnessFileNum() error {
 	return tx.StoreMinExistingWitnessFileNum(i)
 }
 
+// FetchWitnessServiceHeight fetch witness service height from meta data.
+func (tx *transaction) FetchWitnessServiceHeight() (uint32, error) {
+	var witnessServiceHeight []byte
+	witnessServiceHeight = tx.Metadata().Get(witnessServiceHeightKeyName)
+	if witnessServiceHeight == nil {
+		return 0, errors.New("witness service height does not exist")
+	}
+
+	return deserializeUint32(witnessServiceHeight), nil
+}
+
+// StoreWitnessServiceHeight put the witness service height into db.
+func (tx *transaction) StoreWitnessServiceHeight(num uint32) error {
+	err := tx.Metadata().Put(witnessServiceHeightKeyName, serializeUint32(num))
+	return err
+}
+
 // Commit commits all changes that have been made to the root metadata bucket
 // and all of its sub-buckets to the database cache which is periodically synced
 // to persistent storage.  In addition, it commits all new blocks directly to
@@ -2462,6 +2482,8 @@ func initDB(ldb *leveldb.DB, nodeType wire.NodeType, trustLevel wire.TrustLevel)
 		serializeUint32(uint32(nodeType)))
 	batch.Put(bucketizedKey(metadataBucketID, trustLevelKeyName),
 		serializeUint32(uint32(trustLevel)))
+	batch.Put(bucketizedKey(metadataBucketID, witnessServiceHeightKeyName),
+		serializeUint32(uint32(0)))
 
 	// Create block index bucket and set the current bucket id.
 	//
@@ -2555,6 +2577,24 @@ func trustLevelExist(pdb *db) (bool, error) {
 	return hasTrustLevel, nil
 }
 
+// witnessServiceHeightExist check whether witness service height exist in database.
+func witnessServiceHeightExist(pdb *db) (bool, error) {
+	hasWitnessServiceHeight := true
+	var witnessServiceHeight []byte
+	err := pdb.View(func(tx database.Tx) error {
+		witnessServiceHeight = tx.Metadata().Get(witnessServiceHeightKeyName)
+		if witnessServiceHeight == nil {
+			hasWitnessServiceHeight = false
+		}
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+
+	return hasWitnessServiceHeight, nil
+}
+
 // addNodeTypeKey add nodeType in meta data.
 func addNodeTypeKey(ldb *leveldb.DB, nodeType wire.NodeType) error {
 
@@ -2582,6 +2622,23 @@ func addTrustLevelKey(ldb *leveldb.DB, trustLevel wire.TrustLevel) error {
 	// Write everything as a single batch.
 	if err := ldb.Write(batch, nil); err != nil {
 		str := fmt.Sprintf("failed to add trust level key: %v",
+			err)
+		return convertErr(str, err)
+	}
+
+	return nil
+}
+
+// addWitnessServiceHeight add witness service height in meta data.
+func addWitnessServiceHeight(ldb *leveldb.DB, witnessServiceHeight uint32) error {
+
+	batch := new(leveldb.Batch)
+	batch.Put(bucketizedKey(metadataBucketID, witnessServiceHeightKeyName),
+		serializeUint32(witnessServiceHeight))
+
+	// Write everything as a single batch.
+	if err := ldb.Write(batch, nil); err != nil {
+		str := fmt.Sprintf("failed to add witness service height key: %v",
 			err)
 		return convertErr(str, err)
 	}

@@ -290,6 +290,17 @@ func loadBlockDB() (database.DB, error) {
 	cfg.nodeType = nodeType
 	cfg.trustLevel = trustLevel
 
+	var witnessServiceHeight uint32
+	err = db.View(func(dbTx database.Tx) error {
+		var err error
+		witnessServiceHeight, err = dbTx.FetchWitnessServiceHeight()
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	abecLog.Infof("Witness service height: %v", witnessServiceHeight)
+
 	abecLog.Info("Block database loaded")
 	return db, nil
 }
