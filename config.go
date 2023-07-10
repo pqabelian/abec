@@ -143,6 +143,7 @@ type config struct {
 	NoRelayPriority       bool          `long:"norelaypriority" description:"Do not require free or low-fee transactions to have high priority for relaying"`
 	DisableRPC            bool          `long:"norpc" description:"Disable built-in RPC server -- NOTE: The RPC server is disabled by default if no rpcuser/rpcpass or rpclimituser/rpclimitpass is specified"`
 	DisableTLS            bool          `long:"notls" description:"Disable TLS for the RPC server -- NOTE: This is only allowed if the RPC server is bound to localhost"`
+	EnableGetWorkRPC      bool          `long:"enablegetwork" description:"Enable get work RPC server, this server is TLS disabled"`
 	OnionProxy            string        `long:"onion" description:"Connect to tor hidden services via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
 	OnionProxyPass        string        `long:"onionpass" default-mask:"-" description:"Password for onion proxy server"`
 	OnionProxyUser        string        `long:"onionuser" description:"Username for onion proxy server"`
@@ -158,7 +159,8 @@ type config struct {
 	RPCKey                string        `long:"rpckey" description:"File containing the certificate key"`
 	RPCLimitPass          string        `long:"rpclimitpass" default-mask:"-" description:"Password for limited RPC connections"`
 	RPCLimitUser          string        `long:"rpclimituser" description:"Username for limited RPC connections"`
-	RPCListeners          []string      `long:"rpclisten" description:"Add an interface/port to listen for RPC connections (default port: 8334, testnet: 18334)"`
+	RPCListeners          []string      `long:"rpclisten" description:"Add an interface/port to listen for RPC connections (default port: 8667, testnet: 18667, simnet: 18889)"`
+	RPCListenersGetWork   []string      `long:"rpclistengetwork" description:"Add an interface/port to listen for RPC connections for get work (default port: 8668, testnet: 18668, simnet: 18890)"`
 	RPCMaxClients         int           `long:"rpcmaxclients" description:"Max number of RPC clients for standard connections"`
 	RPCMaxConcurrentReqs  int           `long:"rpcmaxconcurrentreqs" description:"Max number of concurrent RPC requests that may be processed concurrently"`
 	RPCMaxWebsockets      int           `long:"rpcmaxwebsockets" description:"Max number of RPC websocket connections"`
@@ -758,6 +760,11 @@ func loadConfig() (*config, []string, error) {
 		abecLog.Infof("RPC service is disabled")
 	}
 
+	if cfg.EnableGetWorkRPC {
+		abecLog.Infof("RPC server for getwork is enabled")
+		cfg.ExternalGenerate = true
+	}
+
 	// Default RPC to listen on localhost only.
 	if !cfg.DisableRPC && len(cfg.RPCListeners) == 0 {
 		addrs, err := net.LookupHost("localhost")
@@ -768,6 +775,20 @@ func loadConfig() (*config, []string, error) {
 		for _, addr := range addrs {
 			addr = net.JoinHostPort(addr, activeNetParams.rpcPort)
 			cfg.RPCListeners = append(cfg.RPCListeners, addr)
+		}
+	}
+
+	// Setup RPC listeners for getwork.
+	if cfg.EnableGetWorkRPC && len(cfg.RPCListenersGetWork) == 0 {
+		// todo: localhost?
+		addrs, err := net.LookupHost("localhost")
+		if err != nil {
+			return nil, nil, err
+		}
+		cfg.RPCListenersGetWork = make([]string, 0, len(addrs))
+		for _, addr := range addrs {
+			addr = net.JoinHostPort(addr, activeNetParams.rpcPortGetWork)
+			cfg.RPCListenersGetWork = append(cfg.RPCListenersGetWork, addr)
 		}
 	}
 
@@ -949,6 +970,11 @@ func loadConfig() (*config, []string, error) {
 	// duplicate addresses.
 	cfg.RPCListeners = normalizeAddresses(cfg.RPCListeners,
 		activeNetParams.rpcPort)
+
+	// Add default port to all getwork rpc listener addresses if needed and remove
+	// duplicate addresses.
+	cfg.RPCListenersGetWork = normalizeAddresses(cfg.RPCListenersGetWork,
+		activeNetParams.rpcPortGetWork)
 
 	// Only allow TLS to be disabled if the RPC is bound to localhost
 	// addresses or is not mainnet.

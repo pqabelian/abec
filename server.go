@@ -198,6 +198,7 @@ type server struct {
 	hashCache            *txscript.HashCache
 	witnessCache         *txscript.WitnessCache
 	rpcServer            *rpcServer
+	rpcServerGetWork     *rpcServer
 	syncManager          *syncmgr.SyncManager
 	chain                *blockchain.BlockChain
 	txMemPool            *mempool.TxPool
@@ -965,6 +966,9 @@ func (s *server) AnnounceNewTransactions(txns []*mempool.TxDescAbe) {
 	// newly accepted transactions.
 	if s.rpcServer != nil {
 		s.rpcServer.NotifyNewTransactionsAbe(txns)
+	}
+	if s.rpcServerGetWork != nil {
+		s.rpcServerGetWork.NotifyNewTransactionsAbe(txns)
 	}
 }
 
@@ -2060,6 +2064,10 @@ func (s *server) Start() {
 		s.rpcServer.Start()
 	}
 
+	if cfg.EnableGetWorkRPC {
+		s.rpcServerGetWork.Start()
+	}
+
 	// Start the CPU miner if generation is enabled.
 	if cfg.Generate {
 		s.cpuMiner.Start() //if the config contains mining flag, then start mining
@@ -2091,6 +2099,9 @@ func (s *server) Stop() error {
 	// Shutdown the RPC server if it's not disabled.
 	if !cfg.DisableRPC {
 		s.rpcServer.Stop()
+	}
+	if cfg.EnableGetWorkRPC {
+		s.rpcServerGetWork.Stop()
 	}
 
 	// Save fee estimator state in the database.
@@ -2281,6 +2292,29 @@ func setupRPCListeners() ([]net.Listener, error) {
 	}
 
 	netAddrs, err := parseListeners(cfg.RPCListeners)
+	if err != nil {
+		return nil, err
+	}
+
+	listeners := make([]net.Listener, 0, len(netAddrs))
+	for _, addr := range netAddrs {
+		listener, err := listenFunc(addr.Network(), addr.String())
+		if err != nil {
+			rpcsLog.Warnf("Can't listen on %s: %v", addr, err)
+			continue
+		}
+		listeners = append(listeners, listener)
+	}
+
+	return listeners, nil
+}
+
+// setupRPCListenersGetWork returns a slice of listeners that are configured for use
+// with the RPC server for getwork depending on the configuration settings for listen
+// addresses.
+func setupRPCListenersGetWork() ([]net.Listener, error) {
+	listenFunc := net.Listen
+	netAddrs, err := parseListeners(cfg.RPCListenersGetWork)
 	if err != nil {
 		return nil, err
 	}
@@ -2618,9 +2652,11 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 			DB:          db,
 			TxMemPool:   s.txMemPool,
 			// todo: (EthashPoW) 202207
-			Ethash:        s.ethash,
-			Generator:     blockTemplateGenerator,
-			CPUMiner:      s.cpuMiner,
+			Ethash:    s.ethash,
+			Generator: blockTemplateGenerator,
+			CPUMiner:  s.cpuMiner,
+			// todo: 2023.05.11 At this moment, the ExternalMiner here is not used,
+			// since we use rpcServerGetWork to respond the requests of getwork.
 			ExternalMiner: s.externalMiner,
 			TxIndex:       s.txIndex,
 			FeeEstimator:  s.feeEstimator,
@@ -2632,6 +2668,46 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		// Signal process shutdown when the RPC server requests it.
 		go func() {
 			<-s.rpcServer.RequestedProcessShutdown()
+			shutdownRequestChannel <- struct{}{}
+		}()
+	}
+
+	if cfg.EnableGetWorkRPC {
+		// Setup listeners for the configured RPC listen addresses.
+		rpcListeners, err := setupRPCListenersGetWork()
+		if err != nil {
+			return nil, err
+		}
+		if len(rpcListeners) == 0 {
+			return nil, errors.New("RPCS: No valid listen address for getwork")
+		}
+
+		s.rpcServerGetWork, err = newRPCServer(&rpcserverConfig{
+			Listeners:   rpcListeners,
+			StartupTime: s.startupTime,
+			ConnMgr:     &rpcConnManager{&s},
+			SyncMgr:     &rpcSyncMgr{&s, s.syncManager},
+			TimeSource:  s.timeSource,
+			Chain:       s.chain,
+			ChainParams: chainParams,
+			DB:          db,
+			TxMemPool:   s.txMemPool,
+			// todo: (EthashPoW) 202207
+			Ethash:        s.ethash,
+			Generator:     blockTemplateGenerator,
+			CPUMiner:      s.cpuMiner,
+			ExternalMiner: s.externalMiner,
+			TxIndex:       s.txIndex,
+			FeeEstimator:  s.feeEstimator,
+			Alias:         "getwork",
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		// Signal process shutdown when the RPC server requests it.
+		go func() {
+			<-s.rpcServerGetWork.RequestedProcessShutdown()
 			shutdownRequestChannel <- struct{}{}
 		}()
 	}
