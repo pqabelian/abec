@@ -471,13 +471,14 @@ type Peer struct {
 	timeOffset    int64
 	timeConnected time.Time
 	//	todo(ABE): did not understand startHeight well yet
-	startingHeight     int32
-	announcedHeight    int32
-	lastBlock          int32
-	lastAnnouncedBlock *chainhash.Hash
-	lastPingNonce      uint64    // Set to nonce if we have a pending ping.
-	lastPingTime       time.Time // Time we sent last ping.
-	lastPingMicros     int64     // Time for last ping to return.
+	startingHeight       int32
+	announcedHeight      int32
+	witnessServiceHeight uint32
+	lastBlock            int32
+	lastAnnouncedBlock   *chainhash.Hash
+	lastPingNonce        uint64    // Set to nonce if we have a pending ping.
+	lastPingTime         time.Time // Time we sent last ping.
+	lastPingMicros       int64     // Time for last ping to return.
 
 	stallControl  chan stallControlMsg
 	outputQueue   chan outMsg
@@ -741,6 +742,10 @@ func (p *Peer) AnnouncedHeight() int32 {
 	p.statsMtx.RUnlock()
 
 	return announcedHeight
+}
+
+func (p *Peer) WitnessServiceHeight() uint32 {
+	return p.witnessServiceHeight
 }
 
 // LastSend returns the last send time of the peer.
@@ -2037,6 +2042,7 @@ func (p *Peer) readRemoteVersionMsg() error {
 	p.lastBlock = msg.LastBlock
 	p.startingHeight = msg.LastBlock
 	p.timeOffset = msg.Timestamp.Unix() - time.Now().Unix()
+	p.witnessServiceHeight = msg.WitnessServiceHeight
 	p.statsMtx.Unlock()
 
 	// Set the peer's ID, user agent, and potentially the flag which

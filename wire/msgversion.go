@@ -51,6 +51,9 @@ type MsgVersion struct {
 
 	// Don't announce transactions to peer.
 	DisableRelayTx bool
+
+	// The minimum height of the block which the node has its witness.
+	WitnessServiceHeight uint32
 }
 
 // HasService returns whether the specified service is supported by the peer
@@ -140,6 +143,12 @@ func (msg *MsgVersion) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) 
 		msg.DisableRelayTx = !relayTx
 	}
 
+	if buf.Len() > 0 {
+		var witnessServiceHeight uint32 = 0
+		readElement(r, &witnessServiceHeight)
+		msg.WitnessServiceHeight = witnessServiceHeight
+	}
+
 	return nil
 }
 
@@ -186,6 +195,11 @@ func (msg *MsgVersion) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) 
 	// relayed, so reverse it from the DisableRelayTx field.
 	//	BIP0037 is implemented.
 	err = writeElement(w, !msg.DisableRelayTx)
+	if err != nil {
+		return err
+	}
+
+	err = writeElement(w, msg.WitnessServiceHeight)
 	if err != nil {
 		return err
 	}

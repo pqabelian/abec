@@ -1366,7 +1366,8 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 	}
 
 	// Add the new peer and start it.
-	srvrLog.Debugf("New peer %s", sp)
+	srvrLog.Debugf("New peer %s (Last block height: %v, Witness Service Height: %v)", sp, sp.LastBlock(),
+		sp.WitnessServiceHeight())
 	if sp.Inbound() {
 		state.inboundPeers[sp.ID()] = sp
 	} else {
