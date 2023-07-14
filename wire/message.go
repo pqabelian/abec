@@ -279,10 +279,8 @@ func WriteMessageWithEncodingN(w io.Writer, msg Message, pver uint32,
 	if wrappedMsg, ok := msg.(*WrappedMessage); ok {
 		wrapped = true
 		if !wrappedMsg.Cached() {
-			log.Infof("Cache block %s to bytes when sending block \n", wrappedMsg.Message.(*MsgBlockAbe).BlockHash())
 			wrappedMsg.Cache(pver, encoding)
 		}
-		log.Infof("Use cached block bytes %s when sending block \n", wrappedMsg.Message.(*MsgBlockAbe).BlockHash())
 		payload = wrappedMsg.Bytes()
 		lenp = len(payload)
 	}

@@ -1000,12 +1000,10 @@ func (s *server) TransactionConfirmed(tx *abeutil.TxAbe) {
 func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
 	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
 
-	testLog.Infof("Send tx %s to peer %s", hash, sp.Addr())
 	var msg wire.Message
 	msgCacheKey := fmt.Sprintf("tx_%s", hash)
 	value, ok := s.communicationCache.Load(msgCacheKey)
 	if wrappedMessage, hit := value.(*wire.WrappedMessage); ok && hit {
-		testLog.Infof("Hit cache with %s when sending block to peer %s, current reference %d", hash, sp.Addr(), wrappedMessage.Count())
 		wrappedMessage.Use()
 		msg = wrappedMessage
 	} else {
@@ -1026,7 +1024,6 @@ func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<-
 		s.communicationCache.Store(msgCacheKey, wrappedTxMsg)
 		wrappedTxMsg.Use()
 		msg = wrappedTxMsg
-		testLog.Infof("Cache tx with %s when sending tx to peer %s", hash, sp.Addr())
 	}
 
 	// Once we have fetched data wait for any previous operation to finish.
@@ -1142,12 +1139,10 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan cha
 // server.cache wire.Message + []byte
 func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
 	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
-	testLog.Infof("Send block %s to peer %s", hash, sp.Addr())
 	var msg wire.Message
 	msgCacheKey := fmt.Sprintf("block_%s", hash)
 	value, ok := s.communicationCache.Load(msgCacheKey)
 	if wrappedMessage, hit := value.(*wire.WrappedMessage); ok && hit {
-		testLog.Infof("Hit cache with %s when sending block to peer %s, current reference %d", hash, sp.Addr(), wrappedMessage.Count())
 		wrappedMessage.Use()
 		msg = wrappedMessage
 	} else {
@@ -1190,7 +1185,6 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 		s.communicationCache.Store(msgCacheKey, wrappedBlockMsg)
 		wrappedBlockMsg.Use()
 		msg = wrappedBlockMsg
-		testLog.Infof("Cache block with %s when sending block to peer %s", hash, sp.Addr())
 	}
 
 	// Once we have fetched data wait for any previous operation to finish.
