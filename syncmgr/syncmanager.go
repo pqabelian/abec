@@ -197,19 +197,20 @@ func limitAdd(m map[chainhash.Hash]struct{}, hash chainhash.Hash, limit int) {
 // chain is in sync, the SyncManager handles incoming block and header
 // notifications and relays announcements of new blocks to peers.
 type SyncManager struct {
-	nodeType       wire.NodeType
-	trustLevel     wire.TrustLevel
-	peerNotifier   PeerNotifier
-	started        int32
-	shutdown       int32
-	chain          *blockchain.BlockChain
-	ethash         *ethash.Ethash // todo: (ethmining)
-	txMemPool      *mempool.TxPool
-	chainParams    *chaincfg.Params
-	progressLogger *blockProgressLogger
-	msgChan        chan interface{}
-	wg             sync.WaitGroup
-	quit           chan struct{}
+	nodeType           wire.NodeType
+	trustLevel         wire.TrustLevel
+	maxReservedWitness uint32
+	peerNotifier       PeerNotifier
+	started            int32
+	shutdown           int32
+	chain              *blockchain.BlockChain
+	ethash             *ethash.Ethash // todo: (ethmining)
+	txMemPool          *mempool.TxPool
+	chainParams        *chaincfg.Params
+	progressLogger     *blockProgressLogger
+	msgChan            chan interface{}
+	wg                 sync.WaitGroup
+	quit               chan struct{}
 
 	// These fields should only be accessed from the blockHandler thread
 	rejectedTxns     map[chainhash.Hash]struct{}
@@ -2399,22 +2400,23 @@ func (sm *SyncManager) Pause() chan<- struct{} {
 // block, tx, and inv updates.
 func New(config *Config) (*SyncManager, error) {
 	sm := SyncManager{
-		nodeType:        config.NodeType,
-		trustLevel:      config.TrustLevel,
-		peerNotifier:    config.PeerNotifier,
-		chain:           config.Chain,
-		txMemPool:       config.TxMemPool,
-		ethash:          config.Ethash, // todo: (EthashPoW)
-		chainParams:     config.ChainParams,
-		rejectedTxns:    make(map[chainhash.Hash]struct{}),
-		requestedTxns:   make(map[chainhash.Hash]struct{}),
-		requestedBlocks: make(map[chainhash.Hash]struct{}),
-		peerStates:      make(map[*peerpkg.Peer]*peerSyncState),
-		progressLogger:  newBlockProgressLogger("Processed", log),
-		msgChan:         make(chan interface{}, config.MaxPeers*3),
-		headerList:      list.New(),
-		quit:            make(chan struct{}),
-		feeEstimator:    config.FeeEstimator,
+		nodeType:           config.NodeType,
+		trustLevel:         config.TrustLevel,
+		maxReservedWitness: config.MaxReservedWitness,
+		peerNotifier:       config.PeerNotifier,
+		chain:              config.Chain,
+		txMemPool:          config.TxMemPool,
+		ethash:             config.Ethash, // todo: (EthashPoW)
+		chainParams:        config.ChainParams,
+		rejectedTxns:       make(map[chainhash.Hash]struct{}),
+		requestedTxns:      make(map[chainhash.Hash]struct{}),
+		requestedBlocks:    make(map[chainhash.Hash]struct{}),
+		peerStates:         make(map[*peerpkg.Peer]*peerSyncState),
+		progressLogger:     newBlockProgressLogger("Processed", log),
+		msgChan:            make(chan interface{}, config.MaxPeers*3),
+		headerList:         list.New(),
+		quit:               make(chan struct{}),
+		feeEstimator:       config.FeeEstimator,
 	}
 
 	best := sm.chain.BestSnapshot()

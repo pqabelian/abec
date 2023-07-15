@@ -135,6 +135,7 @@ type config struct {
 	MaxPeers              int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
 	MiningAddrs           []string      `long:"miningaddr" description:"Add the specified payment address to the list of addresses to use for generated blocks -- At least one address is required if the generate or externalgenerate option is set"`
 	MinRelayTxFee         uint64        `long:"minrelaytxfee" description:"The minimum transaction fee in Neutrino/kB to be considered a non-zero fee."`
+	MaxReservedWitness    uint32        `long:"maxreservedwitness" description:"The maximum number of blocks witness that the node stores (default: 4000)"`
 	DisableBanning        bool          `long:"nobanning" description:"Disable banning of misbehaving peers"`
 	NoCFilters            bool          `long:"nocfilters" description:"Disable committed filtering (CF) support"`
 	DisableCheckpoints    bool          `long:"nocheckpoints" description:"Disable built-in checkpoints.  Don't do this unless you know what you're doing."`
@@ -177,16 +178,16 @@ type config struct {
 	TestNet3              bool          `long:"testnet" description:"Use the test network"`
 	TorIsolation          bool          `long:"torisolation" description:"Enable Tor stream isolation by randomizing user credentials for each connection."`
 	TrickleInterval       time.Duration `long:"trickleinterval" description:"Minimum time between attempts to send new inventory to a connected peer"`
-	//TrustLevel            string        `long:"trustlevel" description:"Trust level of other nodes (high/medium/low). default: high"`
-	TxIndex           bool     `long:"txindex" description:"Maintain a full hash-based transaction index which makes all transactions available via the getrawtransaction RPC"`
-	UserAgentComments []string `long:"uacomment" description:"Comment to add to the user agent -- See BIP 14 for more information."`
-	Upnp              bool     `long:"upnp" description:"Use UPnP to map our listening port outside of NAT"`
-	ShowVersion       bool     `short:"V" long:"version" description:"Display version information and exit"`
-	Whitelists        []string `long:"whitelist" description:"Add an IP network or IP that will not be banned. (eg. 192.168.1.0/24 or ::1)"`
-	lookup            func(string) ([]net.IP, error)
-	oniondial         func(string, string, time.Duration) (net.Conn, error)
-	dial              func(string, string, time.Duration) (net.Conn, error)
-	addCheckpoints    []chaincfg.Checkpoint
+	TrustLevel            string        `long:"trustlevel" description:"Trust level of other nodes (high/medium/low). default: medium"`
+	TxIndex               bool          `long:"txindex" description:"Maintain a full hash-based transaction index which makes all transactions available via the getrawtransaction RPC"`
+	UserAgentComments     []string      `long:"uacomment" description:"Comment to add to the user agent -- See BIP 14 for more information."`
+	Upnp                  bool          `long:"upnp" description:"Use UPnP to map our listening port outside of NAT"`
+	ShowVersion           bool          `short:"V" long:"version" description:"Display version information and exit"`
+	Whitelists            []string      `long:"whitelist" description:"Add an IP network or IP that will not be banned. (eg. 192.168.1.0/24 or ::1)"`
+	lookup                func(string) ([]net.IP, error)
+	oniondial             func(string, string, time.Duration) (net.Conn, error)
+	dial                  func(string, string, time.Duration) (net.Conn, error)
+	addCheckpoints        []chaincfg.Checkpoint
 	// todo: (ethmining) miningAddr vs. the above MiningAddr, need to clarify
 	miningAddrs []abeutil.AbelAddress
 	//miningAddrBytes []byte
@@ -459,6 +460,8 @@ func loadConfig() (*config, []string, error) {
 		EthashConfig:         ethash.DefaultCfg,
 		TxIndex:              defaultTxIndex,
 		NodeType:             defaultNodeType,
+		TrustLevel:           "medium",
+		MaxReservedWitness:   4000,
 	}
 	// Service options which are only added on Windows.
 	// TODO(osy): this set is ingoned, we should detect it!
@@ -608,24 +611,21 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, errors.New("nodetype should be fullnode or semifullnode or normalnode")
 	}
 
-	// Set trust level.
-	cfg.trustLevel = wire.TrustLevelMedium
-
 	// Check trust level.
-	//if cfg.TrustLevel == "high" {
-	//	cfg.trustLevel = wire.TrustLevelHigh
-	//} else if cfg.TrustLevel == "medium" {
-	//	cfg.trustLevel = wire.TrustLevelMedium
-	//} else if cfg.TrustLevel == "low" {
-	//	cfg.trustLevel = wire.TrustLevelLow
-	//} else {
-	//	return nil, nil, errors.New("trustlevel should be high or medium or low")
-	//}
-	//if cfg.NodeType == "fullnode" || cfg.NodeType == "semifullnode" {
-	//	if cfg.trustLevel == wire.TrustLevelHigh {
-	//		cfg.trustLevel = wire.TrustLevelMedium
-	//	}
-	//}
+	if cfg.TrustLevel == "high" {
+		cfg.trustLevel = wire.TrustLevelHigh
+	} else if cfg.TrustLevel == "medium" {
+		cfg.trustLevel = wire.TrustLevelMedium
+	} else if cfg.TrustLevel == "low" {
+		cfg.trustLevel = wire.TrustLevelLow
+	} else {
+		return nil, nil, errors.New("trustlevel should be high or medium or low")
+	}
+	if cfg.NodeType == "fullnode" || cfg.NodeType == "semifullnode" {
+		if cfg.trustLevel == wire.TrustLevelHigh {
+			cfg.trustLevel = wire.TrustLevelMedium
+		}
+	}
 
 	// Set the default policy for relaying non-standard transactions
 	// according to the default of the active network. The set

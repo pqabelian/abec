@@ -26,13 +26,14 @@ type PeerNotifier interface {
 
 // Config is a configuration struct used to initialize a new SyncManager.
 type Config struct {
-	NodeType     wire.NodeType
-	TrustLevel   wire.TrustLevel
-	PeerNotifier PeerNotifier
-	Chain        *blockchain.BlockChain
-	TxMemPool    *mempool.TxPool
-	Ethash       *ethash.Ethash // todo: (ethmining)
-	ChainParams  *chaincfg.Params
+	NodeType           wire.NodeType
+	TrustLevel         wire.TrustLevel
+	MaxReservedWitness uint32
+	PeerNotifier       PeerNotifier
+	Chain              *blockchain.BlockChain
+	TxMemPool          *mempool.TxPool
+	Ethash             *ethash.Ethash // todo: (ethmining)
+	ChainParams        *chaincfg.Params
 
 	DisableCheckpoints bool
 	MaxPeers           int

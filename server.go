@@ -2518,6 +2518,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	s.syncManager, err = syncmgr.New(&syncmgr.Config{
 		NodeType:           cfg.nodeType,
 		TrustLevel:         cfg.trustLevel,
+		MaxReservedWitness: cfg.MaxReservedWitness,
 		PeerNotifier:       &s,
 		Chain:              s.chain,
 		TxMemPool:          s.txMemPool,
@@ -2532,9 +2533,10 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	}
 
 	s.witnessManager, err = witnessmgr.New(&witnessmgr.Config{
-		NodeType:   cfg.nodeType,
-		TrustLevel: cfg.trustLevel,
-		Chain:      s.chain,
+		NodeType:           cfg.nodeType,
+		TrustLevel:         cfg.trustLevel,
+		MaxReservedWitness: cfg.MaxReservedWitness,
+		Chain:              s.chain,
 	})
 	if err != nil {
 		return nil, err
