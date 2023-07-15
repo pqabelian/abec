@@ -19,9 +19,6 @@ const (
 // ServiceFlag identifies services supported by an abec peer.
 type ServiceFlag uint64
 
-// MaxReservedWitness is the max number of block witness reserved by normal node.
-const MaxReservedWitness = 4000
-
 const (
 	// SFNodeNetwork is a flag used to indicate a peer is a full node (without witness).
 	SFNodeNetwork ServiceFlag = 1 << iota

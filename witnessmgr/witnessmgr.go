@@ -73,7 +73,7 @@ func (wm *WitnessManager) handleBlockchainNotification(notification *blockchain.
 
 		currentHeight := block.Height()
 		if currentHeight%deleteInterval == 0 {
-			witnessKeptStartHeight := currentHeight - wire.MaxReservedWitness
+			witnessKeptStartHeight := currentHeight - int32(wm.maxReservedWitness)
 			if witnessKeptStartHeight <= 0 {
 				return
 			}
@@ -170,6 +170,12 @@ func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
 		minConsecutiveWitnessFileNum = fileNumReserved[i]
 	}
 	err = wm.chain.UpdateMinConsecutiveWitnessFileNum(minConsecutiveWitnessFileNum)
+	if err != nil {
+		return err
+	}
+
+	// Store witnessServiceHeight before pruning witness in case the pruning process fails.
+	err = wm.chain.StoreWitnessServiceHeight(uint32(height))
 	if err != nil {
 		return err
 	}

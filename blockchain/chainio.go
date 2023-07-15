@@ -2076,3 +2076,11 @@ func (b *BlockChain) UpdateMinExistingWitnessFileNum() error {
 	})
 	return err
 }
+
+// StoreWitnessServiceHeight update witness service height in db.
+func (b *BlockChain) StoreWitnessServiceHeight(height uint32) error {
+	err := b.db.Update(func(dbTx database.Tx) error {
+		return dbTx.StoreWitnessServiceHeight(height)
+	})
+	return err
+}

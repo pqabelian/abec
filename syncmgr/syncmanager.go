@@ -295,12 +295,12 @@ func (sm *SyncManager) WitnessNeeded(p *peerpkg.Peer) bool {
 	} else {
 		// Normal node.
 		if sm.trustLevel == wire.TrustLevelMedium {
-			if sm.nextCheckpoint == nil || currentHeight+wire.MaxReservedWitness >= p.AnnouncedHeight() {
+			if sm.nextCheckpoint == nil || currentHeight+int32(sm.maxReservedWitness) >= p.AnnouncedHeight() {
 				return true
 			}
 		} else {
 			// Trust level high.
-			if currentHeight+wire.MaxReservedWitness >= p.AnnouncedHeight() {
+			if currentHeight+int32(sm.maxReservedWitness) >= p.AnnouncedHeight() {
 				return true
 			}
 		}
@@ -334,23 +334,11 @@ func (sm *SyncManager) MaybeSyncPeer(p *peerpkg.Peer) bool {
 		return false
 	}
 
-	peerHasWitness := false
-	if p.Services()&wire.SFNodeSemi == wire.SFNodeSemi {
-		if sm.nextCheckpoint == nil {
-			peerHasWitness = true
-		}
-	} else {
-		// Normal node
-		if currentHeight+wire.MaxReservedWitness >= p.LastBlock() {
-			peerHasWitness = true
-		}
+	if p.WitnessServiceHeight() <= uint32(currentHeight) {
+		return true
 	}
 
-	if !peerHasWitness {
-		log.Debugf("peer %v does not have witness of height %v, skipping", p, currentHeight+1)
-		return false
-	}
-	return true
+	return false
 }
 
 // startSync will choose the best peer among the available candidate peers to
