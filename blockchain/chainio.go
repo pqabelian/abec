@@ -2084,3 +2084,14 @@ func (b *BlockChain) StoreWitnessServiceHeight(height uint32) error {
 	})
 	return err
 }
+
+// FetchWitnessServiceHeight fetch witness service height in db.
+func (b *BlockChain) FetchWitnessServiceHeight() (uint32, error) {
+	var witnessServiceHeight uint32
+	err := b.db.View(func(dbTx database.Tx) error {
+		var err error
+		witnessServiceHeight, err = dbTx.FetchWitnessServiceHeight()
+		return err
+	})
+	return witnessServiceHeight, err
+}

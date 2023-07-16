@@ -281,6 +281,9 @@ type Config struct {
 	// TrickleInterval is the duration of the ticker which trickles down the
 	// inventory to a peer.
 	TrickleInterval time.Duration
+
+	// Chain is the current blockchain.
+	Chain *blockchain.BlockChain
 }
 
 // minUint32 is a helper function to return the minimum of two uint32s.
@@ -2189,6 +2192,13 @@ func (p *Peer) localVersionMsg() (*wire.MsgVersion, error) {
 
 	// Advertise if inv messages for transactions are desired.
 	msg.DisableRelayTx = p.cfg.DisableRelayTx
+
+	witnessServiceHeight, err := p.cfg.Chain.FetchWitnessServiceHeight()
+	if err != nil {
+		return nil, err
+	}
+
+	msg.WitnessServiceHeight = witnessServiceHeight
 
 	return msg, nil
 }
