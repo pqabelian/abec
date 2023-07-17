@@ -257,7 +257,26 @@ var MainNetParams = Params{
 
 	// Checkpoints ordered from oldest to newest.
 	// example: {1000, newHashFromStr("0000000069e244f73d78e8fd29ba2fd2ed618bd6fa2ee92559f542fdb26e7c1d")}, {...}
-	Checkpoints: []Checkpoint{},
+	Checkpoints: []Checkpoint{
+		{1000, newHashFromStr("000000011df044f2bad56bd71f57fc88b90ece744a4b78ddb3acfc1b56d6296d")},
+		{2000, newHashFromStr("00000000704427e76270a1bbef9d37551a4b529bb77896c5717ccbcd5db725e3")},
+		{5000, newHashFromStr("000000000305fe80e8d4e66be87ae0023d2dea32d6d27678fbf00a2ad16995d6")},
+		{10000, newHashFromStr("00000000dee3a4cf2bfc3a287666b1de22e29f9d73e2f14de0926cb2eadb711b")},
+		{20000, newHashFromStr("000000000c4b95ac27d9ae3db2cc5b37e21ac173c773976481fecb75533b61db")},
+		{30000, newHashFromStr("000000002c47aba855e45792f6289690e217e7354dc32bcd75744c6fb39f331d")},
+		{40000, newHashFromStr("0000000013c7a5d5ef76c11ae4775015620b3784590bdda12daf4ddd063b2c58")},
+		{50000, newHashFromStr("00000000063cac41343edb0eac3723d5f0b9fdb6329214fb34e6a36d7bbd48e0")},
+		{56000, newHashFromStr("26dc7b66d85d0b6336a1533b36590f6cc082f0ab1469a772e973159ce78456f6")},
+		{60000, newHashFromStr("b7eb9ef9f4ec315b51fbe18e00b79a410f974ae24933ef65d8a40c643003fe10")},
+		{70000, newHashFromStr("4058054cb60cd6db4bd28eab854dd72af6c0a2139f3892389dd8033118066c40")},
+		{80000, newHashFromStr("88334753bb1b4e53485ee3b48327067139ddb053178c0e1192046d4ee0ef4d8e")},
+		{90000, newHashFromStr("c215aa32df3b9d3ed94ceae51897b4903dcb7c2e705caf6b235fd62ef2c9d4f7")},
+		{100000, newHashFromStr("e21edefcd3535977e916c1f945c701a47ef1cff0bb75b855690fb50e6bb4b32b")},
+		{110000, newHashFromStr("31ffc101c3e251c251f0875437201b7d604b2603d15f77191b5ad9847082931f")},
+		{120000, newHashFromStr("fcc3966855fd3ea61d42e47be934e9f8c55607ad5b7cf2f0629516b012482bda")},
+		{130000, newHashFromStr("bda1d808f60ecb3738e8210befa4d867be5d2461e2eaae3077fd7ecae71c9cde")},
+		{140000, newHashFromStr("7ff693005455c348e4b31596e2bef4e8a6d176ca87692705267eb01a4ae10b97")},
+	},
 	// Consensus rule change deployments.
 	//
 	// The miner confirmation window is defined as:
