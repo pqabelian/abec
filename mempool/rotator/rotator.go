@@ -89,7 +89,7 @@ func (r *Rotator) Run(reader io.Reader) error {
 
 	// Rotate file immediately if it is already over the size limit.
 	if r.size >= r.threshold {
-		if err := r.rotate(); err != nil {
+		if err := r.rotate(""); err != nil {
 			return err
 		}
 		r.size = 0
@@ -111,7 +111,7 @@ func (r *Rotator) Run(reader io.Reader) error {
 		r.size += int64(m)
 
 		if r.size >= r.threshold {
-			err := r.rotate()
+			err := r.rotate("")
 			if err != nil {
 				return err
 			}
@@ -122,12 +122,13 @@ func (r *Rotator) Run(reader io.Reader) error {
 
 // Write implements the io.Writer interface for Rotator.  If p ends in a newline
 // and the file has exceeded the threshold size, the file is rotated.
-func (r *Rotator) Write(p []byte) (n int, err error) {
+func (r *Rotator) Write(memo string, p []byte) (n int, err error) {
 	n, _ = r.out.Write(p)
 	r.size += int64(n)
 
 	if r.size >= r.threshold && len(p) > 0 {
-		err := r.rotate()
+		// use memo as part of file name
+		err := r.rotate(memo)
 		if err != nil {
 			return 0, err
 		}
@@ -143,17 +144,28 @@ func (r *Rotator) Close() error {
 	r.wg.Wait()
 	return err
 }
+func (r *Rotator) LoadRotated(memo string) (string, error) {
+	dir := filepath.Dir(r.filename)
+	glob := filepath.Join(dir, filepath.Base(r.filename)+"."+memo+".*")
+	existing, err := filepath.Glob(glob)
+	if err != nil {
+		return "", fmt.Errorf("not find transaction %s in disk", memo)
+	}
+	if len(existing) == 0 {
+		return "", fmt.Errorf("not find transaction %s in disk", memo)
+	}
+	return existing[0], nil
+}
 
-func (r *Rotator) RotatedRolled() (int, int, error) {
+func (r *Rotator) RotatedRolled() ([]string, error) {
 	dir := filepath.Dir(r.filename)
 	glob := filepath.Join(dir, filepath.Base(r.filename)+".*")
 	existing, err := filepath.Glob(glob)
 	if err != nil {
-		return 0, 0, err
+		return nil, err
 	}
 
-	minNum := 1
-	maxNum := 0
+	res := make([]string, 0, len(existing))
 	for _, name := range existing {
 		parts := strings.Split(name, ".")
 		if len(parts) < 2 {
@@ -163,21 +175,16 @@ func (r *Rotator) RotatedRolled() (int, int, error) {
 		if parts[numIdx] == "gz" {
 			numIdx--
 		}
-		num, err := strconv.Atoi(parts[numIdx])
+		_, err = strconv.Atoi(parts[numIdx])
 		if err != nil {
 			continue
 		}
-		if num < minNum {
-			minNum = num
-		}
-		if num > maxNum {
-			maxNum = num
-		}
+		res = append(res, name)
 	}
-	return minNum, maxNum, nil
+	return res, nil
 }
 
-func (r *Rotator) rotate() error {
+func (r *Rotator) rotate(suffix string) error {
 	dir := filepath.Dir(r.filename)
 	glob := filepath.Join(dir, filepath.Base(r.filename)+".*")
 	existing, err := filepath.Glob(glob)
@@ -208,7 +215,7 @@ func (r *Rotator) rotate() error {
 	if err != nil {
 		return err
 	}
-	rotname := fmt.Sprintf("%s.%d", r.filename, maxNum+1)
+	rotname := fmt.Sprintf("%s.%s.%d", r.filename, suffix, maxNum+1)
 	err = os.Rename(r.filename, rotname)
 	if err != nil {
 		return err

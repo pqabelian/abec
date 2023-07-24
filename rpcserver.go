@@ -2972,6 +2972,7 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 // handleGetMempoolInfo implements the getmempoolinfo command.
 func handleGetMempoolInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	mempoolTxns := s.cfg.TxMemPool.TxDescsAbe()
+	diskTxns := s.cfg.TxMemPool.TxHashesInDiskAbe()
 
 	var numBytes int64
 	for _, txD := range mempoolTxns {
@@ -2979,8 +2980,9 @@ func handleGetMempoolInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct
 	}
 
 	ret := &abejson.GetMempoolInfoResult{
-		Size:  int64(len(mempoolTxns)),
-		Bytes: numBytes,
+		Size:      int64(len(mempoolTxns)),
+		Bytes:     numBytes,
+		DiskTxNum: int64(len(diskTxns)),
 	}
 
 	return ret, nil
@@ -3178,9 +3180,13 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 	// The response is simply an array of the transaction hashes if the
 	// verbose flag is not set.
 	descs := mp.TxDescsAbe()
-	hashStrings := make([]string, len(descs))
-	for i := range hashStrings {
-		hashStrings[i] = descs[i].Tx.Hash().String()
+	txInDiskHashes := mp.TxHashesInDiskAbe()
+	hashStrings := make([]string, 0, len(descs)+len(txInDiskHashes))
+	for i := 0; i < len(descs); i++ {
+		hashStrings = append(hashStrings, descs[i].Tx.Hash().String())
+	}
+	for i := 0; i < len(txInDiskHashes); i++ {
+		hashStrings = append(hashStrings, txInDiskHashes[i].String())
 	}
 
 	return hashStrings, nil

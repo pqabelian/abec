@@ -215,7 +215,7 @@ type TxPool struct {
 
 	//	todo(ABE):	begin
 	poolAbe          map[chainhash.Hash]*TxDescAbe
-	cachedTxHashs    map[chainhash.Hash]struct{}
+	diskPool         map[chainhash.Hash]struct{}
 	orphansAbe       map[chainhash.Hash]*orphanTxAbe
 	outpointsAbe     map[chainhash.Hash]map[string]*abeutil.TxAbe                    //TODO(abe):why use two layers map                 //	corresponding to btc's outpoints, using hash rather then TxIn as the key for map
 	orphansByPrevAbe map[chainhash.Hash]map[string]map[chainhash.Hash]*abeutil.TxAbe // corresponding to btc's orphansByPrev //TODO type transfer??? []byte -> string
@@ -600,7 +600,7 @@ func (mp *TxPool) isTransactionInPoolBTCD(hash *chainhash.Hash) bool {
 	return false
 }
 
-func (mp *TxPool) isTransactionInPoolAbe(hash *chainhash.Hash) bool {
+func (mp *TxPool) isTransactionInMemPool(hash *chainhash.Hash) bool {
 	if _, exists := mp.poolAbe[*hash]; exists {
 		return true
 	}
@@ -608,8 +608,8 @@ func (mp *TxPool) isTransactionInPoolAbe(hash *chainhash.Hash) bool {
 	return false
 }
 
-func (mp *TxPool) isCachedInPoolAbe(hash *chainhash.Hash) bool {
-	if _, exists := mp.cachedTxHashs[*hash]; exists {
+func (mp *TxPool) isTransactionInDiskPool(hash *chainhash.Hash) bool {
+	if _, exists := mp.diskPool[*hash]; exists {
 		return true
 	}
 
@@ -623,10 +623,11 @@ func (mp *TxPool) isCachedInPoolAbe(hash *chainhash.Hash) bool {
 func (mp *TxPool) IsTransactionInPool(hash *chainhash.Hash) bool {
 	// Protect concurrent access.
 	mp.mtx.RLock()
-	inPool := mp.isTransactionInPoolAbe(hash)
+	inPool := mp.isTransactionInMemPool(hash)
+	inCache := mp.isTransactionInDiskPool(hash)
 	mp.mtx.RUnlock()
 
-	return inPool
+	return inPool || inCache
 }
 
 // isOrphanInPool returns whether or not the passed transaction already exists
@@ -669,7 +670,7 @@ func (mp *TxPool) IsOrphanInPool(hash *chainhash.Hash) bool {
 //
 //	todo(ABE)
 func (mp *TxPool) haveTransaction(hash *chainhash.Hash) bool {
-	return mp.isTransactionInPoolAbe(hash) || mp.isOrphanInPoolAbe(hash)
+	return mp.isTransactionInMemPool(hash) || mp.isTransactionInDiskPool(hash) || mp.isOrphanInPoolAbe(hash)
 }
 
 // HaveTransaction returns whether or not the passed transaction already exists
@@ -736,6 +737,16 @@ func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 		}
 
 		delete(mp.poolAbe, *txHash)
+		atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
+	}
+	if _, exists := mp.diskPool[*txHash]; exists {
+		delete(mp.diskPool, *txHash)
+		// remove from disk
+		name, err := mp.cfg.TxCacheRotator.LoadRotated(txHash.String())
+		if err != nil {
+			return
+		}
+		os.Remove(name)
 		atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
 	}
 }
@@ -814,7 +825,8 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 	// transaction would be stored in disk
 	// When the transaction is loaded from disk, ignore this mechanism
 	if !fromDiskCache && mp.cfg.AllowDiskCacheTx && len(mp.poolAbe) >= MaxTransactionInMemoryNum {
-		log.Infof("save transaction %s into disk", tx.Hash())
+		txHash := tx.Hash()
+		log.Infof("save transaction %s into disk", txHash)
 		// To avoid that transaction always is cached in disk after triggering cache transaction,
 		// when the transaction in mempool is less than MinTransactionInMemoryNum, we would load
 		// transactions stored in disk
@@ -833,18 +845,18 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 		content := make([]byte, 8+len(txContent))
 		binary.LittleEndian.PutUint64(content, uint64(len(txContent)))
 		copy(content[8:], txContent)
-		if _, err := mp.cfg.TxCacheRotator.Write(content); err == nil {
-			mp.cachedTxHashs[*tx.Hash()] = struct{}{}
-			log.Infof("successful to save transaction %s into disk, current mempool:%d, current cached in disk:%d", tx.Hash(), len(mp.poolAbe), len(mp.cachedTxHashs))
+		if _, err := mp.cfg.TxCacheRotator.Write(txHash.String(), content); err == nil {
+			mp.diskPool[*tx.Hash()] = struct{}{}
+			log.Infof("successful to save transaction %s into disk, current mempool:%d, current cached in disk:%d", txHash, len(mp.poolAbe), len(mp.diskPool))
 			return txD
 		}
-		log.Warnf("Fail to cache transaction %s using disk, save it at memory", tx.Hash())
+		log.Warnf("Fail to cache transaction %s using disk, save it at memory", txHash)
 	}
 
 	mp.poolAbe[*tx.Hash()] = txD
 	if fromDiskCache {
 		log.Infof("successful to load transaction %s from disk, current mempool:%d", tx.Hash(), len(mp.poolAbe))
-		delete(mp.cachedTxHashs, *tx.Hash())
+		delete(mp.diskPool, *tx.Hash())
 	}
 
 	if mp.outpointsAbe == nil {
@@ -946,33 +958,31 @@ func (mp *TxPool) txMonitor() {
 		mp.txMonitorMu.Unlock()
 		log.Infof("stop monitor transaction number in mempool")
 	}()
-	duration := 5 * time.Minute
+	// considerate a block would about 256s, and trigger early a little
+	duration := 3 * time.Minute
 	timer := time.NewTicker(duration)
 	for {
 		select {
 		case <-timer.C:
-			log.Infof("transaction in mempool:%d, cached in disk:%d", len(mp.poolAbe), len(mp.cachedTxHashs))
+			log.Infof("transaction in mempool:%d, cached in disk:%d", len(mp.poolAbe), len(mp.diskPool))
 			if len(mp.poolAbe) >= MaxTransactionInMemoryNum {
 				continue
 			}
 			log.Infof("loading transactions from disk...")
-			minNum, maxNum, err := mp.cfg.TxCacheRotator.RotatedRolled()
+			filenames, err := mp.cfg.TxCacheRotator.RotatedRolled()
 			if err != nil {
 				log.Errorf("Unable to load cached transaction: %v", err)
 				return
 			}
-			if minNum > maxNum {
+			if len(filenames) == 0 {
 				log.Infof("No cached transaction can be loaded.")
 				return
 			}
-			log.Infof("loading some transactions from %s.%d to %s.%d", mp.cfg.CacheTxFileName, minNum, mp.cfg.CacheTxFileName, maxNum)
 
 			var f *os.File
-			i := minNum
-			for ; i <= maxNum && len(mp.poolAbe) < MaxTransactionInMemoryNum; i++ {
-				log.Infof("loading some transactions from %s.%d", mp.cfg.CacheTxFileName, i)
-				rotatedName := fmt.Sprintf("%s.%d", mp.cfg.CacheTxFileName, i)
-				f, err = os.OpenFile(rotatedName, os.O_RDONLY, 0644)
+			for _, name := range filenames {
+				log.Infof("loading some transactions from %s", name)
+				f, err = os.OpenFile(name, os.O_RDONLY, 0644)
 				if err != nil {
 					continue
 				}
@@ -996,20 +1006,16 @@ func (mp *TxPool) txMonitor() {
 						break
 					}
 					tx := abeutil.NewTxAbe(msgTx)
-					log.Infof("load transaction %s from file %s", msgTx.TxHash(), rotatedName)
+					log.Infof("load transaction %s from file %s", msgTx.TxHash(), name)
 					_, err = mp.ProcessTransactionAbe(tx, false, false, 0, true)
 					if err != nil {
 						break
 					}
 				}
 				f.Close()
-				log.Infof("finish loading transactions from file %s, remove it...", rotatedName)
-				os.Remove(rotatedName)
+				log.Infof("finish loading transactions from file %s, remove it...", name)
+				os.Remove(name)
 				f = nil
-			}
-			if i > maxNum {
-				log.Infof("No cached transaction can be loaded.")
-				return
 			}
 
 			timer.Reset(duration)
@@ -1375,10 +1381,41 @@ func (mp *TxPool) FetchTransaction(txHash *chainhash.Hash) (*abeutil.TxAbe, erro
 	// Protect concurrent access.
 	mp.mtx.RLock()
 	txDesc, exists := mp.poolAbe[*txHash]
+	_, existInDisk := mp.diskPool[*txHash]
 	mp.mtx.RUnlock()
 
 	if exists {
 		return txDesc.Tx, nil
+	}
+	if existInDisk {
+		rotatedName, err := mp.cfg.TxCacheRotator.LoadRotated(txHash.String())
+		if err != nil {
+			return nil, fmt.Errorf("transaction is not in the pool")
+		}
+		f, err := os.OpenFile(rotatedName, os.O_RDONLY, 0644)
+		if err != nil {
+			return nil, fmt.Errorf("transaction is not in the pool")
+		}
+		defer f.Close()
+		size := make([]byte, 8)
+		// [transaction_size] [transaction_content]
+		_, err = f.Read(size)
+		if err != nil {
+			return nil, fmt.Errorf("transaction is not in the pool")
+		}
+		contentSize := binary.LittleEndian.Uint64(size)
+		content := make([]byte, contentSize)
+		_, err = f.Read(content)
+		if err != nil {
+			return nil, fmt.Errorf("transaction is not in the pool")
+		}
+		buffer := bytes.NewBuffer(content)
+		msgTx := &wire.MsgTxAbe{}
+		err = msgTx.DeserializeFull(buffer)
+		if err != nil {
+			return nil, fmt.Errorf("transaction is not in the pool")
+		}
+		return abeutil.NewTxAbe(msgTx), nil
 	}
 
 	return nil, fmt.Errorf("transaction is not in the pool")
@@ -1610,8 +1647,8 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	// applies to orphan transactions as well when the reject duplicate
 	// orphans flag is set.  This check is intended to be a quick check to
 	// weed out duplicates.
-	if mp.isTransactionInPoolAbe(txHash) || (rejectDupOrphans &&
-		mp.isOrphanInPoolAbe(txHash)) || (!fromDiskCache && mp.isCachedInPoolAbe(txHash)) {
+	if mp.isTransactionInMemPool(txHash) || (rejectDupOrphans &&
+		mp.isOrphanInPoolAbe(txHash)) || (!fromDiskCache && mp.isTransactionInDiskPool(txHash)) {
 
 		str := fmt.Sprintf("already have transaction %v", txHash)
 		return nil, nil, txRuleError(wire.RejectDuplicate, str)
@@ -1956,7 +1993,7 @@ func (mp *TxPool) ProcessTransactionAbe(tx *abeutil.TxAbe, allowOrphan, rateLimi
 // This function is safe for concurrent access.
 func (mp *TxPool) Count() int {
 	mp.mtx.RLock()
-	count := len(mp.pool)
+	count := len(mp.pool) + len(mp.diskPool)
 	mp.mtx.RUnlock()
 
 	return count
@@ -1968,9 +2005,14 @@ func (mp *TxPool) Count() int {
 // This function is safe for concurrent access.
 func (mp *TxPool) TxHashes() []*chainhash.Hash {
 	mp.mtx.RLock()
-	hashes := make([]*chainhash.Hash, len(mp.pool))
+	hashes := make([]*chainhash.Hash, len(mp.pool)+len(mp.diskPool))
 	i := 0
 	for hash := range mp.pool {
+		hashCopy := hash
+		hashes[i] = &hashCopy
+		i++
+	}
+	for hash := range mp.diskPool {
 		hashCopy := hash
 		hashes[i] = &hashCopy
 		i++
@@ -2010,6 +2052,20 @@ func (mp *TxPool) TxDescsAbe() []*TxDescAbe {
 	mp.mtx.RUnlock()
 
 	return descs
+}
+
+func (mp *TxPool) TxHashesInDiskAbe() []*chainhash.Hash {
+	mp.mtx.RLock()
+	hashes := make([]*chainhash.Hash, len(mp.diskPool))
+	i := 0
+	for hash := range mp.diskPool {
+		hashCopy := hash
+		hashes[i] = &hashCopy
+		i++
+	}
+	mp.mtx.RUnlock()
+
+	return hashes
 }
 
 // MiningDescs returns a slice of mining descriptors for all the transactions
@@ -2077,6 +2133,11 @@ func (mp *TxPool) RawMempoolVerbose() map[string]*abejson.GetRawMempoolVerboseRe
 
 		result[tx.Hash().String()] = mpd
 	}
+	for txHash := range mp.diskPool {
+		result[txHash.String()] = &abejson.GetRawMempoolVerboseResult{
+			Comment: "please query transaction detail with getrawtransaction",
+		}
+	}
 
 	return result
 }
@@ -2110,7 +2171,7 @@ func New(cfg *Config) *TxPool {
 		outpoints:      make(map[wire.OutPoint]*abeutil.Tx),
 
 		poolAbe:          make(map[chainhash.Hash]*TxDescAbe),
-		cachedTxHashs:    make(map[chainhash.Hash]struct{}),
+		diskPool:         make(map[chainhash.Hash]struct{}),
 		orphansAbe:       make(map[chainhash.Hash]*orphanTxAbe),
 		outpointsAbe:     make(map[chainhash.Hash]map[string]*abeutil.TxAbe),
 		orphansByPrevAbe: make(map[chainhash.Hash]map[string]map[chainhash.Hash]*abeutil.TxAbe),
