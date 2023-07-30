@@ -980,7 +980,8 @@ func (mp *TxPool) txMonitor() {
 			}
 
 			var f *os.File
-			for _, name := range filenames {
+			for i := 0; i < len(filenames) && len(mp.poolAbe) < MaxTransactionInMemoryNum; i++ {
+				name := filenames[i]
 				log.Infof("loading some transactions from %s", name)
 				f, err = os.OpenFile(name, os.O_RDONLY, 0644)
 				if err != nil {
