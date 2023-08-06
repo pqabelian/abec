@@ -45,7 +45,7 @@ const (
 	// purposes.  It is also used to help determine if a transaction is
 	// considered dust and as a base for calculating minimum required fees
 	// for larger transactions.  This value is in Neutrino/1000 bytes.
-	DefaultMinRelayTxFee = 1000
+	DefaultMinRelayTxFee = 10
 
 	// maxStandardMultiSigKeys is the maximum number of public keys allowed
 	// in a multi-signature transaction output script for it to be
@@ -141,7 +141,7 @@ func checkInputsStandard(tx *abeutil.Tx, utxoView *blockchain.UtxoViewpoint) err
 	return nil
 }
 
-//	Abe to do
+// Abe to do
 func checkInputsStandardAbe(tx *abeutil.TxAbe, utxoRingView *blockchain.UtxoRingViewpoint) error {
 	// NOTE: The reference implementation also does a coinbase check here,
 	// but coinbases have already been rejected prior to calling this

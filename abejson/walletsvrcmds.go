@@ -540,22 +540,34 @@ func NewListSpentAndMinedAbeCmd() *ListSpentAndMinedAbeCmd {
 	return &ListSpentAndMinedAbeCmd{}
 }
 
-type ListConfirmedTxsCmd struct{}
-
-func NewListConfirmedTxsCmd() *ListConfirmedTxsCmd {
-	return &ListConfirmedTxsCmd{}
+type ListConfirmedTxsCmd struct {
+	Verbose *bool `jsonrpcdefault:"false"`
 }
 
-type ListUnconfirmedTxsCmd struct{}
-
-func NewListUnconfirmedTxsCmd() *ListUnconfirmedTxsCmd {
-	return &ListUnconfirmedTxsCmd{}
+func NewListConfirmedTxsCmd(verbose *bool) *ListConfirmedTxsCmd {
+	return &ListConfirmedTxsCmd{
+		Verbose: verbose,
+	}
 }
 
-type ListInvalidTxsCmd struct{}
+type ListUnconfirmedTxsCmd struct {
+	Verbose *bool `jsonrpcdefault:"false"`
+}
 
-func NewListInvalidTxsCmd() *ListInvalidTxsCmd {
-	return &ListInvalidTxsCmd{}
+func NewListUnconfirmedTxsCmd(verbose *bool) *ListUnconfirmedTxsCmd {
+	return &ListUnconfirmedTxsCmd{
+		Verbose: verbose,
+	}
+}
+
+type ListInvalidTxsCmd struct {
+	Verbose *bool `jsonrpcdefault:"false"`
+}
+
+func NewListInvalidTxsCmd(verbose *bool) *ListInvalidTxsCmd {
+	return &ListInvalidTxsCmd{
+		Verbose: verbose,
+	}
 }
 
 type TxStatusCmd struct {
