@@ -1541,7 +1541,7 @@ func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 		VersionHex:    fmt.Sprintf("%08x", blockHeader.Version),
 		MerkleRoot:    blockHeader.MerkleRoot.String(),
 		PreviousHash:  blockHeader.PrevBlock.String(),
-		Nonce:         blockHeader.Nonce,
+		Nonce:         uint64(blockHeader.Nonce),
 		Time:          blockHeader.Timestamp.Unix(),
 		Confirmations: int64(1 + best.Height - blockHeight),
 		Height:        int64(blockHeight),
@@ -1556,6 +1556,9 @@ func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 		ContentHash: blockHeader.ContentHash().String(),
 		MixDigest:   blockHeader.MixDigest.String(),
 		SealHash:    ethash.SealHash(blockHeader).String(),
+	}
+	if blockHeader.Height > s.cfg.ChainParams.BlockHeightEthashPoW {
+		blockReply.Nonce = blockHeader.NonceExt
 	}
 
 	if *c.Verbosity == 1 {
