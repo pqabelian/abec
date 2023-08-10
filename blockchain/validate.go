@@ -34,7 +34,7 @@ const (
 
 	// serializedHeightVersion is the block version which changed block
 	// coinbases to start with the serialized block height.
-	serializedHeightVersion = 2
+	serializedHeightVersion = 1
 
 	// baseSubsidy is the starting subsidy amount for mined blocks.  This
 	// value is halved every SubsidyHalvingInterval blocks.
@@ -76,7 +76,14 @@ func isNullOutpoint(outpoint *wire.OutPoint) bool {
 // for further information.
 func ShouldHaveSerializedBlockHeight(header *wire.BlockHeader) bool {
 	// todo: (ethmining) This is a bug? we have header.Version = 1 now?
-	return header.Version >= serializedHeightVersion
+	// answer: any time we have height in coinbase transaction
+	// but we version encode mechanism is different:
+	// 0x100_00000 -> left 12 bit is hard-fork and right  20 is soft-fork
+	// it means that we should extract the hard-fork part and convert it
+	blockVersion := (uint32(header.Version)&0x00F00000>>20)<<8 |
+		(uint32(header.Version)&0x0F000000>>24)<<4 |
+		(uint32(header.Version) & 0xF0000000 >> 28)
+	return blockVersion >= serializedHeightVersion
 }
 
 // IsCoinBaseTx determines whether or not a transaction is a coinbase.  A coinbase
