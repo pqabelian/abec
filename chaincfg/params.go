@@ -526,7 +526,7 @@ var SimNetParams = Params{
 
 	// BlockHeightEthashPoW
 	// BlockHeightEthashPoW specifies the block height from which Ethash-PoW mining is applied.
-	BlockHeightEthashPoW: 300,
+	BlockHeightEthashPoW: int32(1 << 30),
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength: 200,
 }
