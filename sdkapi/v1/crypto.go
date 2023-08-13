@@ -38,6 +38,14 @@ func CryptoAddressKeyVerify(cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk 
 	return valid, nil
 }
 
+func CryptoAddressValueKeyVerify(cryptoAddress []byte, cryptoVsk []byte) (bool, error) {
+	valid, hints := abecrypto.VerifyCryptoAddressVsk(cryptoAddress, cryptoVsk)
+	if !valid {
+		return false, errors.New(hints)
+	}
+	return valid, nil
+}
+
 // CheckCryptoAddress checks whether the given cryptoAddress is valid (in format).
 // When the result is false, the hints will give the reasons why it is invalid.
 func CheckCryptoAddress(cryptoAddress []byte) (valid bool, hints string) {
