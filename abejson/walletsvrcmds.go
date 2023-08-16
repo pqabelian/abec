@@ -500,22 +500,40 @@ type ListUnspentCmd struct {
 	MaxConf   *int `jsonrpcdefault:"9999999"`
 	Addresses *[]string
 }
-type ListAllUnspentAbeCmd struct{}
-
-func NewListAllUnspentAbeCmd() *ListAllUnspentAbeCmd {
-	return &ListAllUnspentAbeCmd{}
+type ListAllUnspentAbeCmd struct {
+	Min *float64 `jsonrpcdefault:"0"`
+	Max *float64 `jsonrpcdefault:"0"`
 }
 
-type ListUnmaturedAbeCmd struct{}
-
-func NewListUnmaturedAbeCmd() *ListUnmaturedAbeCmd {
-	return &ListUnmaturedAbeCmd{}
+func NewListAllUnspentAbeCmd(min *float64, max *float64) *ListAllUnspentAbeCmd {
+	return &ListAllUnspentAbeCmd{
+		Min: min,
+		Max: max,
+	}
 }
 
-type ListUnspentAbeCmd struct{}
+type ListUnmaturedAbeCmd struct {
+	Min *float64 `jsonrpcdefault:"0"`
+	Max *float64 `jsonrpcdefault:"0"`
+}
 
-func NewListUnspentAbeCmd() *ListUnspentAbeCmd {
-	return &ListUnspentAbeCmd{}
+func NewListUnmaturedAbeCmd(min *float64, max *float64) *ListUnmaturedAbeCmd {
+	return &ListUnmaturedAbeCmd{
+		Min: min,
+		Max: max,
+	}
+}
+
+type ListUnspentAbeCmd struct {
+	Min *float64 `jsonrpcdefault:"0"`
+	Max *float64 `jsonrpcdefault:"0"`
+}
+
+func NewListUnspentAbeCmd(min *float64, max *float64) *ListUnspentAbeCmd {
+	return &ListUnspentAbeCmd{
+		Min: min,
+		Max: max,
+	}
 }
 
 type ListUnspentCoinbaseAbeCmd struct {
@@ -528,16 +546,28 @@ func NewListUnspentCoinbaseAbeCmd() *ListUnspentCoinbaseAbeCmd {
 	return &ListUnspentCoinbaseAbeCmd{}
 }
 
-type ListSpentButUnminedAbeCmd struct{}
-
-func NewListSpentButUnminedAbeCmd() *ListSpentButUnminedAbeCmd {
-	return &ListSpentButUnminedAbeCmd{}
+type ListSpentButUnminedAbeCmd struct {
+	Min *float64 `jsonrpcdefault:"0"`
+	Max *float64 `jsonrpcdefault:"0"`
 }
 
-type ListSpentAndMinedAbeCmd struct{}
+func NewListSpentButUnminedAbeCmd(min *float64, max *float64) *ListSpentButUnminedAbeCmd {
+	return &ListSpentButUnminedAbeCmd{
+		Min: min,
+		Max: max,
+	}
+}
 
-func NewListSpentAndMinedAbeCmd() *ListSpentAndMinedAbeCmd {
-	return &ListSpentAndMinedAbeCmd{}
+type ListSpentAndMinedAbeCmd struct {
+	Min *float64 `jsonrpcdefault:"0"`
+	Max *float64 `jsonrpcdefault:"0"`
+}
+
+func NewListSpentAndMinedAbeCmd(min *float64, max *float64) *ListSpentAndMinedAbeCmd {
+	return &ListSpentAndMinedAbeCmd{
+		Min: min,
+		Max: max,
+	}
 }
 
 type ListConfirmedTxsCmd struct {
