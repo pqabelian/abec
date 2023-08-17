@@ -217,12 +217,17 @@ type GetBalancesCmd struct{}
 type GenerateAddressCmd struct {
 	Num *int `jsonrpcdefault:"1"`
 }
+type ListFreeAddressesCmd struct {
+}
 type GetBalancesAbeCmd struct {
 	Minconf *int `jsonrpcdefault:"1"`
 }
 
 func NewGenerateAddressCmd() *GenerateAddressCmd {
 	return &GenerateAddressCmd{}
+}
+func NewListFreeAddressesCmd() *ListFreeAddressesCmd {
+	return &ListFreeAddressesCmd{}
 }
 
 // NewGetBalancesCmd returns a new instance which can be used to issue a
@@ -962,6 +967,7 @@ func init() {
 	//MustRegisterCmd("sendmany", (*SendManyCmd)(nil), flags)
 	MustRegisterCmd("sendtoaddressesabe", (*SendToAddressAbeCmd)(nil), flags)
 	MustRegisterCmd("generateaddressabe", (*GenerateAddressCmd)(nil), flags)
+	MustRegisterCmd("listfreeaddresses", (*ListFreeAddressesCmd)(nil), flags)
 	MustRegisterCmd("addressmaxsequencenumber", (*AddressMaxSequenceNumberCmd)(nil), flags)
 	MustRegisterCmd("addressrange", (*AddressRangeCmd)(nil), flags)
 	//MustRegisterCmd("sendtoaddress", (*SendToAddressCmd)(nil), flags)
