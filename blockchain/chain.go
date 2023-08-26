@@ -19,10 +19,10 @@ import (
 	"time"
 )
 
-const (
-	// maxOrphanBlocks is the maximum number of orphan blocks that can be
+var (
+	// MaxOrphanBlocks is the maximum number of orphan blocks that can be
 	// queued.
-	maxOrphanBlocks = 100
+	MaxOrphanBlocks = 10
 )
 
 // BlockLocator is used to help locate a specific block.  The algorithm for
@@ -351,7 +351,7 @@ func (b *BlockChain) addOrphanBlock(block *abeutil.BlockAbe) {
 	}
 
 	// Limit orphan blocks to prevent memory exhaustion.
-	if len(b.orphansAbe)+1 > maxOrphanBlocks {
+	if len(b.orphansAbe)+1 > MaxOrphanBlocks {
 		// Remove the oldest orphan to make room for the new one.
 		b.removeOrphanBlockAbe(b.oldestOrphanAbe)
 		b.oldestOrphanAbe = nil

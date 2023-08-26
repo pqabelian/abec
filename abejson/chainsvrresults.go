@@ -126,7 +126,7 @@ type GetBlockAbeVerboseResult struct {
 	Tx           []string         `json:"tx,omitempty"`
 	RawTx        []TxRawResultAbe `json:"rawtx,omitempty"` // Note: this field is always empty when verbose != 2.
 	Time         int64            `json:"time"`
-	Nonce        uint32           `json:"nonce"`
+	Nonce        uint64           `json:"nonce"`
 	Bits         string           `json:"bits"`
 	Difficulty   float64          `json:"difficulty"`
 	PreviousHash string           `json:"previousblockhash"`
@@ -429,8 +429,9 @@ type GetMempoolEntryResult struct {
 // GetMempoolInfoResult models the data returned from the getmempoolinfo
 // command.
 type GetMempoolInfoResult struct {
-	Size  int64 `json:"size"`
-	Bytes int64 `json:"bytes"`
+	Size      int64 `json:"size"`
+	Bytes     int64 `json:"bytes"`
+	DiskTxNum int64 `json:"disk_tx_num"`
 }
 
 // NetworksResult models the networks data from the getnetworkinfo command.
@@ -510,6 +511,7 @@ type GetRawMempoolVerboseResult struct {
 	StartingPriority float64 `json:"startingpriority"`
 	CurrentPriority  float64 `json:"currentpriority"`
 	//	Depends          []string `json:"depends"`
+	Comment string `json:"comment"`
 }
 
 // ScriptPubKeyResult models the scriptPubKey data of a tx script.  It is

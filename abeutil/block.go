@@ -441,6 +441,7 @@ func NewBlockFromBytes(serializedBlock []byte) (*Block, error) {
 	return b, nil
 }
 
+// NewBlockFromBytesAbe uses serialized block without witness
 func NewBlockFromBytesAbe(serializedBlock []byte) (*BlockAbe, error) {
 	br := bytes.NewReader(serializedBlock)
 	b, err := NewBlockFromReaderAbe(br)

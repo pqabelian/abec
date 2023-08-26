@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/chainhash"
@@ -12,6 +13,7 @@ import (
 )
 
 // borrow something from msgtx.go
+//
 //	todo(ABE)
 const (
 	//TxInputMaxNum = 5
@@ -37,12 +39,33 @@ const (
 	TxPayloadMinSize = 100
 )
 
+// OutPointId is used as unique identifier for OutPoint.
+// Based on the design that each transaction has a unique TxHash, we use (TxHash, Index) as the identifier for OutPoint.
+type OutPointId [chainhash.HashSize + 1]byte
+
 // OutPointAbe defines a ABE data type that is used to track previous transaction outputs.
 // Note that the type of index depends on the TxOutPutMaxNum
+//
 //	todo(ABE): shall index be int8?
 type OutPointAbe struct {
 	TxHash chainhash.Hash
 	Index  uint8 //	due to the large size of post-quantum crypto primitives, ABE will limit the number of outputs of each transaction
+
+	outPointId *OutPointId // cached OutPointId
+}
+
+func (outPoint *OutPointAbe) OutPointId() OutPointId {
+	if outPoint.outPointId == nil {
+		// cache the outPointId
+
+		opId := OutPointId{}
+		copy(opId[:], outPoint.TxHash[:])
+		opId[chainhash.HashSize] = outPoint.Index
+
+		outPoint.outPointId = &opId
+	}
+
+	return *outPoint.outPointId
 }
 
 // String returns the OutPoint in the human-readable form "hash:index".
@@ -69,13 +92,19 @@ func NewOutPointAbe(txHash *chainhash.Hash, index uint8) *OutPointAbe {
 	}
 }
 
-//	todo: shall the ringBlockHeight be added?
+// RingId is used as unique identifier for OutPointRing, as well as the corresponding TxoRing,
+// which contains more detail information for the ring.
+type RingId chainhash.Hash
+
+// todo: shall the ringBlockHeight be added?
 type OutPointRing struct {
 	// TODO(abe): these three successive block hash can be replaced by the hash of block whose heigt equal to 3K+2
 	//	todo: AliceBob 20210616 RingHash should be computed based on the version, blockhashs, and outpoints
 	Version    uint32            //	All TXOs in a ring has the same version, and this version is set to be the ring Version.
 	BlockHashs []*chainhash.Hash //	the hashs for the blocks from which the ring was generated, at this moment it is 3 successive blocks
 	OutPoints  []*OutPointAbe
+
+	ringId *RingId // cached ringId
 }
 
 func (outPointRing *OutPointRing) SerializeSize() int {
@@ -135,11 +164,29 @@ func (outPointRing *OutPointRing) String() string {
 	return string(buf[0:pos])
 }
 
+// Using OutPointRing.Hash() as key map of outPointRing is depreciated.
+// When needing OutPointRing.Hash() to generate key for map of outPoint,
+// please use the RingId(), which is compatible to existing implementation and data.
 func (outPointRing *OutPointRing) Hash() chainhash.Hash {
 	buf := bytes.NewBuffer(make([]byte, 0, outPointRing.SerializeSize()))
 	_ = WriteOutPointRing(buf, 0, outPointRing.Version, outPointRing)
 	return chainhash.DoubleHashH(buf.Bytes())
 }
+
+// RingId() return outPoing.Hash() as the ringId.
+func (outPointRing *OutPointRing) RingId() RingId {
+	if outPointRing.ringId == nil {
+		// cache the ringId
+		// we use Hash() as the RingId
+		hash := outPointRing.Hash()
+		ringId := RingId(hash)
+		outPointRing.ringId = &ringId
+	}
+
+	// Return the cached hash if it has already been generated.
+	return *outPointRing.ringId
+}
+
 func WriteOutPointRing(w io.Writer, pver uint32, version uint32, opr *OutPointRing) error {
 	err := binarySerializer.PutUint32(w, littleEndian, opr.Version)
 	if err != nil {
@@ -260,6 +307,7 @@ func NewOutPointRing(version uint32, blockHashs []*chainhash.Hash, outPoints []*
 		version,
 		blockHashs,
 		outPoints,
+		nil,
 	}
 }
 
@@ -302,6 +350,7 @@ func WriteTxOutAbe(w io.Writer, pver uint32, version uint32, txOut *TxOutAbe) er
 // ReadTxOutAbe reads the next sequence of bytes from r as a transaction input
 // (TxInAbe).
 func ReadTxOutAbe(r io.Reader, pver uint32, version uint32, txOut *TxOutAbe) error {
+	//	todo: 2023.03.31 this read does not exactly match the corresponding write operation.
 	err := readElement(r, &txOut.Version)
 	if err != nil {
 		return err
@@ -327,8 +376,8 @@ func NewTxOutAbe(version uint32, txoScript []byte) *TxOutAbe {
 	}
 }
 
-//	SerialNumber appears only when some ring member is consumed in TxIn,
-//	i.e. logically, SerialNumber accompanies with TxIn.
+// SerialNumber appears only when some ring member is consumed in TxIn,
+// i.e. logically, SerialNumber accompanies with TxIn.
 type TxInAbe struct {
 	SerialNumber []byte
 	//	identify the consumed OutPoint
@@ -427,8 +476,8 @@ func NewTxInAbe(serialNumber []byte, previousOutPointRing *OutPointRing) *TxInAb
 	}
 }
 
-//	At this moment, TxIn is just a ring member (say, identified by (outpointRing, serialNumber)), so that we can use txIn.Serialize
-//	If TxIn includes more information, this needs modification.
+// At this moment, TxIn is just a ring member (say, identified by (outpointRing, serialNumber)), so that we can use txIn.Serialize
+// If TxIn includes more information, this needs modification.
 func (txIn *TxInAbe) RingMemberHash() chainhash.Hash {
 	buf := bytes.NewBuffer(make([]byte, 0, txIn.PreviousOutPointRing.SerializeSize()))
 	_ = WriteOutPointRing(buf, 0, txIn.PreviousOutPointRing.Version, &txIn.PreviousOutPointRing)
@@ -454,6 +503,17 @@ func (txIn *TxInAbe) RingMemberHash() chainhash.Hash {
 //				limited by TxRingSize
 //	TxFee = 0
 //	todo: For coinbase transaction, there is an additional function that returns the bytes in [blockhashs[2]] and later OutPoints
+
+// TxId is used as unique identifier for MsgTx, as well as for abeutil.Tx,
+// which contains some additional helper information.
+// In particular, we use TxHash() (without witness) as TxId.
+// and in logic, we should use (TxId,Index) to denote the OutPoint.
+type TxId chainhash.Hash
+
+func (txId *TxId) String() string {
+	hash := chainhash.Hash(*txId)
+	return hash.String()
+}
 
 type MsgTxAbe struct {
 	Version uint32
@@ -509,6 +569,11 @@ func (msg *MsgTxAbe) IsCoinBase() (bool, error) {
 	return true, nil
 }
 
+// TxId return TxHash().
+func (msg *MsgTxAbe) TxId() TxId {
+	return TxId(msg.TxHash())
+}
+
 // TxHash generates the Hash for the transaction without witness.
 func (msg *MsgTxAbe) TxHash() chainhash.Hash {
 	// Encode the transaction and calculate double sha256 on the result.
@@ -534,6 +599,7 @@ func (msg *MsgTxAbe) TxHashFull() chainhash.Hash {
 }
 
 // TxWitnessHash generates the Hash for the transaction witness.
+//
 //	Note that we separate witness and content of hash explicitly.
 func (msg *MsgTxAbe) TxWitnessHash() *chainhash.Hash {
 	// Encode the transaction and calculate double sha256 on the result.
@@ -722,8 +788,8 @@ func (msg *MsgTxAbe) MaxPayloadLength(pver uint32) uint32 {
 	return MaxBlockPayloadAbe
 }
 
-//	todo: Is it safe to use int as the size type?
-//	Note that, in different system, int may be int16 or int32
+// todo: Is it safe to use int as the size type?
+// Note that, in different system, int may be int16 or int32
 func (msg *MsgTxAbe) SerializeSize() int {
 	//	Version 4 bytes
 	n := 4
@@ -761,7 +827,8 @@ func (msg *MsgTxAbe) SerializeSizeFull() int {
 	return n
 }
 
-/**
+/*
+*
 Compute the size according to the Serialize function, and based on the crypto-scheme
 The result is just appropriate, will be used to compute transaction fee
 */
@@ -820,7 +887,7 @@ func PrecomputeTrTxWitnessSize(txVersion uint32, inputRingVersion uint32, inputR
 	return uint32(approxSize), nil
 }
 
-//	for computing TxId by hash, and for being serialized in block
+// for computing TxId by hash, and for being serialized in block
 func (msg *MsgTxAbe) Serialize(w io.Writer) error {
 	return msg.BtcEncode(w, 0, BaseEncoding)
 }
@@ -908,11 +975,212 @@ func NewStandardCoinbaseTxIn(nextBlockHeight int32, txVersion uint32) (*TxInAbe,
 	return txIn, nil
 }
 
-//	the caller must have checked the format of the coinbaseTxMsg
+// the caller must have checked the format of the coinbaseTxMsg
 func ExtractCoinbaseHeight(coinbaseTx *MsgTxAbe) int32 {
 	blockhash0 := coinbaseTx.TxIns[0].PreviousOutPointRing.BlockHashs[0]
 	blockHeight := int32(binary.BigEndian.Uint32(blockhash0[0:4]))
 	return blockHeight
+}
+
+// TxoRing is a key concept in Abelian
+type TxoRing struct {
+	Version         uint32
+	RingBlockHeight int32
+	OutPointRing    *OutPointRing
+	TxOuts          []*TxOutAbe
+	IsCoinbase      bool
+}
+
+// errDeserialize signifies that a problem was encountered when deserializing
+// data.
+type errTxoRingDeserialize string
+
+// Error implements the error interface.
+func (e errTxoRingDeserialize) Error() string {
+	return string(e)
+}
+
+// RingId() returns the underlying outPointRing's RingId as its RingId.
+// This is compatible the existing implementaion where txoRing.outPointRing.Hash() is used as the key for map.
+func (txoRing *TxoRing) RingId() RingId {
+	return txoRing.OutPointRing.RingId()
+}
+
+func (txoRing *TxoRing) SerializeSize() int {
+
+	//	utxoRingHeaderCode
+	//	blockHeight and IsCoinBase
+	txoRingHeaderCode := uint64(txoRing.RingBlockHeight) << 1
+	if txoRing.IsCoinbase {
+		txoRingHeaderCode |= 0x01
+	}
+
+	n := VarIntSerializeSize(txoRingHeaderCode)
+
+	//	version
+	n = n + VarIntSerializeSize(uint64(txoRing.Version))
+
+	//	outPointRing
+	n = n + txoRing.OutPointRing.SerializeSize()
+
+	//	txOuts
+	n = n + VarIntSerializeSize(uint64(len(txoRing.TxOuts)))
+	for _, txOut := range txoRing.TxOuts {
+		n = n + txOut.SerializeSize()
+	}
+
+	return n
+}
+
+func (txoRing *TxoRing) Serialize(w io.Writer) error {
+	//	utxoRingHeaderCode
+	//	blockHeight and IsCoinBase
+	utxoRingHeaderCode := uint64(txoRing.RingBlockHeight) << 1
+	if txoRing.IsCoinbase {
+		utxoRingHeaderCode |= 0x01
+	}
+	err := WriteVarInt(w, 0, utxoRingHeaderCode)
+	if err != nil {
+		return err
+	}
+
+	//	Version
+	err = WriteVarInt(w, 0, uint64(txoRing.Version))
+	if err != nil {
+		return err
+	}
+
+	//	OutPointRing
+	err = WriteOutPointRing(w, 0, txoRing.Version, txoRing.OutPointRing)
+	if err != nil {
+		return err
+	}
+
+	//	txOuts
+	if len(txoRing.TxOuts) != len(txoRing.OutPointRing.OutPoints) {
+		return errors.New("TxoRing.Serialize: The size of txOuts does not match the number of OutPoints")
+	}
+	err = WriteVarInt(w, 0, uint64(len(txoRing.TxOuts)))
+	if err != nil {
+		return err
+	}
+
+	for _, txOut := range txoRing.TxOuts {
+		err = WriteTxOutAbe(w, 0, txoRing.Version, txOut)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (txoRing *TxoRing) Deserialize(r io.Reader) error {
+	//	utxoRingHeaderCode
+	//	blockHeight and IsCoinBase
+	utxoRingHeaderCode, err := ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	isCoinBase := utxoRingHeaderCode&0x01 != 0
+	ringBlockHeight := int32(utxoRingHeaderCode >> 1)
+
+	txoRing.RingBlockHeight = ringBlockHeight
+	txoRing.IsCoinbase = isCoinBase
+
+	//	Version
+	version, err := ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	txoRing.Version = uint32(version)
+
+	//	OutPointRing
+	txoRing.OutPointRing = &OutPointRing{}
+	err = ReadOutPointRing(r, 0, txoRing.Version, txoRing.OutPointRing)
+	if err != nil {
+		return err
+	}
+
+	//	TxOuts
+	ringSize, err := ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	expectedRingSize, err := GetTxoRingSizeByRingVersion(txoRing.Version)
+	if err != nil {
+		return err
+	}
+	if ringSize > uint64(expectedRingSize) {
+		return errTxoRingDeserialize("The TxoRing to be deseralized has a ring size greater than the allowed max value")
+	}
+	if ringSize != uint64(len(txoRing.OutPointRing.OutPoints)) {
+		return errTxoRingDeserialize("The TxoRing to be deseralized has a ring size does not match the size in OutPointRing")
+	}
+
+	txoRing.TxOuts = make([]*TxOutAbe, ringSize)
+	for i := uint64(0); i < ringSize; i++ {
+		txOut := TxOutAbe{}
+		err = ReadTxOutAbe(r, 0, txoRing.Version, &txOut)
+		if err != nil {
+			return err
+		}
+		txoRing.TxOuts[i] = &txOut
+	}
+
+	return nil
+}
+
+// Clone returns a shallow copy of the utxo entry.
+func (txoRing *TxoRing) Clone() *TxoRing {
+	if txoRing == nil {
+		return nil
+	}
+
+	rstTxoRing := TxoRing{}
+
+	rstTxoRing.Version = txoRing.Version
+	rstTxoRing.RingBlockHeight = txoRing.RingBlockHeight
+	rstTxoRing.OutPointRing = txoRing.OutPointRing
+	rstTxoRing.TxOuts = txoRing.TxOuts
+	rstTxoRing.IsCoinbase = txoRing.IsCoinbase
+	//	all the above are invariant contents for TxoRing, so we use shallow copy
+
+	return &rstTxoRing
+}
+
+func (txoRing *TxoRing) IsSame(obj *TxoRing) bool {
+	if txoRing == nil {
+		if obj == nil {
+			return true
+		} else {
+			return false
+		}
+	}
+
+	entrySize := txoRing.SerializeSize()
+	objSize := obj.SerializeSize()
+	if entrySize != objSize {
+		return false
+	}
+
+	bufEntry := bytes.NewBuffer(make([]byte, 0, entrySize))
+	err := txoRing.Serialize(bufEntry)
+	if err != nil {
+		return false
+	}
+
+	bufObj := bytes.NewBuffer(make([]byte, 0, objSize))
+	err = obj.Serialize(bufObj)
+	if err != nil {
+		return false
+	}
+
+	if !bytes.Equal(bufEntry.Bytes(), bufObj.Bytes()) {
+		return false
+	}
+
+	return true
 }
 
 //func (txOut *TxOutAbe) Serialize(w io.Writer) error {

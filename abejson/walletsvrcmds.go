@@ -217,12 +217,17 @@ type GetBalancesCmd struct{}
 type GenerateAddressCmd struct {
 	Num *int `jsonrpcdefault:"1"`
 }
+type ListFreeAddressesCmd struct {
+}
 type GetBalancesAbeCmd struct {
 	Minconf *int `jsonrpcdefault:"1"`
 }
 
 func NewGenerateAddressCmd() *GenerateAddressCmd {
 	return &GenerateAddressCmd{}
+}
+func NewListFreeAddressesCmd() *ListFreeAddressesCmd {
+	return &ListFreeAddressesCmd{}
 }
 
 // NewGetBalancesCmd returns a new instance which can be used to issue a
@@ -500,22 +505,40 @@ type ListUnspentCmd struct {
 	MaxConf   *int `jsonrpcdefault:"9999999"`
 	Addresses *[]string
 }
-type ListAllUnspentAbeCmd struct{}
-
-func NewListAllUnspentAbeCmd() *ListAllUnspentAbeCmd {
-	return &ListAllUnspentAbeCmd{}
+type ListAllUnspentAbeCmd struct {
+	Min *float64 `jsonrpcdefault:"0"`
+	Max *float64 `jsonrpcdefault:"0"`
 }
 
-type ListUnmaturedAbeCmd struct{}
-
-func NewListUnmaturedAbeCmd() *ListUnmaturedAbeCmd {
-	return &ListUnmaturedAbeCmd{}
+func NewListAllUnspentAbeCmd(min *float64, max *float64) *ListAllUnspentAbeCmd {
+	return &ListAllUnspentAbeCmd{
+		Min: min,
+		Max: max,
+	}
 }
 
-type ListUnspentAbeCmd struct{}
+type ListUnmaturedAbeCmd struct {
+	Min *float64 `jsonrpcdefault:"0"`
+	Max *float64 `jsonrpcdefault:"0"`
+}
 
-func NewListUnspentAbeCmd() *ListUnspentAbeCmd {
-	return &ListUnspentAbeCmd{}
+func NewListUnmaturedAbeCmd(min *float64, max *float64) *ListUnmaturedAbeCmd {
+	return &ListUnmaturedAbeCmd{
+		Min: min,
+		Max: max,
+	}
+}
+
+type ListUnspentAbeCmd struct {
+	Min *float64 `jsonrpcdefault:"0"`
+	Max *float64 `jsonrpcdefault:"0"`
+}
+
+func NewListUnspentAbeCmd(min *float64, max *float64) *ListUnspentAbeCmd {
+	return &ListUnspentAbeCmd{
+		Min: min,
+		Max: max,
+	}
 }
 
 type ListUnspentCoinbaseAbeCmd struct {
@@ -528,34 +551,58 @@ func NewListUnspentCoinbaseAbeCmd() *ListUnspentCoinbaseAbeCmd {
 	return &ListUnspentCoinbaseAbeCmd{}
 }
 
-type ListSpentButUnminedAbeCmd struct{}
-
-func NewListSpentButUnminedAbeCmd() *ListSpentButUnminedAbeCmd {
-	return &ListSpentButUnminedAbeCmd{}
+type ListSpentButUnminedAbeCmd struct {
+	Min *float64 `jsonrpcdefault:"0"`
+	Max *float64 `jsonrpcdefault:"0"`
 }
 
-type ListSpentAndMinedAbeCmd struct{}
-
-func NewListSpentAndMinedAbeCmd() *ListSpentAndMinedAbeCmd {
-	return &ListSpentAndMinedAbeCmd{}
+func NewListSpentButUnminedAbeCmd(min *float64, max *float64) *ListSpentButUnminedAbeCmd {
+	return &ListSpentButUnminedAbeCmd{
+		Min: min,
+		Max: max,
+	}
 }
 
-type ListConfirmedTxsCmd struct{}
-
-func NewListConfirmedTxsCmd() *ListConfirmedTxsCmd {
-	return &ListConfirmedTxsCmd{}
+type ListSpentAndMinedAbeCmd struct {
+	Min *float64 `jsonrpcdefault:"0"`
+	Max *float64 `jsonrpcdefault:"0"`
 }
 
-type ListUnconfirmedTxsCmd struct{}
-
-func NewListUnconfirmedTxsCmd() *ListUnconfirmedTxsCmd {
-	return &ListUnconfirmedTxsCmd{}
+func NewListSpentAndMinedAbeCmd(min *float64, max *float64) *ListSpentAndMinedAbeCmd {
+	return &ListSpentAndMinedAbeCmd{
+		Min: min,
+		Max: max,
+	}
 }
 
-type ListInvalidTxsCmd struct{}
+type ListConfirmedTxsCmd struct {
+	Verbose *int `jsonrpcdefault:"0"`
+}
 
-func NewListInvalidTxsCmd() *ListInvalidTxsCmd {
-	return &ListInvalidTxsCmd{}
+func NewListConfirmedTxsCmd(verbose *int) *ListConfirmedTxsCmd {
+	return &ListConfirmedTxsCmd{
+		Verbose: verbose,
+	}
+}
+
+type ListUnconfirmedTxsCmd struct {
+	Verbose *int `jsonrpcdefault:"0"`
+}
+
+func NewListUnconfirmedTxsCmd(verbose *int) *ListUnconfirmedTxsCmd {
+	return &ListUnconfirmedTxsCmd{
+		Verbose: verbose,
+	}
+}
+
+type ListInvalidTxsCmd struct {
+	Verbose *int `jsonrpcdefault:"0"`
+}
+
+func NewListInvalidTxsCmd(verbose *int) *ListInvalidTxsCmd {
+	return &ListInvalidTxsCmd{
+		Verbose: verbose,
+	}
 }
 
 type TxStatusCmd struct {
@@ -920,6 +967,7 @@ func init() {
 	//MustRegisterCmd("sendmany", (*SendManyCmd)(nil), flags)
 	MustRegisterCmd("sendtoaddressesabe", (*SendToAddressAbeCmd)(nil), flags)
 	MustRegisterCmd("generateaddressabe", (*GenerateAddressCmd)(nil), flags)
+	MustRegisterCmd("listfreeaddresses", (*ListFreeAddressesCmd)(nil), flags)
 	MustRegisterCmd("addressmaxsequencenumber", (*AddressMaxSequenceNumberCmd)(nil), flags)
 	MustRegisterCmd("addressrange", (*AddressRangeCmd)(nil), flags)
 	//MustRegisterCmd("sendtoaddress", (*SendToAddressCmd)(nil), flags)

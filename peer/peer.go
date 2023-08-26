@@ -284,6 +284,8 @@ type Config struct {
 
 	// Chain is the current blockchain.
 	Chain *blockchain.BlockChain
+
+	CommunicationCache *sync.Map
 }
 
 // minUint32 is a helper function to return the minimum of two uint32s.
@@ -489,7 +491,8 @@ type Peer struct {
 	sendDoneQueue chan struct{}
 	outputInvChan chan *wire.InvVect
 
-	needsetResult sync.Map
+	needsetResult      sync.Map
+	communicationCache *sync.Map
 
 	inQuit    chan struct{}
 	queueQuit chan struct{}
@@ -1108,6 +1111,16 @@ func (p *Peer) readMessage(encoding wire.MessageEncoding) (wire.Message, []byte,
 
 // writeMessage sends a abelian message to the peer with logging.
 func (p *Peer) writeMessage(msg wire.Message, enc wire.MessageEncoding) error {
+	defer func() {
+		// whether err or not, down the reference
+		if wrappedMsg, ok := msg.(*wire.WrappedMessage); ok {
+			wrappedMsg.Done()
+			if wrappedMsg.CanDelete() {
+				p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message))
+			}
+		}
+	}()
+
 	// Don't do anything if we're disconnecting.
 	if atomic.LoadInt32(&p.disconnect) != 0 {
 		return nil
@@ -1785,6 +1798,12 @@ out:
 		if msg.doneChan != nil {
 			msg.doneChan <- struct{}{}
 		}
+		if wrappedMsg, ok := msg.msg.(*wire.WrappedMessage); ok {
+			wrappedMsg.Done()
+			if wrappedMsg.CanDelete() {
+				p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message))
+			}
+		}
 	}
 cleanup:
 	for {
@@ -1792,6 +1811,12 @@ cleanup:
 		case msg := <-p.outputQueue:
 			if msg.doneChan != nil {
 				msg.doneChan <- struct{}{}
+			}
+			if wrappedMsg, ok := msg.msg.(*wire.WrappedMessage); ok {
+				wrappedMsg.Done()
+				if wrappedMsg.CanDelete() {
+					p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message))
+				}
 			}
 		case <-p.outputInvChan:
 			// Just drain channel
@@ -1885,6 +1910,13 @@ cleanup:
 			if msg.doneChan != nil {
 				msg.doneChan <- struct{}{}
 			}
+			// whether err or not, down the reference
+			if wrappedMsg, ok := msg.msg.(*wire.WrappedMessage); ok {
+				wrappedMsg.Done()
+				if wrappedMsg.CanDelete() {
+					p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message))
+				}
+			}
 			// no need to send on sendDoneQueue since queueHandler
 			// has been waited on and already exited.
 		default:
@@ -1941,6 +1973,12 @@ func (p *Peer) QueueMessageWithEncoding(msg wire.Message, doneChan chan<- struct
 			go func() {
 				doneChan <- struct{}{}
 			}()
+		}
+		if wrappedMsg, ok := msg.(*wire.WrappedMessage); ok {
+			wrappedMsg.Done()
+			if wrappedMsg.CanDelete() {
+				p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message))
+			}
 		}
 		return
 	}
@@ -2371,15 +2409,16 @@ func newPeerBase(origCfg *Config, inbound bool) *Peer {
 		outputQueue:    make(chan outMsg, outputBufferSize),
 		sendQueue:      make(chan outMsg, 1), // nonblocking sync
 		//needsetResult:   ,
-		sendDoneQueue:   make(chan struct{}, 1), // nonblocking sync
-		outputInvChan:   make(chan *wire.InvVect, outputBufferSize),
-		inQuit:          make(chan struct{}),
-		queueQuit:       make(chan struct{}),
-		outQuit:         make(chan struct{}),
-		quit:            make(chan struct{}),
-		cfg:             cfg, // Copy so caller can't mutate.
-		services:        cfg.Services,
-		protocolVersion: cfg.ProtocolVersion,
+		sendDoneQueue:      make(chan struct{}, 1), // nonblocking sync
+		outputInvChan:      make(chan *wire.InvVect, outputBufferSize),
+		inQuit:             make(chan struct{}),
+		queueQuit:          make(chan struct{}),
+		outQuit:            make(chan struct{}),
+		quit:               make(chan struct{}),
+		cfg:                cfg, // Copy so caller can't mutate.
+		services:           cfg.Services,
+		protocolVersion:    cfg.ProtocolVersion,
+		communicationCache: cfg.CommunicationCache,
 	}
 	return &p
 }

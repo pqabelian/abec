@@ -125,7 +125,7 @@ var rpcHandlers map[string]commandHandler
 var rpcHandlersBeforeInit = map[string]commandHandler{
 	"addnode": handleAddNode,
 	//	todo(ABE.MUST)
-	"createrawtransaction":    handleCreateRawTransaction,
+	"createrawtransaction":    handleCreateRawTransactionAbe,
 	"createrawtransactionAbe": handleCreateRawTransactionAbe,
 	"debuglevel":              handleDebugLevel,
 	"decoderawtransaction":    handleDecodeRawTransaction,
@@ -136,7 +136,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getaddednodeinfo":        handleGetAddedNodeInfo,
 	"getbestblock":            handleGetBestBlock,
 	"getbestblockhash":        handleGetBestBlockHash,
-	"getblock":                handleGetBlock,
+	"getblock":                handleGetBlockAbe,
 	"getblockabe":             handleGetBlockAbe, //TODO(abe):after testing, this command will be replace by getblock
 	"getblockchaininfo":       handleGetBlockChainInfo,
 	"getblockcount":           handleGetBlockCount,
@@ -173,7 +173,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	//	todo(ABE.MUST): However, in ABE, each address is one-time (by stealth address), it does not make sense to search by address.
 	//	todo(ABE.MUST): ABE provides txoIndex which support searching by Txo(txid,index).
 	//	"searchrawtransactions": handleSearchRawTransactions,
-	"sendrawtransaction":    handleSendRawTransaction,
+	"sendrawtransaction":    handleSendRawTransactionAbe,
 	"sendrawtransactionabe": handleSendRawTransactionAbe,
 	"setgenerate":           handleSetGenerate,
 	"stop":                  handleStop,
@@ -962,7 +962,9 @@ func createVoutListAbe(mtx *wire.MsgTxAbe, chainParams *chaincfg.Params) []abejs
 
 		var voutEntry abejson.TxOutAbe
 		voutEntry.N = uint8(i)
-		voutEntry.TxoScript = hex.EncodeToString(txOut.TxoScript)
+		buffer := bytes.NewBuffer(make([]byte, 0, txOut.SerializeSize()))
+		_ = wire.WriteTxOutAbe(buffer, 0, mtx.Version, txOut)
+		voutEntry.TxoScript = hex.EncodeToString(buffer.Bytes())
 
 		voutList = append(voutList, voutEntry)
 	}
@@ -1542,7 +1544,7 @@ func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 		VersionHex:    fmt.Sprintf("%08x", blockHeader.Version),
 		MerkleRoot:    blockHeader.MerkleRoot.String(),
 		PreviousHash:  blockHeader.PrevBlock.String(),
-		Nonce:         blockHeader.Nonce,
+		Nonce:         uint64(blockHeader.Nonce),
 		Time:          blockHeader.Timestamp.Unix(),
 		Confirmations: int64(1 + best.Height - blockHeight),
 		Height:        int64(blockHeight),
@@ -1557,6 +1559,9 @@ func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 		ContentHash: blockHeader.ContentHash().String(),
 		MixDigest:   blockHeader.MixDigest.String(),
 		SealHash:    ethash.SealHash(blockHeader).String(),
+	}
+	if blockHeader.Height > s.cfg.ChainParams.BlockHeightEthashPoW {
+		blockReply.Nonce = blockHeader.NonceExt
 	}
 
 	if *c.Verbosity == 1 {
@@ -2973,6 +2978,7 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 // handleGetMempoolInfo implements the getmempoolinfo command.
 func handleGetMempoolInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	mempoolTxns := s.cfg.TxMemPool.TxDescsAbe()
+	diskTxns := s.cfg.TxMemPool.TxHashesInDiskAbe()
 
 	var numBytes int64
 	for _, txD := range mempoolTxns {
@@ -2980,8 +2986,9 @@ func handleGetMempoolInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct
 	}
 
 	ret := &abejson.GetMempoolInfoResult{
-		Size:  int64(len(mempoolTxns)),
-		Bytes: numBytes,
+		Size:      int64(len(mempoolTxns)),
+		Bytes:     numBytes,
+		DiskTxNum: int64(len(diskTxns)),
 	}
 
 	return ret, nil
@@ -3179,9 +3186,13 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 	// The response is simply an array of the transaction hashes if the
 	// verbose flag is not set.
 	descs := mp.TxDescsAbe()
-	hashStrings := make([]string, len(descs))
-	for i := range hashStrings {
-		hashStrings[i] = descs[i].Tx.Hash().String()
+	txInDiskHashes := mp.TxHashesInDiskAbe()
+	hashStrings := make([]string, 0, len(descs)+len(txInDiskHashes))
+	for i := 0; i < len(descs); i++ {
+		hashStrings = append(hashStrings, descs[i].Tx.Hash().String())
+	}
+	for i := 0; i < len(txInDiskHashes); i++ {
+		hashStrings = append(hashStrings, txInDiskHashes[i].String())
 	}
 
 	return hashStrings, nil
@@ -4092,7 +4103,7 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 
 	// Use 0 for the tag to represent local node.
 	tx := abeutil.NewTxAbe(&msgTx)
-	acceptedTx, err := s.cfg.TxMemPool.ProcessTransactionAbe(tx, false, false, 0)
+	acceptedTx, err := s.cfg.TxMemPool.ProcessTransactionAbe(tx, false, false, 0, false)
 	if err != nil {
 		// When the error is a rule error, it means the transaction was
 		// simply rejected as opposed to something actually going wrong,
@@ -4195,7 +4206,7 @@ func handleSendRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-chan
 
 	// Use 0 for the tag to represent local node.
 	tx := abeutil.NewTxAbe(&msgTx)
-	acceptedTx, err := s.cfg.TxMemPool.ProcessTransactionAbe(tx, false, false, 0)
+	acceptedTx, err := s.cfg.TxMemPool.ProcessTransactionAbe(tx, false, false, 0, false)
 	if err != nil {
 		// When the error is a rule error, it means the transaction was
 		// simply rejected as opposed to something actually going wrong,

@@ -78,6 +78,21 @@ func (tx *TxAbe) Hash() *chainhash.Hash {
 	return &hash
 }
 
+// TxId() return TxHash(), which is the hash of TxContent (without witness), as the TxId.
+//
+//	In logic, outPoint should use (TxId, index).
+func (tx *TxAbe) TxId() wire.TxId {
+	if tx.txHash == nil {
+		// Cache the hash
+		hash := tx.msgTx.TxHash()
+		tx.txHash = &hash
+	}
+
+	// Return the cached hash
+	txId := wire.TxId(*tx.txHash)
+	return txId
+}
+
 // WitnessHash returns the hash the transaction witness.
 // This is equivalent to calling TxWitnessHash on the underlying wire.MsgTx, however it
 // caches the result so subsequent calls are more efficient.

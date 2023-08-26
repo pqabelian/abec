@@ -16,6 +16,7 @@ import (
 	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/mempool"
+	"github.com/abesuite/abec/mempool/rotator"
 	"github.com/abesuite/abec/mining"
 	"github.com/abesuite/abec/mining/cpuminer"
 	"github.com/abesuite/abec/mining/externalminer"
@@ -27,6 +28,8 @@ import (
 	"github.com/abesuite/abec/witnessmgr"
 	"math"
 	"net"
+	"os"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strconv"
@@ -222,6 +225,8 @@ type server struct {
 	timeSource           blockchain.MedianTimeSource
 	services             wire.ServiceFlag
 
+	communicationCache sync.Map
+
 	// The following fields are used for optional indexes.  They will be nil
 	// if the associated index is not enabled.  These fields are set during
 	// initial creation of the server and never changed afterwards, so they
@@ -239,6 +244,10 @@ type server struct {
 	// agentWhitelist is a list of whitelisted user agent substrings, no
 	// whitelisting will be applied if the list is empty or nil.
 	agentWhitelist []string
+
+	// txCacheRotator is one of the logging outputs.  It should be closed on
+	// application shutdown.
+	txCacheRotator *rotator.Rotator
 }
 
 // serverPeer extends the peer to maintain state shared by the server and
@@ -999,18 +1008,30 @@ func (s *server) TransactionConfirmed(tx *abeutil.TxAbe) {
 func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
 	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
 
-	// Attempt to fetch the requested transaction from the pool.  A
-	// call could be made to check for existence first, but simply trying
-	// to fetch a missing transaction results in the same behavior.
-	tx, err := s.txMemPool.FetchTransaction(hash)
-	if err != nil {
-		peerLog.Tracef("Unable to fetch tx %v from transaction "+
-			"pool: %v", hash, err)
+	var msg wire.Message
+	msgCacheKey := fmt.Sprintf("tx_%s", hash)
+	value, ok := s.communicationCache.Load(msgCacheKey)
+	if wrappedMessage, hit := value.(*wire.WrappedMessage); ok && hit {
+		wrappedMessage.Use()
+		msg = wrappedMessage
+	} else {
+		// Attempt to fetch the requested transaction from the pool.  A
+		// call could be made to check for existence first, but simply trying
+		// to fetch a missing transaction results in the same behavior.
+		tx, err := s.txMemPool.FetchTransaction(hash)
+		if err != nil {
+			peerLog.Tracef("Unable to fetch tx %v from transaction "+
+				"pool: %v", hash, err)
 
-		if doneChan != nil {
-			doneChan <- struct{}{}
+			if doneChan != nil {
+				doneChan <- struct{}{}
+			}
+			return err
 		}
-		return err
+		wrappedTxMsg := wire.WrapMessage(tx.MsgTx())
+		s.communicationCache.Store(msgCacheKey, wrappedTxMsg)
+		wrappedTxMsg.Use()
+		msg = wrappedTxMsg
 	}
 
 	// Once we have fetched data wait for any previous operation to finish.
@@ -1018,7 +1039,7 @@ func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<-
 		<-waitChan
 	}
 
-	sp.QueueMessageWithEncoding(tx.MsgTx(), doneChan, encoding)
+	sp.QueueMessageWithEncoding(msg, doneChan, encoding)
 
 	return nil
 }
@@ -1123,49 +1144,71 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan cha
 	return nil
 }
 
+// server.cache wire.Message + []byte
 func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
 	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
+	var msg wire.Message
+	msgCacheKey := fmt.Sprintf("block_%s", hash)
+	value, ok := s.communicationCache.Load(msgCacheKey)
+	if wrappedMessage, hit := value.(*wire.WrappedMessage); ok && hit {
+		wrappedMessage.Use()
+		msg = wrappedMessage
+	} else {
+		// Fetch the raw block bytes from the database.
+		var blockBytes []byte
+		var witnesses [][]byte
+		err := sp.server.db.View(func(dbTx database.Tx) error {
+			var err error
+			if encoding == wire.BaseEncoding {
+				blockBytes, err = dbTx.FetchBlockWithoutWitness(hash)
+			} else {
+				blockBytes, witnesses, err = dbTx.FetchBlockAbe(hash)
+			}
+			return err
+		})
+		if err != nil {
+			peerLog.Tracef("Unable to fetch requested block hash %v: %v",
+				hash, err)
 
-	// Fetch the raw block bytes from the database.
-	var blockBytes []byte
-	var witnesses [][]byte
-	err := sp.server.db.View(func(dbTx database.Tx) error {
-		var err error
-		if encoding == wire.BaseEncoding {
-			blockBytes, err = dbTx.FetchBlockWithoutWitness(hash)
-		} else {
-			blockBytes, witnesses, err = dbTx.FetchBlockAbe(hash)
+			if doneChan != nil {
+				doneChan <- struct{}{}
+			}
+			return err
 		}
-		return err
-	})
-	if err != nil {
-		peerLog.Tracef("Unable to fetch requested block hash %v: %v",
-			hash, err)
 
-		if doneChan != nil {
-			doneChan <- struct{}{}
+		var msgBlock wire.MsgBlockAbe
+		// Deserialize the block.
+		err = msgBlock.DeserializeNoWitness(bytes.NewReader(blockBytes))
+		if err != nil {
+			peerLog.Tracef("Unable to deserialize requested block hash "+
+				"%v: %v", hash, err)
+
+			if doneChan != nil {
+				doneChan <- struct{}{}
+			}
+			return err
 		}
-		return err
-	}
 
-	// Deserialize the block.
-	var msgBlock wire.MsgBlockAbe
-	err = msgBlock.DeserializeNoWitness(bytes.NewReader(blockBytes))
-	if err != nil {
-		peerLog.Tracef("Unable to deserialize requested block hash "+
-			"%v: %v", hash, err)
-
-		if doneChan != nil {
-			doneChan <- struct{}{}
+		if len(witnesses) != 0 {
+			txs := msgBlock.Transactions
+			for i := 0; i < len(txs); i++ {
+				txs[i].TxWitness = witnesses[i][chainhash.HashSize:]
+			}
 		}
-		return err
-	}
 
-	if len(witnesses) != 0 {
-		txs := msgBlock.Transactions
-		for i := 0; i < len(txs); i++ {
-			txs[i].TxWitness = witnesses[i][chainhash.HashSize:]
+		if encoding == wire.WitnessEncoding && !msgBlock.HasWitness() {
+			peerLog.Debugf("Peer %v request witness block %v but we do not have witness", sp, hash.String())
+			// Once we have fetched data wait for any previous operation to finish.
+			if waitChan != nil {
+				<-waitChan
+			}
+			return errors.New("witness block not found")
 		}
+
+		wrappedBlockMsg := wire.WrapMessage(&msgBlock)
+		s.communicationCache.Store(msgCacheKey, wrappedBlockMsg)
+		wrappedBlockMsg.Use()
+		msg = wrappedBlockMsg
 	}
 
 	// Once we have fetched data wait for any previous operation to finish.
@@ -1185,12 +1228,8 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 	if !sendInv { // if the sendInv is false, the the dc is doneChan else dc is nil
 		dc = doneChan // and the dc is nil means that do not finish the request
 	}
-	//	todo (ABE): as the block is fetched from database, the witness may not be included. If so, regardless of encoding, no witness is provided.
-	if encoding == wire.WitnessEncoding && !msgBlock.HasWitness() {
-		peerLog.Debugf("Peer %v request witness block %v but we do not have witness", sp, hash.String())
-		return errors.New("witness block not found")
-	}
-	sp.QueueMessageWithEncoding(&msgBlock, dc, encoding)
+
+	sp.QueueMessageWithEncoding(msg, dc, encoding)
 
 	// When the peer requests the final block that was advertised in
 	// response to a getblocks message which requested more blocks than
@@ -1746,18 +1785,19 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			// other implementations' alert messages, we will not relay theirs.
 			OnAlert: nil,
 		},
-		NewestBlock:       sp.newestBlock,
-		HostToNetAddress:  sp.server.addrManager.HostToNetAddress,
-		Proxy:             cfg.Proxy,
-		UserAgentName:     userAgentName,
-		UserAgentVersion:  userAgentVersion,
-		UserAgentComments: cfg.UserAgentComments,
-		ChainParams:       sp.server.chainParams,
-		Services:          sp.server.services,
-		DisableRelayTx:    cfg.BlocksOnly,
-		ProtocolVersion:   peer.MaxProtocolVersion,
-		TrickleInterval:   cfg.TrickleInterval,
-		Chain:             sp.server.chain,
+		NewestBlock:        sp.newestBlock,
+		HostToNetAddress:   sp.server.addrManager.HostToNetAddress,
+		Proxy:              cfg.Proxy,
+		UserAgentName:      userAgentName,
+		UserAgentVersion:   userAgentVersion,
+		UserAgentComments:  cfg.UserAgentComments,
+		ChainParams:        sp.server.chainParams,
+		Services:           sp.server.services,
+		DisableRelayTx:     cfg.BlocksOnly,
+		ProtocolVersion:    peer.MaxProtocolVersion,
+		TrickleInterval:    cfg.TrickleInterval,
+		Chain:              sp.server.chain,
+		CommunicationCache: &sp.server.communicationCache,
 	}
 }
 
@@ -2409,6 +2449,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		witnessCache:         txscript.NewWitnessCache(cfg.WitnessCacheMaxSize),
 		agentBlacklist:       agentBlacklist,
 		agentWhitelist:       agentWhitelist,
+		communicationCache:   sync.Map{},
 	}
 
 	// Create the transaction index if needed.
@@ -2482,6 +2523,25 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 			mempool.DefaultEstimateFeeMinRegisteredBlocks)
 	}
 
+	if cfg.AllowDiskCacheTx {
+		cacheTxFileName := filepath.Join(cfg.CacheTxDir, defaultCacheTxFilename)
+		logDir, _ := filepath.Split(cacheTxFileName)
+
+		// clean dirty data if shut down unexpectedly
+		os.RemoveAll(cfg.CacheTxDir)
+		err := os.MkdirAll(logDir, 0700)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to create transaction cache directory: %v\n", err)
+			os.Exit(1)
+		}
+		r, err := rotator.New(cacheTxFileName, 0, 0)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to create file rotator: %v\n", err)
+			os.Exit(1)
+		}
+
+		s.txCacheRotator = r
+	}
 	txC := mempool.Config{
 		Policy: mempool.Policy{
 			DisableRelayPriority: cfg.NoRelayPriority,
@@ -2508,9 +2568,11 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		HashCache:          s.hashCache,
 		WitnessCache:       s.witnessCache,
 		FeeEstimator:       s.feeEstimator,
+		AllowDiskCacheTx:   cfg.AllowDiskCacheTx,
+		TxCacheRotator:     s.txCacheRotator,
+		CacheTxFileName:    filepath.Join(cfg.CacheTxDir, defaultCacheTxFilename),
 	}
 	s.txMemPool = mempool.New(&txC)
-
 	//	todo: (EthashPoW)
 	cfg.EthashConfig.BlockHeightStart = s.chainParams.BlockHeightEthashPoW
 	cfg.EthashConfig.EpochLength = s.chainParams.EthashEpochLength

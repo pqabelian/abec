@@ -1,16 +1,20 @@
 package mempool
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/mempool/rotator"
 	"github.com/abesuite/abec/mining"
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
 	"math"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -42,6 +46,11 @@ const (
 	// replacement.
 	MaxReplacementEvictions = 100
 )
+
+// MaxTransactionInMemoryNum is the maximum number of  transaction that
+// can be stored in memory.
+// The transaction would the stored in disk when the pool has no memory
+var MaxTransactionInMemoryNum = 100
 
 // Tag represents an identifier to use for tagging orphan transactions.  The
 // caller may choose any scheme it desires, however it is common to use peer IDs
@@ -96,6 +105,12 @@ type Config struct {
 	// FeeEstimatator provides a feeEstimator. If it is not nil, the mempool
 	// records all new transactions it observes into the feeEstimator.
 	FeeEstimator *FeeEstimator
+
+	// The following two properties are used to avoid transaction mempool
+	// occupy too many memory, and cache trasnaction into disk if possible
+	AllowDiskCacheTx bool
+	TxCacheRotator   *rotator.Rotator
+	CacheTxFileName  string
 }
 
 // Policy houses the policy (configuration parameters) which is used to
@@ -200,10 +215,13 @@ type TxPool struct {
 
 	//	todo(ABE):	begin
 	poolAbe          map[chainhash.Hash]*TxDescAbe
+	diskPool         map[chainhash.Hash]struct{}
 	orphansAbe       map[chainhash.Hash]*orphanTxAbe
 	outpointsAbe     map[chainhash.Hash]map[string]*abeutil.TxAbe                    //TODO(abe):why use two layers map                 //	corresponding to btc's outpoints, using hash rather then TxIn as the key for map
 	orphansByPrevAbe map[chainhash.Hash]map[string]map[chainhash.Hash]*abeutil.TxAbe // corresponding to btc's orphansByPrev //TODO type transfer??? []byte -> string
-	//	todo(ABE):	end
+
+	txMonitorMu  sync.Mutex
+	txMonitoring bool
 }
 
 // Ensure the TxPool type implements the mining.TxSource interface.
@@ -250,7 +268,7 @@ func (mp *TxPool) removeOrphan(tx *abeutil.Tx, removeRedeemers bool) {
 	delete(mp.orphans, *txHash)
 }
 
-//	todo(ABE): ABE does not allow transactions to spend the TXOs of the transactions that are not included in block.
+// todo(ABE): ABE does not allow transactions to spend the TXOs of the transactions that are not included in block.
 func (mp *TxPool) removeOrphanAbe(tx *abeutil.TxAbe) {
 	// Nothing to do if passed tx is not an orphan.
 	txHash := tx.Hash()
@@ -510,7 +528,7 @@ func (mp *TxPool) maybeAddOrphan(tx *abeutil.Tx, tag Tag) error {
 	return nil
 }
 
-//	todo (ABE):
+// todo (ABE):
 func (mp *TxPool) maybeAddOrphanAbe(tx *abeutil.TxAbe, tag Tag) error {
 	// Ignore orphan transactions that are too large.  This helps avoid
 	// a memory exhaustion attack based on sending a lot of really large
@@ -582,8 +600,16 @@ func (mp *TxPool) isTransactionInPoolBTCD(hash *chainhash.Hash) bool {
 	return false
 }
 
-func (mp *TxPool) isTransactionInPoolAbe(hash *chainhash.Hash) bool {
+func (mp *TxPool) isTransactionInMemPool(hash *chainhash.Hash) bool {
 	if _, exists := mp.poolAbe[*hash]; exists {
+		return true
+	}
+
+	return false
+}
+
+func (mp *TxPool) isTransactionInDiskPool(hash *chainhash.Hash) bool {
+	if _, exists := mp.diskPool[*hash]; exists {
 		return true
 	}
 
@@ -597,10 +623,11 @@ func (mp *TxPool) isTransactionInPoolAbe(hash *chainhash.Hash) bool {
 func (mp *TxPool) IsTransactionInPool(hash *chainhash.Hash) bool {
 	// Protect concurrent access.
 	mp.mtx.RLock()
-	inPool := mp.isTransactionInPoolAbe(hash)
+	inPool := mp.isTransactionInMemPool(hash)
+	inCache := mp.isTransactionInDiskPool(hash)
 	mp.mtx.RUnlock()
 
-	return inPool
+	return inPool || inCache
 }
 
 // isOrphanInPool returns whether or not the passed transaction already exists
@@ -640,9 +667,10 @@ func (mp *TxPool) IsOrphanInPool(hash *chainhash.Hash) bool {
 // in the main pool or in the orphan pool.
 //
 // This function MUST be called with the mempool lock held (for reads).
+//
 //	todo(ABE)
 func (mp *TxPool) haveTransaction(hash *chainhash.Hash) bool {
-	return mp.isTransactionInPoolAbe(hash) || mp.isOrphanInPoolAbe(hash)
+	return mp.isTransactionInMemPool(hash) || mp.isTransactionInDiskPool(hash) || mp.isOrphanInPoolAbe(hash)
 }
 
 // HaveTransaction returns whether or not the passed transaction already exists
@@ -685,7 +713,7 @@ func (mp *TxPool) removeTransactionBTCD(tx *abeutil.Tx, removeRedeemers bool) {
 	}
 }
 
-//	todo(ABE):
+// todo(ABE):
 func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 	txHash := tx.Hash()
 	/*	if removeRedeemers {
@@ -709,6 +737,16 @@ func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 		}
 
 		delete(mp.poolAbe, *txHash)
+		atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
+	}
+	if _, exists := mp.diskPool[*txHash]; exists {
+		delete(mp.diskPool, *txHash)
+		// remove from disk
+		name, err := mp.cfg.TxCacheRotator.LoadRotated(txHash.String())
+		if err != nil {
+			return
+		}
+		os.Remove(name)
 		atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
 	}
 }
@@ -746,7 +784,7 @@ func (mp *TxPool) RemoveDoubleSpends(tx *abeutil.Tx) {
 	mp.mtx.Unlock()
 }
 
-//	todo(ABE):
+// todo(ABE):
 func (mp *TxPool) RemoveDoubleSpendsAbe(tx *abeutil.TxAbe) {
 	// Protect concurrent access.
 	mp.mtx.Lock()
@@ -769,7 +807,7 @@ func (mp *TxPool) RemoveDoubleSpendsAbe(tx *abeutil.TxAbe) {
 // helper for maybeAcceptTransactionAbe.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, tx *abeutil.TxAbe, height int32, fee uint64) *TxDescAbe {
+func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, tx *abeutil.TxAbe, height int32, fee uint64, fromDiskCache bool) *TxDescAbe {
 	// Add the transaction to the pool and mark the referenced outpoints
 	// as spent by the pool.
 	txD := &TxDescAbe{
@@ -783,7 +821,43 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 		StartingPriority: mining.CalcPriorityAbe(tx.MsgTx(), utxoRingView, height),
 	}
 
+	// To avoid out of memory, if the transaction in mempool is more than MaxTransactionInMemoryNum
+	// transaction would be stored in disk
+	// When the transaction is loaded from disk, ignore this mechanism
+	if !fromDiskCache && mp.cfg.AllowDiskCacheTx && len(mp.poolAbe) >= MaxTransactionInMemoryNum {
+		txHash := tx.Hash()
+		log.Infof("save transaction %s into disk", txHash)
+		// To avoid that transaction always is cached in disk after triggering cache transaction,
+		// when the transaction in mempool is less than MinTransactionInMemoryNum, we would load
+		// transactions stored in disk
+		// When the transaction is loaded from disk, ignore this mechanism to avoid repeat
+		if !mp.txMonitoring {
+			go mp.txMonitor()
+		}
+
+		// store this transation into disk
+		buff := &bytes.Buffer{}
+		tx.MsgTx().SerializeFull(buff)
+
+		// write to transaction cache rotator
+		// [transaction_size] [transaction_content]
+		txContent := buff.Bytes()
+		content := make([]byte, 8+len(txContent))
+		binary.LittleEndian.PutUint64(content, uint64(len(txContent)))
+		copy(content[8:], txContent)
+		if _, err := mp.cfg.TxCacheRotator.Write(txHash.String(), content); err == nil {
+			mp.diskPool[*tx.Hash()] = struct{}{}
+			log.Infof("successful to save transaction %s into disk, current mempool:%d, current cached in disk:%d", txHash, len(mp.poolAbe), len(mp.diskPool))
+			return txD
+		}
+		log.Warnf("Fail to cache transaction %s using disk, save it at memory", txHash)
+	}
+
 	mp.poolAbe[*tx.Hash()] = txD
+	if fromDiskCache {
+		log.Infof("successful to load transaction %s from disk, current mempool:%d", tx.Hash(), len(mp.poolAbe))
+		delete(mp.diskPool, *tx.Hash())
+	}
 
 	if mp.outpointsAbe == nil {
 		mp.outpointsAbe = make(map[chainhash.Hash]map[string]*abeutil.TxAbe)
@@ -845,8 +919,8 @@ func (mp *TxPool) checkPoolDoubleSpend(tx *abeutil.Tx) (bool, error) {
 	return isReplacement, nil
 }
 
-//	todo(ABE): ABE does not allow replacement.
-//  The double-spend check rule is completely different from btc
+//		todo(ABE): ABE does not allow replacement.
+//	 The double-spend check rule is completely different from btc
 func (mp *TxPool) checkPoolDoubleSpendAbe(tx *abeutil.TxAbe) error {
 	for _, txIn := range tx.MsgTx().TxIns {
 		if _, ringExists := mp.outpointsAbe[txIn.PreviousOutPointRing.Hash()]; !ringExists {
@@ -865,6 +939,90 @@ func (mp *TxPool) checkPoolDoubleSpendAbe(tx *abeutil.TxAbe) error {
 	}
 
 	return nil
+}
+func (mp *TxPool) txMonitor() {
+	if mp.txMonitoring {
+		return
+	}
+	mp.txMonitorMu.Lock()
+	if mp.txMonitoring {
+		mp.txMonitorMu.Unlock()
+		return
+	}
+	mp.txMonitoring = true
+	mp.txMonitorMu.Unlock()
+	log.Infof("start monitor transaction number in mempool")
+	defer func() {
+		mp.txMonitorMu.Lock()
+		mp.txMonitoring = false
+		mp.txMonitorMu.Unlock()
+		log.Infof("stop monitor transaction number in mempool")
+	}()
+	// considerate a block would about 256s, and trigger early a little
+	duration := 3 * time.Minute
+	timer := time.NewTicker(duration)
+	for {
+		select {
+		case <-timer.C:
+			log.Infof("transaction in mempool:%d, cached in disk:%d", len(mp.poolAbe), len(mp.diskPool))
+			if len(mp.poolAbe) >= MaxTransactionInMemoryNum {
+				continue
+			}
+			log.Infof("loading transactions from disk...")
+			filenames, err := mp.cfg.TxCacheRotator.RotatedRolled()
+			if err != nil {
+				log.Errorf("Unable to load cached transaction: %v", err)
+				return
+			}
+			if len(filenames) == 0 {
+				log.Infof("No cached transaction can be loaded.")
+				return
+			}
+
+			var f *os.File
+			for i := 0; i < len(filenames) && len(mp.poolAbe) < MaxTransactionInMemoryNum; i++ {
+				name := filenames[i]
+				log.Infof("loading some transactions from %s", name)
+				f, err = os.OpenFile(name, os.O_RDONLY, 0644)
+				if err != nil {
+					continue
+				}
+				size := make([]byte, 8)
+				for {
+					// [transaction_size] [transaction_content]
+					_, err = f.Read(size)
+					if err != nil {
+						break
+					}
+					contentSize := binary.LittleEndian.Uint64(size)
+					content := make([]byte, contentSize)
+					_, err = f.Read(content)
+					if err != nil {
+						break
+					}
+					buffer := bytes.NewBuffer(content)
+					msgTx := &wire.MsgTxAbe{}
+					err = msgTx.DeserializeFull(buffer)
+					if err != nil {
+						break
+					}
+					tx := abeutil.NewTxAbe(msgTx)
+					log.Infof("load transaction %s from file %s", msgTx.TxHash(), name)
+					_, err = mp.ProcessTransactionAbe(tx, false, false, 0, true)
+					if err != nil {
+						break
+					}
+				}
+				f.Close()
+				log.Infof("finish loading transactions from file %s, remove it...", name)
+				os.Remove(name)
+				f = nil
+			}
+
+			timer.Reset(duration)
+		default:
+		}
+	}
 }
 
 // signalsReplacement determines if a transaction is signaling that it can be
@@ -1003,8 +1161,8 @@ func (mp *TxPool) txAncestors(tx *abeutil.Tx,
 	return ancestors
 }
 
-//	Abe to do
-//	This function is compliacted in ABE.
+// Abe to do
+// This function is compliacted in ABE.
 func (mp *TxPool) txAncestorsAbe(tx *abeutil.TxAbe,
 	cache map[chainhash.Hash]map[chainhash.Hash]*abeutil.TxAbe) map[chainhash.Hash]*abeutil.TxAbe {
 
@@ -1084,8 +1242,8 @@ func (mp *TxPool) txDescendants(tx *abeutil.Tx,
 	return descendants
 }
 
-//	Abe to do
-//	in ABE, finding the descendents is comnplicated
+// Abe to do
+// in ABE, finding the descendents is comnplicated
 func (mp *TxPool) txDescendantsAbe(tx *abeutil.TxAbe,
 	cache map[chainhash.Hash]map[chainhash.Hash]*abeutil.TxAbe) map[chainhash.Hash]*abeutil.TxAbe {
 
@@ -1148,7 +1306,7 @@ func (mp *TxPool) txConflicts(tx *abeutil.Tx) map[chainhash.Hash]*abeutil.Tx {
 	return conflicts
 }
 
-//	todo (ABE): ABE does not support replacement, remove this
+// todo (ABE): ABE does not support replacement, remove this
 func (mp *TxPool) txConflictsAbe(tx *abeutil.TxAbe) map[chainhash.Hash]*abeutil.TxAbe {
 	conflicts := make(map[chainhash.Hash]*abeutil.TxAbe)
 	for _, txIn := range tx.MsgTx().TxIns {
@@ -1224,10 +1382,41 @@ func (mp *TxPool) FetchTransaction(txHash *chainhash.Hash) (*abeutil.TxAbe, erro
 	// Protect concurrent access.
 	mp.mtx.RLock()
 	txDesc, exists := mp.poolAbe[*txHash]
+	_, existInDisk := mp.diskPool[*txHash]
 	mp.mtx.RUnlock()
 
 	if exists {
 		return txDesc.Tx, nil
+	}
+	if existInDisk {
+		rotatedName, err := mp.cfg.TxCacheRotator.LoadRotated(txHash.String())
+		if err != nil {
+			return nil, fmt.Errorf("transaction is not in the pool")
+		}
+		f, err := os.OpenFile(rotatedName, os.O_RDONLY, 0644)
+		if err != nil {
+			return nil, fmt.Errorf("transaction is not in the pool")
+		}
+		defer f.Close()
+		size := make([]byte, 8)
+		// [transaction_size] [transaction_content]
+		_, err = f.Read(size)
+		if err != nil {
+			return nil, fmt.Errorf("transaction is not in the pool")
+		}
+		contentSize := binary.LittleEndian.Uint64(size)
+		content := make([]byte, contentSize)
+		_, err = f.Read(content)
+		if err != nil {
+			return nil, fmt.Errorf("transaction is not in the pool")
+		}
+		buffer := bytes.NewBuffer(content)
+		msgTx := &wire.MsgTxAbe{}
+		err = msgTx.DeserializeFull(buffer)
+		if err != nil {
+			return nil, fmt.Errorf("transaction is not in the pool")
+		}
+		return abeutil.NewTxAbe(msgTx), nil
 	}
 
 	return nil, fmt.Errorf("transaction is not in the pool")
@@ -1440,18 +1629,18 @@ func (mp *TxPool) validateReplacement(tx *abeutil.Tx,
 // more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-//   1. Tx should not exist in mempool or orphan pool
-//   2. Preliminary check on transaction sanity (CheckTransactionSanityAbe)
-//   3. Tx should not be coinbase
-//   4. Check transaction standard (if do not accept non-standard tx)
-//   5. Ensure no double spend with the transactions already in pool
-//   6. Ensure inputs should exist (outpointring must exist)
-//   7. Check each inputs (CheckTransactionInputsAbe)
-//   8. Check transaction input standard (if do not accept non-standard tx)
-//   9. Ensure the fee is not too low (or have enough priority accept free fee tx, or rate limit)
-//   10. Check the witness of the transaction (ValidateTransactionScriptsAbe)
-//   11. Add transaction into mempool
-func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit, rejectDupOrphans bool) ([]*wire.OutPointRing, *TxDescAbe, error) {
+//  1. Tx should not exist in mempool or orphan pool
+//  2. Preliminary check on transaction sanity (CheckTransactionSanityAbe)
+//  3. Tx should not be coinbase
+//  4. Check transaction standard (if do not accept non-standard tx)
+//  5. Ensure no double spend with the transactions already in pool
+//  6. Ensure inputs should exist (outpointring must exist)
+//  7. Check each inputs (CheckTransactionInputsAbe)
+//  8. Check transaction input standard (if do not accept non-standard tx)
+//  9. Ensure the fee is not too low (or have enough priority accept free fee tx, or rate limit)
+//  10. Check the witness of the transaction (ValidateTransactionScriptsAbe)
+//  11. Add transaction into mempool
+func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit, rejectDupOrphans bool, fromDiskCache bool) ([]*wire.OutPointRing, *TxDescAbe, error) {
 
 	txHash := tx.Hash()
 
@@ -1459,8 +1648,8 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	// applies to orphan transactions as well when the reject duplicate
 	// orphans flag is set.  This check is intended to be a quick check to
 	// weed out duplicates.
-	if mp.isTransactionInPoolAbe(txHash) || (rejectDupOrphans &&
-		mp.isOrphanInPoolAbe(txHash)) {
+	if mp.isTransactionInMemPool(txHash) || (rejectDupOrphans &&
+		mp.isOrphanInPoolAbe(txHash)) || (!fromDiskCache && mp.isTransactionInDiskPool(txHash)) {
 
 		str := fmt.Sprintf("already have transaction %v", txHash)
 		return nil, nil, txRuleError(wire.RejectDuplicate, str)
@@ -1664,7 +1853,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 		return nil, nil, err
 	}
 
-	txD := mp.addTransactionAbe(utxoRingView, tx, bestHeight, txFee)
+	txD := mp.addTransactionAbe(utxoRingView, tx, bestHeight, txFee, fromDiskCache)
 
 	log.Debugf("Accepted transaction %v (pool size: %v)", txHash,
 		len(mp.poolAbe))
@@ -1695,7 +1884,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 func (mp *TxPool) MaybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit bool) ([]*wire.OutPointRing, *TxDescAbe, error) {
 	// Protect concurrent access.
 	mp.mtx.Lock()
-	missingParents, txD, err := mp.maybeAcceptTransactionAbe(tx, isNew, rateLimit, true)
+	missingParents, txD, err := mp.maybeAcceptTransactionAbe(tx, isNew, rateLimit, true, false)
 	mp.mtx.Unlock()
 
 	return missingParents, txD, err
@@ -1705,6 +1894,7 @@ func (mp *TxPool) MaybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit 
 // ProcessOrphans.  See the comment for ProcessOrphansAbe for more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
+//
 //	todo(ABE):
 //	As ABE does not allow transaction to depends on the transactions which are not included in block,
 //	the orphans may go into mempool only when new blocks are appended to chain.
@@ -1726,6 +1916,7 @@ func (mp *TxPool) processOrphansAbe(acceptedTx *abeutil.TxAbe) {
 // no transactions were moved from the orphan pool to the mempool.
 //
 // This function is safe for concurrent access.
+//
 //	todo(ABE):
 func (mp *TxPool) ProcessOrphansAbe(acceptedTx *abeutil.TxAbe) {
 	mp.mtx.Lock()
@@ -1744,7 +1935,7 @@ func (mp *TxPool) ProcessOrphansAbe(acceptedTx *abeutil.TxAbe) {
 // the passed one being accepted.
 //
 // This function is safe for concurrent access.
-func (mp *TxPool) ProcessTransactionAbe(tx *abeutil.TxAbe, allowOrphan, rateLimit bool, tag Tag) (*TxDescAbe, error) {
+func (mp *TxPool) ProcessTransactionAbe(tx *abeutil.TxAbe, allowOrphan, rateLimit bool, tag Tag, fromDiskCache bool) (*TxDescAbe, error) {
 	log.Tracef("Processing transaction %v", tx.Hash())
 
 	// Protect concurrent access.
@@ -1753,7 +1944,7 @@ func (mp *TxPool) ProcessTransactionAbe(tx *abeutil.TxAbe, allowOrphan, rateLimi
 
 	// Potentially accept the transaction to the memory pool.
 	missingParents, txD, err := mp.maybeAcceptTransactionAbe(tx, true, rateLimit,
-		true)
+		true, fromDiskCache)
 	if err != nil {
 		return nil, err
 	}
@@ -1803,7 +1994,7 @@ func (mp *TxPool) ProcessTransactionAbe(tx *abeutil.TxAbe, allowOrphan, rateLimi
 // This function is safe for concurrent access.
 func (mp *TxPool) Count() int {
 	mp.mtx.RLock()
-	count := len(mp.pool)
+	count := len(mp.pool) + len(mp.diskPool)
 	mp.mtx.RUnlock()
 
 	return count
@@ -1815,9 +2006,14 @@ func (mp *TxPool) Count() int {
 // This function is safe for concurrent access.
 func (mp *TxPool) TxHashes() []*chainhash.Hash {
 	mp.mtx.RLock()
-	hashes := make([]*chainhash.Hash, len(mp.pool))
+	hashes := make([]*chainhash.Hash, len(mp.pool)+len(mp.diskPool))
 	i := 0
 	for hash := range mp.pool {
+		hashCopy := hash
+		hashes[i] = &hashCopy
+		i++
+	}
+	for hash := range mp.diskPool {
 		hashCopy := hash
 		hashes[i] = &hashCopy
 		i++
@@ -1831,6 +2027,7 @@ func (mp *TxPool) TxHashes() []*chainhash.Hash {
 // The descriptors are to be treated as read only.
 //
 // This function is safe for concurrent access.
+//
 //	todo(ABE):
 func (mp *TxPool) TxDescs() []*TxDesc {
 	mp.mtx.RLock()
@@ -1858,11 +2055,26 @@ func (mp *TxPool) TxDescsAbe() []*TxDescAbe {
 	return descs
 }
 
+func (mp *TxPool) TxHashesInDiskAbe() []*chainhash.Hash {
+	mp.mtx.RLock()
+	hashes := make([]*chainhash.Hash, len(mp.diskPool))
+	i := 0
+	for hash := range mp.diskPool {
+		hashCopy := hash
+		hashes[i] = &hashCopy
+		i++
+	}
+	mp.mtx.RUnlock()
+
+	return hashes
+}
+
 // MiningDescs returns a slice of mining descriptors for all the transactions
 // in the pool.
 //
 // This is part of the mining.TxSource interface implementation and is safe for
 // concurrent access as required by the interface contract.
+//
 //	todo(ABE):
 func (mp *TxPool) MiningDescs() []*mining.TxDescAbe {
 	mp.mtx.RLock()
@@ -1922,6 +2134,11 @@ func (mp *TxPool) RawMempoolVerbose() map[string]*abejson.GetRawMempoolVerboseRe
 
 		result[tx.Hash().String()] = mpd
 	}
+	for txHash := range mp.diskPool {
+		result[txHash.String()] = &abejson.GetRawMempoolVerboseResult{
+			Comment: "please query transaction detail with getrawtransaction",
+		}
+	}
 
 	return result
 }
@@ -1955,6 +2172,7 @@ func New(cfg *Config) *TxPool {
 		outpoints:      make(map[wire.OutPoint]*abeutil.Tx),
 
 		poolAbe:          make(map[chainhash.Hash]*TxDescAbe),
+		diskPool:         make(map[chainhash.Hash]struct{}),
 		orphansAbe:       make(map[chainhash.Hash]*orphanTxAbe),
 		outpointsAbe:     make(map[chainhash.Hash]map[string]*abeutil.TxAbe),
 		orphansByPrevAbe: make(map[chainhash.Hash]map[string]map[chainhash.Hash]*abeutil.TxAbe),

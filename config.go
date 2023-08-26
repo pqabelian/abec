@@ -73,12 +73,16 @@ const (
 	defaultAddrIndex             = false
 	defaultNodeType              = "normalnode"
 	defaultTrustLevel            = "high"
+	defaultAllowDiskCacheTx      = true
+	defaultCacheTxDirname        = "txcaches"
+	defaultCacheTxFilename       = "txcache.abe"
 )
 
 var (
 	defaultHomeDir     = abeutil.AppDataDir("abec", false)
 	defaultConfigFile  = filepath.Join(defaultHomeDir, defaultConfigFilename)
 	defaultDataDir     = filepath.Join(defaultHomeDir, defaultDataDirname)
+	defaultCacheTxDir  = filepath.Join(defaultHomeDir, defaultCacheTxDirname)
 	knownDbTypes       = database.SupportedDrivers()
 	defaultRPCKeyFile  = filepath.Join(defaultHomeDir, "rpc.key")
 	defaultRPCCertFile = filepath.Join(defaultHomeDir, "rpc.cert")
@@ -197,6 +201,10 @@ type config struct {
 	trustLevel    wire.TrustLevel
 	whitelists    []*net.IPNet
 	WorkingDir    string `long:"workingdir" description:"Working directory"`
+
+	// transaction cache in disk
+	AllowDiskCacheTx bool   `long:"allowdiskcachetx" description:"Allow use disk to cache transaction if necessary"`
+	CacheTxDir       string `long:"cachetxdir" description:"Directory to store cached transaction data when allow use disk to cache transaction if necessary"`
 }
 
 // serviceOptions defines the configuration options for the daemon as a service on
@@ -462,6 +470,8 @@ func loadConfig() (*config, []string, error) {
 		NodeType:             defaultNodeType,
 		TrustLevel:           "medium",
 		MaxReservedWitness:   4000,
+		AllowDiskCacheTx:     defaultAllowDiskCacheTx,
+		CacheTxDir:           defaultCacheTxDir,
 	}
 	// Service options which are only added on Windows.
 	// TODO(osy): this set is ingoned, we should detect it!
@@ -678,6 +688,9 @@ func loadConfig() (*config, []string, error) {
 		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err
 	}
+
+	cfg.CacheTxDir = cleanAndExpandPath(cfg.CacheTxDir)
+	cfg.CacheTxDir = filepath.Join(cfg.CacheTxDir, netName(activeNetParams))
 
 	// Validate database type.
 	if !validDbType(cfg.DbType) {

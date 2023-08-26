@@ -670,7 +670,7 @@ func (sm *SyncManager) handleTxMsgAbe(tmsg *txMsgAbe) {
 	// Process the transaction to include validation, insertion in the
 	// memory pool, orphan handling, etc.
 	acceptedTx, err := sm.txMemPool.ProcessTransactionAbe(tmsg.tx,
-		true, true, mempool.Tag(peer.ID()))
+		true, true, mempool.Tag(peer.ID()), false)
 
 	// Remove transaction from request maps. Either the mempool/chain
 	// already knows about it and as such we shouldn't have any more

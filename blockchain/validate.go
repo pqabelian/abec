@@ -34,7 +34,7 @@ const (
 
 	// serializedHeightVersion is the block version which changed block
 	// coinbases to start with the serialized block height.
-	serializedHeightVersion = 2
+	serializedHeightVersion = 1
 
 	// baseSubsidy is the starting subsidy amount for mined blocks.  This
 	// value is halved every SubsidyHalvingInterval blocks.
@@ -76,7 +76,14 @@ func isNullOutpoint(outpoint *wire.OutPoint) bool {
 // for further information.
 func ShouldHaveSerializedBlockHeight(header *wire.BlockHeader) bool {
 	// todo: (ethmining) This is a bug? we have header.Version = 1 now?
-	return header.Version >= serializedHeightVersion
+	// answer: any time we have height in coinbase transaction
+	// but we version encode mechanism is different:
+	// 0x100_00000 -> left 12 bit is hard-fork and right  20 is soft-fork
+	// it means that we should extract the hard-fork part and convert it
+	blockVersion := (uint32(header.Version)&0x00F00000>>20)<<8 |
+		(uint32(header.Version)&0x0F000000>>24)<<4 |
+		(uint32(header.Version) & 0xF0000000 >> 28)
+	return blockVersion >= serializedHeightVersion
 }
 
 // IsCoinBaseTx determines whether or not a transaction is a coinbase.  A coinbase
@@ -239,7 +246,12 @@ func CalcBlockSubsidy(height int32, chainParams *chaincfg.Params) uint64 {
 	}
 
 	// Equivalent to: baseSubsidy / 2^(height/subsidyHalvingInterval)
-	return baseSubsidy >> uint(height/chainParams.SubsidyReductionInterval)
+	era := uint(height / chainParams.SubsidyReductionInterval)
+	if era < 10 {
+		return baseSubsidy >> uint(height/chainParams.SubsidyReductionInterval)
+	} else {
+		return 0
+	}
 }
 
 // CheckTransactionSanity performs some preliminary checks on a transaction to
@@ -341,17 +353,17 @@ func CheckTransactionSanity(tx *abeutil.Tx) error {
 
 // CheckTransactionSanityAbe performs some preliminary checks on a transaction to
 // ensure it is sane.  These checks are context free.
-//   1. There is at least one input and one output
-//   2. The number of input and output should not exceed the maximum
-//   3. Fee should not smaller than zero and bigger than MaxNeutrino
-//   4. The size (without witness) should not exceed MaxBlockBaseSize
-//   5. If is coinbase tx
-//        1. Input's block number and ring size should obey the ring version
-//      If is transfer tx
-//        1. Each input's serial number should not be zero
-//        2. Each input's ring version should be the same
-//        3. Each input's block number and ring size should obey the ring version
-//        4. No duplicate inputs (same ring and same serial number)
+//  1. There is at least one input and one output
+//  2. The number of input and output should not exceed the maximum
+//  3. Fee should not smaller than zero and bigger than MaxNeutrino
+//  4. The size (without witness) should not exceed MaxBlockBaseSize
+//  5. If is coinbase tx
+//  1. Input's block number and ring size should obey the ring version
+//     If is transfer tx
+//  1. Each input's serial number should not be zero
+//  2. Each input's ring version should be the same
+//  3. Each input's block number and ring size should obey the ring version
+//  4. No duplicate inputs (same ring and same serial number)
 func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 	// A transaction must have at least one input.
 	msgTx := tx.MsgTx()
@@ -494,9 +506,9 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 // target difficulty as claimed.
 //
 // The flags modify the behavior of this function as follows:
-//  - BFNoPoWCheck: The check to ensure the block hash is less than the target
-//    difficulty is not performed.
-//	//	todo: (EthashPoW)
+//   - BFNoPoWCheck: The check to ensure the block hash is less than the target
+//     difficulty is not performed.
+//     //	todo: (EthashPoW)
 func checkProofOfWork(header *wire.BlockHeader, ethash *ethash.Ethash, powLimit *big.Int, flags BehaviorFlags) error {
 	// The target difficulty must be larger than zero.
 	target := CompactToBig(header.Bits)
@@ -626,11 +638,13 @@ func CountP2SHSigOps(tx *abeutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint)
 // checkBlockHeaderSanity performs some preliminary checks on a block header to
 // ensure it is sane before continuing with processing.  These checks are
 // context free.
-//   1. Check proof of work
-//   2. Check the precision of timestamp
-//   3. Ensure the timestamp is not too far in the future
+//  1. Check proof of work
+//  2. Check the precision of timestamp
+//  3. Ensure the timestamp is not too far in the future
+//
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkProofOfWork.
+//
 //	todo: (EthashPoW)
 func checkBlockHeaderSanity(header *wire.BlockHeader, ethash *ethash.Ethash, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
 	// Ensure the proof of work bits in the block header is in min/max range
@@ -670,6 +684,7 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, ethash *ethash.Ethash, pow
 //
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkBlockHeaderSanity.
+//
 //	todo(ABE):
 func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
 	msgBlock := block.MsgBlock()
@@ -779,15 +794,17 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 
 // checkBlockSanityAbe performs some preliminary checks on a block to ensure it is
 // sane before continuing with block processing.  These checks are context free.
-//   1. Check sanity of block header (checkBlockHeaderSanity)
-//   2. There is at least one transaction in the block
-//   3. The block size (without witness) is smaller than MaxBlockBaseSize
-//   4. The first transaction is coinbase and there is only one coinbase in the block
-//   5. Preliminary check on each transaction (CheckTransactionSanityAbe)
-//   6. The merkle root is correctly computed with the given transactions
-//   7. No duplicate transactions (same tx hash)
+//  1. Check sanity of block header (checkBlockHeaderSanity)
+//  2. There is at least one transaction in the block
+//  3. The block size (without witness) is smaller than MaxBlockBaseSize
+//  4. The first transaction is coinbase and there is only one coinbase in the block
+//  5. Preliminary check on each transaction (CheckTransactionSanityAbe)
+//  6. The merkle root is correctly computed with the given transactions
+//  7. No duplicate transactions (same tx hash)
+//
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkBlockHeaderSanity.
+//
 //	todo: (EthashPoW)
 func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
 	msgBlock := block.MsgBlock()
@@ -945,7 +962,7 @@ func ExtractCoinbaseHeight(coinbaseTx *abeutil.Tx) (int32, error) {
 	return int32(serializedHeight), nil
 }
 
-//	todo(ABE):
+// todo(ABE):
 func ExtractCoinbaseHeightAbe(coinbaseTx *abeutil.TxAbe) (int32, error) {
 	if coinbaseTx == nil {
 		str := "Cannot extract blockHeight from a coinbase transaction that is null"
@@ -1005,14 +1022,14 @@ func checkSerializedHeightAbe(coinbaseTx *abeutil.TxAbe, wantHeight int32) error
 // which depend on its position within the block chain.
 //
 // The flags modify the behavior of this function as follows:
-//  - BFFastAdd: All checks except those involving comparing the header against
-//    the checkpoints are not performed.
+//   - BFFastAdd: All checks except those involving comparing the header against
+//     the checkpoints are not performed.
 //
 // This function MUST be called with the chain state lock held (for writes).
-//   1. Check the difficulty is correctly computed (if not fast add)
-//   2. Check the timestamp is after the median time of last several blocks (if not fast add)
-//   3. If this height is checkpoint, check if the block hash matches the checkpoint
-//   4. Ensure the height of block is after the latest checkpoint
+//  1. Check the difficulty is correctly computed (if not fast add)
+//  2. Check the timestamp is after the median time of last several blocks (if not fast add)
+//  3. If this height is checkpoint, check if the block hash matches the checkpoint
+//  4. Ensure the height of block is after the latest checkpoint
 func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNode *blockNode, flags BehaviorFlags) error {
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	if !fastAdd {
@@ -1090,14 +1107,14 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 // on its position within the block chain.
 //
 // The flags modify the behavior of this function as follows:
-//  - BFFastAdd: The transaction are not checked to see if they are finalized
+//   - BFFastAdd: The transaction are not checked to see if they are finalized
 //
 // The flags are also passed to checkBlockHeaderContext.  See its documentation
 // for how the flags modify its behavior.
 //
 // This function MUST be called with the chain state lock held (for writes).
-//   1. Check the block header context (checkBlockHeaderContextAbe)
-//   2. Check if the block height is written into the coinbase transaction (if not fast add)
+//  1. Check the block header context (checkBlockHeaderContextAbe)
+//  2. Check if the block height is written into the coinbase transaction (if not fast add)
 func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blockNode, flags BehaviorFlags) error {
 	// Perform all block header related validation checks.
 	header := &block.MsgBlock().Header
@@ -1239,7 +1256,7 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *abeutil.Block, view *U
 	return nil
 }
 
-//	todo(Abe): remove
+// todo(Abe): remove
 func (b *BlockChain) checkBIP0030Abe(node *blockNode, block *abeutil.BlockAbe, view *UtxoRingViewpoint) error {
 	// Fetch utxos for all of the transaction ouputs in this block.
 	// Typically, there will not be any utxos for any of the outputs.
@@ -1378,10 +1395,10 @@ func CheckTransactionInputs(tx *abeutil.Tx, txHeight int32, utxoView *UtxoViewpo
 
 // CheckTransactionInputsAbe performs a series of checks on the inputs to a
 // transaction to ensure they are valid.
-//   1. If the transaction is coinbase, just return
-//   2. For each input, check if has been spent or not (txo ring exists and no existing serial number is the same)
-//   3. For each input, check if it is mature if it consumes coinbase transaction
-//	Abe todo
+//  1. If the transaction is coinbase, just return
+//  2. For each input, check if has been spent or not (txo ring exists and no existing serial number is the same)
+//  3. For each input, check if it is mature if it consumes coinbase transaction
+//     Abe todo
 func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
 	// Coinbase transactions have no inputs.
 	isCb, err := IsCoinBaseAbe(tx)
@@ -1446,14 +1463,15 @@ func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *
 // with that node.
 //
 // This function MUST be called with the chain state lock held (for writes).
-//	Abe todo
-//   1. Ensure the ring view is for the node being checked (the previous block is the best hash of ring view)
-//   2. Fetch all the utxo rings (consumed by inputs in the blocks) needed from the database and store them into ring view
-//   3. Check all transaction inputs (mature and not spent) CheckTransactionInputsAbe
-//   4. Add all transaction inputs into utxo rings (including serial number and consumed block hash)
-//   5. Ensure the block fee in coinbase is not larger than block reward plus tx fee
-//   6. Validate the witness of each transaction (if after the checkpoint)
-//   7. Set new best height for utxo ring view
+//
+//		Abe todo
+//	  1. Ensure the ring view is for the node being checked (the previous block is the best hash of ring view)
+//	  2. Fetch all the utxo rings (consumed by inputs in the blocks) needed from the database and store them into ring view
+//	  3. Check all transaction inputs (mature and not spent) CheckTransactionInputsAbe
+//	  4. Add all transaction inputs into utxo rings (including serial number and consumed block hash)
+//	  5. Ensure the block fee in coinbase is not larger than block reward plus tx fee
+//	  6. Validate the witness of each transaction (if after the checkpoint)
+//	  7. Set new best height for utxo ring view
 func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockAbe, view *UtxoRingViewpoint, stxos *[]*SpentTxOutAbe,
 	mandatoryWitnessCheck bool) error {
 	// If the side chain blocks end up in the database, a call to
@@ -1721,6 +1739,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 // work requirement. The block must connect to the current tip of the main chain.
 //
 // This function is safe for concurrent access.
+//
 //	todo (ABE):
 func (b *BlockChain) CheckConnectBlockTemplateAbe(block *abeutil.BlockAbe) error {
 	b.chainLock.Lock()

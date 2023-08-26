@@ -81,15 +81,15 @@ func main() {
 	// to be read from a stdin pipe.
 	//bio := bufio.NewReader(os.Stdin)
 	params := make([]interface{}, 0, len(args[1:]))
-	num:=1
+	num := 1
 	for _, arg := range args[1:] {
 		if arg == "-" {
 			filePath := filepath.Join(abecHomeDir, "arg"+strconv.Itoa(num))
-			param,err := ioutil.ReadFile(filePath)
+			param, err := ioutil.ReadFile(filePath)
 			//param, err := bio.ReadString('\n')
 			if err != nil && err != io.EOF {
 				fmt.Fprintf(os.Stderr, "Failed to read data "+
-					"from file %v: %v\n",filePath, err)
+					"from file %v: %v\n", filePath, err)
 				os.Exit(1)
 			}
 			if err == io.EOF && len(param) == 0 {
