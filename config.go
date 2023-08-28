@@ -179,6 +179,7 @@ type config struct {
 	WitnessCacheMaxSize   uint          `long:"witnesscachemaxsize" description:"The maximum number of entries in the witness cache"`
 	WitnessKept           int           `long:"witnesskept" description:"If the prunednode is set, this flag indicates how many block witness should be kept"`
 	SimNet                bool          `long:"simnet" description:"Use the simulation test network"`
+	EnableFakePoW         bool          `long:"enablefakepow" description:"fake pow in simulation test network"`
 	TestNet3              bool          `long:"testnet" description:"Use the test network"`
 	TorIsolation          bool          `long:"torisolation" description:"Enable Tor stream isolation by randomizing user credentials for each connection."`
 	TrickleInterval       time.Duration `long:"trickleinterval" description:"Minimum time between attempts to send new inventory to a connected peer"`

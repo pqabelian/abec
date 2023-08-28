@@ -379,7 +379,12 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlockAbe, blockHeight int32,
 
 // todo: (EthashPoW)
 func (m *CPUMiner) solveBlockEthash(blockTemplate *mining.BlockTemplate, ticker *time.Ticker, quit chan struct{}) bool {
-
+	// If we're running a fake PoW, simply return a 0 nonce immediately
+	if m.cfg.Ethash.FakePow() {
+		header := blockTemplate.BlockAbe.Header
+		header.Nonce, header.MixDigest = 0, chainhash.Hash{}
+		return true
+	}
 	var (
 		// Create some convenience variables.
 		header           = &blockTemplate.BlockAbe.Header
@@ -841,7 +846,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 			continue
 		}
 
-		if template.Height == m.cfg.ChainParams.BlockHeightEthashPoW-100 {
+		if !m.ethash.FakePow() && template.Height == m.cfg.ChainParams.BlockHeightEthashPoW-100 {
 			m.ethash.PrepareDatasetForUpdate()
 		}
 

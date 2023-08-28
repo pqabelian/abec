@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/wire"
 	"math/big"
 	"time"
 )
@@ -37,18 +38,21 @@ func HashToBig(hash *chainhash.Hash) *big.Int {
 // Like IEEE754 floating point, there are three basic components: the sign,
 // the exponent, and the mantissa.  They are broken out as follows:
 //
-//	* the most significant 8 bits represent the unsigned base 256 exponent
-// 	* bit 23 (the 24th bit) represents the sign bit
-//	* the least significant 23 bits represent the mantissa
+//   - the most significant 8 bits represent the unsigned base 256 exponent
 //
-//	-------------------------------------------------
-//	|   Exponent     |    Sign    |    Mantissa     |
-//	-------------------------------------------------
-//	| 8 bits [31-24] | 1 bit [23] | 23 bits [22-00] |
-//	-------------------------------------------------
+//   - bit 23 (the 24th bit) represents the sign bit
+//
+//   - the least significant 23 bits represent the mantissa
+//
+//     -------------------------------------------------
+//     |   Exponent     |    Sign    |    Mantissa     |
+//     -------------------------------------------------
+//     | 8 bits [31-24] | 1 bit [23] | 23 bits [22-00] |
+//     -------------------------------------------------
 //
 // The formula to calculate N is:
-// 	N = (-1^sign) * mantissa * 256^(exponent-3)
+//
+//	N = (-1^sign) * mantissa * 256^(exponent-3)
 //
 // This compact form is only used in bitcoin to encode unsigned 256-bit numbers
 // which represent difficulty targets, thus there really is not a need for a
@@ -219,6 +223,10 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 		return b.chainParams.PowLimitBits, nil
 	}
 
+	// In SimNet, do not change the difficult
+	if b.chainParams.Net == wire.SimNet && b.chainParams.FakePoW {
+		return b.chainParams.GenesisBlock.Header.Bits, nil
+	}
 	// Return the previous block's difficulty requirements if this block
 	// is not at a difficulty retarget interval.
 	if (lastNode.height+1)%b.blocksPerRetarget != 0 {

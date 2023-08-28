@@ -219,6 +219,9 @@ type Params struct {
 
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength int32
+
+	// fake pow for simnet
+	FakePoW bool
 }
 
 // MainNetParams defines the network parameters for the main network.
