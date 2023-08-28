@@ -418,6 +418,7 @@ type Config struct {
 	BlockHeightStart int32
 	// EpochLength specifies the epoch length.
 	EpochLength int32
+	FakePoW     bool
 }
 
 // Ethash is the data manager, on which the Abelian-Ethash proof-of-work consensus is build.
@@ -553,6 +554,10 @@ func (ethash *Ethash) dataset(epoch int, async bool) *dataset {
 		}
 	}
 	return current
+}
+
+func (ethash *Ethash) FakePow() bool {
+	return ethash.config.PowMode == ModeFake || ethash.config.PowMode == ModeFullFake
 }
 
 // EthashSeed() generates the seed for generating a verification cache and the mining dataset.
