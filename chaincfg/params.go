@@ -219,6 +219,9 @@ type Params struct {
 
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength int32
+
+	// fake pow for simnet
+	FakePoW bool
 }
 
 // MainNetParams defines the network parameters for the main network.
@@ -526,7 +529,7 @@ var SimNetParams = Params{
 
 	// BlockHeightEthashPoW
 	// BlockHeightEthashPoW specifies the block height from which Ethash-PoW mining is applied.
-	BlockHeightEthashPoW: int32(1 << 30),
+	BlockHeightEthashPoW: 300,
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength: 200,
 }

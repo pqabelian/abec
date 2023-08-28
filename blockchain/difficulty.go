@@ -224,7 +224,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 	}
 
 	// In SimNet, do not change the difficult
-	if b.chainParams.Net == wire.SimNet {
+	if b.chainParams.Net == wire.SimNet && b.chainParams.FakePoW {
 		return b.chainParams.GenesisBlock.Header.Bits, nil
 	}
 	// Return the previous block's difficulty requirements if this block

@@ -2547,6 +2547,10 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	cfg.EthashConfig.BlockHeightStart = s.chainParams.BlockHeightEthashPoW
 	cfg.EthashConfig.EpochLength = s.chainParams.EthashEpochLength
 	s.ethash = ethash.New(cfg.EthashConfig)
+	if cfg.SimNet && cfg.EnableFakePoW {
+		s.ethash = ethash.NewFullFaker()
+		s.chainParams.FakePoW = true
+	}
 
 	s.syncManager, err = syncmgr.New(&syncmgr.Config{
 		PeerNotifier:       &s,
