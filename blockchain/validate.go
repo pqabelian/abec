@@ -80,10 +80,14 @@ func ShouldHaveSerializedBlockHeight(header *wire.BlockHeader) bool {
 	// but we version encode mechanism is different:
 	// 0x100_00000 -> left 12 bit is hard-fork and right  20 is soft-fork
 	// it means that we should extract the hard-fork part and convert it
-	blockVersion := (uint32(header.Version)&0x00F00000>>20)<<8 |
-		(uint32(header.Version)&0x0F000000>>24)<<4 |
-		(uint32(header.Version) & 0xF0000000 >> 28)
+	blockVersion := CalculateBlockVersion(header.Version)
 	return blockVersion >= serializedHeightVersion
+}
+
+func CalculateBlockVersion(headerVersion int32) uint32 {
+	return (uint32(headerVersion)&0x00F00000>>20)<<8 |
+		(uint32(headerVersion)&0x0F000000>>24)<<4 |
+		(uint32(headerVersion) & 0xF0000000 >> 28)
 }
 
 // IsCoinBaseTx determines whether or not a transaction is a coinbase.  A coinbase
