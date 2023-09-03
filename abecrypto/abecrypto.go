@@ -159,12 +159,7 @@ func ExtractCryptoSchemeFromCryptoAddressKeySeed(cryptoAddressKeySeed []byte) (c
 		return 0, errors.New("incorrect length of cryptoAddressKeySeed when calling ExtractCryptoSchemeFromCryptoAddressKeySeed")
 	}
 
-	cryptoscheme := cryptoAddressKeySeed[0]
-	cryptoscheme |= cryptoAddressKeySeed[1]
-	cryptoscheme |= cryptoAddressKeySeed[2]
-	cryptoscheme |= cryptoAddressKeySeed[3]
-
-	return abecryptoparam.CryptoScheme(cryptoscheme), nil
+	return abecryptoparam.Deserialize(cryptoAddressKeySeed)
 }
 
 /*
@@ -216,12 +211,8 @@ func ExtractCryptoSchemeFromCryptoAddress(cryptoAddress []byte) (cryptoScheme ab
 		return 0, errors.New(errStr)
 	}
 
-	cryptoscheme := cryptoAddress[0]
-	cryptoscheme |= cryptoAddress[1]
-	cryptoscheme |= cryptoAddress[2]
-	cryptoscheme |= cryptoAddress[3]
+	return abecryptoparam.Deserialize(cryptoAddress)
 
-	return abecryptoparam.CryptoScheme(cryptoscheme), nil
 }
 
 // CheckCryptoAddress checks whether the input cryptoAddress is well-formed.
