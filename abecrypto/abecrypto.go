@@ -233,6 +233,39 @@ func CheckCryptoAddress(cryptoAddress []byte) (valid bool, hints string) {
 	return true, ""
 }
 
+// ExtractCryptoSchemeFromCryptoAddressSpsk extracts cryptoScheme from cryptoAddress
+func ExtractCryptoSchemeFromCryptoAddressSpsk(cryptoSpsk []byte) (cryptoScheme abecryptoparam.CryptoScheme, err error) {
+	if len(cryptoSpsk) < 4 {
+		errStr := fmt.Sprintf("ExtractCryptoSchemeFromCryptoAddressSpsk: incorrect length of cryptoSpsk: %d", len(cryptoSpsk))
+		return 0, errors.New(errStr)
+	}
+
+	return abecryptoparam.Deserialize(cryptoSpsk[:4])
+
+}
+
+// ExtractCryptoSchemeFromCryptoAddressSnsk extracts cryptoScheme from cryptoAddress
+func ExtractCryptoSchemeFromCryptoAddressSnsk(cryptoSnsk []byte) (cryptoScheme abecryptoparam.CryptoScheme, err error) {
+	if len(cryptoSnsk) < 4 {
+		errStr := fmt.Sprintf("ExtractCryptoSchemeFromCryptoAddressSnsk: incorrect length of cryptoSnsk: %d", len(cryptoSnsk))
+		return 0, errors.New(errStr)
+	}
+
+	return abecryptoparam.Deserialize(cryptoSnsk[:4])
+
+}
+
+// ExtractCryptoSchemeFromCryptoVsk extracts cryptoScheme from cryptoAddress
+func ExtractCryptoSchemeFromCryptoVsk(cryptoVsk []byte) (cryptoScheme abecryptoparam.CryptoScheme, err error) {
+	if len(cryptoVsk) < 4 {
+		errStr := fmt.Sprintf("ExtractCryptoSchemeFromCryptoVsk: incorrect length of cryptoVsk: %d", len(cryptoVsk))
+		return 0, errors.New(errStr)
+	}
+
+	return abecryptoparam.Deserialize(cryptoVsk[:4])
+
+}
+
 // Note that this layer is responsible for only distribute the call to corresponding underlying crypto schemes.
 func VerifyCryptoAddressSpsnsk(cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk []byte) (valid bool, hints string) {
 	cryptoScheme, err := ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)

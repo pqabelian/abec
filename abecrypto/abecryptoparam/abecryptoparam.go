@@ -29,10 +29,10 @@ func (c CryptoScheme) Serialize() []byte {
 }
 
 func Deserialize(content []byte) (CryptoScheme, error) {
-	if len(content) < 4 {
+	if len(content) != 4 {
 		return CryptoSchemePQRingCT, errors.New("invalid length")
 	}
-	return CryptoScheme(binary.LittleEndian.Uint32(content[:4])), nil
+	return CryptoScheme(binary.LittleEndian.Uint32(content)), nil
 }
 
 const (
