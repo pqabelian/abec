@@ -159,7 +159,7 @@ func ExtractCryptoSchemeFromCryptoAddressKeySeed(cryptoAddressKeySeed []byte) (c
 		return 0, errors.New("incorrect length of cryptoAddressKeySeed when calling ExtractCryptoSchemeFromCryptoAddressKeySeed")
 	}
 
-	return abecryptoparam.Deserialize(cryptoAddressKeySeed)
+	return abecryptoparam.Deserialize(cryptoAddressKeySeed[:4])
 }
 
 /*
@@ -211,7 +211,7 @@ func ExtractCryptoSchemeFromCryptoAddress(cryptoAddress []byte) (cryptoScheme ab
 		return 0, errors.New(errStr)
 	}
 
-	return abecryptoparam.Deserialize(cryptoAddress)
+	return abecryptoparam.Deserialize(cryptoAddress[:4])
 
 }
 
