@@ -1565,7 +1565,7 @@ func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 		MixDigest:   blockHeader.MixDigest.String(),
 		SealHash:    ethash.SealHash(blockHeader).String(),
 	}
-	if blockHeader.Height > s.cfg.ChainParams.BlockHeightEthashPoW {
+	if blockHeader.Height >= s.cfg.ChainParams.BlockHeightEthashPoW {
 		blockReply.Nonce = blockHeader.NonceExt
 	}
 
