@@ -1,16 +1,42 @@
 package abecryptoparam
 
 import (
+	"encoding/binary"
 	"errors"
 	"github.com/cryptosuite/pqringct"
 )
 
-//	ABE can support at most 2^32 different CryptoSchemes
-//	The different versions of 'same' CryptoSchemes are regarded as different CryptoSchemes.
+// For 0x12345678
+// Big-Endian
+// ____________________________
+// _0x12_|_0x34_|_0x56_|_0x78_|
+//	a     a+1     a+2    a+3
+
+// Little-Endian
+// ____________________________
+// _0x78_|_0x56_|_0x34_|_0x12_|
+//	a     a+1     a+2    a+3
+
+// ABE can support at most 2^32 different CryptoSchemes
+// The different versions of 'same' CryptoSchemes are regarded as different CryptoSchemes.
 type CryptoScheme uint32
 
+// Serialize use little endian to serialize a uint32 number
+func (c CryptoScheme) Serialize() []byte {
+	res := make([]byte, 4)
+	binary.LittleEndian.PutUint32(res, uint32(c))
+	return res
+}
+
+func Deserialize(content []byte) (CryptoScheme, error) {
+	if len(content) != 4 {
+		return CryptoSchemePQRingCT, errors.New("invalid length")
+	}
+	return CryptoScheme(binary.LittleEndian.Uint32(content)), nil
+}
+
 const (
-	CryptoSchemePQRingCT CryptoScheme = iota
+	CryptoSchemePQRingCT CryptoScheme = 0
 	//CryptoSchemePQRingCTV2
 )
 
@@ -39,6 +65,7 @@ const ( // copyed from pqringct 2022.04.15
 )
 
 //	The mapping between TxVersion/TxoVersion/RingVersion/ and crypto-scheme	begin
+//
 // GetCryptoSchemeByTxVersion returns the CrypoScheme corresponding to the input TxVersion/TxoVersion/RingVersion.
 // For each TxVersion, there is a corresponding CryptoScheme, while multiple TxVersions may use the same CryptoScheme.
 // The package abec.abecrypto will access the function.

@@ -62,12 +62,14 @@ func DecodeAbelAddress(addrStr string) (AbelAddress, error) {
 	}
 
 	//	the bytes [1]~[4] must match the generation of cryptoAddress, namely in pqringctCryptoAddressGen()
-	cryptoScheme := addrBytes[1]
-	cryptoScheme |= addrBytes[2]
-	cryptoScheme |= addrBytes[3]
-	cryptoScheme |= addrBytes[4]
 
-	switch abecryptoparam.CryptoScheme(cryptoScheme) {
+	cryptoScheme, err := abecryptoparam.Deserialize(addrBytes[1:5])
+	if err != nil {
+		errStr := fmt.Sprintf("abel-address %v has a wrong length", addrStr)
+		return nil, errors.New(errStr)
+	}
+
+	switch cryptoScheme {
 	case abecryptoparam.CryptoSchemePQRingCT:
 		instAddr := &InstanceAddress{}
 		err := instAddr.Decode(addrStr)

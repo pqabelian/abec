@@ -37,32 +37,22 @@ func pqringctCryptoAddressGen(pp *pqringct.PublicParameter, seed []byte,
 
 	serializedAddress := append(serializedAPk, serializedVPk...)
 
+	serializeCryptoScheme := cryptoScheme.Serialize()
+
 	cryptoAddress = make([]byte, 0, 4+len(serializedAddress))
-	cryptoAddress = append(cryptoAddress, byte(cryptoScheme>>0))
-	cryptoAddress = append(cryptoAddress, byte(cryptoScheme>>8))
-	cryptoAddress = append(cryptoAddress, byte(cryptoScheme>>16))
-	cryptoAddress = append(cryptoAddress, byte(cryptoScheme>>24))
+	cryptoAddress = append(cryptoAddress, serializeCryptoScheme...)
 	cryptoAddress = append(cryptoAddress, serializedAddress...)
 
 	cryptoSpsk = make([]byte, 0, 4+len(serializedASksp))
-	cryptoSpsk = append(cryptoSpsk, byte(cryptoScheme>>0))
-	cryptoSpsk = append(cryptoSpsk, byte(cryptoScheme>>8))
-	cryptoSpsk = append(cryptoSpsk, byte(cryptoScheme>>16))
-	cryptoSpsk = append(cryptoSpsk, byte(cryptoScheme>>24))
+	cryptoSpsk = append(cryptoSpsk, serializeCryptoScheme...)
 	cryptoSpsk = append(cryptoSpsk, serializedASksp...)
 
 	cryptoSnsk = make([]byte, 0, 4+len(serializedASksn))
-	cryptoSnsk = append(cryptoSnsk, byte(cryptoScheme>>0))
-	cryptoSnsk = append(cryptoSnsk, byte(cryptoScheme>>8))
-	cryptoSnsk = append(cryptoSnsk, byte(cryptoScheme>>16))
-	cryptoSnsk = append(cryptoSnsk, byte(cryptoScheme>>24))
+	cryptoSnsk = append(cryptoSnsk, serializeCryptoScheme...)
 	cryptoSnsk = append(cryptoSnsk, serializedASksn...)
 
 	cryptoVsk = make([]byte, 0, 4+len(serializedVSk))
-	cryptoVsk = append(cryptoVsk, byte(cryptoScheme>>0))
-	cryptoVsk = append(cryptoVsk, byte(cryptoScheme>>8))
-	cryptoVsk = append(cryptoVsk, byte(cryptoScheme>>16))
-	cryptoVsk = append(cryptoVsk, byte(cryptoScheme>>24))
+	cryptoVsk = append(cryptoVsk, serializeCryptoScheme...)
 	cryptoVsk = append(cryptoVsk, serializedVSk...)
 
 	return cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, nil
@@ -81,11 +71,9 @@ func pqringctCryptoAddressKeySeedGen(pp *pqringct.PublicParameter, cryptoScheme 
 	expectedSeedLen := 2 * pqringct.GetParamSeedBytesLen(pp)
 	seed := RandomBytes(expectedSeedLen)
 
+	serializeCryptoScheme := cryptoScheme.Serialize()
 	pqringctCryptoAddressKeySeed = make([]byte, 0, 4+expectedSeedLen)
-	pqringctCryptoAddressKeySeed = append(pqringctCryptoAddressKeySeed, byte(cryptoScheme>>0))
-	pqringctCryptoAddressKeySeed = append(pqringctCryptoAddressKeySeed, byte(cryptoScheme>>8))
-	pqringctCryptoAddressKeySeed = append(pqringctCryptoAddressKeySeed, byte(cryptoScheme>>16))
-	pqringctCryptoAddressKeySeed = append(pqringctCryptoAddressKeySeed, byte(cryptoScheme>>24))
+	pqringctCryptoAddressKeySeed = append(pqringctCryptoAddressKeySeed, serializeCryptoScheme...)
 	pqringctCryptoAddressKeySeed = append(pqringctCryptoAddressKeySeed, seed...)
 	return pqringctCryptoAddressKeySeed
 }
@@ -108,11 +96,8 @@ func pqringctCryptoAddressGenFromSeed(pp *pqringct.PublicParameter, cryptoAddres
 		return nil, nil, nil, nil, errors.New("invalid length of seed in pqringctCryptoAddressGenFromSeed")
 	}
 
-	cryptoschemeInSeed := cryptoAddressKeySeed[0]
-	cryptoschemeInSeed |= cryptoAddressKeySeed[1]
-	cryptoschemeInSeed |= cryptoAddressKeySeed[2]
-	cryptoschemeInSeed |= cryptoAddressKeySeed[3]
-	if abecryptoparam.CryptoScheme(cryptoschemeInSeed) != cryptoScheme {
+	cryptoschemeInSeed, err := ExtractCryptoSchemeFromCryptoAddressKeySeed(cryptoAddressKeySeed)
+	if err != nil || cryptoschemeInSeed != cryptoScheme {
 		return nil, nil, nil, nil, errors.New("unmatched cryptoScheme for cryptoAddressKeySeed and pqringctCryptoAddressGenFromSeed")
 	}
 
@@ -128,32 +113,21 @@ func pqringctCryptoAddressGenFromSeed(pp *pqringct.PublicParameter, cryptoAddres
 
 	serializedAddress := append(serializedAPk, serializedVPk...)
 
+	serializeCryptoScheme := cryptoScheme.Serialize()
 	cryptoAddress = make([]byte, 0, 4+len(serializedAddress))
-	cryptoAddress = append(cryptoAddress, byte(cryptoScheme>>0))
-	cryptoAddress = append(cryptoAddress, byte(cryptoScheme>>8))
-	cryptoAddress = append(cryptoAddress, byte(cryptoScheme>>16))
-	cryptoAddress = append(cryptoAddress, byte(cryptoScheme>>24))
+	cryptoAddress = append(cryptoAddress, serializeCryptoScheme...)
 	cryptoAddress = append(cryptoAddress, serializedAddress...)
 
 	cryptoSpsk = make([]byte, 0, 4+len(serializedASksp))
-	cryptoSpsk = append(cryptoSpsk, byte(cryptoScheme>>0))
-	cryptoSpsk = append(cryptoSpsk, byte(cryptoScheme>>8))
-	cryptoSpsk = append(cryptoSpsk, byte(cryptoScheme>>16))
-	cryptoSpsk = append(cryptoSpsk, byte(cryptoScheme>>24))
+	cryptoSpsk = append(cryptoSpsk, serializeCryptoScheme...)
 	cryptoSpsk = append(cryptoSpsk, serializedASksp...)
 
 	cryptoSnsk = make([]byte, 0, 4+len(serializedASksn))
-	cryptoSnsk = append(cryptoSnsk, byte(cryptoScheme>>0))
-	cryptoSnsk = append(cryptoSnsk, byte(cryptoScheme>>8))
-	cryptoSnsk = append(cryptoSnsk, byte(cryptoScheme>>16))
-	cryptoSnsk = append(cryptoSnsk, byte(cryptoScheme>>24))
+	cryptoSnsk = append(cryptoSnsk, serializeCryptoScheme...)
 	cryptoSnsk = append(cryptoSnsk, serializedASksn...)
 
 	cryptoVsk = make([]byte, 0, 4+len(serializedVSk))
-	cryptoVsk = append(cryptoVsk, byte(cryptoScheme>>0))
-	cryptoVsk = append(cryptoVsk, byte(cryptoScheme>>8))
-	cryptoVsk = append(cryptoVsk, byte(cryptoScheme>>16))
-	cryptoVsk = append(cryptoVsk, byte(cryptoScheme>>24))
+	cryptoVsk = append(cryptoVsk, serializeCryptoScheme...)
 	cryptoVsk = append(cryptoVsk, serializedVSk...)
 
 	return cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, nil
@@ -169,11 +143,8 @@ func pqringctCheckCryptoAddress(pp *pqringct.PublicParameter, cryptoScheme abecr
 		return false, hints
 	}
 
-	cryptoscheme := cryptoAddress[0]
-	cryptoscheme |= cryptoAddress[1]
-	cryptoscheme |= cryptoAddress[2]
-	cryptoscheme |= cryptoAddress[3]
-	if abecryptoparam.CryptoScheme(cryptoscheme) != cryptoScheme {
+	cryptoscheme, err := ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
+	if err != nil || cryptoscheme != cryptoScheme {
 		hints := fmt.Sprintf("pqringctCheckCryptoAddress: invalid length of cryptoAddress: %d vs %d", abecryptoparam.CryptoScheme(cryptoscheme), cryptoScheme)
 		return false, hints
 	}
@@ -200,12 +171,8 @@ func pqringctVerifyCryptoAddressSpsnsk(pp *pqringct.PublicParameter, cryptoSchem
 		hints := fmt.Sprintf("pqringctVerifyCryptoAddressSpsnsk: invalid length of cryptoSpsk: %d", len(cryptoSpsk))
 		return false, hints
 	}
-	cryptoSchemeInSpsk := cryptoSpsk[0]
-	cryptoSchemeInSpsk |= cryptoSpsk[1]
-	cryptoSchemeInSpsk |= cryptoSpsk[2]
-	cryptoSchemeInSpsk |= cryptoSpsk[3]
-
-	if abecryptoparam.CryptoScheme(cryptoSchemeInSpsk) != cryptoScheme {
+	cryptoSchemeInSpsk, err := ExtractCryptoSchemeFromCryptoAddressSpsk(cryptoSpsk)
+	if err != nil || cryptoSchemeInSpsk != cryptoScheme {
 		hints := fmt.Sprintf("pqringctVerifyCryptoAddressSpsnsk: unmacthed cryptoScheme in cryptoSpsk and cryptoAddress: %d vs %d", abecryptoparam.CryptoScheme(cryptoSchemeInSpsk), cryptoScheme)
 		return false, hints
 	}
@@ -214,12 +181,9 @@ func pqringctVerifyCryptoAddressSpsnsk(pp *pqringct.PublicParameter, cryptoSchem
 		hints := fmt.Sprintf("pqringctVerifyCryptoAddressSpsnsk: invalid length of cryptoSnsk: %d", len(cryptoSnsk))
 		return false, hints
 	}
-	cryptoSchemeInSnsk := cryptoSnsk[0]
-	cryptoSchemeInSnsk |= cryptoSnsk[1]
-	cryptoSchemeInSnsk |= cryptoSnsk[2]
-	cryptoSchemeInSnsk |= cryptoSnsk[3]
 
-	if abecryptoparam.CryptoScheme(cryptoSchemeInSnsk) != cryptoScheme {
+	cryptoSchemeInSnsk, err := ExtractCryptoSchemeFromCryptoAddressSnsk(cryptoSnsk)
+	if err != nil || cryptoSchemeInSnsk != cryptoScheme {
 		hints := fmt.Sprintf("pqringctVerifyCryptoAddressSpsnsk: unmacthed cryptoScheme in cryptoSpsk and cryptoAddress: %d vs %d", abecryptoparam.CryptoScheme(cryptoSchemeInSnsk), cryptoScheme)
 		return false, hints
 	}
@@ -252,12 +216,9 @@ func pqringctVerifyCryptoAddressVsk(pp *pqringct.PublicParameter, cryptoScheme a
 		hints := fmt.Sprintf("pqringctVerifyCryptoAddressVsk: invalid length of cryptoVsk: %d", len(cryptoVsk))
 		return false, hints
 	}
-	cryptoSchemeInVsk := cryptoVsk[0]
-	cryptoSchemeInVsk |= cryptoVsk[1]
-	cryptoSchemeInVsk |= cryptoVsk[2]
-	cryptoSchemeInVsk |= cryptoVsk[3]
 
-	if abecryptoparam.CryptoScheme(cryptoSchemeInVsk) != cryptoScheme {
+	cryptoSchemeInVsk, err := ExtractCryptoSchemeFromCryptoVsk(cryptoVsk)
+	if err != nil || cryptoSchemeInVsk != cryptoScheme {
 		hints := fmt.Sprintf("pqringctVerifyCryptoAddressVsk: unmacthed cryptoScheme in cryptoVsk and cryptoAddress: %d vs %d", abecryptoparam.CryptoScheme(cryptoSchemeInVsk), cryptoScheme)
 		return false, hints
 	}
@@ -314,11 +275,8 @@ func pqringctCoinbaseTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 	//	pqringct
 	txOutputDescs := make([]*pqringct.TxOutputDesc, len(abeTxOutputDescs))
 	for j := 0; j < len(abeTxOutputDescs); j++ {
-		cryptoscheme4address := abeTxOutputDescs[j].cryptoAddress[0]
-		cryptoscheme4address |= abeTxOutputDescs[j].cryptoAddress[1]
-		cryptoscheme4address |= abeTxOutputDescs[j].cryptoAddress[2]
-		cryptoscheme4address |= abeTxOutputDescs[j].cryptoAddress[3]
-		if abecryptoparam.CryptoScheme(cryptoscheme4address) != cryptoScheme {
+		cryptoscheme4address, err := ExtractCryptoSchemeFromCryptoAddress(abeTxOutputDescs[j].cryptoAddress)
+		if err != nil || cryptoscheme4address != cryptoScheme {
 			return nil, errors.New("unmatched cryptoScheme for coinbase transaction and cryptoAddress")
 		}
 
@@ -493,38 +451,26 @@ func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 		sidx := abeTxInputDescs[i].sidx
 		value := abeTxInputDescs[i].value
 
-		cryptoSchemeInKey := abeTxInputDescs[i].cryptoSpsk[0]
-		cryptoSchemeInKey |= abeTxInputDescs[i].cryptoSpsk[1]
-		cryptoSchemeInKey |= abeTxInputDescs[i].cryptoSpsk[2]
-		cryptoSchemeInKey |= abeTxInputDescs[i].cryptoSpsk[3]
-		if abecryptoparam.CryptoScheme(cryptoSchemeInKey) != cryptoScheme {
+		cryptoSchemeInKey, err := ExtractCryptoSchemeFromCryptoAddressSpsk(abeTxInputDescs[i].cryptoSpsk)
+		if err != nil || cryptoSchemeInKey != cryptoScheme {
 			return nil, errors.New("pqringctTransferTxGen: unmatched cryptoScheme for Spsk and transaction")
 		}
 		serializedASksp := abeTxInputDescs[i].cryptoSpsk[4:]
 
-		cryptoSchemeInKey = abeTxInputDescs[i].cryptoSnsk[0]
-		cryptoSchemeInKey |= abeTxInputDescs[i].cryptoSnsk[1]
-		cryptoSchemeInKey |= abeTxInputDescs[i].cryptoSnsk[2]
-		cryptoSchemeInKey |= abeTxInputDescs[i].cryptoSnsk[3]
-		if abecryptoparam.CryptoScheme(cryptoSchemeInKey) != cryptoScheme {
+		cryptoSchemeInKey, err = ExtractCryptoSchemeFromCryptoAddressSnsk(abeTxInputDescs[i].cryptoSnsk)
+		if err != nil || cryptoSchemeInKey != cryptoScheme {
 			return nil, errors.New("pqringctTransferTxGen: unmatched cryptoScheme for Snsk and transaction")
 		}
 		serializedASksn := abeTxInputDescs[i].cryptoSnsk[4:]
 
-		cryptoSchemeInKey = abeTxInputDescs[i].cryptoVsk[0]
-		cryptoSchemeInKey |= abeTxInputDescs[i].cryptoVsk[1]
-		cryptoSchemeInKey |= abeTxInputDescs[i].cryptoVsk[2]
-		cryptoSchemeInKey |= abeTxInputDescs[i].cryptoVsk[3]
-		if abecryptoparam.CryptoScheme(cryptoSchemeInKey) != cryptoScheme {
+		cryptoSchemeInKey, err = ExtractCryptoSchemeFromCryptoVsk(abeTxInputDescs[i].cryptoVsk)
+		if err != nil || cryptoSchemeInKey != cryptoScheme {
 			return nil, errors.New("pqringctTransferTxGen: unmatched cryptoScheme for Vsk and transaction")
 		}
 		serializedVSk := abeTxInputDescs[i].cryptoVsk[4:]
 
-		cryptoSchemeInAddress := abeTxInputDescs[i].cryptoAddress[0]
-		cryptoSchemeInAddress |= abeTxInputDescs[i].cryptoAddress[1]
-		cryptoSchemeInAddress |= abeTxInputDescs[i].cryptoAddress[2]
-		cryptoSchemeInAddress |= abeTxInputDescs[i].cryptoAddress[3]
-		if abecryptoparam.CryptoScheme(cryptoSchemeInAddress) != cryptoScheme {
+		cryptoSchemeInAddress, err := ExtractCryptoSchemeFromCryptoAddress(abeTxInputDescs[i].cryptoAddress)
+		if err != nil || cryptoSchemeInAddress != cryptoScheme {
 			return nil, errors.New("pqringctTransferTxGen: unmatched cryptoScheme for input address and transaction")
 		}
 		apkLen := pqringct.GetAddressPublicKeySerializeSize(pp)
@@ -536,11 +482,8 @@ func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 	// outputDescs
 	txOutputDescs := make([]*pqringct.TxOutputDesc, outputNum)
 	for j := 0; j < outputNum; j++ {
-		cryptoscheme4outAddress := abeTxOutputDescs[j].cryptoAddress[0]
-		cryptoscheme4outAddress |= abeTxOutputDescs[j].cryptoAddress[1]
-		cryptoscheme4outAddress |= abeTxOutputDescs[j].cryptoAddress[2]
-		cryptoscheme4outAddress |= abeTxOutputDescs[j].cryptoAddress[3]
-		if abecryptoparam.CryptoScheme(cryptoscheme4outAddress) != cryptoScheme {
+		cryptoscheme4outAddress, err := ExtractCryptoSchemeFromCryptoAddress(abeTxOutputDescs[j].cryptoAddress)
+		if err != nil || cryptoscheme4outAddress != cryptoScheme {
 			return nil, errors.New("pqringctTransferTxGen: unmatched cryptoScheme for transfer transaction and its output cryptoAddress")
 		}
 		// parse the cryptoAddress to serializedApk and serializedVpk
@@ -690,22 +633,16 @@ func pqringctTxoCoinReceive(pp *pqringct.PublicParameter, cryptoScheme abecrypto
 		return false, 0, err
 	}
 
-	cryptoSchemeInAddress := cryptoAddress[0]
-	cryptoSchemeInAddress |= cryptoAddress[1]
-	cryptoSchemeInAddress |= cryptoAddress[2]
-	cryptoSchemeInAddress |= cryptoAddress[3]
-	if abecryptoparam.CryptoScheme(cryptoSchemeInAddress) != cryptoScheme {
+	cryptoSchemeInAddress, err := ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
+	if err != nil || cryptoSchemeInAddress != cryptoScheme {
 		return false, 0, errors.New("pqringctTxoCoinReceive: unmatched cryptoScheme for input instanceAddress")
 	}
 	apkLen := pqringct.GetAddressPublicKeySerializeSize(pp)
 	serializedApk := cryptoAddress[4 : 4+apkLen]
 	serializedVpk := cryptoAddress[4+apkLen:]
 
-	cryptoSchemeInVsk := cryptoVsk[0]
-	cryptoSchemeInVsk |= cryptoVsk[1]
-	cryptoSchemeInVsk |= cryptoVsk[2]
-	cryptoSchemeInVsk |= cryptoVsk[3]
-	if abecryptoparam.CryptoScheme(cryptoSchemeInVsk) != cryptoScheme {
+	cryptoSchemeInVsk, err := ExtractCryptoSchemeFromCryptoVsk(cryptoVsk)
+	if err != nil || cryptoSchemeInVsk != cryptoScheme {
 		return false, 0, errors.New("pqringctTxoCoinReceive: unmatched cryptoScheme for Vsk")
 	}
 	serializedVsk := cryptoVsk[4:]
@@ -735,11 +672,8 @@ func pqringctTxoCoinSerialNumberGen(pp *pqringct.PublicParameter, cryptoScheme a
 
 	lgrTxo := pqringct.NewLgrTxo(txo, txolid)
 
-	cryptoSchemeInSnsk := cryptoSnsk[0]
-	cryptoSchemeInSnsk |= cryptoSnsk[1]
-	cryptoSchemeInSnsk |= cryptoSnsk[2]
-	cryptoSchemeInSnsk |= cryptoSnsk[3]
-	if abecryptoparam.CryptoScheme(cryptoSchemeInSnsk) != cryptoScheme {
+	cryptoSchemeInSnsk, err := ExtractCryptoSchemeFromCryptoAddressSnsk(cryptoSnsk)
+	if err != nil || cryptoSchemeInSnsk != cryptoScheme {
 		return nil, errors.New("pqringctTxoCoinSerialNumberGen: unmatched cryptoScheme for Snsk")
 	}
 	serializedAsksn := cryptoSnsk[4:]

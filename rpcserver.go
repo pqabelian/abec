@@ -1474,7 +1474,15 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 }
 
 func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	c := cmd.(*abejson.GetBlockAbeCmd)
+	var c *abejson.GetBlockAbeCmd
+	if cc, ok := cmd.(*abejson.GetBlockCmd); ok {
+		c = &abejson.GetBlockAbeCmd{
+			Hash:      cc.Hash,
+			Verbosity: cc.Verbosity,
+		}
+	} else {
+		c = cmd.(*abejson.GetBlockAbeCmd)
+	}
 
 	// Load the raw block bytes from the database.
 	hash, err := chainhash.NewHashFromStr(c.Hash)
@@ -4185,7 +4193,16 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 }
 
 func handleSendRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	c := cmd.(*abejson.SendRawTransactionAbeCmd)
+	var c *abejson.SendRawTransactionAbeCmd
+	if cc, ok := cmd.(*abejson.SendRawTransactionCmd); ok {
+		c = &abejson.SendRawTransactionAbeCmd{
+			HexTx:         cc.HexTx,
+			AllowHighFees: cc.AllowHighFees,
+			MaxFeeRate:    cc.MaxFeeRate,
+		}
+	} else {
+		c = cmd.(*abejson.SendRawTransactionAbeCmd)
+	}
 	// Deserialize and send off to tx relay
 	hexStr := c.HexTx
 	if len(hexStr)%2 != 0 { //why length of hexStr = 0 mod 2

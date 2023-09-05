@@ -913,7 +913,7 @@ func (p *Peer) PushGetBlocksMsg(locator blockchain.BlockLocator, stopHash *chain
 	p.prevGetBlocksMtx.Unlock()
 
 	if isDuplicate {
-		log.Tracef("Filtering duplicate [getblocks] with begin "+
+		log.Infof("Filtering duplicate [getblocks] with begin "+
 			"hash %v, stop hash %v", beginHash, stopHash)
 		return nil
 	}
@@ -1382,7 +1382,7 @@ out:
 					continue
 				}
 
-				log.Debugf("Peer %s appears to be stalled or "+
+				log.Infof("Peer %s appears to be stalled or "+
 					"misbehaving, %s timeout -- "+
 					"disconnecting", p, command)
 				p.Disconnect()
@@ -1865,6 +1865,29 @@ out:
 				p.lastPingNonce = m.Nonce
 				p.lastPingTime = time.Now()
 				p.statsMtx.Unlock()
+			case *wire.MsgGetBlocks:
+				// Debug summary of message.
+				summary := messageSummary(msg.msg.(*wire.MsgGetBlocks))
+				if len(summary) > 0 {
+					summary = " (" + summary + ")"
+				}
+				log.Infof("Sending %v%s to %s", "getblocks",
+					summary, p)
+			case *wire.MsgInv:
+				// Debug summary of message.
+				summary := messageSummary(msg.msg.(*wire.MsgInv))
+				if len(summary) > 0 {
+					summary = " (" + summary + ")"
+				}
+				log.Infof("Sending %v%s to %s", "inv",
+					summary, p)
+			case *wire.MsgGetData:
+				summary := messageSummary(msg.msg.(*wire.MsgGetData))
+				if len(summary) > 0 {
+					summary = " (" + summary + ")"
+				}
+				log.Infof("Sending %v%s to %s", "getdata",
+					summary, p)
 			}
 
 			p.stallControl <- stallControlMsg{sccSendMessage, msg.msg}
