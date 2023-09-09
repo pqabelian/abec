@@ -20,6 +20,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"runtime/pprof"
+	"strings"
 )
 
 const (
@@ -320,9 +321,26 @@ func loadBlockDB() (database.DB, error) {
 		return nil, err
 	}
 
-	abecLog.Infof("Node type: %v", nodeType.String())
+	if cfg.nodeType != nodeType {
+		fmt.Printf("Your current node type is %s, but specified node type is %s, do you want to continue"+
+			" (Y/N)? ", nodeType.String(), cfg.nodeType.String())
+		op := "N"
+		fmt.Scanln(&op)
+		if strings.TrimSpace(strings.ToLower(op)) != "y" && strings.TrimSpace(strings.ToLower(op)) != "yes" {
+			os.Exit(0)
+		}
+	}
+
+	// Insert new node type into database.
+	err = db.Update(func(dbTx database.Tx) error {
+		var err error
+		err = dbTx.StoreNodeType(cfg.nodeType)
+		return err
+	})
+
+	abecLog.Infof("Node type: %v", cfg.nodeType.String())
 	//abecLog.Infof("Trust level: %v", trustLevel.String())
-	cfg.nodeType = nodeType
+	//cfg.nodeType = nodeType
 	cfg.trustLevel = trustLevel
 
 	var witnessServiceHeight uint32
