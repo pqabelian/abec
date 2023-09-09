@@ -418,7 +418,6 @@ type Config struct {
 	BlockHeightStart int32
 	// EpochLength specifies the epoch length.
 	EpochLength int32
-	FakePoW     bool
 }
 
 // Ethash is the data manager, on which the Abelian-Ethash proof-of-work consensus is build.
