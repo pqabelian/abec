@@ -84,7 +84,7 @@ func reconcileDB(pdb *db, nodeType wire.NodeType, trustLevel wire.TrustLevel, cr
 		return nil, err
 	}
 	if !hasTrustLevel {
-		log.Info("Adding trust level in database...")
+		//log.Info("Adding trust level in database...")
 		err := addTrustLevelKey(pdb.cache.ldb, wire.TrustLevelMedium)
 		if err != nil {
 			return nil, err

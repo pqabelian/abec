@@ -71,8 +71,8 @@ const (
 	sampleConfigFilename         = "sample-abec.conf"
 	defaultTxIndex               = false
 	defaultAddrIndex             = false
-	defaultNodeType              = "normalnode"
-	defaultTrustLevel            = "high"
+	defaultNodeType              = "unsetnode"
+	defaultTrustLevel            = "unsettrustlevel"
 	defaultAllowDiskCacheTx      = true
 	defaultCacheTxDirname        = "txcaches"
 	defaultCacheTxFilename       = "txcache.abe"
@@ -469,10 +469,11 @@ func loadConfig() (*config, []string, error) {
 		EthashConfig:         ethash.DefaultCfg,
 		TxIndex:              defaultTxIndex,
 		NodeType:             defaultNodeType,
-		TrustLevel:           "medium",
-		MaxReservedWitness:   4000,
-		AllowDiskCacheTx:     defaultAllowDiskCacheTx,
-		CacheTxDir:           defaultCacheTxDir,
+		// Currently we do not expose config `trustlevel` to users.
+		TrustLevel:         "medium",
+		MaxReservedWitness: 4000,
+		AllowDiskCacheTx:   defaultAllowDiskCacheTx,
+		CacheTxDir:         defaultCacheTxDir,
 	}
 	// Service options which are only added on Windows.
 	// TODO(osy): this set is ingoned, we should detect it!
@@ -618,6 +619,8 @@ func loadConfig() (*config, []string, error) {
 	} else if cfg.NodeType == "normalnode" {
 		cfg.nodeType = wire.NormalNode
 		cfg.serviceFlag = wire.SFNodeNetwork | wire.SFNodeNormal
+	} else if cfg.NodeType == defaultNodeType {
+		cfg.nodeType = wire.UnsetNode
 	} else {
 		return nil, nil, errors.New("nodetype should be fullnode or semifullnode or normalnode")
 	}
@@ -632,11 +635,11 @@ func loadConfig() (*config, []string, error) {
 	} else {
 		return nil, nil, errors.New("trustlevel should be high or medium or low")
 	}
-	if cfg.NodeType == "fullnode" || cfg.NodeType == "semifullnode" {
-		if cfg.trustLevel == wire.TrustLevelHigh {
-			cfg.trustLevel = wire.TrustLevelMedium
-		}
-	}
+	//if cfg.NodeType == "fullnode" || cfg.NodeType == "semifullnode" {
+	//	if cfg.trustLevel == wire.TrustLevelHigh {
+	//		cfg.trustLevel = wire.TrustLevelMedium
+	//	}
+	//}
 
 	// Set the default policy for relaying non-standard transactions
 	// according to the default of the active network. The set

@@ -49,6 +49,8 @@ const (
 	SemifullNode
 
 	NormalNode
+
+	UnsetNode
 )
 
 const DefaultNodeType = NormalNode
@@ -58,6 +60,7 @@ var ntStrings = map[NodeType]string{
 	FullNode:     "FullNode",
 	SemifullNode: "SemifullNode",
 	NormalNode:   "NormalNode",
+	UnsetNode:    "UnsetNode",
 }
 
 // String returns the NodeType in human-readable form.
@@ -81,6 +84,10 @@ func (n NodeType) IsNormalNode() bool {
 	return n == NormalNode
 }
 
+func (n NodeType) IsUnsetNode() bool {
+	return n == UnsetNode
+}
+
 // TrustLevel is the level of trust for other nodes.
 type TrustLevel uint64
 
@@ -90,6 +97,8 @@ const (
 	TrustLevelMedium
 
 	TrustLevelHigh
+
+	TrustLevelUnset
 )
 
 const DefaultTrustLevel = TrustLevelHigh
@@ -99,6 +108,7 @@ var tlStrings = map[TrustLevel]string{
 	TrustLevelHigh:   "High",
 	TrustLevelMedium: "Medium",
 	TrustLevelLow:    "Low",
+	TrustLevelUnset:  "Unset",
 }
 
 // String returns the TrustLevel in human-readable form.
