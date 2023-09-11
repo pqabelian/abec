@@ -2095,6 +2095,18 @@ func (tx *transaction) FetchTrustLevel() (wire.TrustLevel, error) {
 	return wire.TrustLevel(deserializeUint32(trustLevel)), nil
 }
 
+// StoreNodeType store node type into meta data.
+func (tx *transaction) StoreNodeType(nodeType wire.NodeType) error {
+	err := tx.Metadata().Put(nodeTypeKeyName, serializeUint32(uint32(nodeType)))
+	return err
+}
+
+// StoreTrustLevel store trust level into meta data.
+func (tx *transaction) StoreTrustLevel(trustLevel wire.TrustLevel) error {
+	err := tx.Metadata().Put(trustLevelKeyName, serializeUint32(uint32(trustLevel)))
+	return err
+}
+
 // FetchMinConsecutiveWitnessFileNum fetch the minimum file number of
 // the last consecutive witness files.
 func (tx *transaction) FetchMinConsecutiveWitnessFileNum() (uint32, error) {
