@@ -1645,14 +1645,14 @@ func (tx *transaction) DeleteWitnessFiles(fileNum []uint32) ([]string, error) {
 		filePath := witnessFilePath(tx.db.store.basePath, num)
 		fileState, err := os.Stat(filePath)
 		if err != nil {
-			log.Debugf("Fail to delete %v: %v", filePath, err)
+			log.Infof("Fail to delete %v: %v", filePath, err)
 			continue
 		}
 		if err := os.Remove(filePath); err != nil {
-			log.Debugf("Fail to delete %v: %v", filePath, err)
+			log.Infof("Fail to delete %v: %v", filePath, err)
 			continue
 		}
-		log.Debugf("Successfully delete %v (Size: %v)", filePath, fileState.Size())
+		log.Infof("Successfully delete %v (Size: %v)", filePath, fileState.Size())
 		res = append(res, filePath)
 	}
 

@@ -42,6 +42,15 @@ func New(config *Config) (*WitnessManager, error) {
 	}
 
 	if wm.nodeType == wire.NormalNode {
+		currentHeight := config.Chain.BestSnapshot().Height
+		witnessKeptStartHeight := currentHeight - int32(wm.maxReservedWitness)
+		if witnessKeptStartHeight > 0 {
+			log.Infof("Start pruning witness data before height %v, please do not shut down abec", witnessKeptStartHeight)
+			err := wm.pruneWitnessBeforeHeight(witnessKeptStartHeight)
+			if err != nil {
+				log.Errorf("Fail to prune witness data: %v", err)
+			}
+		}
 		wm.chain.Subscribe(wm.handleBlockchainNotification)
 	}
 
@@ -116,7 +125,7 @@ func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
 		log.Infof("No witness file should be reserved, skip")
 		return nil
 	}
-	log.Debugf("Reserved witness files between height %v and %v: %v", height, bestHeight, fileNumReserved)
+	log.Infof("Reserved witness files between height %v and %v: %v", height, bestHeight, fileNumReserved)
 
 	// Calculate prune range, starting from min existing witness file num.
 	fileNumPruned := make([]uint32, 0)
@@ -136,7 +145,7 @@ func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
 		log.Infof("No witness file can be pruned, skip")
 		return nil
 	}
-	log.Debugf("No longer needed witness files between height %v and %v: %v", height, bestHeight, fileNumPruned)
+	log.Infof("No longer needed witness files between height %v and %v: %v", height, bestHeight, fileNumPruned)
 
 	// Fetch witness file info, this process will also filter some files that do not exist.
 	fileInfo, err := wm.chain.FetchWitnessFileInfo(fileNumPruned)

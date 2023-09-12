@@ -177,7 +177,6 @@ type config struct {
 	RPCUser               string        `short:"u" long:"rpcuser" description:"Username for RPC connections"`
 	SigCacheMaxSize       uint          `long:"sigcachemaxsize" description:"The maximum number of entries in the signature verification cache"`
 	WitnessCacheMaxSize   uint          `long:"witnesscachemaxsize" description:"The maximum number of entries in the witness cache"`
-	WitnessKept           int           `long:"witnesskept" description:"If the prunednode is set, this flag indicates how many block witness should be kept"`
 	SimNet                bool          `long:"simnet" description:"Use the simulation test network"`
 	EnableFakePoW         bool          `long:"enablefakepow" description:"fake pow in simulation test network"`
 	TestNet3              bool          `long:"testnet" description:"Use the test network"`
