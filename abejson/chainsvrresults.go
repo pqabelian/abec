@@ -751,18 +751,20 @@ type GetMiningInfoResult struct {
 
 // InfoChainResult models the data returned by the chain server getinfo command.
 type InfoChainResult struct {
-	Version         int32   `json:"version"`
-	ProtocolVersion int32   `json:"protocolversion"`
-	Blocks          int32   `json:"blocks"`
-	BestBlockHash   string  `json:"bestblockhash"`
-	WorkSum         string  `json:"worksum"`
-	TimeOffset      int64   `json:"timeoffset"`
-	Connections     int32   `json:"connections"`
-	Proxy           string  `json:"proxy"`
-	Difficulty      float64 `json:"difficulty"`
-	TestNet         bool    `json:"testnet"`
-	RelayFee        float64 `json:"relayfee"`
-	Errors          string  `json:"errors"`
+	Version              int32   `json:"version"`
+	ProtocolVersion      int32   `json:"protocolversion"`
+	Blocks               int32   `json:"blocks"`
+	BestBlockHash        string  `json:"bestblockhash"`
+	WorkSum              string  `json:"worksum"`
+	TimeOffset           int64   `json:"timeoffset"`
+	Connections          int32   `json:"connections"`
+	Proxy                string  `json:"proxy"`
+	Difficulty           float64 `json:"difficulty"`
+	TestNet              bool    `json:"testnet"`
+	RelayFee             float64 `json:"relayfee"`
+	Errors               string  `json:"errors"`
+	NodeType             string  `json:"nodetype"`
+	WitnessServiceHeight int32   `json:"witnessserviceheight"`
 }
 
 // TxRawResult models the data from the getrawtransaction command.

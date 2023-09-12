@@ -2965,19 +2965,42 @@ func handleGetHeaders(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 // handleGetInfo implements the getinfo command. We only return the fields
 // that are not related to wallet functionality.
 func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+
+	var nodeType wire.NodeType
+	err := s.cfg.DB.View(func(dbTx database.Tx) error {
+		var err error
+		nodeType, err = dbTx.FetchNodeType()
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var witnessServiceHeight uint32
+	err = s.cfg.DB.View(func(dbTx database.Tx) error {
+		var err error
+		witnessServiceHeight, err = dbTx.FetchWitnessServiceHeight()
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	best := s.cfg.Chain.BestSnapshot()
 	ret := &abejson.InfoChainResult{
-		Version:         int32(1000000*appMajor + 10000*appMinor + 100*appPatch),
-		ProtocolVersion: int32(maxProtocolVersion),
-		Blocks:          best.Height,
-		BestBlockHash:   best.Hash.String(),
-		WorkSum:         s.cfg.Chain.BestChainWorkSum().String(),
-		TimeOffset:      int64(s.cfg.TimeSource.Offset().Seconds()),
-		Connections:     s.cfg.ConnMgr.ConnectedCount(),
-		Proxy:           cfg.Proxy,
-		Difficulty:      getDifficultyRatio(best.Bits, s.cfg.ChainParams),
-		TestNet:         cfg.TestNet3,
-		RelayFee:        cfg.minRelayTxFee.ToABE(),
+		Version:              int32(1000000*appMajor + 10000*appMinor + 100*appPatch),
+		ProtocolVersion:      int32(maxProtocolVersion),
+		Blocks:               best.Height,
+		BestBlockHash:        best.Hash.String(),
+		WorkSum:              s.cfg.Chain.BestChainWorkSum().String(),
+		TimeOffset:           int64(s.cfg.TimeSource.Offset().Seconds()),
+		Connections:          s.cfg.ConnMgr.ConnectedCount(),
+		Proxy:                cfg.Proxy,
+		Difficulty:           getDifficultyRatio(best.Bits, s.cfg.ChainParams),
+		TestNet:              cfg.TestNet3,
+		RelayFee:             cfg.minRelayTxFee.ToABE(),
+		NodeType:             nodeType.String(),
+		WitnessServiceHeight: int32(witnessServiceHeight),
 	}
 
 	return ret, nil
