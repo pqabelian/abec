@@ -16,7 +16,6 @@ const (
 // Config is a configuration struct used to initialize a new WitnessManager.
 type Config struct {
 	NodeType           wire.NodeType
-	TrustLevel         wire.TrustLevel
 	MaxReservedWitness uint32
 	Chain              *blockchain.BlockChain
 }
@@ -26,7 +25,6 @@ type Config struct {
 // is not a full node.
 type WitnessManager struct {
 	nodeType           wire.NodeType
-	trustLevel         wire.TrustLevel
 	maxReservedWitness uint32
 	chain              *blockchain.BlockChain
 	deleteLock         sync.Mutex
@@ -36,7 +34,6 @@ type WitnessManager struct {
 func New(config *Config) (*WitnessManager, error) {
 	wm := WitnessManager{
 		nodeType:           config.NodeType,
-		trustLevel:         config.TrustLevel,
 		maxReservedWitness: config.MaxReservedWitness,
 		chain:              config.Chain,
 	}

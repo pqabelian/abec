@@ -88,38 +88,6 @@ func (n NodeType) IsUnsetNode() bool {
 	return n == UnsetNode
 }
 
-// TrustLevel is the level of trust for other nodes.
-type TrustLevel uint64
-
-const (
-	TrustLevelLow TrustLevel = iota
-
-	TrustLevelMedium
-
-	TrustLevelHigh
-
-	TrustLevelUnset
-)
-
-const DefaultTrustLevel = TrustLevelHigh
-
-// Map of trust level back to their constant names for pretty printing.
-var tlStrings = map[TrustLevel]string{
-	TrustLevelHigh:   "High",
-	TrustLevelMedium: "Medium",
-	TrustLevelLow:    "Low",
-	TrustLevelUnset:  "Unset",
-}
-
-// String returns the TrustLevel in human-readable form.
-func (t TrustLevel) String() string {
-	res, ok := tlStrings[t]
-	if !ok {
-		return "Unknown"
-	}
-	return res
-}
-
 // Map of service flags back to their constant names for pretty printing.
 var sfStrings = map[ServiceFlag]string{
 	SFNodeNetwork: "SFNodeNetwork",

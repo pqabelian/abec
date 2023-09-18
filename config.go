@@ -72,7 +72,6 @@ const (
 	defaultTxIndex               = false
 	defaultAddrIndex             = false
 	defaultNodeType              = "unsetnode"
-	defaultTrustLevel            = "unsettrustlevel"
 	defaultAllowDiskCacheTx      = true
 	defaultCacheTxDirname        = "txcaches"
 	defaultCacheTxFilename       = "txcache.abe"
@@ -182,7 +181,6 @@ type config struct {
 	TestNet3              bool          `long:"testnet" description:"Use the test network"`
 	TorIsolation          bool          `long:"torisolation" description:"Enable Tor stream isolation by randomizing user credentials for each connection."`
 	TrickleInterval       time.Duration `long:"trickleinterval" description:"Minimum time between attempts to send new inventory to a connected peer"`
-	TrustLevel            string        `long:"trustlevel" description:"Trust level of other nodes (high/medium/low). default: medium"`
 	TxIndex               bool          `long:"txindex" description:"Maintain a full hash-based transaction index which makes all transactions available via the getrawtransaction RPC"`
 	UserAgentComments     []string      `long:"uacomment" description:"Comment to add to the user agent -- See BIP 14 for more information."`
 	Upnp                  bool          `long:"upnp" description:"Use UPnP to map our listening port outside of NAT"`
@@ -198,7 +196,6 @@ type config struct {
 	minRelayTxFee abeutil.Amount
 	nodeType      wire.NodeType
 	serviceFlag   wire.ServiceFlag
-	trustLevel    wire.TrustLevel
 	whitelists    []*net.IPNet
 	WorkingDir    string `long:"workingdir" description:"Working directory"`
 
@@ -468,11 +465,9 @@ func loadConfig() (*config, []string, error) {
 		EthashConfig:         ethash.DefaultCfg,
 		TxIndex:              defaultTxIndex,
 		NodeType:             defaultNodeType,
-		// Currently we do not expose config `trustlevel` to users.
-		TrustLevel:         "medium",
-		MaxReservedWitness: 4000,
-		AllowDiskCacheTx:   defaultAllowDiskCacheTx,
-		CacheTxDir:         defaultCacheTxDir,
+		MaxReservedWitness:   4000,
+		AllowDiskCacheTx:     defaultAllowDiskCacheTx,
+		CacheTxDir:           defaultCacheTxDir,
 	}
 	// Service options which are only added on Windows.
 	// TODO(osy): this set is ingoned, we should detect it!
@@ -623,22 +618,6 @@ func loadConfig() (*config, []string, error) {
 	} else {
 		return nil, nil, errors.New("nodetype should be fullnode or semifullnode or normalnode")
 	}
-
-	// Check trust level.
-	if cfg.TrustLevel == "high" {
-		cfg.trustLevel = wire.TrustLevelHigh
-	} else if cfg.TrustLevel == "medium" {
-		cfg.trustLevel = wire.TrustLevelMedium
-	} else if cfg.TrustLevel == "low" {
-		cfg.trustLevel = wire.TrustLevelLow
-	} else {
-		return nil, nil, errors.New("trustlevel should be high or medium or low")
-	}
-	//if cfg.NodeType == "fullnode" || cfg.NodeType == "semifullnode" {
-	//	if cfg.trustLevel == wire.TrustLevelHigh {
-	//		cfg.trustLevel = wire.TrustLevelMedium
-	//	}
-	//}
 
 	// Set the default policy for relaying non-standard transactions
 	// according to the default of the active network. The set

@@ -58,11 +58,11 @@ func deserializeUint32(num []byte) uint32 {
 
 // reconcileDB reconciles the metadata with the flat block files on disk.  It
 // will also initialize the underlying database if the create flag is set.
-func reconcileDB(pdb *db, nodeType wire.NodeType, trustLevel wire.TrustLevel, create bool) (database.DB, error) {
+func reconcileDB(pdb *db, nodeType wire.NodeType, create bool) (database.DB, error) {
 	// Perform initial internal bucket and value creation during database
 	// creation.
 	if create {
-		if err := initDB(pdb.cache.ldb, nodeType, trustLevel); err != nil {
+		if err := initDB(pdb.cache.ldb, nodeType); err != nil {
 			return nil, err
 		}
 	}
@@ -79,17 +79,7 @@ func reconcileDB(pdb *db, nodeType wire.NodeType, trustLevel wire.TrustLevel, cr
 			return nil, err
 		}
 	}
-	hasTrustLevel, err := trustLevelExist(pdb)
-	if err != nil {
-		return nil, err
-	}
-	if !hasTrustLevel {
-		//log.Info("Adding trust level in database...")
-		err := addTrustLevelKey(pdb.cache.ldb, wire.TrustLevelMedium)
-		if err != nil {
-			return nil, err
-		}
-	}
+
 	hasWitnessServiceHeight, err := witnessServiceHeightExist(pdb)
 	if err != nil {
 		return nil, err

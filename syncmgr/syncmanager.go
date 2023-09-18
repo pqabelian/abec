@@ -198,7 +198,6 @@ func limitAdd(m map[chainhash.Hash]struct{}, hash chainhash.Hash, limit int) {
 // notifications and relays announcements of new blocks to peers.
 type SyncManager struct {
 	nodeType           wire.NodeType
-	trustLevel         wire.TrustLevel
 	maxReservedWitness uint32
 	peerNotifier       PeerNotifier
 	started            int32
@@ -279,9 +278,6 @@ func (sm *SyncManager) findNextHeaderCheckpoint(height int32) *chaincfg.Checkpoi
 }
 
 func (sm *SyncManager) WitnessNeeded(p *peerpkg.Peer) bool {
-	if sm.trustLevel == wire.TrustLevelLow {
-		return true
-	}
 
 	bestSnapShot := sm.chain.BestSnapshot()
 	currentHeight := bestSnapShot.Height
@@ -294,15 +290,8 @@ func (sm *SyncManager) WitnessNeeded(p *peerpkg.Peer) bool {
 		}
 	} else {
 		// Normal node.
-		if sm.trustLevel == wire.TrustLevelMedium {
-			if sm.nextCheckpoint == nil || currentHeight+int32(sm.maxReservedWitness) >= p.AnnouncedHeight() {
-				return true
-			}
-		} else {
-			// Trust level high.
-			if currentHeight+int32(sm.maxReservedWitness) >= p.AnnouncedHeight() {
-				return true
-			}
+		if sm.nextCheckpoint == nil || currentHeight+int32(sm.maxReservedWitness) >= p.AnnouncedHeight() {
+			return true
 		}
 	}
 
@@ -1040,7 +1029,7 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
 	//	todo (EthashPoW): 202207
-	_, isOrphan, err := sm.chain.ProcessBlockAbe(bmsg.block, sm.ethash, behaviorFlags, sm.trustLevel == wire.TrustLevelLow)
+	_, isOrphan, err := sm.chain.ProcessBlockAbe(bmsg.block, sm.ethash, behaviorFlags, false)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
@@ -1319,7 +1308,7 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	block := abeutil.NewBlockAbe(&msgBlockAbe)
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
-	_, isOrphan, err := sm.chain.ProcessBlockAbe(block, sm.ethash, behaviorFlags, sm.trustLevel == wire.TrustLevelLow)
+	_, isOrphan, err := sm.chain.ProcessBlockAbe(block, sm.ethash, behaviorFlags, false)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
@@ -2037,7 +2026,7 @@ out:
 
 			case processBlockMsgAbe:
 				//	todo (EthashPoW): 202207
-				_, isOrphan, err := sm.chain.ProcessBlockAbe(msg.block, sm.ethash, msg.flags, sm.trustLevel == wire.TrustLevelLow)
+				_, isOrphan, err := sm.chain.ProcessBlockAbe(msg.block, sm.ethash, msg.flags, false)
 				if err != nil {
 					msg.reply <- processBlockResponse{
 						isOrphan: false,
@@ -2389,7 +2378,6 @@ func (sm *SyncManager) Pause() chan<- struct{} {
 func New(config *Config) (*SyncManager, error) {
 	sm := SyncManager{
 		nodeType:           config.NodeType,
-		trustLevel:         config.TrustLevel,
 		maxReservedWitness: config.MaxReservedWitness,
 		peerNotifier:       config.PeerNotifier,
 		chain:              config.Chain,

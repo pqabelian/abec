@@ -281,7 +281,7 @@ func loadBlockDB() (database.DB, error) {
 	removeRegressionDB(dbPath)
 
 	abecLog.Infof("Loading block database from '%s'", dbPath)
-	db, err := database.Open(cfg.DbType, dbPath, activeNetParams.Net, cfg.nodeType, cfg.trustLevel)
+	db, err := database.Open(cfg.DbType, dbPath, activeNetParams.Net, cfg.nodeType)
 	if err != nil {
 		// Return the error if it's not because the database doesn't
 		// exist.
@@ -302,14 +302,13 @@ func loadBlockDB() (database.DB, error) {
 			cfg.nodeType = wire.NormalNode
 			cfg.serviceFlag = wire.SFNodeNetwork | wire.SFNodeNormal
 		}
-		db, err = database.Create(cfg.DbType, dbPath, activeNetParams.Net, cfg.nodeType, cfg.trustLevel)
+		db, err = database.Create(cfg.DbType, dbPath, activeNetParams.Net, cfg.nodeType)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	var nodeType wire.NodeType
-	var trustLevel wire.TrustLevel
 	err = db.View(func(dbTx database.Tx) error {
 		var err error
 		nodeType, err = dbTx.FetchNodeType()
@@ -324,15 +323,6 @@ func loadBlockDB() (database.DB, error) {
 		cfg.nodeType = nodeType
 	}
 
-	err = db.View(func(dbTx database.Tx) error {
-		var err error
-		trustLevel, err = dbTx.FetchTrustLevel()
-		return err
-	})
-	if err != nil {
-		return nil, err
-	}
-
 	// If the user specifies a node type that is conflict with the previous node type,
 	// let them confirm this change.
 	if cfg.nodeType != nodeType {
@@ -345,17 +335,7 @@ func loadBlockDB() (database.DB, error) {
 		}
 	}
 
-	if cfg.trustLevel != trustLevel {
-		fmt.Printf("Your current trust level is %s, but specified trust level is %s, do you want to continue"+
-			" (Y/N)? ", trustLevel.String(), cfg.trustLevel.String())
-		op := "N"
-		fmt.Scanln(&op)
-		if strings.TrimSpace(strings.ToLower(op)) != "y" && strings.TrimSpace(strings.ToLower(op)) != "yes" {
-			os.Exit(0)
-		}
-	}
-
-	// Insert new node type and trust level into database.
+	// Insert new node type into database.
 	err = db.Update(func(dbTx database.Tx) error {
 		var err error
 		err = dbTx.StoreNodeType(cfg.nodeType)
@@ -364,18 +344,8 @@ func loadBlockDB() (database.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = db.Update(func(dbTx database.Tx) error {
-		var err error
-		err = dbTx.StoreTrustLevel(cfg.trustLevel)
-		return err
-	})
-	if err != nil {
-		return nil, err
-	}
 
 	abecLog.Infof("Node type: %v", cfg.nodeType.String())
-	// Currently we do not tell trust level to user.
-	//abecLog.Infof("Trust level: %v", trustLevel.String())
 
 	var witnessServiceHeight uint32
 	err = db.View(func(dbTx database.Tx) error {

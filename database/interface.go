@@ -400,8 +400,6 @@ type Tx interface {
 
 	FetchNodeType() (wire.NodeType, error)
 	StoreNodeType(wire.NodeType) error
-	FetchTrustLevel() (wire.TrustLevel, error)
-	StoreTrustLevel(wire.TrustLevel) error
 
 	FetchMinConsecutiveWitnessFileNum() (uint32, error)
 	StoreMinConsecutiveWitnessFileNum(num uint32) error

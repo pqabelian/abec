@@ -2584,7 +2584,6 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 
 	s.syncManager, err = syncmgr.New(&syncmgr.Config{
 		NodeType:           cfg.nodeType,
-		TrustLevel:         cfg.trustLevel,
 		MaxReservedWitness: cfg.MaxReservedWitness,
 		PeerNotifier:       &s,
 		Chain:              s.chain,
@@ -2601,7 +2600,6 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 
 	s.witnessManager, err = witnessmgr.New(&witnessmgr.Config{
 		NodeType:           cfg.nodeType,
-		TrustLevel:         cfg.trustLevel,
 		MaxReservedWitness: cfg.MaxReservedWitness,
 		Chain:              s.chain,
 	})

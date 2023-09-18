@@ -89,10 +89,6 @@ var (
 	// 0: full node, 1: semifull node, 2: normal node
 	nodeTypeKeyName = []byte("ffldb-nodetype")
 
-	// trustLevelKeyName is the key used to store the trust level.
-	// 0: high, 1: medium, 2: low
-	trustLevelKeyName = []byte("ffldb-trustlevel")
-
 	// witnessServiceHeightKeyName is the key used to store the min height of witness stored by the node.
 	witnessServiceHeightKeyName = []byte("ffldb-witnessserviceheight")
 )
@@ -2084,26 +2080,9 @@ func (tx *transaction) FetchNodeType() (wire.NodeType, error) {
 	return wire.NodeType(deserializeUint32(nodeType)), nil
 }
 
-// FetchTrustLevel fetch trust level from meta data.
-func (tx *transaction) FetchTrustLevel() (wire.TrustLevel, error) {
-	var trustLevel []byte
-	trustLevel = tx.Metadata().Get(trustLevelKeyName)
-	if trustLevel == nil {
-		return 0, errors.New("trust level does not exist")
-	}
-
-	return wire.TrustLevel(deserializeUint32(trustLevel)), nil
-}
-
 // StoreNodeType store node type into meta data.
 func (tx *transaction) StoreNodeType(nodeType wire.NodeType) error {
 	err := tx.Metadata().Put(nodeTypeKeyName, serializeUint32(uint32(nodeType)))
-	return err
-}
-
-// StoreTrustLevel store trust level into meta data.
-func (tx *transaction) StoreTrustLevel(trustLevel wire.TrustLevel) error {
-	err := tx.Metadata().Put(trustLevelKeyName, serializeUint32(uint32(trustLevel)))
 	return err
 }
 
@@ -2478,7 +2457,7 @@ func fileExists(name string) bool {
 
 // initDB creates the initial buckets and values used by the package.  This is
 // mainly in a separate function for testing purposes.
-func initDB(ldb *leveldb.DB, nodeType wire.NodeType, trustLevel wire.TrustLevel) error {
+func initDB(ldb *leveldb.DB, nodeType wire.NodeType) error {
 	// The starting block file write cursor location is file num 0, offset
 	// 0.
 	batch := new(leveldb.Batch)
@@ -2492,8 +2471,6 @@ func initDB(ldb *leveldb.DB, nodeType wire.NodeType, trustLevel wire.TrustLevel)
 		serializeUint32(0))
 	batch.Put(bucketizedKey(metadataBucketID, nodeTypeKeyName),
 		serializeUint32(uint32(nodeType)))
-	batch.Put(bucketizedKey(metadataBucketID, trustLevelKeyName),
-		serializeUint32(uint32(trustLevel)))
 	batch.Put(bucketizedKey(metadataBucketID, witnessServiceHeightKeyName),
 		serializeUint32(uint32(0)))
 
@@ -2571,24 +2548,6 @@ func nodeTypeExist(pdb *db) (bool, error) {
 	return hasNodeType, nil
 }
 
-// trustLevelExist check whether trust level exist in database.
-func trustLevelExist(pdb *db) (bool, error) {
-	hasTrustLevel := true
-	var trustLevel []byte
-	err := pdb.View(func(tx database.Tx) error {
-		trustLevel = tx.Metadata().Get(trustLevelKeyName)
-		if trustLevel == nil {
-			hasTrustLevel = false
-		}
-		return nil
-	})
-	if err != nil {
-		return false, err
-	}
-
-	return hasTrustLevel, nil
-}
-
 // witnessServiceHeightExist check whether witness service height exist in database.
 func witnessServiceHeightExist(pdb *db) (bool, error) {
 	hasWitnessServiceHeight := true
@@ -2624,23 +2583,6 @@ func addNodeTypeKey(ldb *leveldb.DB, nodeType wire.NodeType) error {
 	return nil
 }
 
-// addTrustLevelKey add trustLevel in meta data.
-func addTrustLevelKey(ldb *leveldb.DB, trustLevel wire.TrustLevel) error {
-
-	batch := new(leveldb.Batch)
-	batch.Put(bucketizedKey(metadataBucketID, trustLevelKeyName),
-		serializeUint32(uint32(trustLevel)))
-
-	// Write everything as a single batch.
-	if err := ldb.Write(batch, nil); err != nil {
-		str := fmt.Sprintf("failed to add trust level key: %v",
-			err)
-		return convertErr(str, err)
-	}
-
-	return nil
-}
-
 // addWitnessServiceHeight add witness service height in meta data.
 func addWitnessServiceHeight(ldb *leveldb.DB, witnessServiceHeight uint32) error {
 
@@ -2660,8 +2602,7 @@ func addWitnessServiceHeight(ldb *leveldb.DB, witnessServiceHeight uint32) error
 
 // openDB opens the database at the provided path.  database.ErrDbDoesNotExist
 // is returned if the database doesn't exist and the create flag is not set.
-func openDB(dbPath string, network wire.AbelianNet, nodeType wire.NodeType, trustLevel wire.TrustLevel,
-	create bool) (database.DB, error) {
+func openDB(dbPath string, network wire.AbelianNet, nodeType wire.NodeType, create bool) (database.DB, error) {
 	// Error if the database doesn't exist and the create flag is not set.
 	metadataDbPath := filepath.Join(dbPath, metadataDbName)
 	dbExists := fileExists(metadataDbPath)
@@ -2705,5 +2646,5 @@ func openDB(dbPath string, network wire.AbelianNet, nodeType wire.NodeType, trus
 
 	// Perform any reconciliation needed between the block and metadata as
 	// well as database initialization, if needed.
-	return reconcileDB(pdb, nodeType, trustLevel, create)
+	return reconcileDB(pdb, nodeType, create)
 }
