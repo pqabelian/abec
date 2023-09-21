@@ -101,6 +101,7 @@ type BlockChain struct {
 	// The following fields are set when the instance is created and can't
 	// be changed afterwards, so there is no need to protect them with a
 	// separate mutex.
+	nodeType            wire.NodeType
 	checkpoints         []chaincfg.Checkpoint
 	checkpointsByHeight map[int32]*chaincfg.Checkpoint // initialized by checkpoints
 	db                  database.DB
@@ -1431,7 +1432,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			// In the case the block is determined to be invalid due to a
 			// rule violation, mark it as invalid and mark all of its
 			// descendants as having an invalid ancestor.
-			err = b.checkConnectBlockAbe(n, block, view, nil, false)
+			err = b.checkConnectBlockAbe(n, block, view, nil)
 			if err != nil {
 				if _, ok := err.(RuleError); ok {
 					b.index.SetStatusFlags(n, statusValidateFailed)
@@ -1628,8 +1629,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 //	    1. Log and return if worksum is smaller than main chain (we do not check the inputs and witness)
 //	    2. Find detachNodes and attachNode (getReorganizeNodesAbe)
 //	    3. Reorganize the chain (reorganizeChainAbe)
-func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAbe, flags BehaviorFlags,
-	mandatoryWitnessCheck bool) (bool, error) {
+func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAbe, flags BehaviorFlags) (bool, error) {
 	fastAdd := flags&BFFastAdd == BFFastAdd
 
 	flushIndexState := func() {
@@ -1657,7 +1657,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 		view.SetBestHash(parentHash)
 		stxos := make([]*SpentTxOutAbe, 0, countSpentOutputsAbe(block))
 		if !fastAdd {
-			err := b.checkConnectBlockAbe(node, block, view, &stxos, mandatoryWitnessCheck)
+			err := b.checkConnectBlockAbe(node, block, view, &stxos)
 			if err == nil {
 				b.index.SetStatusFlags(node, statusValid)
 			} else if _, ok := err.(RuleError); ok {
@@ -2286,6 +2286,8 @@ type Config struct {
 	// WitnessCache defines a transaction witness cache to store the already
 	// validated transactions to speed up block verification.
 	WitnessCache *txscript.WitnessCache
+
+	NodeType wire.NodeType
 }
 
 // New returns a BlockChain instance using the provided configuration details.
@@ -2324,6 +2326,7 @@ func New(config *Config) (*BlockChain, error) {
 	targetTimePerBlock := int64(params.TargetTimePerBlock / time.Second)
 	adjustmentFactor := params.RetargetAdjustmentFactor
 	b := BlockChain{
+		nodeType:            config.NodeType,
 		checkpoints:         config.Checkpoints,
 		checkpointsByHeight: checkpointsByHeight,
 		db:                  config.DB,

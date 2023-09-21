@@ -2476,9 +2476,19 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		checkpoints = mergeCheckpoints(s.chainParams.Checkpoints, cfg.addCheckpoints)
 	}
 
+	var nodeType wire.NodeType
+	err := db.View(func(dbTx database.Tx) error {
+		var err error
+		nodeType, err = dbTx.FetchNodeType()
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	// Create a new block chain instance with the appropriate configuration.
-	var err error
 	s.chain, err = blockchain.New(&blockchain.Config{
+		NodeType:     nodeType,
 		DB:           s.db,
 		Interrupt:    interrupt,
 		ChainParams:  s.chainParams,

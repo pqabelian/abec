@@ -112,7 +112,7 @@ func (b *BlockChain) processOrphansAbe(hash *chainhash.Hash, flags BehaviorFlags
 			i--
 
 			// Potentially accept the block into the block chain.
-			_, err := b.maybeAcceptBlockAbe(orphan.block, flags, false)
+			_, err := b.maybeAcceptBlockAbe(orphan.block, flags)
 			if err != nil {
 				return err
 			}
@@ -136,17 +136,16 @@ func (b *BlockChain) processOrphansAbe(hash *chainhash.Hash, flags BehaviorFlags
 // whether or not the block is an orphan.
 //
 // This function is safe for concurrent access.
-//   1. The block should not exist on main chain or side chain or an orphan
-//   2. Preliminary check on block sanity (checkBlockSanityAbe)
-//   3. The timestamp of the block should after the latest checkpoint. The difficulty should be at least the
-//      easiest one that can be adjusted since last checkpoint (in not fast add mode)
-//   4. Check if it is orphan block (if so, add it into orphan map and return)
-//   5. Connect the new block into the chain (maybeAcceptBlockAbe)
-//   6. If any orphan blocks depend on this block, check and accept it (processOrphansAbe) todo: to be checked
-//	todo (ABE):
-//	todo (EthashPoW): 202207
-func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.Ethash, flags BehaviorFlags,
-	mandatoryWitnessCheck bool) (bool, bool, error) {
+//  1. The block should not exist on main chain or side chain or an orphan
+//  2. Preliminary check on block sanity (checkBlockSanityAbe)
+//  3. The timestamp of the block should after the latest checkpoint. The difficulty should be at least the
+//     easiest one that can be adjusted since last checkpoint (in not fast add mode)
+//  4. Check if it is orphan block (if so, add it into orphan map and return)
+//  5. Connect the new block into the chain (maybeAcceptBlockAbe)
+//  6. If any orphan blocks depend on this block, check and accept it (processOrphansAbe) todo: to be checked
+//     todo (ABE):
+//     todo (EthashPoW): 202207
+func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.Ethash, flags BehaviorFlags) (bool, bool, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
 
@@ -233,7 +232,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.
 
 	// The block has passed all context independent checks and appears sane
 	// enough to potentially accept it into the block chain.
-	isMainChain, err := b.maybeAcceptBlockAbe(block, flags, mandatoryWitnessCheck)
+	isMainChain, err := b.maybeAcceptBlockAbe(block, flags)
 	if err != nil {
 		return false, false, err
 	}

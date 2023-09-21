@@ -23,7 +23,7 @@ import (
 //  5. Add the new block into block index
 //  6. Connect new block to the chain, including reorganization and switch main chain if needed (connectBestChainAbe)
 //  7. Send NTBlockAccepted notification
-func (b *BlockChain) maybeAcceptBlockAbe(block *abeutil.BlockAbe, flags BehaviorFlags, mandatoryWitnessCheck bool) (bool, error) {
+func (b *BlockChain) maybeAcceptBlockAbe(block *abeutil.BlockAbe, flags BehaviorFlags) (bool, error) {
 	// The height of this block is one more than the referenced previous
 	// block.
 	prevHash := &block.MsgBlock().Header.PrevBlock
@@ -83,7 +83,7 @@ func (b *BlockChain) maybeAcceptBlockAbe(block *abeutil.BlockAbe, flags Behavior
 	// Connect the passed block to the chain while respecting proper chain
 	// selection according to the chain with the most proof of work.  This
 	// also handles validation of the transaction scripts.
-	isMainChain, err := b.connectBestChainAbe(newNode, block, flags, mandatoryWitnessCheck)
+	isMainChain, err := b.connectBestChainAbe(newNode, block, flags)
 	if err != nil {
 		return false, err
 	}

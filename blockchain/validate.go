@@ -1469,8 +1469,7 @@ func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *
 //	  5. Ensure the block fee in coinbase is not larger than block reward plus tx fee
 //	  6. Validate the witness of each transaction (if after the checkpoint)
 //	  7. Set new best height for utxo ring view
-func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockAbe, view *UtxoRingViewpoint, stxos *[]*SpentTxOutAbe,
-	mandatoryWitnessCheck bool) error {
+func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockAbe, view *UtxoRingViewpoint, stxos *[]*SpentTxOutAbe) error {
 	// If the side chain blocks end up in the database, a call to
 	// CheckBlockSanity should be done here in case a previous version
 	// allowed a block that is no longer valid.  However, since the
@@ -1640,10 +1639,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// portion of block handling.
 	checkpoint := b.LatestCheckpoint()
 	witnessCheck := true
-	if !mandatoryWitnessCheck && checkpoint != nil && node.height <= checkpoint.Height {
-		witnessCheck = false
-	}
-	if !block.Transactions()[0].HasWitness() {
+	if b.nodeType != wire.FullNode && checkpoint != nil {
 		witnessCheck = false
 	}
 
@@ -1784,5 +1780,5 @@ func (b *BlockChain) CheckConnectBlockTemplateAbe(block *abeutil.BlockAbe) error
 		return err
 	}
 
-	return b.checkConnectBlockAbe(newNode, block, view, nil, false)
+	return b.checkConnectBlockAbe(newNode, block, view, nil)
 }

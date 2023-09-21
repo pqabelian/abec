@@ -278,21 +278,12 @@ func (sm *SyncManager) findNextHeaderCheckpoint(height int32) *chaincfg.Checkpoi
 }
 
 func (sm *SyncManager) WitnessNeeded(p *peerpkg.Peer) bool {
-
-	bestSnapShot := sm.chain.BestSnapshot()
-	currentHeight := bestSnapShot.Height
-
 	if sm.nodeType.IsFullNode() {
 		return true
-	} else if sm.nodeType.IsSemifullNode() {
-		if sm.nextCheckpoint == nil {
-			return true
-		}
-	} else {
-		// Normal node.
-		if sm.nextCheckpoint == nil || currentHeight+int32(sm.maxReservedWitness) >= p.AnnouncedHeight() {
-			return true
-		}
+	}
+
+	if sm.nextCheckpoint == nil {
+		return true
 	}
 
 	return false
@@ -1029,7 +1020,7 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
 	//	todo (EthashPoW): 202207
-	_, isOrphan, err := sm.chain.ProcessBlockAbe(bmsg.block, sm.ethash, behaviorFlags, false)
+	_, isOrphan, err := sm.chain.ProcessBlockAbe(bmsg.block, sm.ethash, behaviorFlags)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
@@ -1308,7 +1299,7 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	block := abeutil.NewBlockAbe(&msgBlockAbe)
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
-	_, isOrphan, err := sm.chain.ProcessBlockAbe(block, sm.ethash, behaviorFlags, false)
+	_, isOrphan, err := sm.chain.ProcessBlockAbe(block, sm.ethash, behaviorFlags)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
@@ -2026,7 +2017,7 @@ out:
 
 			case processBlockMsgAbe:
 				//	todo (EthashPoW): 202207
-				_, isOrphan, err := sm.chain.ProcessBlockAbe(msg.block, sm.ethash, msg.flags, false)
+				_, isOrphan, err := sm.chain.ProcessBlockAbe(msg.block, sm.ethash, msg.flags)
 				if err != nil {
 					msg.reply <- processBlockResponse{
 						isOrphan: false,
