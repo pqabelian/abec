@@ -72,6 +72,7 @@ const (
 	defaultTxIndex               = false
 	defaultAddrIndex             = false
 	defaultNodeType              = "unsetnode"
+	defaultMaxReservedWitness    = 4000
 	defaultAllowDiskCacheTx      = true
 	defaultCacheTxDirname        = "txcaches"
 	defaultCacheTxFilename       = "txcache.abe"
@@ -465,7 +466,7 @@ func loadConfig() (*config, []string, error) {
 		EthashConfig:         ethash.DefaultCfg,
 		TxIndex:              defaultTxIndex,
 		NodeType:             defaultNodeType,
-		MaxReservedWitness:   4000,
+		MaxReservedWitness:   defaultMaxReservedWitness,
 		AllowDiskCacheTx:     defaultAllowDiskCacheTx,
 		CacheTxDir:           defaultCacheTxDir,
 	}
@@ -604,6 +605,12 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Check node type.
+	// Different type would decide the service it can provide when communicating with its peers.
+	// 1) full node: provide any witness
+	// 2) semi full node: provide some witness
+	// 3) normal node: provide some witness
+	// Optimization: the service flag would use a bit to present the witness service, but it would
+	// be supported by witness service height when initializing with its peers
 	if cfg.NodeType == "fullnode" {
 		cfg.nodeType = wire.FullNode
 		cfg.serviceFlag = wire.SFNodeNetwork | wire.SFNodeWitness

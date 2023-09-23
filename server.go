@@ -2594,8 +2594,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 
 	s.syncManager, err = syncmgr.New(&syncmgr.Config{
 		NodeType:           cfg.nodeType,
-		MaxReservedWitness: cfg.MaxReservedWitness,
-		PeerNotifier:       &s,
+		PeerNotifier:       &s, // serve
 		Chain:              s.chain,
 		TxMemPool:          s.txMemPool,
 		Ethash:             s.ethash, // todo: (EthashPoW)
@@ -2638,11 +2637,10 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		Ethash:                 s.ethash, // todo: (EthashPoW)
 		BlockTemplateGenerator: blockTemplateGenerator,
 		MiningAddrs:            cfg.miningAddrs,
-		//MiningAddrBytes:        cfg.miningAddrBytes,
-		HashRateWatermark: cfg.HashRateWatermark,
-		ProcessBlock:      s.syncManager.ProcessBlock,
-		ConnectedCount:    s.ConnectedCount,
-		IsCurrent:         s.syncManager.IsCurrent,
+		HashRateWatermark:      cfg.HashRateWatermark,
+		ProcessBlock:           s.syncManager.ProcessBlock,
+		ConnectedCount:         s.ConnectedCount,
+		IsCurrent:              s.syncManager.IsCurrent,
 	})
 
 	s.externalMiner = externalminer.New(&externalminer.Config{
@@ -2650,10 +2648,9 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		Ethash:                 s.ethash,
 		BlockTemplateGenerator: blockTemplateGenerator,
 		MiningAddrs:            cfg.miningAddrs,
-		//MiningAddrBytes:        cfg.miningAddrBytes,
-		ProcessBlock:   s.syncManager.ProcessBlock,
-		ConnectedCount: s.ConnectedCount,
-		IsCurrent:      s.syncManager.IsCurrent,
+		ProcessBlock:           s.syncManager.ProcessBlock,
+		ConnectedCount:         s.ConnectedCount,
+		IsCurrent:              s.syncManager.IsCurrent,
 	})
 
 	// Only setup a function to return new addresses to connect to when
