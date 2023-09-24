@@ -196,7 +196,6 @@ type config struct {
 	//miningAddrBytes []byte
 	minRelayTxFee abeutil.Amount
 	nodeType      wire.NodeType
-	serviceFlag   wire.ServiceFlag
 	whitelists    []*net.IPNet
 	WorkingDir    string `long:"workingdir" description:"Working directory"`
 
@@ -611,15 +610,14 @@ func loadConfig() (*config, []string, error) {
 	// 3) normal node: provide some witness
 	// Optimization: the service flag would use a bit to present the witness service, but it would
 	// be supported by witness service height when initializing with its peers
+	// The service flag would be defaultServices, and use witness service height to distinguish those type
+	// is enough
 	if cfg.NodeType == "fullnode" {
 		cfg.nodeType = wire.FullNode
-		cfg.serviceFlag = wire.SFNodeNetwork | wire.SFNodeWitness
 	} else if cfg.NodeType == "semifullnode" {
 		cfg.nodeType = wire.SemifullNode
-		cfg.serviceFlag = wire.SFNodeNetwork | wire.SFNodeSemi
 	} else if cfg.NodeType == "normalnode" {
 		cfg.nodeType = wire.NormalNode
-		cfg.serviceFlag = wire.SFNodeNetwork | wire.SFNodeNormal
 	} else if cfg.NodeType == defaultNodeType {
 		cfg.nodeType = wire.UnsetNode
 	} else {

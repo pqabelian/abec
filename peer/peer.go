@@ -519,6 +519,12 @@ func (p *Peer) UpdateLastBlockHeight(newHeight int32) {
 	p.statsMtx.Unlock()
 }
 
+// the value should be consistent with witnessmgr.deleteInterval
+const witnessPruningInterval = 100
+
+// the value should be consistent with 	main.defaultMaxReservedWitness
+const defaultMaxReservedWitness = 4000
+
 // UpdateAnnouncedHeight updates the latest block
 // which peer announced it has.
 // This function is safe for concurrent access.
@@ -527,6 +533,16 @@ func (p *Peer) UpdateAnnouncedHeight(newHeight int32) {
 	log.Tracef("Updating announced height of peer %v from %v to %v",
 		p.addr, p.announcedHeight, newHeight)
 	p.announcedHeight = newHeight
+	if p.witnessServiceHeight != 0 {
+		if newHeight%witnessPruningInterval == 0 {
+			witnessKeptStartHeight := newHeight - int32(defaultMaxReservedWitness)
+			if witnessKeptStartHeight <= 0 {
+				return
+			}
+			log.Infof("Start pruning witness data before height %v, please do not shut down abec", witnessKeptStartHeight)
+			p.witnessServiceHeight = uint32(witnessKeptStartHeight)
+		}
+	}
 	p.statsMtx.Unlock()
 }
 
@@ -1116,7 +1132,7 @@ func (p *Peer) writeMessage(msg wire.Message, enc wire.MessageEncoding) error {
 		if wrappedMsg, ok := msg.(*wire.WrappedMessage); ok {
 			wrappedMsg.Done()
 			if wrappedMsg.CanDelete() {
-				p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message))
+				p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message, enc))
 			}
 		}
 	}()
@@ -1801,7 +1817,7 @@ out:
 		if wrappedMsg, ok := msg.msg.(*wire.WrappedMessage); ok {
 			wrappedMsg.Done()
 			if wrappedMsg.CanDelete() {
-				p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message))
+				p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message, wrappedMsg.Encoding()))
 			}
 		}
 	}
@@ -1815,7 +1831,7 @@ cleanup:
 			if wrappedMsg, ok := msg.msg.(*wire.WrappedMessage); ok {
 				wrappedMsg.Done()
 				if wrappedMsg.CanDelete() {
-					p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message))
+					p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message, wrappedMsg.Encoding()))
 				}
 			}
 		case <-p.outputInvChan:
@@ -1937,7 +1953,7 @@ cleanup:
 			if wrappedMsg, ok := msg.msg.(*wire.WrappedMessage); ok {
 				wrappedMsg.Done()
 				if wrappedMsg.CanDelete() {
-					p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message))
+					p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message, wrappedMsg.Encoding()))
 				}
 			}
 			// no need to send on sendDoneQueue since queueHandler
@@ -2000,7 +2016,7 @@ func (p *Peer) QueueMessageWithEncoding(msg wire.Message, doneChan chan<- struct
 		if wrappedMsg, ok := msg.(*wire.WrappedMessage); ok {
 			wrappedMsg.Done()
 			if wrappedMsg.CanDelete() {
-				p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message))
+				p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message, wrappedMsg.Encoding()))
 			}
 		}
 		return

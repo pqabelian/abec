@@ -20,6 +20,7 @@ type Entry interface {
 
 type WrappedMessage struct {
 	Message
+	encoding MessageEncoding
 	//key     string
 	//mapping *sync.Map
 	mu      sync.RWMutex
@@ -28,6 +29,10 @@ type WrappedMessage struct {
 	cacheMu sync.RWMutex
 	cached  bool
 	buf     *bytes.Buffer
+}
+
+func (m *WrappedMessage) Encoding() MessageEncoding {
+	return m.encoding
 }
 
 func (m *WrappedMessage) Use() {
@@ -83,14 +88,14 @@ func WrapMessage(msg Message) *WrappedMessage {
 		counter: 0,
 	}
 }
-func WrapMsgKey(msg Message) string {
+func WrapMsgKey(msg Message, encoding MessageEncoding) string {
 	switch msg.Command() {
 	case "block":
 		blockMsg := msg.(*MsgBlockAbe)
-		return fmt.Sprintf("block_%s", blockMsg.BlockHash())
+		return fmt.Sprintf("block_%s_%d", blockMsg.BlockHash(), encoding)
 	case "tx":
 		txMsg := msg.(*MsgTxAbe)
-		return fmt.Sprintf("tx_%s", txMsg.TxHash())
+		return fmt.Sprintf("tx_%s_%d", txMsg.TxHash(), encoding)
 	default:
 		return ""
 	}

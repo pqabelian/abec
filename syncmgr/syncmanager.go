@@ -276,7 +276,10 @@ func (sm *SyncManager) findNextHeaderCheckpoint(height int32) *chaincfg.Checkpoi
 	return nextCheckpoint
 }
 
-func (sm *SyncManager) WitnessNeeded(p *peerpkg.Peer) bool {
+// WitnessNeeded report whether block witness is needed in sync process
+// For full node, any time it request a block, witness is needed
+// For other type node, any witness in block after last checkpoint is needed
+func (sm *SyncManager) WitnessNeeded() bool {
 	if sm.nodeType.IsFullNode() {
 		return true
 	}
@@ -302,7 +305,7 @@ func (sm *SyncManager) MaybeSyncPeer(p *peerpkg.Peer) bool {
 		return false
 	}
 
-	witnessNeeded := sm.WitnessNeeded(p)
+	witnessNeeded := sm.WitnessNeeded()
 
 	if !witnessNeeded {
 		return true
@@ -984,7 +987,7 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 	delete(state.requestedBlocks, *blockHash)
 	delete(sm.requestedBlocks, *blockHash)
 
-	witnessNeeded := sm.WitnessNeeded(peer)
+	witnessNeeded := sm.WitnessNeeded()
 	if witnessNeeded {
 		numTx := len(bmsg.block.MsgBlock().Transactions)
 		if numTx == 0 {
@@ -992,8 +995,8 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 			peer.Disconnect()
 			return
 		}
-		if !bmsg.block.Transactions()[0].HasWitness() {
-			log.Infof("Rejected block %v from %s: block without witness but we need it", blockHash, peer)
+		if !bmsg.block.MsgBlock().HasWitness() {
+			log.Infof("Rejected block %v from %s: block without witness but we request with needing witness", blockHash, peer)
 			peer.Disconnect()
 			return
 		}
@@ -1388,7 +1391,7 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 		if heightUpdate > peer.AnnouncedHeight() {
 			peer.UpdateAnnouncedHeight(heightUpdate)
 		}
-		//peer.UpdateLastAnnouncedBlock(blkHashUpdate)
+		peer.UpdateLastAnnouncedBlock(blkHashUpdate)
 		if isOrphan || sm.current() {
 			go sm.peerNotifier.UpdatePeerHeights(blkHashUpdate, heightUpdate,
 				peer)
@@ -1534,7 +1537,7 @@ func (sm *SyncManager) fetchHeaderBlocks() {
 			// witness data in the blocks.
 			// todo(ABE): for ABE, even for WitnessEnabled peer, we may do not want receive the witness
 			//	todo(ABE): for blocks before checkpoint, we do not need to check the transactions' witness
-			witnessNeeded := sm.WitnessNeeded(sm.syncPeer)
+			witnessNeeded := sm.WitnessNeeded()
 			if witnessNeeded {
 				iv.Type = wire.InvTypeWitnessBlock
 			}
@@ -1765,7 +1768,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 			if blkHeight > peer.AnnouncedHeight() {
 				peer.UpdateAnnouncedHeight(blkHeight)
 			}
-			//peer.UpdateLastAnnouncedBlock(&invVects[lastBlock].Hash)
+			peer.UpdateLastAnnouncedBlock(&invVects[lastBlock].Hash)
 		}
 	}
 
@@ -1899,7 +1902,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 				limitAdd(sm.requestedBlocks, iv.Hash, maxRequestedBlocks)
 				limitAdd(state.requestedBlocks, iv.Hash, maxRequestedBlocks)
 
-				witnessNeeded := sm.WitnessNeeded(sm.syncPeer)
+				witnessNeeded := sm.WitnessNeeded()
 				if witnessNeeded {
 					iv.Type = wire.InvTypeWitnessBlock
 				}
@@ -1927,11 +1930,8 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 				limitAdd(sm.requestedTxns, iv.Hash, maxRequestedTxns)
 				limitAdd(state.requestedTxns, iv.Hash, maxRequestedTxns)
 
-				// If the peer is capable, request the txn
-				// including all witness data.
-				if peer.IsWitnessEnabled() {
-					iv.Type = wire.InvTypeWitnessTx
-				}
+				// Any time transaction would be with witness in Abelian
+				iv.Type = wire.InvTypeWitnessTx
 
 				gdmsg.AddInvVect(iv)
 				numRequested++

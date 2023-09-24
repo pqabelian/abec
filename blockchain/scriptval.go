@@ -126,12 +126,18 @@ func newTxValidator(utxoRingView *UtxoRingViewpoint, witnessCache *txscript.Witn
 }
 
 //	new validate function under pqringct
+//
 // to be discussed
 func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingViewpoint, witnessCache *txscript.WitnessCache) error {
 	// If transaction witness has already been validated and stored in cache, just return.
 	if witnessCache.Exists(*tx.Hash()) {
 		return nil
 	}
+	start := time.Now()
+	defer func() {
+		elapsed := time.Since(start)
+		log.Debugf("Tx(%d-in-%d-out) %v took %v to verify", len(tx.MsgTx().TxIns), len(tx.MsgTx().TxOuts), tx.Hash(), elapsed)
+	}()
 
 	isCB, err := tx.IsCoinBase()
 	if err != nil {

@@ -30,14 +30,6 @@ const (
 	// SFNodeWitness is a flag used to indicate a peer supports blocks
 	// and transactions including witness data.
 	SFNodeWitness
-
-	// SFNodeSemi is a flag used to indicate a peer which has pruned witness data
-	// before the last checkpoint.
-	SFNodeSemi
-
-	// SFNodeNormal is a flag used to indicate a peer which has pruned
-	// witness data partially (MaxReservedWitness)
-	SFNodeNormal
 )
 
 // NodeType is the type of node.
@@ -93,8 +85,6 @@ var sfStrings = map[ServiceFlag]string{
 	SFNodeNetwork: "SFNodeNetwork",
 	SFNodeGetUTXO: "SFNodeGetUTXO",
 	SFNodeWitness: "SFNodeWitness",
-	SFNodeSemi:    "SFNodeSemi",
-	SFNodeNormal:  "SFNodeNormal",
 }
 
 // orderedSFStrings is an ordered list of service flags from highest to
@@ -103,8 +93,6 @@ var orderedSFStrings = []ServiceFlag{
 	SFNodeNetwork,
 	SFNodeGetUTXO,
 	SFNodeWitness,
-	SFNodeSemi,
-	SFNodeNormal,
 }
 
 // String returns the ServiceFlag in human-readable form.

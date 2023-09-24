@@ -583,6 +583,8 @@ func (sp *serverPeer) OnInv(p *peer.Peer, msg *wire.MsgInv) {
 		return
 	}
 
+	// when enable block only, transaction should not be received from any peer
+	// so filter the inventory
 	newInv := wire.NewMsgInvSizeHint(uint(len(msg.InvList)))
 	for _, invVect := range msg.InvList {
 		if invVect.Type == wire.InvTypeTx {
@@ -665,7 +667,11 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 		}
 		if err != nil {
 			notFound.AddInvVect(iv)
+			// deny all subsequent requests
 			if iv.Type == wire.InvTypeWitnessBlock {
+				for j := i + 1; j < len(msg.InvList); j++ {
+					notFound.AddInvVect(msg.InvList[j])
+				}
 				break
 			}
 
@@ -1008,8 +1014,13 @@ func (s *server) TransactionConfirmed(tx *abeutil.TxAbe) {
 func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
 	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
 
+	if encoding != wire.WitnessEncoding {
+		peerLog.Warnf("Unexpected type of transaction with hash %d is"+
+			"requested by peer %s", hash, sp.Peer)
+	}
+
 	var msg wire.Message
-	msgCacheKey := fmt.Sprintf("tx_%s", hash)
+	msgCacheKey := fmt.Sprintf("tx_%s_%d", hash, encoding)
 	value, ok := s.communicationCache.Load(msgCacheKey)
 	if wrappedMessage, hit := value.(*wire.WrappedMessage); ok && hit {
 		wrappedMessage.Use()
@@ -1148,7 +1159,7 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan cha
 func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
 	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
 	var msg wire.Message
-	msgCacheKey := fmt.Sprintf("block_%s", hash)
+	msgCacheKey := fmt.Sprintf("block_%s_%d", hash, encoding)
 	value, ok := s.communicationCache.Load(msgCacheKey)
 	if wrappedMessage, hit := value.(*wire.WrappedMessage); ok && hit {
 		wrappedMessage.Use()
@@ -1866,7 +1877,7 @@ func (s *server) peerDoneHandler(sp *serverPeer) {
 func (s *server) peerHandler() {
 	// Start the address manager and sync manager, both of which are needed
 	// by peers.  This is done here since their lifecycle is closely tied
-	// to this handler and rather than adding more channels to sychronize
+	// to this handler and rather than adding more channels to synchronize
 	// things, it's easier and slightly faster to simply start and stop them
 	// in this handler.
 	s.addrManager.Start() // address manager, not containing transports
@@ -1897,7 +1908,8 @@ func (s *server) peerHandler() {
 	}
 
 	// todo(ABE): why here is "go s.connManager.Start()" rather than "s.connManager.Start()"
-	// osy: When the node is closed, need to handle the network source, if the conn manager also close, the source will be can not control
+	// osy: When the node is closed, need to handle the network source,
+	// if the conn manager also close, the source will be can not control
 	go s.connManager.Start() // connect manager depending the peeraddress
 
 out:
@@ -2404,7 +2416,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	db database.DB, chainParams *chaincfg.Params,
 	interrupt <-chan struct{}) (*server, error) {
 
-	services := cfg.serviceFlag
+	services := defaultServices
 
 	amgr := netaddrmgr.New(cfg.DataDir, abecLookup)
 

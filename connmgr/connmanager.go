@@ -235,10 +235,10 @@ func (cm *ConnManager) connHandler() {
 out:
 	for {
 		select {
-		case req := <-cm.requests:       // receive the date from chan and enter into case according the msg type
+		case req := <-cm.requests: // receive the date from chan and enter into case according the msg type
 			switch msg := req.(type) {
 
-			case registerPending:  //conn state will be updated to pending
+			case registerPending: //conn state will be updated to pending
 				connReq := msg.c
 				connReq.updateState(ConnPending)
 				pending[msg.c.id] = connReq
@@ -441,17 +441,17 @@ func (cm *ConnManager) Connect(c *ConnReq) {
 
 	log.Debugf("Attempting to connect to %v", c)
 
-	conn, err := cm.cfg.Dial(c.Addr)      // connecting with peer, is package by net.Dial
+	conn, err := cm.cfg.Dial(c.Addr) // connecting with peer, is package by net.Dial
 	if err != nil {
 		select {
-		case cm.requests <- handleFailed{c, err}:        // if connection is fail 
+		case cm.requests <- handleFailed{c, err}: // if connection is fail
 		case <-cm.quit:
 		}
 		return
 	}
 
 	select {
-	case cm.requests <- handleConnected{c, conn}:     //successful connection
+	case cm.requests <- handleConnected{c, conn}: //successful connection
 	case <-cm.quit:
 	}
 }
@@ -491,7 +491,7 @@ func (cm *ConnManager) Remove(id uint64) {
 func (cm *ConnManager) listenHandler(listener net.Listener) {
 	log.Infof("Server listening on %s", listener.Addr())
 	for atomic.LoadInt32(&cm.stop) == 0 {
-		conn, err := listener.Accept()      // is package by net.Accept
+		conn, err := listener.Accept() // is package by net.Accept
 		if err != nil {
 			// Only log the error if not forcibly shutting down.
 			if atomic.LoadInt32(&cm.stop) == 0 {
@@ -499,7 +499,7 @@ func (cm *ConnManager) listenHandler(listener net.Listener) {
 			}
 			continue
 		}
-		go cm.cfg.OnAccept(conn)        //convey the request to OnAccept 
+		go cm.cfg.OnAccept(conn) //convey the request to OnAccept
 	}
 
 	cm.wg.Done()
@@ -515,19 +515,19 @@ func (cm *ConnManager) Start() {
 
 	log.Trace("Connection manager started")
 	cm.wg.Add(1)
-	go cm.connHandler()     // manager all active connection
+	go cm.connHandler() // manager all active connection
 
 	// Start all the listeners so long as the caller requested them and
 	// provided a callback to be invoked when connections are accepted.
 	if cm.cfg.OnAccept != nil {
 		for _, listner := range cm.cfg.Listeners {
 			cm.wg.Add(1)
-			go cm.listenHandler(listner)     // wait for connection from peers
+			go cm.listenHandler(listner) // wait for connection from peers
 		}
 	}
 
 	for i := atomic.LoadUint64(&cm.connReqCount); i < uint64(cm.cfg.TargetOutbound); i++ {
-		go cm.NewConnReq()     // postive connect with other peers, if success, the conn will be registed
+		go cm.NewConnReq() // positive connect with other peers, if success, the conn will be registered
 	}
 }
 

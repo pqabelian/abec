@@ -1639,7 +1639,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// portion of block handling.
 	checkpoint := b.LatestCheckpoint()
 	witnessCheck := true
-	if b.nodeType != wire.FullNode && checkpoint != nil {
+	if b.nodeType != wire.FullNode && checkpoint != nil && node.height <= checkpoint.Height {
 		witnessCheck = false
 	}
 
