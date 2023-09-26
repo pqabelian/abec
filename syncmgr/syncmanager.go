@@ -987,35 +987,19 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 	delete(state.requestedBlocks, *blockHash)
 	delete(sm.requestedBlocks, *blockHash)
 
+	numTx := len(bmsg.block.MsgBlock().Transactions)
+	if numTx == 0 {
+		log.Infof("Rejected block %v from %s: block without any transactions", blockHash, peer)
+		peer.Disconnect()
+		return
+	}
+
 	witnessNeeded := sm.WitnessNeeded()
 	if witnessNeeded {
-		numTx := len(bmsg.block.MsgBlock().Transactions)
-		if numTx == 0 {
-			log.Infof("Rejected block %v from %s: block without any transactions", blockHash, peer)
-			peer.Disconnect()
-			return
-		}
 		if !bmsg.block.MsgBlock().HasWitness() {
 			log.Infof("Rejected block %v from %s: block without witness but we request with needing witness", blockHash, peer)
 			peer.Disconnect()
 			return
-		}
-	}
-
-	// Just for debug convenience.
-	if witnessNeeded {
-		log.Debugf("We need witness for block %v and it contains witness", blockHash)
-	} else {
-		numTx := len(bmsg.block.MsgBlock().Transactions)
-		if numTx == 0 {
-			log.Infof("Rejected block %v from %s: block without any transactions", blockHash, peer)
-			peer.Disconnect()
-			return
-		}
-		if !bmsg.block.Transactions()[0].HasWitness() {
-			log.Debugf("We do not need witness for block %v and it does not contain witness", blockHash)
-		} else {
-			log.Debugf("We do not need witness for block %v and it contains witness", blockHash)
 		}
 	}
 
