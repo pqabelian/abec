@@ -2111,22 +2111,24 @@ func (b *BlockChain) locateInventory(locator BlockLocator, hashStop *chainhash.H
 // See the comment on the exported function for more details on special cases.
 //
 // This function MUST be called with the chain state lock held (for reads).
-func (b *BlockChain) locateBlocks(locator BlockLocator, hashStop *chainhash.Hash, maxHashes uint32) []chainhash.Hash {
+func (b *BlockChain) locateBlocks(locator BlockLocator, hashStop *chainhash.Hash, maxHashes uint32) ([]chainhash.Hash, []int32) {
 	// Find the node after the first known block in the locator and the
 	// total number of nodes after it needed while respecting the stop hash
 	// and max entries.
 	node, total := b.locateInventory(locator, hashStop, maxHashes)
 	if total == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// Populate and return the found hashes.
 	hashes := make([]chainhash.Hash, 0, total)
+	heights := make([]int32, 0, total)
 	for i := uint32(0); i < total; i++ {
 		hashes = append(hashes, node.hash)
+		heights = append(heights, node.height)
 		node = b.bestChain.Next(node)
 	}
-	return hashes
+	return hashes, heights
 }
 
 // LocateBlocks returns the hashes of the blocks after the first known block in
@@ -2142,11 +2144,11 @@ func (b *BlockChain) locateBlocks(locator BlockLocator, hashStop *chainhash.Hash
 //     after the genesis block will be returned
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) LocateBlocks(locator BlockLocator, hashStop *chainhash.Hash, maxHashes uint32) []chainhash.Hash {
+func (b *BlockChain) LocateBlocks(locator BlockLocator, hashStop *chainhash.Hash, maxHashes uint32) ([]chainhash.Hash, []int32) {
 	b.chainLock.RLock()
-	hashes := b.locateBlocks(locator, hashStop, maxHashes)
+	hashes, heights := b.locateBlocks(locator, hashStop, maxHashes)
 	b.chainLock.RUnlock()
-	return hashes
+	return hashes, heights
 }
 
 // locateHeaders returns the headers of the blocks after the first known block

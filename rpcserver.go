@@ -4321,7 +4321,7 @@ func handleSendRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-chan
 	// Keep track of all the sendrawtransaction request txns so that they
 	// can be rebroadcast if they don't make their way into a block.
 	txD := acceptedTxs[0]
-	iv := wire.NewInvVect(wire.InvTypeTx, txD.Tx.Hash())
+	iv := wire.NewInvVect(txD.Tx.InvType(), txD.Tx.Hash())
 	s.cfg.ConnMgr.AddRebroadcastInventory(iv, txD)
 
 	return tx.Hash().String(), nil

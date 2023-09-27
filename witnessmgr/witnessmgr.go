@@ -24,10 +24,11 @@ type Config struct {
 // It will automatically prune the witness file if the node
 // is not a full node.
 type WitnessManager struct {
-	nodeType           wire.NodeType
-	maxReservedWitness uint32
-	chain              *blockchain.BlockChain
-	deleteLock         sync.Mutex
+	nodeType             wire.NodeType
+	maxReservedWitness   uint32
+	chain                *blockchain.BlockChain
+	deleteLock           sync.Mutex
+	witnessServiceHeight int32
 }
 
 // New constructs a new WitnessManager.
@@ -51,7 +52,7 @@ func New(config *Config) (*WitnessManager, error) {
 		wm.chain.Subscribe(wm.handleBlockchainNotification)
 	}
 
-	if wm.nodeType == wire.SemifullNode {
+	if wm.nodeType == wire.SemiFullNode {
 		lastCheckpoint := wm.chain.LatestCheckpoint()
 		if lastCheckpoint != nil {
 			log.Infof("Start pruning witness data before height %v, please do not shut down abec", lastCheckpoint.Height)
@@ -185,6 +186,7 @@ func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
 	if err != nil {
 		return err
 	}
+	wm.witnessServiceHeight = height
 
 	// Prune witness files, this may take a while.
 	_, err = wm.chain.PruneWitnessFile(realFileNumPruned)
@@ -195,4 +197,12 @@ func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
 	// Update min existing witness file.
 	err = wm.chain.UpdateMinExistingWitnessFileNum()
 	return err
+}
+
+func (wm *WitnessManager) NodeType() wire.NodeType {
+	return wm.nodeType
+}
+
+func (wm *WitnessManager) WitnessServiceHeight() int32 {
+	return wm.witnessServiceHeight
 }

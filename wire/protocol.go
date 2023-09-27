@@ -30,29 +30,34 @@ const (
 	// SFNodeWitness is a flag used to indicate a peer supports blocks
 	// and transactions including witness data.
 	SFNodeWitness
+
+	// SFNodeTypeBit1 and SFNodeTypeBit2 used to indicate behavior about witness
+	// SFNodeUnknown(00) represents lower version (<0.12.0) node which never prune witness
+	// SFNodeFull(01) represents full node which keep all witness
+	// SFNodeSemi(10) represents semi-full node which prunes witness data before last checkpoint.
+	// SFNodeNormal(11) represents normal node which only keep a fixed number of witness data (MaxReservedWitness)
+	SFNodeTypeBit1
+	SFNodeTypeBit2
 )
 
 // NodeType is the type of node.
 type NodeType uint64
 
 const (
-	FullNode NodeType = iota
-
-	SemifullNode
-
+	UnsetNode NodeType = iota
+	FullNode
+	SemiFullNode
 	NormalNode
-
-	UnsetNode
 )
 
 const DefaultNodeType = NormalNode
 
 // Map of node type back to their constant names for pretty printing.
 var ntStrings = map[NodeType]string{
-	FullNode:     "FullNode",
-	SemifullNode: "SemifullNode",
-	NormalNode:   "NormalNode",
 	UnsetNode:    "UnsetNode",
+	FullNode:     "FullNode",
+	SemiFullNode: "SemiFullNode",
+	NormalNode:   "NormalNode",
 }
 
 // String returns the NodeType in human-readable form.
@@ -64,27 +69,29 @@ func (n NodeType) String() string {
 	return res
 }
 
+func (n NodeType) IsUnsetNode() bool {
+	return n == UnsetNode
+}
+
 func (n NodeType) IsFullNode() bool {
 	return n == FullNode
 }
 
 func (n NodeType) IsSemifullNode() bool {
-	return n == SemifullNode
+	return n == SemiFullNode
 }
 
 func (n NodeType) IsNormalNode() bool {
 	return n == NormalNode
 }
 
-func (n NodeType) IsUnsetNode() bool {
-	return n == UnsetNode
-}
-
 // Map of service flags back to their constant names for pretty printing.
 var sfStrings = map[ServiceFlag]string{
-	SFNodeNetwork: "SFNodeNetwork",
-	SFNodeGetUTXO: "SFNodeGetUTXO",
-	SFNodeWitness: "SFNodeWitness",
+	SFNodeNetwork:  "SFNodeNetwork",
+	SFNodeGetUTXO:  "SFNodeGetUTXO",
+	SFNodeWitness:  "SFNodeWitness",
+	SFNodeTypeBit1: "SFNodeTypeBit1",
+	SFNodeTypeBit2: "SFNodeTypeBit1",
 }
 
 // orderedSFStrings is an ordered list of service flags from highest to
@@ -93,6 +100,8 @@ var orderedSFStrings = []ServiceFlag{
 	SFNodeNetwork,
 	SFNodeGetUTXO,
 	SFNodeWitness,
+	SFNodeTypeBit1,
+	SFNodeTypeBit2,
 }
 
 // String returns the ServiceFlag in human-readable form.

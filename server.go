@@ -491,7 +491,11 @@ func (sp *serverPeer) OnBlock(p *peer.Peer, msg *wire.MsgBlockAbe, buf []byte) {
 	block := abeutil.NewBlockFromBlockAndBytesAbe(msg, buf) // TODO(abe): the height of block is unknown
 
 	// Add the block to the known inventory for the peer.
-	iv := wire.NewInvVect(wire.InvTypeBlock, block.Hash())
+	inv := wire.InvTypeBlock
+	if block.MsgBlock().HasWitness() {
+		inv = wire.InvTypeWitnessBlock
+	}
+	iv := wire.NewInvVect(inv, block.Hash())
 	sp.AddKnownInventory(iv)
 
 	// Queue the block up to be handled by the block
@@ -587,7 +591,7 @@ func (sp *serverPeer) OnInv(p *peer.Peer, msg *wire.MsgInv) {
 	// so filter the inventory
 	newInv := wire.NewMsgInvSizeHint(uint(len(msg.InvList)))
 	for _, invVect := range msg.InvList {
-		if invVect.Type == wire.InvTypeTx {
+		if invVect.Type == wire.InvTypeTx || invVect.Type == wire.InvTypeWitnessTx {
 			peerLog.Tracef("Ignoring tx %v in inv from %v -- "+
 				"blocksonly enabled", invVect.Hash, sp)
 			//	BIP0037 is implemented.
@@ -715,13 +719,21 @@ func (sp *serverPeer) OnGetBlocks(_ *peer.Peer, msg *wire.MsgGetBlocks) {
 	//
 	// This mirrors the behavior in the reference implementation.
 	chain := sp.server.chain
-	hashList := chain.LocateBlocks(msg.BlockLocatorHashes, &msg.HashStop,
+	hashList, heights := chain.LocateBlocks(msg.BlockLocatorHashes, &msg.HashStop,
 		wire.MaxBlocksPerMsg) // from the start node to hash stop node or max blockhash
+	witnessServiceHeight := int32(0)
+	if sp.server.witnessManager.NodeType() != wire.FullNode {
+		witnessServiceHeight = sp.server.witnessManager.WitnessServiceHeight()
+	}
 
 	// Generate inventory message.
 	invMsg := wire.NewMsgInv()
 	for i := range hashList {
-		iv := wire.NewInvVect(wire.InvTypeBlock, &hashList[i])
+		inv := wire.InvTypeBlock
+		if heights[i] >= witnessServiceHeight {
+			inv = wire.InvTypeWitnessBlock
+		}
+		iv := wire.NewInvVect(inv, &hashList[i])
 		invMsg.AddInvVect(iv)
 	}
 
@@ -969,7 +981,7 @@ func (s *server) RemoveRebroadcastInventory(iv *wire.InvVect) {
 // passed transactions to all connected peers.
 func (s *server) relayTransactions(txns []*mempool.TxDescAbe) {
 	for _, txD := range txns {
-		iv := wire.NewInvVect(wire.InvTypeTx, txD.Tx.Hash())
+		iv := wire.NewInvVect(txD.Tx.InvType(), txD.Tx.Hash())
 		s.RelayInventory(iv, txD)
 	}
 }
@@ -1005,7 +1017,7 @@ func (s *server) TransactionConfirmed(tx *abeutil.TxAbe) {
 		return
 	}
 
-	iv := wire.NewInvVect(wire.InvTypeTx, tx.Hash())
+	iv := wire.NewInvVect(tx.InvType(), tx.Hash())
 	s.RemoveRebroadcastInventory(iv)
 }
 
@@ -1013,11 +1025,6 @@ func (s *server) TransactionConfirmed(tx *abeutil.TxAbe) {
 // connected peer.  An error is returned if the transaction hash is not known.
 func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
 	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
-
-	if encoding != wire.WitnessEncoding {
-		peerLog.Warnf("Unexpected type of transaction with hash %d is"+
-			"requested by peer %s", hash, sp.Peer)
-	}
 
 	var msg wire.Message
 	msgCacheKey := fmt.Sprintf("tx_%s_%d", hash, encoding)
@@ -1039,6 +1046,15 @@ func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<-
 			}
 			return err
 		}
+		if encoding == wire.WitnessEncoding && !tx.HasWitness() {
+			peerLog.Warnf("Transaction %v fetch successful but it do not has witness: %v", hash, err)
+
+			if doneChan != nil {
+				doneChan <- struct{}{}
+			}
+			return err
+		}
+
 		wrappedTxMsg := wire.WrapMessage(tx.MsgTx())
 		s.communicationCache.Store(msgCacheKey, wrappedTxMsg)
 		wrappedTxMsg.Use()
@@ -1250,8 +1266,8 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 	if sendInv { // if the sendInv is true, update the continueHash
 		best := sp.server.chain.BestSnapshot()
 		invMsg := wire.NewMsgInvSizeHint(1)
-		iv := wire.NewInvVect(wire.InvTypeBlock, &best.Hash) // best block hash
-		invMsg.AddInvVect(iv)                                //just contain a message
+		iv := wire.NewInvVect(wire.InvTypeWitnessBlock, &best.Hash) // best block hash
+		invMsg.AddInvVect(iv)                                       //just contain a message
 		sp.QueueMessage(invMsg, doneChan)
 		sp.continueHash = nil
 	}
@@ -1529,7 +1545,9 @@ func (s *server) handleRelayInvMsg(state *peerState, msg relayMsg) {
 		// If the inventory is a block and the peer prefers headers,
 		// generate and send a headers message instead of an inventory
 		// message.
-		if msg.invVect.Type == wire.InvTypeBlock && sp.WantsHeaders() {
+		if sp.WantsHeaders() && (msg.invVect.Type == wire.InvTypeBlock ||
+			msg.invVect.Type == wire.InvTypePrunedBlock ||
+			msg.invVect.Type == wire.InvTypeWitnessBlock) {
 			blockHeader, ok := msg.data.(wire.BlockHeader)
 			if !ok {
 				peerLog.Warnf("Underlying data for headers" +
@@ -1546,7 +1564,7 @@ func (s *server) handleRelayInvMsg(state *peerState, msg relayMsg) {
 			return
 		}
 
-		if msg.invVect.Type == wire.InvTypeTx {
+		if msg.invVect.Type == wire.InvTypeTx || msg.invVect.Type == wire.InvTypeWitnessTx {
 			// Don't relay the transaction to the peer when it has
 			// transaction relaying disabled.
 			if sp.relayTxDisabled() {
@@ -2416,7 +2434,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	db database.DB, chainParams *chaincfg.Params,
 	interrupt <-chan struct{}) (*server, error) {
 
-	services := defaultServices
+	services := cfg.serviceFlag
 
 	amgr := netaddrmgr.New(cfg.DataDir, abecLookup)
 

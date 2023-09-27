@@ -47,6 +47,13 @@ func (tx *TxAbe) MsgTx() *wire.MsgTxAbe {
 	return tx.msgTx
 }
 
+func (tx *TxAbe) InvType() wire.InvType {
+	if tx.msgTx != nil && tx.msgTx.HasWitness() {
+		return wire.InvTypeWitnessTx
+	}
+	return wire.InvTypeTx
+}
+
 func (tx *TxAbe) IsCoinBase() (bool, error) {
 	return tx.msgTx.IsCoinBase()
 }

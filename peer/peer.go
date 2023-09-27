@@ -533,7 +533,8 @@ func (p *Peer) UpdateAnnouncedHeight(newHeight int32) {
 	log.Tracef("Updating announced height of peer %v from %v to %v",
 		p.addr, p.announcedHeight, newHeight)
 	p.announcedHeight = newHeight
-	if p.witnessServiceHeight != 0 {
+	// update peer witness height
+	if p.IsNormalNode() {
 		if newHeight%witnessPruningInterval == 0 {
 			witnessKeptStartHeight := newHeight - int32(defaultMaxReservedWitness)
 			if witnessKeptStartHeight <= 0 {
@@ -652,6 +653,34 @@ func (p *Peer) Services() wire.ServiceFlag {
 	p.flagsMtx.Unlock()
 
 	return services
+}
+
+// IsFullNode report whether the node type of remote peer is
+// full node.
+//
+// This function is safe for concurrent access.
+func (p *Peer) IsFullNode() bool {
+	p.flagsMtx.Lock()
+	services := p.services
+	p.flagsMtx.Unlock()
+
+	return services&(wire.SFNodeTypeBit1|wire.SFNodeTypeBit2) == wire.SFNodeTypeBit1 ||
+		services&(wire.SFNodeTypeBit1|wire.SFNodeTypeBit2) == 0 // old version
+}
+
+func (p *Peer) IsSemiFullNode() bool {
+	p.flagsMtx.Lock()
+	services := p.services
+	p.flagsMtx.Unlock()
+
+	return services&(wire.SFNodeTypeBit1|wire.SFNodeTypeBit2) == wire.SFNodeTypeBit2
+}
+func (p *Peer) IsNormalNode() bool {
+	p.flagsMtx.Lock()
+	services := p.services
+	p.flagsMtx.Unlock()
+
+	return services&(wire.SFNodeTypeBit1|wire.SFNodeTypeBit2) == wire.SFNodeTypeBit1|wire.SFNodeTypeBit2
 }
 
 // UserAgent returns the user agent of the remote peer.
@@ -1751,7 +1780,8 @@ out:
 				// out immediately, sipping the inv trickle
 				// queue.
 				if iv.Type == wire.InvTypeBlock ||
-					iv.Type == wire.InvTypeWitnessBlock || iv.Type == wire.InvTypePrunedBlock {
+					iv.Type == wire.InvTypeWitnessBlock ||
+					iv.Type == wire.InvTypePrunedBlock {
 
 					invMsg := wire.NewMsgInvSizeHint(1)
 					invMsg.AddInvVect(iv)

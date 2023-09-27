@@ -293,7 +293,7 @@ func (sm *SyncManager) WitnessNeeded() bool {
 
 func (sm *SyncManager) MaybeSyncPeer(p *peerpkg.Peer) bool {
 	// If peer is a full node.
-	if p.Services()&wire.SFNodeWitness == wire.SFNodeWitness {
+	if p.IsFullNode() {
 		return true
 	}
 
@@ -463,8 +463,16 @@ func (sm *SyncManager) isSyncCandidate(peer *peerpkg.Peer) bool {
 		// The peer is not a candidate for sync if it's not a full
 		// node.
 		//  todo (abe): the condition may change after we modify the service flag
+		// the full node would fetch all witness, so the candidate must be a full node
+		if sm.nodeType == wire.FullNode && !peer.IsFullNode() {
+			return false
+		}
+		// the semi-full node/normal node can sync with a full node or a semi-full node
+		if sm.nodeType != wire.FullNode && sm.WitnessNeeded() && peer.IsNormalNode() {
+			return false
+		}
 		nodeServices := peer.Services()
-		if nodeServices&wire.SFNodeNetwork != wire.SFNodeNetwork {
+		if nodeServices&wire.SFNodeNetwork != wire.SFNodeNetwork || !peer.IsWitnessEnabled() {
 			return false
 		}
 	}
@@ -1521,8 +1529,7 @@ func (sm *SyncManager) fetchHeaderBlocks() {
 			// witness data in the blocks.
 			// todo(ABE): for ABE, even for WitnessEnabled peer, we may do not want receive the witness
 			//	todo(ABE): for blocks before checkpoint, we do not need to check the transactions' witness
-			witnessNeeded := sm.WitnessNeeded()
-			if witnessNeeded {
+			if sm.WitnessNeeded() {
 				iv.Type = wire.InvTypeWitnessBlock
 			}
 
@@ -1719,7 +1726,9 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 	lastBlock := -1
 	invVects := imsg.inv.InvList
 	for i := len(invVects) - 1; i >= 0; i-- {
-		if invVects[i].Type == wire.InvTypeBlock || invVects[i].Type == wire.InvTypePrunedBlock {
+		if invVects[i].Type == wire.InvTypeBlock ||
+			invVects[i].Type == wire.InvTypeWitnessBlock ||
+			invVects[i].Type == wire.InvTypePrunedBlock {
 			//	todo(ABE): for block-invMsg, for block, there is only InvTypeBlock? without InvTypeWitnessTx
 			lastBlock = i
 			break
@@ -1793,7 +1802,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 			continue
 		}
 		if !haveInv {
-			if iv.Type == wire.InvTypeTx {
+			if iv.Type == wire.InvTypeTx || iv.Type == wire.InvTypeWitnessTx {
 				// Skip the transaction if it has already been
 				// rejected.
 				if _, exists := sm.rejectedTxns[iv.Hash]; exists {
@@ -1814,7 +1823,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 			//	todo (ABE): (1) as an received reply for GetBlocks request
 			//	todo (ABE): (2) some miner announce its new found block candidate
 			//	todo (ABE): (3) in the pushBlockMsg of getData of the syning peer, the peer may send a invMsg with its latest block
-			if !peer.IsWitnessEnabled() && iv.Type == wire.InvTypeBlock {
+			if !peer.IsWitnessEnabled() && iv.Type == wire.InvTypeWitnessBlock {
 				continue
 			}
 
@@ -1824,7 +1833,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 			continue
 		}
 
-		if iv.Type == wire.InvTypeBlock {
+		if iv.Type == wire.InvTypeBlock || iv.Type == wire.InvTypeWitnessBlock {
 			// The block is an orphan block that we already have.
 			// When the existing orphan was processed, it requested
 			// the missing parent blocks.  When this scenario
@@ -1886,8 +1895,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 				limitAdd(sm.requestedBlocks, iv.Hash, maxRequestedBlocks)
 				limitAdd(state.requestedBlocks, iv.Hash, maxRequestedBlocks)
 
-				witnessNeeded := sm.WitnessNeeded()
-				if witnessNeeded {
+				if sm.WitnessNeeded() {
 					iv.Type = wire.InvTypeWitnessBlock
 				}
 
@@ -1914,8 +1922,11 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 				limitAdd(sm.requestedTxns, iv.Hash, maxRequestedTxns)
 				limitAdd(state.requestedTxns, iv.Hash, maxRequestedTxns)
 
-				// Any time transaction would be with witness in Abelian
-				iv.Type = wire.InvTypeWitnessTx
+				// If the peer is capable, request the txn
+				// including all witness data.
+				if peer.IsWitnessEnabled() {
+					iv.Type = wire.InvTypeWitnessTx
+				}
 
 				gdmsg.AddInvVect(iv)
 				numRequested++
@@ -2006,6 +2017,7 @@ out:
 						isOrphan: false,
 						err:      err,
 					}
+					continue
 				}
 
 				msg.reply <- processBlockResponse{

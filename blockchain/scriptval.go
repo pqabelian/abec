@@ -133,11 +133,6 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 	if witnessCache.Exists(*tx.Hash()) {
 		return nil
 	}
-	start := time.Now()
-	defer func() {
-		elapsed := time.Since(start)
-		log.Debugf("Tx(%d-in-%d-out) %v took %v to verify", len(tx.MsgTx().TxIns), len(tx.MsgTx().TxOuts), tx.Hash(), elapsed)
-	}()
 
 	isCB, err := tx.IsCoinBase()
 	if err != nil {

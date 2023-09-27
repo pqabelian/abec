@@ -300,6 +300,7 @@ func loadBlockDB() (database.DB, error) {
 		// If user does not specify node type for new node, we assume the node type is normal.
 		if cfg.nodeType == wire.UnsetNode {
 			cfg.nodeType = wire.NormalNode
+			cfg.serviceFlag = wire.SFNodeNetwork | wire.SFNodeWitness | wire.SFNodeTypeBit1 | wire.SFNodeTypeBit2
 		}
 		db, err = database.Create(cfg.DbType, dbPath, activeNetParams.Net, cfg.nodeType)
 		if err != nil {
