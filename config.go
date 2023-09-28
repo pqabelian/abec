@@ -72,7 +72,7 @@ const (
 	defaultTxIndex               = false
 	defaultAddrIndex             = false
 	defaultNodeType              = "unsetnode"
-	defaultMaxReservedWitness    = 1000 // change this value please also change peer.defaultMaxReservedWitness
+	defaultMaxReservedWitness    = peer.DefaultMaxReservedWitness
 	defaultAllowDiskCacheTx      = true
 	defaultCacheTxDirname        = "txcaches"
 	defaultCacheTxFilename       = "txcache.abe"
@@ -139,7 +139,6 @@ type config struct {
 	MaxPeers              int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
 	MiningAddrs           []string      `long:"miningaddr" description:"Add the specified payment address to the list of addresses to use for generated blocks -- At least one address is required if the generate or externalgenerate option is set"`
 	MinRelayTxFee         uint64        `long:"minrelaytxfee" description:"The minimum transaction fee in Neutrino/kB to be considered a non-zero fee."`
-	MaxReservedWitness    uint32        `long:"maxreservedwitness" description:"The maximum number of blocks witness that the node stores (default: 4000)"`
 	DisableBanning        bool          `long:"nobanning" description:"Disable banning of misbehaving peers"`
 	NoCFilters            bool          `long:"nocfilters" description:"Disable committed filtering (CF) support"`
 	DisableCheckpoints    bool          `long:"nocheckpoints" description:"Disable built-in checkpoints.  Don't do this unless you know what you're doing."`
@@ -203,6 +202,8 @@ type config struct {
 	// transaction cache in disk
 	AllowDiskCacheTx bool   `long:"allowdiskcachetx" description:"Allow use disk to cache transaction if necessary"`
 	CacheTxDir       string `long:"cachetxdir" description:"Directory to store cached transaction data when allow use disk to cache transaction if necessary"`
+
+	maxReservedWitness uint32 //  `long:"maxreservedwitness" description:"The maximum number of blocks witness that the node stores (default: 4000)"`
 }
 
 // serviceOptions defines the configuration options for the daemon as a service on
@@ -466,7 +467,7 @@ func loadConfig() (*config, []string, error) {
 		EthashConfig:         ethash.DefaultCfg,
 		TxIndex:              defaultTxIndex,
 		NodeType:             defaultNodeType,
-		MaxReservedWitness:   defaultMaxReservedWitness,
+		maxReservedWitness:   defaultMaxReservedWitness,
 		AllowDiskCacheTx:     defaultAllowDiskCacheTx,
 		CacheTxDir:           defaultCacheTxDir,
 	}

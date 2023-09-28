@@ -2649,9 +2649,17 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		return nil, err
 	}
 
+	witnessMgrMaxReservedWitness := cfg.maxReservedWitness
+	if os.Getenv("ABEC_MAX_RESERVED_WITNESS") != "" {
+		envWitnessMgrMaxReservedWitness, err := strconv.ParseInt(os.Getenv("ABEC_MAX_RESERVED_WITNESS"), 10, 32)
+		if err != nil {
+			panic(err)
+		}
+		witnessMgrMaxReservedWitness = uint32(envWitnessMgrMaxReservedWitness)
+	}
 	s.witnessManager, err = witnessmgr.New(&witnessmgr.Config{
 		NodeType:           cfg.nodeType,
-		MaxReservedWitness: cfg.MaxReservedWitness,
+		MaxReservedWitness: witnessMgrMaxReservedWitness,
 		Chain:              s.chain,
 	})
 	if err != nil {

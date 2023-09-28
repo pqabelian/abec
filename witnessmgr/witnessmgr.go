@@ -4,15 +4,14 @@ import (
 	"errors"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
+	"github.com/abesuite/abec/peer"
 	"github.com/abesuite/abec/wire"
 	"sync"
 )
 
-const (
-	// deleteInterval is the number of blocks between each delete operation.
-	// please keep it line with peer.witnessPruningInterval
-	deleteInterval = 10
-)
+// witnessPruningInterval is the number of blocks between each delete operation.
+// please keep it line with peer.witnessPruningInterval
+const witnessPruningInterval = peer.WitnessPruningInterval
 
 // Config is a configuration struct used to initialize a new WitnessManager.
 type Config struct {
@@ -80,7 +79,7 @@ func (wm *WitnessManager) handleBlockchainNotification(notification *blockchain.
 		}
 
 		currentHeight := block.Height()
-		if currentHeight%deleteInterval == 0 {
+		if currentHeight%witnessPruningInterval == 0 {
 			witnessKeptStartHeight := currentHeight - int32(wm.maxReservedWitness)
 			if witnessKeptStartHeight <= 0 {
 				return

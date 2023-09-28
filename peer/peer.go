@@ -65,6 +65,12 @@ const (
 	// stalling.  The deadlines are adjusted for callback running times and
 	// only checked on each stall tick interval.
 	stallResponseTimeout = 30 * time.Second
+
+	// WitnessPruningInterval is the value should be consistent with witnessmgr.deleteInterval
+	WitnessPruningInterval = 10
+
+	// DefaultMaxReservedWitness is the num of the normal node would reserved witness
+	DefaultMaxReservedWitness = 1000
 )
 
 var (
@@ -519,12 +525,6 @@ func (p *Peer) UpdateLastBlockHeight(newHeight int32) {
 	p.statsMtx.Unlock()
 }
 
-// the value should be consistent with witnessmgr.deleteInterval
-const witnessPruningInterval = 10
-
-// the value should be consistent with 	main.defaultMaxReservedWitness
-const defaultMaxReservedWitness = 1000
-
 // UpdateAnnouncedHeight updates the latest block
 // which peer announced it has.
 // This function is safe for concurrent access.
@@ -535,8 +535,8 @@ func (p *Peer) UpdateAnnouncedHeight(newHeight int32) {
 	p.announcedHeight = newHeight
 	// update peer witness height
 	if p.IsNormalNode() {
-		if newHeight%witnessPruningInterval == 0 {
-			witnessKeptStartHeight := newHeight - int32(defaultMaxReservedWitness)
+		if newHeight%WitnessPruningInterval == 0 {
+			witnessKeptStartHeight := newHeight - int32(DefaultMaxReservedWitness)
 			if witnessKeptStartHeight <= 0 {
 				return
 			}
