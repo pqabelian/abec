@@ -10,7 +10,8 @@ import (
 
 const (
 	// deleteInterval is the number of blocks between each delete operation.
-	deleteInterval = 100
+	// please keep it line with peer.witnessPruningInterval
+	deleteInterval = 10
 )
 
 // Config is a configuration struct used to initialize a new WitnessManager.

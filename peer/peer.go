@@ -520,10 +520,10 @@ func (p *Peer) UpdateLastBlockHeight(newHeight int32) {
 }
 
 // the value should be consistent with witnessmgr.deleteInterval
-const witnessPruningInterval = 100
+const witnessPruningInterval = 10
 
 // the value should be consistent with 	main.defaultMaxReservedWitness
-const defaultMaxReservedWitness = 4000
+const defaultMaxReservedWitness = 1000
 
 // UpdateAnnouncedHeight updates the latest block
 // which peer announced it has.

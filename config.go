@@ -72,7 +72,7 @@ const (
 	defaultTxIndex               = false
 	defaultAddrIndex             = false
 	defaultNodeType              = "unsetnode"
-	defaultMaxReservedWitness    = 4000
+	defaultMaxReservedWitness    = 1000 // change this value please also change peer.defaultMaxReservedWitness
 	defaultAllowDiskCacheTx      = true
 	defaultCacheTxDirname        = "txcaches"
 	defaultCacheTxFilename       = "txcache.abe"
