@@ -1051,8 +1051,11 @@ func (p *Peer) PushNeedSetMsg(blockHash chainhash.Hash, hashes []chainhash.Hash)
 			return nil, errors.New("peer disconnected")
 		case <-txTicker.C:
 			if response, ok := p.needsetResult.LoadAndDelete(blockHash); ok {
-				res := response.(*wire.MsgNeedSetResult)
-				return res.Txs, nil
+				if response != nil {
+					res := response.(*wire.MsgNeedSetResult)
+					return res.Txs, nil
+				}
+				return nil, errors.New("invalid transaction in response")
 			}
 		}
 	}

@@ -31,8 +31,12 @@ const (
 	statusValidateFailed
 
 	// statusInvalidAncestor indicates that one of the block's ancestors has
-	// has failed validation, thus the block is also invalid.
+	// failed validation, thus the block is also invalid.
 	statusInvalidAncestor
+
+	// statusWitnessMissing indicates that the block has not witness for
+	// validation.
+	statusWitnessMissing
 
 	// statusNone indicates that the block has no validation state flags set.
 	//
@@ -150,6 +154,7 @@ func (b *BlockChain) initBlockNode(node *blockNode, blockHeader *wire.BlockHeade
 // newBlockNode returns a new block node for the given block header and parent
 // node, calculating the height and workSum from the respective fields on the
 // parent. This function is NOT safe for concurrent access.
+//
 //	todo: (EthashPoW)
 func (b *BlockChain) newBlockNode(blockHeader *wire.BlockHeader, parent *blockNode) (*blockNode, error) {
 	var node blockNode

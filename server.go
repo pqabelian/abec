@@ -548,15 +548,14 @@ func (sp *serverPeer) OnNeedSet(_ *peer.Peer, msg *wire.MsgNeedSet, buf []byte) 
 }
 
 func (sp *serverPeer) OnNeedSetResult(p *peer.Peer, msg *wire.MsgNeedSetResult, buf []byte) {
-
-	state, exists := sp.server.syncManager.PeerStates()[p]
-	if !exists {
+	peerExist, reqExist := sp.server.syncManager.ExistRequestedNeedSetInPeerStates(p, msg.BlockHash)
+	if !peerExist {
 		peerLog.Warnf("Received pruned block message from unknown peer %s", p)
 		return
 	}
 
 	// If we didn't ask for this needset then the peer is misbehaving.
-	if _, exists = state.RequestedNeedSet()[msg.BlockHash]; !exists {
+	if !reqExist {
 		// Disconnect with the misbehaving peer
 		peerLog.Warnf("Got unrequested needset %v from %s -- "+
 			"disconnecting", msg.BlockHash, p.Addr())
@@ -564,9 +563,22 @@ func (sp *serverPeer) OnNeedSetResult(p *peer.Peer, msg *wire.MsgNeedSetResult, 
 		return
 	}
 
-	delete(state.RequestedNeedSet(), msg.BlockHash)
+	defer func() {
+		p.StoreNeedSetResult(msg)
+		sp.server.syncManager.RemoveRequestedNeedSetInPeerStates(p, msg.BlockHash)
+	}()
 
-	p.StoreNeedSetResult(msg)
+	// check witness in response
+	for i := 0; i < len(msg.Txs); i++ {
+		if !msg.Txs[i].HasWitness() {
+			peerLog.Warnf("Got needset %v from %s, but some transaction in response does not has witness -- "+
+				"disconnecting", msg.BlockHash, p.Addr())
+			p.Disconnect()
+			p.StoreNeedSetResult(nil)
+			return
+		}
+	}
+
 }
 
 // OnInv is invoked when a peer receives an inv message and is

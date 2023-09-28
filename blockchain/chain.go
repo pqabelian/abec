@@ -1434,11 +1434,15 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			// descendants as having an invalid ancestor.
 			err = b.checkConnectBlockAbe(n, block, view, nil)
 			if err != nil {
-				if _, ok := err.(RuleError); ok {
-					b.index.SetStatusFlags(n, statusValidateFailed)
-					for de := e.Next(); de != nil; de = de.Next() {
-						dn := de.Value.(*blockNode)
-						b.index.SetStatusFlags(dn, statusInvalidAncestor)
+				if ruleErr, ok := err.(RuleError); ok {
+					if ruleErr.ErrorCode == ErrWitnessMissing {
+						b.index.SetStatusFlags(n, statusWitnessMissing)
+					} else {
+						b.index.SetStatusFlags(n, statusValidateFailed)
+						for de := e.Next(); de != nil; de = de.Next() {
+							dn := de.Value.(*blockNode)
+							b.index.SetStatusFlags(dn, statusInvalidAncestor)
+						}
 					}
 				}
 				return err

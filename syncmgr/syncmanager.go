@@ -168,8 +168,12 @@ type peerSyncState struct {
 	requestedNeedSet map[chainhash.Hash]struct{}
 }
 
-func (p peerSyncState) RequestedNeedSet() map[chainhash.Hash]struct{} {
-	return p.requestedNeedSet
+func (p peerSyncState) ExistRequestedNeedSet(blockHash chainhash.Hash) bool {
+	_, ok := p.requestedNeedSet[blockHash]
+	return ok
+}
+func (p peerSyncState) RemoveRequestedNeedSet(blockHash chainhash.Hash) {
+	delete(p.requestedNeedSet, blockHash)
 }
 
 // limitAdd is a helper function for maps that require a maximum limit by
@@ -228,8 +232,20 @@ type SyncManager struct {
 	feeEstimator *mempool.FeeEstimator
 }
 
-func (sm *SyncManager) PeerStates() map[*peerpkg.Peer]*peerSyncState {
-	return sm.peerStates
+func (sm *SyncManager) ExistRequestedNeedSetInPeerStates(p *peerpkg.Peer, blockHash chainhash.Hash) (bool, bool) {
+	state, exist := sm.peerStates[p]
+	if !exist {
+		return false, false
+	}
+	_, ok := state.requestedNeedSet[blockHash]
+	return true, ok
+}
+
+func (sm *SyncManager) RemoveRequestedNeedSetInPeerStates(p *peerpkg.Peer, blockHash chainhash.Hash) {
+	if _, exist := sm.peerStates[p]; exist {
+		delete(sm.peerStates[p].requestedNeedSet, blockHash)
+	}
+	return
 }
 
 // resetHeaderState sets the headers-first mode state to values appropriate for
@@ -1261,7 +1277,6 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 		}
 		syncPeerState.requestedNeedSet[*blockHash] = struct{}{}
 		txs, err := peer.PushNeedSetMsg(*blockHash, needSet)
-
 		if txs == nil || err != nil {
 			log.Infof("Rejected block %v from %s: %v", blockHash,
 				peer, err)
