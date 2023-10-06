@@ -144,10 +144,6 @@ func (t *Tx) HasWitness() bool {
 }
 
 func (tx *TxAbe) HasWitness() bool {
-	if tx.txHasWitness != nil {
-		return *tx.txHasWitness
-	}
-
 	hasWitness := tx.msgTx.HasWitness()
 	tx.txHasWitness = &hasWitness
 	return hasWitness
