@@ -484,7 +484,7 @@ func (sm *SyncManager) isSyncCandidate(peer *peerpkg.Peer) bool {
 			return false
 		}
 		// the semi-full node/normal node can sync with a full node or a semi-full node
-		if sm.nodeType != wire.FullNode && sm.WitnessNeeded() && peer.IsNormalNode() {
+		if sm.nodeType != wire.FullNode && sm.WitnessNeeded() && !peer.IsNormalNode() {
 			return false
 		}
 		nodeServices := peer.Services()
