@@ -321,6 +321,7 @@ func loadBlockDB() (database.DB, error) {
 	// If user does not specify the node type, we use the node type fetched from the database.
 	if cfg.nodeType == wire.UnsetNode {
 		cfg.nodeType = nodeType
+		cfg.serviceFlag = wire.SFNodeNetwork | wire.SFNodeWitness | wire.SFNodeTypeBit1 | wire.SFNodeTypeBit2
 	}
 
 	// If the user specifies a node type that is conflict with the previous node type,
