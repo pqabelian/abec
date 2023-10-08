@@ -134,7 +134,7 @@ func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
 	var currentNum uint32 = minExistingWitnessFileNum
 	for _, num := range fileNumReserved {
 		var i uint32
-		for i = currentNum; i != num; i++ {
+		for i = currentNum; i < num; i++ {
 			fileNumPruned = append(fileNumPruned, i)
 		}
 		currentNum = i + 1
