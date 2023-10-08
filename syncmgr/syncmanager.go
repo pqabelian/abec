@@ -479,14 +479,14 @@ func (sm *SyncManager) isSyncCandidate(peer *peerpkg.Peer) bool {
 		// The peer is not a candidate for sync if it's not a full
 		// node.
 		//  todo (abe): the condition may change after we modify the service flag
-		// the full node would fetch all witness, so the candidate must be a full node
-		if sm.nodeType == wire.FullNode && !peer.IsFullNode() {
-			return false
-		}
-		// the semi-full node/normal node can sync with a full node or a semi-full node
-		if sm.nodeType != wire.FullNode && sm.WitnessNeeded() && !peer.IsNormalNode() {
-			return false
-		}
+		//// the full node would fetch all witness, so the candidate must be a full node
+		//if sm.nodeType == wire.FullNode && !peer.IsFullNode() {
+		//	return false
+		//}
+		//// the semi-full node/normal node can sync with a full node or a semi-full node
+		//if sm.nodeType != wire.FullNode && sm.WitnessNeeded() && !peer.IsNormalNode() {
+		//	return false
+		//}
 		nodeServices := peer.Services()
 		if nodeServices&wire.SFNodeNetwork != wire.SFNodeNetwork || !peer.IsWitnessEnabled() {
 			return false
