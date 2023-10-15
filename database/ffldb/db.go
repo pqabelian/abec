@@ -1639,6 +1639,14 @@ func (tx *transaction) DeleteWitnessFiles(fileNum []uint32) ([]string, error) {
 	res := make([]string, 0)
 	for _, num := range fileNum {
 		filePath := witnessFilePath(tx.db.store.basePath, num)
+		tx.db.store.obfWitnessMutex.Lock()
+		if file, ok := tx.db.store.openWitnessFiles[num]; ok {
+			file.file.Close()
+			tx.db.store.lruWitnessMutex.Lock()
+			tx.db.store.openWitnessLRU.Remove(tx.db.store.fileNumToLRUElemWitness[num])
+			tx.db.store.lruWitnessMutex.Unlock()
+		}
+		tx.db.store.obfWitnessMutex.Unlock()
 		fileState, err := os.Stat(filePath)
 		if err != nil {
 			log.Infof("Fail to delete %v: %v", filePath, err)
