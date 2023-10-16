@@ -358,6 +358,7 @@ func loadBlockDB() (database.DB, error) {
 		return nil, err
 	}
 	abecLog.Infof("Witness service height: %v", witnessServiceHeight)
+	cfg.witnessServiceHeight = int32(witnessServiceHeight)
 
 	abecLog.Info("Block database loaded")
 	return db, nil

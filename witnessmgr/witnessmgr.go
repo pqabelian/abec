@@ -15,9 +15,10 @@ const witnessPruningInterval = peer.WitnessPruningInterval
 
 // Config is a configuration struct used to initialize a new WitnessManager.
 type Config struct {
-	NodeType           wire.NodeType
-	MaxReservedWitness uint32
-	Chain              *blockchain.BlockChain
+	NodeType             wire.NodeType
+	MaxReservedWitness   uint32
+	Chain                *blockchain.BlockChain
+	WitnessServiceHeight int32
 }
 
 // WitnessManager is used to control the storage of witness.
@@ -34,9 +35,10 @@ type WitnessManager struct {
 // New constructs a new WitnessManager.
 func New(config *Config) (*WitnessManager, error) {
 	wm := WitnessManager{
-		nodeType:           config.NodeType,
-		maxReservedWitness: config.MaxReservedWitness,
-		chain:              config.Chain,
+		nodeType:             config.NodeType,
+		maxReservedWitness:   config.MaxReservedWitness,
+		chain:                config.Chain,
+		witnessServiceHeight: config.WitnessServiceHeight,
 	}
 
 	if wm.nodeType == wire.NormalNode {
@@ -186,6 +188,7 @@ func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
 	if err != nil {
 		return err
 	}
+	log.Infof("Updating witness service height from %d to %d", wm.witnessServiceHeight, height)
 	wm.witnessServiceHeight = height
 
 	// Prune witness files, this may take a while.

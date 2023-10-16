@@ -2658,9 +2658,10 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		witnessMgrMaxReservedWitness = uint32(envWitnessMgrMaxReservedWitness)
 	}
 	s.witnessManager, err = witnessmgr.New(&witnessmgr.Config{
-		NodeType:           cfg.nodeType,
-		MaxReservedWitness: witnessMgrMaxReservedWitness,
-		Chain:              s.chain,
+		NodeType:             cfg.nodeType,
+		MaxReservedWitness:   witnessMgrMaxReservedWitness,
+		Chain:                s.chain,
+		WitnessServiceHeight: cfg.witnessServiceHeight,
 	})
 	if err != nil {
 		return nil, err

@@ -193,11 +193,12 @@ type config struct {
 	// todo: (ethmining) miningAddr vs. the above MiningAddr, need to clarify
 	miningAddrs []abeutil.AbelAddress
 	//miningAddrBytes []byte
-	minRelayTxFee abeutil.Amount
-	nodeType      wire.NodeType
-	serviceFlag   wire.ServiceFlag
-	whitelists    []*net.IPNet
-	WorkingDir    string `long:"workingdir" description:"Working directory"`
+	minRelayTxFee        abeutil.Amount
+	nodeType             wire.NodeType
+	witnessServiceHeight int32
+	serviceFlag          wire.ServiceFlag
+	whitelists           []*net.IPNet
+	WorkingDir           string `long:"workingdir" description:"Working directory"`
 
 	// transaction cache in disk
 	AllowDiskCacheTx bool   `long:"allowdiskcachetx" description:"Allow use disk to cache transaction if necessary"`
