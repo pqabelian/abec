@@ -6,6 +6,8 @@ import (
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/database"
+	_ "github.com/abesuite/abec/database/ffldb"
+	"github.com/abesuite/abec/wire"
 	"os"
 	"path/filepath"
 )
@@ -22,7 +24,7 @@ func loadBlockDB() (database.DB, error) {
 	dbName := blockDbNamePrefix + "_" + cfg.DbType
 	dbPath := filepath.Join(cfg.DataDir, dbName)
 	fmt.Printf("Loading block database from '%s'\n", dbPath)
-	db, err := database.Open(cfg.DbType, dbPath, activeNetParams.Net)
+	db, err := database.Open(cfg.DbType, dbPath, activeNetParams.Net, wire.UnsetNode)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +38,7 @@ func loadBlockDB() (database.DB, error) {
 // checkpoints.
 func findCandidates(chain *blockchain.BlockChain, latestHash *chainhash.Hash) ([]*chaincfg.Checkpoint, error) {
 	// Start with the latest block of the main chain.
-	block, err := chain.BlockByHash(latestHash)
+	block, err := chain.BlockByHashAbe(latestHash)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +89,7 @@ func findCandidates(chain *blockchain.BlockChain, latestHash *chainhash.Hash) ([
 		}
 
 		// Determine if this block is a checkpoint candidate.
-		isCandidate, err := chain.IsCheckpointCandidate(block)
+		isCandidate, err := chain.IsCheckpointCandidateAbe(block)
 		if err != nil {
 			return nil, err
 		}
@@ -103,7 +105,7 @@ func findCandidates(chain *blockchain.BlockChain, latestHash *chainhash.Hash) ([
 		}
 
 		prevHash := &block.MsgBlock().Header.PrevBlock
-		block, err = chain.BlockByHash(prevHash)
+		block, err = chain.BlockByHashAbe(prevHash)
 		if err != nil {
 			return nil, err
 		}

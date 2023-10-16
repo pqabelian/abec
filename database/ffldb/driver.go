@@ -17,7 +17,7 @@ const (
 func parseArgs(funcName string, args ...interface{}) (string, wire.AbelianNet, wire.NodeType, error) {
 	if len(args) != 3 {
 		return "", 0, 0, fmt.Errorf("invalid arguments to %s.%s -- "+
-			"expected database path and block network", dbType,
+			"expected database path, block network and default node type", dbType,
 			funcName)
 	}
 
