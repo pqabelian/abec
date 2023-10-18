@@ -540,7 +540,7 @@ func (p *Peer) UpdateAnnouncedHeight(newHeight int32) {
 			if witnessKeptStartHeight <= 0 {
 				return
 			}
-			log.Infof("Start pruning witness data before height %v, please do not shut down abec", witnessKeptStartHeight)
+			log.Infof("updating witness service height %d for peer %s", witnessKeptStartHeight, p)
 			p.witnessServiceHeight = uint32(witnessKeptStartHeight)
 		}
 	}
