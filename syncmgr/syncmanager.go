@@ -479,14 +479,32 @@ func (sm *SyncManager) isSyncCandidate(peer *peerpkg.Peer) bool {
 		// The peer is not a candidate for sync if it's not a full
 		// node.
 		//  todo (abe): the condition may change after we modify the service flag
-		//// the full node would fetch all witness, so the candidate must be a full node
-		//if sm.nodeType == wire.FullNode && !peer.IsFullNode() {
-		//	return false
-		//}
-		//// the semi-full node/normal node can sync with a full node or a semi-full node
-		//if sm.nodeType != wire.FullNode && sm.WitnessNeeded() && !peer.IsNormalNode() {
-		//	return false
-		//}
+
+		// the full node would fetch all witness, so the candidate must be a full node or semi-full node depend on last checkpoint
+		// the semi-full node would fetch witness after last checkpoint, the full node or semi-full node would be candidate
+		// the normal node would choose any node as a candidate
+		if sm.nodeType == wire.FullNode {
+			// when the full node has next checkpoint need witness for all block, so the peer muse be full node
+			// after last checkpoint, the semi-full node also would be candidate
+			if sm.nextCheckpoint != nil {
+				if !peer.IsFullNode() {
+					return false
+				}
+			} else {
+				if peer.IsNormalNode() {
+					return false
+				}
+			}
+		} else if sm.nodeType == wire.SemiFullNode {
+			if sm.nextCheckpoint == nil {
+				if peer.IsNormalNode() {
+					return false
+				}
+			}
+		} else if sm.nodeType == wire.NormalNode {
+			// any node type is OK
+		}
+
 		nodeServices := peer.Services()
 		if nodeServices&wire.SFNodeNetwork != wire.SFNodeNetwork || !peer.IsWitnessEnabled() {
 			return false
