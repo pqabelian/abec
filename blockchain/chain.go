@@ -1660,7 +1660,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 		view := NewUtxoRingViewpoint()
 		view.SetBestHash(parentHash)
 		stxos := make([]*SpentTxOutAbe, 0, countSpentOutputsAbe(block))
-		if !fastAdd {
+		if !fastAdd || b.nodeType == wire.FullNode {
 			err := b.checkConnectBlockAbe(node, block, view, &stxos)
 			if err == nil {
 				b.index.SetStatusFlags(node, statusValid)
