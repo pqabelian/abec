@@ -537,11 +537,10 @@ func (p *Peer) UpdateAnnouncedHeight(newHeight int32) {
 	if p.IsNormalNode() {
 		if newHeight%WitnessPruningInterval == 0 {
 			witnessKeptStartHeight := newHeight - int32(DefaultMaxReservedWitness)
-			if witnessKeptStartHeight <= 0 {
-				return
+			if witnessKeptStartHeight >= 0 {
+				log.Infof("updating witness service height %d for peer %s", witnessKeptStartHeight, p)
+				p.witnessServiceHeight = uint32(witnessKeptStartHeight)
 			}
-			log.Infof("updating witness service height %d for peer %s", witnessKeptStartHeight, p)
-			p.witnessServiceHeight = uint32(witnessKeptStartHeight)
 		}
 	}
 	p.statsMtx.Unlock()
