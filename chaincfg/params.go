@@ -261,6 +261,12 @@ var MainNetParams = Params{
 	// Checkpoints ordered from oldest to newest.
 	// example: {1000, newHashFromStr("0000000069e244f73d78e8fd29ba2fd2ed618bd6fa2ee92559f542fdb26e7c1d")}, {...}
 	Checkpoints: []Checkpoint{
+		{40000, newHashFromStr("0000000013c7a5d5ef76c11ae4775015620b3784590bdda12daf4ddd063b2c58")},
+		{56000, newHashFromStr("26dc7b66d85d0b6336a1533b36590f6cc082f0ab1469a772e973159ce78456f6")},
+		{80000, newHashFromStr("88334753bb1b4e53485ee3b48327067139ddb053178c0e1192046d4ee0ef4d8e")},
+		{120000, newHashFromStr("fcc3966855fd3ea61d42e47be934e9f8c55607ad5b7cf2f0629516b012482bda")},
+		{160000, newHashFromStr("cfe129e8b9427eed69c78b632f1f53a26b0c2f0bbe38c8b849a9a799dc474e1b")},
+		{196000, newHashFromStr("b504a4b4fb7e2141f493885d40e5742db7eab8359b6dfc9569dc5be58c020da4")},
 		//{1000, newHashFromStr("000000011df044f2bad56bd71f57fc88b90ece744a4b78ddb3acfc1b56d6296d")},
 		//{2000, newHashFromStr("00000000704427e76270a1bbef9d37551a4b529bb77896c5717ccbcd5db725e3")},
 		//{5000, newHashFromStr("000000000305fe80e8d4e66be87ae0023d2dea32d6d27678fbf00a2ad16995d6")},
