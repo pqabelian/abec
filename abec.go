@@ -327,12 +327,14 @@ func loadBlockDB() (database.DB, error) {
 	// If the user specifies a node type that is conflict with the previous node type,
 	// let them confirm this change.
 	if cfg.nodeType != nodeType {
-		fmt.Printf("Your current node type is %s, but specified node type is %s, do you want to continue"+
-			" (Y/N)? ", nodeType.String(), cfg.nodeType.String())
-		op := "N"
-		fmt.Scanln(&op)
-		if strings.TrimSpace(strings.ToLower(op)) != "y" && strings.TrimSpace(strings.ToLower(op)) != "yes" {
-			os.Exit(0)
+		if os.Getenv("ABEC_DO_NOT_ASK_FOR_NODE_TYPE_CHANGE") != "true" {
+			fmt.Printf("Your current node type is %s, but specified node type is %s, do you want to continue"+
+				" (Y/N)? ", nodeType.String(), cfg.nodeType.String())
+			op := "N"
+			fmt.Scanln(&op)
+			if strings.TrimSpace(strings.ToLower(op)) != "y" && strings.TrimSpace(strings.ToLower(op)) != "yes" {
+				os.Exit(0)
+			}
 		}
 	}
 
