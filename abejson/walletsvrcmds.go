@@ -541,6 +541,18 @@ func NewListUnspentAbeCmd(min *float64, max *float64) *ListUnspentAbeCmd {
 	}
 }
 
+type RangeSpendableUTXOAbeCmd struct {
+	Min *float64 `jsonrpcdefault:"0"`
+	Max *float64 `jsonrpcdefault:"0"`
+}
+
+func NewRangeUTXOAbeCmd(min *float64, max *float64) *RangeSpendableUTXOAbeCmd {
+	return &RangeSpendableUTXOAbeCmd{
+		Min: min,
+		Max: max,
+	}
+}
+
 type ListUnspentCoinbaseAbeCmd struct {
 	HeightStart  *int64
 	HeightEnd    *int64
@@ -956,6 +968,9 @@ func init() {
 	MustRegisterCmd("listmaturecoinbasetxoabe", (*ListUnspentCoinbaseAbeCmd)(nil), flags)
 	MustRegisterCmd("listunconfirmedtxoabe", (*ListSpentButUnminedAbeCmd)(nil), flags)
 	MustRegisterCmd("listconfirmedtxoabe", (*ListSpentAndMinedAbeCmd)(nil), flags)
+
+	MustRegisterCmd("rangespendableutxo", (*RangeSpendableUTXOAbeCmd)(nil), flags)
+
 	MustRegisterCmd("listconfirmedtxs", (*ListConfirmedTxsCmd)(nil), flags)
 	MustRegisterCmd("listunconfirmedtxs", (*ListUnconfirmedTxsCmd)(nil), flags)
 	MustRegisterCmd("listinvalidtxs", (*ListInvalidTxsCmd)(nil), flags)
