@@ -81,11 +81,12 @@ func (m *WrappedMessage) Cache(pver uint32, encoding MessageEncoding) {
 	m.cached = true
 }
 
-func WrapMessage(msg Message) *WrappedMessage {
+func WrapMessage(msg Message, encoding MessageEncoding) *WrappedMessage {
 	return &WrappedMessage{
-		Message: msg,
-		mu:      sync.RWMutex{},
-		counter: 0,
+		Message:  msg,
+		encoding: encoding,
+		mu:       sync.RWMutex{},
+		counter:  0,
 	}
 }
 func WrapMsgKey(msg Message, encoding MessageEncoding) string {

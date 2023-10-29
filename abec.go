@@ -127,22 +127,26 @@ func abecMain(serverChan chan<- *server) error {
 	if err != nil {
 		abecLog.Warnf("fail to acquire system info %v, use the default memory configuration", err)
 	} else {
-		if v.Total >= 32*1024*1024*1024 {
+		if v.Total >= 32*1024*1024*1024 { // 32G
 			blockchain.MaxOrphanBlocks = 160
 			mempool.MaxTransactionInMemoryNum = 1600
-		} else if v.Total >= 16*1024*1024*1024 {
+		} else if v.Total >= 16*1024*1024*1024 { // 16G
 			blockchain.MaxOrphanBlocks = 80
 			mempool.MaxTransactionInMemoryNum = 800
-		} else if v.Total >= 8*1024*1024*1024 {
+		} else if v.Total >= 8*1024*1024*1024 { // 8G
 			blockchain.MaxOrphanBlocks = 40
 			mempool.MaxTransactionInMemoryNum = 400
-		} else if v.Total >= 4*1024*1024*1024 {
+		} else if v.Total >= 4*1024*1024*1024 { // 4G
 			blockchain.MaxOrphanBlocks = 20
 			mempool.MaxTransactionInMemoryNum = 200
 		} else {
 			blockchain.MaxOrphanBlocks = 10
 			mempool.MaxTransactionInMemoryNum = 100
 		}
+		abecLog.Infof("Choose maxOrphanBlock %d and maxTransactionInMemory %d the depend on queried total RAM on this system %dGB",
+			blockchain.MaxOrphanBlocks,
+			mempool.MaxTransactionInMemoryNum,
+			v.Total/1024/1024/1024)
 	}
 
 	// Create P2P server and start it.

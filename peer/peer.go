@@ -1164,6 +1164,7 @@ func (p *Peer) writeMessage(msg wire.Message, enc wire.MessageEncoding) error {
 			wrappedMsg.Done()
 			if wrappedMsg.CanDelete() {
 				p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message, enc))
+				log.Debugf("Delete wrapped message with key %s", wire.WrapMsgKey(wrappedMsg.Message, enc))
 			}
 		}
 	}()
@@ -1850,6 +1851,7 @@ out:
 			wrappedMsg.Done()
 			if wrappedMsg.CanDelete() {
 				p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message, wrappedMsg.Encoding()))
+				log.Debugf("Delete wrapped message with key %s", wire.WrapMsgKey(wrappedMsg.Message, wrappedMsg.Encoding()))
 			}
 		}
 	}
@@ -1864,6 +1866,7 @@ cleanup:
 				wrappedMsg.Done()
 				if wrappedMsg.CanDelete() {
 					p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message, wrappedMsg.Encoding()))
+					log.Debugf("Delete wrapped message with key %s", wire.WrapMsgKey(wrappedMsg.Message, wrappedMsg.Encoding()))
 				}
 			}
 		case <-p.outputInvChan:
@@ -1986,6 +1989,7 @@ cleanup:
 				wrappedMsg.Done()
 				if wrappedMsg.CanDelete() {
 					p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message, wrappedMsg.Encoding()))
+					log.Debugf("Delete wrapped message with key %s", wire.WrapMsgKey(wrappedMsg.Message, wrappedMsg.Encoding()))
 				}
 			}
 			// no need to send on sendDoneQueue since queueHandler
@@ -2049,6 +2053,7 @@ func (p *Peer) QueueMessageWithEncoding(msg wire.Message, doneChan chan<- struct
 			wrappedMsg.Done()
 			if wrappedMsg.CanDelete() {
 				p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message, wrappedMsg.Encoding()))
+				log.Debugf("Delete wrapped message with key %s", wire.WrapMsgKey(wrappedMsg.Message, wrappedMsg.Encoding()))
 			}
 		}
 		return

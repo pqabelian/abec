@@ -26,6 +26,7 @@ import (
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
 	"github.com/abesuite/abec/witnessmgr"
+	"github.com/shirou/gopsutil/v3/process"
 	"math"
 	"net"
 	"os"
@@ -1067,7 +1068,7 @@ func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<-
 			return err
 		}
 
-		wrappedTxMsg := wire.WrapMessage(tx.MsgTx())
+		wrappedTxMsg := wire.WrapMessage(tx.MsgTx(), encoding)
 		s.communicationCache.Store(msgCacheKey, wrappedTxMsg)
 		wrappedTxMsg.Use()
 		msg = wrappedTxMsg
@@ -1244,7 +1245,7 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 			return errors.New("witness block not found")
 		}
 
-		wrappedBlockMsg := wire.WrapMessage(&msgBlock)
+		wrappedBlockMsg := wire.WrapMessage(&msgBlock, encoding)
 		s.communicationCache.Store(msgCacheKey, wrappedBlockMsg)
 		wrappedBlockMsg.Use()
 		msg = wrappedBlockMsg
@@ -2184,6 +2185,9 @@ func (s *server) Start() {
 	if cfg.ExternalGenerate {
 		s.externalMiner.Start()
 	}
+
+	s.wg.Add(1)
+	go s.memUsage()
 }
 
 // Stop gracefully shuts down the server by stopping and disconnecting all
@@ -2365,6 +2369,23 @@ out:
 	}
 
 	s.wg.Done()
+}
+
+func (s *server) memUsage() {
+	defer s.wg.Done()
+	ticker := time.NewTicker(3 * time.Minute)
+	defer ticker.Stop()
+out:
+	for {
+		select {
+		case <-ticker.C:
+			p, _ := process.NewProcess(int32(os.Getpid()))
+			memoryInfo, _ := p.MemoryInfo()
+			srvrLog.Infof("Memory usage:rss %.2fG vms %.2fG", float64(memoryInfo.RSS)/1024/1024/1024, float64(memoryInfo.VMS)/1024/1024/1024)
+		case <-s.quit:
+			break out
+		}
+	}
 }
 
 // setupRPCListeners returns a slice of listeners that are configured for use
