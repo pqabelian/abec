@@ -506,7 +506,7 @@ func (sm *SyncManager) handleNewPeerMsg(peer *peerpkg.Peer) {
 		return
 	}
 
-	log.Infof("New valid peer %s (%s)", peer, peer.UserAgent())
+	log.Infof("New valid peer %s (%s) with height %d", peer, peer.UserAgent(), peer.StartingHeight())
 
 	// Initialize the peer state
 	isSyncCandidate := sm.isSyncCandidate(peer)
