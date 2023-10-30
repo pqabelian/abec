@@ -542,11 +542,11 @@ func NewListUnspentAbeCmd(min *float64, max *float64) *ListUnspentAbeCmd {
 }
 
 type RangeSpendableUTXOAbeCmd struct {
-	Min *float64 `jsonrpcdefault:"0"`
-	Max *float64 `jsonrpcdefault:"0"`
+	Min *uint64 `jsonrpcdefault:"0"`
+	Max *uint64 `jsonrpcdefault:"0"`
 }
 
-func NewRangeUTXOAbeCmd(min *float64, max *float64) *RangeSpendableUTXOAbeCmd {
+func NewRangeUTXOAbeCmd(min *uint64, max *uint64) *RangeSpendableUTXOAbeCmd {
 	return &RangeSpendableUTXOAbeCmd{
 		Min: min,
 		Max: max,
