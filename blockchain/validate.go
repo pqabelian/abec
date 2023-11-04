@@ -1002,6 +1002,7 @@ func checkSerializedHeight(coinbaseTx *abeutil.Tx, wantHeight int32) error {
 }
 
 func checkSerializedHeightAbe(coinbaseTx *abeutil.TxAbe, wantHeight int32) error {
+	log.Debugf("Check the height in coinbase transaction with the block height %d", wantHeight)
 	serializedHeight, err := ExtractCoinbaseHeightAbe(coinbaseTx)
 	if err != nil {
 		return err
