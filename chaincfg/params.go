@@ -31,7 +31,7 @@ var (
 	// testNet3PowLimit is the highest proof of work value a block
 	// can have for the test network (version 3).  It is the value
 	// 2^224 - 1.
-	testNet3PowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 233), bigOne)
+	testNet3PowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 255), bigOne)
 
 	// simNetPowLimit is the highest proof of work value a block
 	// can have for the simulation test network.  It is the value 2^255 - 1.
@@ -219,9 +219,6 @@ type Params struct {
 
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength int32
-
-	// fake pow for simnet
-	FakePoW bool
 }
 
 // MainNetParams defines the network parameters for the main network.
@@ -413,16 +410,15 @@ var TestNet3Params = Params{
 	GenesisBlock:             &testNet3GenesisBlock,
 	GenesisHash:              &testNet3GenesisHash,
 	PowLimit:                 testNet3PowLimit,
-	PowLimitBits:             0x1e01ffff,
-	CoinbaseMaturity:         6,
+	PowLimitBits:             0x207fffff,
+	CoinbaseMaturity:         200,
 	SubsidyReductionInterval: 400_000,
-	TargetTimespan:           time.Second * 256 * 4000,
-	TargetTimePerBlock:       time.Second * 256,
-	RetargetAdjustmentFactor: 4, // 25% less, 400% more
-	ReduceMinDifficulty:      true,
-	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
-	GenerateSupported:        false,
-
+	TargetTimespan:           time.Second * 256 * 4000, // 14 days TODO(abe):this value may be need changed
+	TargetTimePerBlock:       time.Second * 256,        // 10 minutes TODO(abe): this value may be need changed, now temporary to be 3 min
+	RetargetAdjustmentFactor: 4,                        // 25% less, 400% more
+	ReduceMinDifficulty:      true,                     // TODO(abe): this config may be used for adjust the difficult automatic?
+	MinDiffReductionTime:     time.Minute * 20,
+	GenerateSupported:        true,
 	// Checkpoints ordered from oldest to newest.
 	// example: {1000, newHashFromStr("0000000069e244f73d78e8fd29ba2fd2ed618bd6fa2ee92559f542fdb26e7c1d")}, {...}
 	Checkpoints: []Checkpoint{},
@@ -431,9 +427,11 @@ var TestNet3Params = Params{
 	//
 	// The miner confirmation window is defined as:
 	//   target proof of work timespan / target proof of work spacing
-	RuleChangeActivationThreshold: 1512, // 75% of MinerConfirmationWindow
-	MinerConfirmationWindow:       2016,
-	Deployments:                   [DefinedDeployments]ConsensusDeployment{
+	RuleChangeActivationThreshold: 3800, // 95% of MinerConfirmationWindow
+	//		todo: 20220324
+	MinerConfirmationWindow: 4000, //
+	// TODO(20220409): clear the deployment information
+	Deployments: [DefinedDeployments]ConsensusDeployment{
 		//DeploymentTestDummy: {
 		//	BitNumber:  28,
 		//	StartTime:  1199145601, // January 1, 2008 UTC
@@ -467,9 +465,9 @@ var TestNet3Params = Params{
 
 	// BlockHeightEthashPoW
 	// BlockHeightEthashPoW specifies the block height from which Ethash-PoW mining is applied.
-	BlockHeightEthashPoW: 300,
+	BlockHeightEthashPoW: 56000,
 	// EthashEpochLength specifies the epoch length of EthashPoW.
-	EthashEpochLength: 200,
+	EthashEpochLength: 4000,
 }
 
 // SimNetParams defines the network parameters for the simulation test

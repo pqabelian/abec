@@ -15,6 +15,7 @@ import (
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 )
@@ -93,6 +94,14 @@ func newBestState(node *blockNode, blockSize, blockWeight, numTxns,
 	}
 }
 
+// FakePoWHeightScope specify the height would skip PoW in range.
+//
+// To verify block in some height again, this param would be kept by database.
+type BlockHeightScope struct {
+	StartHeight int32
+	EndHeight   int32
+}
+
 // BlockChain provides functions for working with the bitcoin block chain.
 // It includes functionality such as rejecting duplicate blocks, ensuring blocks
 // follow all rules, orphan handling, checkpoint handling, and best chain
@@ -104,13 +113,18 @@ type BlockChain struct {
 	nodeType            wire.NodeType
 	checkpoints         []chaincfg.Checkpoint
 	checkpointsByHeight map[int32]*chaincfg.Checkpoint // initialized by checkpoints
-	db                  database.DB
-	chainParams         *chaincfg.Params
-	timeSource          MedianTimeSource // modified when communicating with peers
-	sigCache            *txscript.SigCache
-	witnessCache        *txscript.WitnessCache
-	indexManager        IndexManager
-	hashCache           *txscript.HashCache
+
+	// FakePoWHeightScopes keeps the fake pow in height range
+	// which would ONLY set by non-mainnet
+	fakePoWHeightScopes []BlockHeightScope
+
+	db           database.DB
+	chainParams  *chaincfg.Params
+	timeSource   MedianTimeSource // modified when communicating with peers
+	sigCache     *txscript.SigCache
+	witnessCache *txscript.WitnessCache
+	indexManager IndexManager
+	hashCache    *txscript.HashCache
 
 	// The following fields are calculated based upon the provided chain
 	// parameters.  They are also set when the instance is created and
@@ -197,6 +211,10 @@ type BlockChain struct {
 	// certain blockchain events.
 	notificationsLock sync.RWMutex
 	notifications     []NotificationCallback
+}
+
+func (b *BlockChain) FakePoWHeightScopes() []BlockHeightScope {
+	return b.fakePoWHeightScopes
 }
 
 // HaveBlock returns whether or not the chain instance has the block represented
@@ -2255,6 +2273,13 @@ type Config struct {
 	// checkpoints.
 	Checkpoints []chaincfg.Checkpoint
 
+	// FakePowHeightScopes hold caller-defined fake pow height scope that should be added to
+	// ChainParams and database.
+	//
+	// This field can be nil if the caller does not wish to specify any
+	// fake pow height scope.
+	FakePowHeightScopes []BlockHeightScope
+
 	// TimeSource defines the median time source to use for things such as
 	// block processing and determining whether or not the chain is current.
 	//
@@ -2335,6 +2360,7 @@ func New(config *Config) (*BlockChain, error) {
 		nodeType:            config.NodeType,
 		checkpoints:         config.Checkpoints,
 		checkpointsByHeight: checkpointsByHeight,
+		fakePoWHeightScopes: config.FakePowHeightScopes,
 		db:                  config.DB,
 		chainParams:         params,
 		timeSource:          config.TimeSource,
@@ -2360,6 +2386,15 @@ func New(config *Config) (*BlockChain, error) {
 	// will be initialized to contain only the genesis block.
 	if err := b.initChainState(); err != nil {
 		return nil, err
+	}
+
+	if len(b.fakePoWHeightScopes) != 0 {
+		heightRanges := make([]string, len(b.fakePoWHeightScopes))
+		for i := 0; i < len(b.fakePoWHeightScopes); i++ {
+			heightRanges[i] = fmt.Sprintf("[%d,%d]",
+				b.fakePoWHeightScopes[i].StartHeight, b.fakePoWHeightScopes[i].EndHeight)
+		}
+		log.Infof("block in following height range %s would skip pow check", strings.Join(heightRanges, " "))
 	}
 
 	// Perform any upgrades to the various chain-specific buckets as needed.

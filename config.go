@@ -127,69 +127,70 @@ type config struct {
 	DropTxIndex       bool          `long:"droptxindex" description:"Deletes the hash-based transaction index from the database on start up and then exits."`
 	ExternalIPs       []string      `long:"externalip" description:"Add an ip to the list of local addresses we claim to listen on to peers"`
 	//	todo: (EthashPoW)
-	EthashConfig          ethash.Config
-	EthashVerifyByFullDAG bool          `long:"ethashverifybyfulldag" description:"For a mining node, use full DAG to verify EthashPow"`
-	Generate              bool          `long:"generate" description:"Generate (mine) ABEs using the CPU"`
-	HashRateWatermark     int           `long:"hashratewatermark" description:"Watermark of CPU mining hashrate that will trigger a warning."`
-	ExternalGenerate      bool          `long:"externalgenerate" description:"Generate (mine) ABEs using the external miners"`
-	FreeTxRelayLimit      float64       `long:"limitfreerelay" description:"Limit relay of transactions with no transaction fee to the given amount in thousands of bytes per minute"`
-	Listeners             []string      `long:"listen" description:"Add an interface/port to listen for connections (default all interfaces port: 8333, testnet: 18333)"`
-	LogDir                string        `long:"logdir" description:"Directory to log output."`
-	MaxOrphanTxs          int           `long:"maxorphantx" description:"Max number of orphan transactions to keep in memory"`
-	MaxPeers              int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
-	MiningAddrs           []string      `long:"miningaddr" description:"Add the specified payment address to the list of addresses to use for generated blocks -- At least one address is required if the generate or externalgenerate option is set"`
-	MinRelayTxFee         uint64        `long:"minrelaytxfee" description:"The minimum transaction fee in Neutrino/kB to be considered a non-zero fee."`
-	DisableBanning        bool          `long:"nobanning" description:"Disable banning of misbehaving peers"`
-	NoCFilters            bool          `long:"nocfilters" description:"Disable committed filtering (CF) support"`
-	DisableCheckpoints    bool          `long:"nocheckpoints" description:"Disable built-in checkpoints.  Don't do this unless you know what you're doing."`
-	DisableDNSSeed        bool          `long:"nodnsseed" description:"Disable DNS seeding for peers"`
-	DisableListen         bool          `long:"nolisten" description:"Disable listening for incoming connections -- NOTE: Listening is automatically disabled if the --connect or --proxy options are used without also specifying listen interfaces via --listen"`
-	NodeType              string        `long:"nodetype" description:"Node type (fullnode/semifullnode/normalnode) default: normalnode"`
-	NoOnion               bool          `long:"noonion" description:"Disable connecting to tor hidden services"`
-	NoPeerBloomFilters    bool          `long:"nopeerbloomfilters" description:"Disable bloom filtering support"`
-	NoRelayPriority       bool          `long:"norelaypriority" description:"Do not require free or low-fee transactions to have high priority for relaying"`
-	DisableRPC            bool          `long:"norpc" description:"Disable built-in RPC server -- NOTE: The RPC server is disabled by default if no rpcuser/rpcpass or rpclimituser/rpclimitpass is specified"`
-	DisableTLS            bool          `long:"notls" description:"Disable TLS for the RPC server -- NOTE: This is only allowed if the RPC server is bound to localhost"`
-	EnableGetWorkRPC      bool          `long:"enablegetwork" description:"Enable get work RPC server, this server is TLS disabled"`
-	OnionProxy            string        `long:"onion" description:"Connect to tor hidden services via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
-	OnionProxyPass        string        `long:"onionpass" default-mask:"-" description:"Password for onion proxy server"`
-	OnionProxyUser        string        `long:"onionuser" description:"Username for onion proxy server"`
-	Profile               string        `long:"profile" description:"Enable HTTP profiling on given port -- NOTE port must be between 1024 and 65536"`
-	Proxy                 string        `long:"proxy" description:"Connect via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
-	ProxyPass             string        `long:"proxypass" default-mask:"-" description:"Password for proxy server"`
-	ProxyUser             string        `long:"proxyuser" description:"Username for proxy server"`
-	RegressionTest        bool          `long:"regtest" description:"Use the regression test network"`
-	RejectNonStd          bool          `long:"rejectnonstd" description:"Reject non-standard transactions regardless of the default settings for the active network."`
-	RejectReplacement     bool          `long:"rejectreplacement" description:"Reject transactions that attempt to replace existing transactions within the mempool through the Replace-By-Fee (RBF) signaling policy."`
-	RelayNonStd           bool          `long:"relaynonstd" description:"Relay non-standard transactions regardless of the default settings for the active network."`
-	RPCCert               string        `long:"rpccert" description:"File containing the certificate file"`
-	RPCKey                string        `long:"rpckey" description:"File containing the certificate key"`
-	RPCLimitPass          string        `long:"rpclimitpass" default-mask:"-" description:"Password for limited RPC connections"`
-	RPCLimitUser          string        `long:"rpclimituser" description:"Username for limited RPC connections"`
-	RPCListeners          []string      `long:"rpclisten" description:"Add an interface/port to listen for RPC connections (default port: 8667, testnet: 18667, simnet: 18889)"`
-	RPCListenersGetWork   []string      `long:"rpclistengetwork" description:"Add an interface/port to listen for RPC connections for get work (default port: 8668, testnet: 18668, simnet: 18890)"`
-	RPCMaxClients         int           `long:"rpcmaxclients" description:"Max number of RPC clients for standard connections"`
-	RPCMaxConcurrentReqs  int           `long:"rpcmaxconcurrentreqs" description:"Max number of concurrent RPC requests that may be processed concurrently"`
-	RPCMaxWebsockets      int           `long:"rpcmaxwebsockets" description:"Max number of RPC websocket connections"`
-	RPCQuirks             bool          `long:"rpcquirks" description:"Mirror some JSON-RPC quirks of Bitcoin Core -- NOTE: Discouraged unless interoperability issues need to be worked around"`
-	RPCPass               string        `short:"P" long:"rpcpass" default-mask:"-" description:"Password for RPC connections"`
-	RPCUser               string        `short:"u" long:"rpcuser" description:"Username for RPC connections"`
-	SigCacheMaxSize       uint          `long:"sigcachemaxsize" description:"The maximum number of entries in the signature verification cache"`
-	WitnessCacheMaxSize   uint          `long:"witnesscachemaxsize" description:"The maximum number of entries in the witness cache"`
-	SimNet                bool          `long:"simnet" description:"Use the simulation test network"`
-	EnableFakePoW         bool          `long:"enablefakepow" description:"fake pow in simulation test network"`
-	TestNet3              bool          `long:"testnet" description:"Use the test network"`
-	TorIsolation          bool          `long:"torisolation" description:"Enable Tor stream isolation by randomizing user credentials for each connection."`
-	TrickleInterval       time.Duration `long:"trickleinterval" description:"Minimum time between attempts to send new inventory to a connected peer"`
-	TxIndex               bool          `long:"txindex" description:"Maintain a full hash-based transaction index which makes all transactions available via the getrawtransaction RPC"`
-	UserAgentComments     []string      `long:"uacomment" description:"Comment to add to the user agent -- See BIP 14 for more information."`
-	Upnp                  bool          `long:"upnp" description:"Use UPnP to map our listening port outside of NAT"`
-	ShowVersion           bool          `short:"V" long:"version" description:"Display version information and exit"`
-	Whitelists            []string      `long:"whitelist" description:"Add an IP network or IP that will not be banned. (eg. 192.168.1.0/24 or ::1)"`
-	lookup                func(string) ([]net.IP, error)
-	oniondial             func(string, string, time.Duration) (net.Conn, error)
-	dial                  func(string, string, time.Duration) (net.Conn, error)
-	addCheckpoints        []chaincfg.Checkpoint
+	EthashConfig           ethash.Config
+	EthashVerifyByFullDAG  bool          `long:"ethashverifybyfulldag" description:"For a mining node, use full DAG to verify EthashPow"`
+	Generate               bool          `long:"generate" description:"Generate (mine) ABEs using the CPU"`
+	HashRateWatermark      int           `long:"hashratewatermark" description:"Watermark of CPU mining hashrate that will trigger a warning."`
+	ExternalGenerate       bool          `long:"externalgenerate" description:"Generate (mine) ABEs using the external miners"`
+	FreeTxRelayLimit       float64       `long:"limitfreerelay" description:"Limit relay of transactions with no transaction fee to the given amount in thousands of bytes per minute"`
+	Listeners              []string      `long:"listen" description:"Add an interface/port to listen for connections (default all interfaces port: 8333, testnet: 18333)"`
+	LogDir                 string        `long:"logdir" description:"Directory to log output."`
+	MaxOrphanTxs           int           `long:"maxorphantx" description:"Max number of orphan transactions to keep in memory"`
+	MaxPeers               int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
+	MiningAddrs            []string      `long:"miningaddr" description:"Add the specified payment address to the list of addresses to use for generated blocks -- At least one address is required if the generate or externalgenerate option is set"`
+	MinRelayTxFee          uint64        `long:"minrelaytxfee" description:"The minimum transaction fee in Neutrino/kB to be considered a non-zero fee."`
+	DisableBanning         bool          `long:"nobanning" description:"Disable banning of misbehaving peers"`
+	NoCFilters             bool          `long:"nocfilters" description:"Disable committed filtering (CF) support"`
+	DisableCheckpoints     bool          `long:"nocheckpoints" description:"Disable built-in checkpoints.  Don't do this unless you know what you're doing."`
+	DisableDNSSeed         bool          `long:"nodnsseed" description:"Disable DNS seeding for peers"`
+	DisableListen          bool          `long:"nolisten" description:"Disable listening for incoming connections -- NOTE: Listening is automatically disabled if the --connect or --proxy options are used without also specifying listen interfaces via --listen"`
+	NodeType               string        `long:"nodetype" description:"Node type (fullnode/semifullnode/normalnode) default: normalnode"`
+	NoOnion                bool          `long:"noonion" description:"Disable connecting to tor hidden services"`
+	NoPeerBloomFilters     bool          `long:"nopeerbloomfilters" description:"Disable bloom filtering support"`
+	NoRelayPriority        bool          `long:"norelaypriority" description:"Do not require free or low-fee transactions to have high priority for relaying"`
+	DisableRPC             bool          `long:"norpc" description:"Disable built-in RPC server -- NOTE: The RPC server is disabled by default if no rpcuser/rpcpass or rpclimituser/rpclimitpass is specified"`
+	DisableTLS             bool          `long:"notls" description:"Disable TLS for the RPC server -- NOTE: This is only allowed if the RPC server is bound to localhost"`
+	EnableGetWorkRPC       bool          `long:"enablegetwork" description:"Enable get work RPC server, this server is TLS disabled"`
+	OnionProxy             string        `long:"onion" description:"Connect to tor hidden services via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
+	OnionProxyPass         string        `long:"onionpass" default-mask:"-" description:"Password for onion proxy server"`
+	OnionProxyUser         string        `long:"onionuser" description:"Username for onion proxy server"`
+	Profile                string        `long:"profile" description:"Enable HTTP profiling on given port -- NOTE port must be between 1024 and 65536"`
+	Proxy                  string        `long:"proxy" description:"Connect via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
+	ProxyPass              string        `long:"proxypass" default-mask:"-" description:"Password for proxy server"`
+	ProxyUser              string        `long:"proxyuser" description:"Username for proxy server"`
+	RegressionTest         bool          `long:"regtest" description:"Use the regression test network"`
+	RejectNonStd           bool          `long:"rejectnonstd" description:"Reject non-standard transactions regardless of the default settings for the active network."`
+	RejectReplacement      bool          `long:"rejectreplacement" description:"Reject transactions that attempt to replace existing transactions within the mempool through the Replace-By-Fee (RBF) signaling policy."`
+	RelayNonStd            bool          `long:"relaynonstd" description:"Relay non-standard transactions regardless of the default settings for the active network."`
+	RPCCert                string        `long:"rpccert" description:"File containing the certificate file"`
+	RPCKey                 string        `long:"rpckey" description:"File containing the certificate key"`
+	RPCLimitPass           string        `long:"rpclimitpass" default-mask:"-" description:"Password for limited RPC connections"`
+	RPCLimitUser           string        `long:"rpclimituser" description:"Username for limited RPC connections"`
+	RPCListeners           []string      `long:"rpclisten" description:"Add an interface/port to listen for RPC connections (default port: 8667, testnet: 18667, simnet: 18889)"`
+	RPCListenersGetWork    []string      `long:"rpclistengetwork" description:"Add an interface/port to listen for RPC connections for get work (default port: 8668, testnet: 18668, simnet: 18890)"`
+	RPCMaxClients          int           `long:"rpcmaxclients" description:"Max number of RPC clients for standard connections"`
+	RPCMaxConcurrentReqs   int           `long:"rpcmaxconcurrentreqs" description:"Max number of concurrent RPC requests that may be processed concurrently"`
+	RPCMaxWebsockets       int           `long:"rpcmaxwebsockets" description:"Max number of RPC websocket connections"`
+	RPCQuirks              bool          `long:"rpcquirks" description:"Mirror some JSON-RPC quirks of Bitcoin Core -- NOTE: Discouraged unless interoperability issues need to be worked around"`
+	RPCPass                string        `short:"P" long:"rpcpass" default-mask:"-" description:"Password for RPC connections"`
+	RPCUser                string        `short:"u" long:"rpcuser" description:"Username for RPC connections"`
+	SigCacheMaxSize        uint          `long:"sigcachemaxsize" description:"The maximum number of entries in the signature verification cache"`
+	WitnessCacheMaxSize    uint          `long:"witnesscachemaxsize" description:"The maximum number of entries in the witness cache"`
+	SimNet                 bool          `long:"simnet" description:"Use the simulation test network"`
+	AddFakePoWHeightScopes []string      `long:"addfakepowheightscope" description:"Add a custom height range for fake pow.  Format: '<start_height>:<end_height>'"`
+	TestNet3               bool          `long:"testnet" description:"Use the test network"`
+	TorIsolation           bool          `long:"torisolation" description:"Enable Tor stream isolation by randomizing user credentials for each connection."`
+	TrickleInterval        time.Duration `long:"trickleinterval" description:"Minimum time between attempts to send new inventory to a connected peer"`
+	TxIndex                bool          `long:"txindex" description:"Maintain a full hash-based transaction index which makes all transactions available via the getrawtransaction RPC"`
+	UserAgentComments      []string      `long:"uacomment" description:"Comment to add to the user agent -- See BIP 14 for more information."`
+	Upnp                   bool          `long:"upnp" description:"Use UPnP to map our listening port outside of NAT"`
+	ShowVersion            bool          `short:"V" long:"version" description:"Display version information and exit"`
+	Whitelists             []string      `long:"whitelist" description:"Add an IP network or IP that will not be banned. (eg. 192.168.1.0/24 or ::1)"`
+	lookup                 func(string) ([]net.IP, error)
+	oniondial              func(string, string, time.Duration) (net.Conn, error)
+	dial                   func(string, string, time.Duration) (net.Conn, error)
+	addCheckpoints         []chaincfg.Checkpoint
+	addFakePowHeightScopes []blockchain.BlockHeightScope
 	// todo: (ethmining) miningAddr vs. the above MiningAddr, need to clarify
 	miningAddrs []abeutil.AbelAddress
 	//miningAddrBytes []byte
@@ -402,6 +403,55 @@ func parseCheckpoints(checkpointStrings []string) ([]chaincfg.Checkpoint, error)
 		checkpoints[i] = checkpoint
 	}
 	return checkpoints, nil
+}
+
+// newCheckpointFromStr parses checkpoints in the '<height>:<hash>' format.
+func newFakePowHeightScopeFromStr(heightScope string) (blockchain.BlockHeightScope, error) {
+	parts := strings.Split(heightScope, ":")
+	if len(parts) != 2 {
+		return blockchain.BlockHeightScope{}, fmt.Errorf("unable to parse "+
+			"heightScope %q -- use the syntax <start_height>:<end_height>",
+			heightScope)
+	}
+
+	startHeight, err := strconv.ParseInt(parts[0], 10, 32)
+	if err != nil {
+		return blockchain.BlockHeightScope{}, fmt.Errorf("unable to parse "+
+			"heightScope %q due to malformed height", heightScope)
+	}
+
+	endHeight, err := strconv.ParseInt(parts[1], 10, 32)
+	if err != nil {
+		return blockchain.BlockHeightScope{}, fmt.Errorf("unable to parse "+
+			"heightScope %q due to malformed height", heightScope)
+	}
+
+	if startHeight > endHeight {
+		return blockchain.BlockHeightScope{}, fmt.Errorf("unable to parse "+
+			"heightScope %q due to malformed scope", heightScope)
+	}
+
+	return blockchain.BlockHeightScope{
+		StartHeight: int32(startHeight),
+		EndHeight:   int32(endHeight),
+	}, nil
+}
+
+// parseFakePowHeightScopes checks the heightscope strings for valid syntax
+// ('<start_height>:<end_height>') and parses them to blockchain.BlockHeightScopes instances.
+func parseFakePowHeightScopes(fakePowHeightScopeStrings []string) ([]blockchain.BlockHeightScope, error) {
+	if len(fakePowHeightScopeStrings) == 0 {
+		return nil, nil
+	}
+	fakePoWHeightScopes := make([]blockchain.BlockHeightScope, len(fakePowHeightScopeStrings))
+	for i, hrString := range fakePowHeightScopeStrings {
+		fakePowHeightScope, err := newFakePowHeightScopeFromStr(hrString)
+		if err != nil {
+			return nil, err
+		}
+		fakePoWHeightScopes[i] = fakePowHeightScope
+	}
+	return fakePoWHeightScopes, nil
 }
 
 // filesExists reports whether the named file or directory exists.
@@ -1076,6 +1126,18 @@ func loadConfig() (*config, []string, error) {
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err
+	}
+
+	if activeNetParams.Net != wire.MainNet {
+		// Check the checkpoints for syntax errors.
+		cfg.addFakePowHeightScopes, err = parseFakePowHeightScopes(cfg.AddFakePoWHeightScopes)
+		if err != nil {
+			str := "%s: Error parsing fake pow height scope: %v"
+			err := fmt.Errorf(str, funcName, err)
+			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(os.Stderr, usageMessage)
+			return nil, nil, err
+		}
 	}
 
 	// Tor stream isolation requires either proxy or onion proxy to be set.

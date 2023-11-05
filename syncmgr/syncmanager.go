@@ -1005,6 +1005,20 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 		}
 	}
 
+	// for fake pow mode
+	if sm.chainParams.Net != wire.MainNet {
+		fakePoWHeightScopes := sm.chain.FakePoWHeightScopes()
+		if len(fakePoWHeightScopes) != 0 {
+			blockHeight := wire.ExtractCoinbaseHeight(bmsg.block.MsgBlock().Transactions[0])
+			for _, scope := range fakePoWHeightScopes {
+				if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
+					behaviorFlags |= blockchain.BFNoPoWCheck
+					break
+				}
+			}
+		}
+	}
+
 	// Remove block from request maps. Either chain will know about it and
 	// so we shouldn't have any more instances of trying to fetch it, or we
 	// will fail the insert and thus we'll retry next time we get an inv.

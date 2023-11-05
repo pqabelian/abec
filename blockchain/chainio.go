@@ -13,6 +13,8 @@ import (
 	"math/big"
 	"os"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -81,6 +83,13 @@ var (
 	// deletedWitnessFileBucketName is the name of the db key used to store
 	// the delete history of witness files.
 	deletedWitnessFileBucketName = []byte("deletedwitnessfile")
+
+	// fakePowHeightScopeBucketName is the bucket used internally to track fake pow for block
+	// format: start_end:start_end:start_end
+	fakePowHeightScopeBucketName = []byte("fakepowheightscopes")
+
+	workedFakePowHeightScopeKeyName = []byte("workedfakepowheightscopes")
+	readyFakePowHeightScopeKeyName  = []byte("readyfakepowheightscopes")
 
 	// byteOrder is the preferred byte order used for serializing numeric
 	// fields for storage in the database.
@@ -1395,6 +1404,27 @@ func (b *BlockChain) createChainState() error {
 	b.stateSnapshot = newBestState(node, blockSize, blockWeight, numTxns,
 		numTxns, time.Unix(node.timestamp, 0))
 
+	var activeHeightScope []BlockHeightScope
+	currentHeight := int32(0)
+	if b.fakePoWHeightScopes != nil {
+		activeHeightScope = make([]BlockHeightScope, 0, len(b.fakePoWHeightScopes))
+		for _, scope := range b.fakePoWHeightScopes {
+			if scope.StartHeight <= currentHeight && currentHeight < scope.EndHeight {
+				activeHeightScope = append(activeHeightScope, BlockHeightScope{
+					StartHeight: currentHeight + 1,
+					EndHeight:   scope.EndHeight,
+				})
+			} else if currentHeight < scope.StartHeight {
+				activeHeightScope = append(activeHeightScope, BlockHeightScope{
+					StartHeight: scope.StartHeight,
+					EndHeight:   scope.EndHeight,
+				})
+			}
+		}
+	}
+	// TODO merge the active height scope
+	b.fakePoWHeightScopes = activeHeightScope
+
 	// Create the initial the database chain state including creating the
 	// necessary index buckets and inserting the genesis block.
 	err = b.db.Update(func(dbTx database.Tx) error {
@@ -1481,6 +1511,16 @@ func (b *BlockChain) createChainState() error {
 			return err
 		}
 
+		_, err = meta.CreateBucket(fakePowHeightScopeBucketName)
+		if err != nil {
+			return err
+		}
+
+		err = dbStoreReadyFakePowBlockScope(dbTx, b.fakePoWHeightScopes)
+		if err != nil {
+			return err
+		}
+
 		// Save the genesis block to the block index database.
 		err = dbStoreBlockNode(dbTx, node)
 		if err != nil {
@@ -1514,10 +1554,17 @@ func (b *BlockChain) initChainState() error {
 	// everything from scratch or upgrade certain buckets.
 	var initialized, hasBlockIndex bool
 	var hasDeletedWitnessFileBucket bool
+	var workedHeightScope, readyHeightScope []BlockHeightScope
 	err := b.db.View(func(dbTx database.Tx) error {
 		initialized = dbTx.Metadata().Get(chainStateKeyName) != nil
 		hasBlockIndex = dbTx.Metadata().Bucket(blockIndexBucketName) != nil
 		hasDeletedWitnessFileBucket = dbTx.Metadata().Bucket(deletedWitnessFileBucketName) != nil
+
+		if b.chainParams.Net != wire.MainNet {
+			workedHeightScope = dbFetchWorkedFakePowBlockScope(dbTx)
+			readyHeightScope = dbFetchReadyFakePowBlockScope(dbTx)
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -1688,7 +1735,75 @@ func (b *BlockChain) initChainState() error {
 	// As we might have updated the index after it was loaded, we'll
 	// attempt to flush the index to the DB. This will only result in a
 	// write if the elements are dirty, so it'll usually be a noop.
-	return b.index.flushToDB()
+	err = b.index.flushToDB()
+	if err != nil {
+		return err
+	}
+
+	if b.chainParams.Net == wire.MainNet {
+		return nil
+	}
+
+	activeHeightScope := make([]BlockHeightScope, 0, len(readyHeightScope))
+	currentHeight := b.bestChain.Height()
+	for _, scope := range readyHeightScope {
+		if scope.StartHeight <= currentHeight && currentHeight < scope.EndHeight {
+			workedHeightScope = append(workedHeightScope, BlockHeightScope{
+				StartHeight: scope.StartHeight,
+				EndHeight:   currentHeight,
+			})
+			activeHeightScope = append(activeHeightScope, BlockHeightScope{
+				StartHeight: currentHeight + 1,
+				EndHeight:   scope.EndHeight,
+			})
+		} else if scope.EndHeight <= currentHeight {
+			workedHeightScope = append(workedHeightScope, BlockHeightScope{
+				StartHeight: scope.StartHeight,
+				EndHeight:   scope.EndHeight,
+			})
+		} else {
+			activeHeightScope = append(activeHeightScope, BlockHeightScope{
+				StartHeight: scope.StartHeight,
+				EndHeight:   scope.EndHeight,
+			})
+		}
+	}
+
+	// replace with caller-defined scopes
+	if b.fakePoWHeightScopes != nil {
+		activeHeightScope = make([]BlockHeightScope, 0, len(b.fakePoWHeightScopes))
+		for _, scope := range b.fakePoWHeightScopes {
+			if scope.StartHeight <= currentHeight && currentHeight < scope.EndHeight {
+				activeHeightScope = append(activeHeightScope, BlockHeightScope{
+					StartHeight: currentHeight + 1,
+					EndHeight:   scope.EndHeight,
+				})
+			} else if currentHeight < scope.StartHeight {
+				activeHeightScope = append(activeHeightScope, BlockHeightScope{
+					StartHeight: scope.StartHeight,
+					EndHeight:   scope.EndHeight,
+				})
+			}
+		}
+	}
+
+	// TODO merge the worked/active height scope
+
+	b.fakePoWHeightScopes = activeHeightScope
+
+	// flush workedHeightScope and activeHeightScope into database
+	err = b.db.Update(func(tx database.Tx) error {
+		dbErr := dbStoreWorkedFakePowBlockScope(tx, workedHeightScope)
+		if dbErr != nil {
+			return dbErr
+		}
+		return dbStoreReadyFakePowBlockScope(tx, activeHeightScope)
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // deserializeBlockRow parses a value in the block index bucket into a block
@@ -2094,4 +2209,76 @@ func (b *BlockChain) FetchWitnessServiceHeight() (uint32, error) {
 		return err
 	})
 	return witnessServiceHeight, err
+}
+
+// dbStoreWorkedFakePowBlockScope store the worked block height with fake pow
+func dbStoreWorkedFakePowBlockScope(dbTx database.Tx, scopes []BlockHeightScope) error {
+	bucket, err := dbTx.Metadata().CreateBucketIfNotExists(fakePowHeightScopeBucketName)
+	if err != nil {
+		return err
+	}
+	serializedScopes := make([]string, len(scopes))
+	for i, scope := range scopes {
+		serializedScopes[i] = fmt.Sprintf("%d_%d", scope.StartHeight, scope.EndHeight)
+	}
+	return bucket.Put(workedFakePowHeightScopeKeyName, []byte(strings.Join(serializedScopes, ":")))
+}
+func dbFetchWorkedFakePowBlockScope(dbTx database.Tx) []BlockHeightScope {
+	bucket := dbTx.Metadata().Bucket(fakePowHeightScopeBucketName)
+	if bucket == nil {
+		return nil
+	}
+
+	serializedBlockHeightScopes := bucket.Get(workedFakePowHeightScopeKeyName)
+	if len(serializedBlockHeightScopes) == 0 {
+		return nil
+	}
+
+	scopes := strings.Split(string(serializedBlockHeightScopes), ":")
+	res := make([]BlockHeightScope, len(scopes))
+	for i, scope := range scopes {
+		heights := strings.Split(scope, "_")
+		startHeight, _ := strconv.Atoi(heights[0])
+		endHeight, _ := strconv.Atoi(heights[1])
+		res[i].StartHeight = int32(startHeight)
+		res[i].EndHeight = int32(endHeight)
+	}
+
+	return res
+}
+
+// dbStoreReadyFakePowBlockScope store the ready block height with fake pow
+func dbStoreReadyFakePowBlockScope(dbTx database.Tx, scopes []BlockHeightScope) error {
+	bucket, err := dbTx.Metadata().CreateBucketIfNotExists(fakePowHeightScopeBucketName)
+	if err != nil {
+		return err
+	}
+	serializedScopes := make([]string, len(scopes))
+	for i, scope := range scopes {
+		serializedScopes[i] = fmt.Sprintf("%d_%d", scope.StartHeight, scope.EndHeight)
+	}
+	return bucket.Put(readyFakePowHeightScopeKeyName, []byte(strings.Join(serializedScopes, ":")))
+}
+func dbFetchReadyFakePowBlockScope(dbTx database.Tx) []BlockHeightScope {
+	bucket := dbTx.Metadata().Bucket(fakePowHeightScopeBucketName)
+	if bucket == nil {
+		return nil
+	}
+
+	serializedBlockHeightScopes := bucket.Get(readyFakePowHeightScopeKeyName)
+	if len(serializedBlockHeightScopes) == 0 {
+		return nil
+	}
+
+	scopes := strings.Split(string(serializedBlockHeightScopes), ":")
+	res := make([]BlockHeightScope, len(scopes))
+	for i, scope := range scopes {
+		heights := strings.Split(scope, "_")
+		startHeight, _ := strconv.Atoi(heights[0])
+		endHeight, _ := strconv.Atoi(heights[1])
+		res[i].StartHeight = int32(startHeight)
+		res[i].EndHeight = int32(endHeight)
+	}
+
+	return res
 }

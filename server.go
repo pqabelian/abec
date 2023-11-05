@@ -2551,16 +2551,17 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 
 	// Create a new block chain instance with the appropriate configuration.
 	s.chain, err = blockchain.New(&blockchain.Config{
-		NodeType:     nodeType,
-		DB:           s.db,
-		Interrupt:    interrupt,
-		ChainParams:  s.chainParams,
-		Checkpoints:  checkpoints,
-		TimeSource:   s.timeSource,
-		SigCache:     s.sigCache,
-		WitnessCache: s.witnessCache,
-		IndexManager: indexManager,
-		HashCache:    s.hashCache,
+		NodeType:            nodeType,
+		DB:                  s.db,
+		Interrupt:           interrupt,
+		ChainParams:         s.chainParams,
+		Checkpoints:         checkpoints,
+		FakePowHeightScopes: cfg.addFakePowHeightScopes,
+		TimeSource:          s.timeSource,
+		SigCache:            s.sigCache,
+		WitnessCache:        s.witnessCache,
+		IndexManager:        indexManager,
+		HashCache:           s.hashCache,
 	})
 	if err != nil {
 		return nil, err
@@ -2650,10 +2651,6 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	cfg.EthashConfig.BlockHeightStart = s.chainParams.BlockHeightEthashPoW
 	cfg.EthashConfig.EpochLength = s.chainParams.EthashEpochLength
 	s.ethash = ethash.New(cfg.EthashConfig)
-	if cfg.SimNet && cfg.EnableFakePoW {
-		s.ethash = ethash.NewFullFaker()
-		s.chainParams.FakePoW = true
-	}
 
 	s.syncManager, err = syncmgr.New(&syncmgr.Config{
 		NodeType:           cfg.nodeType,
@@ -2707,6 +2704,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	s.cpuMiner = cpuminer.New(&cpuminer.Config{
 		ChainParams:            chainParams,
 		Ethash:                 s.ethash, // todo: (EthashPoW)
+		FakePowHeightScope:     s.chain.FakePoWHeightScopes(),
 		BlockTemplateGenerator: blockTemplateGenerator,
 		MiningAddrs:            cfg.miningAddrs,
 		HashRateWatermark:      cfg.HashRateWatermark,

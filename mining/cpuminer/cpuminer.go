@@ -57,6 +57,8 @@ type Config struct {
 	//	Ethash manages the cache and dataset for EthashPoW mining.
 	Ethash *ethash.Ethash
 
+	FakePowHeightScope []blockchain.BlockHeightScope
+
 	// BlockTemplateGenerator identifies the instance to use in order to
 	// generate block templates that the miner will attempt to solve.
 	BlockTemplateGenerator *mining.BlkTmplGenerator
@@ -205,7 +207,19 @@ func (m *CPUMiner) submitBlock(block *abeutil.BlockAbe) bool {
 
 	// Process this block using the same rules as blocks coming from other
 	// nodes.  This will in turn relay it to the network like normal.
-	isOrphan, err := m.cfg.ProcessBlock(block, blockchain.BFNone)
+	behavior := blockchain.BFNone
+	if m.cfg.ChainParams.Net != wire.MainNet && len(m.cfg.FakePowHeightScope) != 0 {
+		blockHeight := wire.ExtractCoinbaseHeight(block.MsgBlock().Transactions[0])
+		for _, scope := range m.cfg.FakePowHeightScope {
+			if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
+				behavior |= blockchain.BFNoPoWCheck
+				log.Infof("Skip the PoW check for height %d in range [%d,%d]",
+					blockHeight, scope.StartHeight, scope.EndHeight)
+				break
+			}
+		}
+	}
+	isOrphan, err := m.cfg.ProcessBlock(block, behavior)
 	if err != nil {
 		// Anything other than a rule violation is an unexpected error,
 		// so log that error as an internal error.
@@ -251,7 +265,19 @@ func (m *CPUMiner) submitBlockEthash(block *abeutil.BlockAbe) bool {
 
 	// Process this block using the same rules as blocks coming from other
 	// nodes.  This will in turn relay it to the network like normal.
-	isOrphan, err := m.cfg.ProcessBlock(block, blockchain.BFNone)
+	behavior := blockchain.BFNone
+	if m.cfg.ChainParams.Net != wire.MainNet && len(m.cfg.FakePowHeightScope) != 0 {
+		blockHeight := wire.ExtractCoinbaseHeight(block.MsgBlock().Transactions[0])
+		for _, scope := range m.cfg.FakePowHeightScope {
+			if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
+				behavior |= blockchain.BFNoPoWCheck
+				log.Infof("Skip the PoW check for height %d in range [%d,%d]",
+					blockHeight, scope.StartHeight, scope.EndHeight)
+				break
+			}
+		}
+	}
+	isOrphan, err := m.cfg.ProcessBlock(block, behavior)
 	if err != nil {
 		// Anything other than a rule violation is an unexpected error,
 		// so log that error as an internal error.
@@ -289,6 +315,16 @@ func (m *CPUMiner) submitBlockEthash(block *abeutil.BlockAbe) bool {
 // new transactions and enough time has elapsed without finding a solution.
 func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlockAbe, blockHeight int32,
 	ticker *time.Ticker, quit chan struct{}) bool {
+
+	if m.cfg.ChainParams.Net != wire.MainNet && len(m.cfg.FakePowHeightScope) != 0 {
+		for _, scope := range m.cfg.FakePowHeightScope {
+			if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
+				log.Infof("Do not find PoW for height %d in range [%d,%d]",
+					blockHeight, scope.StartHeight, scope.EndHeight)
+				return true
+			}
+		}
+	}
 
 	// Choose a random extra nonce offset for this block template and
 	// worker.
@@ -380,7 +416,14 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlockAbe, blockHeight int32,
 // todo: (EthashPoW)
 func (m *CPUMiner) solveBlockEthash(blockTemplate *mining.BlockTemplate, ticker *time.Ticker, quit chan struct{}) bool {
 	// If we're running a fake PoW, simply return a 0 nonce immediately
-	if m.cfg.Ethash.FakePow() {
+	if m.cfg.ChainParams.Net != wire.MainNet && len(m.cfg.FakePowHeightScope) != 0 {
+		for _, scope := range m.cfg.FakePowHeightScope {
+			if scope.StartHeight <= blockTemplate.Height && blockTemplate.Height <= scope.EndHeight {
+				log.Infof("Do not find EthPoW for height %d in range [%d,%d]",
+					blockTemplate.Height, scope.StartHeight, scope.EndHeight)
+				return true
+			}
+		}
 		header := blockTemplate.BlockAbe.Header
 		header.Nonce, header.MixDigest = 0, chainhash.Hash{}
 		return true
@@ -574,7 +617,7 @@ out:
 		//	Such a call will generate the first dataset and the second dataset (as the future one).
 		//	Each will take 10 minutes (even in the setting without mining).
 		//	To be safe, we call this procedure 200 minutes in advance.
-		if template.Height == m.cfg.ChainParams.BlockHeightEthashPoW-100 {
+		if !m.ethash.FakePow() && template.Height == m.cfg.ChainParams.BlockHeightEthashPoW-100 {
 			m.ethash.PrepareDatasetForUpdate()
 		}
 
