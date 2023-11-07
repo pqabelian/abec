@@ -1,8 +1,9 @@
-module github.com/abesuite/abec
+module github.com/pqabelian/abec
 
 go 1.18
 
 require (
+	github.com/abesuite/abec v0.0.0-00010101000000-000000000000
 	github.com/abesuite/go-socks v0.0.0-20170105172521-4720035b7bfd
 	github.com/abesuite/go-spew v1.1.1
 	github.com/aead/siphash v1.0.1
@@ -35,3 +36,9 @@ require (
 	github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db // indirect
 	github.com/hashicorp/golang-lru v0.5.4
 )
+
+replace github.com/abesuite/abec => github.com/pqabelian/abec v0.0.0-20231008132910-1a882b301389
+
+replace github.com/abesuite/abeutil => github.com/pqabelian/abeutil v0.0.0-20231107022913-d6d3bf295938
+
+replace github.com/cryptosuite/pqringct => github.com/pqabelian/pqringct v0.0.0-20231107022351-feb587470e43
