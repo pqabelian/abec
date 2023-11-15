@@ -2680,6 +2680,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		MaxReservedWitness:   witnessMgrMaxReservedWitness,
 		Chain:                s.chain,
 		WitnessServiceHeight: cfg.witnessServiceHeight,
+		TLogFilename:         cfg.tLogFilename,
 	})
 	if err != nil {
 		return nil, err

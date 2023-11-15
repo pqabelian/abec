@@ -144,7 +144,7 @@ func reconcileDB(pdb *db, nodeType wire.NodeType, create bool) (database.DB, err
 		wcForWitness.curOffset > curWitnessOffset) {
 
 		log.Info("Detected unclean shutdown - Repairing...")
-		log.Debugf("Metadata claims file %d, offset %d. Block data is "+
+		log.Debugf("Metadata claims file %d, offset %d. Witness data is "+
 			"at file %d, offset %d", curWitnessFileNum, curWitnessOffset,
 			wcForWitness.curFileNum, wcForWitness.curOffset)
 		pdb.store.handleRollbackForWitness(curWitnessFileNum, curWitnessOffset)
@@ -174,7 +174,7 @@ func reconcileDB(pdb *db, nodeType wire.NodeType, create bool) (database.DB, err
 		wcForWitness.curOffset < curWitnessOffset) {
 
 		str := fmt.Sprintf("metadata claims file %d, offset %d, but "+
-			"block data is at file %d, offset %d", curFileNum,
+			"witness data is at file %d, offset %d", curFileNum,
 			curOffset, wcForWitness.curFileNum, wcForWitness.curOffset)
 		log.Warnf("***Database corruption detected***: %v", str)
 		return nil, makeDbErr(database.ErrCorruption, str, nil)

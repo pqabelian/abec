@@ -41,6 +41,7 @@ const (
 	defaultLogLevel             = "info"
 	defaultLogDirname           = "logs"
 	defaultLogFilename          = "abec.log"
+	defaultTLogFilename         = "t.log"
 	defaultMaxPeers             = 125
 	defaultBanDuration          = time.Hour * 24
 	defaultBanThreshold         = 100
@@ -202,9 +203,9 @@ type config struct {
 	WorkingDir           string `long:"workingdir" description:"Working directory"`
 
 	// transaction cache in disk
-	AllowDiskCacheTx bool   `long:"allowdiskcachetx" description:"Allow use disk to cache transaction if necessary"`
-	CacheTxDir       string `long:"cachetxdir" description:"Directory to store cached transaction data when allow use disk to cache transaction if necessary"`
-
+	AllowDiskCacheTx   bool   `long:"allowdiskcachetx" description:"Allow use disk to cache transaction if necessary"`
+	CacheTxDir         string `long:"cachetxdir" description:"Directory to store cached transaction data when allow use disk to cache transaction if necessary"`
+	tLogFilename       string
 	maxReservedWitness uint32 //  `long:"maxreservedwitness" description:"The maximum number of blocks witness that the node stores (default: 4000)"`
 }
 
@@ -732,6 +733,8 @@ func loadConfig() (*config, []string, error) {
 
 	cfg.CacheTxDir = cleanAndExpandPath(cfg.CacheTxDir)
 	cfg.CacheTxDir = filepath.Join(cfg.CacheTxDir, netName(activeNetParams))
+
+	cfg.tLogFilename = filepath.Join(cfg.DataDir, defaultTLogFilename)
 
 	// Validate database type.
 	if !validDbType(cfg.DbType) {

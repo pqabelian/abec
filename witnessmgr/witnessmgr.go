@@ -2,11 +2,14 @@ package witnessmgr
 
 import (
 	"errors"
+	"fmt"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/peer"
 	"github.com/abesuite/abec/wire"
+	"os"
 	"sync"
+	"time"
 )
 
 // witnessPruningInterval is the number of blocks between each delete operation.
@@ -19,6 +22,7 @@ type Config struct {
 	MaxReservedWitness   uint32
 	Chain                *blockchain.BlockChain
 	WitnessServiceHeight int32
+	TLogFilename         string
 }
 
 // WitnessManager is used to control the storage of witness.
@@ -30,6 +34,7 @@ type WitnessManager struct {
 	chain                *blockchain.BlockChain
 	deleteLock           sync.Mutex
 	witnessServiceHeight int32
+	tLogFilename         string
 }
 
 // New constructs a new WitnessManager.
@@ -39,6 +44,7 @@ func New(config *Config) (*WitnessManager, error) {
 		maxReservedWitness:   config.MaxReservedWitness,
 		chain:                config.Chain,
 		witnessServiceHeight: config.WitnessServiceHeight,
+		tLogFilename:         config.TLogFilename,
 	}
 
 	if wm.nodeType == wire.NormalNode {
@@ -161,6 +167,15 @@ func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
 		realFileNumPruned = append(realFileNumPruned, num)
 	}
 
+	f, err := os.OpenFile(wm.tLogFilename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+	if err != nil {
+		log.Errorf("can not create a log file for recording witness history and minimum file num")
+	}
+	defer f.Close()
+	for num, info := range fileInfo {
+		f.WriteString(fmt.Sprintf("[Witness Delete History] %d(%d) at %d\n", num, info.Size(), time.Now().Unix()))
+	}
+
 	// Save delete info to database, including file size and delete time,
 	// these information may be useful in the future.
 	err = wm.chain.StoreDeleteHistory(fileInfo)
@@ -182,6 +197,8 @@ func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
 	if err != nil {
 		return err
 	}
+
+	f.WriteString(fmt.Sprintf("[Minimum Consecutive Witness File Num] %d\n", minConsecutiveWitnessFileNum))
 
 	// Store witnessServiceHeight before pruning witness in case the pruning process fails.
 	err = wm.chain.StoreWitnessServiceHeight(uint32(height))

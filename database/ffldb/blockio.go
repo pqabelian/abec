@@ -4,6 +4,7 @@
 package ffldb
 
 import (
+	"bytes"
 	"container/list"
 	"encoding/binary"
 	"fmt"
@@ -14,6 +15,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"sync"
 )
 
@@ -1215,23 +1218,108 @@ func scanBlockFiles(dbPath string) (int, uint32) {
 	return lastFile, fileLen
 }
 
-func scanWitnessFiles(dbPath string, startIdx int) (int, uint32) {
+func recoveryFromTLog(filename string) (map[int]int, int) {
+	deleteSizeHistory := map[int]int{}
+	maxIdx := 0
+
+	tf, err := os.OpenFile(filename, os.O_RDONLY, 0666)
+	if err != nil {
+		return nil, 0
+	}
+	defer tf.Close()
+	fileContent, err := io.ReadAll(tf)
+	if err != nil {
+		return nil, 0
+	}
+	lines := bytes.Split(fileContent, []byte{'\n'})
+	re1, _ := regexp.Compile("^\\[Witness Delete History] (\\d+)\\((\\d+)\\) at (\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})$")
+	re2, _ := regexp.Compile("^\\[Minimum Consecutive Witness File Num] (\\d+)$")
+	for _, line := range lines {
+		content := string(line)
+		submatch1 := re1.FindAllStringSubmatch(content, -1)
+		if len(submatch1) != 0 {
+			deletedFileNum, err := strconv.Atoi(submatch1[0][1])
+			if err != nil {
+				return nil, 0
+			}
+			deleteFileSize, err := strconv.Atoi(submatch1[0][2])
+			if err != nil {
+				return nil, 0
+			}
+			deleteSizeHistory[deletedFileNum] = deleteFileSize
+		}
+		submatch2 := re2.FindAllStringSubmatch(content, -1)
+		if len(submatch2) != 0 {
+			maxIdx, err = strconv.Atoi(submatch2[0][1])
+			if err != nil {
+				return nil, 0
+			}
+		}
+	}
+	return deleteSizeHistory, maxIdx
+
+}
+
+func scanWitnessFiles(dbPath string, tLogFilename string, startIdx int) (int, uint32) {
 	lastFile := -1
 	fileLen := uint32(0)
 
+	first := true
+	done := false
+	var deleteHistory map[int]int
+	var minIdx int
 	log.Tracef("Scan from witness file #%d", startIdx)
 	for i := startIdx; ; i++ {
 		filePath := witnessFilePath(dbPath, uint32(i))
 		st, err := os.Stat(filePath)
 		if err != nil {
+			if !first {
+				break
+			}
+			if !done {
+				deleteHistory, minIdx = recoveryFromTLog(tLogFilename)
+				done = true
+			}
+			if _, ok := deleteHistory[i]; ok {
+				// temporary recovery for deleting later
+				recovered := true
+				for num, size := range deleteHistory {
+					filename := witnessFilePath(dbPath, uint32(num))
+					log.Infof("Detect uncompleted deletion records, temporarily restore the file %s(size %d), and automatically delete it later. Please do not shutdown Abec...", filename, size)
+					f, err := os.Create(filename)
+					if err != nil {
+						recovered = false
+						break
+					}
+					_, err = f.Seek(int64(size)-1, 0)
+					if err != nil {
+						recovered = false
+						break
+					}
+
+					_, err = f.Write([]byte{0})
+					if err != nil {
+						recovered = false
+						break
+					}
+					f.Sync()
+					f.Close()
+				}
+				if !recovered {
+					break
+				}
+				lastFile = minIdx - 1
+				continue
+			}
 			break
 		}
-		lastFile = i
 
+		lastFile = i
 		fileLen = uint32(st.Size())
+		first = false
 	}
 
-	log.Tracef("Scan found latest block file #%d with length %d", lastFile,
+	log.Tracef("Scan found latest witness file #%d with length %d", lastFile,
 		fileLen)
 	return lastFile, fileLen
 }
@@ -1322,7 +1410,7 @@ func fetchMinExistingWitnessFileNum(pdb *db) (int, error) {
 	return int(deserializeUint32(minWitnessFileNum)), nil
 }
 
-func initWitnessCursor(basePath string, pdb *db) error {
+func initWitnessCursor(basePath string, tLogFilename string, pdb *db) error {
 	minIdx, err := fetchMinConsecutiveWitnessFileNum(pdb)
 	if err != nil {
 		return err
@@ -1333,7 +1421,7 @@ func initWitnessCursor(basePath string, pdb *db) error {
 		return err
 	}
 
-	witnessFileNum, witnessFileOff := scanWitnessFiles(basePath, minIdx)
+	witnessFileNum, witnessFileOff := scanWitnessFiles(basePath, tLogFilename, minIdx)
 	if witnessFileNum == -1 {
 		witnessFileNum = 0
 		witnessFileOff = 0
@@ -1344,5 +1432,6 @@ func initWitnessCursor(basePath string, pdb *db) error {
 		curFileNum: uint32(witnessFileNum),
 		curOffset:  witnessFileOff,
 	}
+
 	return nil
 }

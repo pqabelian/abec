@@ -285,7 +285,7 @@ func loadBlockDB() (database.DB, error) {
 	removeRegressionDB(dbPath)
 
 	abecLog.Infof("Loading block database from '%s'", dbPath)
-	db, err := database.Open(cfg.DbType, dbPath, activeNetParams.Net, cfg.nodeType)
+	db, err := database.Open(cfg.DbType, dbPath, activeNetParams.Net, cfg.nodeType, filepath.Join(cfg.DataDir, "t.log"))
 	if err != nil {
 		// Return the error if it's not because the database doesn't
 		// exist.
@@ -303,10 +303,10 @@ func loadBlockDB() (database.DB, error) {
 
 		// If user does not specify node type for new node, we assume the node type is normal.
 		if cfg.nodeType == wire.UnsetNode {
-			cfg.nodeType = wire.NormalNode
-			cfg.serviceFlag = wire.SFNodeNetwork | wire.SFNodeWitness | wire.SFNodeTypeBit1 | wire.SFNodeTypeBit2
+			cfg.nodeType = wire.SemiFullNode
+			cfg.serviceFlag = wire.SFNodeNetwork | wire.SFNodeWitness | wire.SFNodeTypeBit2
 		}
-		db, err = database.Create(cfg.DbType, dbPath, activeNetParams.Net, cfg.nodeType)
+		db, err = database.Create(cfg.DbType, dbPath, activeNetParams.Net, cfg.nodeType, cfg.tLogFilename)
 		if err != nil {
 			return nil, err
 		}
