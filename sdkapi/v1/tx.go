@@ -533,7 +533,11 @@ func BuildTransferTxRequestDescFromBlocks(
 
 		//	assume the blocks are valid blocks in ledger, include:
 		// (1) the Header contains its height. Based on this, we explicitly set the height of Block.
-		blocks[i].SetHeight(blocks[i].MsgBlock().Header.Height)
+		height := blocks[i].MsgBlock().Header.Height
+		if height == 0 {
+			height = wire.ExtractCoinbaseHeight(blocks[i].MsgBlock().Transactions[0])
+		}
+		blocks[i].SetHeight(height)
 	}
 
 	blockIdx := 0
