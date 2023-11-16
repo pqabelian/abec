@@ -1939,6 +1939,14 @@ out:
 				}
 				log.Infof("Sending %v%s to %s", "getdata",
 					summary, p)
+			case *wire.MsgBlockAbe:
+				// Debug summary of message.
+				summary := messageSummary(msg.msg.(*wire.MsgBlockAbe))
+				if len(summary) > 0 {
+					summary = " (" + summary + ")"
+				}
+				log.Infof("Sending %v%s to %s", "block",
+					summary, p)
 			}
 
 			p.stallControl <- stallControlMsg{sccSendMessage, msg.msg}
