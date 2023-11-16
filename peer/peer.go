@@ -67,7 +67,7 @@ const (
 	stallResponseTimeout = 30 * time.Second
 
 	// WitnessPruningInterval is the value should be consistent with witnessmgr.deleteInterval
-	WitnessPruningInterval = 10
+	WitnessPruningInterval = 100
 
 	// DefaultMaxReservedWitness is the num of the normal node would reserved witness
 	DefaultMaxReservedWitness = 1000
