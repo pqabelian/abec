@@ -402,6 +402,7 @@ func main() {
 
 	// Work around defer not working after os.Exit()
 	if err := abecMain(nil); err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
 }
