@@ -280,6 +280,13 @@ func pqringctCoinbaseTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 			return nil, errors.New("unmatched cryptoScheme for coinbase transaction and cryptoAddress")
 		}
 
+		//	make sure that the cryptoAddress for the target Txo is valid
+		valid, hints := pqringctCheckCryptoAddress(pp, cryptoScheme, abeTxOutputDescs[j].cryptoAddress)
+		if !valid {
+			errMsg := fmt.Sprintf("pqringctCheckCryptoAddress: the cryptoAddress in %d -th abeTxOutputDescs is not valid:"+hints, j)
+			return nil, errors.New(errMsg)
+		}
+
 		// parse the cryptoAddress to serializedApk and serializedVpk
 		apkLen := pqringct.GetAddressPublicKeySerializeSize(pp)
 		//vpkLen := pp.GetValuePublicKeySerializeSize()

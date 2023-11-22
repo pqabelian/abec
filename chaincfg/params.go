@@ -217,6 +217,9 @@ type Params struct {
 	// BlockHeightEthashPoW specifies the block height from which Ethash-PoW mining is applied.
 	BlockHeightEthashPoW int32
 
+	// BlockHeightMLP specifies the block height from which Ethash-PoW mining is applied.
+	BlockHeightMLP int32
+
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength int32
 }
@@ -400,7 +403,7 @@ var TestNet3Params = Params{
 	Net:  wire.TestNet3,
 	//DefaultPort: "18333",
 	DefaultPort: "18666",
-	DNSSeeds:    []DNSSeed{
+	DNSSeeds: []DNSSeed{
 		//{"testnet-seed.bitcoin.jonasschnelli.ch", true},
 		//{"testnet-seed.bitcoin.schildbach.de", false},
 		//{"seed.tbtc.petertodd.org", true},
