@@ -217,11 +217,15 @@ type Params struct {
 	// BlockHeightEthashPoW specifies the block height from which Ethash-PoW mining is applied.
 	BlockHeightEthashPoW int32
 
-	// BlockHeightMLP specifies the block height from which Ethash-PoW mining is applied.
-	BlockHeightMLP int32
-
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength int32
+
+	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
+	// ToDo(MLP):
+	BlockHeightMLPAUT int32
+	// BlockHeightMLPAUTCOMMIT specifies the block height
+	// from which new transactions with version before TxVersion_Height_MLPAUT_236000 will not be accepted anymore.
+	BlockHeightMLPAUTCOMMIT int32
 }
 
 // MainNetParams defines the network parameters for the main network.
@@ -321,6 +325,11 @@ var MainNetParams = Params{
 
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength: 4000,
+
+	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
+	// ToDo(MLP):
+	BlockHeightMLPAUT:       236000,
+	BlockHeightMLPAUTCOMMIT: 256000,
 }
 
 // RegressionNetParams defines the network parameters for the regression test
@@ -393,6 +402,11 @@ var RegressionNetParams = Params{
 	BlockHeightEthashPoW: 300,
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength: 200,
+
+	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
+	// ToDo(MLP):
+	BlockHeightMLPAUT:       236000,
+	BlockHeightMLPAUTCOMMIT: 256000,
 }
 
 // TestNet3Params defines the network parameters for the test network
@@ -403,7 +417,7 @@ var TestNet3Params = Params{
 	Net:  wire.TestNet3,
 	//DefaultPort: "18333",
 	DefaultPort: "18666",
-	DNSSeeds: []DNSSeed{
+	DNSSeeds:    []DNSSeed{
 		//{"testnet-seed.bitcoin.jonasschnelli.ch", true},
 		//{"testnet-seed.bitcoin.schildbach.de", false},
 		//{"seed.tbtc.petertodd.org", true},
@@ -472,6 +486,11 @@ var TestNet3Params = Params{
 	BlockHeightEthashPoW: 56000,
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength: 4000,
+
+	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
+	// ToDo(MLP):
+	BlockHeightMLPAUT:       236000,
+	BlockHeightMLPAUTCOMMIT: 256000,
 }
 
 // SimNetParams defines the network parameters for the simulation test
@@ -547,6 +566,11 @@ var SimNetParams = Params{
 	BlockHeightEthashPoW: 300,
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength: 200,
+
+	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
+	// ToDo(MLP):
+	BlockHeightMLPAUT:       236000,
+	BlockHeightMLPAUTCOMMIT: 256000,
 }
 
 var (

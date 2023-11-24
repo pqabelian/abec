@@ -8,6 +8,8 @@ import (
 const (
 	TxVersion_Height_0 uint32 = iota + 1 // the TxVersion since height 0, corresponding to CryptoSchemePQRingCT
 	//CryptoSchemePQRingCTV2
+	// ToDo(MLP): how about not use iota?
+	TxVersion_Height_MLPAUT_236000 uint32 = 2
 )
 
 const (
@@ -40,6 +42,11 @@ const (
 	//	This causes hard-fork.
 	//	Thus, we set it to 0x20000000, while the previous (original) version is 0x10000000.
 	BlockVersionEthashPow = 0x20000000
+
+	// BlockVersionMLPAUT is the block version which changed block to support MLP and AUT.
+	// The version is coded by the rule in versionbits.go
+	// ToDo(MLP):
+	BlockVersionMLPAUT = 0x30000000
 
 	// BlockHeightEthashPoW
 	// BlockHeightEthashPoW denotes the block height from which Ethash-PoW mining is applied.

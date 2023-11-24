@@ -136,15 +136,25 @@ func (b *BlockChain) initBlockNode(node *blockNode, blockHeader *wire.BlockHeade
 		node.workSum = node.workSum.Add(parent.workSum, node.workSum)
 		// todo: (EthashPow) 202207
 		if node.height >= b.chainParams.BlockHeightEthashPoW {
+			//	Since BlockHeightEthashPoW, blockHeader contains Height.
 			if blockHeader.Height != node.height {
 				errStr := fmt.Sprintf("Block %v has height %d, while its parent has height %d", node.hash, blockHeader.Height, parent.height)
 				return ruleError(ErrMismatchedBlockHeightWithPrevNode, errStr)
 			}
 			//	todo: when more versions appear, we need to refactor here.
-			if blockHeader.Version != int32(wire.BlockVersionEthashPow) {
-				str := fmt.Sprintf("block has height %d, it should have version %d for EthashPoW, rather than the old version %d", blockHeader.Height, int32(wire.BlockVersionEthashPow), blockHeader.Version)
-				return ruleError(ErrMismatchedBlockHeightAndVersion, str)
-			}
+			if blockHeader.Height < b.chainParams.BlockHeightMLPAUT {
+				if blockHeader.Version != int32(wire.BlockVersionEthashPow) {
+					str := fmt.Sprintf("block has height %d, it should have version %d for EthashPoW, rather than the old version %d", blockHeader.Height, int32(wire.BlockVersionEthashPow), blockHeader.Version)
+					return ruleError(ErrMismatchedBlockHeightAndVersion, str)
+				}
+			} else {
+				// blockHeader.Height >= b.chainParams.BlockHeightMLPAUT
+				if blockHeader.Version != int32(wire.BlockVersionMLPAUT) {
+					str := fmt.Sprintf("block has height %d, it should have version %d for MLPAUT, rather than the old version %d", blockHeader.Height, int32(wire.BlockVersionMLPAUT), blockHeader.Version)
+					return ruleError(ErrMismatchedBlockHeightAndVersion, str)
+				}
+			} // ToDo(MLP): when more versions appear, we need to add here
+
 		}
 	}
 
