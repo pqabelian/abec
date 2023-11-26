@@ -3,6 +3,7 @@ package abecryptoparam
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"github.com/cryptosuite/pqringct"
 )
 
@@ -181,5 +182,41 @@ func GetTrTxWitnessSerializeSizeApprox(txVersion uint32, inputRingVersion uint32
 		return pqringct.GetTrTxWitnessSerializeSizeApprox(PQRingCTPP, inputRingSizes, outputTxoNum), nil
 	default:
 		return 0, errors.New("GetTrTxWitnessSerializeSizeApprox: Unsupported txVersion")
+	}
+}
+
+func ParseCryptoAddress(cryptoAddress []byte) (serializedAPK []byte, serializedVPK []byte, err error) {
+	cryptoScheme, err := ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	switch cryptoScheme {
+	case CryptoSchemePQRingCT:
+		return pqringctParseCryptoAddress(PQRingCTPP, cryptoScheme, cryptoAddress)
+
+	default:
+		return nil, nil, errors.New("ParseCryptoAddress: non-supported cryptoScheme appears in cryptoAddress")
+	}
+}
+
+// ExtractCryptoSchemeFromCryptoAddress extracts cryptoScheme from cryptoAddress
+func ExtractCryptoSchemeFromCryptoAddress(cryptoAddress []byte) (cryptoScheme CryptoScheme, err error) {
+	if len(cryptoAddress) < 4 {
+		errStr := fmt.Sprintf("ExtractCryptoSchemeFromCryptoAddress: incorrect length of cryptoAddress: %d", len(cryptoAddress))
+		return 0, errors.New(errStr)
+	}
+
+	return Deserialize(cryptoAddress[:4])
+
+}
+
+func GetCryptoSchemeParamSeedBytesLen(cryptoScheme CryptoScheme) (int, error) {
+	switch cryptoScheme {
+	case CryptoSchemePQRingCT:
+		return pqringctGetParamSeedBytesLen(PQRingCTPP), nil
+
+	default:
+		return 0, errors.New("GetParamSeedBytesLen: unsupported crypto-scheme")
 	}
 }

@@ -283,7 +283,7 @@ func pqringctCoinbaseTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 		//	make sure that the cryptoAddress for the target Txo is valid
 		valid, hints := pqringctCheckCryptoAddress(pp, cryptoScheme, abeTxOutputDescs[j].cryptoAddress)
 		if !valid {
-			errMsg := fmt.Sprintf("pqringctCheckCryptoAddress: the cryptoAddress in %d -th abeTxOutputDescs is not valid:"+hints, j)
+			errMsg := fmt.Sprintf("pqringctCoinbaseTxGen: the cryptoAddress in %d -th abeTxOutputDescs is not valid:"+hints, j)
 			return nil, errors.New(errMsg)
 		}
 
