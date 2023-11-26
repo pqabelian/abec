@@ -200,6 +200,7 @@ func ParseCryptoAddress(cryptoAddress []byte) (serializedAPK []byte, serializedV
 	}
 }
 
+// refactored when adding abecryptox	begin
 // ExtractCryptoSchemeFromCryptoAddress extracts cryptoScheme from cryptoAddress
 func ExtractCryptoSchemeFromCryptoAddress(cryptoAddress []byte) (cryptoScheme CryptoScheme, err error) {
 	if len(cryptoAddress) < 4 {
@@ -220,3 +221,5 @@ func GetCryptoSchemeParamSeedBytesLen(cryptoScheme CryptoScheme) (int, error) {
 		return 0, errors.New("GetParamSeedBytesLen: unsupported crypto-scheme")
 	}
 }
+
+// refactored when adding abecryptox	end
