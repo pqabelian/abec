@@ -14,8 +14,12 @@ import (
 )
 
 func TestBlkTmplGenerator_UpdateExtraNonceAbe(t *testing.T) {
+	payToAddress, err := hex.DecodeString(payToAddressStr)
+	if err != nil {
+		fmt.Println(err)
+	}
 
-	cbTx, _ := createCoinbaseTxAbeMsgTemplate(49999, 1)
+	cbTx, _ := createCoinbaseTxAbeMsgTemplate(49999, 1, payToAddress)
 
 	binary.BigEndian.PutUint64(cbTx.TxIns[0].PreviousOutPointRing.BlockHashs[1][0:8], 15)
 
@@ -34,7 +38,7 @@ func TestBlkTmplGenerator_NewBlockTemplate_UpdateExtraNonceAbe(t *testing.T) {
 		fmt.Println(err)
 	}
 
-	coinbaseTxMsg, err := createCoinbaseTxAbeMsgTemplate(nextBlockHeight, 1)
+	coinbaseTxMsg, err := createCoinbaseTxAbeMsgTemplate(nextBlockHeight, 1, payToAddress)
 	if err != nil {
 		fmt.Println(err)
 	}

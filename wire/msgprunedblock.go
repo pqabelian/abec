@@ -133,7 +133,8 @@ func (msg *MsgPrunedBlock) SerializeSize() int {
 	// todo: (EthashPow)
 	// n := blockHeaderLen + msg.CoinbaseTx.SerializeSizeFull() + VarIntSerializeSize(uint64(len(msg.TransactionHashes))) + len(msg.TransactionHashes)*32 + len(msg.WitnessHashs)*32
 	n := blockHeaderLen
-	if msg.Header.Version == int32(BlockVersionEthashPow) {
+	// todo(MLP):
+	if msg.Header.Version >= int32(BlockVersionEthashPow) {
 		n = blockHeaderLenEthash
 	}
 	n += msg.CoinbaseTx.SerializeSizeFull() + VarIntSerializeSize(uint64(len(msg.TransactionHashes))) + len(msg.TransactionHashes)*32 + len(msg.WitnessHashs)*32

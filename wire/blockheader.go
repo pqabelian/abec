@@ -15,6 +15,7 @@ import (
 const MaxBlockHeaderPayload = 16 + (chainhash.HashSize * 2)
 
 //	todo: (EthashPoW)
+//
 // Version 4 bytes + Timestamp 4 bytes + Bits 4 bytes + NonceExt 8 bytes + Height 4 bytes
 // PrevBlock, MerkleRoot, and MixDigest hashes
 const MaxBlockHeaderPayloadEthash = 24 + (chainhash.HashSize * 3)
@@ -72,7 +73,8 @@ func (h *BlockHeader) BlockHash() chainhash.Hash {
 	// todo: (EthashPoW) BlockHash() is called by many places, such as validate, it is necessary to have an if-else here,
 	// to avoid modifying everywhere to call BlockHashETHash().
 	//	Here it is necessary to use version rather than height, since the blocks before the update do not have a meaningful height.
-	if h.Version == int32(BlockVersionEthashPow) {
+	// todo(MLP):
+	if h.Version >= int32(BlockVersionEthashPow) {
 		return h.BlockHashEthash()
 	}
 
@@ -83,6 +85,7 @@ func (h *BlockHeader) BlockHash() chainhash.Hash {
 }
 
 // todo: (EthashPoW)
+//
 //	We separate this as a standalone funciton, since when mining, this funciton will be called very frequently.
 //	In mining, this funciton, rather than the original BlockHash() is called.
 //	Actually, this method is not called in mining. Just keeping here for completeness.
@@ -176,7 +179,7 @@ func NewBlockHeader(version int32, prevHash, merkleRootHash *chainhash.Hash,
 	}
 }
 
-//	todo: (EthashPoW)
+// todo: (EthashPoW)
 func NewBlockHeaderEthash(version int32, prevHash, merkleRootHash *chainhash.Hash,
 	bits uint32, height int32, nonceExt uint64, mixDigest *chainhash.Hash) *BlockHeader {
 
@@ -197,6 +200,7 @@ func NewBlockHeaderEthash(version int32, prevHash, merkleRootHash *chainhash.Has
 // readBlockHeader reads a bitcoin block header from r.  See Deserialize for
 // decoding block headers stored to disk, such as in a database, as opposed to
 // decoding from the wire.
+//
 //	todo: (EthashPoW)
 func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
 
@@ -207,7 +211,8 @@ func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
 	}
 
 	//	read the remainder fields according to the version
-	if bh.Version == int32(BlockVersionEthashPow) {
+	// todo(MLP):
+	if bh.Version >= int32(BlockVersionEthashPow) {
 		return readElements(r, &bh.PrevBlock, &bh.MerkleRoot,
 			(*uint32Time)(&bh.Timestamp), &bh.Bits, &bh.Height, &bh.NonceExt, &bh.MixDigest)
 	}
@@ -222,11 +227,13 @@ func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
 // writeBlockHeader writes a bitcoin block header to w.  See Serialize for
 // encoding block headers to be stored to disk, such as in a database, as
 // opposed to encoding for the wire.
+//
 //	todo: (EthashPoW)
 func writeBlockHeader(w io.Writer, pver uint32, bh *BlockHeader) error {
 	sec := uint32(bh.Timestamp.Unix())
 
-	if bh.Version == int32(BlockVersionEthashPow) {
+	// todo(MLP):
+	if bh.Version >= int32(BlockVersionEthashPow) {
 		return writeElements(w, bh.Version, &bh.PrevBlock, &bh.MerkleRoot,
 			sec, bh.Bits, bh.Height, bh.NonceExt, bh.MixDigest)
 		//	The codes here should be the same as that in writeBlockHeaderEthash().

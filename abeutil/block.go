@@ -367,7 +367,8 @@ func (b *Block) TxLoc() ([]wire.TxLoc, error) {
 
 func (b *BlockAbe) TxLoc() ([]wire.TxAbeLoc, error) {
 	var offset, witOffset int
-	if b.msgBlock.Header.Version == int32(wire.BlockVersionEthashPow) {
+	// todo(MLP):
+	if b.msgBlock.Header.Version >= int32(wire.BlockVersionEthashPow) {
 		offset, witOffset = 120+wire.VarIntSerializeSize(uint64(len(b.msgBlock.Transactions))), 8
 	} else {
 		offset, witOffset = 80+wire.VarIntSerializeSize(uint64(len(b.msgBlock.Transactions))), 8

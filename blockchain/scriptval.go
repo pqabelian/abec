@@ -2,7 +2,7 @@ package blockchain
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/abecrypto"
+	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/txscript"
 	"runtime"
@@ -140,7 +140,8 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 	}
 
 	if isCB {
-		isValid, err := abecrypto.CoinbaseTxVerify(tx.MsgTx())
+		// ToDo(MLP):todo
+		isValid, err := abecryptox.CoinbaseTxVerify(tx.MsgTx())
 		if !isValid || err != nil {
 			str := fmt.Sprintf("coinbase transaction %s verify failed", tx.Hash())
 			return ruleError(ErrScriptValidation, str)
@@ -148,8 +149,9 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 		return nil
 	}
 
+	// ToDo(MLP):todo
 	txInLen := len(tx.MsgTx().TxIns)
-	abeTxInDetail := make([]*abecrypto.AbeTxInDetail, txInLen)
+	abeTxInDetail := make([]*abecryptox.AbeTxInDetail, txInLen)
 	for i := 0; i < txInLen; i++ {
 		utxoRing := utxoRingView.LookupEntry(tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash())
 		if utxoRing == nil {
@@ -164,10 +166,10 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 		serializedTxoList := utxoRing.TxOuts()
 
 		ringHash := utxoRing.outPointRing.Hash()
-		abeTxInDetail[i] = abecrypto.NewAbeTxInDetail(ringHash, serializedTxoList, tx.MsgTx().TxIns[i].SerialNumber)
+		abeTxInDetail[i] = abecryptox.NewAbeTxInDetail(ringHash, serializedTxoList, tx.MsgTx().TxIns[i].SerialNumber)
 	}
 
-	isValid, err := abecrypto.TransferTxVerify(tx.MsgTx(), abeTxInDetail)
+	isValid, err := abecryptox.TransferTxVerify(tx.MsgTx(), abeTxInDetail)
 	if !isValid || err != nil {
 		str := fmt.Sprintf("transaction %s verify failed", tx.Hash())
 		return ruleError(ErrScriptValidation, str)

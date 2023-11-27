@@ -46,12 +46,12 @@ func CoinbaseTxGen(abeTxOutputDescs []*AbeTxOutputDesc, coinbaseTxMsgTemplate *w
 	case abecryptoxparam.CryptoSchemePQRingCT:
 		// This is to achieve back-compatibility with CryptoSchemePQRingCT.
 		// Before the BlockHeightMLP, the caller may use the coinbaseTxMsgTemplate.Version that maps to CryptoSchemePQRingCT.
-		pqRingCTAbeTxOutputDescs := make([]*abecrypto.AbeTxOutputDesc, len(abeTxOutputDescs))
+		pqringctAbeTxOutputDescs := make([]*abecrypto.AbeTxOutputDesc, len(abeTxOutputDescs))
 		for i := 0; i < len(abeTxOutputDescs); i++ {
-			pqRingCTAbeTxOutputDescs[i] = abecrypto.NewAbeTxOutDesc(abeTxOutputDescs[i].cryptoAddress, abeTxOutputDescs[i].value)
+			pqringctAbeTxOutputDescs[i] = abecrypto.NewAbeTxOutDesc(abeTxOutputDescs[i].cryptoAddress, abeTxOutputDescs[i].value)
 		}
 
-		cbTx, err := abecrypto.CoinbaseTxGen(pqRingCTAbeTxOutputDescs, coinbaseTxMsgTemplate)
+		cbTx, err := abecrypto.CoinbaseTxGen(pqringctAbeTxOutputDescs, coinbaseTxMsgTemplate)
 		if err != nil {
 			return nil, err
 		}
@@ -67,6 +67,57 @@ func CoinbaseTxGen(abeTxOutputDescs []*AbeTxOutputDesc, coinbaseTxMsgTemplate *w
 		return nil, errors.New("CoinbaseTxGen: Unsupported crypto scheme")
 	}
 
+}
+
+func CoinbaseTxVerify(coinbaseTx *wire.MsgTxAbe) (bool, error) {
+	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(coinbaseTx.Version)
+	if err != nil {
+		return false, err
+	}
+
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCT:
+		valid, err := abecrypto.CoinbaseTxVerify(coinbaseTx)
+		if err != nil {
+			return false, err
+		}
+		return valid, nil
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+		return pqringctxCoinbaseTxVerify(abecryptoxparam.PQRingCTXPP, coinbaseTx)
+	default:
+		return false, errors.New("CoinbaseTxVerify: Unsupported crypto scheme")
+	}
+}
+
+func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail) (bool, error) {
+	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(transferTx.Version)
+	if err != nil {
+		return false, err
+	}
+
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCT:
+		pqringctAbeTxInDetails := make([]*abecrypto.AbeTxInDetail, len(abeTxInDetails))
+		for i := 0; i < len(abeTxInDetails); i++ {
+			abeTxInDetail := abeTxInDetails[i]
+			pqringctAbeTxInDetails[i] = abecrypto.NewAbeTxInDetail(abeTxInDetail.ringHash, abeTxInDetail.txoList, abeTxInDetail.serialNumber)
+		}
+
+		valid, err := abecrypto.TransferTxVerify(transferTx, pqringctAbeTxInDetails)
+		if err != nil {
+			return false, err
+		}
+		return valid, nil
+
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+		valid, err := pqringctxTransferTxVerify(abecryptoxparam.PQRingCTXPP, transferTx, abeTxInDetails)
+		if err != nil {
+			return false, err
+		}
+		return valid, nil
+	default:
+		return false, errors.New("TransferTxVerify: Unsupported crypto scheme")
+	}
 }
 
 //	APIs for AddressKey-Encode-Format	begin

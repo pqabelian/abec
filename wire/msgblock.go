@@ -543,7 +543,8 @@ func (msg *MsgBlock) SerializeSize() int {
 	// todo: (EthashPow)
 	// n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
 	n := blockHeaderLen
-	if msg.Header.Version == int32(BlockVersionEthashPow) {
+	// todo(MLP):
+	if msg.Header.Version >= int32(BlockVersionEthashPow) {
 		n = blockHeaderLenEthash
 	}
 	n += VarIntSerializeSize(uint64(len(msg.Transactions)))
@@ -563,7 +564,8 @@ func (msg *MsgBlock) SerializeSizeStripped() int {
 	//	todo: (EthashPoW)
 	//n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
 	n := blockHeaderLen
-	if msg.Header.Version == int32(BlockVersionEthashPow) {
+	// todo(MLP):
+	if msg.Header.Version >= int32(BlockVersionEthashPow) {
 		n = blockHeaderLenEthash
 	}
 	n += VarIntSerializeSize(uint64(len(msg.Transactions)))
@@ -580,7 +582,8 @@ func (msg *MsgBlockAbe) SerializeSizeStripped() int {
 	// todo: (EthashPoW)
 	//n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
 	n := blockHeaderLen
-	if msg.Header.Version == int32(BlockVersionEthashPow) {
+	// todo(MLP):
+	if msg.Header.Version >= int32(BlockVersionEthashPow) {
 		n = blockHeaderLenEthash
 	}
 	n += VarIntSerializeSize(uint64(len(msg.Transactions)))
@@ -628,7 +631,8 @@ func (msg *MsgBlockAbe) SerializeSize() int {
 	// todo: (EthashPoW)
 	// n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
 	n := blockHeaderLen
-	if msg.Header.Version == int32(BlockVersionEthashPow) {
+	// todo(MLP):
+	if msg.Header.Version >= int32(BlockVersionEthashPow) {
 		n = blockHeaderLenEthash
 	}
 	n += VarIntSerializeSize(uint64(len(msg.Transactions)))

@@ -361,6 +361,8 @@ func CheckTransactionSanity(tx *abeutil.Tx) error {
 //  2. Each input's ring version should be the same
 //  3. Each input's block number and ring size should obey the ring version
 //  4. No duplicate inputs (same ring and same serial number)
+//
+// todo(MLP): todo
 func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 	// A transaction must have at least one input.
 	msgTx := tx.MsgTx()
@@ -528,7 +530,8 @@ func checkProofOfWork(header *wire.BlockHeader, ethash *ethash.Ethash, powLimit 
 		// The block hash must be less than the claimed target.
 		// todo: (EthashPoW)
 		// It is necessary to use header.Version, rather than the Height as the branch condition.
-		if header.Version == int32(wire.BlockVersionEthashPow) {
+		// todo(MLP):
+		if header.Version >= int32(wire.BlockVersionEthashPow) {
 			err := ethash.VerifySeal(header, target)
 			if err != nil {
 				return err
@@ -878,7 +881,8 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, powLimi
 	// merkle root matches here.
 	// todo: (EthashPoW) use the optimized BuildMerkleTreeStoreAbeEthash()
 	log.Debugf("Verify the transaction merkle tree for block %s", block.Hash())
-	if header.Version == int32(wire.BlockVersionEthashPow) {
+	// todo(MLP):
+	if header.Version >= int32(wire.BlockVersionEthashPow) {
 		calculatedMerkleRoot, _ := BuildMerkleTreeStoreAbeEthash(block.Transactions())
 		if !header.MerkleRoot.IsEqual(calculatedMerkleRoot) {
 			str := fmt.Sprintf("block merkle root is invalid - block "+
@@ -1425,6 +1429,7 @@ func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *
 		return nil
 	}
 
+	// ToDo(MLP):todo
 	for txInIndex, txIn := range tx.MsgTx().TxIns {
 		// Ensure the referenced input transaction is available.
 		utxoRing := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())

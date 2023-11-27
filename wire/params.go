@@ -34,8 +34,10 @@ const (
 	//	But on the other side, TxVersion updates do not only work for crypto-scheme update, and it works for all possible updates.
 	//	That's why we need to maintain the mapping of (CryptoScheme, TxVersion).
 
+	// ToDo(MLP):
 	//	TxVersion = 1
-	TxVersion = TxVersion_Height_0
+	// TxVersion = TxVersion_Height_0
+	TxVersion = TxVersion_Height_MLPAUT_236000
 
 	//	todo: (EthashPow) BlockVersionEthashPow
 	// BlockVersionEthashPow is the block version which changed block to use EthashPoW

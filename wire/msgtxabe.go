@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
+	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/chainhash"
 	"io"
 	"strconv"
@@ -558,7 +559,7 @@ func (msg *MsgTxAbe) IsCoinBase() (bool, error) {
 	// Whatever ths ring members for the TxIns[0]
 	// the ring members' (TXHash, index) can be used as coin-nonce
 	txIn := msg.TxIns[0]
-	nullSn, err := abecryptoparam.GetNullSerialNumber(txIn.PreviousOutPointRing.Version)
+	nullSn, err := abecryptoxparam.GetNullSerialNumber(txIn.PreviousOutPointRing.Version)
 	if err != nil {
 		return false, err
 	}
@@ -935,7 +936,7 @@ func NewMsgTxAbe(version uint32) *MsgTxAbe {
 func NewStandardCoinbaseTxIn(nextBlockHeight int32, txVersion uint32) (*TxInAbe, error) {
 	txIn := &TxInAbe{}
 
-	nullSn, err := abecryptoparam.GetNullSerialNumber(txVersion)
+	nullSn, err := abecryptoxparam.GetNullSerialNumber(txVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -943,7 +944,7 @@ func NewStandardCoinbaseTxIn(nextBlockHeight int32, txVersion uint32) (*TxInAbe,
 	txIn.SerialNumber = nullSn
 
 	previousOutPointRing := OutPointRing{}
-	// For coinbase transaction, as the previousOutPointRing is actually empty (withour any real Txo),
+	// For coinbase transaction, as the previousOutPointRing is actually empty (without any real Txo),
 	// the ring version is set the same as the transaction.
 	previousOutPointRing.Version = txVersion
 	previousOutPointRing.BlockHashs = make([]*chainhash.Hash, 3)

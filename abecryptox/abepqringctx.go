@@ -149,5 +149,147 @@ func pqringctxCoinbaseTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecr
 	return nil, nil
 }
 
+// pqringctxCoinbaseTxVerify verify the input coinbaseTx.
+// The caller needs to guarantee the well-form of the input coinbaseTx *wire.MsgTxAbe, such as the TxIns.
+// This function only checks the balance proof, by calling the crypto-scheme.
+func pqringctxCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, coinbaseTx *wire.MsgTxAbe) (bool, error) {
+	//if coinbaseTx == nil {
+	//	return false, nil
+	//}
+	//if len(coinbaseTx.TxOuts) <= 0 {
+	//	return false, nil
+	//}
+	//var err error
+	//
+	//cryptoCoinbaseTx := &pqringct.CoinbaseTx{}
+	//
+	//cryptoCoinbaseTx.Vin = coinbaseTx.TxFee
+	//
+	//cryptoCoinbaseTx.OutputTxos = make([]*pqringct.Txo, len(coinbaseTx.TxOuts))
+	//for i := 0; i < len(coinbaseTx.TxOuts); i++ {
+	//	if coinbaseTx.TxOuts[i].Version != coinbaseTx.Version {
+	//		return false, nil
+	//	}
+	//	cryptoCoinbaseTx.OutputTxos[i], err = pqringct.DeserializeTxo(pp, coinbaseTx.TxOuts[i].TxoScript)
+	//	if err != nil {
+	//		return false, err
+	//	}
+	//}
+	//
+	//cryptoCoinbaseTx.TxMemo = coinbaseTx.TxMemo
+	//
+	//if len(coinbaseTx.TxOuts) == 1 {
+	//	cryptoCoinbaseTx.TxWitnessJ1, err = pqringct.DeserializeCbTxWitnessJ1(pp, coinbaseTx.TxWitness)
+	//	cryptoCoinbaseTx.TxWitnessJ2 = nil
+	//} else {
+	//	cryptoCoinbaseTx.TxWitnessJ1 = nil
+	//	cryptoCoinbaseTx.TxWitnessJ2, err = pqringct.DeserializeCbTxWitnessJ2(pp, coinbaseTx.TxWitness)
+	//}
+	//if err != nil {
+	//	return false, err
+	//}
+	//
+	//bl, err := pqringct.CoinbaseTxVerify(pp, cryptoCoinbaseTx)
+	//if err != nil {
+	//	return false, err
+	//}
+	//if bl == false {
+	//	return false, nil
+	//}
+
+	return true, nil
+}
+
+func pqringctxTransferTxVerify(pp *pqringctxapi.PublicParameter, transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail) (bool, error) {
+	//if transferTx == nil {
+	//	return false, nil
+	//}
+	//
+	//inputNum := len(transferTx.TxIns)
+	//outputNum := len(transferTx.TxOuts)
+	//if inputNum <= 0 || outputNum <= 0 {
+	//	return false, nil
+	//}
+	//
+	//if len(abeTxInDetails) != inputNum {
+	//	return false, nil
+	//}
+	//
+	//var err error
+	//inputsVersion := transferTx.TxIns[0].PreviousOutPointRing.Version
+	//outputsVersion := transferTx.Version
+	//
+	//cryptoTransferTx := &pqringct.TransferTx{}
+	//
+	////	Inputs
+	//cryptoTransferTx.Inputs = make([]*pqringct.TrTxInput, inputNum)
+	//for i := 0; i < inputNum; i++ {
+	//	if transferTx.TxIns[i].PreviousOutPointRing.Version != inputsVersion {
+	//		return false, nil
+	//		//	This is necessary, since the same version will ensure that when calling the cryptoscheme, there are not exceptions.
+	//	}
+	//	if bytes.Compare(abeTxInDetails[i].serialNumber, transferTx.TxIns[i].SerialNumber) != 0 {
+	//		return false, nil
+	//		//	This check can be removed, as the caller will provide abeTxInDetails, which are made by querying the database using the transferTx.TxIns information
+	//	}
+	//	txoList := make([]*pqringct.LgrTxo, len(abeTxInDetails[i].txoList))
+	//	for j := 0; j < len(abeTxInDetails[i].txoList); j++ {
+	//		if abeTxInDetails[i].txoList[j].Version != transferTx.TxIns[i].PreviousOutPointRing.Version {
+	//			return false, nil
+	//			//	The Txos in the same ring should have the same version
+	//		}
+	//
+	//		txo, err := pp.DeserializeTxo(abeTxInDetails[i].txoList[j].TxoScript)
+	//		if err != nil {
+	//			return false, err
+	//		}
+	//		txolid := ledgerTxoIdGen(abeTxInDetails[i].ringHash, uint8(j))
+	//		txoList[j] = pqringct.NewLgrTxo(txo, txolid)
+	//
+	//	}
+	//	cryptoTransferTx.Inputs[i] = &pqringct.TrTxInput{
+	//		TxoList:      txoList,
+	//		SerialNumber: abeTxInDetails[i].serialNumber,
+	//	}
+	//}
+	//
+	////	OutputTxos
+	//cryptoTransferTx.OutputTxos = make([]*pqringct.Txo, outputNum)
+	//for j := 0; j < outputNum; j++ {
+	//	if transferTx.TxOuts[j].Version != outputsVersion {
+	//		return false, nil
+	//		//	The output Txos of a transaction should have the same version as the transaction.
+	//	}
+	//
+	//	cryptoTransferTx.OutputTxos[j], err = pp.DeserializeTxo(transferTx.TxOuts[j].TxoScript)
+	//	if err != nil {
+	//		return false, err
+	//	}
+	//}
+	//
+	////	Fee
+	//cryptoTransferTx.Fee = transferTx.TxFee
+	//
+	////	TxMemo
+	//cryptoTransferTx.TxMemo = transferTx.TxMemo
+	//
+	////	TxWitness
+	//cryptoTransferTx.TxWitness, err = pp.DeserializeTrTxWitness(transferTx.TxWitness)
+	//if err != nil {
+	//	return false, nil
+	//}
+	//
+	//// call the crypto scheme's verify algroithm
+	//bl, err := pqringct.TransferTxVerify(pp, cryptoTransferTx)
+	//if err != nil {
+	//	return false, err
+	//}
+	//if bl == false {
+	//	return false, nil
+	//}
+
+	return true, nil
+}
+
 // API for AddressKeys	begin
 // API for AddressKeys	end
