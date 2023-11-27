@@ -6,7 +6,7 @@ import (
 	"github.com/cryptosuite/pqringct"
 )
 
-func pqringctParseCryptoAddress(pp *pqringct.PublicParameter, cryptoScheme CryptoScheme, cryptoAddress []byte) (serializedAPK []byte, serializedVPK []byte, err error) {
+func pqringctCryptoAddressParse(pp *pqringct.PublicParameter, cryptoScheme CryptoScheme, cryptoAddress []byte) (serializedAPK []byte, serializedVPK []byte, err error) {
 	if len(cryptoAddress) < 4 {
 		errMsg := fmt.Sprintf("pqringctParseCryptoAddress: invalid length of cryptoAddress: %d", len(cryptoAddress))
 		return nil, nil, errors.New(errMsg)
