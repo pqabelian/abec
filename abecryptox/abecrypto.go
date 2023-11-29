@@ -36,6 +36,9 @@ func CryptoAddressKeyGen(randSeed []byte, cryptoScheme abecryptoxparam.CryptoSch
 	//return nil, nil, nil, nil, nil
 }
 
+// APIs for Transactions	begin
+
+// CoinbaseTxGen takes as input the transaction material and outputs a *wire.MsgTxAbe
 func CoinbaseTxGen(abeTxOutputDescs []*AbeTxOutputDesc, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(coinbaseTxMsgTemplate.Version)
 	if err != nil {
@@ -58,7 +61,7 @@ func CoinbaseTxGen(abeTxOutputDescs []*AbeTxOutputDesc, coinbaseTxMsgTemplate *w
 		return cbTx, nil
 
 	case abecryptoxparam.CryptoSchemePQRingCTX:
-		cbTx, err := pqringctxCoinbaseTxGen(abecryptoxparam.PQRingCTXPP, cryptoScheme, abeTxOutputDescs, coinbaseTxMsgTemplate)
+		cbTx, err := pqringctxCoinbaseTxGen(abecryptoxparam.PQRingCTXPP, abeTxOutputDescs, coinbaseTxMsgTemplate)
 		if err != nil {
 			return nil, err
 		}
@@ -120,5 +123,10 @@ func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail
 	}
 }
 
+//	APIs for Transactions	end
+
 //	APIs for AddressKey-Encode-Format	begin
 //	APIs for AddressKey-Encode-Format	end
+
+//	APIs for Txos	begin
+//	APIs for Txos	end

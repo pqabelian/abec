@@ -212,6 +212,7 @@ func CryptoAddressParse(cryptoAddress []byte) (privacyLevel PrivacyLevel,
 	coinAddress []byte,
 	valuePublicKey []byte,
 	err error) {
+
 	cryptoScheme, err := ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
 	if err != nil {
 		return 0, nil, nil, err

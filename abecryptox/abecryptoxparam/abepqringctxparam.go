@@ -91,8 +91,8 @@ func pqringctxGetCryptoSchemeParamSeedBytesLen(pp *pqringctxapi.PublicParameter)
 	return pqringctxapi.GetParamSeedBytesLen(pp)
 }
 
-func pqringctxGetTxoSerializeSizeApprox(pp *pqringctxapi.PublicParameter, coinAddress []byte) (int, error) {
-	return pqringctxapi.GetTxoSerializeSizeApprox(pp, coinAddress)
+func pqringctxGetTxoSerializeSize(pp *pqringctxapi.PublicParameter, coinAddress []byte) (int, error) {
+	return pqringctxapi.GetTxoSerializeSize(pp, coinAddress)
 }
 
 func pqringctxGetCbTxWitnessSerializeSizeApprox(pp *pqringctxapi.PublicParameter, coinAddressListPayTo [][]byte) (int, error) {

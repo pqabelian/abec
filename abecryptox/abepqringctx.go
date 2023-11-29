@@ -95,107 +95,93 @@ func pqringctxCryptoAddressKeyGen(pp *pqringctxapi.PublicParameter, randSeed []b
 
 // The caller needs to fill the Version, TxIns, TxFee, TxMemo fields for coinbaseTxMsgTemplate,
 // this function will fill the TxOuts and TxWitness fields.
-// The cryptoScheme here is used only for double-check.
-func pqringctxCoinbaseTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxOutputDescs []*AbeTxOutputDesc, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
-	////	pqringctx
-	//txOutputDescs := make([]*pqringct.TxOutputDesc, len(abeTxOutputDescs))
-	//for j := 0; j < len(abeTxOutputDescs); j++ {
-	//	cryptoSchemeInAddress, err := abecryptoxparam.ExtractCryptoSchemeFromCryptoAddress(abeTxOutputDescs[j].cryptoAddress)
-	//	if err != nil || cryptoSchemeInAddress != cryptoScheme {
-	//		return nil, errors.New("unmatched cryptoScheme for coinbase transaction and cryptoAddress")
-	//	}
-	//
-	//	// parse the cryptoAddress to serializedApk and serializedVpk
-	//	apkLen := pqringct.GetAddressPublicKeySerializeSize(pp)
-	//	//vpkLen := pp.GetValuePublicKeySerializeSize()
-	//	serializedApk := abeTxOutputDescs[j].cryptoAddress[4 : 4+apkLen]
-	//	serializedVpk := abeTxOutputDescs[j].cryptoAddress[4+apkLen:]
-	//	txOutputDescs[j] = pqringct.NewTxOutputDescv2(pp, serializedApk, serializedVpk, abeTxOutputDescs[j].value)
-	//}
-	//
-	//// call the pqringct.CoinbaseTxGen
-	////	vin is set in coinbaseTxMsgTemplate.TxFee
-	//cryptoCoinbaseTx, err := pqringct.CoinbaseTxGen(pp, coinbaseTxMsgTemplate.TxFee, txOutputDescs, coinbaseTxMsgTemplate.TxMemo)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//// parse the pqringct.CoinbaseTx to wire.TxAbe
-	//coinbaseTxMsgTemplate.TxOuts = make([]*wire.TxOutAbe, len(cryptoCoinbaseTx.OutputTxos))
-	//for i := 0; i < len(cryptoCoinbaseTx.OutputTxos); i++ {
-	//	serializedTxo, err := pqringct.SerializeTxo(pp, cryptoCoinbaseTx.OutputTxos[i])
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//	coinbaseTxMsgTemplate.TxOuts[i] = &wire.TxOutAbe{
-	//		Version:   coinbaseTxMsgTemplate.Version,
-	//		TxoScript: serializedTxo,
-	//	}
-	//}
-	//
-	//// witness must be associated with Tx, so it does not need to contain cryptoscheme or TxVersion.
-	//var serializedCbTxWitness []byte
-	//if len(cryptoCoinbaseTx.OutputTxos) == 1 {
-	//	serializedCbTxWitness, err = pqringct.SerializeCbTxWitnessJ1(pp, cryptoCoinbaseTx.TxWitnessJ1)
-	//} else {
-	//	serializedCbTxWitness, err = pqringct.SerializeCbTxWitnessJ2(pp, cryptoCoinbaseTx.TxWitnessJ2)
-	//}
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//coinbaseTxMsgTemplate.TxWitness = serializedCbTxWitness
-	//return coinbaseTxMsgTemplate, nil
-	return nil, nil
+func pqringctxCoinbaseTxGen(pp *pqringctxapi.PublicParameter, abeTxOutputDescs []*AbeTxOutputDesc, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
+
+	//	parse AbeTxOutputDesc to pqringctx.TxOutputDesc
+	txOutputDescs := make([]*pqringctxapi.TxOutputDescMLP, len(abeTxOutputDescs))
+	for j := 0; j < len(abeTxOutputDescs); j++ {
+		_, coinAddress, valuePublicKey, err := abecryptoxparam.CryptoAddressParse(abeTxOutputDescs[j].cryptoAddress)
+		if err != nil {
+			return nil, err
+		}
+
+		txOutputDescs[j] = pqringctxapi.NewTxOutputDescMLP(coinAddress, valuePublicKey, abeTxOutputDescs[j].value)
+	}
+
+	// call the pqringctx.CoinbaseTxGen
+	//	vin is set in coinbaseTxMsgTemplate.TxFee
+	cryptoCoinbaseTx, err := pqringctxapi.CoinbaseTxGen(pp, coinbaseTxMsgTemplate.TxFee, txOutputDescs, coinbaseTxMsgTemplate.TxMemo)
+	if err != nil {
+		return nil, err
+	}
+
+	// parse the pqringctx.CoinbaseTx to wire.TxAbe
+	cryptoTxos := cryptoCoinbaseTx.GetTxos()
+	coinbaseTxMsgTemplate.TxOuts = make([]*wire.TxOutAbe, len(cryptoTxos))
+	for i := 0; i < len(cryptoTxos); i++ {
+		serializedTxo, err := pqringctxapi.SerializeTxo(pp, cryptoTxos[i])
+		if err != nil {
+			return nil, err
+		}
+		coinbaseTxMsgTemplate.TxOuts[i] = &wire.TxOutAbe{
+			Version:   coinbaseTxMsgTemplate.Version,
+			TxoScript: serializedTxo,
+		}
+	}
+
+	// witness must be associated with Tx, so it does not need to contain cryptoScheme or TxVersion.
+	serializedCbTxWitness, err := pqringctxapi.SerializeTxWitness(pp, cryptoCoinbaseTx.GetTxWitness())
+	if err != nil {
+		return nil, err
+	}
+
+	coinbaseTxMsgTemplate.TxWitness = serializedCbTxWitness
+	return coinbaseTxMsgTemplate, nil
+	//return nil, nil
 }
 
 // pqringctxCoinbaseTxVerify verify the input coinbaseTx.
 // The caller needs to guarantee the well-form of the input coinbaseTx *wire.MsgTxAbe, such as the TxIns.
 // This function only checks the balance proof, by calling the crypto-scheme.
 func pqringctxCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, coinbaseTx *wire.MsgTxAbe) (bool, error) {
-	//if coinbaseTx == nil {
-	//	return false, nil
-	//}
-	//if len(coinbaseTx.TxOuts) <= 0 {
-	//	return false, nil
-	//}
-	//var err error
-	//
-	//cryptoCoinbaseTx := &pqringct.CoinbaseTx{}
-	//
-	//cryptoCoinbaseTx.Vin = coinbaseTx.TxFee
-	//
-	//cryptoCoinbaseTx.OutputTxos = make([]*pqringct.Txo, len(coinbaseTx.TxOuts))
-	//for i := 0; i < len(coinbaseTx.TxOuts); i++ {
-	//	if coinbaseTx.TxOuts[i].Version != coinbaseTx.Version {
-	//		return false, nil
-	//	}
-	//	cryptoCoinbaseTx.OutputTxos[i], err = pqringct.DeserializeTxo(pp, coinbaseTx.TxOuts[i].TxoScript)
-	//	if err != nil {
-	//		return false, err
-	//	}
-	//}
-	//
-	//cryptoCoinbaseTx.TxMemo = coinbaseTx.TxMemo
-	//
-	//if len(coinbaseTx.TxOuts) == 1 {
-	//	cryptoCoinbaseTx.TxWitnessJ1, err = pqringct.DeserializeCbTxWitnessJ1(pp, coinbaseTx.TxWitness)
-	//	cryptoCoinbaseTx.TxWitnessJ2 = nil
-	//} else {
-	//	cryptoCoinbaseTx.TxWitnessJ1 = nil
-	//	cryptoCoinbaseTx.TxWitnessJ2, err = pqringct.DeserializeCbTxWitnessJ2(pp, coinbaseTx.TxWitness)
-	//}
-	//if err != nil {
-	//	return false, err
-	//}
-	//
-	//bl, err := pqringct.CoinbaseTxVerify(pp, cryptoCoinbaseTx)
-	//if err != nil {
-	//	return false, err
-	//}
-	//if bl == false {
-	//	return false, nil
-	//}
+	if coinbaseTx == nil {
+		return false, nil
+	}
+	if len(coinbaseTx.TxOuts) <= 0 {
+		return false, nil
+	}
+	var err error
+
+	vin := coinbaseTx.TxFee
+
+	txoMLPs := make([]pqringctxapi.TxoMLP, len(coinbaseTx.TxOuts))
+	for i := 0; i < len(coinbaseTx.TxOuts); i++ {
+		if coinbaseTx.TxOuts[i].Version != coinbaseTx.Version {
+			return false, nil
+		}
+
+		txoMLPs[i], err = pqringctxapi.DeserializeTxo(pp, coinbaseTx.TxOuts[i].TxoScript)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	txMemo := coinbaseTx.TxMemo
+
+	txWitnessMLP, err := pqringctxapi.DeserializeTxWitness(pp, coinbaseTx.TxWitness)
+	if err != nil {
+		return false, err
+	}
+
+	cryptoCoinbaseTx := pqringctxapi.NewCoinbaseTxMLP(vin, txoMLPs, txMemo, txWitnessMLP)
+
+	bl, err := pqringctxapi.CoinbaseTxVerify(pp, cryptoCoinbaseTx)
+	if err != nil {
+		return false, err
+	}
+	if bl == false {
+		return false, nil
+	}
 
 	return true, nil
 }
