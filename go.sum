@@ -50,8 +50,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c h1:ncq/mPwQF4JjgDlrVEn3C11VoGHZN7m8qihwgMEtzYw=
 github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c/go.mod h1:OmDBASR4679mdNQnz2pUhc2G8CO2JrUAVFDRBDP/hJE=
-github.com/pqabelian/abec v0.0.0-20231118053133-0fc963ec74cf h1:To8dGFRFH8RYvrpL0fCaWKLSThQsNYELKLqrKYJtBgU=
-github.com/pqabelian/abec v0.0.0-20231118053133-0fc963ec74cf/go.mod h1:kmUBSI6+QYWOxZRf9GcwURtgRV48ksgfffGek9/zXns=
+github.com/pqabelian/abec v0.0.0-20231130144401-eb13c21d10d3 h1:RM3uhOYIbAFL9UrScQsYI8IeFLeDXOo5qs1NWI0DaWo=
+github.com/pqabelian/abec v0.0.0-20231130144401-eb13c21d10d3/go.mod h1:unkOE9jjUr1UjU3NEAS6gktV78ofjdMLMEv2u6wNYeU=
 github.com/pqabelian/pqringct v0.0.0-20231107022351-feb587470e43 h1:G2jh3ZXjPw9rkzNoyPknv35bgOMHy0V/fR+10lorXCI=
 github.com/pqabelian/pqringct v0.0.0-20231107022351-feb587470e43/go.mod h1:27zZcwOIf+Jc6+tAfcVJ+VqNY5GzhLn+D5+Vq+u+Ww0=
 github.com/shirou/gopsutil/v3 v3.23.7 h1:C+fHO8hfIppoJ1WdsVm1RoI0RwXoNdfTK7yWXV0wVj4=
