@@ -650,6 +650,8 @@ func BuildTransferTxRequestDescFromBlocks(
 	return serializedTxRequestDesc, nil
 }
 
+//	todo(MLP): todo
+//
 // CreateTransferTx would use the result called by BuildTransferTxRequestDescFromBlocks or BuildTransferTxRequestDescFromTxoRings as the unsigned transaction
 // and the cryptoKeys should be matched in order for the input in unsigned transaction
 func CreateTransferTx(serializedTransferTxRequestDesc []byte, cryptoKeys []*CryptoKey) (serializedTxFull []byte, txId *TxId, err error) {
