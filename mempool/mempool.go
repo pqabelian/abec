@@ -3,9 +3,11 @@ package mempool
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
+	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
@@ -72,6 +74,7 @@ type Config struct {
 	FetchUtxoView func(*abeutil.Tx) (*blockchain.UtxoViewpoint, error)
 
 	FetchUtxoRingView func(*abeutil.TxAbe) (*blockchain.UtxoRingViewpoint, error)
+	FetchAUTView      func(*abeutil.TxAbe) (*blockchain.AUTViewpoint, error)
 
 	// BestHeight defines the function to use to access the block height of
 	// the current best chain.
@@ -219,6 +222,8 @@ type TxPool struct {
 	orphansAbe       map[chainhash.Hash]*orphanTxAbe
 	outpointsAbe     map[chainhash.Hash]map[string]*abeutil.TxAbe                    //TODO(abe):why use two layers map                 //	corresponding to btc's outpoints, using hash rather then TxIn as the key for map
 	orphansByPrevAbe map[chainhash.Hash]map[string]map[chainhash.Hash]*abeutil.TxAbe // corresponding to btc's orphansByPrev //TODO type transfer??? []byte -> string
+
+	expiredAUTTransaction map[int32]*TxDescAbe
 
 	txMonitorMu  sync.Mutex
 	txMonitoring bool
@@ -807,7 +812,9 @@ func (mp *TxPool) RemoveDoubleSpendsAbe(tx *abeutil.TxAbe) {
 // helper for maybeAcceptTransactionAbe.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, tx *abeutil.TxAbe, height int32, fee uint64, fromDiskCache bool) *TxDescAbe {
+func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint,
+	autView *blockchain.AUTViewpoint, tx *abeutil.TxAbe,
+	height int32, fee uint64, fromDiskCache bool) *TxDescAbe {
 	// Add the transaction to the pool and mark the referenced outpoints
 	// as spent by the pool.
 	txD := &TxDescAbe{
@@ -881,6 +888,19 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 	// Record this tx for fee estimation if enabled.
 	if mp.cfg.FeeEstimator != nil {
 		mp.cfg.FeeEstimator.ObserveTransaction(txD)
+	}
+
+	autTx, _ := aut.DeserializeFromTx(tx.MsgTx())
+	switch autTransaction := autTx.(type) {
+	case *aut.RegistrationTx:
+		mp.expiredAUTTransaction[autTransaction.ExpireHeight] = txD
+	case *aut.ReRegistrationTx:
+		mp.expiredAUTTransaction[autTransaction.ExpireHeight] = txD
+	case *aut.MintTx:
+		info := autView.LookupInfo(hex.EncodeToString(autTransaction.Name))
+		mp.expiredAUTTransaction[info.ExpireHeight] = txD
+	default:
+		// nothing to do
 	}
 
 	return txD
@@ -1373,6 +1393,15 @@ func (mp *TxPool) fetchInputUtxoRingsAbe(tx *abeutil.TxAbe) (*blockchain.UtxoRin
 	return utxoRingView, nil
 }
 
+func (mp *TxPool) fetchInputAUT(tx *abeutil.TxAbe) (*blockchain.AUTViewpoint, error) {
+	autView, err := mp.cfg.FetchAUTView(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	return autView, nil
+}
+
 // FetchTransaction returns the requested transaction from the transaction pool.
 // This only fetches from the main transaction pool and does not include
 // orphans.
@@ -1853,7 +1882,24 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 		return nil, nil, err
 	}
 
-	txD := mp.addTransactionAbe(utxoRingView, tx, bestHeight, txFee, fromDiskCache)
+	// TODO AUT Check, just promote efficiency
+	autView, err := mp.fetchInputAUT(tx)
+	if err != nil {
+		if cerr, ok := err.(blockchain.RuleError); ok {
+			return nil, nil, chainRuleError(cerr)
+		}
+		return nil, nil, err
+	}
+
+	err = blockchain.CheckTransactionInputsAUT(tx, nextBlockHeight, autView, mp.cfg.ChainParams)
+	if err != nil {
+		if cerr, ok := err.(blockchain.RuleError); ok {
+			return nil, nil, chainRuleError(cerr)
+		}
+		return nil, nil, err
+	}
+
+	txD := mp.addTransactionAbe(utxoRingView, autView, tx, bestHeight, txFee, fromDiskCache)
 
 	log.Debugf("Accepted transaction %v (pool size: %v)", txHash,
 		len(mp.poolAbe))

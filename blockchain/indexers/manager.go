@@ -89,7 +89,7 @@ func dbIndexConnectBlock(dbTx database.Tx, indexer Indexer, block *abeutil.Block
 	return dbPutIndexerTip(dbTx, idxKey, block.Hash(), block.Height())
 }
 
-//	Abe to do
+// Abe to do
 func dbIndexConnectBlockAbe(dbTx database.Tx, indexer Indexer, block *abeutil.BlockAbe,
 	stxo []*blockchain.SpentTxOutAbe) error {
 
@@ -565,8 +565,8 @@ func (m *Manager) ConnectBlock(dbTx database.Tx, block *abeutil.Block,
 	return nil
 }
 
-//	Abe to do
-//	Really Need TO DO
+// Abe to do
+// Really Need TO DO
 func (m *Manager) ConnectBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe,
 	stxos []*blockchain.SpentTxOutAbe) error {
 
@@ -601,7 +601,7 @@ func (m *Manager) DisconnectBlock(dbTx database.Tx, block *abeutil.Block,
 	return nil
 }
 
-//	todo(ABE.MUST)
+// todo(ABE.MUST)
 func (m *Manager) DisconnectBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe,
 	stxo []*blockchain.SpentTxOutAbe) error {
 

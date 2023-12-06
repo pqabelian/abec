@@ -3,10 +3,12 @@ package mining
 import (
 	"container/heap"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/abeutil"
+	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
@@ -250,6 +252,29 @@ func mergeUtxoView(viewA *blockchain.UtxoViewpoint, viewB *blockchain.UtxoViewpo
 	}
 }
 
+func mergeUtxoRingView(viewA *blockchain.UtxoRingViewpoint, viewB *blockchain.UtxoRingViewpoint) {
+	viewAEntries := viewA.Entries()
+	for outpoint, entryB := range viewB.Entries() {
+		viewAEntries[outpoint] = entryB
+	}
+
+	viewA.SetEntries(viewAEntries)
+}
+
+func mergeAUTView(viewA *blockchain.AUTViewpoint, viewB *blockchain.AUTViewpoint) {
+	viewAEntries := viewA.Entries()
+	for outpoint, entryB := range viewB.Entries() {
+		viewAEntries[outpoint] = entryB
+	}
+	viewA.SetEntries(viewAEntries)
+
+	viewAInfos := viewA.Infos()
+	for outpoint, entryB := range viewB.Infos() {
+		viewAInfos[outpoint] = entryB
+	}
+	viewA.SetInfos(viewAInfos)
+}
+
 // standardCoinbaseScript returns a standard script suitable for use as the
 // signature script of the coinbase transaction of a new block.  In particular,
 // it starts with the block height that is required by version 2 blocks and adds
@@ -432,13 +457,24 @@ func spendTransaction(utxoView *blockchain.UtxoViewpoint, tx *abeutil.Tx, height
 }
 
 // todo(ABE): the block is unknown yet, use hainhash.ZeroHash as the block hash consuming the serialNumber
-func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, tx *abeutil.TxAbe) error {
+func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *blockchain.AUTViewpoint, tx *abeutil.TxAbe) error {
 	for _, txIn := range tx.MsgTx().TxIns {
 		entry := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())
 		if entry != nil {
 			entry.Spend(txIn.SerialNumber, &chainhash.ZeroHash)
 		}
 	}
+	autTx, err := aut.DeserializeFromTx(tx.MsgTx())
+	if err != nil {
+		return err
+	}
+	for _, txIn := range autTx.Ins() {
+		entry := autView.LookupEntry(txIn)
+		if entry != nil {
+			entry.Spend()
+		}
+	}
+
 	return nil
 }
 
@@ -628,6 +664,7 @@ func (g *BlkTmplGenerator) NewBlockTemplate(cryptoAddressPayTo []byte) (*BlockTe
 	coinbaseTx := abeutil.NewTxAbe(coinbaseTxMsg)
 	blockTxns = append(blockTxns, coinbaseTx)
 	blockUtxoRings := blockchain.NewUtxoRingViewpoint()
+	blockAUTView := blockchain.NewAUTViewpoint()
 
 	// Create slices to hold the fees and number of signature operations
 	// for each of the selected transactions and add an entry for the
@@ -692,6 +729,44 @@ mempoolLoop:
 			}
 		}
 
+		autView, err := g.chain.FetchAUTView(tx)
+		if err != nil {
+			log.Warnf("Unable to fetch aut view for tx %s: %v",
+				tx.Hash(), err)
+			continue
+		}
+		autTx, _ := aut.DeserializeFromTx(tx.MsgTx())
+		switch autTransaction := autTx.(type) {
+		case *aut.RegistrationTx:
+			if autTransaction.ExpireHeight <= nextBlockHeight {
+				log.Tracef("Skipping tx %s because the aut "+
+					"transaction specify the expire height lower than "+
+					"current block height %d",
+					tx.Hash(), nextBlockHeight)
+				continue mempoolLoop
+			}
+		case *aut.ReRegistrationTx:
+			info := autView.LookupInfo(hex.EncodeToString(autTransaction.Name))
+			if info.ExpireHeight <= nextBlockHeight {
+				log.Tracef("Skipping tx %s because "+
+					"the expire height of aut lower than "+
+					"current block height %d",
+					tx.Hash(), nextBlockHeight)
+				continue mempoolLoop
+			}
+		case *aut.MintTx:
+			info := autView.LookupInfo(hex.EncodeToString(autTransaction.Name))
+			if info.ExpireHeight <= nextBlockHeight {
+				log.Tracef("Skipping tx %s because "+
+					"the expire height of aut lower than "+
+					"current block height %d",
+					tx.Hash(), nextBlockHeight)
+				continue mempoolLoop
+			}
+		default:
+			// nothing to do
+		}
+
 		prioItem := &txPrioItemAbe{tx: tx}
 		// Calculate the final transaction priority using the input
 		// value age sum as well as the adjusted transaction size.
@@ -711,10 +786,10 @@ mempoolLoop:
 		// code below to avoid a second lookup.
 		//	todo(ABE): how to prevent double spending
 		//mergeUtxoView(blockUtxos, utxos)
-		//	if blockUtxoRings.Entries() has the same utxoRing, just replace, as the utxoRing in utxoRings is queried from the latest database
-		for ringHash, utxoRing := range utxoRings.Entries() {
-			blockUtxoRings.Entries()[ringHash] = utxoRing
-		}
+		// if blockUtxoRings.Entries() has the same utxoRing,
+		// just replace, as the utxoRing in utxoRings is queried from the latest database
+		mergeUtxoRingView(blockUtxoRings, utxoRings)
+		mergeAUTView(blockAUTView, autView)
 	}
 
 	log.Tracef("Priority queue len %d", priorityQueue.Len())
@@ -806,11 +881,23 @@ mempoolLoop:
 			continue
 		}
 
+		err = blockchain.CheckTransactionInputsAUT(tx, nextBlockHeight, blockAUTView, g.chainParams)
+		if err != nil {
+			log.Tracef("Skipping tx %s due to error in "+
+				"CheckTransactionInputsAUT: %v", tx.Hash(), err)
+			continue
+		}
+
 		// Spend the transaction inputs in the block utxoRing view and add
 		// an entry for it to ensure any transactions which reference
 		// this one have it available as an input and can ensure they
 		// aren't double spending.
-		spendTransactionAbe(blockUtxoRings, tx)
+		err = spendTransactionAbe(blockUtxoRings, blockAUTView, tx)
+		if err != nil {
+			log.Tracef("Skipping tx %s due to error in "+
+				"spendTransactionAbe: %v", tx.Hash(), err)
+			continue
+		}
 
 		// Add the transaction to the block, increment counters, and
 		// save the fees and signature operation counts to the block

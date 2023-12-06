@@ -826,6 +826,10 @@ func (view *UtxoRingViewpoint) Entries() map[chainhash.Hash]*UtxoRingEntry {
 	return view.entries
 }
 
+func (view *UtxoRingViewpoint) SetEntries(entries map[chainhash.Hash]*UtxoRingEntry) {
+	view.entries = entries
+}
+
 // commit prunes all entries marked modified that are now fully spent and marks
 // all entries as unmodified.
 func (view *UtxoRingViewpoint) commit() {

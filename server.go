@@ -2632,6 +2632,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		//	todo(ABE):
 		FetchUtxoView:     s.chain.FetchUtxoView,
 		FetchUtxoRingView: s.chain.FetchUtxoRingView,
+		FetchAUTView:      s.chain.FetchAUTView,
 		BestHeight:        func() int32 { return s.chain.BestSnapshot().Height },
 		MedianTimePast:    func() time.Time { return s.chain.BestSnapshot().MedianTime },
 		CalcSequenceLock: func(tx *abeutil.Tx, view *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error) {

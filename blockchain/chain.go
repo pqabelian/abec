@@ -823,7 +823,9 @@ func (b *BlockChain) connectBlock(node *blockNode, block *abeutil.Block,
 //  3. Update index manager if exists (todo)
 //  4. Send NTBlockConnected notification
 func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
-	view *UtxoRingViewpoint, stxos []*SpentTxOutAbe) error {
+	view *UtxoRingViewpoint, stxos []*SpentTxOutAbe,
+	autView *AUTViewpoint, sauts []SpentAUT,
+) error {
 
 	// Make sure it's extending the end of the best chain.
 	prevHash := &block.MsgBlock().Header.PrevBlock
@@ -897,9 +899,19 @@ func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 			return err
 		}
 
+		err = dbPutAUTView(dbTx, autView)
+		if err != nil {
+			return err
+		}
+
 		// Update the transaction spend journal by adding a record for
 		// the block that contains all txos spent by it.
 		err = dbPutSpendJournalEntryAbe(dbTx, block.Hash(), stxos)
+		if err != nil {
+			return err
+		}
+
+		err = dbPutSpendJournalEntryAUT(dbTx, block.Hash(), sauts)
 		if err != nil {
 			return err
 		}
@@ -924,6 +936,7 @@ func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 	// Prune fully spent entries and mark all entries in the view unmodified
 	// now that the modifications have been committed to the database.
 	view.commit()
+	autView.commit()
 
 	// This node is now the end of the best chain.
 	b.bestChain.SetTip(node)
@@ -1067,7 +1080,9 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *abeutil.Block, view
 }
 
 // Abe to do
-func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe, view *UtxoRingViewpoint, viewToDel *UtxoRingViewpoint) error {
+func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
+	view *UtxoRingViewpoint, viewToDel *UtxoRingViewpoint,
+	autView *AUTViewpoint) error {
 	// Make sure the node being disconnected is the end of the best chain.
 	if !node.hash.IsEqual(&b.bestChain.Tip().hash) {
 		return AssertError("disconnectBlock must be called with the " +
@@ -1136,6 +1151,15 @@ func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe
 		if err != nil {
 			return err
 		}
+
+		err = dbPutAUTView(dbTx, autView)
+		if err != nil {
+			return err
+		}
+
+		// TODO AUT
+		// 1 remove the new AUT with registration transaction
+		// 2 recover the old AUT with re-registration transaction
 
 		// Before we delete the spend journal entry for this back,
 		// we'll fetch it as is so the indexers can utilize if needed.
@@ -1221,6 +1245,14 @@ func countSpentOutputsAbe(block *abeutil.BlockAbe) int {
 	}
 	return numSpent
 }
+func countSpentOutputsAUT(block *abeutil.BlockAbe) int {
+	// Exclude the coinbase transaction since it can't spend anything.
+	numSpent := 0
+	for _, tx := range block.AUTTransactions() {
+		numSpent += tx.NumIns()
+	}
+	return numSpent
+}
 
 // reorganizeChainAbe reorganizes the block chain by disconnecting the nodes in the
 // detachNodes list and connecting the nodes in the attach list.  It expects
@@ -1286,6 +1318,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 	// Rather than doing two loads, cache the loaded data into these slices.
 	detachBlocks := make([]*abeutil.BlockAbe, 0, detachNodes.Len())
 	detachSpentTxOuts := make([][]*SpentTxOutAbe, 0, detachNodes.Len())
+	detachSpentAUTs := make([][]SpentAUT, 0, detachNodes.Len())
 	attachBlocks := make([]*abeutil.BlockAbe, 0, attachNodes.Len())
 
 	// Disconnect all of the blocks back to the point of the fork.  This
@@ -1296,6 +1329,11 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 	view.SetBestHash(&oldBest.hash)
 	viewToDelAll := NewUtxoRingViewpoint()
 	viewToDelAll.SetBestHash(&oldBest.hash)
+
+	autView := NewAUTViewpoint()
+	autView.SetBestHash(&oldBest.hash)
+	autViewToDelAll := NewAUTViewpoint()
+	autViewToDelAll.SetBestHash(&oldBest.hash)
 
 	for e := detachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
@@ -1325,8 +1363,13 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		// Load all of the spent txos for the block from the spend
 		// journal.
 		var stxos []*SpentTxOutAbe
+		var sauts []SpentAUT
 		err = b.db.View(func(dbTx database.Tx) error {
 			stxos, err = dbFetchSpendJournalEntryAbe(dbTx, block)
+			if err != nil {
+				return err
+			}
+			sauts, err = dbFetchSpendJournalEntryAUT(dbTx, block)
 			return err
 		})
 		if err != nil {
@@ -1336,6 +1379,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		// Store the loaded block and spend journal entry for later.
 		detachBlocks = append(detachBlocks, block)
 		detachSpentTxOuts = append(detachSpentTxOuts, stxos)
+		detachSpentAUTs = append(detachSpentAUTs, sauts)
 
 		err = view.disconnectTransactions(b.db, block, stxos)
 		if err != nil {
@@ -1450,7 +1494,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			// In the case the block is determined to be invalid due to a
 			// rule violation, mark it as invalid and mark all of its
 			// descendants as having an invalid ancestor.
-			err = b.checkConnectBlockAbe(n, block, view, nil)
+			err = b.checkConnectBlockAbe(n, block, view, nil, autView, nil)
 			if err != nil {
 				if ruleErr, ok := err.(RuleError); ok {
 					if ruleErr.ErrorCode == ErrWitnessMissing {
@@ -1519,6 +1563,12 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			return err
 		}
 
+		err = autView.disconnectTransactions(b.db, block,
+			detachSpentAUTs[i])
+		if err != nil {
+			return err
+		}
+
 		//	Abe to do
 		//	view.disconnectTransactions update the view for this block, the following b.disconnectBlock persist the changes for this block to the database
 		//	So, here we need to generate the utxoRings that need to be deleted from database
@@ -1548,7 +1598,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		}
 
 		// Update the database and chain state.
-		err = b.disconnectBlockAbe(n, block, view, viewToDel)
+		err = b.disconnectBlockAbe(n, block, view, viewToDel, autView)
 		if err != nil {
 			return err
 		}
@@ -1580,12 +1630,23 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			return err
 		}
 
+		err = autView.fetchInputAUTUtxos(b.db, block)
+		if err != nil {
+			return err
+		}
+
 		// Update the view to mark all utxos referenced by the block
 		// as spent and add all transactions being created by this block
 		// to it.  Also, provide an stxo slice so the spent txout
 		// details are generated.
 		stxos := make([]*SpentTxOutAbe, 0, countSpentOutputsAbe(block))
 		err = view.connectTransactions(block, &stxos)
+		if err != nil {
+			return err
+		}
+
+		sauts := make([]SpentAUT, 0, countSpentOutputsAUT(block))
+		err = autView.connectTransactions(block, &sauts)
 		if err != nil {
 			return err
 		}
@@ -1606,7 +1667,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		}
 
 		// Update the database and chain state.
-		err = b.connectBlockAbe(n, block, view, stxos)
+		err = b.connectBlockAbe(n, block, view, stxos, autView, sauts)
 		if err != nil {
 			return err
 		}
@@ -1678,8 +1739,12 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 		view := NewUtxoRingViewpoint()
 		view.SetBestHash(parentHash)
 		stxos := make([]*SpentTxOutAbe, 0, countSpentOutputsAbe(block))
+
+		autView := NewAUTViewpoint()
+		autView.SetBestHash(parentHash)
+		sauts := make([]SpentAUT, 0, countSpentOutputsAbe(block))
 		if !fastAdd || b.nodeType == wire.FullNode {
-			err := b.checkConnectBlockAbe(node, block, view, &stxos)
+			err := b.checkConnectBlockAbe(node, block, view, &stxos, autView, &sauts)
 			if err == nil {
 				b.index.SetStatusFlags(node, statusValid)
 			} else if _, ok := err.(RuleError); ok {
@@ -1725,7 +1790,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 
 		// Connect the block to the main chain.
 		//	ToDo(ABE): Here stxos is used as input, all precious are setting stxos
-		err := b.connectBlockAbe(node, block, view, stxos)
+		err := b.connectBlockAbe(node, block, view, stxos, autView, sauts)
 		if err != nil {
 			// If we got hit with a rule error, then we'll mark
 			// that status of the block as invalid and flush the

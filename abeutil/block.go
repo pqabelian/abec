@@ -3,6 +3,7 @@ package abeutil
 import (
 	"bytes"
 	"fmt"
+	"github.com/abesuite/abec/aut"
 	"io"
 
 	"github.com/abesuite/abec/chainhash"
@@ -46,6 +47,9 @@ type BlockAbe struct {
 	blockHeight              int32             // Height in the main block chain
 	transactions             []*TxAbe          // Transactions
 	txnsGenerated            bool              // ALL wrapped transactions generated
+
+	autTransactions  []aut.Transaction
+	autTxnsGenerated bool
 }
 
 // Abe to do
@@ -326,6 +330,38 @@ func (b *BlockAbe) Transactions() []*TxAbe {
 
 	b.txnsGenerated = true
 	return b.transactions
+}
+
+func (b *BlockAbe) AUTTransactions() []aut.Transaction {
+	// Return transactions if they have ALL already been generated.  This
+	// flag is necessary because the wrapped transactions are lazily
+	// generated in a sparse fashion.
+	if b.txnsGenerated {
+		return b.autTransactions
+	}
+
+	// Generate slice to hold all of the wrapped transactions if needed.
+	if len(b.autTransactions) == 0 {
+		b.autTransactions = make([]aut.Transaction, 0, len(b.msgBlock.Transactions))
+	}
+
+	// Generate and cache the wrapped autTransactions for all that haven't
+	// already been done.
+	for _, tx := range b.msgBlock.Transactions {
+		isCb, err := tx.IsCoinBase()
+		if err != nil {
+			continue
+		}
+		if isCb {
+			continue
+		}
+		if autTx, err := aut.DeserializeFromTx(tx); err == nil {
+			b.autTransactions = append(b.autTransactions, autTx)
+		}
+	}
+
+	b.autTxnsGenerated = true
+	return b.autTransactions
 }
 
 // TxHash returns the hash for the requested transaction number in the Block.

@@ -3,13 +3,17 @@ package blockchain
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/abeutil"
+	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/wire"
 	"io"
+	"math"
 	"math/big"
 	"os"
 	"sort"
@@ -91,6 +95,12 @@ var (
 	workedFakePowHeightScopeKeyName = []byte("workedfakepowheightscopes")
 	readyFakePowHeightScopeKeyName  = []byte("readyfakepowheightscopes")
 
+	// autStateBucketName is the name of the db bucket used to house the
+	// Abelian User Token (AUT) state
+	autInfoBucketName         = []byte("autinfo")
+	autRootCoinBucketName     = []byte("autrootcoinset")
+	autStateBucketName        = []byte("autstate")
+	spendJournalAUTBucketName = []byte("autspendjournal")
 	// byteOrder is the preferred byte order used for serializing numeric
 	// fields for storage in the database.
 	byteOrder = binary.LittleEndian
@@ -322,6 +332,17 @@ func (spentTxo *SpentTxOutAbe) Deserialize(r io.Reader) error {
 	return nil
 }
 
+type SpentAUT struct {
+	// Amount is the amount of the output.
+	Amount uint64
+
+	// Height is the height of the the block containing the creating tx.
+	Height int32
+
+	// Denotes if the creating tx is a coinbase.
+	IsRootCoin bool
+}
+
 // FetchSpendJournal attempts to retrieve the spend journal, or the set of
 // outputs spent for the target block. This provides a view of all the outputs
 // that will be consumed once the target block is connected to the end of the
@@ -364,6 +385,24 @@ func (b *BlockChain) FetchSpendJournalAbe(targetBlock *abeutil.BlockAbe) ([]*Spe
 	return spendEntries, nil
 }
 
+func (b *BlockChain) FetchSpendJournalAUT(targetBlock *abeutil.BlockAbe) ([]SpentAUT, error) {
+	b.chainLock.RLock()
+	defer b.chainLock.RUnlock()
+
+	var spendEntries []SpentAUT
+	err := b.db.View(func(dbTx database.Tx) error {
+		var err error
+
+		spendEntries, err = dbFetchSpendJournalEntryAUT(dbTx, targetBlock)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return spendEntries, nil
+}
+
 // spentTxOutHeaderCode returns the calculated header code to be used when
 // serializing the provided stxo entry.
 func spentTxOutHeaderCode(stxo *SpentTxOut) uint64 {
@@ -372,6 +411,17 @@ func spentTxOutHeaderCode(stxo *SpentTxOut) uint64 {
 	// lowest bit.
 	headerCode := uint64(stxo.Height) << 1
 	if stxo.IsCoinBase {
+		headerCode |= 0x01
+	}
+
+	return headerCode
+}
+func spentAUTHeaderCode(stxo *SpentAUT) uint64 {
+	// As described in the serialization format comments, the header code
+	// encodes the height shifted over one bit and the coinbase flag in the
+	// lowest bit.
+	headerCode := uint64(stxo.Height) << 1
+	if stxo.IsRootCoin {
 		headerCode |= 0x01
 	}
 
@@ -390,6 +440,16 @@ func spentTxOutSerializeSize(stxo *SpentTxOut) int {
 	}
 	return size + compressedTxOutSize(uint64(stxo.Amount), stxo.PkScript)
 }
+func spentAUTSerializeSize(stxo *SpentAUT) int {
+	size := serializeSizeVLQ(spentAUTHeaderCode(stxo))
+	if stxo.Height > 0 {
+		// The legacy v1 spend journal format conditionally tracked the
+		// containing transaction version when the height was non-zero,
+		// so this is required for backwards compat.
+		size += serializeSizeVLQ(0)
+	}
+	return size + compressedAUTSize(stxo.Amount)
+}
 
 // putSpentTxOut serializes the passed stxo according to the format described
 // above directly into the passed target byte slice.  The target byte slice must
@@ -406,6 +466,18 @@ func putSpentTxOut(target []byte, stxo *SpentTxOut) int {
 	}
 	return offset + putCompressedTxOut(target[offset:], uint64(stxo.Amount),
 		stxo.PkScript)
+}
+
+func putSpentAUT(target []byte, stxo *SpentAUT) int {
+	headerCode := spentAUTHeaderCode(stxo)
+	offset := putVLQ(target, headerCode)
+	if stxo.Height > 0 {
+		// The legacy v1 spend journal format conditionally tracked the
+		// containing transaction version when the height was non-zero,
+		// so this is required for backwards compat.
+		offset += putVLQ(target[offset:], 0)
+	}
+	return offset + putCompressedAUT(target[offset:], stxo.Amount)
 }
 
 // decodeSpentTxOut decodes the passed serialized stxo entry, possibly followed
@@ -452,6 +524,44 @@ func decodeSpentTxOut(serialized []byte, stxo *SpentTxOut) (int, error) {
 	}
 	stxo.Amount = int64(amount)
 	stxo.PkScript = pkScript
+	return offset, nil
+}
+
+func decodeSpentAUT(serialized []byte, stxo *SpentAUT) (int, error) {
+	// Ensure there are bytes to decode.
+	if len(serialized) == 0 {
+		return 0, errDeserialize("no serialized bytes")
+	}
+
+	// Deserialize the header code.
+	code, offset := deserializeVLQ(serialized)
+	if offset >= len(serialized) {
+		return offset, errDeserialize("unexpected end of data after " +
+			"header code")
+	}
+
+	// Decode the header code.
+	//
+	// Bit 0 indicates containing transaction is a coinbase.
+	// Bits 1-x encode height of containing transaction.
+	stxo.IsRootCoin = code&0x01 != 0
+	stxo.Height = int32(code >> 1)
+	if stxo.Height > 0 {
+		// The legacy v1 spend journal format conditionally tracked the
+		// containing transaction version when the height was non-zero,
+		// so this is required for backwards compat.
+		_, bytesRead := deserializeVLQ(serialized[offset:])
+		offset += bytesRead
+		if offset >= len(serialized) {
+			return offset, errDeserialize("unexpected end of data " +
+				"after reserved")
+		}
+	}
+
+	// Decode the compressed txout.
+	compressedAmount, bytesRead := deserializeVLQ(serialized[offset:])
+	offset += bytesRead
+	stxo.Amount = decompressTxOutAmount(compressedAmount)
 	return offset, nil
 }
 
@@ -563,6 +673,54 @@ func deserializeSpendJournalEntryAbe(serialized []byte, txns []*wire.MsgTxAbe) (
 
 	return stxos, nil
 }
+func deserializeSpendJournalEntryAUT(serialized []byte, txns []aut.Transaction) ([]SpentAUT, error) {
+	// Calculate the total number of stxos.
+	var numStxos int
+	for _, tx := range txns {
+		numStxos += tx.NumIns()
+	}
+
+	// When a block has no spent txouts there is nothing to serialize.
+	if len(serialized) == 0 {
+		// Ensure the block actually has no stxos.  This should never
+		// happen unless there is database corruption or an empty entry
+		// erroneously made its way into the database.
+		if numStxos != 0 {
+			return nil, AssertError(fmt.Sprintf("mismatched spend "+
+				"journal serialization - no serialization for "+
+				"expected %d stxos", numStxos))
+		}
+
+		return nil, nil
+	}
+
+	// Loop backwards through all transactions so everything is read in
+	// reverse order to match the serialization order.
+	stxoIdx := numStxos - 1
+	offset := 0
+	stxos := make([]SpentAUT, numStxos)
+	for txIdx := len(txns) - 1; txIdx > -1; txIdx-- {
+		tx := txns[txIdx]
+		txIns := tx.Ins()
+		// Loop backwards through all of the transaction inputs and read
+		// the associated stxo.
+		for txInIdx := tx.NumIns() - 1; txInIdx > -1; txInIdx-- {
+			txIn := txIns[txInIdx]
+			stxo := &stxos[stxoIdx]
+			stxoIdx--
+
+			n, err := decodeSpentAUT(serialized[offset:], stxo)
+			offset += n
+			if err != nil {
+				return nil, errDeserialize(fmt.Sprintf("unable "+
+					"to decode stxo for %v: %v",
+					txIn, err))
+			}
+		}
+	}
+
+	return stxos, nil
+}
 
 // serializeSpendJournalEntry serializes all of the passed spent txouts into a
 // single byte slice according to the format described in detail above.
@@ -611,6 +769,28 @@ func serializeSpendJournalEntryAbe(stxos []*SpentTxOutAbe) ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
+}
+
+func serializeSpendJournalEntryAUT(stxos []SpentAUT) []byte {
+	if len(stxos) == 0 {
+		return nil
+	}
+
+	// Calculate the size needed to serialize the entire journal entry.
+	var size int
+	for i := range stxos {
+		size += spentAUTSerializeSize(&stxos[i])
+	}
+	serialized := make([]byte, size)
+
+	// Serialize each individual stxo directly into the slice in reverse
+	// order one after the other.
+	var offset int
+	for i := len(stxos) - 1; i > -1; i-- {
+		offset += putSpentAUT(serialized[offset:], &stxos[i])
+	}
+
+	return serialized
 }
 
 // dbFetchSpendJournalEntry fetches the spend journal entry for the passed block
@@ -668,6 +848,29 @@ func dbFetchSpendJournalEntryAbe(dbTx database.Tx, block *abeutil.BlockAbe) ([]*
 	return stxos, nil
 }
 
+func dbFetchSpendJournalEntryAUT(dbTx database.Tx, block *abeutil.BlockAbe) ([]SpentAUT, error) {
+	// Exclude the coinbase transaction since it can't spend anything.
+	spendBucket := dbTx.Metadata().Bucket(spendJournalAUTBucketName)
+	serialized := spendBucket.Get(block.Hash()[:])
+	stxos, err := deserializeSpendJournalEntryAUT(serialized, block.AUTTransactions())
+	if err != nil {
+		// Ensure any deserialization errors are returned as database
+		// corruption errors.
+		if isDeserializeErr(err) {
+			return nil, database.Error{
+				ErrorCode: database.ErrCorruption,
+				Description: fmt.Sprintf("corrupt spend "+
+					"information for %v: %v", block.Hash(),
+					err),
+			}
+		}
+
+		return nil, err
+	}
+
+	return stxos, nil
+}
+
 // dbPutSpendJournalEntry uses an existing database transaction to update the
 // spend journal entry for the given block hash using the provided slice of
 // spent txouts.   The spent txouts slice must contain an entry for every txout
@@ -684,6 +887,16 @@ func dbPutSpendJournalEntryAbe(dbTx database.Tx, blockHash *chainhash.Hash, stxo
 	if err != nil {
 		return err
 	}
+	if len(serialized) == 0 {
+		return nil
+	}
+
+	return spendBucket.Put(blockHash[:], serialized)
+}
+
+func dbPutSpendJournalEntryAUT(dbTx database.Tx, blockHash *chainhash.Hash, sauts []SpentAUT) error {
+	spendBucket := dbTx.Metadata().Bucket(spendJournalAUTBucketName)
+	serialized := serializeSpendJournalEntryAUT(sauts)
 	if len(serialized) == 0 {
 		return nil
 	}
@@ -817,6 +1030,13 @@ var outPointRingKeyPool = sync.Pool{
 	},
 }
 
+var autOutpointKeyPool = sync.Pool{
+	New: func() interface{} {
+		b := make([]byte, chainhash.HashSize+maxUint32VLQSerializeSize)
+		return &b // Pointer to slice to avoid boxing alloc.
+	},
+}
+
 // outpointKey returns a key suitable for use as a database key in the utxo set
 // while making use of a free list.  A new buffer is allocated if there are not
 // already any available on the free list.  The returned byte slice should be
@@ -824,6 +1044,18 @@ var outPointRingKeyPool = sync.Pool{
 // caller is done with it _unless_ the slice will need to live for longer than
 // the caller can calculate such as when used to write to the database.
 func outpointKey(outpoint wire.OutPoint) *[]byte {
+	// A VLQ employs an MSB encoding, so they are useful not only to reduce
+	// the amount of storage space, but also so iteration of utxos when
+	// doing byte-wise comparisons will produce them in order.
+	key := outpointKeyPool.Get().(*[]byte)
+	idx := uint64(outpoint.Index)
+	*key = (*key)[:chainhash.HashSize+serializeSizeVLQ(idx)]
+	copy(*key, outpoint.Hash[:])
+	putVLQ((*key)[chainhash.HashSize:], idx)
+	return key
+}
+
+func autOutpointKey(outpoint aut.OutPoint) *[]byte {
 	// A VLQ employs an MSB encoding, so they are useful not only to reduce
 	// the amount of storage space, but also so iteration of utxos when
 	// doing byte-wise comparisons will produce them in order.
@@ -852,6 +1084,9 @@ func recycleOutpointKey(key *[]byte) {
 func recycleOutPointRingKey(key *[]byte) {
 	outPointRingKeyPool.Put(key)
 }
+func recycleAUTOutpointKey(key *[]byte) {
+	autOutpointKeyPool.Put(key)
+}
 
 // utxoEntryHeaderCode returns the calculated header code to be used when
 // serializing the provided utxo entry.
@@ -865,6 +1100,22 @@ func utxoEntryHeaderCode(entry *UtxoEntry) (uint64, error) {
 	// lowest bit.
 	headerCode := uint64(entry.BlockHeight()) << 1
 	if entry.IsCoinBase() {
+		headerCode |= 0x01
+	}
+
+	return headerCode, nil
+}
+
+func autEntryHeaderCode(entry *AUTEntry) (uint64, error) {
+	if entry.IsSpent() {
+		return 0, AssertError("attempt to serialize spent utxo header")
+	}
+
+	// As described in the serialization format comments, the header code
+	// encodes the height shifted over one bit and the coinbase flag in the
+	// lowest bit.
+	headerCode := uint64(entry.BlockHeight()) << 1
+	if entry.IsRootCoin() {
 		headerCode |= 0x01
 	}
 
@@ -897,6 +1148,115 @@ func serializeUtxoEntry(entry *UtxoEntry) ([]byte, error) {
 		entry.PkScript())
 
 	return serialized, nil
+}
+
+func serializeAUTEntry(entry *AUTEntry) ([]byte, error) {
+	// Spent outputs have no serialization.
+	if entry.IsSpent() {
+		return nil, nil
+	}
+
+	// Encode the header code.
+	headerCode, err := autEntryHeaderCode(entry)
+	if err != nil {
+		return nil, err
+	}
+
+	// Calculate the size needed to serialize the entry.
+	size := serializeSizeVLQ(headerCode) +
+		compressedAUTSize(entry.Amount())
+
+	// Serialize the header code followed by the compressed unspent
+	// transaction output.
+	serialized := make([]byte, size)
+	offset := putVLQ(serialized, headerCode)
+	offset += putCompressedAUT(serialized[offset:], entry.Amount())
+
+	return serialized, nil
+}
+
+func serializeAUTInfo(info *aut.Info) ([]byte, error) {
+	// Calculate the size needed to serialize AUT info.
+	size := wire.VarIntSerializeSize(uint64(len(info.Name))) + len(info.Name) +
+		wire.VarIntSerializeSize(uint64(len(info.Memo))) + len(info.Memo) +
+		1 +
+		1 +
+		wire.VarIntSerializeSize(info.PlannedTotalAmount) +
+		wire.VarIntSerializeSize(uint64(info.ExpireHeight)) +
+		wire.VarIntSerializeSize(uint64(len(info.Issuers))) + chainhash.HashSize*len(info.Issuers) +
+		wire.VarIntSerializeSize(uint64(len(info.UnitName))) + len(info.UnitName) +
+		wire.VarIntSerializeSize(uint64(len(info.MinUnitName))) + len(info.MinUnitName) +
+		wire.VarIntSerializeSize(info.UnitScale) +
+		wire.VarIntSerializeSize(info.MintedAmount)
+
+	// Serialize the header code followed by the compressed unspent
+	// transaction output.
+	buff := bytes.NewBuffer(make([]byte, 0, size))
+	err := wire.WriteVarBytes(buff, 0, info.Name)
+	if err != nil {
+		return nil, err
+	}
+	err = wire.WriteVarBytes(buff, 0, info.Memo)
+	if err != nil {
+		return nil, err
+	}
+
+	err = buff.WriteByte(info.UpdateThreshold)
+	if err != nil {
+		return nil, err
+	}
+	err = buff.WriteByte(info.IssueThreshold)
+	if err != nil {
+		return nil, err
+	}
+	err = wire.WriteVarInt(buff, 0, info.PlannedTotalAmount)
+	if err != nil {
+		return nil, err
+	}
+	err = wire.WriteVarInt(buff, 0, uint64(info.ExpireHeight))
+	if err != nil {
+		return nil, err
+	}
+
+	err = wire.WriteVarInt(buff, 0, uint64(len(info.Issuers)))
+	if err != nil {
+		return nil, err
+	}
+	for i := 0; i < len(info.Issuers); i++ {
+		n, err := buff.Write(info.Issuers[i][:])
+		if err != nil || n != chainhash.HashSize {
+			return nil, errors.New("error to write issuer hash")
+		}
+	}
+	err = wire.WriteVarBytes(buff, 0, info.UnitName)
+	if err != nil {
+		return nil, err
+	}
+	err = wire.WriteVarBytes(buff, 0, info.MinUnitName)
+	if err != nil {
+		return nil, err
+	}
+	err = wire.WriteVarInt(buff, 0, info.UnitScale)
+	if err != nil {
+		return nil, err
+	}
+	err = wire.WriteVarInt(buff, 0, info.MintedAmount)
+	if err != nil {
+		return nil, err
+	}
+
+	return buff.Bytes(), nil
+}
+func serializeAUTRootCoinSet(coins []*aut.OutPoint) ([]byte, error) {
+	res := make([]byte, serializeSizeVLQ(uint64(len(coins)))+(chainhash.HashSize+maxUint32VLQSerializeSize)*len(coins))
+	offset := putVLQ(res, uint64(len(coins)))
+	for i := 0; i < len(coins); i++ {
+		copy(res[offset:], coins[i].Hash[:])
+		offset += chainhash.HashSize
+		offset += putVLQ(res[offset:], uint64(coins[i].Index))
+	}
+
+	return res[:offset], nil
 }
 
 // Abe to do
@@ -962,6 +1322,123 @@ func deserializeUtxoRingEntry(serialized []byte) (*UtxoRingEntry, error) {
 
 	return &entry, nil
 
+}
+
+func deserializeAUTEntry(serialized []byte) (*AUTEntry, error) {
+	// Deserialize the header code.
+	code, offset := deserializeVLQ(serialized)
+	if offset >= len(serialized) {
+		return nil, errDeserialize("unexpected end of data after header")
+	}
+
+	// Decode the header code.
+	//
+	// Bit 0 indicates whether the containing transaction is a coinbase.
+	// Bits 1-x encode height of containing transaction.
+	isRootCoin := code&0x01 != 0
+	blockHeight := int32(code >> 1)
+
+	// Decode the compressed unspent transaction output.
+	amount, _, err := decodeCompressedAUT(serialized[offset:])
+	if err != nil {
+		return nil, errDeserialize(fmt.Sprintf("unable to decode "+
+			"utxo: %v", err))
+	}
+
+	entry := &AUTEntry{
+		amount:      amount,
+		blockHeight: blockHeight,
+		packedFlags: 0,
+	}
+	if isRootCoin {
+		entry.packedFlags |= atfRootCoin
+	}
+
+	return entry, nil
+}
+
+func deserializeAUTInfo(serialized []byte) (*aut.Info, error) {
+	// Serialize the header code followed by the compressed unspent
+	// transaction output.
+	info := &aut.Info{}
+	var err error
+	buff := bytes.NewReader(serialized)
+	info.Name, err = wire.ReadVarBytes(buff, 0, aut.MaxNameLength, "name")
+	if err != nil {
+		return nil, err
+	}
+	info.Memo, err = wire.ReadVarBytes(buff, 0, aut.MaxMemoLength, "memo")
+	if err != nil {
+		return nil, err
+	}
+
+	info.UpdateThreshold, err = buff.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+	info.IssueThreshold, err = buff.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+
+	info.PlannedTotalAmount, err = wire.ReadVarInt(buff, 0)
+	if err != nil {
+		return nil, err
+	}
+	expiredHeight, err := wire.ReadVarInt(buff, 0)
+	if err != nil {
+		return nil, err
+	}
+	info.ExpireHeight = int32(expiredHeight)
+
+	issuerNum, err := wire.ReadVarInt(buff, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	info.Issuers = make([]*chainhash.Hash, issuerNum)
+	for i := uint64(0); i < issuerNum; i++ {
+		info.Issuers[i] = &chainhash.Hash{}
+		n, err := buff.Read(info.Issuers[i][:])
+		if err != nil || n != chainhash.HashSize {
+			return nil, errors.New("error to write issuer hash")
+		}
+	}
+	info.UnitName, err = wire.ReadVarBytes(buff, 0, aut.MaxUnitLength, "memo")
+	if err != nil {
+		return nil, err
+	}
+	info.MinUnitName, err = wire.ReadVarBytes(buff, 0, aut.MaxMinUnitLength, "memo")
+	if err != nil {
+		return nil, err
+	}
+	info.UnitScale, err = wire.ReadVarInt(buff, 0)
+	if err != nil {
+		return nil, err
+	}
+	info.MintedAmount, err = wire.ReadVarInt(buff, 0)
+	if err != nil {
+		return nil, err
+	}
+	return info, nil
+}
+func deserializeAUTRootCoinSet(serialized []byte) ([]*aut.OutPoint, error) {
+	coinNum, offset := deserializeVLQ(serialized)
+	outpoints := make([]*aut.OutPoint, coinNum)
+	for i := uint64(0); i < coinNum; i++ {
+		outpoint := &aut.OutPoint{}
+		copy(outpoint.Hash[:], serialized[offset:])
+		offset += chainhash.HashSize
+		idx, n := deserializeVLQ(serialized[offset:])
+		offset += n
+		if idx > math.MaxUint8 {
+			return nil, errDeserialize("idx exceed the max allowed")
+		}
+		outpoint.Index = uint8(idx)
+		outpoints[i] = outpoint
+	}
+
+	return outpoints, nil
 }
 
 // dbFetchUtxoEntryByHash attempts to find and fetch a utxo for the given hash.
@@ -1076,6 +1553,87 @@ func dbFetchUtxoRingEntry(dbTx database.Tx, outPointRingHash chainhash.Hash) (*U
 	return entry, nil
 }
 
+func dbFetchAUTEntry(dbTx database.Tx, outpoint aut.OutPoint) (*AUTEntry, error) {
+	// Fetch the unspent transaction output information for the passed
+	// transaction output.  Return now when there is no entry.
+	key := autOutpointKey(outpoint)
+	autStateBucket := dbTx.Metadata().Bucket(autStateBucketName)
+	serializedUtxo := autStateBucket.Get(*key)
+	recycleAUTOutpointKey(key)
+	if serializedUtxo == nil {
+		return nil, nil
+	}
+
+	// A non-nil zero-length entry means there is an entry in the database
+	// for a spent transaction output which should never be the case.
+	if len(serializedUtxo) == 0 {
+		return nil, AssertError(fmt.Sprintf("database contains entry "+
+			"for spent tx output %v", outpoint))
+	}
+
+	// Deserialize the utxo entry and return it.
+	entry, err := deserializeAUTEntry(serializedUtxo)
+	if err != nil {
+		// Ensure any deserialization errors are returned as database
+		// corruption errors.
+		if isDeserializeErr(err) {
+			return nil, database.Error{
+				ErrorCode: database.ErrCorruption,
+				Description: fmt.Sprintf("corrupt utxo entry "+
+					"for %v: %v", outpoint, err),
+			}
+		}
+
+		return nil, err
+	}
+
+	return entry, nil
+}
+
+func dbFetchAUTInfo(dbTx database.Tx, key []byte) (*aut.Info, error) {
+	// Fetch the unspent transaction output information for the passed
+	// transaction output.  Return now when there is no entry.
+	autInfoBucket := dbTx.Metadata().Bucket(autInfoBucketName)
+	serializedAUTInfo := autInfoBucket.Get(key)
+	if serializedAUTInfo == nil {
+		return nil, nil
+	}
+
+	// Deserialize the utxo entry and return it.
+	info, err := deserializeAUTInfo(serializedAUTInfo)
+	if err != nil {
+		// Ensure any deserialization errors are returned as database
+		// corruption errors.
+		if isDeserializeErr(err) {
+			return nil, database.Error{
+				ErrorCode: database.ErrCorruption,
+				Description: fmt.Sprintf("corrupt information "+
+					"for AUT %v: %v", key, err),
+			}
+		}
+
+		return nil, err
+	}
+	autRootCoinBucket := dbTx.Metadata().Bucket(autRootCoinBucketName)
+	serializedAUTRootCoins := autRootCoinBucket.Get(key)
+	rootCoinSet, err := deserializeAUTRootCoinSet(serializedAUTRootCoins)
+	if isDeserializeErr(err) {
+		return nil, database.Error{
+			ErrorCode: database.ErrCorruption,
+			Description: fmt.Sprintf("corrupt information "+
+				"for AUT %v: %v", key, err),
+		}
+	}
+	if info.RootCoinSet == nil {
+		info.RootCoinSet = map[aut.OutPoint]struct{}{}
+	}
+	for i := 0; i < len(rootCoinSet); i++ {
+		info.RootCoinSet[*rootCoinSet[i]] = struct{}{}
+	}
+
+	return info, nil
+}
+
 // dbPutUtxoView uses an existing database transaction to update the utxo set
 // in the database based on the provided utxo view contents and state.  In
 // particular, only the entries that have been marked as modified are written
@@ -1111,6 +1669,77 @@ func dbPutUtxoView(dbTx database.Tx, view *UtxoViewpoint) error {
 		// database interface contract prohibits modifications.  It will
 		// be garbage collected normally when the database is done with
 		// it.
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func dbPutAUTView(dbTx database.Tx, view *AUTViewpoint) error {
+	autStateBucket := dbTx.Metadata().Bucket(autStateBucketName)
+	for outpoint, entry := range view.entries {
+		// No need to update the database if the entry was not modified.
+		if entry == nil || !entry.isModified() {
+			continue
+		}
+
+		// Remove the utxo entry if it is spent.
+		if entry.IsSpent() {
+			key := autOutpointKey(outpoint)
+			err := autStateBucket.Delete(*key)
+			recycleOutpointKey(key)
+			if err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		// Serialize and store the utxo entry.
+		serialized, err := serializeAUTEntry(entry)
+		if err != nil {
+			return err
+		}
+		key := autOutpointKey(outpoint)
+		err = autStateBucket.Put(*key, serialized)
+		// NOTE: The key is intentionally not recycled here since the
+		// database interface contract prohibits modifications.  It will
+		// be garbage collected normally when the database is done with
+		// it.
+		if err != nil {
+			return err
+		}
+	}
+
+	autInfoBucket := dbTx.Metadata().Bucket(autInfoBucketName)
+	autRootCoinBucket := dbTx.Metadata().Bucket(autRootCoinBucketName)
+	for autNameKey, info := range view.infos {
+		// Serialize and store the utxo entry.
+		serialized, err := serializeAUTInfo(info)
+		if err != nil {
+			return err
+		}
+		autName, _ := hex.DecodeString(autNameKey)
+		err = autInfoBucket.Put(autName, serialized)
+		// NOTE: The key is intentionally not recycled here since the
+		// database interface contract prohibits modifications.  It will
+		// be garbage collected normally when the database is done with
+		// it.
+		if err != nil {
+			return err
+		}
+
+		rootCoinSet := make([]*aut.OutPoint, len(info.RootCoinSet))
+		for rootCoin := range info.RootCoinSet {
+			rootCoinSet = append(rootCoinSet, &aut.OutPoint{
+				Hash:  rootCoin.Hash,
+				Index: rootCoin.Index,
+			})
+		}
+		serializedRootCoinSet, err := serializeAUTRootCoinSet(rootCoinSet)
+		err = autRootCoinBucket.Put(autName, serializedRootCoinSet)
 		if err != nil {
 			return err
 		}
