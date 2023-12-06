@@ -95,7 +95,7 @@ func pqringctxGetTxoSerializeSize(pp *pqringctxapi.PublicParameter, coinAddress 
 	return pqringctxapi.GetTxoSerializeSize(pp, coinAddress)
 }
 
-func pqringctxGetCbTxWitnessSerializeSizeApprox(pp *pqringctxapi.PublicParameter, coinAddressListPayTo [][]byte) (int, error) {
+func pqringctxGetCbTxWitnessSerializeSize(pp *pqringctxapi.PublicParameter, coinAddressListPayTo [][]byte) (int, error) {
 	return pqringctxapi.GetCbTxWitnessSerializeSizeByDesc(pp, coinAddressListPayTo)
 }
 

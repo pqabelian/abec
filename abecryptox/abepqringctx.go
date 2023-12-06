@@ -130,7 +130,7 @@ func pqringctxCoinbaseTxGen(pp *pqringctxapi.PublicParameter, abeTxOutputDescs [
 	}
 
 	// witness must be associated with Tx, so it does not need to contain cryptoScheme or TxVersion.
-	serializedCbTxWitness, err := pqringctxapi.SerializeTxWitness(pp, cryptoCoinbaseTx.GetTxWitness())
+	serializedCbTxWitness, err := pqringctxapi.SerializeTxWitnessCbTx(pp, cryptoCoinbaseTx.GetTxWitness())
 	if err != nil {
 		return nil, err
 	}
@@ -168,12 +168,12 @@ func pqringctxCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, coinbaseTx *wir
 
 	txMemo := coinbaseTx.TxMemo
 
-	txWitnessMLP, err := pqringctxapi.DeserializeTxWitness(pp, coinbaseTx.TxWitness)
+	txWitness, err := pqringctxapi.DeserializeTxWitnessCbTx(pp, coinbaseTx.TxWitness)
 	if err != nil {
 		return false, err
 	}
 
-	cryptoCoinbaseTx := pqringctxapi.NewCoinbaseTxMLP(vin, txoMLPs, txMemo, txWitnessMLP)
+	cryptoCoinbaseTx := pqringctxapi.NewCoinbaseTxMLP(vin, txoMLPs, txMemo, txWitness)
 
 	bl, err := pqringctxapi.CoinbaseTxVerify(pp, cryptoCoinbaseTx)
 	if err != nil {

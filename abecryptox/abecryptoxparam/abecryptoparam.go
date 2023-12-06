@@ -113,7 +113,7 @@ func GetTxoSerializeSizeApprox(txVersion uint32, cryptoAddress []byte) (int, err
 	case CryptoSchemePQRingCT:
 		return abecryptoparam.GetTxoSerializeSizeApprox(txVersion)
 	case CryptoSchemePQRingCTX:
-		return pqringctxGetTxoSerializeSizeApprox(PQRingCTXPP, cryptoAddress)
+		return pqringctxGetTxoSerializeSize(PQRingCTXPP, cryptoAddress)
 	default:
 		return 0, errors.New("GetTxoSerializeSizeApprox: Unsupported txVersion")
 	}
@@ -145,7 +145,7 @@ func GetCbTxWitnessSerializeSizeApprox(txVersion uint32, cryptoAddressListPayTo 
 			}
 			coinAddressListPayTo[i] = coinAddress
 		}
-		return pqringctxGetCbTxWitnessSerializeSizeApprox(PQRingCTXPP, coinAddressListPayTo)
+		return pqringctxGetCbTxWitnessSerializeSize(PQRingCTXPP, coinAddressListPayTo)
 	default:
 		return 0, errors.New("GetCbTxWitnessSerializeSizeApprox: Unsupported txVersion")
 	}
