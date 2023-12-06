@@ -38,7 +38,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.4
 )
 
-replace github.com/abesuite/abec => github.com/pqabelian/abec v0.0.0-20231130144401-eb13c21d10d3
+replace github.com/abesuite/abec => github.com/pqabelian/abec v0.0.0-20231206045017-a5785360ac5a
 
 replace github.com/abesuite/abeutil => github.com/pqabelian/abeutil v0.0.0-20231107022913-d6d3bf295938
 
