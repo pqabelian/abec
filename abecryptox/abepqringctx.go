@@ -1,16 +1,18 @@
 package abecryptox
 
 import (
-	"errors"
+	"fmt"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/wire"
 	"github.com/cryptosuite/pqringctx/pqringctxapi"
 )
 
 // // abecryptox -> abepqringctx -> pqringctx
+
 // pqringctxCryptoAddressGen() generates cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, by calling pqringctx's key-generation functions and encapsed the keys.
 // cryptoScheme is set as a parameter, since the map between CryptoScheme and the real crypto-scheme (here is pqringct) is coded by abecryptoparam.
 // Note that based on privacyLevel, the returned cryptoSnsk and cryptoVsk could be nil.
+// reviewed on 2023.12.07
 func pqringctxCryptoAddressKeyGen(pp *pqringctxapi.PublicParameter, randSeed []byte,
 	cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel abecryptoxparam.PrivacyLevel) (
 	cryptoAddress []byte,
@@ -23,7 +25,7 @@ func pqringctxCryptoAddressKeyGen(pp *pqringctxapi.PublicParameter, randSeed []b
 
 	if privacyLevel == abecryptoxparam.PrivacyLevelRINGCT {
 		if 2*expectedSeedLen != len(randSeed) {
-			return nil, nil, nil, nil, errors.New("invalid length of seed in pqringctxCryptoAddressGen")
+			return nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressKeyGen: invalid length of seed for RingCT-privacy")
 		}
 
 		coinAddress, coinSpendKey, coinSnKey, err := pqringctxapi.CoinAddressKeyForRingGen(pp, randSeed[:expectedSeedLen])
@@ -46,24 +48,24 @@ func pqringctxCryptoAddressKeyGen(pp *pqringctxapi.PublicParameter, randSeed []b
 
 		cryptoSpsk = make([]byte, 5+len(coinSpendKey))
 		copy(cryptoSpsk[0:], serializedCryptoScheme)
-		cryptoAddress[4] = byte(abecryptoxparam.PrivacyLevelRINGCT)
+		cryptoSpsk[4] = byte(abecryptoxparam.PrivacyLevelRINGCT)
 		copy(cryptoSpsk[5:], coinSpendKey)
 
 		cryptoSnsk = make([]byte, 5+len(coinSnKey))
 		copy(cryptoSnsk[0:], serializedCryptoScheme)
-		cryptoAddress[4] = byte(abecryptoxparam.PrivacyLevelRINGCT)
+		cryptoSnsk[4] = byte(abecryptoxparam.PrivacyLevelRINGCT)
 		copy(cryptoSnsk[5:], coinSnKey)
 
 		cryptoVsk = make([]byte, 5+len(serializedVSk))
 		copy(cryptoVsk[0:], serializedCryptoScheme)
-		cryptoAddress[4] = byte(abecryptoxparam.PrivacyLevelRINGCT)
+		cryptoVsk[4] = byte(abecryptoxparam.PrivacyLevelRINGCT)
 		copy(cryptoVsk[5:], serializedVSk)
 
 		return cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, nil
 
 	} else if privacyLevel == abecryptoxparam.PrivacyLevelPSEUDONYM {
 		if expectedSeedLen != len(randSeed) {
-			return nil, nil, nil, nil, errors.New("invalid length of seed in pqringctxCryptoAddressGen")
+			return nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressGen: invalid length of seed for Pseudonym-privacy")
 		}
 
 		coinAddress, coinSpendKey, err := pqringctxapi.CoinAddressKeyForSingleGen(pp, randSeed)
@@ -80,7 +82,7 @@ func pqringctxCryptoAddressKeyGen(pp *pqringctxapi.PublicParameter, randSeed []b
 
 		cryptoSpsk = make([]byte, 5+len(coinSpendKey))
 		copy(cryptoSpsk[0:], serializedCryptoScheme)
-		cryptoAddress[4] = byte(abecryptoxparam.PrivacyLevelPSEUDONYM)
+		cryptoSpsk[4] = byte(abecryptoxparam.PrivacyLevelPSEUDONYM)
 		copy(cryptoSpsk[5:], coinSpendKey)
 
 		cryptoSnsk = nil
@@ -89,7 +91,7 @@ func pqringctxCryptoAddressKeyGen(pp *pqringctxapi.PublicParameter, randSeed []b
 
 		return cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, nil
 	} else {
-		return nil, nil, nil, nil, errors.New("unsupported privacyLevel in pqringctxCryptoAddressGen")
+		return nil, nil, nil, nil, fmt.Errorf("unsupported privacyLevel in pqringctxCryptoAddressGen")
 	}
 }
 
