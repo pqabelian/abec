@@ -2,6 +2,7 @@ package abecryptox
 
 import (
 	"errors"
+	"fmt"
 	"github.com/abesuite/abec/abecrypto"
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
@@ -40,6 +41,7 @@ func CryptoAddressKeyGen(randSeed []byte, cryptoScheme abecryptoxparam.CryptoSch
 // APIs for Transactions	begin
 
 // CoinbaseTxGen takes as input the transaction material and outputs a *wire.MsgTxAbe
+// reviewed on 2023.12.07
 func CoinbaseTxGen(abeTxOutputDescs []*AbeTxOutputDesc, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(coinbaseTxMsgTemplate.Version)
 	if err != nil {
@@ -68,7 +70,7 @@ func CoinbaseTxGen(abeTxOutputDescs []*AbeTxOutputDesc, coinbaseTxMsgTemplate *w
 		}
 		return cbTx, nil
 	default:
-		return nil, errors.New("CoinbaseTxGen: Unsupported crypto scheme")
+		return nil, fmt.Errorf("CoinbaseTxGen: Unsupported crypto scheme")
 	}
 
 }

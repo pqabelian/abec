@@ -97,6 +97,7 @@ func pqringctxCryptoAddressKeyGen(pp *pqringctxapi.PublicParameter, randSeed []b
 
 // The caller needs to fill the Version, TxIns, TxFee, TxMemo fields for coinbaseTxMsgTemplate,
 // this function will fill the TxOuts and TxWitness fields.
+// reviewed on 2023.12.07
 func pqringctxCoinbaseTxGen(pp *pqringctxapi.PublicParameter, abeTxOutputDescs []*AbeTxOutputDesc, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 
 	//	parse AbeTxOutputDesc to pqringctx.TxOutputDesc
@@ -136,8 +137,8 @@ func pqringctxCoinbaseTxGen(pp *pqringctxapi.PublicParameter, abeTxOutputDescs [
 	if err != nil {
 		return nil, err
 	}
-
 	coinbaseTxMsgTemplate.TxWitness = serializedCbTxWitness
+
 	return coinbaseTxMsgTemplate, nil
 	//return nil, nil
 }
