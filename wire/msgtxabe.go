@@ -52,21 +52,29 @@ type OutPointAbe struct {
 	TxHash chainhash.Hash
 	Index  uint8 //	due to the large size of post-quantum crypto primitives, ABE will limit the number of outputs of each transaction
 
-	outPointId *OutPointId // cached OutPointId
+	// outPointId *OutPointId // cached OutPointId
+	// For safety, we do not cache outPointId. 2023.12.08
 }
 
 func (outPoint *OutPointAbe) OutPointId() OutPointId {
-	if outPoint.outPointId == nil {
-		// cache the outPointId
+	// For safety, we do not cache outPointId. 2023.12.08
+	//if outPoint.outPointId == nil {
+	//	// cache the outPointId
+	//
+	//	opId := OutPointId{}
+	//	copy(opId[:], outPoint.TxHash[:])
+	//	opId[chainhash.HashSize] = outPoint.Index
+	//
+	//	outPoint.outPointId = &opId
+	//}
+	//
+	//return *outPoint.outPointId
 
-		opId := OutPointId{}
-		copy(opId[:], outPoint.TxHash[:])
-		opId[chainhash.HashSize] = outPoint.Index
+	opId := OutPointId{}
+	copy(opId[:], outPoint.TxHash[:])
+	opId[chainhash.HashSize] = outPoint.Index
 
-		outPoint.outPointId = &opId
-	}
-
-	return *outPoint.outPointId
+	return opId
 }
 
 // String returns the OutPoint in the human-readable form "hash:index".
@@ -105,8 +113,9 @@ type OutPointRing struct {
 	BlockHashs []*chainhash.Hash //	the hashs for the blocks from which the ring was generated, at this moment it is 3 successive blocks
 	OutPoints  []*OutPointAbe
 
-	ringId *RingId // cached ringId, should not be serialized, since it is a derived data and should not be transmitted.
+	// ringId *RingId // cached ringId, should not be serialized, since it is a derived data and should not be transmitted.
 	// Anytime, we shall work based on the core data, rather than those derive data.
+	// For safety, we do not cache ringId
 }
 
 func (outPointRing *OutPointRing) SerializeSize() int {
@@ -177,16 +186,21 @@ func (outPointRing *OutPointRing) Hash() chainhash.Hash {
 
 // RingId() return outPoing.Hash() as the ringId.
 func (outPointRing *OutPointRing) RingId() RingId {
-	if outPointRing.ringId == nil {
-		// cache the ringId
-		// we use Hash() as the RingId
-		hash := outPointRing.Hash()
-		ringId := RingId(hash)
-		outPointRing.ringId = &ringId
-	}
+	//	For safety, we do not cache ringId. 2023.12.08
 
-	// Return the cached hash if it has already been generated.
-	return *outPointRing.ringId
+	//if outPointRing.ringId == nil {
+	//	// cache the ringId
+	//	// we use Hash() as the RingId
+	//	hash := outPointRing.Hash()
+	//	ringId := RingId(hash)
+	//	outPointRing.ringId = &ringId
+	//}
+	//
+	//// Return the cached hash if it has already been generated.
+	//return *outPointRing.ringId
+
+	hash := outPointRing.Hash()
+	return RingId(hash)
 }
 
 func WriteOutPointRing(w io.Writer, pver uint32, version uint32, opr *OutPointRing) error {
