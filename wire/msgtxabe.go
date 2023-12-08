@@ -103,7 +103,7 @@ func NewOutPointAbe(txHash *chainhash.Hash, index uint8) *OutPointAbe {
 
 // RingId is used as unique identifier for OutPointRing, as well as the corresponding TxoRing,
 // which contains more detail information for the ring.
-type RingId chainhash.Hash
+type RingId = chainhash.Hash
 
 // todo: shall the ringBlockHeight be added?
 type OutPointRing struct {
