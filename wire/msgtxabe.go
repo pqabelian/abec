@@ -99,13 +99,14 @@ type RingId chainhash.Hash
 
 // todo: shall the ringBlockHeight be added?
 type OutPointRing struct {
-	// TODO(abe): these three successive block hash can be replaced by the hash of block whose heigt equal to 3K+2
+	// TODO(abe): these three successive block hash can be replaced by the hash of block whose height equal to 3K+2
 	//	todo: AliceBob 20210616 RingHash should be computed based on the version, blockhashs, and outpoints
 	Version    uint32            //	All TXOs in a ring has the same version, and this version is set to be the ring Version.
 	BlockHashs []*chainhash.Hash //	the hashs for the blocks from which the ring was generated, at this moment it is 3 successive blocks
 	OutPoints  []*OutPointAbe
 
-	ringId *RingId // cached ringId
+	ringId *RingId // cached ringId, should not be serialized, since it is a derived data and should not be transmitted.
+	// Anytime, we shall work based on the core data, rather than those derive data.
 }
 
 func (outPointRing *OutPointRing) SerializeSize() int {
