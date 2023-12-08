@@ -199,8 +199,7 @@ func (outPointRing *OutPointRing) RingId() RingId {
 	//// Return the cached hash if it has already been generated.
 	//return *outPointRing.ringId
 
-	hash := outPointRing.Hash()
-	return RingId(hash)
+	return outPointRing.Hash()
 }
 
 func WriteOutPointRing(w io.Writer, pver uint32, version uint32, opr *OutPointRing) error {
