@@ -997,7 +997,7 @@ func init() {
 	MustRegisterCmd("listfreeaddresses", (*ListFreeAddressesCmd)(nil), flags)
 	MustRegisterCmd("addressmaxsequencenumber", (*AddressMaxSequenceNumberCmd)(nil), flags)
 	MustRegisterCmd("addressrange", (*AddressRangeCmd)(nil), flags)
-	MustRegisterCmd("exportrange", (*ExportRangeCmd)(nil), flags)
+	MustRegisterCmd("exportaddresskeyrandseed", (*ExportRangeCmd)(nil), flags)
 	//MustRegisterCmd("sendtoaddress", (*SendToAddressCmd)(nil), flags)
 	//MustRegisterCmd("sendtopayee", (*SendToPayeesCmd)(nil), flags)
 	//MustRegisterCmd("setaccount", (*SetAccountCmd)(nil), flags)
