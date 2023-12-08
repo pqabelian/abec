@@ -323,7 +323,6 @@ func NewOutPointRing(version uint32, blockHashs []*chainhash.Hash, outPoints []*
 		version,
 		blockHashs,
 		outPoints,
-		nil,
 	}
 }
 
