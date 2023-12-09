@@ -29,7 +29,7 @@ func (c CryptoScheme) Serialize() []byte {
 	return res
 }
 
-func Deserialize(content []byte) (CryptoScheme, error) {
+func DeserializeCryptoScheme(content []byte) (CryptoScheme, error) {
 	if len(content) != 4 {
 		return CryptoSchemePQRingCT, errors.New("invalid length")
 	}
@@ -202,6 +202,21 @@ func CryptoAddressParse(cryptoAddress []byte) (serializedAPK []byte, serializedV
 	}
 }
 
+func CryptoSpendSecretKeyParse(cryptoSpendSecretKey []byte) (serializedSpendSecretKey []byte, err error) {
+	cryptoScheme, err := ExtractCryptoSchemeFromCryptoSpsk(cryptoSpendSecretKey)
+	if err != nil {
+		return nil, err
+	}
+
+	switch cryptoScheme {
+	case CryptoSchemePQRingCT:
+		return pqringctCryptoSpendSecretKeyParse(PQRingCTPP, cryptoScheme, cryptoSpendSecretKey)
+
+	default:
+		return nil, errors.New("ParseCryptoAddress: non-supported cryptoScheme appears in cryptoAddress")
+	}
+}
+
 // refactored when adding abecryptox	begin
 
 // ExtractCryptoSchemeFromCryptoAddress extracts cryptoScheme from cryptoAddress
@@ -211,7 +226,40 @@ func ExtractCryptoSchemeFromCryptoAddress(cryptoAddress []byte) (cryptoScheme Cr
 		return 0, fmt.Errorf("ExtractCryptoSchemeFromCryptoAddress: incorrect length of cryptoAddress: %d", len(cryptoAddress))
 	}
 
-	return Deserialize(cryptoAddress[:4])
+	return DeserializeCryptoScheme(cryptoAddress[:4])
+
+}
+
+// ExtractCryptoSchemeFromCryptoSpsk extracts cryptoScheme from CryptoSpsk
+func ExtractCryptoSchemeFromCryptoSpsk(cryptoSpsk []byte) (cryptoScheme CryptoScheme, err error) {
+	if len(cryptoSpsk) < 4 {
+		errStr := fmt.Sprintf("ExtractCryptoSchemeFromCryptoSpsk: incorrect length of cryptoSpsk: %d", len(cryptoSpsk))
+		return 0, errors.New(errStr)
+	}
+
+	return DeserializeCryptoScheme(cryptoSpsk[:4])
+
+}
+
+// ExtractCryptoSchemeFromCryptoSnsk extracts cryptoScheme from cryptoSnsk
+func ExtractCryptoSchemeFromCryptoSnsk(cryptoSnsk []byte) (cryptoScheme CryptoScheme, err error) {
+	if len(cryptoSnsk) < 4 {
+		errStr := fmt.Sprintf("ExtractCryptoSchemeFromCryptoSnsk: incorrect length of cryptoSnsk: %d", len(cryptoSnsk))
+		return 0, errors.New(errStr)
+	}
+
+	return DeserializeCryptoScheme(cryptoSnsk[:4])
+
+}
+
+// ExtractCryptoSchemeFromCryptoVsk extracts cryptoScheme from cryptoAddress
+func ExtractCryptoSchemeFromCryptoVsk(cryptoVsk []byte) (cryptoScheme CryptoScheme, err error) {
+	if len(cryptoVsk) < 4 {
+		errStr := fmt.Sprintf("ExtractCryptoSchemeFromCryptoVsk: incorrect length of cryptoVsk: %d", len(cryptoVsk))
+		return 0, fmt.Errorf(errStr)
+	}
+
+	return DeserializeCryptoScheme(cryptoVsk[:4])
 
 }
 

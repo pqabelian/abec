@@ -2,7 +2,6 @@ package abecrypto
 
 import (
 	"errors"
-	"fmt"
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
@@ -159,7 +158,7 @@ func ExtractCryptoSchemeFromCryptoAddressKeySeed(cryptoAddressKeySeed []byte) (c
 		return 0, errors.New("incorrect length of cryptoAddressKeySeed when calling ExtractCryptoSchemeFromCryptoAddressKeySeed")
 	}
 
-	return abecryptoparam.Deserialize(cryptoAddressKeySeed[:4])
+	return abecryptoparam.DeserializeCryptoScheme(cryptoAddressKeySeed[:4])
 }
 
 /*
@@ -204,20 +203,20 @@ func GetCryptoAddressSerializeSizeMax() uint32 {
 	return pqringctCryptoAddressSize(abecryptoparam.PQRingCTPP)
 }
 
-// ExtractCryptoSchemeFromCryptoAddress extracts cryptoScheme from cryptoAddress
-func ExtractCryptoSchemeFromCryptoAddress(cryptoAddress []byte) (cryptoScheme abecryptoparam.CryptoScheme, err error) {
-	if len(cryptoAddress) < 4 {
-		errStr := fmt.Sprintf("ExtractCryptoSchemeFromCryptoAddress: incorrect length of cryptoAddress: %d", len(cryptoAddress))
-		return 0, errors.New(errStr)
-	}
-
-	return abecryptoparam.Deserialize(cryptoAddress[:4])
-
-}
+//// ExtractCryptoSchemeFromCryptoAddress extracts cryptoScheme from cryptoAddress
+//func ExtractCryptoSchemeFromCryptoAddress(cryptoAddress []byte) (cryptoScheme abecryptoparam.CryptoScheme, err error) {
+//	if len(cryptoAddress) < 4 {
+//		errStr := fmt.Sprintf("ExtractCryptoSchemeFromCryptoAddress: incorrect length of cryptoAddress: %d", len(cryptoAddress))
+//		return 0, errors.New(errStr)
+//	}
+//
+//	return abecryptoparam.Deserialize(cryptoAddress[:4])
+//
+//}
 
 // CheckCryptoAddress checks whether the input cryptoAddress is well-formed.
 func CheckCryptoAddress(cryptoAddress []byte) (valid bool, hints string) {
-	cryptoScheme, err := ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
+	cryptoScheme, err := abecryptoparam.ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
 	if err != nil {
 		return false, err.Error()
 	}
@@ -233,42 +232,42 @@ func CheckCryptoAddress(cryptoAddress []byte) (valid bool, hints string) {
 	return true, ""
 }
 
-// ExtractCryptoSchemeFromCryptoAddressSpsk extracts cryptoScheme from cryptoAddress
-func ExtractCryptoSchemeFromCryptoAddressSpsk(cryptoSpsk []byte) (cryptoScheme abecryptoparam.CryptoScheme, err error) {
-	if len(cryptoSpsk) < 4 {
-		errStr := fmt.Sprintf("ExtractCryptoSchemeFromCryptoAddressSpsk: incorrect length of cryptoSpsk: %d", len(cryptoSpsk))
-		return 0, errors.New(errStr)
-	}
+//// ExtractCryptoSchemeFromCryptoAddressSpsk extracts cryptoScheme from cryptoAddress
+//func ExtractCryptoSchemeFromCryptoAddressSpsk(cryptoSpsk []byte) (cryptoScheme abecryptoparam.CryptoScheme, err error) {
+//	if len(cryptoSpsk) < 4 {
+//		errStr := fmt.Sprintf("ExtractCryptoSchemeFromCryptoAddressSpsk: incorrect length of cryptoSpsk: %d", len(cryptoSpsk))
+//		return 0, errors.New(errStr)
+//	}
+//
+//	return abecryptoparam.Deserialize(cryptoSpsk[:4])
+//
+//}
 
-	return abecryptoparam.Deserialize(cryptoSpsk[:4])
+//// ExtractCryptoSchemeFromCryptoAddressSnsk extracts cryptoScheme from cryptoAddress
+//func ExtractCryptoSchemeFromCryptoAddressSnsk(cryptoSnsk []byte) (cryptoScheme abecryptoparam.CryptoScheme, err error) {
+//	if len(cryptoSnsk) < 4 {
+//		errStr := fmt.Sprintf("ExtractCryptoSchemeFromCryptoAddressSnsk: incorrect length of cryptoSnsk: %d", len(cryptoSnsk))
+//		return 0, errors.New(errStr)
+//	}
+//
+//	return abecryptoparam.Deserialize(cryptoSnsk[:4])
+//
+//}
 
-}
-
-// ExtractCryptoSchemeFromCryptoAddressSnsk extracts cryptoScheme from cryptoAddress
-func ExtractCryptoSchemeFromCryptoAddressSnsk(cryptoSnsk []byte) (cryptoScheme abecryptoparam.CryptoScheme, err error) {
-	if len(cryptoSnsk) < 4 {
-		errStr := fmt.Sprintf("ExtractCryptoSchemeFromCryptoAddressSnsk: incorrect length of cryptoSnsk: %d", len(cryptoSnsk))
-		return 0, errors.New(errStr)
-	}
-
-	return abecryptoparam.Deserialize(cryptoSnsk[:4])
-
-}
-
-// ExtractCryptoSchemeFromCryptoVsk extracts cryptoScheme from cryptoAddress
-func ExtractCryptoSchemeFromCryptoVsk(cryptoVsk []byte) (cryptoScheme abecryptoparam.CryptoScheme, err error) {
-	if len(cryptoVsk) < 4 {
-		errStr := fmt.Sprintf("ExtractCryptoSchemeFromCryptoVsk: incorrect length of cryptoVsk: %d", len(cryptoVsk))
-		return 0, errors.New(errStr)
-	}
-
-	return abecryptoparam.Deserialize(cryptoVsk[:4])
-
-}
+//// ExtractCryptoSchemeFromCryptoVsk extracts cryptoScheme from cryptoAddress
+//func ExtractCryptoSchemeFromCryptoVsk(cryptoVsk []byte) (cryptoScheme abecryptoparam.CryptoScheme, err error) {
+//	if len(cryptoVsk) < 4 {
+//		errStr := fmt.Sprintf("ExtractCryptoSchemeFromCryptoVsk: incorrect length of cryptoVsk: %d", len(cryptoVsk))
+//		return 0, errors.New(errStr)
+//	}
+//
+//	return abecryptoparam.Deserialize(cryptoVsk[:4])
+//
+//}
 
 // Note that this layer is responsible for only distribute the call to corresponding underlying crypto schemes.
 func VerifyCryptoAddressSpsnsk(cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk []byte) (valid bool, hints string) {
-	cryptoScheme, err := ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
+	cryptoScheme, err := abecryptoparam.ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
 	if err != nil {
 		return false, err.Error()
 	}
@@ -285,7 +284,7 @@ func VerifyCryptoAddressSpsnsk(cryptoAddress []byte, cryptoSpsk []byte, cryptoSn
 }
 
 func VerifyCryptoAddressVsk(cryptoAddress []byte, cryptoVsk []byte) (ok bool, hints string) {
-	cryptoScheme, err := ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
+	cryptoScheme, err := abecryptoparam.ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
 	if err != nil {
 		return false, err.Error()
 	}
@@ -321,7 +320,7 @@ func VerifyCryptoAddressKey(cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk 
 // ExtractCoinAddressFromCryptoAddress is implemented for only the designs where coinAddress is a part of cryptoAddress,
 // such as CryptoSchemePQRingCT.
 func ExtractCoinAddressFromCryptoAddress(cryptoAddress []byte) ([]byte, error) {
-	cryptoScheme, err := ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
+	cryptoScheme, err := abecryptoparam.ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
 	if err != nil {
 		return nil, err
 	}
