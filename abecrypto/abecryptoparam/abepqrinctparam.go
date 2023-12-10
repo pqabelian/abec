@@ -10,9 +10,9 @@ import (
 // pqringctCryptoAddressParse parse the input cryptoAddress into (serializedAPK, serializedVPK).
 // reviewed on 2023.12.07.
 func pqringctCryptoAddressParse(pp *pqringct.PublicParameter, cryptoScheme CryptoScheme, cryptoAddress []byte) (serializedAPK []byte, serializedVPK []byte, err error) {
-	if len(cryptoAddress) < 4 {
-		return nil, nil, fmt.Errorf("pqringctParseCryptoAddress: invalid length of cryptoAddress: %d", len(cryptoAddress))
-	}
+	//if len(cryptoAddress) < 4 {
+	//	return nil, nil, fmt.Errorf("pqringctParseCryptoAddress: invalid length of cryptoAddress: %d", len(cryptoAddress))
+	//}
 
 	cryptoSchemeInAddress, err := ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
 	if err != nil {
@@ -37,9 +37,9 @@ func pqringctCryptoAddressParse(pp *pqringct.PublicParameter, cryptoScheme Crypt
 }
 
 func pqringctCryptoSpendSecretKeyParse(pp *pqringct.PublicParameter, cryptoScheme CryptoScheme, cryptoSpendSecretKey []byte) (serializedASKSp []byte, err error) {
-	if len(cryptoSpendSecretKey) < 4 {
-		return nil, fmt.Errorf("pqringctCryptoSpendSecretKeyParse: invalid length of cryptoSpendSecretKey: %d", len(cryptoSpendSecretKey))
-	}
+	//if len(cryptoSpendSecretKey) < 4 {
+	//	return nil, fmt.Errorf("pqringctCryptoSpendSecretKeyParse: invalid length of cryptoSpendSecretKey: %d", len(cryptoSpendSecretKey))
+	//}
 
 	cryptoSchemeInSpSk, err := ExtractCryptoSchemeFromCryptoSpsk(cryptoSpendSecretKey)
 	if err != nil {
@@ -54,6 +54,38 @@ func pqringctCryptoSpendSecretKeyParse(pp *pqringct.PublicParameter, cryptoSchem
 	copy(serializedASKSp, cryptoSpendSecretKey[4:])
 
 	return serializedASKSp, nil
+}
+
+func pqringctCryptoSerialNumberSecretKeyParse(pp *pqringct.PublicParameter, cryptoScheme CryptoScheme, cryptoSerialNumberSecretKey []byte) (serializedASKSn []byte, err error) {
+	cryptoSchemeInSnSk, err := ExtractCryptoSchemeFromCryptoSnsk(cryptoSerialNumberSecretKey)
+	if err != nil {
+		return nil, err
+	}
+	if cryptoSchemeInSnSk != cryptoScheme {
+		return nil, fmt.Errorf("pqringctCryptoSerialNumberSecretKeyParse: the CryptoScheme of the input cryptoSerialNumberSecretKey %d does match the input CryptoScheme %d", cryptoSerialNumberSecretKey, cryptoScheme)
+	}
+
+	// parse the cryptoSerialNumberSecretKey to serializedASKSn
+	serializedASKSn = make([]byte, len(cryptoSerialNumberSecretKey)-4)
+	copy(serializedASKSn, cryptoSerialNumberSecretKey[4:])
+
+	return serializedASKSn, nil
+}
+
+func pqringctCryptoValueSecretKeyParse(pp *pqringct.PublicParameter, cryptoScheme CryptoScheme, cryptoValueSecretKey []byte) (serializedVsk []byte, err error) {
+	cryptoSchemeInVsk, err := ExtractCryptoSchemeFromCryptoVsk(cryptoValueSecretKey)
+	if err != nil {
+		return nil, err
+	}
+	if cryptoSchemeInVsk != cryptoScheme {
+		return nil, fmt.Errorf("pqringctCryptoValueSecretKeyParse: the CryptoScheme of the input cryptoValueSecretKey %d does match the input CryptoScheme %d", cryptoValueSecretKey, cryptoScheme)
+	}
+
+	// parse the cryptoValueSecretKey to serializedVsk
+	serializedVsk = make([]byte, len(cryptoValueSecretKey)-4)
+	copy(serializedVsk, cryptoValueSecretKey[4:])
+
+	return serializedVsk, nil
 }
 
 func pqringctGetParamSeedBytesLen(pp *pqringct.PublicParameter) int {

@@ -2,11 +2,13 @@ package abecryptox
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 	"github.com/cryptosuite/pqringct"
+	"github.com/cryptosuite/pqringctx"
 	"github.com/cryptosuite/pqringctx/pqringctxapi"
 )
 
@@ -31,38 +33,38 @@ func pqringctxCryptoAddressKeyGen(pp *pqringctxapi.PublicParameter, randSeed []b
 			return nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressKeyGen: invalid length of seed for RingCT-privacy")
 		}
 
-		coinAddress, coinSpendKey, coinSnKey, err := pqringctxapi.CoinAddressKeyForRingGen(pp, randSeed[:expectedSeedLen])
+		coinAddress, coinSpSk, coinSnSk, err := pqringctxapi.CoinAddressKeyForPKRingGen(pp, randSeed[:expectedSeedLen])
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
 
-		serializedVPk, serializedVSk, err := pqringctxapi.CoinValueKeyGen(pp, randSeed[expectedSeedLen:])
+		coinValuePK, coinValueSk, err := pqringctxapi.CoinValueKeyGen(pp, randSeed[expectedSeedLen:])
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
 
 		serializedCryptoScheme := abecryptoxparam.SerializeCryptoScheme(cryptoScheme)
 
-		cryptoAddress = make([]byte, 5+len(coinAddress)+len(serializedVPk))
+		cryptoAddress = make([]byte, 5+len(coinAddress)+len(coinValuePK))
 		copy(cryptoAddress[0:], serializedCryptoScheme)
 		cryptoAddress[4] = byte(abecryptoxparam.PrivacyLevelRINGCT)
 		copy(cryptoAddress[5:], coinAddress)
-		copy(cryptoAddress[5+len(coinAddress):], serializedVPk)
+		copy(cryptoAddress[5+len(coinAddress):], coinValuePK)
 
-		cryptoSpsk = make([]byte, 5+len(coinSpendKey))
+		cryptoSpsk = make([]byte, 5+len(coinSpSk))
 		copy(cryptoSpsk[0:], serializedCryptoScheme)
 		cryptoSpsk[4] = byte(abecryptoxparam.PrivacyLevelRINGCT)
-		copy(cryptoSpsk[5:], coinSpendKey)
+		copy(cryptoSpsk[5:], coinSpSk)
 
-		cryptoSnsk = make([]byte, 5+len(coinSnKey))
+		cryptoSnsk = make([]byte, 5+len(coinSnSk))
 		copy(cryptoSnsk[0:], serializedCryptoScheme)
 		cryptoSnsk[4] = byte(abecryptoxparam.PrivacyLevelRINGCT)
-		copy(cryptoSnsk[5:], coinSnKey)
+		copy(cryptoSnsk[5:], coinSnSk)
 
-		cryptoVsk = make([]byte, 5+len(serializedVSk))
+		cryptoVsk = make([]byte, 5+len(coinValueSk))
 		copy(cryptoVsk[0:], serializedCryptoScheme)
 		cryptoVsk[4] = byte(abecryptoxparam.PrivacyLevelRINGCT)
-		copy(cryptoVsk[5:], serializedVSk)
+		copy(cryptoVsk[5:], coinValueSk)
 
 		return cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, nil
 
@@ -71,7 +73,7 @@ func pqringctxCryptoAddressKeyGen(pp *pqringctxapi.PublicParameter, randSeed []b
 			return nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressGen: invalid length of seed for Pseudonym-privacy")
 		}
 
-		coinAddress, coinSpendKey, err := pqringctxapi.CoinAddressKeyForSingleGen(pp, randSeed)
+		coinAddress, coinSpendKey, err := pqringctxapi.CoinAddressKeyForPKHSingleGen(pp, randSeed)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -98,6 +100,20 @@ func pqringctxCryptoAddressKeyGen(pp *pqringctxapi.PublicParameter, randSeed []b
 	}
 }
 
+// todo: review
+func pqringctxMapPrivacyLevelToCoinAddressType(privacyLevel abecryptoxparam.PrivacyLevel) (pqringctxapi.CoinAddressType, error) {
+	switch privacyLevel {
+	case abecryptoxparam.PrivacyLevelRINGCTPre:
+		return pqringctx.CoinAddressTypePublicKeyForRingPre, nil
+	case abecryptoxparam.PrivacyLevelRINGCT:
+		return pqringctx.CoinAddressTypePublicKeyForRing, nil
+	case abecryptoxparam.PrivacyLevelPSEUDONYM:
+		return pqringctx.CoinAddressTypePublicKeyHashForSingle, nil
+	default:
+		return 0, fmt.Errorf("pqringctxMapPrivacyLevelToCoinAddressType: the input privacyLevel(%d) is not supported")
+	}
+}
+
 // The caller needs to fill the Version, TxIns, TxFee, TxMemo fields for coinbaseTxMsgTemplate,
 // this function will fill the TxOuts and TxWitness fields.
 // reviewed on 2023.12.07
@@ -106,12 +122,12 @@ func pqringctxCoinbaseTxGen(pp *pqringctxapi.PublicParameter, abeTxOutputDescs [
 	//	parse AbeTxOutputDesc to pqringctx.TxOutputDesc
 	txOutputDescs := make([]*pqringctxapi.TxOutputDescMLP, len(abeTxOutputDescs))
 	for j := 0; j < len(abeTxOutputDescs); j++ {
-		_, coinAddress, valuePublicKey, err := abecryptoxparam.CryptoAddressParse(abeTxOutputDescs[j].cryptoAddress)
+		_, coinAddress, coinValuePK, err := abecryptoxparam.CryptoAddressParse(abeTxOutputDescs[j].cryptoAddress)
 		if err != nil {
 			return nil, err
 		}
 
-		txOutputDescs[j] = pqringctxapi.NewTxOutputDescMLP(coinAddress, valuePublicKey, abeTxOutputDescs[j].value)
+		txOutputDescs[j] = pqringctxapi.NewTxOutputDescMLP(coinAddress, coinValuePK, abeTxOutputDescs[j].value)
 	}
 
 	// call the pqringctx.CoinbaseTxGen
@@ -229,7 +245,7 @@ func pqringctxTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecr
 	inForSingleDistinct := 0
 
 	// cryptoTxInputDescs
-	cryptoTxInputDescs := make([]pqringctxapi.TxInputDescMLP, inputNum)
+	cryptoTxInputDescs := make([]*pqringctxapi.TxInputDescMLP, inputNum)
 	for i := 0; i < inputNum; i++ {
 		txInRingVersion := transferTxMsgTemplate.TxIns[i].PreviousOutPointRing.Version
 		if txInRingVersion != transferTxMsgTemplate.Version {
@@ -244,19 +260,6 @@ func pqringctxTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecr
 				return nil, fmt.Errorf("pqringctxTransferTxGen: the transferTxMsgTemplate is attempting to spend coins created by transactions with differnet versions, but the case is out of the allowed ones")
 			}
 		}
-
-		//privacyLevel, _, _, err := abecryptoxparam.CryptoAddressParse(abeTxInputDescs[i].cryptoAddress)
-		//if err != nil {
-		//	return nil, err
-		//}
-		//
-		//if privacyLevel == abecryptoxparam.PrivacyLevelRINGCTPre || privacyLevel == abecryptoxparam.PrivacyLevelRINGCT {
-		//	if i == inForRing {
-		//		inForRing += 1
-		//	} else {
-		//
-		//	}
-		//}
 
 		// lgrTxoList
 		lgrTxoList := make([]*pqringctxapi.LgrTxoMLP, len(abeTxInputDescs[i].txoRing.TxOuts))
@@ -276,11 +279,104 @@ func pqringctxTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecr
 			lgrTxoList[j] = pqringctxapi.NewLgrTxo(txoMLP, txolid)
 		}
 
-		// sidx
+		//  sidx          uint8
 		sidx := abeTxInputDescs[i].sidx
 
-		// value
+		//	keys
+		var coinAddressInCoin []byte
+		var coinAddressTypeInCoin pqringctxapi.CoinAddressType
+		coinAddressInCoin, err = pqringctxapi.ExtractCoinAddressFromSerializedTxo(pp, abeTxInputDescs[i].txoRing.TxOuts[sidx].TxoScript)
+		if err != nil {
+			return nil, err
+		}
+		coinAddressTypeInCoin, err = pqringctxapi.ExtractCoinAddressTypeFromCoinAddress(pp, coinAddressInCoin)
+		if err != nil {
+			return nil, err
+		}
 
+		//	cryptoAddress check
+		var coinAddressFromCryptoAddress []byte = nil
+		var privacyLevelInAddress abecryptoxparam.PrivacyLevel
+		var coinValuePublicKey []byte = nil
+		privacyLevelInAddress, coinAddressFromCryptoAddress, coinValuePublicKey, err = abecryptoxparam.CryptoAddressParse(abeTxInputDescs[i].cryptoAddress)
+		if err != nil {
+			return nil, err
+		}
+		if bytes.Compare(coinAddressFromCryptoAddress, coinAddressInCoin) != 0 {
+			return nil, fmt.Errorf("pqringctxTransferTxGen: the coinAddress extracted from abeTxInputDescs[%d].cryptoAddress and that extracted from abeTxInputDescs[%d].txoRing.TxOuts[%].TxoScript are inconsistent", i, i, sidx)
+		}
+
+		//	coinSpendSecretKey []byte
+		var coinSpendSecretKey []byte
+		var privacyLevelInKey abecryptoxparam.PrivacyLevel
+		var coinAddressTypeInKey pqringctxapi.CoinAddressType
+
+		privacyLevelInKey, coinSpendSecretKey, err = abecryptoxparam.CryptoSpendSecretKeyParse(abeTxInputDescs[i].cryptoSpsk)
+		if err != nil {
+			return nil, err
+		}
+		if privacyLevelInKey != privacyLevelInAddress {
+			return nil, fmt.Errorf("pqringctxTransferTxGen: the privacyLevel extracted from abeTxInputDescs[%d].cryptoSpsk and that extracted from abeTxInputDescs[%d].cryptoAddress are inconsistent", i, i)
+		}
+		coinAddressTypeInKey, err = pqringctxapi.ExtractCoinAddressTypeFromCoinSpendSecretKey(pp, coinSpendSecretKey)
+		if err != nil {
+			return nil, err
+		}
+		if coinAddressTypeInKey != coinAddressTypeInCoin {
+			return nil, fmt.Errorf("pqringctxTransferTxGen: the coinAddressType in abeTxInputDescs[%d].cryptoSpsk does not match of the coin to spend", i)
+		}
+
+		//	coinSerialNumberSecretKey []byte
+		var coinSerialNumberSecretKey []byte = nil
+		if abeTxInputDescs[i].cryptoSnsk != nil {
+			privacyLevelInKey, coinSerialNumberSecretKey, err = abecryptoxparam.CryptoSerialNumberSecretKeyParse(abeTxInputDescs[i].cryptoSnsk)
+			if err != nil {
+				return nil, err
+			}
+			if err != nil {
+				return nil, err
+			}
+			if privacyLevelInKey != privacyLevelInAddress {
+				return nil, fmt.Errorf("pqringctxTransferTxGen: the privacyLevel extracted from abeTxInputDescs[%d].cryptoSnsk and that extracted from abeTxInputDescs[%d].cryptoAddress are inconsistent", i, i)
+			}
+
+			coinAddressTypeInKey, err = pqringctxapi.ExtractCoinAddressTypeFromCoinSerialNumberSecretKey(pp, coinSerialNumberSecretKey)
+			if err != nil {
+				return nil, err
+			}
+			if coinAddressTypeInKey != coinAddressTypeInCoin {
+				return nil, fmt.Errorf("pqringctxTransferTxGen: the coinAddressType in abeTxInputDescs[%d].cryptoSnsk does not match of the coin to spend", i)
+			}
+		} else {
+			if privacyLevelInAddress != abecryptoxparam.PrivacyLevelPSEUDONYM {
+				return nil, fmt.Errorf("pqringctxTransferTxGen: the abeTxInputDescs[%d].[%d]-th Txo's has privacy-level PrivacyLevelPSEUDONYM, but the cryptoSnsk is nil", i, sidx)
+			}
+		}
+
+		//	coinValuePublicKey             []byte
+		//	parsed from cryptoAddress as above
+
+		//	coinValueSecretKey             []byte
+		var coinValueSecretKey []byte = nil
+		if abeTxInputDescs[i].cryptoVsk != nil {
+			privacyLevelInKey, coinValueSecretKey, err = abecryptoxparam.CryptoValueSecretKeyParse(abeTxInputDescs[i].cryptoVsk)
+			if err != nil {
+				return nil, err
+			}
+			if privacyLevelInKey != privacyLevelInAddress {
+				return nil, fmt.Errorf("pqringctxTransferTxGen: the privacyLevel extracted from abeTxInputDescs[%d].cryptoVsk and that extracted from abeTxInputDescs[%d].cryptoAddress are inconsistent", i, i)
+			}
+		} else {
+			if privacyLevelInAddress != abecryptoxparam.PrivacyLevelPSEUDONYM {
+				return nil, fmt.Errorf("pqringctxTransferTxGen: the abeTxInputDescs[%d].[%d]-th Txo's has privacy-level PrivacyLevelPSEUDONYM, but the cryptoVsk is nil", i, sidx)
+			}
+		}
+
+		// value
+		// explicitly given in abeTxInputDescs[i]
+		value := abeTxInputDescs[i].value
+
+		cryptoTxInputDescs[i] = pqringctxapi.NewTxInputDescMLP(lgrTxoList, sidx, coinSpendSecretKey, coinSerialNumberSecretKey, coinValuePublicKey, coinValueSecretKey, value)
 	}
 
 	// todo:XXXX

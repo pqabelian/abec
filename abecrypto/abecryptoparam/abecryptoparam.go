@@ -213,7 +213,37 @@ func CryptoSpendSecretKeyParse(cryptoSpendSecretKey []byte) (serializedSpendSecr
 		return pqringctCryptoSpendSecretKeyParse(PQRingCTPP, cryptoScheme, cryptoSpendSecretKey)
 
 	default:
-		return nil, errors.New("ParseCryptoAddress: non-supported cryptoScheme appears in cryptoAddress")
+		return nil, errors.New("CryptoSpendSecretKeyParse: non-supported cryptoScheme appears in serializedSpendSecretKey")
+	}
+}
+
+func CryptoSerialNumberSecretKeyParse(cryptoSerialNumberSecretKey []byte) (serializedSerialNumberSecretKey []byte, err error) {
+	cryptoScheme, err := ExtractCryptoSchemeFromCryptoSnsk(cryptoSerialNumberSecretKey)
+	if err != nil {
+		return nil, err
+	}
+
+	switch cryptoScheme {
+	case CryptoSchemePQRingCT:
+		return pqringctCryptoSerialNumberSecretKeyParse(PQRingCTPP, cryptoScheme, serializedSerialNumberSecretKey)
+
+	default:
+		return nil, errors.New("CryptoSerialNumberSecretKeyParse: non-supported cryptoScheme appears in serializedSerialNumberSecretKey")
+	}
+}
+
+func CryptoValueSecretKeyParse(cryptoValueSecretKey []byte) (coinValueSecretKey []byte, err error) {
+	cryptoScheme, err := ExtractCryptoSchemeFromCryptoVsk(cryptoValueSecretKey)
+	if err != nil {
+		return nil, err
+	}
+
+	switch cryptoScheme {
+	case CryptoSchemePQRingCT:
+		return pqringctCryptoValueSecretKeyParse(PQRingCTPP, cryptoScheme, coinValueSecretKey)
+
+	default:
+		return nil, errors.New("CryptoSerialNumberSecretKeyParse: non-supported cryptoScheme appears in serializedSerialNumberSecretKey")
 	}
 }
 
