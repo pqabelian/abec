@@ -109,6 +109,10 @@ func CoinbaseTxVerify(coinbaseTx *wire.MsgTxAbe) (bool, error) {
 // In summary, CreateTransferTxMsgTemplate() fills all fields except the serialNumber, TxOuts, and TxWitness.
 // Note that these filled fields (except the Version) are independent of the underlying crypto scheme,
 // and are specified by the issuer of a transaction.
+// We separate the creation of this TransferTxMsgTemplate from TransferTxGen, because
+//
+//	a caller may use other methods to create a TransferTxMsgTemplate.
+//
 // todo: review
 func CreateTransferTxMsgTemplate(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxOutputDesc, txFee uint64, txMemo []byte) (*wire.MsgTxAbe, error) {
 
@@ -116,13 +120,13 @@ func CreateTransferTxMsgTemplate(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputD
 	//	Note that new Tx must use the latest/current TxVersion.
 	txMsgTemplate := wire.NewMsgTxAbe(wire.TxVersion)
 
-	//	TxIns
+	//	TxIns     []*TxInAbe
 	for _, abeTxInputDesc := range abeTxInputDescs {
 		txIn := wire.NewTxInAbe(nil, abeTxInputDesc.txoRing.OutPointRing)
 		txMsgTemplate.AddTxIn(txIn)
 	}
 
-	//	TxOuts: skip
+	//	 TxOuts    []*TxOutAbe: skip
 
 	//	TxFee
 	txMsgTemplate.TxFee = txFee
@@ -151,7 +155,8 @@ func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxO
 		pqringctAbeTxOutputDescs := make([]*abecrypto.AbeTxOutputDesc, len(abeTxOutputDescs))
 		for i := 0; i < len(abeTxInputDescs); i++ {
 			abeTxInputDesc := abeTxInputDescs[i]
-			pqringctAbeTxInputDescs[i] = abecrypto.NewAbeTxInputDescWithFullRing(abeTxInputDesc.ringId, abeTxInputDesc.txoRing, abeTxInputDesc.sidx,
+			ringId := abeTxInputDesc.txoRing.RingId()
+			pqringctAbeTxInputDescs[i] = abecrypto.NewAbeTxInputDescWithFullRing(&ringId, abeTxInputDesc.txoRing, abeTxInputDesc.sidx,
 				abeTxInputDesc.cryptoAddress, abeTxInputDesc.cryptoSpsk, abeTxInputDesc.cryptoSnsk, abeTxInputDesc.cryptoVsk,
 				abeTxInputDesc.value)
 		}
