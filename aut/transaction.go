@@ -6,6 +6,7 @@ import (
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 	"io"
+	"math"
 	"strconv"
 )
 
@@ -103,6 +104,44 @@ type Info struct {
 	RootCoinSet  map[OutPoint]struct{}
 }
 
+// Clone returns a shallow copy of the utxo entry.
+func (info *Info) Clone() *Info {
+	if info == nil {
+		return nil
+	}
+
+	cloned := &Info{
+		Name:               make([]byte, len(info.Name)),
+		Memo:               make([]byte, len(info.Memo)),
+		UpdateThreshold:    info.UpdateThreshold,
+		IssueThreshold:     info.IssueThreshold,
+		PlannedTotalAmount: info.PlannedTotalAmount,
+		ExpireHeight:       info.ExpireHeight,
+		Issuers:            make([]*chainhash.Hash, len(info.Issuers)),
+		UnitName:           make([]byte, len(info.UnitName)),
+		MinUnitName:        make([]byte, len(info.MinUnitName)),
+		UnitScale:          info.UnitScale,
+		MintedAmount:       info.MintedAmount,
+		RootCoinSet:        make(map[OutPoint]struct{}, len(info.RootCoinSet)),
+	}
+	copy(cloned.Name, info.Name)
+	copy(cloned.Memo, info.Memo)
+
+	for i := 0; i < len(info.Issuers); i++ {
+		cloned.Issuers[i] = &chainhash.Hash{}
+		copy(cloned.Issuers[i][:], info.Issuers[i][:])
+	}
+
+	copy(cloned.UnitName, info.UnitName)
+	copy(cloned.MinUnitName, info.MinUnitName)
+
+	for outpoint, rootCoin := range info.RootCoinSet {
+		cloned.RootCoinSet[outpoint] = rootCoin
+	}
+
+	return cloned
+}
+
 // Flag = ”AUTRegistration”
 // <AUTName>
 // a string
@@ -154,6 +193,23 @@ func (tx *RegistrationTx) AUTName() []byte {
 	panic("implement me!")
 }
 func (tx *RegistrationTx) Deserialize(r io.Reader) error {
+	// 1. length
+	if len(tx.Name) > MaxNameLength ||
+		len(tx.Memo) > MaxMemoLength ||
+		len(tx.UnitName) > MaxUnitLength ||
+		len(tx.MinUnitName) > MaxMinUnitLength {
+		return errors.New("an AUT with invalid length of name")
+	}
+	// 2. threshold
+	if len(tx.Issuers) > MaxIssuerNum ||
+		int(tx.IssueTokensThreshold) > len(tx.Issuers) ||
+		int(tx.IssuerUpdateThreshold) > len(tx.Issuers) {
+		return errors.New("an AUT with invalid threshold")
+	}
+	// 3. unit scale
+	if tx.UnitScale > tx.PlannedTotalAmount {
+		return errors.New("an AUT with invalid scale")
+	}
 	panic("implement me!")
 }
 func (tx *RegistrationTx) NumIns() int {
@@ -201,6 +257,9 @@ func (tx *MintTx) Serialize() ([]byte, error) {
 	panic("implement me!")
 }
 func (tx *MintTx) Deserialize(r io.Reader) error {
+	if len(tx.Memo) > MaxMemoLength {
+		return errors.New("an AUT with invalid length of name")
+	}
 	panic("implement me!")
 }
 func (tx *MintTx) AUTName() []byte {
@@ -258,6 +317,14 @@ func (tx *ReRegistrationTx) Serialize() ([]byte, error) {
 	panic("implement me!")
 }
 func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
+	if len(tx.Memo) > MaxMemoLength {
+		return errors.New("an AUT with invalid length of name")
+	}
+	if len(tx.Issuers) > MaxIssuerNum ||
+		int(tx.IssueTokensThreshold) > len(tx.Issuers) ||
+		int(tx.IssuerUpdateThreshold) > len(tx.Issuers) {
+		return errors.New("an AUT with invalid threshold")
+	}
 	panic("implement me!")
 }
 func (tx *ReRegistrationTx) AUTName() []byte {
@@ -309,6 +376,9 @@ func (tx *TransferTx) Serialize() ([]byte, error) {
 	panic("implement me!")
 }
 func (tx *TransferTx) Deserialize(r io.Reader) error {
+	if len(tx.Memo) > MaxMemoLength {
+		return errors.New("an AUT with invalid length of name")
+	}
 	panic("implement me!")
 }
 func (tx *TransferTx) AUTName() []byte {
@@ -359,6 +429,9 @@ func (tx *BurnTx) Serialize() ([]byte, error) {
 	panic("implement me!")
 }
 func (tx *BurnTx) Deserialize(r io.Reader) error {
+	if len(tx.Memo) > MaxMemoLength {
+		return errors.New("an AUT with invalid length of name")
+	}
 	panic("implement me!")
 }
 func (tx *BurnTx) AUTName() []byte {
@@ -413,6 +486,38 @@ func DeserializeFromTx(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 	err = autTx.Deserialize(reader)
 	if err != nil {
 		return nil, err
+	}
+
+	// TODO set tx in and tx out
+
+	// TODO check sanity
+	switch autTransaction := autTx.(type) {
+	case *RegistrationTx:
+		if autTx.NumOuts() < int(autTransaction.IssueTokensThreshold) ||
+			autTx.NumOuts() < int(autTransaction.IssuerUpdateThreshold) {
+			return nil, errors.New("an AUT with num of root coin than threshold")
+		}
+	case *MintTx:
+		if autTx.NumIns() > math.MaxUint8 {
+			return nil, errors.New("an AUT with num of root coin than allowed")
+		}
+
+	case *ReRegistrationTx:
+		if autTx.NumIns() > math.MaxUint8 {
+			return nil, errors.New("an AUT with num of root coin than allowed")
+		}
+		if autTx.NumOuts() < int(autTransaction.IssueTokensThreshold) ||
+			autTx.NumOuts() < int(autTransaction.IssuerUpdateThreshold) {
+			return nil, errors.New("an AUT with num of root coin than threshold")
+		}
+	case *TransferTx:
+		if autTx.NumIns() > math.MaxUint8 {
+			return nil, errors.New("an AUT transfer transaction with root coin lower than threshold")
+		}
+	case *BurnTx:
+		autTx = &BurnTx{}
+	default:
+		return nil, ErrInValidAUTTx
 	}
 
 	return autTx, nil

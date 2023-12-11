@@ -262,17 +262,19 @@ func mergeUtxoRingView(viewA *blockchain.UtxoRingViewpoint, viewB *blockchain.Ut
 }
 
 func mergeAUTView(viewA *blockchain.AUTViewpoint, viewB *blockchain.AUTViewpoint) {
+	if viewB == nil {
+		return
+	}
+
 	viewAEntries := viewA.Entries()
-	for outpoint, entryB := range viewB.Entries() {
-		viewAEntries[outpoint] = entryB
+	for autNameKeys := range viewB.Entries() {
+		existAUTInfo := viewAEntries[autNameKeys]
+		for outpiont, autEntry := range viewB.AUTEntries(autNameKeys) {
+			existAUTInfo.Add(outpiont, autEntry)
+		}
+		viewAEntries[autNameKeys] = existAUTInfo
 	}
 	viewA.SetEntries(viewAEntries)
-
-	viewAInfos := viewA.Infos()
-	for outpoint, entryB := range viewB.Infos() {
-		viewAInfos[outpoint] = entryB
-	}
-	viewA.SetInfos(viewAInfos)
 }
 
 // standardCoinbaseScript returns a standard script suitable for use as the
@@ -464,14 +466,17 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *bl
 			entry.Spend(txIn.SerialNumber, &chainhash.ZeroHash)
 		}
 	}
-	autTx, err := aut.DeserializeFromTx(tx.MsgTx())
-	if err != nil {
-		return err
-	}
-	for _, txIn := range autTx.Ins() {
-		entry := autView.LookupEntry(txIn)
-		if entry != nil {
-			entry.Spend()
+	// AUT
+	autTx, ok := tx.AUTTransaction()
+	if ok {
+		if autTx == nil {
+			return aut.ErrInValidAUTTx
+		}
+		for _, txIn := range autTx.Ins() {
+			entry := autView.LookupEntry(hex.EncodeToString(autTx.AUTName()), txIn)
+			if entry != nil {
+				entry.Spend()
+			}
 		}
 	}
 
@@ -729,42 +734,50 @@ mempoolLoop:
 			}
 		}
 
-		autView, err := g.chain.FetchAUTView(tx)
-		if err != nil {
-			log.Warnf("Unable to fetch aut view for tx %s: %v",
-				tx.Hash(), err)
-			continue
-		}
-		autTx, _ := aut.DeserializeFromTx(tx.MsgTx())
-		switch autTransaction := autTx.(type) {
-		case *aut.RegistrationTx:
-			if autTransaction.ExpireHeight <= nextBlockHeight {
-				log.Tracef("Skipping tx %s because the aut "+
-					"transaction specify the expire height lower than "+
-					"current block height %d",
-					tx.Hash(), nextBlockHeight)
+		var autView *blockchain.AUTViewpoint
+		autTx, ok := tx.AUTTransaction()
+		if ok {
+			if autTx == nil {
+				log.Warnf("Invalid AUT Transaction %s", tx.Hash())
 				continue mempoolLoop
 			}
-		case *aut.ReRegistrationTx:
-			info := autView.LookupInfo(hex.EncodeToString(autTransaction.Name))
-			if info.ExpireHeight <= nextBlockHeight {
-				log.Tracef("Skipping tx %s because "+
-					"the expire height of aut lower than "+
-					"current block height %d",
-					tx.Hash(), nextBlockHeight)
+			autView, err = g.chain.FetchAUTView(tx)
+			if err != nil {
+				log.Warnf("Unable to fetch aut view for tx %s: %v",
+					tx.Hash(), err)
 				continue mempoolLoop
 			}
-		case *aut.MintTx:
-			info := autView.LookupInfo(hex.EncodeToString(autTransaction.Name))
-			if info.ExpireHeight <= nextBlockHeight {
-				log.Tracef("Skipping tx %s because "+
-					"the expire height of aut lower than "+
-					"current block height %d",
-					tx.Hash(), nextBlockHeight)
-				continue mempoolLoop
+
+			switch autTransaction := autTx.(type) {
+			case *aut.RegistrationTx:
+				if autTransaction.ExpireHeight < nextBlockHeight {
+					log.Tracef("Skipping tx %s because the aut "+
+						"transaction specify the expire height lower than "+
+						"current block height %d",
+						tx.Hash(), nextBlockHeight)
+					continue mempoolLoop
+				}
+			case *aut.ReRegistrationTx:
+				info := autView.LookupInfo(hex.EncodeToString(autTransaction.Name))
+				if info == nil || info.ExpireHeight < nextBlockHeight {
+					log.Tracef("Skipping tx %s because "+
+						"the expire height of aut lower than "+
+						"current block height %d",
+						tx.Hash(), nextBlockHeight)
+					continue mempoolLoop
+				}
+			case *aut.MintTx:
+				info := autView.LookupInfo(hex.EncodeToString(autTransaction.Name))
+				if info == nil || info.ExpireHeight <= nextBlockHeight {
+					log.Tracef("Skipping tx %s because "+
+						"the expire height of aut lower than "+
+						"current block height %d",
+						tx.Hash(), nextBlockHeight)
+					continue mempoolLoop
+				}
+			default:
+				// nothing to do
 			}
-		default:
-			// nothing to do
 		}
 
 		prioItem := &txPrioItemAbe{tx: tx}
@@ -881,13 +894,6 @@ mempoolLoop:
 			continue
 		}
 
-		err = blockchain.CheckTransactionInputsAUT(tx, nextBlockHeight, blockAUTView, g.chainParams)
-		if err != nil {
-			log.Tracef("Skipping tx %s due to error in "+
-				"CheckTransactionInputsAUT: %v", tx.Hash(), err)
-			continue
-		}
-
 		// Spend the transaction inputs in the block utxoRing view and add
 		// an entry for it to ensure any transactions which reference
 		// this one have it available as an input and can ensure they
@@ -896,6 +902,13 @@ mempoolLoop:
 		if err != nil {
 			log.Tracef("Skipping tx %s due to error in "+
 				"spendTransactionAbe: %v", tx.Hash(), err)
+			continue
+		}
+
+		err = blockchain.CheckTransactionInputsAUT(tx, nextBlockHeight, blockAUTView, g.chainParams)
+		if err != nil {
+			log.Tracef("Skipping tx %s due to error in "+
+				"CheckTransactionInputsAUT: %v", tx.Hash(), err)
 			continue
 		}
 

@@ -1245,14 +1245,6 @@ func countSpentOutputsAbe(block *abeutil.BlockAbe) int {
 	}
 	return numSpent
 }
-func countSpentOutputsAUT(block *abeutil.BlockAbe) int {
-	// Exclude the coinbase transaction since it can't spend anything.
-	numSpent := 0
-	for _, tx := range block.AUTTransactions() {
-		numSpent += tx.NumIns()
-	}
-	return numSpent
-}
 
 // reorganizeChainAbe reorganizes the block chain by disconnecting the nodes in the
 // detachNodes list and connecting the nodes in the attach list.  It expects
@@ -1332,8 +1324,6 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 
 	autView := NewAUTViewpoint()
 	autView.SetBestHash(&oldBest.hash)
-	autViewToDelAll := NewAUTViewpoint()
-	autViewToDelAll.SetBestHash(&oldBest.hash)
 
 	for e := detachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
@@ -1382,6 +1372,11 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		detachSpentAUTs = append(detachSpentAUTs, sauts)
 
 		err = view.disconnectTransactions(b.db, block, stxos)
+		if err != nil {
+			return err
+		}
+
+		err = autView.disconnectTransactions(b.db, block, sauts)
 		if err != nil {
 			return err
 		}
@@ -1645,7 +1640,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			return err
 		}
 
-		sauts := make([]SpentAUT, 0, countSpentOutputsAUT(block))
+		sauts := make([]SpentAUT, 0, countSpentOutputsAbe(block))
 		err = autView.connectTransactions(block, &sauts)
 		if err != nil {
 			return err

@@ -1668,7 +1668,8 @@ func (mp *TxPool) validateReplacement(tx *abeutil.Tx,
 //  8. Check transaction input standard (if do not accept non-standard tx)
 //  9. Ensure the fee is not too low (or have enough priority accept free fee tx, or rate limit)
 //  10. Check the witness of the transaction (ValidateTransactionScriptsAbe)
-//  11. Add transaction into mempool
+//  11. Check the AUT feature of the transaction if the memo meet the condition
+//  12. Add transaction into mempool
 func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit, rejectDupOrphans bool, fromDiskCache bool) ([]*wire.OutPointRing, *TxDescAbe, error) {
 
 	txHash := tx.Hash()
@@ -1885,9 +1886,6 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	// TODO AUT Check, just promote efficiency
 	autView, err := mp.fetchInputAUT(tx)
 	if err != nil {
-		if cerr, ok := err.(blockchain.RuleError); ok {
-			return nil, nil, chainRuleError(cerr)
-		}
 		return nil, nil, err
 	}
 

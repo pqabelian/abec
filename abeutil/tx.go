@@ -2,6 +2,8 @@ package abeutil
 
 import (
 	"bytes"
+	"errors"
+	"github.com/abesuite/abec/aut"
 	"io"
 
 	"github.com/abesuite/abec/chainhash"
@@ -34,6 +36,10 @@ type TxAbe struct {
 	//	txHasTxoDetails *bool // if the transaction has txo details
 	txHasWitness *bool // If the transaction has witness data
 	txIndex      int   // Position within a block or TxIndexUnknown
+
+	autTxDone bool
+	autTx     aut.Transaction
+	isAUTTx   bool
 }
 
 // MsgTx returns the underlying wire.MsgTx for the transaction.
@@ -45,6 +51,31 @@ func (t *Tx) MsgTx() *wire.MsgTx {
 func (tx *TxAbe) MsgTx() *wire.MsgTxAbe {
 	// Return the cached transaction.
 	return tx.msgTx
+}
+
+func (tx *TxAbe) AUTTransaction() (aut.Transaction, bool) {
+	if tx.autTxDone {
+		return tx.autTx, tx.isAUTTx
+	}
+	tx.autTxDone = true
+
+	autTx, err := aut.DeserializeFromTx(tx.MsgTx())
+	if err != nil {
+		if errors.Is(err, aut.ErrNonAutTx) {
+			tx.isAUTTx = false
+			tx.autTx = nil
+			return nil, false
+		}
+		if errors.Is(err, aut.ErrInValidAUTTx) {
+			tx.isAUTTx = true
+			tx.autTx = nil
+			return nil, true
+		}
+		return nil, true
+	}
+	tx.autTx = autTx
+	tx.isAUTTx = true
+	return autTx, true
 }
 
 func (tx *TxAbe) InvType() wire.InvType {
