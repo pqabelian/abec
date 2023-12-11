@@ -2,13 +2,10 @@ package abecryptox
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
-	"github.com/cryptosuite/pqringct"
-	"github.com/cryptosuite/pqringctx"
 	"github.com/cryptosuite/pqringctx/pqringctxapi"
 )
 
@@ -97,20 +94,6 @@ func pqringctxCryptoAddressKeyGen(pp *pqringctxapi.PublicParameter, randSeed []b
 		return cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, nil
 	} else {
 		return nil, nil, nil, nil, fmt.Errorf("unsupported privacyLevel in pqringctxCryptoAddressGen")
-	}
-}
-
-// todo: review
-func pqringctxMapPrivacyLevelToCoinAddressType(privacyLevel abecryptoxparam.PrivacyLevel) (pqringctxapi.CoinAddressType, error) {
-	switch privacyLevel {
-	case abecryptoxparam.PrivacyLevelRINGCTPre:
-		return pqringctx.CoinAddressTypePublicKeyForRingPre, nil
-	case abecryptoxparam.PrivacyLevelRINGCT:
-		return pqringctx.CoinAddressTypePublicKeyForRing, nil
-	case abecryptoxparam.PrivacyLevelPSEUDONYM:
-		return pqringctx.CoinAddressTypePublicKeyHashForSingle, nil
-	default:
-		return 0, fmt.Errorf("pqringctxMapPrivacyLevelToCoinAddressType: the input privacyLevel(%d) is not supported")
 	}
 }
 
@@ -239,10 +222,6 @@ func pqringctxTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecr
 	if inputNum != len(transferTxMsgTemplate.TxIns) {
 		return nil, fmt.Errorf("pqringctxTransferTxGen: the number of abeTxInputDescs does not match the number of TxIn in transferTxMsgTemplate")
 	}
-
-	inForRing := 0
-	inForSingle := 0
-	inForSingleDistinct := 0
 
 	// cryptoTxInputDescs
 	cryptoTxInputDescs := make([]*pqringctxapi.TxInputDescMLP, inputNum)
@@ -379,100 +358,44 @@ func pqringctxTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecr
 		cryptoTxInputDescs[i] = pqringctxapi.NewTxInputDescMLP(lgrTxoList, sidx, coinSpendSecretKey, coinSerialNumberSecretKey, coinValuePublicKey, coinValueSecretKey, value)
 	}
 
-	// todo:XXXX
-	//	inputDescs
-	txInputDescs := make([]*pqringct.TxInputDesc, inputNum)
-	for i := 0; i < inputNum; i++ {
-		if transferTxMsgTemplate.TxIns[i].PreviousOutPointRing.Version != inputsRingVersion {
-			return nil, errors.New("pqringctTransferTxGen: the version of the TxIn in one transaction should be the same")
-		}
-		lgrTxoList := make([]*pqringct.LgrTxo, len(abeTxInputDescs[i].txoList))
-		for j := 0; j < len(abeTxInputDescs[i].txoList); j++ {
-			if abeTxInputDescs[i].txoList[j].Version != inputsRingVersion {
-				return nil, errors.New("pqringctTransferTxGen: the version of TXOs in abeTxInputDescs.serializedTxoList does not match the version in the corresponding TxIn")
-			}
-			txo, err := pqringct.DeserializeTxo(pp, abeTxInputDescs[i].txoList[j].TxoScript)
-			if err != nil {
-				return nil, err
-			}
-
-			txolid := ledgerTxoIdGen(abeTxInputDescs[i].ringHash, uint8(j))
-
-			lgrTxoList[j] = pqringct.NewLgrTxo(txo, txolid)
-		}
-
-		sidx := abeTxInputDescs[i].sidx
-		value := abeTxInputDescs[i].value
-
-		cryptoSchemeInKey, err := ExtractCryptoSchemeFromCryptoAddressSpsk(abeTxInputDescs[i].cryptoSpsk)
-		if err != nil || cryptoSchemeInKey != cryptoScheme {
-			return nil, errors.New("pqringctTransferTxGen: unmatched cryptoScheme for Spsk and transaction")
-		}
-		serializedASksp := abeTxInputDescs[i].cryptoSpsk[4:]
-
-		cryptoSchemeInKey, err = ExtractCryptoSchemeFromCryptoAddressSnsk(abeTxInputDescs[i].cryptoSnsk)
-		if err != nil || cryptoSchemeInKey != cryptoScheme {
-			return nil, errors.New("pqringctTransferTxGen: unmatched cryptoScheme for Snsk and transaction")
-		}
-		serializedASksn := abeTxInputDescs[i].cryptoSnsk[4:]
-
-		cryptoSchemeInKey, err = ExtractCryptoSchemeFromCryptoVsk(abeTxInputDescs[i].cryptoVsk)
-		if err != nil || cryptoSchemeInKey != cryptoScheme {
-			return nil, errors.New("pqringctTransferTxGen: unmatched cryptoScheme for Vsk and transaction")
-		}
-		serializedVSk := abeTxInputDescs[i].cryptoVsk[4:]
-
-		cryptoSchemeInAddress, err := ExtractCryptoSchemeFromCryptoAddress(abeTxInputDescs[i].cryptoAddress)
-		if err != nil || cryptoSchemeInAddress != cryptoScheme {
-			return nil, errors.New("pqringctTransferTxGen: unmatched cryptoScheme for input address and transaction")
-		}
-		apkLen := pqringct.GetAddressPublicKeySerializeSize(pp)
-		serializedVpk := abeTxInputDescs[i].cryptoAddress[4+apkLen:]
-
-		txInputDescs[i] = pqringct.NewTxInputDescv2(pp, lgrTxoList, sidx, serializedASksp, serializedASksn, serializedVpk, serializedVSk, value)
-	}
-
-	// outputDescs
-	txOutputDescs := make([]*pqringct.TxOutputDesc, outputNum)
+	//	cryptoTxOutputDescs
+	cryptoTxOutputDescs := make([]*pqringctxapi.TxOutputDescMLP, outputNum)
 	for j := 0; j < outputNum; j++ {
-		cryptoscheme4outAddress, err := ExtractCryptoSchemeFromCryptoAddress(abeTxOutputDescs[j].cryptoAddress)
-		if err != nil || cryptoscheme4outAddress != cryptoScheme {
-			return nil, errors.New("pqringctTransferTxGen: unmatched cryptoScheme for transfer transaction and its output cryptoAddress")
-		}
-		// parse the cryptoAddress to serializedApk and serializedVpk
-		apkLen := pqringct.GetAddressPublicKeySerializeSize(pp)
-		serializedApk := abeTxOutputDescs[j].cryptoAddress[4 : 4+apkLen]
-		serializedVpk := abeTxOutputDescs[j].cryptoAddress[4+apkLen:]
-
-		txOutputDescs[j] = pqringct.NewTxOutputDescv2(pp, serializedApk, serializedVpk, abeTxOutputDescs[j].value)
-	}
-
-	//	call the crypto scheme
-	cryptoTransferTx, err := pqringct.TransferTxGen(pp, txInputDescs, txOutputDescs, transferTxMsgTemplate.TxFee, transferTxMsgTemplate.TxMemo)
-	if err != nil {
-		return nil, err
-	}
-	//	For the inputs, only the serial number needs to be set
-	for i := 0; i < inputNum; i++ {
-		transferTxMsgTemplate.TxIns[i].SerialNumber = cryptoTransferTx.Inputs[i].SerialNumber
-	}
-
-	//	Set the output Txos
-	transferTxMsgTemplate.TxOuts = make([]*wire.TxOutAbe, outputNum)
-	for j := 0; j < outputNum; j++ {
-		serializeTxo, err := pp.SerializeTxo(cryptoTransferTx.OutputTxos[j])
+		_, coinAddress, coinValuePublicKey, err := abecryptoxparam.CryptoAddressParse(abeTxOutputDescs[j].cryptoAddress)
 		if err != nil {
 			return nil, err
 		}
-		//	todo: wire.TxOutAbe use NewTxOutAbe()
-		transferTxMsgTemplate.TxOuts[j] = &wire.TxOutAbe{
+
+		cryptoTxOutputDescs[j] = pqringctxapi.NewTxOutputDescMLP(coinAddress, coinValuePublicKey, abeTxOutputDescs[j].value)
+	}
+
+	//	call the crypto scheme
+	cryptoTransferTx, err := pqringctxapi.TransferTxGen(pp, cryptoTxInputDescs, cryptoTxOutputDescs, transferTxMsgTemplate.TxFee, transferTxMsgTemplate.TxMemo)
+	if err != nil {
+		return nil, err
+	}
+	//	Set the txInputs
+	//	only the serial number needs to be set
+	cryptoTxInputs := cryptoTransferTx.GetTxInputs()
+	for i := 0; i < inputNum; i++ {
+		transferTxMsgTemplate.TxIns[i].SerialNumber = cryptoTxInputs[i].GetSerialNumber()
+	}
+
+	cryptoTxos := cryptoTransferTx.GetTxos()
+	transferTxMsgTemplate.TxOuts = make([]*wire.TxOutAbe, len(cryptoTxos))
+	for i := 0; i < len(cryptoTxos); i++ {
+		serializedTxo, err := pqringctxapi.SerializeTxo(pp, cryptoTxos[i])
+		if err != nil {
+			return nil, err
+		}
+		transferTxMsgTemplate.TxOuts[i] = &wire.TxOutAbe{
 			Version:   transferTxMsgTemplate.Version,
-			TxoScript: serializeTxo,
+			TxoScript: serializedTxo,
 		}
 	}
 
-	//	Set the TxWitness
-	transferTxMsgTemplate.TxWitness, err = pp.SerializeTrTxWitness(cryptoTransferTx.TxWitness)
+	// witness must be associated with Tx, so it does not need to contain cryptoScheme or TxVersion.
+	transferTxMsgTemplate.TxWitness, err = pqringctxapi.SerializeTxWitnessTrTx(pp, cryptoTransferTx.GetTxWitness())
 	if err != nil {
 		return nil, err
 	}
