@@ -45,6 +45,7 @@ func SerializeCryptoScheme(cryptoScheme CryptoScheme) []byte {
 
 // DeserializeCryptoScheme deserialize the input []byte to a CryptoScheme, using little endian.
 // reviewed on 2023.12.07
+// reviewed on 2023.12.12
 func DeserializeCryptoScheme(serializedCryptoScheme []byte) (CryptoScheme, error) {
 	if len(serializedCryptoScheme) != 4 {
 		return CryptoSchemePQRingCTX, fmt.Errorf("DeserializeCryptoScheme: invalid length")

@@ -108,15 +108,22 @@ func pqringctxCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, coinbaseTx *wir
 	return true, nil
 }
 
-// pqringctxTransferTxGen generates a MsgTxAbe, by filling the serialNumbers in TxIns， Txos and TxWitness of the input transferTxMsgTemplate.
-// The caller needs to fill the Version, TxIns, TxFee, TxMemo fields of transferTxMsgTemplate.
-// This function will fill the serialNumbers in TxIns, the Txos, and TxWitness fields of transferTxMsgTemplate, and return it as the result.
+// pqringctxTransferTxGen generates a MsgTxAbe,
+// by filling TxIns[].serialNumber，Txos, and TxWitness of the input transferTxMsgTemplate.
+// The caller needs to fill the Version, TxIns[].PreviousOutPointRing, TxFee, TxMemo fields of transferTxMsgTemplate.
+// This function will fill the TxIns[].serialNumber，Txos, and TxWitness of the input transferTxMsgTemplate, and return it as the result.
 // The parameter cryptoScheme here is obtained by the caller from TxVersion, which causes this function is called.
 // Now it is redundant at this moment and works for ony double-check.
 // In the future, when the version of input ring is different from the ring of TxVersion/TxoVersion,
 // the two corresponding cryptoSchemes will be extracted here and further decides the TxGen algorithms.
 // Refer to wire.param for the details.
 // todo: to review
+// todo: review CryptoValueSecretKeyParse
+// todo: review pqringctxapi.TransferTxGen
+// todo: review cryptoTransferTx.GetTxInputs()
+// todo: review cryptoTransferTx.GetTxos()
+// todo: review cryptoTransferTx.GetTxWitness()
+// todo: review pqringctxapi.SerializeTxWitnessTrTx
 func pqringctxTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxOutputDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 	// just redundant double check
 	cryptoSchemeFromTxVersion, err := abecryptoxparam.GetCryptoSchemeByTxVersion(transferTxMsgTemplate.Version)
@@ -131,7 +138,7 @@ func pqringctxTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecr
 	outputNum := len(abeTxOutputDescs)
 
 	if inputNum == 0 || outputNum == 0 {
-		return nil, fmt.Errorf("pqringctxTransferTxGen: the input abeTxInputDescs and abeTxOutputDescs should not be empty")
+		return nil, fmt.Errorf("pqringctxTransferTxGen: neither the input abeTxInputDescs or abeTxOutputDescs could be empty")
 	}
 
 	if inputNum != len(transferTxMsgTemplate.TxIns) {
@@ -168,7 +175,7 @@ func pqringctxTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecr
 				return nil, err
 			}
 
-			txolid := ledgerTxoIdGen(ringId, uint8(j))
+			txolid := pqringctxLedgerTxoIdGen(ringId, uint8(j))
 
 			lgrTxoList[j] = pqringctxapi.NewLgrTxo(txoMLP, txolid)
 		}
@@ -189,7 +196,7 @@ func pqringctxTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecr
 		}
 
 		//	cryptoAddress check
-		var coinAddressFromCryptoAddress []byte = nil
+		var coinAddressFromCryptoAddress []byte
 		var privacyLevelInAddress abecryptoxkey.PrivacyLevel
 		var coinValuePublicKey []byte = nil
 		privacyLevelInAddress, coinAddressFromCryptoAddress, coinValuePublicKey, err = abecryptoxkey.CryptoAddressParse(abeTxInputDescs[i].cryptoAddress)
@@ -227,9 +234,6 @@ func pqringctxTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecr
 			if err != nil {
 				return nil, err
 			}
-			if err != nil {
-				return nil, err
-			}
 			if privacyLevelInKey != privacyLevelInAddress {
 				return nil, fmt.Errorf("pqringctxTransferTxGen: the privacyLevel extracted from abeTxInputDescs[%d].cryptoSnsk and that extracted from abeTxInputDescs[%d].cryptoAddress are inconsistent", i, i)
 			}
@@ -239,16 +243,23 @@ func pqringctxTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecr
 				return nil, err
 			}
 			if coinAddressTypeInKey != coinAddressTypeInCoin {
-				return nil, fmt.Errorf("pqringctxTransferTxGen: the coinAddressType in abeTxInputDescs[%d].cryptoSnsk does not match of the coin to spend", i)
+				return nil, fmt.Errorf("pqringctxTransferTxGen: the coinAddressType in abeTxInputDescs[%d].cryptoSnsk does not match that of the coin to spend", i)
 			}
 		} else {
 			if privacyLevelInAddress != abecryptoxkey.PrivacyLevelPSEUDONYM {
-				return nil, fmt.Errorf("pqringctxTransferTxGen: the abeTxInputDescs[%d].[%d]-th Txo's has privacy-level PrivacyLevelPSEUDONYM, but the cryptoSnsk is nil", i, sidx)
+				// only when the privacyLevelInAddress is PrivacyLevelPSEUDONYM, the provided cryptoSnsk could be nil.
+				return nil, fmt.Errorf("pqringctxTransferTxGen: the abeTxInputDescs[%d].[%d]-th Txo's privacy-level is not PrivacyLevelPSEUDONYM, but the cryptoSnsk is nil", i, sidx)
 			}
 		}
 
 		//	coinValuePublicKey             []byte
 		//	parsed from cryptoAddress as above
+		if coinValuePublicKey == nil {
+			if privacyLevelInAddress != abecryptoxkey.PrivacyLevelPSEUDONYM {
+				// only when the privacyLevelInAddress is PrivacyLevelPSEUDONYM, the extracted coinValuePublicKey from the cryptoAddress could be nil.
+				return nil, fmt.Errorf("pqringctxTransferTxGen: the abeTxInputDescs[%d].[%d]-th Txo's privacy-level is not PrivacyLevelPSEUDONYM, but the coinValuePublicKey is nil", i, sidx)
+			}
+		}
 
 		//	coinValueSecretKey             []byte
 		var coinValueSecretKey []byte = nil
@@ -262,7 +273,8 @@ func pqringctxTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecr
 			}
 		} else {
 			if privacyLevelInAddress != abecryptoxkey.PrivacyLevelPSEUDONYM {
-				return nil, fmt.Errorf("pqringctxTransferTxGen: the abeTxInputDescs[%d].[%d]-th Txo's has privacy-level PrivacyLevelPSEUDONYM, but the cryptoVsk is nil", i, sidx)
+				// only when the privacyLevelInAddress is PrivacyLevelPSEUDONYM, the provided cryptoVsk could be nil.
+				return nil, fmt.Errorf("pqringctxTransferTxGen: the abeTxInputDescs[%d].[%d]-th Txo's privacy-level is not PrivacyLevelPSEUDONYM, but the cryptoVsk is nil", i, sidx)
 			}
 		}
 
@@ -289,6 +301,7 @@ func pqringctxTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecr
 	if err != nil {
 		return nil, err
 	}
+
 	//	Set the txInputs
 	//	only the serial number needs to be set
 	cryptoTxInputs := cryptoTransferTx.GetTxInputs()
@@ -414,10 +427,10 @@ func pqringctxTransferTxVerify(pp *pqringctxapi.PublicParameter, transferTx *wir
 
 // helper functions	begin
 
-// ledgerTxoIdGen generates ledgerTxoId for Txo in a ring (meaning in a ledger).
+// pqringctxLedgerTxoIdGen generates ledgerTxoId for Txo in a ring (meaning in a ledger).
 // This keeps the same as that in pqringct.
 // reviewed on 2023.12.08
-func ledgerTxoIdGen(ringId wire.RingId, index uint8) []byte {
+func pqringctxLedgerTxoIdGen(ringId wire.RingId, index uint8) []byte {
 	w := bytes.NewBuffer(make([]byte, 0, chainhash.HashSize+1))
 	var err error
 	// ringId

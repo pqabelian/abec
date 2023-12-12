@@ -124,6 +124,7 @@ func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxO
 	case abecryptoxparam.CryptoSchemePQRingCT:
 		// This is to achieve back-compatibility with CryptoSchemePQRingCT.
 		// Before the BlockHeightMLP, the caller may use the transferTxMsgTemplate.Version that maps to CryptoSchemePQRingCT.
+		// Actually, this should not happen, since the caller with abec/abecryptox should have used a new crypto-scheme.
 		pqringctAbeTxInputDescs := make([]*abecrypto.AbeTxInputDesc, len(abeTxInputDescs))
 		pqringctAbeTxOutputDescs := make([]*abecrypto.AbeTxOutputDesc, len(abeTxOutputDescs))
 		for i := 0; i < len(abeTxInputDescs); i++ {
