@@ -428,7 +428,7 @@ func pqringctxTransferTxVerify(pp *pqringctxapi.PublicParameter, transferTx *wir
 // helper functions	begin
 
 // pqringctxLedgerTxoIdGen generates ledgerTxoId for Txo in a ring (meaning in a ledger).
-// This keeps the same as that in pqringct.
+// This must keep the same as that in pqringct.
 // reviewed on 2023.12.08
 func pqringctxLedgerTxoIdGen(ringId wire.RingId, index uint8) []byte {
 	w := bytes.NewBuffer(make([]byte, 0, chainhash.HashSize+1))

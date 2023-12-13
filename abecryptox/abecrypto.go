@@ -111,7 +111,7 @@ func CreateTransferTxMsgTemplate(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputD
 	return txMsgTemplate, nil
 }
 
-// todo: review
+// todo: review pqringctxTransferTxGen
 func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxOutputDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(transferTxMsgTemplate.Version)
