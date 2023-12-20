@@ -8,6 +8,7 @@ import (
 	"container/list"
 	"fmt"
 	"github.com/abesuite/abec/abeutil"
+	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/consensus/ethash"
@@ -839,6 +840,10 @@ func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 		return AssertError("connectBlock called with inconsistent " +
 			"spent transaction out information")
 	}
+	if len(sauts) != countSpentOutputsAUT(block) {
+		return AssertError("connectBlock called with inconsistent " +
+			"spent aut transaction information")
+	}
 
 	// No warnings about unknown rules or versions until the chain is
 	// current.
@@ -1082,7 +1087,7 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *abeutil.Block, view
 // Abe to do
 func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 	view *UtxoRingViewpoint, viewToDel *UtxoRingViewpoint,
-	autView *AUTViewpoint) error {
+	autView *AUTViewpoint, infoToDel map[string]struct{}) error {
 	// Make sure the node being disconnected is the end of the best chain.
 	if !node.hash.IsEqual(&b.bestChain.Tip().hash) {
 		return AssertError("disconnectBlock must be called with the " +
@@ -1157,9 +1162,11 @@ func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe
 			return err
 		}
 
-		// TODO AUT
-		// 1 remove the new AUT with registration transaction
-		// 2 recover the old AUT with re-registration transaction
+		// remove the new AUT with registration transaction
+		err = dbRemoveAUTInfo(dbTx, infoToDel)
+		if err != nil {
+			return err
+		}
 
 		// Before we delete the spend journal entry for this back,
 		// we'll fetch it as is so the indexers can utilize if needed.
@@ -1246,6 +1253,20 @@ func countSpentOutputsAbe(block *abeutil.BlockAbe) int {
 	return numSpent
 }
 
+func countSpentOutputsAUT(block *abeutil.BlockAbe) int {
+	// Exclude the transfer transaction which is not an AUT transaction
+	var num = 0
+	for _, tx := range block.Transactions()[1:] {
+		if autTx, ok := tx.AUTTransaction(); ok {
+			if autTx.Type() < aut.ReRegistration {
+				// it seems that we do not need saut for those type
+			}
+			num++
+		}
+	}
+	return num
+}
+
 // reorganizeChainAbe reorganizes the block chain by disconnecting the nodes in the
 // detachNodes list and connecting the nodes in the attach list.  It expects
 // that the lists are already in the correct order and are in sync with the
@@ -1324,6 +1345,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 
 	autView := NewAUTViewpoint()
 	autView.SetBestHash(&oldBest.hash)
+	autInfoToDel := map[string]struct{}{}
 
 	for e := detachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
@@ -1376,7 +1398,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			return err
 		}
 
-		err = autView.disconnectTransactions(b.db, block, sauts)
+		err = autView.disconnectTransactions(b.db, block, sauts, autInfoToDel)
 		if err != nil {
 			return err
 		}
@@ -1533,6 +1555,8 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 	// disconnected.
 	view = NewUtxoRingViewpoint()
 	view.SetBestHash(&b.bestChain.Tip().hash)
+	autView = NewAUTViewpoint()
+	autView.SetBestHash(&b.bestChain.Tip().hash)
 
 	// Disconnect blocks from the main chain.
 	for i, e := 0, detachNodes.Front(); e != nil; i, e = i+1, e.Next() {
@@ -1541,6 +1565,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 
 		viewToDel := NewUtxoRingViewpoint()
 		viewToDel.SetBestHash(block.Hash())
+		infoToDel := map[string]struct{}{}
 
 		//	Abe to do: why to read from databse, we can directly use the SpendJournal to obtain the related UtxoRings
 		// Load all of the utxos referenced by the block that aren't
@@ -1559,7 +1584,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		}
 
 		err = autView.disconnectTransactions(b.db, block,
-			detachSpentAUTs[i])
+			detachSpentAUTs[i], infoToDel)
 		if err != nil {
 			return err
 		}
@@ -1593,7 +1618,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		}
 
 		// Update the database and chain state.
-		err = b.disconnectBlockAbe(n, block, view, viewToDel, autView)
+		err = b.disconnectBlockAbe(n, block, view, viewToDel, autView, infoToDel)
 		if err != nil {
 			return err
 		}
@@ -1640,7 +1665,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			return err
 		}
 
-		sauts := make([]SpentAUT, 0, countSpentOutputsAbe(block))
+		sauts := make([]SpentAUT, 0, countSpentOutputsAUT(block))
 		err = autView.connectTransactions(block, &sauts)
 		if err != nil {
 			return err
@@ -1737,7 +1762,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 
 		autView := NewAUTViewpoint()
 		autView.SetBestHash(parentHash)
-		sauts := make([]SpentAUT, 0, countSpentOutputsAbe(block))
+		sauts := make([]SpentAUT, 0, countSpentOutputsAUT(block))
 		if !fastAdd || b.nodeType == wire.FullNode {
 			err := b.checkConnectBlockAbe(node, block, view, &stxos, autView, &sauts)
 			if err == nil {
@@ -1763,6 +1788,15 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 				return false, err
 			}
 			err = view.connectTransactions(block, &stxos)
+			if err != nil {
+				return false, err
+			}
+
+			err = autView.fetchInputAUTUtxos(b.db, block)
+			if err != nil {
+				return false, err
+			}
+			err = autView.connectTransactions(block, &sauts)
 			if err != nil {
 				return false, err
 			}

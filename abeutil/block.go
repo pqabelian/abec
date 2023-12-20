@@ -336,7 +336,7 @@ func (b *BlockAbe) AUTTransactions() []aut.Transaction {
 	// Return transactions if they have ALL already been generated.  This
 	// flag is necessary because the wrapped transactions are lazily
 	// generated in a sparse fashion.
-	if b.txnsGenerated {
+	if b.autTxnsGenerated {
 		return b.autTransactions
 	}
 
@@ -347,17 +347,23 @@ func (b *BlockAbe) AUTTransactions() []aut.Transaction {
 
 	// Generate and cache the wrapped autTransactions for all that haven't
 	// already been done.
-	for _, tx := range b.msgBlock.Transactions {
-		isCb, err := tx.IsCoinBase()
+	for _, txAbe := range b.Transactions() {
+		isCb, err := txAbe.IsCoinBase()
 		if err != nil {
 			continue
 		}
 		if isCb {
 			continue
 		}
-		if autTx, err := aut.DeserializeFromTx(tx); err == nil {
-			b.autTransactions = append(b.autTransactions, autTx)
+		autTx, ok := txAbe.AUTTransaction()
+		if !ok {
+			continue
 		}
+		if autTx == nil {
+			// TODO print log
+			continue
+		}
+		b.autTransactions = append(b.autTransactions, autTx)
 	}
 
 	b.autTxnsGenerated = true

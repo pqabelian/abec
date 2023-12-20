@@ -500,8 +500,29 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		consumedOutPoints[ringHash][string(txIn.SerialNumber)] = struct{}{}
 	}
 
-	// TODO AUT check aut rules
-	// such as number of AUT input number
+	autTransaction, ok := tx.AUTTransaction()
+	if ok {
+		if autTransaction == nil {
+			return aut.ErrInValidAUTTx
+		}
+
+		consumedAUTCoins := make(map[aut.OutPoint]struct{})
+		for _, in := range autTransaction.Ins() {
+			if _, inExists := consumedAUTCoins[in]; inExists {
+				return ruleError(ErrDuplicateTxInputs, "transaction "+
+					"contains duplicate inputs")
+			}
+			consumedAUTCoins[in] = struct{}{}
+		}
+
+		// TODO extract output to check chain rule for AUT
+		for i := range autTransaction.Outs() {
+			// TODO check version
+			// TODO check output type
+			// TODO check output value
+			panic(fmt.Sprintf("check the output of %v for AUT", msgTx.TxOuts[i]))
+		}
+	}
 
 	return nil
 }
@@ -1481,119 +1502,90 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, autView *AUTVi
 		return aut.ErrInValidAUTTx
 	}
 
-	entry, exist := autView.entries[hex.EncodeToString(autTx.AUTName())]
+	autNameKey := hex.EncodeToString(autTx.AUTName())
+	entry, exist := autView.entries[autNameKey]
+	if autTx.Type() == aut.Registration {
+		if exist {
+			return errors.New("an non-registration AUT transaction try to register a existing AUT name ")
+		}
+	} else {
+		if !exist {
+			return errors.New("an non-registration AUT transaction try to operate on a non-existing aut")
+		}
+	}
+
+	// Check the value of output
+	txOuts := tx.MsgTx().TxOuts
+	for i := range autTx.Outs() {
+		panic(fmt.Sprintf("check the output of %v for AUT", txOuts[i]))
+		// TODO output type
+		// TODO value
+	}
 
 	switch autTransaction := autTx.(type) {
 	case *aut.RegistrationTx:
-		// TODO AUT check the sanity of registration transaction
-		// 1. duplicate aut name
-		if exist {
-			return errors.New("an AUT with the same name exists")
-		}
-		// 2. expire height
 		// TODO if the height in %3!=2 it means that the aut should be expired!
 		if autTransaction.ExpireHeight < txHeight {
 			return errors.New("an AUT with invalid height")
 		}
-
-		tokens := map[aut.OutPoint]*AUTEntry{}
-		rootCoinSet := map[aut.OutPoint]struct{}{}
-		for i := 0; i < len(autTransaction.TxOuts); i++ {
-			tokens[autTransaction.TxOuts[i]] = NewAUTEntry(autTransaction.Name, 0, txHeight, true)
-			rootCoinSet[autTransaction.TxOuts[i]] = struct{}{}
-		}
-		// register the AUT entry
-		autView.entries[hex.EncodeToString(autTransaction.Name)] = &Entry{
-			info: &aut.Info{
-				Name:               autTransaction.Name,
-				Memo:               autTransaction.Memo,
-				UpdateThreshold:    autTransaction.IssuerUpdateThreshold,
-				IssueThreshold:     autTransaction.IssueTokensThreshold,
-				PlannedTotalAmount: autTransaction.PlannedTotalAmount,
-				ExpireHeight:       autTransaction.ExpireHeight,
-				Issuers:            autTransaction.Issuers,
-				UnitName:           autTransaction.UnitName,
-				MinUnitName:        autTransaction.MinUnitName,
-				UnitScale:          autTransaction.UnitScale,
-				MintedAmount:       0,
-				RootCoinSet:        rootCoinSet,
-			},
-			tokens: tokens,
-		}
+		// TODO Check issuer?
 
 	case *aut.MintTx:
-		// check the sanity of mint transaction
-		// 1. exist?
-		if !exist {
-			return errors.New("an AUT min transaction try to operate on a non-existing aut")
-		}
-		// 2. expired?
+		// expired?
 		if entry.info.ExpireHeight < txHeight {
 			return errors.New("an AUT has expired")
 		}
-		// 3. threshold
+		// threshold
 		if uint8(autTx.NumIns()) < entry.info.IssueThreshold {
 			return errors.New("an AUT mint transaction spend root coins but lower than threshold")
 		}
-		// 4. input exist? double spent?
+		// input exist? double spent?
+		spentRootCoins := map[aut.OutPoint]struct{}{}
+		for i := 0; i < len(autTransaction.TxIns); i++ {
+			if _, ok := entry.info.RootCoinSet[autTransaction.TxIns[i]]; !ok {
+				return errors.New("an AUT transaction with non-existing root coin")
+			}
+			if _, ok := spentRootCoins[autTransaction.TxIns[i]]; ok {
+				return errors.New("an AUT transaction with spent root coin")
+			}
+			spentRootCoins[autTransaction.TxIns[i]] = struct{}{}
+		}
+
+	case *aut.ReRegistrationTx:
+		// check the sanity of re-registration transaction
+		// threshold
+		if uint8(autTx.NumIns()) < entry.info.UpdateThreshold {
+			return errors.New("an AUT re-registration transaction with root coin lower than threshold")
+		}
+		// expire height
+		if autTransaction.ExpireHeight < txHeight {
+			return errors.New("an AUT with invalid height")
+		}
+
+		// check updated AUT info
+		// planned amount
+		if autTransaction.PlannedTotalAmount < entry.info.MintedAmount {
+			return errors.New("an AUT re-registration transaction try to adjust the planned total amount lower than minted amount")
+		}
+
+		// input exist? double spent?
+		spentRootCoins := map[aut.OutPoint]struct{}{}
 		for i := 0; i < len(autTransaction.TxIns); i++ {
 			if _, ok := entry.info.RootCoinSet[autTransaction.TxIns[i]]; !ok {
 				return errors.New("an AUT transaction with non-existing/spent root coin")
 			}
-			delete(entry.info.RootCoinSet, autTransaction.TxIns[i])
-		}
-		// 5. value overflow? exceed?
-		wouldMintedAmount := entry.info.MintedAmount
-		for i := 0; i < len(autTransaction.TxoAUTValues); i++ {
-			if wouldMintedAmount+autTransaction.TxoAUTValues[i] <= wouldMintedAmount || // overflow
-				wouldMintedAmount+autTransaction.TxoAUTValues[i] > entry.info.PlannedTotalAmount {
-				return errors.New("an AUT mint transaction try to mint amount exceed planned")
+			if _, ok := spentRootCoins[autTransaction.TxIns[i]]; ok {
+				return errors.New("an AUT transaction with spent root coin")
 			}
-			wouldMintedAmount += autTransaction.TxoAUTValues[i]
-			entry.tokens[autTransaction.TxOuts[i]] = NewAUTEntry(autTransaction.Name, autTransaction.TxoAUTValues[i], txHeight, false)
-		}
-		entry.info.MintedAmount = wouldMintedAmount
-
-	case *aut.ReRegistrationTx:
-		// check the sanity of re-registration transaction
-		// 1. exist aut
-		if !exist {
-			return errors.New("an AUT re-registration transaction try to operate on a non-existing aut")
-		}
-		// 2. threshold
-		if uint8(autTx.NumIns()) < entry.info.IssueThreshold {
-			return errors.New("an AUT re-registration transaction with root coin lower than threshold")
-		}
-		// 3. expire height
-		if autTransaction.ExpireHeight < txHeight {
-			return errors.New("an AUT with invalid height")
-		}
-		// 4. planned amount
-		if autTransaction.PlannedTotalAmount < entry.info.MintedAmount {
-			return errors.New("an AUT re-registration transaction try to adjust the planned total amount lower than minted amount")
-		}
-		// update aut info
-		entry.info.Memo = autTransaction.Memo
-		entry.info.UpdateThreshold = autTransaction.IssuerUpdateThreshold
-		entry.info.IssueThreshold = autTransaction.IssueTokensThreshold
-		entry.info.PlannedTotalAmount = autTransaction.PlannedTotalAmount
-		entry.info.ExpireHeight = autTransaction.ExpireHeight
-		entry.info.Issuers = autTransaction.Issuers
-		entry.info.RootCoinSet = make(map[aut.OutPoint]struct{}, len(autTransaction.TxOuts))
-		for i := 0; i < len(autTransaction.TxOuts); i++ {
-			entry.info.RootCoinSet[autTransaction.TxOuts[i]] = struct{}{}
+			spentRootCoins[autTransaction.TxIns[i]] = struct{}{}
 		}
 
 	case *aut.TransferTx:
 		// check the sanity of transfer transaction
-		// 1. exist aut
-		if !exist {
-			return errors.New("an AUT transfer transaction try to operate on a non-existing aut")
-		}
-		// 3. balance
+		// balance between inputs and outputs
 		totalInputValue := uint64(0)
 		for i := 0; i < len(autTransaction.TxIns); i++ {
-			token, ok := entry.tokens[autTransaction.TxIns[i]]
+			token, ok := entry.coins[autTransaction.TxIns[i]]
 			if !ok {
 				return errors.New("an AUT transfer transaction try to spend non-existing/spent/burn token")
 			}
@@ -1601,20 +1593,19 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, autView *AUTVi
 				return errors.New("an AUT transfer transaction try to spend non-existing/spent/burn token")
 			}
 			// check overflow
-			if totalInputValue+token.amount <= totalInputValue {
+			if totalInputValue+token.amount < totalInputValue || totalInputValue+token.amount < token.amount {
 				return errors.New("an AUT transfer transaction try to spend overflow token")
 			}
 			totalInputValue += token.amount
-			token.Spend()
 		}
 		totalOutValue := uint64(0)
 		for i := 0; i < len(autTransaction.TxoAUTValues); i++ {
-			if totalOutValue+autTransaction.TxoAUTValues[i] <= totalOutValue || // overflow
+			if totalOutValue+autTransaction.TxoAUTValues[i] < totalOutValue || // overflow
+				totalOutValue+autTransaction.TxoAUTValues[i] < autTransaction.TxoAUTValues[i] || // overflow
 				totalOutValue+autTransaction.TxoAUTValues[i] > entry.info.MintedAmount ||
 				totalOutValue+autTransaction.TxoAUTValues[i] > entry.info.PlannedTotalAmount {
 				return errors.New("an AUT transfer transaction try to overflow amount")
 			}
-			entry.tokens[autTransaction.TxOuts[i]] = NewAUTEntry(autTransaction.Name, autTransaction.TxoAUTValues[i], txHeight, false)
 		}
 		if totalInputValue != totalOutValue {
 			return errors.New("an AUT transfer transaction try to break-balance amount")
@@ -1629,17 +1620,24 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, autView *AUTVi
 		burnedValues := uint64(0)
 		// 2. input
 		for i := 0; i < len(autTransaction.TxIns); i++ {
-			token, ok := entry.tokens[autTransaction.TxIns[i]]
+			token, ok := entry.coins[autTransaction.TxIns[i]]
 			if !ok {
 				return errors.New("an AUT transfer transaction try to spend non-existing/spent/burn token")
 			}
 			if token.IsSpent() {
 				return errors.New("an AUT transfer transaction try to spend non-existing/spent/burn token")
 			}
-			token.Spend()
+			if burnedValues+token.amount < burnedValues ||
+				burnedValues+token.amount < token.amount {
+				return errors.New("an AUT transfer transaction try to spend overflow token")
+			}
 			burnedValues += token.amount
 		}
-		entry.info.MintedAmount -= burnedValues
+		if entry.info.MintedAmount-burnedValues > 0 ||
+			entry.info.MintedAmount-burnedValues > entry.info.MintedAmount {
+			return errors.New("an AUT transfer transaction try to overflow token")
+		}
+		log.Infof("AUT %s would burn %d coins by transaction %s", autNameKey, burnedValues, tx.Hash())
 
 	default:
 		return errors.New("unreachable")
@@ -1809,16 +1807,15 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 			return err
 		}
 		autTx, ok := tx.AUTTransaction()
-		if !ok {
-			return aut.ErrInValidAUTTx
-		}
-		if autTx == nil {
-			return aut.ErrInValidAUTTx
-		}
-		err = CheckTransactionInputsAUT(tx, node.height, autView,
-			b.chainParams)
-		if err != nil {
-			return err
+		if ok {
+			if autTx == nil {
+				return aut.ErrInValidAUTTx
+			}
+			err = CheckTransactionInputsAUT(tx, node.height, autView,
+				b.chainParams)
+			if err != nil {
+				return err
+			}
 		}
 
 		// Sum the total fees and ensure we don't overflow the
@@ -1958,6 +1955,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// Update the best hash for view to include this block since all of its
 	// transactions have been connected.
 	view.SetBestHash(&node.hash)
+	autView.SetBestHash(&node.hash)
 
 	return nil
 }

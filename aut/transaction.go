@@ -82,7 +82,6 @@ type Transaction interface {
 	Deserialize(io.Reader) error
 	AUTName() []byte
 	NumIns() int
-	NumOuts() int
 	Ins() []OutPoint
 	Outs() []OutPoint
 	Values(uint8) uint64
@@ -170,15 +169,14 @@ type RegistrationTx struct {
 	ExpireHeight          int32
 	IssuerUpdateThreshold uint8 // TODO confirm the range
 	IssueTokensThreshold  uint8
-	NumAutRootCoins       uint8
+	NumOutAutRootCoins    uint8
 	Memo                  []byte
 	PlannedTotalAmount    uint64
 	UnitName              []byte
 	MinUnitName           []byte
 	UnitScale             uint64
 
-	TxHash chainhash.Hash
-	TxIns  []*OutPoint
+	TxIns  []OutPoint
 	TxOuts []OutPoint
 }
 
@@ -187,49 +185,215 @@ func (tx *RegistrationTx) Type() TransactionType {
 }
 
 func (tx *RegistrationTx) Serialize() ([]byte, error) {
-	panic("implement me!")
+	var b bytes.Buffer
+	var err error
+
+	_, err = b.Write(CommonPrefix)
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.WriteByte(Registration)
+	if err != nil {
+		return nil, err
+	}
+
+	err = wire.WriteVarBytes(&b, 0, tx.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	err = wire.WriteVarInt(&b, 0, uint64(len(tx.Issuers)))
+	if err != nil {
+		return nil, err
+	}
+	for _, issuer := range tx.Issuers {
+		_, err = b.Write(issuer[:])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err = wire.WriteVarInt(&b, 0, uint64(tx.ExpireHeight))
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.WriteByte(tx.IssuerUpdateThreshold)
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.WriteByte(tx.IssueTokensThreshold)
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.WriteByte(tx.NumOutAutRootCoins)
+	if err != nil {
+		return nil, err
+	}
+
+	err = wire.WriteVarBytes(&b, 0, tx.Memo)
+	if err != nil {
+		return nil, err
+	}
+
+	err = wire.WriteVarInt(&b, 0, tx.PlannedTotalAmount)
+	if err != nil {
+		return nil, err
+	}
+
+	err = wire.WriteVarBytes(&b, 0, tx.UnitName)
+	if err != nil {
+		return nil, err
+	}
+	err = wire.WriteVarBytes(&b, 0, tx.MinUnitName)
+	if err != nil {
+		return nil, err
+	}
+
+	err = wire.WriteVarInt(&b, 0, tx.UnitScale)
+	if err != nil {
+		return nil, err
+	}
+
+	return b.Bytes(), nil
 }
 func (tx *RegistrationTx) AUTName() []byte {
-	panic("implement me!")
+	return tx.Name
 }
 func (tx *RegistrationTx) Deserialize(r io.Reader) error {
-	// 1. length
+	var err error
+
+	commprefix := make([]byte, len(CommonPrefix))
+	_, err = r.Read(commprefix)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(commprefix, CommonPrefix) {
+		return ErrNonAutTx
+	}
+
+	oneByte := make([]byte, 1)
+	_, err = r.Read(oneByte)
+	if err != nil {
+		return err
+	}
+	if oneByte[0] != Registration {
+		return ErrInValidAUTTx
+	}
+
+	tx.Name, err = wire.ReadVarBytes(r, 0, MaxNameLength, "name")
+	if err != nil {
+		return err
+	}
+	if len(tx.Name) == 0 {
+		return ErrInValidAUTTx
+	}
+
+	var numIssuer uint64
+	numIssuer, err = wire.ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+
+	tx.Issuers = make([]*chainhash.Hash, numIssuer)
+	for i := 0; i < len(tx.Issuers); i++ {
+		tx.Issuers[i] = &chainhash.Hash{}
+		_, err = r.Read(tx.Issuers[i][:])
+		if err != nil {
+			return err
+		}
+	}
+
+	var expireHeight uint64
+	expireHeight, err = wire.ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	if expireHeight > math.MaxInt32 {
+		return ErrInValidAUTTx
+	}
+	tx.ExpireHeight = int32(expireHeight)
+
+	_, err = r.Read(oneByte)
+	if err != nil {
+		return err
+	}
+	tx.IssuerUpdateThreshold = oneByte[0]
+
+	_, err = r.Read(oneByte)
+	if err != nil {
+		return err
+	}
+	tx.IssueTokensThreshold = oneByte[0]
+
+	_, err = r.Read(oneByte)
+	if err != nil {
+		return err
+	}
+	tx.NumOutAutRootCoins = oneByte[0]
+
+	tx.Memo, err = wire.ReadVarBytes(r, 0, MaxMemoLength, "memo")
+	if err != nil {
+		return err
+	}
+
+	tx.PlannedTotalAmount, err = wire.ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+
+	tx.UnitName, err = wire.ReadVarBytes(r, 0, MaxUnitLength, "unit")
+	if err != nil {
+		return err
+	}
+	if len(tx.UnitName) == 0 {
+		return ErrInValidAUTTx
+	}
+
+	tx.MinUnitName, err = wire.ReadVarBytes(r, 0, MaxMinUnitLength, "minUnit")
+	if err != nil {
+		return err
+	}
+	if len(tx.MinUnitName) == 0 {
+		return ErrInValidAUTTx
+	}
+
+	tx.UnitScale, err = wire.ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+
 	if len(tx.Name) > MaxNameLength ||
 		len(tx.Memo) > MaxMemoLength ||
 		len(tx.UnitName) > MaxUnitLength ||
 		len(tx.MinUnitName) > MaxMinUnitLength {
 		return errors.New("an AUT with invalid length of name")
 	}
-	// 2. threshold
 	if len(tx.Issuers) > MaxIssuerNum ||
 		int(tx.IssueTokensThreshold) > len(tx.Issuers) ||
 		int(tx.IssuerUpdateThreshold) > len(tx.Issuers) {
 		return errors.New("an AUT with invalid threshold")
 	}
-	// 3. unit scale
 	if tx.UnitScale > tx.PlannedTotalAmount {
 		return errors.New("an AUT with invalid scale")
 	}
-	panic("implement me!")
+	return nil
 }
 func (tx *RegistrationTx) NumIns() int {
-	panic("implement me!")
-}
-func (tx *RegistrationTx) NumOuts() int {
-	panic("implement me!")
+	return len(tx.TxIns)
 }
 func (tx *RegistrationTx) Ins() []OutPoint {
-	//TODO implement me
-	panic("implement me")
+	return tx.TxIns
 }
 
 func (tx *RegistrationTx) Outs() []OutPoint {
-	//TODO implement me
-	panic("implement me")
+	return tx.TxOuts
 }
 func (tx *RegistrationTx) Values(uint8) uint64 {
-	//TODO implement me
-	panic("implement me")
+	return 0
 }
 
 var _ Transaction = &RegistrationTx{}
@@ -240,12 +404,12 @@ var _ Transaction = &RegistrationTx{}
 // <TxoAUTValues> an array of n integer value each one for a an AUTCoin
 // [Memo]
 type MintTx struct {
-	Name         []byte
-	NumAutCoins  uint8
-	TxoAUTValues []uint64
-	Memo         []byte
+	Name              []byte
+	NumInAutRootCoins uint8
+	NumOutAutCoins    uint8
+	TxoAUTValues      []uint64
+	Memo              []byte
 
-	TxHash chainhash.Hash
 	TxIns  []OutPoint
 	TxOuts []OutPoint
 }
@@ -254,36 +418,146 @@ func (tx *MintTx) Type() TransactionType {
 	return Mint
 }
 func (tx *MintTx) Serialize() ([]byte, error) {
-	panic("implement me!")
+	var b bytes.Buffer
+	var err error
+
+	_, err = b.Write(CommonPrefix)
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.WriteByte(Mint)
+	if err != nil {
+		return nil, err
+	}
+
+	err = wire.WriteVarBytes(&b, 0, tx.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.WriteByte(tx.NumInAutRootCoins)
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.WriteByte(tx.NumOutAutCoins)
+	if err != nil {
+		return nil, err
+	}
+
+	err = wire.WriteVarInt(&b, 0, uint64(len(tx.TxoAUTValues)))
+	if err != nil {
+		return nil, err
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	for _, value := range tx.TxoAUTValues {
+		err = wire.WriteVarInt(&b, 0, value)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err = wire.WriteVarBytes(&b, 0, tx.Memo)
+	if err != nil {
+		return nil, err
+	}
+
+	return b.Bytes(), nil
+
 }
 func (tx *MintTx) Deserialize(r io.Reader) error {
-	if len(tx.Memo) > MaxMemoLength {
+	var err error
+
+	commprefix := make([]byte, len(CommonPrefix))
+	_, err = r.Read(commprefix)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(commprefix, CommonPrefix) {
+		return ErrNonAutTx
+	}
+
+	oneByte := make([]byte, 1)
+	_, err = r.Read(oneByte)
+	if err != nil {
+		return err
+	}
+	if oneByte[0] != Mint {
+		return ErrInValidAUTTx
+	}
+
+	tx.Name, err = wire.ReadVarBytes(r, 0, MaxNameLength, "name")
+	if err != nil {
+		return err
+	}
+	if len(tx.Name) == 0 {
+		return ErrInValidAUTTx
+	}
+
+	_, err = r.Read(oneByte)
+	if err != nil {
+		return err
+	}
+	tx.NumInAutRootCoins = oneByte[0]
+
+	_, err = r.Read(oneByte)
+	if err != nil {
+		return err
+	}
+	tx.NumOutAutCoins = oneByte[0]
+
+	_, err = r.Read(oneByte)
+	if err != nil {
+		return err
+	}
+	numOutAutCoins := oneByte[0]
+
+	if tx.NumOutAutCoins != numOutAutCoins {
+		return errors.New("mis-match output coin")
+	}
+
+	tx.TxoAUTValues = make([]uint64, numOutAutCoins)
+	for i := 0; i < len(tx.TxoAUTValues); i++ {
+		tx.TxoAUTValues[i], err = wire.ReadVarInt(r, 0)
+		if err != nil {
+			return err
+		}
+	}
+
+	tx.Memo, err = wire.ReadVarBytes(r, 0, MaxMemoLength, "memo")
+	if err != nil {
+		return err
+	}
+
+	if len(tx.Name) > MaxNameLength ||
+		len(tx.Memo) > MaxMemoLength {
 		return errors.New("an AUT with invalid length of name")
 	}
-	panic("implement me!")
+	return nil
 }
 func (tx *MintTx) AUTName() []byte {
-	panic("implement me!")
+
+	return tx.Name
 }
 func (tx *MintTx) NumIns() int {
-	panic("implement me!")
-}
-func (tx *MintTx) NumOuts() int {
-	//TODO implement me
-	panic("implement me")
+	return len(tx.TxIns)
 }
 func (tx *MintTx) Ins() []OutPoint {
-	//TODO implement me
-	panic("implement me")
+	return tx.TxIns
 }
 
 func (tx *MintTx) Outs() []OutPoint {
-	//TODO implement me
-	panic("implement me")
+	return tx.TxOuts
 }
-func (tx *MintTx) Values(uint8) uint64 {
-	//TODO implement me
-	panic("implement me")
+func (tx *MintTx) Values(idx uint8) uint64 {
+	if int(idx) < len(tx.TxoAUTValues) {
+		return tx.TxoAUTValues[idx]
+	}
+	return 0
 }
 
 var _ Transaction = &MintTx{}
@@ -301,11 +575,12 @@ type ReRegistrationTx struct {
 	ExpireHeight          int32
 	IssuerUpdateThreshold uint8 // TODO confirm the range
 	IssueTokensThreshold  uint8
-	NumAutRootCoins       uint8
+	NumInAutRootCoins     uint8
+	NumOutAutRootCoins    uint8
 	Memo                  []byte
 	PlannedTotalAmount    uint64
+	UnitScale             uint64
 
-	TxHash chainhash.Hash
 	TxIns  []OutPoint
 	TxOuts []OutPoint
 }
@@ -314,10 +589,165 @@ func (tx *ReRegistrationTx) Type() TransactionType {
 	return ReRegistration
 }
 func (tx *ReRegistrationTx) Serialize() ([]byte, error) {
-	panic("implement me!")
+	var b bytes.Buffer
+	var err error
+
+	_, err = b.Write(CommonPrefix)
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.WriteByte(ReRegistration)
+	if err != nil {
+		return nil, err
+	}
+
+	err = wire.WriteVarBytes(&b, 0, tx.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	err = wire.WriteVarInt(&b, 0, uint64(len(tx.Issuers)))
+	if err != nil {
+		return nil, err
+	}
+	for _, issuer := range tx.Issuers {
+		_, err = b.Write(issuer[:])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err = wire.WriteVarInt(&b, 0, uint64(tx.ExpireHeight))
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.WriteByte(tx.IssuerUpdateThreshold)
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.WriteByte(tx.IssueTokensThreshold)
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.WriteByte(tx.NumInAutRootCoins)
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.WriteByte(tx.NumOutAutRootCoins)
+	if err != nil {
+		return nil, err
+	}
+
+	err = wire.WriteVarBytes(&b, 0, tx.Memo)
+	if err != nil {
+		return nil, err
+	}
+
+	err = wire.WriteVarInt(&b, 0, tx.PlannedTotalAmount)
+	if err != nil {
+		return nil, err
+	}
+
+	err = wire.WriteVarInt(&b, 0, tx.UnitScale)
+	if err != nil {
+		return nil, err
+	}
+
+	return b.Bytes(), nil
 }
 func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
-	if len(tx.Memo) > MaxMemoLength {
+	var err error
+
+	commprefix := make([]byte, len(CommonPrefix))
+	_, err = r.Read(commprefix)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(commprefix, CommonPrefix) {
+		return ErrNonAutTx
+	}
+
+	oneByte := make([]byte, 1)
+	_, err = r.Read(oneByte)
+	if err != nil {
+		return err
+	}
+	if oneByte[0] != ReRegistration {
+		return ErrInValidAUTTx
+	}
+
+	tx.Name, err = wire.ReadVarBytes(r, 0, MaxNameLength, "name")
+	if err != nil {
+		return err
+	}
+	if len(tx.Name) == 0 {
+		return ErrInValidAUTTx
+	}
+
+	var numIssuer uint64
+	numIssuer, err = wire.ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+
+	tx.Issuers = make([]*chainhash.Hash, numIssuer)
+	for i := 0; i < len(tx.Issuers); i++ {
+		tx.Issuers[i] = &chainhash.Hash{}
+		_, err = r.Read(tx.Issuers[i][:])
+		if err != nil {
+			return err
+		}
+	}
+
+	var expireHeight uint64
+	expireHeight, err = wire.ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	if tx.ExpireHeight > math.MaxInt32 {
+		return ErrInValidAUTTx
+	}
+	tx.ExpireHeight = int32(expireHeight)
+
+	_, err = r.Read(oneByte)
+	if err != nil {
+		return err
+	}
+	tx.IssuerUpdateThreshold = oneByte[0]
+
+	_, err = r.Read(oneByte)
+	if err != nil {
+		return err
+	}
+	tx.IssueTokensThreshold = oneByte[0]
+
+	_, err = r.Read(oneByte)
+	if err != nil {
+		return err
+	}
+	tx.NumOutAutRootCoins = oneByte[0]
+
+	tx.Memo, err = wire.ReadVarBytes(r, 0, MaxMemoLength, "memo")
+	if err != nil {
+		return err
+	}
+
+	tx.PlannedTotalAmount, err = wire.ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+
+	tx.UnitScale, err = wire.ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+
+	if len(tx.Name) > MaxNameLength || len(tx.Memo) > MaxMemoLength {
 		return errors.New("an AUT with invalid length of name")
 	}
 	if len(tx.Issuers) > MaxIssuerNum ||
@@ -325,30 +755,26 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 		int(tx.IssuerUpdateThreshold) > len(tx.Issuers) {
 		return errors.New("an AUT with invalid threshold")
 	}
-	panic("implement me!")
+	if tx.UnitScale > tx.PlannedTotalAmount {
+		return errors.New("an AUT with invalid scale")
+	}
+	return nil
 }
 func (tx *ReRegistrationTx) AUTName() []byte {
-	panic("implement me!")
+	return tx.Name
 }
 func (tx *ReRegistrationTx) NumIns() int {
-	panic("implement me!")
-}
-func (tx *ReRegistrationTx) NumOuts() int {
-	//TODO implement me
-	panic("implement me")
+	return len(tx.TxIns)
 }
 func (tx *ReRegistrationTx) Ins() []OutPoint {
-	//TODO implement me
-	panic("implement me")
+	return tx.TxIns
 }
 
 func (tx *ReRegistrationTx) Outs() []OutPoint {
-	//TODO implement me
-	panic("implement me")
+	return tx.TxOuts
 }
 func (tx *ReRegistrationTx) Values(uint8) uint64 {
-	//TODO implement me
-	panic("implement me")
+	return 0
 }
 
 var _ Transaction = &ReRegistrationTx{}
@@ -359,12 +785,12 @@ var _ Transaction = &ReRegistrationTx{}
 // <TxoAUTValues> an array of n integer value, each one for a AUTCoin-TXO
 // [Memo]
 type TransferTx struct {
-	Name         []byte
-	NumAutCoins  uint8
-	TxoAUTValues []uint64
-	Memo         []byte
+	Name           []byte
+	NumInAutCoins  uint8
+	NumOutAutCoins uint8
+	TxoAUTValues   []uint64
+	Memo           []byte
 
-	TxHash chainhash.Hash
 	TxIns  []OutPoint
 	TxOuts []OutPoint
 }
@@ -373,37 +799,148 @@ func (tx *TransferTx) Type() TransactionType {
 	return Transfer
 }
 func (tx *TransferTx) Serialize() ([]byte, error) {
-	panic("implement me!")
+	var b bytes.Buffer
+	var err error
+
+	_, err = b.Write(CommonPrefix)
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.WriteByte(Transfer)
+	if err != nil {
+		return nil, err
+	}
+
+	err = wire.WriteVarBytes(&b, 0, tx.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.WriteByte(tx.NumInAutCoins)
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.WriteByte(tx.NumOutAutCoins)
+	if err != nil {
+		return nil, err
+	}
+
+	if int(tx.NumOutAutCoins) != len(tx.TxoAUTValues) {
+		return nil, ErrInValidAUTTx
+	}
+
+	err = wire.WriteVarInt(&b, 0, uint64(len(tx.TxoAUTValues)))
+	if err != nil {
+		return nil, err
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	for _, value := range tx.TxoAUTValues {
+		err = wire.WriteVarInt(&b, 0, value)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err = wire.WriteVarBytes(&b, 0, tx.Memo)
+	if err != nil {
+		return nil, err
+	}
+
+	return b.Bytes(), nil
 }
 func (tx *TransferTx) Deserialize(r io.Reader) error {
+	var err error
+
+	commprefix := make([]byte, len(CommonPrefix))
+	_, err = r.Read(commprefix)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(commprefix, CommonPrefix) {
+		return ErrNonAutTx
+	}
+
+	oneByte := make([]byte, 1)
+	_, err = r.Read(oneByte)
+	if err != nil {
+		return err
+	}
+	if oneByte[0] != Transfer {
+		return ErrInValidAUTTx
+	}
+
+	tx.Name, err = wire.ReadVarBytes(r, 0, MaxNameLength, "name")
+	if err != nil {
+		return err
+	}
+	if len(tx.Name) == 0 {
+		return ErrInValidAUTTx
+	}
+
+	_, err = r.Read(oneByte)
+	if err != nil {
+		return err
+	}
+	tx.NumInAutCoins = oneByte[0]
+
+	_, err = r.Read(oneByte)
+	if err != nil {
+		return err
+	}
+	tx.NumOutAutCoins = oneByte[0]
+
+	numOutAutCoins, err := wire.ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+
+	if numOutAutCoins != uint64(tx.NumOutAutCoins) {
+		return errors.New("mis-match output coin")
+	}
+
+	tx.TxoAUTValues = make([]uint64, numOutAutCoins)
+	for i := 0; i < len(tx.TxoAUTValues); i++ {
+		tx.TxoAUTValues[i], err = wire.ReadVarInt(r, 0)
+		if err != nil {
+			return err
+		}
+	}
+
+	tx.Memo, err = wire.ReadVarBytes(r, 0, MaxMemoLength, "memo")
+	if err != nil {
+		return err
+	}
+
 	if len(tx.Memo) > MaxMemoLength {
 		return errors.New("an AUT with invalid length of name")
 	}
-	panic("implement me!")
+	return nil
 }
 func (tx *TransferTx) AUTName() []byte {
-	panic("implement me!")
+	return tx.Name
 }
 func (tx *TransferTx) NumIns() int {
-	panic("implement me!")
+	return len(tx.TxIns)
 }
 
-func (tx *TransferTx) NumOuts() int {
-	//TODO implement me
-	panic("implement me")
-}
 func (tx *TransferTx) Ins() []OutPoint {
-	//TODO implement me
-	panic("implement me")
+	return tx.TxIns
 }
 
 func (tx *TransferTx) Outs() []OutPoint {
-	//TODO implement me
-	panic("implement me")
+	return tx.TxOuts
+
 }
-func (tx *TransferTx) Values(uint8) uint64 {
-	//TODO implement me
-	panic("implement me")
+func (tx *TransferTx) Values(idx uint8) uint64 {
+	if int(idx) < len(tx.TxoAUTValues) {
+		return tx.TxoAUTValues[idx]
+	}
+	return 0
 }
 
 var _ Transaction = &TransferTx{}
@@ -412,10 +949,10 @@ var _ Transaction = &TransferTx{}
 // <Name>  a string
 // [Memo]
 type BurnTx struct {
-	Name []byte
-	Memo []byte
+	Name          []byte
+	NumInAutCoins uint8
+	Memo          []byte
 
-	TxHash chainhash.Hash
 	TxIns  []OutPoint
 	TxOuts []OutPoint
 }
@@ -426,42 +963,107 @@ func (tx *BurnTx) Type() TransactionType {
 	return Burn
 }
 func (tx *BurnTx) Serialize() ([]byte, error) {
-	panic("implement me!")
+	var b bytes.Buffer
+	var err error
+
+	_, err = b.Write(CommonPrefix)
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.WriteByte(Burn)
+	if err != nil {
+		return nil, err
+	}
+
+	err = wire.WriteVarBytes(&b, 0, tx.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.WriteByte(tx.NumInAutCoins)
+	if err != nil {
+		return nil, err
+	}
+
+	err = wire.WriteVarBytes(&b, 0, tx.Memo)
+	if err != nil {
+		return nil, err
+	}
+
+	return b.Bytes(), nil
 }
 func (tx *BurnTx) Deserialize(r io.Reader) error {
+	var err error
+
+	commprefix := make([]byte, len(CommonPrefix))
+	_, err = r.Read(commprefix)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(commprefix, CommonPrefix) {
+		return ErrNonAutTx
+	}
+
+	oneByte := make([]byte, 1)
+	_, err = r.Read(oneByte)
+	if err != nil {
+		return err
+	}
+	if oneByte[0] != Burn {
+		return ErrInValidAUTTx
+	}
+
+	tx.Name, err = wire.ReadVarBytes(r, 0, MaxNameLength, "name")
+	if err != nil {
+		return err
+	}
+	if len(tx.Name) == 0 {
+		return ErrInValidAUTTx
+	}
+
+	_, err = r.Read(oneByte)
+	if err != nil {
+		return err
+	}
+	tx.NumInAutCoins = oneByte[0]
+
+	tx.Memo, err = wire.ReadVarBytes(r, 0, MaxMemoLength, "memo")
+	if err != nil {
+		return err
+	}
+
 	if len(tx.Memo) > MaxMemoLength {
 		return errors.New("an AUT with invalid length of name")
 	}
-	panic("implement me!")
+	return nil
 }
 func (tx *BurnTx) AUTName() []byte {
-	panic("implement me!")
+	return tx.Name
 }
 func (tx *BurnTx) NumIns() int {
-	panic("implement me!")
-}
-func (tx *BurnTx) NumOuts() int {
-	return 0
+	return len(tx.TxIns)
 }
 func (tx *BurnTx) Ins() []OutPoint {
-	//TODO implement me
-	panic("implement me")
+	return tx.TxIns
 }
 
 func (tx *BurnTx) Outs() []OutPoint {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 func (tx *BurnTx) Values(uint8) uint64 {
-	//TODO implement me
-	panic("implement me")
+	return 0
 }
 
 var ErrNonAutTx = errors.New("not a AUT transaction")
 var ErrInValidAUTTx = errors.New("not a valid AUT transaction")
 
+// DeserializeFromTx try to deserialize AUT transaction from transaction memo
+// if success, do some sanity for AUT transaction:
+// - check amount of output of origin transaction for AUT
+// - check configuration of AUT transaction
 func DeserializeFromTx(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
-	if len(tx.TxMemo) < CommonPrefixLength {
+	if len(tx.TxMemo) <= CommonPrefixLength {
 		return nil, ErrNonAutTx
 	}
 	if !bytes.Equal(tx.TxMemo[:CommonPrefixLength], CommonPrefix) {
@@ -482,40 +1084,135 @@ func DeserializeFromTx(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 	default:
 		return nil, ErrInValidAUTTx
 	}
-	reader := bytes.NewBuffer(tx.TxMemo[CommonPrefixLength+1:])
+	reader := bytes.NewBuffer(tx.TxMemo)
 	err = autTx.Deserialize(reader)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO set tx in and tx out
+	// we don't know whether the AUT name is exist or not, it should be checked by blockchain
+	// and even the output rules are specified by the chain, so they are not check here.
+	// Here only need to verify built-in rules of the AUT configuration itself, such as:
+	// - limit for some configuration item
+	// - length for some configuration item
 
-	// TODO check sanity
 	switch autTransaction := autTx.(type) {
 	case *RegistrationTx:
-		if autTx.NumOuts() < int(autTransaction.IssueTokensThreshold) ||
-			autTx.NumOuts() < int(autTransaction.IssuerUpdateThreshold) {
-			return nil, errors.New("an AUT with num of root coin than threshold")
+		// invalid configurations can exit early
+		if int(autTransaction.NumOutAutRootCoins) > len(tx.TxOuts) {
+			return nil, ErrInValidAUTTx
 		}
+		autTransaction.TxOuts = make([]OutPoint, 0, autTransaction.NumOutAutRootCoins)
+		for i := 0; i < int(autTransaction.NumOutAutRootCoins); i++ {
+			autTransaction.TxOuts = append(autTransaction.TxOuts, OutPoint{
+				Hash:  tx.TxHash(),
+				Index: uint8(i),
+			})
+		}
+
+		// configuration conflict
+		if autTransaction.NumOutAutRootCoins < autTransaction.IssueTokensThreshold ||
+			autTransaction.NumOutAutRootCoins < autTransaction.IssuerUpdateThreshold {
+			return nil, errors.New("an AUT with invalid threshold")
+		}
+		if autTransaction.UnitScale > autTransaction.PlannedTotalAmount {
+			return nil, errors.New("an AUT with invalid unit scale")
+		}
+
 	case *MintTx:
-		if autTx.NumIns() > math.MaxUint8 {
-			return nil, errors.New("an AUT with num of root coin than allowed")
+		// invalid configurations can exit early
+		if int(autTransaction.NumInAutRootCoins) > len(tx.TxIns) {
+			return nil, ErrInValidAUTTx
+		}
+		autTransaction.TxIns = make([]OutPoint, 0, autTransaction.NumInAutRootCoins)
+		for i := 0; i < int(autTransaction.NumInAutRootCoins); i++ {
+			autTransaction.TxIns = append(autTransaction.TxIns, OutPoint{
+				Hash:  tx.TxIns[i].PreviousOutPointRing.OutPoints[0].TxHash,
+				Index: tx.TxIns[i].PreviousOutPointRing.OutPoints[0].Index,
+			})
+		}
+
+		// invalid configurations can exit early
+		if int(autTransaction.NumOutAutCoins) > len(tx.TxOuts) {
+			return nil, ErrInValidAUTTx
+		}
+		autTransaction.TxOuts = make([]OutPoint, 0, autTransaction.NumOutAutCoins)
+		for i := 0; i < int(autTransaction.NumOutAutCoins); i++ {
+			autTransaction.TxOuts = append(autTransaction.TxOuts, OutPoint{
+				Hash:  tx.TxHash(),
+				Index: uint8(i),
+			})
 		}
 
 	case *ReRegistrationTx:
-		if autTx.NumIns() > math.MaxUint8 {
-			return nil, errors.New("an AUT with num of root coin than allowed")
+		// invalid configurations can exit early
+		if int(autTransaction.NumInAutRootCoins) > len(tx.TxIns) {
+			return nil, ErrInValidAUTTx
 		}
-		if autTx.NumOuts() < int(autTransaction.IssueTokensThreshold) ||
-			autTx.NumOuts() < int(autTransaction.IssuerUpdateThreshold) {
-			return nil, errors.New("an AUT with num of root coin than threshold")
+		autTransaction.TxIns = make([]OutPoint, 0, autTransaction.NumInAutRootCoins)
+		for i := 0; i < int(autTransaction.NumInAutRootCoins); i++ {
+			autTransaction.TxIns = append(autTransaction.TxIns, OutPoint{
+				Hash:  tx.TxIns[i].PreviousOutPointRing.OutPoints[0].TxHash,
+				Index: tx.TxIns[i].PreviousOutPointRing.OutPoints[0].Index,
+			})
+		}
+
+		// invalid configurations can exit early
+		if int(autTransaction.NumOutAutRootCoins) > len(tx.TxOuts) {
+			return nil, ErrInValidAUTTx
+		}
+		autTransaction.TxOuts = make([]OutPoint, 0, autTransaction.NumOutAutRootCoins)
+		for i := 0; i < int(autTransaction.NumOutAutRootCoins); i++ {
+			autTransaction.TxOuts = append(autTransaction.TxOuts, OutPoint{
+				Hash:  tx.TxHash(),
+				Index: uint8(i),
+			})
+		}
+
+		// configuration conflict
+		if autTransaction.NumOutAutRootCoins < autTransaction.IssueTokensThreshold ||
+			autTransaction.NumOutAutRootCoins < autTransaction.IssuerUpdateThreshold {
+			return nil, errors.New("an AUT with invalid threshold")
 		}
 	case *TransferTx:
-		if autTx.NumIns() > math.MaxUint8 {
-			return nil, errors.New("an AUT transfer transaction with root coin lower than threshold")
+		// invalid configurations can exit early
+		if int(autTransaction.NumInAutCoins) > len(tx.TxIns) {
+			return nil, ErrInValidAUTTx
+		}
+		autTransaction.TxIns = make([]OutPoint, 0, autTransaction.NumInAutCoins)
+		for i := 0; i < int(autTransaction.NumInAutCoins); i++ {
+			// TODO Check length
+			autTransaction.TxIns = append(autTransaction.TxIns, OutPoint{
+				Hash:  tx.TxIns[i].PreviousOutPointRing.OutPoints[0].TxHash,
+				Index: tx.TxIns[i].PreviousOutPointRing.OutPoints[0].Index,
+			})
+		}
+
+		// invalid configurations can exit early
+		if int(autTransaction.NumOutAutCoins) > len(tx.TxOuts) {
+			return nil, ErrInValidAUTTx
+		}
+		autTransaction.TxOuts = make([]OutPoint, 0, autTransaction.NumOutAutCoins)
+		for i := 0; i < int(autTransaction.NumOutAutCoins); i++ {
+			// TODO check the value is 1
+			//ExtractValueFromScript(tx.TxOuts[i].TxoScript)
+			autTransaction.TxOuts = append(autTransaction.TxOuts, OutPoint{
+				Hash:  tx.TxHash(),
+				Index: uint8(i),
+			})
 		}
 	case *BurnTx:
-		autTx = &BurnTx{}
+		// invalid configurations can exit early
+		if int(autTransaction.NumInAutCoins) > len(tx.TxIns) {
+			return nil, ErrInValidAUTTx
+		}
+		autTransaction.TxIns = make([]OutPoint, 0, autTransaction.NumInAutCoins)
+		for i := 0; i < int(autTransaction.NumInAutCoins); i++ {
+			autTransaction.TxIns = append(autTransaction.TxIns, OutPoint{
+				Hash:  tx.TxIns[i].PreviousOutPointRing.OutPoints[0].TxHash,
+				Index: tx.TxIns[i].PreviousOutPointRing.OutPoints[0].Index,
+			})
+		}
 	default:
 		return nil, ErrInValidAUTTx
 	}

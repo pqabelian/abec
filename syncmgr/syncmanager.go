@@ -2131,6 +2131,7 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 			//todo(ABE): for ABE, sm does not need to sm.peerNotifier.AnnounceNewTransactions(acceptedTx),
 			// as tx is propagated with blocks, and may be announced when verify the block.
 		}
+		sm.txMemPool.RemoveExpiredAUTTransaction(block.Height())
 
 		// Register block with the fee estimator, if it exists.
 		if sm.feeEstimator != nil {

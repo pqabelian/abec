@@ -53,6 +53,11 @@ func (tx *TxAbe) MsgTx() *wire.MsgTxAbe {
 	return tx.msgTx
 }
 
+// AUTTransaction try to deserialize the memo in transaction to AUT transaction,
+// when success, set the fields autTx to the AUT transaction, and isAUTTx to true
+// when failed:
+// - if the origin transaction can not be an AUT transaction, set the fields autTx to nil, and isAUTTx to false
+// - if the origin transaction can be an AUT transaction but conflict with sanity, set the fields autTx to nil, and isAUTTx to true
 func (tx *TxAbe) AUTTransaction() (aut.Transaction, bool) {
 	if tx.autTxDone {
 		return tx.autTx, tx.isAUTTx
