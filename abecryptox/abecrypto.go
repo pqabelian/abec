@@ -14,6 +14,7 @@ import (
 
 // CoinbaseTxGen takes as input the transaction material and outputs a *wire.MsgTxAbe
 // reviewed on 2023.12.07
+// reviewed on 2023.12.21
 func CoinbaseTxGen(abeTxOutputDescs []*AbeTxOutputDesc, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(coinbaseTxMsgTemplate.Version)
 	if err != nil {
@@ -48,7 +49,7 @@ func CoinbaseTxGen(abeTxOutputDescs []*AbeTxOutputDesc, coinbaseTxMsgTemplate *w
 }
 
 // CoinbaseTxVerify verifies whether the input coinbaseTx *wire.MsgTxAbe is valid.
-// todo review
+// reviewed on 2023.12.21
 func CoinbaseTxVerify(coinbaseTx *wire.MsgTxAbe) (bool, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(coinbaseTx.Version)
 	if err != nil {
@@ -85,7 +86,7 @@ func CoinbaseTxVerify(coinbaseTx *wire.MsgTxAbe) (bool, error) {
 //
 //	a caller may use other methods to create a TransferTxMsgTemplate.
 //
-// todo: review
+// reviewed on 2023.12.21
 func CreateTransferTxMsgTemplate(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxOutputDesc, txFee uint64, txMemo []byte) (*wire.MsgTxAbe, error) {
 
 	//	Version
@@ -111,7 +112,8 @@ func CreateTransferTxMsgTemplate(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputD
 	return txMsgTemplate, nil
 }
 
-// todo: review pqringctxTransferTxGen
+// TransferTxGen generates a new MsgTxAbe by filling the TxIns[].serialNumber, TxOuts[], and the TxWitness of the input transferTxMsgTemplate.
+// reviewed on 2023.12.21
 func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxOutputDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(transferTxMsgTemplate.Version)
@@ -168,7 +170,7 @@ func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail
 		pqringctAbeTxInDetails := make([]*abecrypto.AbeTxInDetail, len(abeTxInDetails))
 		for i := 0; i < len(abeTxInDetails); i++ {
 			abeTxInDetail := abeTxInDetails[i]
-			pqringctAbeTxInDetails[i] = abecrypto.NewAbeTxInDetail(abeTxInDetail.ringHash, abeTxInDetail.txoList, abeTxInDetail.serialNumber)
+			pqringctAbeTxInDetails[i] = abecrypto.NewAbeTxInDetail(abeTxInDetail.ringId, abeTxInDetail.txoList, abeTxInDetail.serialNumber)
 		}
 
 		valid, err := abecrypto.TransferTxVerify(transferTx, pqringctAbeTxInDetails)

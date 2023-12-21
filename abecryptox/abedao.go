@@ -1,7 +1,6 @@
 package abecryptox
 
 import (
-	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 )
 
@@ -26,7 +25,7 @@ func NewAbeTxOutDesc(cryptoAddress []byte, value uint64) *AbeTxOutputDesc {
 //}
 
 // AbeTxInputDesc defines the data that are need to spend a TxoCoin, in TransferTxGen.
-// todo: review
+// reviewed on 2023.12.21
 type AbeTxInputDesc struct {
 	// ringId        *wire.RingId  // txoRing identifier
 	txoRing       *wire.TxoRing // complete TxoRing information
@@ -39,7 +38,7 @@ type AbeTxInputDesc struct {
 }
 
 // NewAbeTxInputDesc constructs a new AbeTxInputDesc.
-// todo: review
+// reviewed on 2023.12.21
 func NewAbeTxInputDesc( //ringId *wire.RingId,
 	txoRing *wire.TxoRing,
 	sidx uint8, cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk []byte, cryptoVsk []byte, value uint64) *AbeTxInputDesc {
@@ -56,18 +55,18 @@ func NewAbeTxInputDesc( //ringId *wire.RingId,
 }
 
 // AbeTxInDetail defines the data describing a consumed TxoCoin in TransferTx, which will be used in TransferTxVerify
-// todo: review
+// reviewed on 2023.12.21
 type AbeTxInDetail struct {
-	ringHash     chainhash.Hash // txoRing identifier
+	ringId       wire.RingId // txoRing identifier
 	txoList      []*wire.TxOutAbe
 	serialNumber []byte
 }
 
 // NewAbeTxInDetail constructs a new NewAbeTxInDetail.
-// todo: review
-func NewAbeTxInDetail(ringHash chainhash.Hash, txoList []*wire.TxOutAbe, serialNumber []byte) *AbeTxInDetail {
+// reviewed on 2023.12.21
+func NewAbeTxInDetail(ringId wire.RingId, txoList []*wire.TxOutAbe, serialNumber []byte) *AbeTxInDetail {
 	return &AbeTxInDetail{
-		ringHash:     ringHash,
+		ringId:       ringId,
 		txoList:      txoList,
 		serialNumber: serialNumber,
 	}
