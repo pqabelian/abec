@@ -1414,7 +1414,9 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		//if n.height%wire.BlockNumPerRingGroup == wire.BlockNumPerRingGroup-1 {
 		if n.height%blockNumPerRingGroup == blockNumPerRingGroup-1 {
 			viewToDelAll.SetBestHash(&n.hash)
-			err = viewToDelAll.newUtxoRingEntries(b.db, n, block)
+			//	todo(MLPAUT):
+			// err = viewToDelAll.newUtxoRingEntries(b.db, n, block)
+			err = viewToDelAll.newUtxoRingEntriesMLP(b.db, n, block)
 			if err != nil {
 				return err
 			}
@@ -1540,7 +1542,9 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		//if n.height%3 == 2 {
 		//if n.height%wire.BlockNumPerRingGroup == wire.BlockNumPerRingGroup-1 {
 		if n.height%blockNumPerRingGroup == blockNumPerRingGroup-1 {
-			err = view.newUtxoRingEntries(b.db, n, block)
+			//	todo(MLPAUT):
+			//err = view.newUtxoRingEntries(b.db, n, block)
+			err = view.newUtxoRingEntriesMLP(b.db, n, block)
 			if err != nil {
 				return err
 			}
@@ -1600,7 +1604,9 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		//if n.height%3 == 2 {
 		//if n.height%wire.BlockNumPerRingGroup == wire.BlockNumPerRingGroup-1 {
 		if n.height%blockNumPerRingGroup == blockNumPerRingGroup-1 {
-			err = viewToDel.newUtxoRingEntries(b.db, n, block)
+			//	todo(MLPAUT):
+			// err = viewToDel.newUtxoRingEntries(b.db, n, block)
+			err = viewToDel.newUtxoRingEntriesMLP(b.db, n, block)
 			if err != nil {
 				return err
 			}
@@ -1680,7 +1686,9 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		// if n.height%3 == 2 {
 		//if n.height%wire.BlockNumPerRingGroup == wire.BlockNumPerRingGroup-1 {
 		if n.height%blockNumPerRingGroup == blockNumPerRingGroup-1 {
-			err = view.newUtxoRingEntries(b.db, n, block)
+			//	todo(MLPAUT):
+			// err = view.newUtxoRingEntries(b.db, n, block)
+			err = view.newUtxoRingEntriesMLP(b.db, n, block)
 			if err != nil {
 				return err
 			}
@@ -1811,7 +1819,9 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 		blockNumPerRingGroup := int32(wire.GetBlockNumPerRingGroupByBlockHeight(node.height))
 		//if node.height%wire.BlockNumPerRingGroup == wire.BlockNumPerRingGroup-1 {
 		if node.height%blockNumPerRingGroup == blockNumPerRingGroup-1 {
-			err := view.newUtxoRingEntries(b.db, node, block)
+			//	todo(MLPAUT):
+			// err := view.newUtxoRingEntries(b.db, node, block)
+			err := view.newUtxoRingEntriesMLP(b.db, node, block)
 			if err != nil {
 				return false, err
 			}

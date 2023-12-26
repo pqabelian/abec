@@ -150,7 +150,9 @@ func BuildTxoRings(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.
 func buildTxoRingsFromTxos(ringMemberTxos []*RingMemberTxo, ringBlockHeight int32, blockhashs []*chainhash.Hash, txoRingSize int, isCoinBase bool) (txoRings []*wire.TxoRing, err error) {
 
 	if len(ringMemberTxos) == 0 {
-		return nil, errors.New("buildTxoRingsFromTxos: the input ringMemberTxos is empty")
+		//return nil, errors.New("buildTxoRingsFromTxos: the input ringMemberTxos is empty")
+		// Note that with the MLPAUT fork, the input ringMemberTxos maye be empty.
+		return nil, nil
 	}
 
 	// sort

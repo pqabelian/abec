@@ -2,39 +2,54 @@ package blockchain
 
 import (
 	"fmt"
+	"github.com/abesuite/abec/abecryptox"
+	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/wire"
 )
 
+// These constants are used to initialize the capacity for the corresponding slice.
+// These constants should be set according to a computation and evaluation on number of transactions in a block,
+// and they could be adjusted later,
+// for example, after MLPAUT_FORK_COMMIT, the first two could be adjusted to small, since they are expected to be 0.
+const (
+	defaultCoinbaseRmTxoNumWithTxVersionInit      = 3
+	defaultTransferRmTxoNumWithTxVersionInit      = 30
+	defaultCoinbaseRmTxoNumWithTxVersionMLPAUTRCT = 3
+	defaultCoinbaseRmTxoNumWithTxVersionMLPAUTSDN = 3
+	defaultTransferRmTxoNumWithTxVersionMLPAUTRCT = 30
+	defaultTransferRmTxoNumWithTxVersionMLPAUTSDN = 300
+)
+
+// newUtxoRingEntriesMLP creates new UtxoRingEntries for the input block, which serves as the last block for the block-group.
+// todo: review
 func (view *UtxoRingViewpoint) newUtxoRingEntriesMLP(db database.DB, node *blockNode, block *abeutil.BlockAbe) error {
 	if node == nil || block == nil {
-		return AssertError("newUtxoRingEntriesFromNode is called with nil node or nil block.")
+		return AssertError("newUtxoRingEntriesMLP: newUtxoRingEntriesMLP is called with nil node or nil block.")
 	}
 
 	//	TODO: when BlockNumPerRingGroup or TxoRingSize change, it may cause fork.
 	//	The mapping between BlockNumPerRingGroup/TxoRingSize and height is hardcoded in wire.GetBlockNumPerRingGroup/TxoRingSize.
 	//	Here we should call blockNumPerRingGroup = wire.GetBlockNumPerRingGroup()
-	//	At this moment (no fork due to BlockNumPerRingGroup/TxoRingSize change), we directly use the constant.
 	blockNumPerRingGroup := int32(wire.GetBlockNumPerRingGroupByBlockHeight(node.height))
 	txoRingSize := int(wire.GetTxoRingSizeByBlockHeight(node.height))
-	//if !(node.height%wire.BlockNumPerRingGroup == wire.BlockNumPerRingGroup-1) {
 	if !(node.height%blockNumPerRingGroup == blockNumPerRingGroup-1) {
-		return AssertError("newUtxoRingEntriesFromNode is called with node where node.height % BlockNumPerRingGroup != BlockNumPerRingGroup-1.")
+		return AssertError("newUtxoRingEntriesMLP: newUtxoRingEntriesMLP is called with node where node.height % BlockNumPerRingGroup != BlockNumPerRingGroup-1.")
 	}
 
 	if !view.bestHash.IsEqual(block.Hash()) {
-		return AssertError("newUtxoRingEntriesFromNode is called with block's hash not equal to the view.bestHash")
+		return AssertError("newUtxoRingEntriesMLP: newUtxoRingEntriesMLP is called with block's hash not equal to the view.bestHash")
 	}
 
 	if !node.hash.IsEqual(block.Hash()) {
-		return AssertError("newUtxoRingEntries is called with block that has different hash with the node.")
+		return AssertError("newUtxoRingEntriesMLP: newUtxoRingEntriesMLP is called with block that has different hash with the node.")
 	}
 
 	ringBlockHeight := block.Height()
-	//blockNum := wire.BlockNumPerRingGroup
 	blockNum := int(blockNumPerRingGroup)
+	//	read blocks from database
 	nodeTmp := node
 	blockTmp := block
 	blocks := make([]*abeutil.BlockAbe, blockNum)
@@ -46,8 +61,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesMLP(db database.DB, node *block
 
 		nodeTmp = nodeTmp.parent
 		if nodeTmp == nil {
-			//return AssertError("a node with height % BlockNumPerRingGroup == BlockNumPerRingGroup-1 should have BlockNumPerRingGroup previous successive nodes.")
-			return AssertError("newUtxoRingEntries is called with node that does not have (BlockNumPerRingGroup-1) previous successive blocks in database")
+			return AssertError("newUtxoRingEntriesMLP: newUtxoRingEntriesMLP is called with node that does not have (BlockNumPerRingGroup-1) previous successive blocks in database")
 		}
 
 		err := db.View(func(dbTx database.Tx) error {
@@ -60,237 +74,350 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesMLP(db database.DB, node *block
 		}
 	}
 
-	//node1 := node.parent
-	//node0 := node1.parent
-	//if node1 == nil || node0 == nil {
-	//	return AssertError("a node with height %2 == 0 should have two previous successive nodes.")
-	//}
-	//
-	//if !node.hash.IsEqual(block.Hash()) {
-	//	return AssertError("newUtxoRingEntries is called with block that has different hash with the node.")
-	//}
-	//
-	//block2 := block
-	//var block1 *abeutil.BlockAbe
-	//var block0 *abeutil.BlockAbe
-	//err := db.View(func(dbTx database.Tx) error {
-	//	var err error
-	//	block1, err = dbFetchBlockByNodeAbe(dbTx, node1)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	block0, err = dbFetchBlockByNodeAbe(dbTx, node0)
-	//	return err
-	//})
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//if block0 == nil || block1 == nil {
-	//	return AssertError("newUtxoRingEntries is called with node that does not have 2 previous successive blocks in database")
-	//}
-	//
-	//blocks := []*abeutil.BlockAbe{block0, block1, block2}
-	//ringBlockHeight := blocks[2].Height()
-	//blockNum := len(blocks)
-
-	blockHashs := make([]*chainhash.Hash, blockNum)
-	coinBaseRmTxoNum := 0
-	transferRmTxoNum := 0
-	for i := 0; i < blockNum; i++ {
-		blockHashs[i] = blocks[i].Hash()
-
-		coinBaseRmTxoNum += len(blocks[i].Transactions()[0].MsgTx().TxOuts)
-		for _, tx := range blocks[i].Transactions()[1:] {
-			transferRmTxoNum += len(tx.MsgTx().TxOuts)
-		}
-	}
-	allCoinBaseRmTxos := make([]*RingMemberTxo, 0, coinBaseRmTxoNum)
-	allTransferRmTxos := make([]*RingMemberTxo, 0, transferRmTxoNum)
-
-	// str = block1.hash, block2.hash, block3.hash, blockhash, txHash, outIndex
-	// all Txos are ordered by Hash(str), then grouped into rings
-	txoSortStr := make([]byte, blockNum*chainhash.HashSize+chainhash.HashSize+chainhash.HashSize+1)
-	for i := 0; i < blockNum; i++ {
-		copy(txoSortStr[i*chainhash.HashSize:], blocks[i].Hash()[:])
-	}
-
-	for i := 0; i < blockNum; i++ {
-		block := blocks[i]
-		blockHash := block.Hash()
-		blockHeight := block.Height()
-
-		copy(txoSortStr[blockNum*chainhash.HashSize:], blockHash[:])
-
-		coinBaseTx := block.Transactions()[0]
-		txHash := coinBaseTx.Hash()
-		copy(txoSortStr[(blockNum+1)*chainhash.HashSize:], txHash[:])
-		for outIndex, txOut := range coinBaseTx.MsgTx().TxOuts {
-			txoSortStr[(blockNum+2)*chainhash.HashSize] = uint8(outIndex)
-
-			txoOrderHash := chainhash.DoubleHashH(txoSortStr)
-
-			ringMemberTxo := NewRingMemberTxo(coinBaseTx.MsgTx().Version, &txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
-			allCoinBaseRmTxos = append(allCoinBaseRmTxos, ringMemberTxo)
-		}
-		for _, tx := range block.Transactions()[1:] {
-			txHash := tx.Hash()
-			copy(txoSortStr[(blockNum+1)*chainhash.HashSize:], txHash[:])
-
-			for outIndex, txOut := range tx.MsgTx().TxOuts {
-				txoSortStr[(blockNum+2)*chainhash.HashSize] = uint8(outIndex)
-
-				txoOrderHash := chainhash.DoubleHashH(txoSortStr)
-
-				ringMemberTxo := NewRingMemberTxo(tx.MsgTx().Version, &txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
-				allTransferRmTxos = append(allTransferRmTxos, ringMemberTxo)
-			}
-		}
-	}
-
-	// TODO: change the version field in node and block to uint32 type?
-	//	TODO: when BlockNumPerRingGroup or TxoRingSize change, it may cause fork.
-	//	The mapping between BlockNumPerRingGroup/TxoRingSize and height is hardcoded in wire.GetBlockNumPerRingGroup/TxoRingSize.
-	//	Here we should call blockNumPerRingGroup = wire.TxoRingSize()
-	//	At this moment (no fork due to BlockNumPerRingGroup/TxoRingSize change), we directly use the constant.
-	//txoRingSize := wire.TxoRingSize
-	//	TODO: (2023.03.23) call NewUtxoRingEntriesFromBlocks and incorporate the resulting UtxoRingEntries to view.entries.
-	err := view.NewUtxoRingEntriesFromTxos(allCoinBaseRmTxos, ringBlockHeight, blockHashs, txoRingSize, true)
+	newTxoRings, err := BuildTxoRingsMLP(blockNum, txoRingSize, blocks)
 	if err != nil {
 		return err
 	}
 
-	err = view.NewUtxoRingEntriesFromTxos(allTransferRmTxos, ringBlockHeight, blockHashs, txoRingSize, false)
-	if err != nil {
-		return err
+	for ringId, txoRing := range newTxoRings {
+		if _, ok := view.entries[ringId]; ok {
+			return AssertError(fmt.Sprintf("newUtxoRingEntriesMLP: Found a hash collision (by RingId) when calling newUtxoRingEntriesMLP with blocks (hash %v, ringHeight %d, ringId %v)",
+				node.hash, ringBlockHeight, ringId))
+		} else {
+			newUtxoRingEntry := initNewUtxoRingEntryMLP(txoRing)
+			view.entries[ringId] = newUtxoRingEntry
+		}
 	}
+
 	return nil
 
 }
 
+// BuildTxoRingsMLP builds txoRings for the input blocks.
+// todo: review
 func BuildTxoRingsMLP(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.BlockAbe) (txoRings map[wire.RingId]*wire.TxoRing, err error) {
 	//blockNum := blockNumPerRingGroup
 
 	if blockNumPerRingGroup < 1 {
-		return nil, AssertError("BuildTxoRings: number of blocks is smaller than 1")
+		return nil, AssertError("BuildTxoRingsMLP: number of blocks is smaller than 1")
 	}
 
 	if len(blocks) != blockNumPerRingGroup {
-		return nil, AssertError("BuildTxoRings: number of blocks does not match the parameter blockNumPerRingGroup")
+		return nil, AssertError("BuildTxoRingsMLP: number of blocks does not match the parameter blockNumPerRingGroup")
 	}
 
 	for i := 0; i < blockNumPerRingGroup; i++ {
 		if blocks[i] == nil {
-			return nil, AssertError("NewUtxoRingEntriesFromBlocks: there are nil in the input blocks")
+			return nil, AssertError("BuildTxoRingsMLP: there are nil in the input blocks")
 		}
 	}
 
 	ringBlockHeight := blocks[blockNumPerRingGroup-1].Height()
 	for i := blockNumPerRingGroup - 1; i >= 0; i-- {
 		if blocks[i].Height() != ringBlockHeight-(int32(blockNumPerRingGroup)-1-int32(i)) {
-			return nil, AssertError("NewUtxoRingEntriesFromBlocks: the input blocks should have successive height")
+			return nil, AssertError("BuildTxoRingsMLP: the input blocks should have successive height")
 		}
 	}
 
-	blockhashStr := make([]byte, blockNumPerRingGroup*chainhash.HashSize)
-	//	blockhashStr is used only for the hint of hash-collision happening
+	blockHashStr := make([]byte, blockNumPerRingGroup*chainhash.HashSize)
+	//	blockHashStr is used only for the hint of hash-collision happening
 	for i := 0; i < blockNumPerRingGroup; i++ {
-		copy(blockhashStr[i*chainhash.HashSize:], blocks[i].Hash()[:])
+		copy(blockHashStr[i*chainhash.HashSize:], blocks[i].Hash()[:])
 	}
 
-	blockHashs := make([]*chainhash.Hash, blockNumPerRingGroup)
-	coinBaseRmTxoNum := 0
-	transferRmTxoNum := 0
-	for i := 0; i < blockNumPerRingGroup; i++ {
-		blockHashs[i] = blocks[i].Hash()
+	//	2023.12.24 MLP Fork
+	//	With the MLP_Fork, there are two TxVersions, say, TxVersion_Height_0 and TxVersion_Height_MLPAUT_236000,
+	//	For TxVersion_Height_0, all Txos have the same privacy-level: RingCTPre, and all these Txos will be collected together and divided into rings.
+	//	For TxVersion_Height_MLPAUT_236000, the Txos may have three privacy-level, say, RingCTPre, RingCT, and Pseudonym,
+	//		the Txos of RingCTPre and RingCT will be collected together and divided into rings,
+	//		the Txos of Pseudonym will be collected and divided into rings with size 1.
+	//	NOTE: when there are more cases ,we need to hard code the ring-building process here.
 
-		coinBaseRmTxoNum += len(blocks[i].Transactions()[0].MsgTx().TxOuts)
-		for _, tx := range blocks[i].Transactions()[1:] {
-			transferRmTxoNum += len(tx.MsgTx().TxOuts)
-		}
-	}
-	allCoinBaseRmTxos := make([]*RingMemberTxo, 0, coinBaseRmTxoNum)
-	allTransferRmTxos := make([]*RingMemberTxo, 0, transferRmTxoNum)
+	allCoinbaseRmTxoWithTxVersionInit := make([]*RingMemberTxo, 0, defaultCoinbaseRmTxoNumWithTxVersionInit)
+	allTransferRmTxoWithTxVersionInit := make([]*RingMemberTxo, 0, defaultTransferRmTxoNumWithTxVersionInit)
+	allCoinbaseRmTxoWithTxVersionMLPAUTRCT := make([]*RingMemberTxo, 0, defaultCoinbaseRmTxoNumWithTxVersionMLPAUTRCT)
+	allCoinbaseRmTxoWithTxVersionMLPAUTSDN := make([]*RingMemberTxo, 0, defaultCoinbaseRmTxoNumWithTxVersionMLPAUTSDN)
+	allTransferRmTxoWithTxVersionMLPAUTRCT := make([]*RingMemberTxo, 0, defaultTransferRmTxoNumWithTxVersionMLPAUTRCT)
+	allTransferRmTxoWithTxVersionMLPAUTSDN := make([]*RingMemberTxo, 0, defaultTransferRmTxoNumWithTxVersionMLPAUTSDN)
 
 	// str = block1.hash, block2.hash, block3.hash, blockhash, txHash, outIndex
 	// all Txos are ordered by Hash(str), then grouped into rings
 	txoSortStr := make([]byte, blockNumPerRingGroup*chainhash.HashSize+chainhash.HashSize+chainhash.HashSize+1)
+	//	(1) block1.hash, block2.hash, block3.hash
 	for i := 0; i < blockNumPerRingGroup; i++ {
 		copy(txoSortStr[i*chainhash.HashSize:], blocks[i].Hash()[:])
 	}
 
+	blockHashes := make([]*chainhash.Hash, blockNumPerRingGroup) // blockHashes is collected for later use in buildTxoRingsFromTxos
 	for i := 0; i < blockNumPerRingGroup; i++ {
-		block := blocks[i]
-		blockHash := block.Hash()
-		blockHeight := block.Height()
+		blockHashes[i] = blocks[i].Hash()
 
+		blockHash := blocks[i].Hash()
+		blockHeight := blocks[i].Height()
+
+		//	(2) block hash
 		copy(txoSortStr[blockNumPerRingGroup*chainhash.HashSize:], blockHash[:])
 
-		coinBaseTx := block.Transactions()[0]
-		txHash := coinBaseTx.Hash()
+		//	coinbase transaction
+		cbTx := blocks[i].Transactions()[0]
+		isCbTx, err := cbTx.IsCoinBase()
+		if err != nil {
+			return nil, err
+		}
+		if !isCbTx {
+			return nil, AssertError(fmt.Sprintf("BuildTxoRingsMLP: the %d -th input block's first transaction is not coinbase transaction", i))
+		}
+
+		//	(3) tx hash
+		txHash := cbTx.Hash()
 		copy(txoSortStr[(blockNumPerRingGroup+1)*chainhash.HashSize:], txHash[:])
-		for outIndex, txOut := range coinBaseTx.MsgTx().TxOuts {
+
+		for outIndex, txOut := range cbTx.MsgTx().TxOuts {
+			//	(4) outIndex
 			txoSortStr[(blockNumPerRingGroup+2)*chainhash.HashSize] = uint8(outIndex)
 
 			txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
-			ringMemberTxo := NewRingMemberTxo(coinBaseTx.MsgTx().Version, &txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
-			allCoinBaseRmTxos = append(allCoinBaseRmTxos, ringMemberTxo)
+			ringMemberTxo := NewRingMemberTxo(txOut.Version, &txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
+
+			if txOut.Version != cbTx.MsgTx().Version {
+				return nil, AssertError(fmt.Sprintf("BuildTxoRingsMLP: the %d -th input block's coinbase transaction's %d -th txo has a version different from that of tx", i, outIndex))
+			}
+
+			//	put into corresponding group
+			switch txOut.Version {
+			case wire.TxVersion_Height_0:
+				allCoinbaseRmTxoWithTxVersionInit = append(allCoinbaseRmTxoWithTxVersionInit, ringMemberTxo)
+
+			case wire.TxVersion_Height_MLPAUT_236000:
+				privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
+				if err != nil {
+					return nil, err
+				}
+				switch privacyLevel {
+				case abecryptoxkey.PrivacyLevelRINGCTPre:
+					allCoinbaseRmTxoWithTxVersionMLPAUTRCT = append(allCoinbaseRmTxoWithTxVersionMLPAUTRCT, ringMemberTxo)
+
+				case abecryptoxkey.PrivacyLevelRINGCT:
+					allCoinbaseRmTxoWithTxVersionMLPAUTRCT = append(allCoinbaseRmTxoWithTxVersionMLPAUTRCT, ringMemberTxo)
+
+				case abecryptoxkey.PrivacyLevelPSEUDONYM:
+					allCoinbaseRmTxoWithTxVersionMLPAUTSDN = append(allCoinbaseRmTxoWithTxVersionMLPAUTSDN, ringMemberTxo)
+
+				default:
+					return nil, AssertError(fmt.Sprintf("BuildTxoRingsMLP: the %d -th input block's coinbase transaction's %d -th TxOut's PrivacyLevel (%d) is not supported.", i, outIndex, privacyLevel))
+				}
+
+			default:
+				return nil, AssertError(fmt.Sprintf("BuildTxoRingsMLP: the %d -th input block's coinbase transaction's version is not supported", i))
+			}
 		}
-		for _, tx := range block.Transactions()[1:] {
-			txHash := tx.Hash()
+
+		//	transfer transactions
+		for t, trTx := range blocks[i].Transactions()[1:] {
+			isCbTx, err = trTx.IsCoinBase()
+			if err != nil {
+				return nil, err
+			}
+			if isCbTx {
+				return nil, AssertError(fmt.Sprintf("BuildTxoRingsMLP: the %d -th input block's %d -th transaction is a coinbase transaction", i, t))
+			}
+
+			//	(3) tx hash
+			txHash = trTx.Hash()
 			copy(txoSortStr[(blockNumPerRingGroup+1)*chainhash.HashSize:], txHash[:])
 
-			for outIndex, txOut := range tx.MsgTx().TxOuts {
+			for outIndex, txOut := range trTx.MsgTx().TxOuts {
+				//	(4) outIndex
 				txoSortStr[(blockNumPerRingGroup+2)*chainhash.HashSize] = uint8(outIndex)
 
 				txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
-				ringMemberTxo := NewRingMemberTxo(tx.MsgTx().Version, &txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
-				allTransferRmTxos = append(allTransferRmTxos, ringMemberTxo)
+				ringMemberTxo := NewRingMemberTxo(txOut.Version, &txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
+
+				if txOut.Version != trTx.MsgTx().Version {
+					return nil, AssertError(fmt.Sprintf("BuildTxoRingsMLP: the %d -th input block's %d -th transaction's %d -th txo has a version different from that of tx", i, t, outIndex))
+				}
+
+				//	put into corresponding group
+				switch txOut.Version {
+				case wire.TxVersion_Height_0:
+					allTransferRmTxoWithTxVersionInit = append(allTransferRmTxoWithTxVersionInit, ringMemberTxo)
+
+				case wire.TxVersion_Height_MLPAUT_236000:
+					privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
+					if err != nil {
+						return nil, err
+					}
+					switch privacyLevel {
+					case abecryptoxkey.PrivacyLevelRINGCTPre:
+						allTransferRmTxoWithTxVersionMLPAUTRCT = append(allTransferRmTxoWithTxVersionMLPAUTRCT, ringMemberTxo)
+
+					case abecryptoxkey.PrivacyLevelRINGCT:
+						allTransferRmTxoWithTxVersionMLPAUTRCT = append(allTransferRmTxoWithTxVersionMLPAUTRCT, ringMemberTxo)
+
+					case abecryptoxkey.PrivacyLevelPSEUDONYM:
+						allTransferRmTxoWithTxVersionMLPAUTSDN = append(allTransferRmTxoWithTxVersionMLPAUTSDN, ringMemberTxo)
+
+					default:
+						return nil, AssertError(fmt.Sprintf("BuildTxoRingsMLP: the %d -th input block's %d -th transaction's %d -th TxOut's PrivacyLevel (%d) is not supported.", i, t, outIndex, privacyLevel))
+					}
+
+				default:
+					return nil, AssertError(fmt.Sprintf("BuildTxoRingsMLP: the %d -th input block's %d -th transaction's version is not supported", i, t))
+				}
 			}
 		}
 	}
 
-	// TODO: change the version field in node and block to uint32 type?
+	log.Debugf("BuildTxoRingsMLP: %d blocks are building rings for ringBlockHeight %d: "+
+		"coinBaseRmTxoNumTxVersionInit = %d, transferRmTxoNumTxVersionInit = %d, "+
+		"coinBaseRmTxoNumTxVersionMLPAUTRCT = %d, coinBaseRmTxoNumTxVersionMLPAUTSDN = %d, "+
+		"transferRmTxoNumTxVersionMLPAUTRCT = %d, transferRmTxoNumTxVersionMLPAUTSDN = %d",
+		blockNumPerRingGroup, ringBlockHeight,
+		len(allCoinbaseRmTxoWithTxVersionInit), len(allTransferRmTxoWithTxVersionInit),
+		len(allCoinbaseRmTxoWithTxVersionMLPAUTRCT), len(allCoinbaseRmTxoWithTxVersionMLPAUTSDN),
+		len(allTransferRmTxoWithTxVersionMLPAUTRCT), len(allTransferRmTxoWithTxVersionMLPAUTSDN))
+
 	//	TODO: when BlockNumPerRingGroup or TxoRingSize change, it may cause fork.
-	//	The mapping between BlockNumPerRingGroup/TxoRingSize and height is hardcoded in wire.GetBlockNumPerRingGroup/TxoRingSize.
-	//	Here we should call blockNumPerRingGroup = wire.TxoRingSize()
-	//	At this moment (no fork due to BlockNumPerRingGroup/TxoRingSize change), we directly use the constant.
-	//txoRingSize := wire.TxoRingSize
-	cbTxoRings, err := buildTxoRingsFromTxos(allCoinBaseRmTxos, ringBlockHeight, blockHashs, txoRingSize, true)
+	cbTxoRingsWithTxVersionInit, err := buildTxoRingsFromTxos(allCoinbaseRmTxoWithTxVersionInit, ringBlockHeight, blockHashes, txoRingSize, true)
 	if err != nil {
 		return nil, err
 	}
 
-	trTxoRings, err := buildTxoRingsFromTxos(allTransferRmTxos, ringBlockHeight, blockHashs, txoRingSize, false)
+	trTxoRingsWithTxVersionInit, err := buildTxoRingsFromTxos(allTransferRmTxoWithTxVersionInit, ringBlockHeight, blockHashes, txoRingSize, false)
 	if err != nil {
 		return nil, err
 	}
 
-	rstTxoRings := make(map[wire.RingId]*wire.TxoRing, len(cbTxoRings)+len(trTxoRings))
-
-	for _, txoRing := range cbTxoRings {
-		//ringHash := txoRing.outPointRing.Hash()
-		ringId := txoRing.RingId()
-		if _, ok := rstTxoRings[ringId]; ok {
-			return nil, AssertError(fmt.Sprintf("BuildTxoRings: Found a hash collision when calling BuildTxoRings with blocks (hash %v, ringHeight %d)",
-				blockhashStr, ringBlockHeight))
-		} else {
-			rstTxoRings[ringId] = txoRing
-		}
+	cbTxoRingsWithTxVersionMLPAUTRCT, err := buildTxoRingsFromTxos(allCoinbaseRmTxoWithTxVersionMLPAUTRCT, ringBlockHeight, blockHashes, txoRingSize, true)
+	if err != nil {
+		return nil, err
 	}
-	for _, txoRing := range trTxoRings {
-		//ringHash := txoRing.outPointRing.Hash()
+
+	trTxoRingsWithTxVersionMLPAUTRCT, err := buildTxoRingsFromTxos(allTransferRmTxoWithTxVersionMLPAUTRCT, ringBlockHeight, blockHashes, txoRingSize, false)
+	if err != nil {
+		return nil, err
+	}
+
+	cbTxoRingsWithTxVersionMLPAUTSDN, err := buildTxoRingsFromTxosForSingle(allCoinbaseRmTxoWithTxVersionMLPAUTSDN, ringBlockHeight, blockHashes, true)
+	if err != nil {
+		return nil, err
+	}
+
+	trTxoRingsWithTxVersionMLPAUTSDN, err := buildTxoRingsFromTxosForSingle(allTransferRmTxoWithTxVersionMLPAUTSDN, ringBlockHeight, blockHashes, false)
+	if err != nil {
+		return nil, err
+	}
+
+	rstRingNum := len(cbTxoRingsWithTxVersionInit) + len(trTxoRingsWithTxVersionInit) +
+		len(cbTxoRingsWithTxVersionMLPAUTRCT) + len(trTxoRingsWithTxVersionMLPAUTRCT) +
+		len(cbTxoRingsWithTxVersionMLPAUTSDN) + len(trTxoRingsWithTxVersionMLPAUTSDN)
+
+	rstTxoRings := make(map[wire.RingId]*wire.TxoRing, rstRingNum)
+
+	for i, txoRing := range cbTxoRingsWithTxVersionInit {
 		ringId := txoRing.RingId()
 		if _, ok := rstTxoRings[ringId]; ok {
-			return nil, AssertError(fmt.Sprintf("BuildTxoRings: Found a hash collision when calling BuildTxoRings with blocks (hash %v, ringHeight %d)",
-				blockhashStr, ringBlockHeight))
+			return nil, AssertError(fmt.Sprintf("BuildTxoRingsMLP: Found a hash collision when calling BuildTxoRings with blocks (hash %v, ringHeight %d)",
+				blockHashStr, ringBlockHeight))
 		} else {
 			rstTxoRings[ringId] = txoRing
 		}
+		log.Debugf("BuildTxoRingsMLP: cbTxoRingsWithTxVersionInit[%d], ring size = %d", i, len(txoRing.TxOuts))
+	}
+	for i, txoRing := range trTxoRingsWithTxVersionInit {
+		ringId := txoRing.RingId()
+		if _, ok := rstTxoRings[ringId]; ok {
+			return nil, AssertError(fmt.Sprintf("BuildTxoRingsMLP: Found a hash collision when calling BuildTxoRings with blocks (hash %v, ringHeight %d)",
+				blockHashStr, ringBlockHeight))
+		} else {
+			rstTxoRings[ringId] = txoRing
+		}
+		log.Debugf("BuildTxoRingsMLP: trTxoRingsWithTxVersionInit[%d], ring size = %d", i, len(txoRing.TxOuts))
+	}
+	for i, txoRing := range cbTxoRingsWithTxVersionMLPAUTRCT {
+		ringId := txoRing.RingId()
+		if _, ok := rstTxoRings[ringId]; ok {
+			return nil, AssertError(fmt.Sprintf("BuildTxoRingsMLP: Found a hash collision when calling BuildTxoRings with blocks (hash %v, ringHeight %d)",
+				blockHashStr, ringBlockHeight))
+		} else {
+			rstTxoRings[ringId] = txoRing
+		}
+		log.Debugf("BuildTxoRingsMLP: cbTxoRingsWithTxVersionMLPAUTRCT[%d], ring size = %d", i, len(txoRing.TxOuts))
+	}
+	for i, txoRing := range trTxoRingsWithTxVersionMLPAUTRCT {
+		ringId := txoRing.RingId()
+		if _, ok := rstTxoRings[ringId]; ok {
+			return nil, AssertError(fmt.Sprintf("BuildTxoRingsMLP: Found a hash collision when calling BuildTxoRings with blocks (hash %v, ringHeight %d)",
+				blockHashStr, ringBlockHeight))
+		} else {
+			rstTxoRings[ringId] = txoRing
+		}
+		log.Debugf("BuildTxoRingsMLP: trTxoRingsWithTxVersionMLPAUTRCT[%d], ring size = %d", i, len(txoRing.TxOuts))
+	}
+	for i, txoRing := range cbTxoRingsWithTxVersionMLPAUTSDN {
+		ringId := txoRing.RingId()
+		if _, ok := rstTxoRings[ringId]; ok {
+			return nil, AssertError(fmt.Sprintf("BuildTxoRingsMLP: Found a hash collision when calling BuildTxoRings with blocks (hash %v, ringHeight %d)",
+				blockHashStr, ringBlockHeight))
+		} else {
+			rstTxoRings[ringId] = txoRing
+		}
+		log.Debugf("BuildTxoRingsMLP: cbTxoRingsWithTxVersionMLPAUTSDN[%d], ring size = %d", i, len(txoRing.TxOuts))
+	}
+	for i, txoRing := range trTxoRingsWithTxVersionMLPAUTSDN {
+		ringId := txoRing.RingId()
+		if _, ok := rstTxoRings[ringId]; ok {
+			return nil, AssertError(fmt.Sprintf("BuildTxoRingsMLP: Found a hash collision when calling BuildTxoRings with blocks (hash %v, ringHeight %d)",
+				blockHashStr, ringBlockHeight))
+		} else {
+			rstTxoRings[ringId] = txoRing
+		}
+		log.Debugf("BuildTxoRingsMLP: trTxoRingsWithTxVersionMLPAUTSDN[%d], ring size = %d", i, len(txoRing.TxOuts))
 	}
 
 	return rstTxoRings, nil
 
+}
+
+// initNewUtxoRingEntryMLP initializes a new UtxoRingEntry from the input wire.TxoRing.
+// todo: review
+func initNewUtxoRingEntryMLP(txoRing *wire.TxoRing) *UtxoRingEntry {
+	utxoRingEntry := &UtxoRingEntry{
+		Version:             txoRing.Version,
+		ringBlockHeight:     txoRing.RingBlockHeight,
+		outPointRing:        txoRing.OutPointRing,
+		txOuts:              txoRing.TxOuts,
+		serialNumbers:       nil,
+		consumingBlockHashs: nil,
+		packedFlags:         tfModified,
+	}
+
+	if txoRing.IsCoinbase {
+		utxoRingEntry.packedFlags |= tfCoinBase
+	}
+	return utxoRingEntry
+}
+
+// buildTxoRingsFromTxosForSingle builds rings with ringSize = 1 from the input ringMemberTxos,
+// i.e., each ringMemberTxo will form a ring.
+// todo: review
+func buildTxoRingsFromTxosForSingle(ringMemberTxos []*RingMemberTxo, ringBlockHeight int32, blockHashes []*chainhash.Hash, isCoinBase bool) (txoRings []*wire.TxoRing, err error) {
+
+	if len(ringMemberTxos) == 0 {
+		return nil, nil
+	}
+
+	rstTxoRings := make([]*wire.TxoRing, len(ringMemberTxos))
+
+	// txoRingSize := 1
+	for i := 0; i < len(ringMemberTxos); i++ {
+		rstTxoRings[i], err = NewTxoRing(ringMemberTxos[i].version, ringBlockHeight, blockHashes, ringMemberTxos[i:i+1], isCoinBase)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return rstTxoRings, nil
 }
