@@ -1,7 +1,6 @@
 package abecryptox
 
 import (
-	"errors"
 	"fmt"
 	"github.com/abesuite/abec/abecrypto"
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
@@ -153,12 +152,12 @@ func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxO
 		}
 		return trTx, nil
 	default:
-		return nil, errors.New("TransferTxGen: Unsupported crypto scheme")
+		return nil, fmt.Errorf("TransferTxGen: Unsupported crypto scheme")
 	}
 
 }
 
-// todo
+// todo: review
 func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail) (bool, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(transferTx.Version)
 	if err != nil {
@@ -186,7 +185,7 @@ func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail
 		}
 		return valid, nil
 	default:
-		return false, errors.New("TransferTxVerify: Unsupported crypto scheme")
+		return false, fmt.Errorf("TransferTxVerify: Unsupported crypto scheme")
 	}
 }
 
@@ -196,7 +195,28 @@ func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail
 //	APIs for AddressKey-Encode-Format	end
 
 //	APIs for Txos	begin
-//
+
+// GetTxoPrivacyLevel returns the PrivacyLevel of the input wire.TxOutAbe,
+// which is determined by its version and its coinAddress.
+// todo: review
+func GetTxoPrivacyLevel(abeTxo *wire.TxOutAbe) (abecryptoxkey.PrivacyLevel, error) {
+	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
+	if err != nil {
+		return 0, err
+	}
+
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCT:
+		return abecryptoxkey.PrivacyLevelRINGCTPre, nil
+
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+		return pqringctxGetTxoPrivacyLevel(abecryptoxparam.PQRingCTXPP, abeTxo)
+	default:
+		return 0, fmt.Errorf("GetTxoPrivacyLevel: the crypto scheme mapped from abeTxo.Version is not supported")
+	}
+	return 0, nil
+}
+
 // GetTxoSerializeSizeApprox returns the approximate serialize size for Txo, which is decided by the TxVersion.
 // Note that the transactions are generated and versified by the underlying crypto-scheme,
 // the approximate serialize size for Txo actually depends on the underlying crypto-scheme.

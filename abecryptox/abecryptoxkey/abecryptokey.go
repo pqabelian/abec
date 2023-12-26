@@ -6,6 +6,7 @@ import (
 	"github.com/abesuite/abec/abecrypto"
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
+	"github.com/cryptosuite/pqringctx/pqringctxapi"
 )
 
 // PrivacyLevel defines the type to denote PrivacyLevel.
@@ -47,6 +48,12 @@ func CryptoAddressKeyGen(randSeed []byte, cryptoScheme abecryptoxparam.CryptoSch
 		return nil, nil, nil, nil, errors.New("CryptoAddressKeyGen: unsupported crypto-scheme")
 	}
 	//return nil, nil, nil, nil, nil
+}
+
+// GetPrivacyLevelFromCoinAddressType returns the PrivacyLevel corresponding to the input coinAddressType.
+// todo: review
+func GetPrivacyLevelFromCoinAddressType(coinAddressType pqringctxapi.CoinAddressType) (PrivacyLevel, error) {
+	return pqringctxGetPrivacyLevelFromCoinAddressType(coinAddressType)
 }
 
 //	APIs for AddressKey-Encode-Format	begin
