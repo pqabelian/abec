@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/abesuite/abec/abecryptox"
-	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/blockchain"
@@ -424,7 +423,7 @@ func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, txVersion uint32, cry
 	msgTx.AddTxIn(coinbaseTxIn)
 
 	// oneTxOut
-	txoScriptSizeApprox, err := abecryptoxparam.GetTxoSerializeSizeApprox(msgTx.Version, cryptoAddressPayTo)
+	txoScriptSizeApprox, err := abecryptox.GetTxoSerializeSizeApprox(msgTx.Version, cryptoAddressPayTo)
 	if err != nil {
 		return nil, err
 	}
@@ -444,7 +443,7 @@ func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, txVersion uint32, cry
 
 	cryptoAddressListPayTo := make([][]byte, 1)
 	cryptoAddressListPayTo[0] = cryptoAddressPayTo
-	txWitnessSizeApprox, err := abecryptoxparam.GetCbTxWitnessSerializeSizeApprox(msgTx.Version, cryptoAddressListPayTo)
+	txWitnessSizeApprox, err := abecryptox.GetCbTxWitnessSerializeSizeApprox(msgTx.Version, cryptoAddressListPayTo)
 	if err != nil {
 		return nil, err
 	}

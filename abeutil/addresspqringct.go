@@ -140,7 +140,7 @@ func (instAddr *InstanceAddress) Deserialize(serializedInstAddr []byte) error {
 	netId := serializedInstAddr[0]
 
 	//	the bytes [1]~[4] must match the generation of cryptoAddress, namely in pqringctCryptoAddressGen()
-	cryptoScheme, err := abecryptoparam.Deserialize(serializedInstAddr[1:5])
+	cryptoScheme, err := abecryptoparam.DeserializeCryptoScheme(serializedInstAddr[1:5])
 	if err != nil || cryptoScheme != abecryptoparam.CryptoSchemePQRingCT {
 		return errors.New("A non-PQRingCT1.0 abelAddress is deserialized as an instanceAddress")
 	}
