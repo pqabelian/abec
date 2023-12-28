@@ -7,7 +7,7 @@ import (
 	"github.com/cryptosuite/pqringctx/pqringctxapi"
 )
 
-// pqringctxCryptoAddressKeyGenByRootSeed generates (CryptoAddress, CryptoKeys) for the input Root Seeds and the CoinDetectorRootKey.
+// pqringctxCryptoAddressKeyGenByRootSeeds generates (CryptoAddress, CryptoKeys) for the input Root Seeds and the CoinDetectorRootKey.
 // This is a randomized algorithm, in particular,
 // (1) A Public Rand is chosen,
 // (2) Rand Seeds are generated from (Root Seeds, Public Rand),
@@ -20,7 +20,7 @@ import (
 // (b) the layer here takes the responsibility of generating the Rand Seeds for crypto-scheme layer.
 // (c) such an architecture provides flexible functionalities to the application layer,
 // namely, the application layer can use (Root Seeds, CoinDetectorRootKey) or (Rand Seeds, CoinDetectorKey) to call the functionalities.
-func pqringctxCryptoAddressKeyGenByRootSeed(pp *pqringctxapi.PublicParameter,
+func pqringctxCryptoAddressKeyGenByRootSeeds(pp *pqringctxapi.PublicParameter,
 	cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
 	coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte,
 	coinDetectorRootKey []byte) (
@@ -63,13 +63,13 @@ func pqringctxCryptoAddressKeyGenByRootSeed(pp *pqringctxapi.PublicParameter,
 		coinSerialNumberKeyRandSeed := abecryptoutils.PRF(coinSerialNumberKeyRootSeed, publicRand)
 		coinValueKeyRandSeed := abecryptoutils.PRF(coinValueKeyRootSeed, publicRand)
 
-		cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, err = pqringctxCryptoAddressKeyGenByRandSeed(pp, cryptoScheme, privacyLevel, coinSpendKeyRandSeed, coinSerialNumberKeyRandSeed, coinValueKeyRandSeed, coinDetectorKey, publicRand)
+		cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, err = pqringctxCryptoAddressKeyGenByRandSeeds(pp, cryptoScheme, privacyLevel, coinSpendKeyRandSeed, coinSerialNumberKeyRandSeed, coinValueKeyRandSeed, coinDetectorKey, publicRand)
 		if err != nil {
 			return nil, nil, nil, nil, nil, err
 		}
 
 	} else if privacyLevel == PrivacyLevelPSEUDONYM {
-		cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, err = pqringctxCryptoAddressKeyGenByRandSeed(pp, cryptoScheme, privacyLevel, coinSpendKeyRandSeed, nil, nil, coinDetectorKey, publicRand)
+		cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, err = pqringctxCryptoAddressKeyGenByRandSeeds(pp, cryptoScheme, privacyLevel, coinSpendKeyRandSeed, nil, nil, coinDetectorKey, publicRand)
 		if err != nil {
 			return nil, nil, nil, nil, nil, err
 		}
@@ -106,7 +106,7 @@ func pqringctxCryptoDetectorKeyGenByRootKey(pp *pqringctxapi.PublicParameter,
 // // The rand seeds will make the algorithm (i.e., the generated address and keys) are deterministic.
 //// The coinDetectorKey is a symmetric key, which is used to run MAC to generate a tag for the coin-address.
 
-// pqringctxCryptoAddressKeyGenByRandSeed() generates cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk,
+// pqringctxCryptoAddressKeyGenByRandSeeds() generates cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk,
 // by calling pqringctx's key-generation functions to obtain CoinAddress and Coin-keys, and packaging them to CryptoAddress ane Crypto-keys.
 // Note that based on privacyLevel, the returned cryptoSnsk and cryptoVsk could be nil.
 // Note that the input Rand Seeds are used to make the underlying crypto-algorithms deterministic.
@@ -114,7 +114,7 @@ func pqringctxCryptoDetectorKeyGenByRootKey(pp *pqringctxapi.PublicParameter,
 // so that only its owner can detect such a coin-address.
 // reviewed on 2023.12.07
 // todo: review the rand seeds
-func pqringctxCryptoAddressKeyGenByRandSeed(pp *pqringctxapi.PublicParameter,
+func pqringctxCryptoAddressKeyGenByRandSeeds(pp *pqringctxapi.PublicParameter,
 	cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
 	coinSpendKeyRandSeed []byte, coinSerialNumberKeyRandSeed []byte, coinValueKeyRandSeed []byte,
 	coinDetectorKey []byte, publicRand []byte) (
