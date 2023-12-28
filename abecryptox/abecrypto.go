@@ -69,24 +69,9 @@ func CoinbaseTxVerify(coinbaseTx *wire.MsgTxAbe) (bool, error) {
 	}
 }
 
-// CreateTransferTxMsgTemplate creates a *wire.MsgTxAbe template, which will be used when calling TransferTxGen().
-// To be self-contained, we put it here, together with TransferTxGen().
-// The fields of *wire.MsgTxAbe template will be handled as below:
-// (1) Version: filled here
-// (2) TxIns: partially filled here, say filled except the serialNumber
-// (3) TxOuts: set empty here and will be filled by underlying crypto schemes
-// (4) TxFee: filled here
-// (5) TxMemo: filled here
-// (6) TxWitness: set empty here and will be filled by underlying crypto schemes
-// In summary, CreateTransferTxMsgTemplate() fills all fields except the serialNumber, TxOuts, and TxWitness.
-// Note that these filled fields (except the Version) are independent of the underlying crypto scheme,
-// and are specified by the issuer of a transaction.
-// We separate the creation of this TransferTxMsgTemplate from TransferTxGen, because
-//
-//	a caller may use other methods to create a TransferTxMsgTemplate.
-//
-// reviewed on 2023.12.21
-func CreateTransferTxMsgTemplate(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxOutputDesc, txFee uint64, txMemo []byte) (*wire.MsgTxAbe, error) {
+// CreateTransferTxMsgTemplateByRootSeeds creates a *wire.MsgTxAbe template, which will be used when calling TransferTxGen().
+// todo: review
+func CreateTransferTxMsgTemplateByRootSeeds(abeTxInputDescs []*AbeTxInputDescByRootSeeds, abeTxOutputDescs []*AbeTxOutputDesc, txFee uint64, txMemo []byte) (*wire.MsgTxAbe, error) {
 
 	//	Version
 	//	Note that new Tx must use the latest/current TxVersion.
@@ -111,9 +96,71 @@ func CreateTransferTxMsgTemplate(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputD
 	return txMsgTemplate, nil
 }
 
+// CreateTransferTxMsgTemplateByKeys creates a *wire.MsgTxAbe template, which will be used when calling TransferTxGen().
+// To be self-contained, we put it here, together with TransferTxGen().
+// The fields of *wire.MsgTxAbe template will be handled as below:
+// (1) Version: filled here
+// (2) TxIns: partially filled here, say filled except the serialNumber
+// (3) TxOuts: set empty here and will be filled by underlying crypto schemes
+// (4) TxFee: filled here
+// (5) TxMemo: filled here
+// (6) TxWitness: set empty here and will be filled by underlying crypto schemes
+// In summary, CreateTransferTxMsgTemplate() fills all fields except the serialNumber, TxOuts, and TxWitness.
+// Note that these filled fields (except the Version) are independent of the underlying crypto scheme,
+// and are specified by the issuer of a transaction.
+// We separate the creation of this TransferTxMsgTemplate from TransferTxGen, because
+//
+//	a caller may use other methods to create a TransferTxMsgTemplate.
+//
+// reviewed on 2023.12.21
+// todo: review
+func CreateTransferTxMsgTemplateByKeys(abeTxInputDescs []*AbeTxInputDescByKeys, abeTxOutputDescs []*AbeTxOutputDesc, txFee uint64, txMemo []byte) (*wire.MsgTxAbe, error) {
+
+	//	Version
+	//	Note that new Tx must use the latest/current TxVersion.
+	txMsgTemplate := wire.NewMsgTxAbe(wire.TxVersion)
+
+	//	TxIns     []*TxInAbe
+	for _, abeTxInputDesc := range abeTxInputDescs {
+		txIn := wire.NewTxInAbe(nil, abeTxInputDesc.txoRing.OutPointRing)
+		txMsgTemplate.AddTxIn(txIn)
+	}
+
+	//	 TxOuts    []*TxOutAbe: skip
+
+	//	TxFee
+	txMsgTemplate.TxFee = txFee
+
+	//	TxMemo
+	txMsgTemplate.TxMemo = txMemo
+
+	//	TxWitness: skip
+
+	return txMsgTemplate, nil
+}
+
+func TransferTxGenByRootSeeds(abeTxInputDescs []*AbeTxInputDescByRootSeeds, abeTxOutputDescs []*AbeTxOutputDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
+
+	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(transferTxMsgTemplate.Version)
+	if err != nil {
+		return nil, err
+	}
+
+	//	Note that only CryptoSchemePQRingCTX supports TransferTxGenByRootSeeds.
+
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+		return pqringctxTransferTxGenByRootSeeds(abecryptoxparam.PQRingCTXPP, cryptoScheme, abeTxInputDescs, abeTxOutputDescs, transferTxMsgTemplate)
+
+	default:
+		return nil, fmt.Errorf("TransferTxGenByRootSeeds: Unsupported crypto scheme")
+	}
+
+}
+
 // TransferTxGen generates a new MsgTxAbe by filling the TxIns[].serialNumber, TxOuts[], and the TxWitness of the input transferTxMsgTemplate.
 // reviewed on 2023.12.21
-func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxOutputDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
+func TransferTxGenByKeys(abeTxInputDescs []*AbeTxInputDescByKeys, abeTxOutputDescs []*AbeTxOutputDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(transferTxMsgTemplate.Version)
 	if err != nil {
@@ -146,13 +193,13 @@ func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxO
 		return trTx, nil
 
 	case abecryptoxparam.CryptoSchemePQRingCTX:
-		trTx, err := pqringctxTransferTxGen(abecryptoxparam.PQRingCTXPP, cryptoScheme, abeTxInputDescs, abeTxOutputDescs, transferTxMsgTemplate)
+		trTx, err := pqringctxTransferTxGenByKeys(abecryptoxparam.PQRingCTXPP, cryptoScheme, abeTxInputDescs, abeTxOutputDescs, transferTxMsgTemplate)
 		if err != nil {
 			return nil, err
 		}
 		return trTx, nil
 	default:
-		return nil, fmt.Errorf("TransferTxGen: Unsupported crypto scheme")
+		return nil, fmt.Errorf("TransferTxGenByKeys: Unsupported crypto scheme")
 	}
 
 }

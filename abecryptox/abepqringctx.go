@@ -109,7 +109,58 @@ func pqringctxCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, coinbaseTx *wir
 	return true, nil
 }
 
-// pqringctxTransferTxGen generates a MsgTxAbe,
+// pqringctxTransferTxGenByRootSeeds translates []*AbeTxInputDescByRootSeeds into []*AbeTxInputDescByKeys, then call pqringctxTransferTxGenByKeys.
+// todo: review
+func pqringctxTransferTxGenByRootSeeds(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxInputDescsByRootSeeds []*AbeTxInputDescByRootSeeds, abeTxOutputDescs []*AbeTxOutputDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
+	// just redundant double check
+	cryptoSchemeFromTxVersion, err := abecryptoxparam.GetCryptoSchemeByTxVersion(transferTxMsgTemplate.Version)
+	if err != nil {
+		return nil, err
+	}
+	if cryptoSchemeFromTxVersion != cryptoScheme {
+		return nil, fmt.Errorf("pqringctxTransferTxGenByRootSeeds: the input cryptoScheme is different from that implied by transferTxMsgTemplate.Version")
+	}
+
+	inputNum := len(abeTxInputDescsByRootSeeds)
+	abeTxInputDescs := make([]*AbeTxInputDescByKeys, inputNum)
+	for i := 0; i < inputNum; i++ {
+		abeTxInputDescByRootSeedsItem := abeTxInputDescsByRootSeeds[i]
+		cryptoSchemeForCoinToSpend, err := abecryptoxkey.ExtractCryptoSchemeFromCryptoAddress(abeTxInputDescByRootSeedsItem.cryptoAddress)
+		if err != nil {
+			return nil, err
+		}
+		privacyLevelForCoinToSpend, _, _, err := abecryptoxkey.CryptoAddressParse(abeTxInputDescByRootSeedsItem.cryptoAddress)
+		if privacyLevelForCoinToSpend != abecryptoxkey.PrivacyLevelRINGCT && privacyLevelForCoinToSpend != abecryptoxkey.PrivacyLevelPSEUDONYM {
+			return nil, fmt.Errorf("pqringctxTransferTxGenByRootSeeds: the privacyLeve of the %d -th coin-to-spend is not PrivacyLevelRINGCT or PrivacyLevelPSEUDONYM", i)
+		}
+
+		publicRand, err := abecryptoxkey.ExtractPublicRandFromCryptoAddress(abeTxInputDescByRootSeedsItem.cryptoAddress)
+		if err != nil {
+			return nil, err
+		}
+
+		cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, cryptoDetectorKey, err :=
+			abecryptoxkey.CryptoAddressKeyReGenByRootSeedsFromPublicRand(cryptoSchemeForCoinToSpend, privacyLevelForCoinToSpend,
+				abeTxInputDescByRootSeedsItem.coinSpendKeyRootSeed, abeTxInputDescByRootSeedsItem.coinSerialNumberKeyRootSeed, abeTxInputDescByRootSeedsItem.coinValueKeyRootSeed,
+				abeTxInputDescByRootSeedsItem.coinDetectorRootKey, publicRand)
+		if err != nil {
+			return nil, err
+		}
+
+		if bytes.Compare(cryptoAddress, abeTxInputDescByRootSeedsItem.cryptoAddress) != 0 {
+			return nil, fmt.Errorf("pqringctxTransferTxGenByRootSeeds: the cryptoAddress of the %d -th coin-to-spend is not same as that re-generated from corresponding Root Seeds", i)
+		}
+
+		abeTxInputDescs[i] = NewAbeTxInputDescByKeys(
+			abeTxInputDescByRootSeedsItem.txoRing, abeTxInputDescByRootSeedsItem.sidx,
+			cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, cryptoDetectorKey,
+			abeTxInputDescByRootSeedsItem.value)
+	}
+
+	return pqringctxTransferTxGenByKeys(pp, cryptoScheme, abeTxInputDescs, abeTxOutputDescs, transferTxMsgTemplate)
+}
+
+// pqringctxTransferTxGenByKeys generates a MsgTxAbe,
 // by filling TxIns[].serialNumber，Txos, and TxWitness of the input transferTxMsgTemplate.
 // The caller needs to fill the Version, TxIns[].PreviousOutPointRing, TxFee, TxMemo fields of transferTxMsgTemplate.
 // This function will fill the TxIns[].serialNumber，Txos, and TxWitness of the input transferTxMsgTemplate, and return it as the result.
@@ -121,7 +172,7 @@ func pqringctxCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, coinbaseTx *wir
 // reviewed on 2023.12.21
 // todo: to review
 // todo: review CryptoValueSecretKeyParse
-func pqringctxTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxOutputDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
+func pqringctxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxInputDescs []*AbeTxInputDescByKeys, abeTxOutputDescs []*AbeTxOutputDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 	// just redundant double check
 	cryptoSchemeFromTxVersion, err := abecryptoxparam.GetCryptoSchemeByTxVersion(transferTxMsgTemplate.Version)
 	if err != nil {
@@ -275,11 +326,21 @@ func pqringctxTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecr
 			}
 		}
 
+		//	coinDetectorKey []byte
+		var coinDetectorKey []byte
+		privacyLevelInKey, coinDetectorKey, err = abecryptoxkey.CryptoDetectorKeyParse(abeTxInputDescs[i].cryptoDetectorKey)
+		if err != nil {
+			return nil, err
+		}
+		if privacyLevelInKey != privacyLevelInAddress {
+			return nil, fmt.Errorf("pqringctxTransferTxGen: the privacyLevel extracted from abeTxInputDescs[%d].cryptoDetectorKey and that extracted from abeTxInputDescs[%d].cryptoAddress are inconsistent", i, i)
+		}
+
 		// value
 		// explicitly given in abeTxInputDescs[i]
 		value := abeTxInputDescs[i].value
 
-		cryptoTxInputDescs[i] = pqringctxapi.NewTxInputDescMLP(lgrTxoList, sidx, coinSpendSecretKey, coinSerialNumberSecretKey, coinValuePublicKey, coinValueSecretKey, value)
+		cryptoTxInputDescs[i] = pqringctxapi.NewTxInputDescMLP(lgrTxoList, sidx, coinSpendSecretKey, coinSerialNumberSecretKey, coinValuePublicKey, coinValueSecretKey, coinDetectorKey, value)
 	}
 
 	//	cryptoTxOutputDescs
