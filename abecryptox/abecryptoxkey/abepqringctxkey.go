@@ -2,16 +2,122 @@ package abecryptoxkey
 
 import (
 	"fmt"
+	"github.com/abesuite/abec/abecryptox/abecryptoutils"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/cryptosuite/pqringctx/pqringctxapi"
 )
 
-// pqringctxCryptoAddressGen() generates cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, by calling pqringctx's key-generation functions and encapsed the keys.
-// cryptoScheme is set as a parameter, since the map between CryptoScheme and the real crypto-scheme (here is pqringct) is coded by abecryptoparam.
+// pqringctxCryptoAddressKeyGenByRootSeed generates (CryptoAddress, CryptoKeys) for the input Root Seeds and the CoinDetectorRootKey.
+// This is a randomized algorithm, in particular,
+// (1) A Public Rand is chosen,
+// (2) Rand Seeds are generated from (Root Seeds, Public Rand),
+// (3) CoinDetectorKey is generated from (CoinDetectorRootKey, Public Rand)，
+// (4) (Rand Seeds, CoinDetectorKey, Public Rand) are passed to pqringctxCryptoAddressKeyGenByRandSeed to generate a (CryptoAddress, Crypto-keys) tuple.
+// (5) (cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, cryptoDetectorKey) is returned.
+// NOTE: With this function, we separate the generation of Rand Seeds from the crypto-scheme layer, and form a standalone layer here.
+// As a result,
+// (a) crypto-scheme layer still only needs to guarantee the cryptographic security, where the only "change" is that it use rand seeds to make randomized algorithm deterministic.
+// (b) the layer here takes the responsibility of generating the Rand Seeds for crypto-scheme layer.
+// (c) such an architecture provides flexible functionalities to the application layer,
+// namely, the application layer can use (Root Seeds, CoinDetectorRootKey) or (Rand Seeds, CoinDetectorKey) to call the functionalities.
+func pqringctxCryptoAddressKeyGenByRootSeed(pp *pqringctxapi.PublicParameter,
+	cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
+	coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte,
+	coinDetectorRootKey []byte) (
+	cryptoAddress []byte,
+	cryptoSpsk []byte,
+	cryptoSnsk []byte,
+	cryptoVsk []byte,
+	cryptoDetectorKey []byte,
+	err error) {
+
+	if len(coinSpendKeyRootSeed) != abecryptoutils.PRFKeyBytesLen {
+		return nil, nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressKeyGenByRootSeed: invalid length of coinSpendKeyRootSeed (%d)", len(coinSpendKeyRootSeed))
+	}
+
+	if len(coinDetectorRootKey) != abecryptoutils.PRFKeyBytesLen {
+		return nil, nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressKeyGenByRootSeed: invalid length of coinDetectorRootKey (%d)", len(coinDetectorRootKey))
+	}
+
+	// choose PublicRand
+	publicRand := abecryptoutils.RandomBytes(pp.GetParamKeyGenPublicRandBytesLen())
+	coinSpendKeyRandSeed := abecryptoutils.PRF(coinSpendKeyRootSeed, publicRand)
+
+	cryptoDetectorKey, err = pqringctxCryptoDetectorKeyGenByRootKey(pp, cryptoScheme, privacyLevel, coinDetectorRootKey, publicRand)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	_, coinDetectorKey, err := pqringctxCryptoDetectorKeyParse(pp, cryptoScheme, cryptoDetectorKey)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+
+	if privacyLevel == PrivacyLevelRINGCT {
+		if len(coinSerialNumberKeyRootSeed) != abecryptoutils.PRFKeyBytesLen {
+			return nil, nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressKeyGenByRootSeed: invalid length of coinSerialNumberKeyRootSeed (%d)", len(coinSerialNumberKeyRootSeed))
+		}
+		if len(coinValueKeyRootSeed) != abecryptoutils.PRFKeyBytesLen {
+			return nil, nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressKeyGenByRootSeed: invalid length of coinValueKeyRootSeed (%d)", len(coinValueKeyRootSeed))
+		}
+
+		coinSerialNumberKeyRandSeed := abecryptoutils.PRF(coinSerialNumberKeyRootSeed, publicRand)
+		coinValueKeyRandSeed := abecryptoutils.PRF(coinValueKeyRootSeed, publicRand)
+
+		cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, err = pqringctxCryptoAddressKeyGenByRandSeed(pp, cryptoScheme, privacyLevel, coinSpendKeyRandSeed, coinSerialNumberKeyRandSeed, coinValueKeyRandSeed, coinDetectorKey, publicRand)
+		if err != nil {
+			return nil, nil, nil, nil, nil, err
+		}
+
+	} else if privacyLevel == PrivacyLevelPSEUDONYM {
+		cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, err = pqringctxCryptoAddressKeyGenByRandSeed(pp, cryptoScheme, privacyLevel, coinSpendKeyRandSeed, nil, nil, coinDetectorKey, publicRand)
+		if err != nil {
+			return nil, nil, nil, nil, nil, err
+		}
+
+	} else {
+		return nil, nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressKeyGenByRootSeed: the input privacyLevel (%d) is not supported", privacyLevel)
+	}
+
+	return cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, cryptoDetectorKey, nil
+}
+
+// qringctxCryptoDetectorKeyGenByRootKey generates/derives a CryptoDetectorKey from the input (CryptoScheme, CoinDetectorRootKey, PublicRand).
+// NOTE: The DetectorKey is actually a symmetric key for MAC. That is why we use this standalone algorithm to package it.
+// todo: review
+func pqringctxCryptoDetectorKeyGenByRootKey(pp *pqringctxapi.PublicParameter,
+	cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
+	coinDetectorRootKey []byte, publicRand []byte) (cryptoDetectorKey []byte, err error) {
+
+	// abecryptoutils.PRF's PRFOutputBytesLen is the same as the pqringctx.MACKeyBytesLen
+	// as a result, here we directly use PRF's output as the key for MAC.
+	if len(coinDetectorRootKey) != abecryptoutils.PRFKeyBytesLen {
+		return nil, fmt.Errorf("pqringctxCryptoDetectorKeyGenByRootKey: invalid length of coinDetectorRootKey (%d)", len(coinDetectorRootKey))
+	}
+
+	coinDetectorKey := abecryptoutils.PRF(coinDetectorRootKey, publicRand)
+	serializedCryptoScheme := abecryptoxparam.SerializeCryptoScheme(cryptoScheme)
+	cryptoDetectorKey = make([]byte, 5+len(coinDetectorKey))
+	copy(cryptoDetectorKey[0:], serializedCryptoScheme)
+	cryptoDetectorKey[4] = byte(privacyLevel)
+	copy(cryptoDetectorKey[5:], coinDetectorKey)
+	return cryptoDetectorKey, nil
+}
+
+// // The rand seeds will make the algorithm (i.e., the generated address and keys) are deterministic.
+//// The coinDetectorKey is a symmetric key, which is used to run MAC to generate a tag for the coin-address.
+
+// pqringctxCryptoAddressKeyGenByRandSeed() generates cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk,
+// by calling pqringctx's key-generation functions to obtain CoinAddress and Coin-keys, and packaging them to CryptoAddress ane Crypto-keys.
 // Note that based on privacyLevel, the returned cryptoSnsk and cryptoVsk could be nil.
+// Note that the input Rand Seeds are used to make the underlying crypto-algorithms deterministic.
+// Note that the input CoinDetectorKey works as a symmetric key, which will be used to generate tag for coin-address,
+// so that only its owner can detect such a coin-address.
 // reviewed on 2023.12.07
-func pqringctxCryptoAddressKeyGen(pp *pqringctxapi.PublicParameter, randSeed []byte,
-	cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel) (
+// todo: review the rand seeds
+func pqringctxCryptoAddressKeyGenByRandSeed(pp *pqringctxapi.PublicParameter,
+	cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
+	coinSpendKeyRandSeed []byte, coinSerialNumberKeyRandSeed []byte, coinValueKeyRandSeed []byte,
+	coinDetectorKey []byte, publicRand []byte) (
 	cryptoAddress []byte,
 	cryptoSpsk []byte,
 	cryptoSnsk []byte,
@@ -20,17 +126,32 @@ func pqringctxCryptoAddressKeyGen(pp *pqringctxapi.PublicParameter, randSeed []b
 
 	expectedSeedLen := pqringctxapi.GetParamSeedBytesLen(pp)
 
+	if len(coinSpendKeyRandSeed) != expectedSeedLen {
+		return nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressKeyGen: invalid length of coinSpendKeyRandSeed (%d)", len(coinSpendKeyRandSeed))
+	}
+
+	if len(coinDetectorKey) != pqringctxapi.GetParamMACKeyBytesLen(pp) {
+		return nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressKeyGen: invalid length of coinDetectorKey (%d)", len(coinDetectorKey))
+	}
+
+	if len(publicRand) != pqringctxapi.GetParamKeyGenPublicRandBytesLen(pp) {
+		return nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressKeyGen: invalid length of publicRand (%d)", len(publicRand))
+	}
+
 	if privacyLevel == PrivacyLevelRINGCT {
-		if 2*expectedSeedLen != len(randSeed) {
-			return nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressKeyGen: invalid length of seed for RingCT-privacy")
+		if len(coinSerialNumberKeyRandSeed) != expectedSeedLen {
+			return nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressKeyGen: invalid length of coinSerialNumberKeyRandSeed (%d)", len(coinSerialNumberKeyRandSeed))
+		}
+		if len(coinValueKeyRandSeed) != expectedSeedLen {
+			return nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressKeyGen: invalid length of coinValueKeyRandSeed (%d)", len(coinValueKeyRandSeed))
 		}
 
-		coinAddress, coinSpSk, coinSnSk, err := pqringctxapi.CoinAddressKeyForPKRingGen(pp, randSeed[:expectedSeedLen])
+		coinAddress, coinSpSk, coinSnSk, err := pqringctxapi.CoinAddressKeyForPKRingGen(pp, coinSpendKeyRandSeed, coinSerialNumberKeyRandSeed, coinDetectorKey, publicRand)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
 
-		coinValuePK, coinValueSk, err := pqringctxapi.CoinValueKeyGen(pp, randSeed[expectedSeedLen:])
+		coinValuePK, coinValueSk, err := pqringctxapi.CoinValueKeyGen(pp, coinValueKeyRandSeed)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -61,11 +182,7 @@ func pqringctxCryptoAddressKeyGen(pp *pqringctxapi.PublicParameter, randSeed []b
 		return cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, nil
 
 	} else if privacyLevel == PrivacyLevelPSEUDONYM {
-		if expectedSeedLen != len(randSeed) {
-			return nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressGen: invalid length of seed for Pseudonym-privacy")
-		}
-
-		coinAddress, coinSpendKey, err := pqringctxapi.CoinAddressKeyForPKHSingleGen(pp, randSeed)
+		coinAddress, coinSpendKey, err := pqringctxapi.CoinAddressKeyForPKHSingleGen(pp, coinSpendKeyRandSeed, coinDetectorKey, publicRand)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -109,6 +226,43 @@ func pqringctxGetPrivacyLevelFromCoinAddressType(coinAddressType pqringctxapi.Co
 }
 
 //	APIs for AddressKey-Encode-Format	begin
+
+// pqringctxCryptoDetectorKeyParse parses the input cryptoDetectorKey, which was generated by pqringctxCryptoDetectorKeyGenByRootKey,
+// to privacyLevel and coinDetectorKey.
+// todo: review
+func pqringctxCryptoDetectorKeyParse(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, cryptoDetectorKey []byte) (
+	privacyLevel PrivacyLevel,
+	coinDetectorKey []byte,
+	err error) {
+
+	cryptoSchemeInCryptoSpSk, err := ExtractCryptoSchemeFromCryptoDetectorKey(cryptoDetectorKey)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	if cryptoSchemeInCryptoSpSk != cryptoScheme {
+		return 0, nil, fmt.Errorf("pqringctxCryptoDetectorKeyParse: the input cryptoScheme does not match the cryptoScheme extracted from the input cryptoDetectorKey")
+	}
+
+	if len(cryptoDetectorKey) < 5 {
+		return 0, nil, fmt.Errorf("pqringctxCryptoDetectorKeyParse: incorrect length of cryptoDetectorKey: %d", len(cryptoDetectorKey))
+	}
+
+	privacyLevel = PrivacyLevel(cryptoDetectorKey[4])
+	if privacyLevel != PrivacyLevelRINGCT && privacyLevel != PrivacyLevelPSEUDONYM {
+		return 0, nil, fmt.Errorf("pqringctxCryptoDetectorKeyParse: invalid PrivacyLevel of cryptoDetectorKey: %d", byte(privacyLevel))
+
+	}
+
+	if len(cryptoDetectorKey) != 5+pqringctxapi.GetParamMACKeyBytesLen(pp) {
+		return 0, nil, fmt.Errorf("pqringctxCryptoDetectorKeyParse: incorrect length of cryptoDetectorKey: %d", len(cryptoDetectorKey))
+	}
+
+	coinDetectorKey = make([]byte, pqringctxapi.GetParamMACKeyBytesLen(pp))
+	copy(coinDetectorKey, cryptoDetectorKey[5:])
+
+	return privacyLevel, coinDetectorKey, nil
+}
 
 // pqringctxCryptoAddressParse parses the input cryptoAddress into (coinAddress, valuePublicKey), where valuePublicKey may be nil.
 // Note that cryptoAddress was generated by pqringctxCryptoAddressKeyGen, where, depending on the privacyLevel,
