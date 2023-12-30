@@ -66,7 +66,7 @@ func CryptoAddressKeyGenByRootSeeds(cryptoScheme abecryptoxparam.CryptoScheme, p
 		return cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, cryptoDetectorKey, nil
 
 	default:
-		return nil, nil, nil, nil, nil, fmt.Errorf("CryptoAddressKeyGenByRootSeed: cryptoScheme (%d) is not supported", cryptoScheme)
+		return nil, nil, nil, nil, nil, fmt.Errorf("CryptoAddressKeyGenByRootSeeds: cryptoScheme (%d) is not supported", cryptoScheme)
 	}
 	//return nil, nil, nil, nil, nil
 }
@@ -100,6 +100,14 @@ func CryptoAddressKeyReGenByRootSeedsFromPublicRand(cryptoScheme abecryptoxparam
 		return nil, nil, nil, nil, nil, fmt.Errorf("CryptoAddressKeyGenByRootSeed: cryptoScheme (%d) is not supported", cryptoScheme)
 	}
 	//return nil, nil, nil, nil, nil
+}
+
+func RandSeedsGenByRootSeedsFromPublicRand(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
+	coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte,
+	coinDetectorRootKey []byte, publicRand []byte) (coinSpendKeyRandSeed []byte, coinSerialNumberKeyRandSeed []byte, coinValueKeyRandSeed []byte,
+	coinDetectorKey []byte, err error) {
+
+	return nil, nil, nil, nil, err
 }
 
 // CryptoAddressKeyGenByRandSeeds generates (cryptoAddress, cryptoKeys) from the input Rand Seeds, coinDetectorKey, and Public Rand.
@@ -161,6 +169,7 @@ func ExtractCryptoSchemeFromCryptoAddress(cryptoAddress []byte) (cryptoScheme ab
 }
 
 // ExtractCryptoSchemeFromCryptoDetectorKey extracts cryptoScheme from cryptoDetectorKey.
+// reviewed on 2023.12.30
 // todo: review
 func ExtractCryptoSchemeFromCryptoDetectorKey(cryptoDetectorKey []byte) (cryptoScheme abecryptoxparam.CryptoScheme, err error) {
 	if len(cryptoDetectorKey) < 4 {
