@@ -82,9 +82,10 @@ func pqringctxCryptoAddressKeyGenByRootSeeds(pp *pqringctxapi.PublicParameter,
 	return cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, cryptoDetectorKey, nil
 }
 
-// pqringctxExtractPublicRandFromCryptoAddress
-// todo: review
-func pqringctxExtractPublicRandFromCryptoAddress(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, cryptoAddress []byte) (
+// pqringctxExtractPublicRandFromCryptoAddress extracts PublicRand from CryptoAddress.
+// reviewed on 2023.12.30
+func pqringctxExtractPublicRandFromCryptoAddress(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
+	cryptoAddress []byte) (
 	publicRand []byte, err error) {
 
 	_, coinAddress, _, err := pqringctxCryptoAddressParse(pp, cryptoScheme, cryptoAddress)

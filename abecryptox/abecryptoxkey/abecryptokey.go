@@ -53,7 +53,7 @@ func CryptoAddressKeyGen(randSeed []byte, cryptoScheme abecryptoxparam.CryptoSch
 
 // CryptoAddressKeyGenByRootSeeds generates a (cryptoAddress, cryptoKeys) for the input Root Seeds and the coinDetectorRootKey.
 // This is a randomized algorithm.
-// todo: review
+// reviewed on 2023.12.30
 func CryptoAddressKeyGenByRootSeeds(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
 	coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte,
 	coinDetectorRootKey []byte) (cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk []byte, cryptoVsk []byte, cryptoDetectorKey []byte, err error) {
@@ -72,7 +72,7 @@ func CryptoAddressKeyGenByRootSeeds(cryptoScheme abecryptoxparam.CryptoScheme, p
 }
 
 // ExtractPublicRandFromCryptoAddress
-// todo: review
+// reviewed on 2023.12.30
 func ExtractPublicRandFromCryptoAddress(cryptoAddress []byte) (publicRand []byte, err error) {
 	cryptoScheme, err := ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
 
