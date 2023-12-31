@@ -70,8 +70,35 @@ func CoinbaseTxVerify(coinbaseTx *wire.MsgTxAbe) (bool, error) {
 }
 
 // CreateTransferTxMsgTemplateByRootSeeds creates a *wire.MsgTxAbe template, which will be used when calling TransferTxGen().
-// todo: review
+// reviewed on 2023.12.31
 func CreateTransferTxMsgTemplateByRootSeeds(abeTxInputDescs []*AbeTxInputDescByRootSeeds, abeTxOutputDescs []*AbeTxOutputDesc, txFee uint64, txMemo []byte) (*wire.MsgTxAbe, error) {
+
+	//	Version
+	//	Note that new Tx must use the latest/current TxVersion.
+	txMsgTemplate := wire.NewMsgTxAbe(wire.TxVersion)
+
+	//	TxIns     []*TxInAbe
+	for _, abeTxInputDesc := range abeTxInputDescs {
+		txIn := wire.NewTxInAbe(nil, abeTxInputDesc.txoRing.OutPointRing)
+		txMsgTemplate.AddTxIn(txIn)
+	}
+
+	//	 TxOuts    []*TxOutAbe: skip
+
+	//	TxFee
+	txMsgTemplate.TxFee = txFee
+
+	//	TxMemo
+	txMsgTemplate.TxMemo = txMemo
+
+	//	TxWitness: skip
+
+	return txMsgTemplate, nil
+}
+
+// CreateTransferTxMsgTemplateByRandSeeds creates a *wire.MsgTxAbe template, which will be used when calling TransferTxGen().
+// reviewed on 2023.12.31
+func CreateTransferTxMsgTemplateByRandSeeds(abeTxInputDescs []*AbeTxInputDescByRandSeeds, abeTxOutputDescs []*AbeTxOutputDesc, txFee uint64, txMemo []byte) (*wire.MsgTxAbe, error) {
 
 	//	Version
 	//	Note that new Tx must use the latest/current TxVersion.
@@ -109,11 +136,9 @@ func CreateTransferTxMsgTemplateByRootSeeds(abeTxInputDescs []*AbeTxInputDescByR
 // Note that these filled fields (except the Version) are independent of the underlying crypto scheme,
 // and are specified by the issuer of a transaction.
 // We separate the creation of this TransferTxMsgTemplate from TransferTxGen, because
-//
-//	a caller may use other methods to create a TransferTxMsgTemplate.
-//
+// a caller may use other methods to create a TransferTxMsgTemplate.
 // reviewed on 2023.12.21
-// todo: review
+// reviewed on 2023.12.31
 func CreateTransferTxMsgTemplateByKeys(abeTxInputDescs []*AbeTxInputDescByKeys, abeTxOutputDescs []*AbeTxOutputDesc, txFee uint64, txMemo []byte) (*wire.MsgTxAbe, error) {
 
 	//	Version
@@ -139,7 +164,28 @@ func CreateTransferTxMsgTemplateByKeys(abeTxInputDescs []*AbeTxInputDescByKeys, 
 	return txMsgTemplate, nil
 }
 
+// TransferTxGenByRootSeeds generates a wire.MsgTxAbe by using the (Root Seeds, CoinDetectorRootKey) to spend the coins.
+// reviewed on 2023.12.31
 func TransferTxGenByRootSeeds(abeTxInputDescs []*AbeTxInputDescByRootSeeds, abeTxOutputDescs []*AbeTxOutputDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
+
+	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(transferTxMsgTemplate.Version)
+	if err != nil {
+		return nil, err
+	}
+
+	//	Note that only CryptoSchemePQRingCTX supports TransferTxGenByRootSeeds.
+
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+		return pqringctxTransferTxGenByRootSeeds(abecryptoxparam.PQRingCTXPP, cryptoScheme, abeTxInputDescs, abeTxOutputDescs, transferTxMsgTemplate)
+
+	default:
+		return nil, fmt.Errorf("TransferTxGenByRootSeeds: the crypto scheme obained by transferTxMsgTemplate.Version (%d) is not CryptoSchemePQRingCTX", cryptoScheme)
+	}
+
+}
+
+func TransferTxGenByRandSeeds(abeTxInputDescs []*AbeTxInputDescByRandSeeds, abeTxOutputDescs []*AbeTxOutputDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(transferTxMsgTemplate.Version)
 	if err != nil {
@@ -282,6 +328,28 @@ func GetTxoSerializeSizeApprox(txVersion uint32, cryptoAddress []byte) (int, err
 	default:
 		return 0, fmt.Errorf("GetTxoSerializeSizeApprox: Unsupported txVersion")
 	}
+}
+
+// ExtractPublicRandFromTxo returns the PublicRand in the CoinAddress of the input wire.TxOutAbe.
+// reviewed on 2023.12.31
+func ExtractPublicRandFromTxo(abeTxo *wire.TxOutAbe) (publicRand []byte, err error) {
+	if abeTxo == nil {
+		return nil, fmt.Errorf("ExtractPublicRandFromTxo: the input abeTxo is nil")
+	}
+
+	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
+	if err != nil {
+		return nil, err
+	}
+
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+		return pqringctxExtractPublicRandFromTxo(abecryptoxparam.PQRingCTXPP, abeTxo)
+	default:
+		return nil, fmt.Errorf("ExtractPublicRandFromTxo: the crypto-scheme obtained from abeTxo.Version is not CryptoSchemePQRingCTX")
+	}
+
+	return nil, err
 }
 
 //	APIs for Txos	end
