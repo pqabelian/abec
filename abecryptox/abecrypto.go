@@ -196,7 +196,7 @@ func TransferTxGenByRandSeeds(abeTxInputDescs []*AbeTxInputDescByRandSeeds, abeT
 
 	switch cryptoScheme {
 	case abecryptoxparam.CryptoSchemePQRingCTX:
-		return pqringctxTransferTxGenByRootSeeds(abecryptoxparam.PQRingCTXPP, cryptoScheme, abeTxInputDescs, abeTxOutputDescs, transferTxMsgTemplate)
+		return pqringctxTransferTxGenByRandSeeds(abecryptoxparam.PQRingCTXPP, cryptoScheme, abeTxInputDescs, abeTxOutputDescs, transferTxMsgTemplate)
 
 	default:
 		return nil, fmt.Errorf("TransferTxGenByRootSeeds: Unsupported crypto scheme")
