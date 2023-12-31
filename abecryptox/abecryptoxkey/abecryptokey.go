@@ -51,19 +51,15 @@ func CryptoAddressKeyGen(randSeed []byte, cryptoScheme abecryptoxparam.CryptoSch
 	//return nil, nil, nil, nil, nil
 }
 
-// CryptoAddressKeyGenByRootSeeds generates a (cryptoAddress, cryptoKeys) for the input Root Seeds and the coinDetectorRootKey.
-// This is a randomized algorithm.
+// CryptoAddressKeyGenByRootSeeds generates a (cryptoAddress, cryptoKeys) for the input (Root Seeds, CoinDetectorRootKey).
+// CryptoAddressKeyGenByRootSeeds is a randomized algorithm.
 // reviewed on 2023.12.30
 func CryptoAddressKeyGenByRootSeeds(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
 	coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte,
 	coinDetectorRootKey []byte) (cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk []byte, cryptoVsk []byte, cryptoDetectorKey []byte, err error) {
 	switch cryptoScheme {
 	case abecryptoxparam.CryptoSchemePQRingCTX:
-		cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, cryptoDetectorKey, err = pqringctxCryptoAddressKeyGenByRootSeeds(abecryptoxparam.PQRingCTXPP, cryptoScheme, privacyLevel, coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey)
-		if err != nil {
-			return nil, nil, nil, nil, nil, err
-		}
-		return cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, cryptoDetectorKey, nil
+		return pqringctxCryptoAddressKeyGenByRootSeeds(abecryptoxparam.PQRingCTXPP, cryptoScheme, privacyLevel, coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey)
 
 	default:
 		return nil, nil, nil, nil, nil, fmt.Errorf("CryptoAddressKeyGenByRootSeeds: cryptoScheme (%d) is not supported", cryptoScheme)
@@ -71,7 +67,7 @@ func CryptoAddressKeyGenByRootSeeds(cryptoScheme abecryptoxparam.CryptoScheme, p
 	//return nil, nil, nil, nil, nil
 }
 
-// ExtractPublicRandFromCryptoAddress
+// ExtractPublicRandFromCryptoAddress extracts the PublicRand from the input/given CryptoAddress.
 // reviewed on 2023.12.30
 func ExtractPublicRandFromCryptoAddress(cryptoAddress []byte) (publicRand []byte, err error) {
 	cryptoScheme, err := ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
@@ -84,39 +80,58 @@ func ExtractPublicRandFromCryptoAddress(cryptoAddress []byte) (publicRand []byte
 	}
 }
 
-// todo: review
+// CryptoAddressKeyReGenByRootSeedsFromPublicRand is used to re-generates the (CryptoAddress, Crypto-Keys) for the given/input (Root Seeds, Root Key) and PublicRand.
+// CryptoAddressKeyReGenByRootSeedsFromPublicRand is the same as CryptoAddressKeyGenByRootSeeds, except that an additional Public Rand is given as input.
+// CryptoAddressKeyReGenByRootSeedsFromPublicRand is a deterministic algorithm.
+// reviewed on 2023.12.31
 func CryptoAddressKeyReGenByRootSeedsFromPublicRand(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
 	coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte,
 	coinDetectorRootKey []byte, publicRand []byte) (cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk []byte, cryptoVsk []byte, cryptoDetectorKey []byte, err error) {
+
 	switch cryptoScheme {
 	case abecryptoxparam.CryptoSchemePQRingCTX:
-		cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, cryptoDetectorKey, err = pqringctxCryptoAddressKeyReGenByRootSeedsFromPublicRand(abecryptoxparam.PQRingCTXPP, cryptoScheme, privacyLevel, coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey, publicRand)
-		if err != nil {
-			return nil, nil, nil, nil, nil, err
-		}
-		return cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, cryptoDetectorKey, nil
+		return pqringctxCryptoAddressKeyReGenByRootSeedsFromPublicRand(abecryptoxparam.PQRingCTXPP, cryptoScheme, privacyLevel, coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey, publicRand)
 
 	default:
-		return nil, nil, nil, nil, nil, fmt.Errorf("CryptoAddressKeyGenByRootSeed: cryptoScheme (%d) is not supported", cryptoScheme)
+		return nil, nil, nil, nil, nil, fmt.Errorf("CryptoAddressKeyReGenByRootSeedsFromPublicRand: cryptoScheme (%d) is not supported", cryptoScheme)
 	}
 	//return nil, nil, nil, nil, nil
 }
 
+// RandSeedsGenByRootSeedsFromPublicRand generates (Rand Seeds, coinDetectorKey) from the input/given (Root Seeds, coinDetectorKey) and PublicRand.
+// RandSeedsGenByRootSeedsFromPublicRand has the same inputs as CryptoAddressKeyReGenByRootSeedsFromPublicRand, but outputs the internal (Rand Seeds, coinDetectorKey),
+// rather than the final (CryptoAddress, Crypto-Keys).
+// The output (Rand Seeds, coinDetectorKey) can be used to call CryptoAddressKeyGenByRandSeeds to generate the final (CryptoAddress, Crypto-Keys).
+// reviewed on 2023.12.31
 func RandSeedsGenByRootSeedsFromPublicRand(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
 	coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte,
 	coinDetectorRootKey []byte, publicRand []byte) (coinSpendKeyRandSeed []byte, coinSerialNumberKeyRandSeed []byte, coinValueKeyRandSeed []byte,
 	coinDetectorKey []byte, err error) {
 
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+		return pqringctxRandSeedsGenByRootSeedsFromPublicRand(abecryptoxparam.PQRingCTXPP, cryptoScheme, privacyLevel, coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey, publicRand)
+
+	default:
+		return nil, nil, nil, nil, fmt.Errorf("RandSeedsGenByRootSeedsFromPublicRand: cryptoScheme (%d) is not supported", cryptoScheme)
+	}
+
 	return nil, nil, nil, nil, err
 }
 
 // CryptoAddressKeyGenByRandSeeds generates (cryptoAddress, cryptoKeys) from the input Rand Seeds, coinDetectorKey, and Public Rand.
-// A caller may directly use the a set of Rand Seeds, CoinDetectorKey, and Public Rand to generate a particular (CryptoAddress, Crypto-Keys) tuple.
+// A caller may directly use a set of Rand Seeds, CoinDetectorKey, and Public Rand to generate a particular (CryptoAddress, Crypto-Keys) tuple.
 // This is a deterministic algorithm, because the Public Rand is given.
-// todo: review
+// NOTE: coinDetectorKey is given in the input, implying that the caller have this key, and it will be the responsibility to put the returned (CryptoAddress)
+// NOTE: CryptoAddressKeyGenByRandSeeds is back-compatible with CryptoSchemePQRingCT. In particular,
+// the caller, e.g., the wallet created with CryptoSchemePQRingCT, shall still call this function with cryptoScheme=CryptoSchemePQRingCT, with the following specifications:
+// (1) For CryptoSchemePQRingCT, the case is randSeed = AddressKeyRandSeed || ValueKeyRandSeed, and AddressKeyRandSeed will be used to generate coinSpendKey and coinSerialNumberKey.
+// (2) To call this function, the caller should pass AddressKeyRandSeed as input coinSpendKeyRandSeed, and here it will set that randSeed := coinSpendKeyRandSeed || coinValueKeyRandSeed,
+// and then call abecrypto.CryptoAddressKeyGen(randSeed, abecryptoparam.CryptoSchemePQRingCT).
+// reviewed on 2023.12.31
 func CryptoAddressKeyGenByRandSeeds(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
 	coinSpendKeyRandSeed []byte, coinSerialNumberKeyRandSeed []byte, coinValueKeyRandSeed []byte,
-	coinDetectorKey []byte, publicRand []byte) (retCryptoAddress []byte, retCryptoSpsk []byte, retCryptoSnsk []byte, retCryptoVsk []byte, err error) {
+	coinDetectorKey []byte, publicRand []byte) (cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk []byte, cryptoVsk []byte, cryptoDetectorKey []byte, err error) {
 	switch cryptoScheme {
 	case abecryptoxparam.CryptoSchemePQRingCT:
 		// This is to achieve back-compatibility with CryptoSchemePQRingCT.
@@ -128,17 +143,16 @@ func CryptoAddressKeyGenByRandSeeds(cryptoScheme abecryptoxparam.CryptoScheme, p
 		copy(randSeed, coinSpendKeyRandSeed)
 		copy(randSeed[len(coinSpendKeyRandSeed):], coinValueKeyRandSeed)
 
-		return abecrypto.CryptoAddressKeyGen(randSeed, abecryptoparam.CryptoSchemePQRingCT)
+		cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, err = abecrypto.CryptoAddressKeyGen(randSeed, abecryptoparam.CryptoSchemePQRingCT)
+		if err != nil {
+			return nil, nil, nil, nil, nil, err
+		}
+		return cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, nil, err
 
 	case abecryptoxparam.CryptoSchemePQRingCTX:
-		cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, err := pqringctxCryptoAddressKeyGenByRandSeeds(abecryptoxparam.PQRingCTXPP, cryptoScheme, privacyLevel, coinSpendKeyRandSeed, coinSerialNumberKeyRandSeed, coinValueKeyRandSeed, coinDetectorKey, publicRand)
-		if err != nil {
-			return nil, nil, nil, nil, err
-		}
-		return cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, nil
-
+		return pqringctxCryptoAddressKeyGenByRandSeeds(abecryptoxparam.PQRingCTXPP, cryptoScheme, privacyLevel, coinSpendKeyRandSeed, coinSerialNumberKeyRandSeed, coinValueKeyRandSeed, coinDetectorKey, publicRand)
 	default:
-		return nil, nil, nil, nil, errors.New("CryptoAddressKeyGen: unsupported crypto-scheme")
+		return nil, nil, nil, nil, nil, fmt.Errorf("CryptoAddressKeyGenByRandSeeds: unsupported crypto-scheme")
 	}
 	//return nil, nil, nil, nil, nil
 }
