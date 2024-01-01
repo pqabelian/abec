@@ -408,9 +408,11 @@ func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockH
 todo: create a coinbaseTx template, where the TxOuts, the TxFee, and TxWitness are set to be 'fake' ones, and TxMemo is set to null
 */
 // ToDo(MLP):
+// reviewed on 2024.01.01, by Alice
 func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, txVersion uint32, cryptoAddressPayTo []byte) (*wire.MsgTxAbe, error) {
 	//	When a new msgTx is created for a new transaction, it should use the current TxVersion
 	// msgTx := wire.NewMsgTxAbe(wire.TxVersion)
+	// More reasonable, the txVersion should be decided by the caller.
 	msgTx := wire.NewMsgTxAbe(txVersion)
 
 	//	one TxIn
@@ -441,6 +443,7 @@ func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, txVersion uint32, cry
 	msgTx.TxMemo = []byte{byte(msgTx.Version >> 24), byte(msgTx.Version >> 16), byte(msgTx.Version >> 8), byte(msgTx.Version)}
 	//	TxWitnessSerializeSize here is used to occupy space.
 
+	//	For the default/reference implementation of coinbaseTx, there is only one output Txo.
 	cryptoAddressListPayTo := make([][]byte, 1)
 	cryptoAddressListPayTo[0] = cryptoAddressPayTo
 	txWitnessSizeApprox, err := abecryptox.GetCbTxWitnessSerializeSizeApprox(msgTx.Version, cryptoAddressListPayTo)
@@ -761,6 +764,8 @@ func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
 //	|  transactions (while block size   |   |
 //	|  <= policy.BlockMinSize)          |   |
 //	 -----------------------------------  --
+//
+// reviewed on 2024.01.01, by Alice
 func (g *BlkTmplGenerator) NewBlockTemplate(cryptoAddressPayTo []byte) (*BlockTemplate, error) {
 	// Extend the most recently known best block.
 	best := g.chain.BestSnapshot()
@@ -780,7 +785,7 @@ func (g *BlkTmplGenerator) NewBlockTemplate(cryptoAddressPayTo []byte) (*BlockTe
 	if nextBlockHeight < g.chainParams.BlockHeightMLPAUT {
 		txVersion = wire.TxVersion_Height_0
 	} else {
-		txVersion = wire.TxVersion_Height_MLPAUT_236000
+		txVersion = wire.TxVersion_Height_MLPAUT_280000
 	}
 	// At this moment, we do not need to support output for coinbaseTx,
 	// since it will require the mechanism on separating the total output value to the multiple output Txos.
@@ -845,8 +850,8 @@ mempoolLoop:
 
 		// ToDo(MLP):
 		if nextBlockHeight >= g.chainParams.BlockHeightMLPAUTCOMMIT {
-			if tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_236000 {
-				log.Tracef("Skipping tx %s, since from block %d, transactions with version %d wii not be mined any more", tx.Hash(), nextBlockHeight, wire.TxVersion_Height_0)
+			if tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_280000 {
+				log.Tracef("Skipping tx %s, since from block %d, transactions with version %d will not be mined any more", tx.Hash(), nextBlockHeight, tx.MsgTx().Version)
 				continue
 			}
 		}
@@ -1137,6 +1142,7 @@ mempoolLoop:
 
 	coinbaseTxMsg.TxFee = subsidy + totalFee
 	// txFees[0] = -totalFee
+	// For the default/reference implementation, here we set the coinbaseTx to have only one output Txo.
 	abeTxOutDescs := make([]*abecryptox.AbeTxOutputDesc, 1)
 	abeTxOutDescs[0] = abecryptox.NewAbeTxOutDesc(cryptoAddressPayTo, coinbaseTxMsg.TxFee)
 

@@ -946,6 +946,8 @@ func NewMsgTxAbe(version uint32) *MsgTxAbe {
 	}
 }
 
+// NewStandardCoinbaseTxIn creates a new TxInAbe for coinbaseTx.
+// reviewed on 2024.01.01
 func NewStandardCoinbaseTxIn(nextBlockHeight int32, txVersion uint32) (*TxInAbe, error) {
 	txIn := &TxInAbe{}
 
@@ -960,6 +962,8 @@ func NewStandardCoinbaseTxIn(nextBlockHeight int32, txVersion uint32) (*TxInAbe,
 	// For coinbase transaction, as the previousOutPointRing is actually empty (without any real Txo),
 	// the ring version is set the same as the transaction.
 	previousOutPointRing.Version = txVersion
+	// If the wire.BlockNumPerRingGroup changes, we need to hard code here.
+	// As so far (MLPAUT_Fork), wire.BlockNumPerRingGroup = 3
 	previousOutPointRing.BlockHashs = make([]*chainhash.Hash, 3)
 
 	hash0 := chainhash.Hash{}
