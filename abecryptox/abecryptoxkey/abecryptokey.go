@@ -320,6 +320,7 @@ func ExtractCryptoSchemeFromCryptoValueSecretKey(cryptoValueSecretKey []byte) (c
 // namely, the first 4 bytes is the encoded CryptoScheme, under which the cryptoAddress was generated.
 // reviewed on 2023.12.07
 // reviewed on 2023.12.12
+// reviewed on 2024.01.01
 func CryptoAddressParse(cryptoAddress []byte) (privacyLevel PrivacyLevel,
 	coinAddress []byte,
 	coinValuePublicKey []byte,
@@ -346,7 +347,7 @@ func CryptoAddressParse(cryptoAddress []byte) (privacyLevel PrivacyLevel,
 		}
 
 	default:
-		return 0, nil, nil, errors.New("CryptoAddressParse: unsupported crypto-scheme")
+		return 0, nil, nil, fmt.Errorf("CryptoAddressParse: unsupported crypto-scheme")
 	}
 
 	return privacyLevel, coinAddress, coinValuePublicKey, nil

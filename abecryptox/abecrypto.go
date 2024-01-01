@@ -311,10 +311,11 @@ func GetTxoPrivacyLevel(abeTxo *wire.TxOutAbe) (abecryptoxkey.PrivacyLevel, erro
 }
 
 // GetTxoSerializeSizeApprox returns the approximate serialize size for Txo, which is decided by the TxVersion.
-// Note that the transactions are generated and versified by the underlying crypto-scheme,
+// Note that the transactions are generated and verified by the underlying crypto-scheme,
 // the approximate serialize size for Txo actually depends on the underlying crypto-scheme.
 // That's why txVersion is required as the input for this function.
 // reviewed on 2023.12.07
+// reviewed on 2024.01.01
 func GetTxoSerializeSizeApprox(txVersion uint32, cryptoAddress []byte) (int, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
 	if err != nil {
@@ -361,6 +362,7 @@ func ExtractPublicRandFromTxo(abeTxo *wire.TxOutAbe) (publicRand []byte, err err
 // the approximate serialize size for CoinbaseTxWitness actually depends on the underlying crypto-scheme.
 // That's why txVersion is required as the input for this function.
 // reviewed on 2023.12.07
+// reviewed on 2024.01.01, by Alice
 func GetCbTxWitnessSerializeSizeApprox(txVersion uint32, cryptoAddressListPayTo [][]byte) (int, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
 	if err != nil {
@@ -383,7 +385,7 @@ func GetCbTxWitnessSerializeSizeApprox(txVersion uint32, cryptoAddressListPayTo 
 			}
 			coinAddressListPayTo[i] = coinAddress
 		}
-		return pqringctxGetCbTxWitnessSerializeSize(abecryptoxparam.PQRingCTXPP, coinAddressListPayTo)
+		return pqringctxGetTxWitnessCbTxSerializeSizeByDesc(abecryptoxparam.PQRingCTXPP, coinAddressListPayTo)
 	default:
 		return 0, fmt.Errorf("GetCbTxWitnessSerializeSizeApprox: Unsupported txVersion")
 	}

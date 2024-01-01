@@ -10,6 +10,7 @@ import (
 // pqringctCryptoAddressParse parse the input cryptoAddress into (serializedAPK, serializedVPK).
 // reviewed on 2023.12.07.
 // reviewed on 2023.12.12
+// reviewed on 2024.01.01
 func pqringctCryptoAddressParse(pp *pqringct.PublicParameter, cryptoScheme CryptoScheme, cryptoAddress []byte) (serializedAPK []byte, serializedVPK []byte, err error) {
 	//if len(cryptoAddress) < 4 {
 	//	return nil, nil, fmt.Errorf("pqringctParseCryptoAddress: invalid length of cryptoAddress: %d", len(cryptoAddress))

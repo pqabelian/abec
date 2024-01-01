@@ -81,6 +81,46 @@ func GetCurrentCryptoScheme() CryptoScheme {
 
 //	The mapping between TxVersion/TxoVersion/RingVersion/ and crypto-scheme	end
 
+//	Transaction-related Params	begin
+//
+// GetTxInputMaxNum returns the allowed maximum number of inputs for transaction, which is decided by the TxVersion.
+// Note that the transactions are generated and versified by the underlying crypto-scheme,
+// the allowed maximum number of inputs actually depends on the underlying crypto-scheme.
+// That's why txVersion is required as the input for this function.
+// todo: review
+func GetTxInputMaxNum(txVersion uint32) (int, error) {
+	switch txVersion {
+	// todo: for each version, there is a corresponding CryptoScheme.
+	// Here we call the function of corresponding crypto-scheme
+	case 1: // wire.TxVersion_Height_0:
+		return abecryptoparam.GetTxInputMaxNum(txVersion)
+
+	case 2: // wire.TxVersion_Height_MLPAUT_280000:
+		return pqringctxGetTxInputMaxNum(PQRingCTXPP), nil
+
+	default:
+		return 0, fmt.Errorf("GetTxInputMaxNum: the input txVersion (%d) is not supported", txVersion)
+	}
+}
+
+// GetTxOutputMaxNum returns the allowed maximum number of outputs for transaction, which is decided by the TxVersion.
+// Note that the transactions are generated and versified by the underlying crypto-scheme,
+// the allowed maximum number of outputs actually depends on the underlying crypto-scheme.
+// That's why txVersion is required as the input for this function.
+// todo: review
+func GetTxOutputMaxNum(txVersion uint32) (int, error) {
+	switch txVersion {
+	case 1: //wire.TxVersion_Height_0:
+		return abecryptoparam.GetTxOutputMaxNum(txVersion)
+
+	case 2: //wire.TxVersion_Height_MLPAUT_280000:
+		return pqringctxGetTxOutputMaxNum(PQRingCTXPP), nil
+
+	default:
+		return 0, fmt.Errorf("GetTxInputMaxNum: the input txVersion (%d) is not supported", txVersion)
+	}
+}
+
 // GetNullSerialNumber return the null-serial-number.
 // Note that to be simple and back-compatible, PQRingCTX use the same null-serial-number as PQRingCT.
 // reviewed on 2023.12.07
@@ -98,6 +138,8 @@ func GetNullSerialNumber(txVersion uint32) ([]byte, error) {
 		return nil, fmt.Errorf("GetNullSerialNumber: Unsupported txVersion")
 	}
 }
+
+//	Transaction-related Params	end
 
 // APIs providing params of underlying CryptoScheme		begin
 
