@@ -9,7 +9,7 @@ const (
 	TxVersion_Height_0 uint32 = 1 // the TxVersion since height 0, corresponding to CryptoSchemePQRingCT
 	//CryptoSchemePQRingCTV2
 	// ToDo(MLP): how about not use iota?
-	TxVersion_Height_MLPAUT_236000 uint32 = 2
+	TxVersion_Height_MLPAUT_280000 uint32 = 2
 )
 
 const (
@@ -37,7 +37,7 @@ const (
 	// ToDo(MLP):
 	//	TxVersion = 1
 	// TxVersion = TxVersion_Height_0
-	TxVersion = TxVersion_Height_MLPAUT_236000
+	TxVersion = TxVersion_Height_MLPAUT_280000
 
 	//	todo: (EthashPow) BlockVersionEthashPow
 	// BlockVersionEthashPow is the block version which changed block to use EthashPoW
@@ -76,7 +76,9 @@ const (
 // The mapping between TxVersion and BlockNumPerRingGroup is hardcode here.
 func GetBlockNumPerRingGroupByRingVersion(version uint32) (uint8, error) {
 	switch version {
-	case 1:
+	case TxVersion_Height_0:
+		return BlockNumPerRingGroup, nil
+	case TxVersion_Height_MLPAUT_280000:
 		return BlockNumPerRingGroup, nil
 
 	default:
@@ -96,7 +98,9 @@ func GetBlockNumPerRingGroupByBlockHeight(height int32) uint8 {
 // The mapping between TxVersion and TxoRingSize is hardcode here.
 func GetTxoRingSizeByRingVersion(version uint32) (uint8, error) {
 	switch version {
-	case 1:
+	case TxVersion_Height_0:
+		return TxoRingSize, nil
+	case TxVersion_Height_MLPAUT_280000:
 		return TxoRingSize, nil
 
 	default:
