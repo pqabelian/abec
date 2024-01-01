@@ -224,7 +224,7 @@ type Params struct {
 	// ToDo(MLP):
 	BlockHeightMLPAUT int32
 	// BlockHeightMLPAUTCOMMIT specifies the block height
-	// from which new transactions with version before TxVersion_Height_MLPAUT_236000 will not be accepted anymore.
+	// from which new transactions with version before TxVersion_Height_MLPAUT_280000 will not be accepted anymore.
 	BlockHeightMLPAUTCOMMIT int32
 }
 

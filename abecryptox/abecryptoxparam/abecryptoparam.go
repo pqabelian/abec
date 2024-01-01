@@ -64,7 +64,7 @@ func GetCryptoSchemeByTxVersion(txVersion uint32) (CryptoScheme, error) {
 	switch txVersion {
 	case 1: // wire.TxVersion_Height_0
 		return CryptoSchemePQRingCT, nil
-	case 2: // wire.TxVersion_Height_MLPAUT_236000
+	case 2: // wire.TxVersion_Height_MLPAUT_280000
 		return CryptoSchemePQRingCTX, nil
 	default:
 		return 0, fmt.Errorf("GetCryptoSchemeByTxVersion: Unsupported TxVersion")
