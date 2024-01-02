@@ -1009,7 +1009,13 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 	if sm.chainParams.Net != wire.MainNet {
 		fakePoWHeightScopes := sm.chain.FakePoWHeightScopes()
 		if len(fakePoWHeightScopes) != 0 {
-			blockHeight := wire.ExtractCoinbaseHeight(bmsg.block.MsgBlock().Transactions[0])
+			blockHeight, err := wire.ExtractCoinbaseHeight(bmsg.block.MsgBlock().Transactions[0])
+			if err != nil {
+				log.Infof("Rejected block %v from %s: error happens wire.ExtractCoinbaseHeight(bmsg.block.MsgBlock().Transactions[0]): %v", blockHash, peer, err)
+				peer.Disconnect()
+				return
+			}
+
 			for _, scope := range fakePoWHeightScopes {
 				if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
 					behaviorFlags |= blockchain.BFNoPoWCheck

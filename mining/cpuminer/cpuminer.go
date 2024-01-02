@@ -209,7 +209,12 @@ func (m *CPUMiner) submitBlock(block *abeutil.BlockAbe) bool {
 	// nodes.  This will in turn relay it to the network like normal.
 	behavior := blockchain.BFNone
 	if m.cfg.ChainParams.Net != wire.MainNet && len(m.cfg.FakePowHeightScope) != 0 {
-		blockHeight := wire.ExtractCoinbaseHeight(block.MsgBlock().Transactions[0])
+		blockHeight, err := wire.ExtractCoinbaseHeight(block.MsgBlock().Transactions[0])
+		if err != nil {
+			log.Errorf("error happens when ExtractCoinbaseHeight(block.MsgBlock().Transactions[0]) : %v", err)
+			return false
+		}
+
 		for _, scope := range m.cfg.FakePowHeightScope {
 			if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
 				behavior |= blockchain.BFNoPoWCheck
@@ -267,7 +272,11 @@ func (m *CPUMiner) submitBlockEthash(block *abeutil.BlockAbe) bool {
 	// nodes.  This will in turn relay it to the network like normal.
 	behavior := blockchain.BFNone
 	if m.cfg.ChainParams.Net != wire.MainNet && len(m.cfg.FakePowHeightScope) != 0 {
-		blockHeight := wire.ExtractCoinbaseHeight(block.MsgBlock().Transactions[0])
+		blockHeight, err := wire.ExtractCoinbaseHeight(block.MsgBlock().Transactions[0])
+		if err != nil {
+			log.Errorf("error happens when ExtractCoinbaseHeight(block.MsgBlock().Transactions[0]) : %v", err)
+			return false
+		}
 		for _, scope := range m.cfg.FakePowHeightScope {
 			if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
 				behavior |= blockchain.BFNoPoWCheck

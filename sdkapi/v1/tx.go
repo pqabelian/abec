@@ -535,7 +535,10 @@ func BuildTransferTxRequestDescFromBlocks(
 		// (1) the Header contains its height. Based on this, we explicitly set the height of Block.
 		height := blocks[i].MsgBlock().Header.Height
 		if height == 0 {
-			height = wire.ExtractCoinbaseHeight(blocks[i].MsgBlock().Transactions[0])
+			height, err = wire.ExtractCoinbaseHeight(blocks[i].MsgBlock().Transactions[0])
+			if err != nil {
+				return nil, err
+			}
 		}
 		blocks[i].SetHeight(height)
 	}

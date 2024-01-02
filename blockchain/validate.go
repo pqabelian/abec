@@ -1011,21 +1011,21 @@ func ExtractCoinbaseHeightAbe(coinbaseTx *abeutil.TxAbe) (int32, error) {
 		return 0, ruleError(ErrMissingCoinbaseHeight, str)
 	}
 
-	isCb, err := coinbaseTx.IsCoinBase()
-	if err != nil {
-		return 0, err
-	}
-	if !isCb {
-		str := "Cannot extract blockHeight from a transaction that is not coinbase"
-		return 0, ruleError(ErrMissingCoinbaseHeight, str)
-	}
+	//isCb, err := coinbaseTx.IsCoinBase()
+	//if err != nil {
+	//	return 0, err
+	//}
+	//if !isCb {
+	//	str := "Cannot extract blockHeight from a transaction that is not coinbase"
+	//	return 0, ruleError(ErrMissingCoinbaseHeight, str)
+	//}
+	//
+	//if len(coinbaseTx.MsgTx().TxIns[0].PreviousOutPointRing.BlockHashs) < 1 {
+	//	str := "Cannot extract blockHeight from a coinbase transaction that does not match the protocol: There are no BlockHashs in PreviousOutPointRing"
+	//	return 0, ruleError(ErrMissingCoinbaseHeight, str)
+	//}
 
-	if len(coinbaseTx.MsgTx().TxIns[0].PreviousOutPointRing.BlockHashs) < 1 {
-		str := "Cannot extract blockHeight from a coinbase transaction that does not match the protocol: There are no BlockHashs in PreviousOutPointRing"
-		return 0, ruleError(ErrMissingCoinbaseHeight, str)
-	}
-
-	return wire.ExtractCoinbaseHeight(coinbaseTx.MsgTx()), nil
+	return wire.ExtractCoinbaseHeight(coinbaseTx.MsgTx())
 }
 
 // checkSerializedHeight checks if the signature script in the passed

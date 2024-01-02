@@ -563,26 +563,6 @@ func (msg *MsgTxAbe) HasWitness() bool {
 	return true
 }
 
-func (msg *MsgTxAbe) IsCoinBase() (bool, error) {
-	if len(msg.TxIns) != 1 {
-		return false, nil
-	}
-
-	// The serialNumber of the consumed coin must be a zero hash.
-	// Whatever ths ring members for the TxIns[0]
-	// the ring members' (TXHash, index) can be used as coin-nonce
-	txIn := msg.TxIns[0]
-	nullSn, err := abecryptoxparam.GetNullSerialNumber(txIn.PreviousOutPointRing.Version)
-	if err != nil {
-		return false, err
-	}
-	if bytes.Compare(txIn.SerialNumber, nullSn) != 0 {
-		return false, nil
-	}
-
-	return true, nil
-}
-
 // TxId return TxHash().
 func (msg *MsgTxAbe) TxId() TxId {
 	return TxId(msg.TxHash())
@@ -993,11 +973,53 @@ func NewStandardCoinbaseTxIn(nextBlockHeight int32, txVersion uint32) (*TxInAbe,
 	return txIn, nil
 }
 
-// the caller must have checked the format of the coinbaseTxMsg
-func ExtractCoinbaseHeight(coinbaseTx *MsgTxAbe) int32 {
+// IsCoinBase checks whether a MsgTxAbe is coinbase Tx.
+// Note that this function depends on the above NewStandardCoinbaseTxIn.
+// reviewed on 2024.01.02
+func (msg *MsgTxAbe) IsCoinBase() (bool, error) {
+	if len(msg.TxIns) != 1 {
+		return false, nil
+	}
+
+	// The serialNumber of the consumed coin must be a zero hash.
+	// Whatever ths ring members for the TxIns[0]
+	// the ring members' (TXHash, index) can be used as coin-nonce
+	txIn := msg.TxIns[0]
+	expectedBlockNumPerRing, err := GetBlockNumPerRingGroupByRingVersion(txIn.PreviousOutPointRing.Version)
+	if err != nil {
+		return false, err
+	}
+	if len(txIn.PreviousOutPointRing.BlockHashs) != int(expectedBlockNumPerRing) {
+		return false, nil
+	}
+
+	nullSn, err := abecryptoxparam.GetNullSerialNumber(txIn.PreviousOutPointRing.Version)
+	if err != nil {
+		return false, err
+	}
+	if bytes.Compare(txIn.SerialNumber, nullSn) != 0 {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+// ExtractCoinbaseHeight extracts the block height from the input MsgTxAbe (if it is a coinbase Tx).
+// Note that this function depends on the above NewStandardCoinbaseTxIn.
+// reviewed on 2024.01.02
+func ExtractCoinbaseHeight(coinbaseTx *MsgTxAbe) (int32, error) {
+	if coinbaseTx == nil {
+		return 0, fmt.Errorf("ExtractCoinbaseHeight: the input MsgTxAbe is nil")
+	}
+
+	isCb, err := coinbaseTx.IsCoinBase()
+	if err != nil || !isCb {
+		return 0, nil
+	}
+
 	blockhash0 := coinbaseTx.TxIns[0].PreviousOutPointRing.BlockHashs[0]
 	blockHeight := int32(binary.BigEndian.Uint32(blockhash0[0:4]))
-	return blockHeight
+	return blockHeight, nil
 }
 
 // TxoRing is a key concept in Abelian
