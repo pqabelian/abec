@@ -992,6 +992,12 @@ func (msg *MsgTxAbe) IsCoinBase() (bool, error) {
 	if len(txIn.PreviousOutPointRing.BlockHashs) != int(expectedBlockNumPerRing) {
 		return false, nil
 	}
+	if len(txIn.PreviousOutPointRing.OutPoints) != 1 {
+		return false, nil
+	}
+	if bytes.Compare(txIn.PreviousOutPointRing.OutPoints[0].TxHash[:], chainhash.ZeroHash[:]) != 0 || txIn.PreviousOutPointRing.OutPoints[0].Index != 0 {
+		return false, nil
+	}
 
 	nullSn, err := abecryptoxparam.GetNullSerialNumber(txIn.PreviousOutPointRing.Version)
 	if err != nil {
