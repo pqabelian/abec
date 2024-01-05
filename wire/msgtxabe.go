@@ -372,7 +372,7 @@ func ReadTxOutAbe(r io.Reader, pver uint32, version uint32, txOut *TxOutAbe) err
 
 	//txoScript, err := ReadVarBytes(r, pver, uint32(abecryptoparam.GetTxoSerializeSizeApprox(version)), "TxoScript")
 	//	For performance, here the maxallowedlen uses constant, rather than calling funciton.
-	txoScript, err := ReadVarBytes(r, pver, abecryptoparam.MaxAllowedTxoSize, "TxoScript")
+	txoScript, err := ReadVarBytes(r, pver, abecryptoxparam.MaxAllowedTxoSize, "TxoScript")
 	if err != nil {
 		return err
 	}
@@ -973,37 +973,76 @@ func NewStandardCoinbaseTxIn(nextBlockHeight int32, txVersion uint32) (*TxInAbe,
 	return txIn, nil
 }
 
+// CheckStandardCoinbaseTxIn checks whether the input MsgTxAbe is a coinbaseTx and has standard TxIn as designed.
+// reviewed on 2024.01.05
+func CheckStandardCoinbaseTxIn(coinbaseTx *MsgTxAbe) error {
+	isCb, err := coinbaseTx.IsCoinBase()
+	if err != nil {
+		return err
+	}
+	if !isCb {
+		return fmt.Errorf("CheckStandardCoinbaseTxIn: the input MsgTxAbe is not a coinbaseTx")
+	}
+
+	// coinbaseTx.IsCoinBase() guarantees that the tx has only one TxIn, and the TxIn.SerialNumber is NullSerialNumber.
+
+	txIn := coinbaseTx.TxIns[0]
+
+	// PreviousOutPointRing
+	if txIn.PreviousOutPointRing.Version != coinbaseTx.Version {
+		//	For coinbaseTx, as the ring is an artificial one, the txIn.PreviousOutPointRing.Version must be the same as msg.Version
+		return fmt.Errorf("CheckStandardCoinbaseTxIn: TxIns[0].PreviousOutPointRing.Version != msg.Version")
+	}
+
+	expectedBlockNumPerRing, err := GetBlockNumPerRingGroupByRingVersion(txIn.PreviousOutPointRing.Version)
+	if err != nil {
+		return err
+	}
+	if len(txIn.PreviousOutPointRing.BlockHashs) != int(expectedBlockNumPerRing) {
+		return fmt.Errorf("CheckStandardCoinbaseTxIn: the number of block hashes in TxIns[0].PreviousOutPointRing.BlockHashs (%d) is not as expected (%d)", len(txIn.PreviousOutPointRing.BlockHashs), expectedBlockNumPerRing)
+	}
+	if len(txIn.PreviousOutPointRing.OutPoints) != 1 {
+		return fmt.Errorf("CheckStandardCoinbaseTxIn: the number of outpoints in TxIns[0].PreviousOutPointRing.OutPoints is not 1")
+	}
+	if bytes.Compare(txIn.PreviousOutPointRing.OutPoints[0].TxHash[:], chainhash.ZeroHash[:]) != 0 || txIn.PreviousOutPointRing.OutPoints[0].Index != 0 {
+		return fmt.Errorf("CheckStandardCoinbaseTxIn: TxIns[0].PreviousOutPointRing.OutPoints[0].TxHash or TxIns[0].PreviousOutPointRing.OutPoints[0].Index is not as expected")
+	}
+
+	return nil
+
+}
+
 // IsCoinBase checks whether a MsgTxAbe is coinbase Tx.
 // Note that this function depends on the above NewStandardCoinbaseTxIn.
+// A transaction is judged as a coinbaseTx if
+// (1) the tx has only one TxIn, and
+// (2) the TxIn.SerialNumber is NullSerialNumber, and
+// (3) txIn.PreviousOutPointRing.BlockHashs is not empty, and
+// (4) txIn.PreviousOutPointRing.OutPoints  is not empty.
+// Whether such a Tx is a valid coinbaseTx, more checks need to be conducted.
 // reviewed on 2024.01.02
 func (msg *MsgTxAbe) IsCoinBase() (bool, error) {
+	// number of inputs
 	if len(msg.TxIns) != 1 {
 		return false, nil
 	}
 
-	// The serialNumber of the consumed coin must be a zero hash.
-	// Whatever ths ring members for the TxIns[0]
-	// the ring members' (TXHash, index) can be used as coin-nonce
 	txIn := msg.TxIns[0]
-	expectedBlockNumPerRing, err := GetBlockNumPerRingGroupByRingVersion(txIn.PreviousOutPointRing.Version)
-	if err != nil {
-		return false, err
-	}
-	if len(txIn.PreviousOutPointRing.BlockHashs) != int(expectedBlockNumPerRing) {
-		return false, nil
-	}
-	if len(txIn.PreviousOutPointRing.OutPoints) != 1 {
-		return false, nil
-	}
-	if bytes.Compare(txIn.PreviousOutPointRing.OutPoints[0].TxHash[:], chainhash.ZeroHash[:]) != 0 || txIn.PreviousOutPointRing.OutPoints[0].Index != 0 {
-		return false, nil
-	}
 
+	// serial number
 	nullSn, err := abecryptoxparam.GetNullSerialNumber(txIn.PreviousOutPointRing.Version)
 	if err != nil {
 		return false, err
 	}
 	if bytes.Compare(txIn.SerialNumber, nullSn) != 0 {
+		return false, nil
+	}
+
+	if len(txIn.PreviousOutPointRing.BlockHashs) == 0 {
+		//	This is to guarantee that coinbaseTx serialize the block height in txIn.PreviousOutPointRing.BlockHashs[0]
+		return false, nil
+	}
+	if len(txIn.PreviousOutPointRing.OutPoints) == 0 {
 		return false, nil
 	}
 
@@ -1019,8 +1058,12 @@ func ExtractCoinbaseHeight(coinbaseTx *MsgTxAbe) (int32, error) {
 	}
 
 	isCb, err := coinbaseTx.IsCoinBase()
-	if err != nil || !isCb {
-		return 0, nil
+	if err != nil {
+		return 0, err
+	}
+
+	if !isCb {
+		return 0, fmt.Errorf("ExtractCoinbaseHeight: the input MsgTxAbe is not coinbase Tx")
 	}
 
 	blockhash0 := coinbaseTx.TxIns[0].PreviousOutPointRing.BlockHashs[0]
