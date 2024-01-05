@@ -40,6 +40,7 @@ func (v *txValidator) sendResult(result error) {
 // validateHandler consumes items to validate from the internal validate channel
 // and returns the result of the validation on the internal result channel. It
 // must be run as a goroutine.
+// todo_DONE(MLP): reviewed on 2024.01.04
 func (v *txValidator) validateHandler() {
 out:
 	for {
@@ -57,6 +58,7 @@ out:
 
 // Validate validates the scripts for all of the passed transactions using
 // multiple goroutines.
+// todo_DONE(MLP): reviewed on 2024.01.04
 func (v *txValidator) Validate(items []*txValidateItem) error {
 	if len(items) == 0 {
 		return nil
@@ -125,9 +127,10 @@ func newTxValidator(utxoRingView *UtxoRingViewpoint, witnessCache *txscript.Witn
 	}
 }
 
-//	new validate function under pqringct
-//
+// new validate function under pqringct
 // to be discussed
+// ValidateTransactionScriptsAbe validates the input abeutil.TxAbe.
+// todo_DONE(MLP): review on 2024.01.04
 func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingViewpoint, witnessCache *txscript.WitnessCache) error {
 	// If transaction witness has already been validated and stored in cache, just return.
 	if witnessCache.Exists(*tx.Hash()) {
@@ -140,16 +143,20 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 	}
 
 	if isCB {
-		// ToDo(MLP):todo
+
 		isValid, err := abecryptox.CoinbaseTxVerify(tx.MsgTx())
-		if !isValid || err != nil {
+		if err != nil {
+			str := fmt.Sprintf("coinbase transaction %s verify failed: %v", tx.Hash(), err)
+			return ruleError(ErrScriptValidation, str)
+		}
+		if !isValid {
 			str := fmt.Sprintf("coinbase transaction %s verify failed", tx.Hash())
 			return ruleError(ErrScriptValidation, str)
 		}
+
 		return nil
 	}
 
-	// ToDo(MLP):todo
 	txInLen := len(tx.MsgTx().TxIns)
 	abeTxInDetail := make([]*abecryptox.AbeTxInDetail, txInLen)
 	for i := 0; i < txInLen; i++ {
@@ -170,7 +177,11 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 	}
 
 	isValid, err := abecryptox.TransferTxVerify(tx.MsgTx(), abeTxInDetail)
-	if !isValid || err != nil {
+	if err != nil {
+		str := fmt.Sprintf("transaction %s verify failed: %v", tx.Hash(), err)
+		return ruleError(ErrScriptValidation, str)
+	}
+	if !isValid {
 		str := fmt.Sprintf("transaction %s verify failed", tx.Hash())
 		return ruleError(ErrScriptValidation, str)
 	}
@@ -181,6 +192,7 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 }
 
 // checkBlockScriptsAbe validates the witness of each transaction in blocks
+// todo_DONE(MLP): reviewed on 2024.01.04
 func checkBlockScriptsAbe(block *abeutil.BlockAbe, utxoRingView *UtxoRingViewpoint, witnessCache *txscript.WitnessCache) error {
 
 	//	Collect all transactions and required information for validation.

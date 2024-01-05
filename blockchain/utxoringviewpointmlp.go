@@ -24,7 +24,7 @@ const (
 )
 
 // newUtxoRingEntriesMLP creates new UtxoRingEntries for the input block, which serves as the last block for the block-group.
-// todo: review
+// reviewed on 2024.01.04
 func (view *UtxoRingViewpoint) newUtxoRingEntriesMLP(db database.DB, node *blockNode, block *abeutil.BlockAbe) error {
 	if node == nil || block == nil {
 		return AssertError("newUtxoRingEntriesMLP: newUtxoRingEntriesMLP is called with nil node or nil block.")
@@ -33,9 +33,9 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesMLP(db database.DB, node *block
 	//	TODO: when BlockNumPerRingGroup or TxoRingSize change, it may cause fork.
 	//	The mapping between BlockNumPerRingGroup/TxoRingSize and height is hardcoded in wire.GetBlockNumPerRingGroup/TxoRingSize.
 	//	Here we should call blockNumPerRingGroup = wire.GetBlockNumPerRingGroup()
-	blockNumPerRingGroup := int32(wire.GetBlockNumPerRingGroupByBlockHeight(node.height))
+	blockNumPerRingGroup := int(wire.GetBlockNumPerRingGroupByBlockHeight(node.height))
 	txoRingSize := int(wire.GetTxoRingSizeByBlockHeight(node.height))
-	if !(node.height%blockNumPerRingGroup == blockNumPerRingGroup-1) {
+	if !(node.height%int32(blockNumPerRingGroup) == int32(blockNumPerRingGroup)-1) {
 		return AssertError("newUtxoRingEntriesMLP: newUtxoRingEntriesMLP is called with node where node.height % BlockNumPerRingGroup != BlockNumPerRingGroup-1.")
 	}
 
@@ -48,7 +48,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesMLP(db database.DB, node *block
 	}
 
 	ringBlockHeight := block.Height()
-	blockNum := int(blockNumPerRingGroup)
+	blockNum := blockNumPerRingGroup
 	//	read blocks from database
 	nodeTmp := node
 	blockTmp := block
@@ -94,7 +94,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesMLP(db database.DB, node *block
 }
 
 // BuildTxoRingsMLP builds txoRings for the input blocks.
-// todo: review
+// reviewed on 2024.01.04
 func BuildTxoRingsMLP(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.BlockAbe) (txoRings map[wire.RingId]*wire.TxoRing, err error) {
 	//blockNum := blockNumPerRingGroup
 
@@ -382,7 +382,7 @@ func BuildTxoRingsMLP(blockNumPerRingGroup int, txoRingSize int, blocks []*abeut
 }
 
 // initNewUtxoRingEntryMLP initializes a new UtxoRingEntry from the input wire.TxoRing.
-// todo: review
+// reviewed on 2024.01.04
 func initNewUtxoRingEntryMLP(txoRing *wire.TxoRing) *UtxoRingEntry {
 	utxoRingEntry := &UtxoRingEntry{
 		Version:             txoRing.Version,
@@ -402,7 +402,7 @@ func initNewUtxoRingEntryMLP(txoRing *wire.TxoRing) *UtxoRingEntry {
 
 // buildTxoRingsFromTxosForSingle builds rings with ringSize = 1 from the input ringMemberTxos,
 // i.e., each ringMemberTxo will form a ring.
-// todo: review
+// reviewed on 2024.01.04
 func buildTxoRingsFromTxosForSingle(ringMemberTxos []*RingMemberTxo, ringBlockHeight int32, blockHashes []*chainhash.Hash, isCoinBase bool) (txoRings []*wire.TxoRing, err error) {
 
 	if len(ringMemberTxos) == 0 {

@@ -145,6 +145,8 @@ func (b *BlockChain) processOrphansAbe(hash *chainhash.Hash, flags BehaviorFlags
 //  6. If any orphan blocks depend on this block, check and accept it (processOrphansAbe) todo: to be checked
 //     todo (ABE):
 //     todo (EthashPoW): 202207
+//
+// todo(MLP): review
 func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.Ethash, flags BehaviorFlags) (bool, bool, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
@@ -172,6 +174,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.
 
 	// Perform preliminary sanity checks on the block and its transactions.
 	//	todo (EthashPoW): 202207
+	// todo_DONE(MLP): reviewed on 2024.01.03, by Alice
 	err = checkBlockSanityAbe(block, ethashObj, b.chainParams.PowLimit, b.timeSource, flags)
 	if err != nil {
 		return false, false, err
@@ -232,6 +235,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.
 
 	// The block has passed all context independent checks and appears sane
 	// enough to potentially accept it into the block chain.
+	// todo(MLP): review on 2024.01.03
 	isMainChain, err := b.maybeAcceptBlockAbe(block, flags)
 	if err != nil {
 		return false, false, err
@@ -240,6 +244,8 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.
 	// Accept any orphan blocks that depend on this block (they are
 	// no longer orphans) and repeat for those accepted blocks until
 	// there are no more.
+
+	// todo(MLP): review on 2024.01.03
 	err = b.processOrphansAbe(blockHash, flags)
 	if err != nil {
 		return false, false, err

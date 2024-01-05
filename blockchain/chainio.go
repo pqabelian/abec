@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abecrypto/abecryptoparam"
+	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/chainhash"
@@ -300,6 +300,8 @@ func (spentTxo *SpentTxOutAbe) SerializeSize() int {
 	return wire.VarIntSerializeSize(uint64(len(spentTxo.SerialNumber))) + len(spentTxo.SerialNumber) + spentTxo.UtxoRing.SerializeSize()
 }
 
+// Serialize
+// todo_DONE(MLP): reviewed on 2024.01.04
 func (spentTxo *SpentTxOutAbe) Serialize(w io.Writer) error {
 
 	//	the serialNumber of spentTxo
@@ -317,9 +319,11 @@ func (spentTxo *SpentTxOutAbe) Serialize(w io.Writer) error {
 	return nil
 }
 
+// Deserialize
+// todo_DONE(MLP): reviewed on 2024.01.04
 func (spentTxo *SpentTxOutAbe) Deserialize(r io.Reader) error {
 	var err error
-	spentTxo.SerialNumber, err = wire.ReadVarBytes(r, 0, abecryptoparam.MaxAllowedSerialNumberSize, "SpentTxOutAbe.SerialNumber")
+	spentTxo.SerialNumber, err = wire.ReadVarBytes(r, 0, abecryptoxparam.MaxAllowedSerialNumberSize, "SpentTxOutAbe.SerialNumber")
 	if err != nil {
 		return err
 	}
@@ -962,6 +966,8 @@ func serializeSpendJournalEntry(stxos []SpentTxOut) []byte {
 }
 
 // Abe to do
+// serializeSpendJournalEntryAbe
+// todo_DONE(MLP): reviewed on 2024.01.04
 func serializeSpendJournalEntryAbe(stxos []*SpentTxOutAbe) ([]byte, error) {
 	if len(stxos) == 0 {
 		return nil, nil
@@ -1096,6 +1102,7 @@ func dbPutSpendJournalEntry(dbTx database.Tx, blockHash *chainhash.Hash, stxos [
 	return spendBucket.Put(blockHash[:], serialized)
 }
 
+// todo_DONE(MLP): reviewed on 2024.01.04
 func dbPutSpendJournalEntryAbe(dbTx database.Tx, blockHash *chainhash.Hash, stxos []*SpentTxOutAbe) error {
 	spendBucket := dbTx.Metadata().Bucket(spendJournalBucketName)
 	serialized, err := serializeSpendJournalEntryAbe(stxos)
@@ -1545,7 +1552,8 @@ func deserializeUtxoEntry(serialized []byte) (*UtxoEntry, error) {
 	return entry, nil
 }
 
-// todo(ABE):
+// deserializeUtxoRingEntry
+// reviewed on 2024.01.04
 func deserializeUtxoRingEntry(serialized []byte) (*UtxoRingEntry, error) {
 
 	entry := UtxoRingEntry{}
@@ -1765,7 +1773,8 @@ func dbFetchUtxoEntry(dbTx database.Tx, outpoint wire.OutPoint) (*UtxoEntry, err
 	return entry, nil
 }
 
-// todo(ABE):
+// dbFetchUtxoRingEntry
+// reviewed on 2024.01.04
 func dbFetchUtxoRingEntry(dbTx database.Tx, outPointRingHash chainhash.Hash) (*UtxoRingEntry, error) {
 	// Fetch the unspent transaction output information for the passed
 	// transaction output.  Return nil when there is no entry.
@@ -1780,7 +1789,7 @@ func dbFetchUtxoRingEntry(dbTx database.Tx, outPointRingHash chainhash.Hash) (*U
 	// A non-nil zero-length entry means there is an entry in the database
 	// for a spent transaction output which should never be the case.
 	if len(serializedUtxoRing) == 0 {
-		return nil, AssertError(fmt.Sprintf("database contains entry "+
+		return nil, AssertError(fmt.Sprintf("database contains empty entry "+
 			"for spent tx output %v", outPointRingHash))
 	}
 
@@ -2007,6 +2016,7 @@ func dbPutAUTView(dbTx database.Tx, view *AUTViewpoint) error {
 // in the database based on the provided utxo ring view contents and state.  In
 // particular, only the entries that have been marked as modified are written
 // to the database.
+// todo_DONE(MLP): reviewed on 2024.01.04
 func dbPutUtxoRingView(dbTx database.Tx, view *UtxoRingViewpoint) error {
 	utxoRingBucket := dbTx.Metadata().Bucket(utxoRingSetBucketName)
 

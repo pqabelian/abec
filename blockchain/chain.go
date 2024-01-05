@@ -823,6 +823,8 @@ func (b *BlockChain) connectBlock(node *blockNode, block *abeutil.Block,
 //     and add spent txos journal in database (block hash->txos)
 //  3. Update index manager if exists (todo)
 //  4. Send NTBlockConnected notification
+//
+// todo_DONE(MLP): reviewed on 2024.01.04
 func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 	view *UtxoRingViewpoint, stxos []*SpentTxOutAbe,
 	autView *AUTViewpoint, sauts []SpentAUT,
@@ -899,6 +901,7 @@ func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 		// Update the utxo set using the state of the utxo view.  This
 		// entails removing all of the utxos spent and adding the new
 		// ones created by the block.
+		// todo_DONE(MLP): reviewed on 2024.01.04
 		err = dbPutUtxoRingView(dbTx, view)
 		if err != nil {
 			return err
@@ -911,6 +914,7 @@ func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 
 		// Update the transaction spend journal by adding a record for
 		// the block that contains all txos spent by it.
+		// todo_DONE(MLP): reviewed on 2024.01.04
 		err = dbPutSpendJournalEntryAbe(dbTx, block.Hash(), stxos)
 		if err != nil {
 			return err
@@ -1291,6 +1295,8 @@ func countSpentOutputsAUT(block *abeutil.BlockAbe) int {
 //	      1. If is tagged as valid before, just connect (connectTransactions), otherwise, check and connect (checkConnectBlockAbe)
 //	      2. If block height matches the certain height, generate new utxo rings
 //	  6. Detach each block and attach each block really
+//
+// todo(MLP): review on 2024.01.04
 func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) error {
 	// Nothing to do if no reorganize nodes were provided.
 	if detachNodes.Len() == 0 && attachNodes.Len() == 0 {
@@ -1740,6 +1746,8 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 //	    1. Log and return if worksum is smaller than main chain (we do not check the inputs and witness)
 //	    2. Find detachNodes and attachNode (getReorganizeNodesAbe)
 //	    3. Reorganize the chain (reorganizeChainAbe)
+//
+// todo: review on 2024.01.04
 func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAbe, flags BehaviorFlags) (bool, error) {
 	fastAdd := flags&BFFastAdd == BFFastAdd
 
@@ -1772,6 +1780,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 		autView.SetBestHash(parentHash)
 		sauts := make([]SpentAUT, 0, countSpentOutputsAUT(block))
 		if !fastAdd || b.nodeType == wire.FullNode {
+			// todo_DONE(MLP): reviewed on 2024.01.04
 			err := b.checkConnectBlockAbe(node, block, view, &stxos, autView, &sauts)
 			if err == nil {
 				b.index.SetStatusFlags(node, statusValid)
@@ -1795,6 +1804,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 			if err != nil {
 				return false, err
 			}
+			// todo_DONE(MLP): reviewed on 2024.01.04
 			err = view.connectTransactions(block, &stxos)
 			if err != nil {
 				return false, err
@@ -1819,7 +1829,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 		blockNumPerRingGroup := int32(wire.GetBlockNumPerRingGroupByBlockHeight(node.height))
 		//if node.height%wire.BlockNumPerRingGroup == wire.BlockNumPerRingGroup-1 {
 		if node.height%blockNumPerRingGroup == blockNumPerRingGroup-1 {
-			//	todo(MLPAUT):
+			//	todo_DONE(MLP): reviewed on 2024.01.04
 			// err := view.newUtxoRingEntries(b.db, node, block)
 			err := view.newUtxoRingEntriesMLP(b.db, node, block)
 			if err != nil {
@@ -1829,6 +1839,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 
 		// Connect the block to the main chain.
 		//	ToDo(ABE): Here stxos is used as input, all precious are setting stxos
+		//	todo_DONE(MLP): reviewed on 2024.01.04
 		err := b.connectBlockAbe(node, block, view, stxos, autView, sauts)
 		if err != nil {
 			// If we got hit with a rule error, then we'll mark
@@ -1889,6 +1900,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 
 	// Reorganize the chain.
 	log.Infof("REORGANIZE: Block %v (seal hash %v) is causing a reorganize.", node.hash, ethash.SealHash(&block.MsgBlock().Header))
+	// todo(MLP): review on 2024.01.04
 	err := b.reorganizeChainAbe(detachNodes, attachNodes)
 
 	// Either getReorganizeNodes or reorganizeChain could have made unsaved
