@@ -957,6 +957,7 @@ func (sm *SyncManager) current() bool {
 //	todo(ABE):
 //
 // handleBlockMsgAbe handles block messages from all peers.
+// todo(MLP): to review on 2024.01.04
 func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 	peer := bmsg.peer
 	state, exists := sm.peerStates[peer]
@@ -1050,6 +1051,7 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
 	//	todo (EthashPoW): 202207
+	// todo(MLP): review on 2024.01.03
 	_, isOrphan, err := sm.chain.ProcessBlockAbe(bmsg.block, sm.ethash, behaviorFlags)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
@@ -1096,7 +1098,12 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 		// high enough (ver 2+).
 		// todo (ABE): does abec have height stored in coinbase?
 		header := &bmsg.block.MsgBlock().Header
-		if blockchain.ShouldHaveSerializedBlockHeight(header) {
+
+		if blockchain.ShouldHaveHeightInBlockHeader(header) {
+			heightUpdate = header.Height
+			blkHashUpdate = blockHash
+		} else {
+			// extract from coinbase Tx.
 			coinbaseTx := bmsg.block.Transactions()[0]
 			cbHeight, err := blockchain.ExtractCoinbaseHeightAbe(coinbaseTx)
 			if err != nil {
