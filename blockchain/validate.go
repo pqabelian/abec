@@ -86,6 +86,17 @@ func ShouldHaveSerializedBlockHeight(header *wire.BlockHeader) bool {
 	return true
 }
 
+// ShouldHaveHeightInBlockHeader returns whether a blockHeader has block height in the header.
+// Note that before block 56000, block header does not contain height, and after that, block header has.
+// reviewed on 2024.01.03
+func ShouldHaveHeightInBlockHeader(header *wire.BlockHeader) bool {
+	if header.Version >= wire.BlockVersionEthashPow {
+		return true
+	}
+
+	return false
+}
+
 // IsCoinBaseTx determines whether or not a transaction is a coinbase.  A coinbase
 // is a special transaction created by miners that has no inputs.  This is
 // represented in the block chain by a transaction with a single input that has
@@ -365,7 +376,7 @@ func CheckTransactionSanity(tx *abeutil.Tx) error {
 //  3. Each input's block number and ring size should obey the ring version
 //  4. No duplicate inputs (same ring and same serial number)
 //
-// todo(MLP): todo
+// todo_DONE(MLP): reviewed on 2024.01.03 by Alice.
 func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 	// A transaction must have at least one input.
 	msgTx := tx.MsgTx()
@@ -419,34 +430,39 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		return err
 	}
 	if isCb {
-		previousOutPointRing := msgTx.TxIns[0].PreviousOutPointRing
-		/*		if previousOutPointRing == nil {
-				return ruleError(ErrBadTxInput, "Coinbase Transaction refers to an OutPointRing that is null")
-			}*/
-		//	For coinbase transaction, the previousOutPointRing is hardcoded by design,
-		//	where the ringVersion is set the same as the coinbase transaction.
-		blockNumPerRingGroup, err := wire.GetBlockNumPerRingGroupByRingVersion(previousOutPointRing.Version)
-		if err != nil {
-			return err
-		}
-		txoRingSize, err := wire.GetTxoRingSizeByRingVersion(previousOutPointRing.Version)
+		err = wire.CheckStandardCoinbaseTxIn(msgTx)
 		if err != nil {
 			return err
 		}
 
-		blkHashNum := len(previousOutPointRing.BlockHashs)
-		if blkHashNum != int(blockNumPerRingGroup) {
-			str := fmt.Sprintf("Coinbase Transaction refers to an OutPointRing with block-hash-number "+
-				"%d, should be %d", blkHashNum, blockNumPerRingGroup)
-			return ruleError(ErrBadTxInput, str)
-		}
-
-		ringSize := len(previousOutPointRing.OutPoints)
-		if ringSize > int(txoRingSize) {
-			str := fmt.Sprintf("Coinbase Transaction refers to an OutPointRing with ring-size too big: "+
-				"%d, max %d", ringSize, txoRingSize)
-			return ruleError(ErrBadTxInput, str)
-		}
+		//previousOutPointRing := msgTx.TxIns[0].PreviousOutPointRing
+		///*		if previousOutPointRing == nil {
+		//		return ruleError(ErrBadTxInput, "Coinbase Transaction refers to an OutPointRing that is null")
+		//	}*/
+		////	For coinbase transaction, the previousOutPointRing is hardcoded by design,
+		////	where the ringVersion is set the same as the coinbase transaction.
+		//blockNumPerRingGroup, err := wire.GetBlockNumPerRingGroupByRingVersion(previousOutPointRing.Version)
+		//if err != nil {
+		//	return err
+		//}
+		//txoRingSize, err := wire.GetTxoRingSizeByRingVersion(previousOutPointRing.Version)
+		//if err != nil {
+		//	return err
+		//}
+		//
+		//blkHashNum := len(previousOutPointRing.BlockHashs)
+		//if blkHashNum != int(blockNumPerRingGroup) {
+		//	str := fmt.Sprintf("Coinbase Transaction refers to an OutPointRing with block-hash-number "+
+		//		"%d, should be %d", blkHashNum, blockNumPerRingGroup)
+		//	return ruleError(ErrBadTxInput, str)
+		//}
+		//
+		//ringSize := len(previousOutPointRing.OutPoints)
+		//if ringSize > int(txoRingSize) {
+		//	str := fmt.Sprintf("Coinbase Transaction refers to an OutPointRing with ring-size too big: "+
+		//		"%d, max %d", ringSize, txoRingSize)
+		//	return ruleError(ErrBadTxInput, str)
+		//}
 
 		return nil
 	}
@@ -461,6 +477,10 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		nullSn, err := abecryptoxparam.GetNullSerialNumber(txIn.PreviousOutPointRing.Version)
 		if err != nil {
 			return err
+		}
+
+		if len(txIn.SerialNumber) == 0 {
+			return ruleError(ErrBadTxInput, "transaction input refers to a serial number that is null")
 		}
 		if bytes.Compare(txIn.SerialNumber, nullSn) == 0 {
 			return ruleError(ErrBadTxInput, "transaction input refers to a serial number that is null")
@@ -513,6 +533,7 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		consumedOutPoints[ringHash][string(txIn.SerialNumber)] = struct{}{}
 	}
 
+	// todo(MLPAUT): to review
 	autTransaction, ok := tx.AUTTransaction()
 	if ok {
 		if autTransaction == nil {
@@ -684,13 +705,14 @@ func CountP2SHSigOps(tx *abeutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint)
 //
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkProofOfWork.
-//
-//	todo: (EthashPoW)
+// todo: (EthashPoW)
+// reviewed on 2024.01.03, by Alice
 func checkBlockHeaderSanity(header *wire.BlockHeader, ethash *ethash.Ethash, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
 	// Ensure the proof of work bits in the block header is in min/max range
 	// and the block hash is less than the target value described by the
 	// bits.
 	//	todo: (EthashPoW)
+	// todo(MLP): done, reviewed on 2024.01.03, by Alice
 	err := checkProofOfWork(header, ethash, powLimit, flags)
 	if err != nil {
 		return err
@@ -845,11 +867,13 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkBlockHeaderSanity.
 //
-//	todo: (EthashPoW)
+// todo: (EthashPoW)
+// reviewed on 2024.01.03 by Alice
 func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
 	msgBlock := block.MsgBlock()
 	header := &msgBlock.Header
 	//	todo: (EthashPoW)
+	// todo_DONE(MLP): reviewed on 2024.01.03, by Alice
 	err := checkBlockHeaderSanity(header, ethash, powLimit, timeSource, flags)
 	if err != nil {
 		return err
@@ -892,7 +916,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, powLimi
 
 	// A block must not have more than one coinbase.
 	for i, tx := range transactions[1:] {
-		isCb, err := tx.IsCoinBase()
+		isCb, err = tx.IsCoinBase()
 		if err != nil {
 			return err
 		}
@@ -907,6 +931,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, powLimi
 	// Do some preliminary checks on each transaction to ensure they are
 	// sane before continuing.
 	for _, tx := range transactions {
+		// todo_DONE(MLP): reviewed on 2024.01.03 by Alice.
 		err := CheckTransactionSanityAbe(tx)
 		if err != nil {
 			return err
@@ -1004,7 +1029,8 @@ func ExtractCoinbaseHeight(coinbaseTx *abeutil.Tx) (int32, error) {
 	return int32(serializedHeight), nil
 }
 
-// todo(ABE):
+// ExtractCoinbaseHeightAbe extracts the serialized block height in coinbaseTx.
+// reviewed on 2024.01.03
 func ExtractCoinbaseHeightAbe(coinbaseTx *abeutil.TxAbe) (int32, error) {
 	if coinbaseTx == nil {
 		str := "Cannot extract blockHeight from a coinbase transaction that is null"
@@ -1045,6 +1071,8 @@ func checkSerializedHeight(coinbaseTx *abeutil.Tx, wantHeight int32) error {
 	return nil
 }
 
+// checkSerializedHeightAbe checks whether the serialized block-height in coinbaseTx is the input wantHeight.
+// reviewed on 2024.01.03 by Alice
 func checkSerializedHeightAbe(coinbaseTx *abeutil.TxAbe, wantHeight int32) error {
 	log.Debugf("Check the height in coinbase transaction with the block height %d", wantHeight)
 	serializedHeight, err := ExtractCoinbaseHeightAbe(coinbaseTx)
@@ -1073,6 +1101,8 @@ func checkSerializedHeightAbe(coinbaseTx *abeutil.TxAbe, wantHeight int32) error
 //  2. Check the timestamp is after the median time of last several blocks (if not fast add)
 //  3. If this height is checkpoint, check if the block hash matches the checkpoint
 //  4. Ensure the height of block is after the latest checkpoint
+//
+// reviewed on 2024.01.03, by Alice for MLP
 func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNode *blockNode, flags BehaviorFlags) error {
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	if !fastAdd {
@@ -1135,6 +1165,11 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 			}
 		} // ToDo(MLP): when more versions appear, we need to add here
 
+	} else { // blockHeight < b.chainParams.BlockHeightEthashPoW
+		if header.Version != int32(BlockVersionInitial) {
+			str := fmt.Sprintf("block has height %d, it should have version %d, rather than the version %d", header.Height, int32(BlockVersionInitial), header.Version)
+			return ruleError(ErrMismatchedBlockHeightAndVersion, str)
+		}
 	}
 
 	// Ensure chain matches up to predetermined checkpoints.
@@ -1175,6 +1210,9 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 // This function MUST be called with the chain state lock held (for writes).
 //  1. Check the block header context (checkBlockHeaderContextAbe)
 //  2. Check if the block height is written into the coinbase transaction (if not fast add)
+//
+// refactored on 2024.01.03 by Alice
+// reviewed on 2024.01.03 by Alice
 func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blockNode, flags BehaviorFlags) error {
 	// Perform all block header related validation checks.
 	header := &block.MsgBlock().Header
@@ -1183,22 +1221,58 @@ func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blo
 		return err
 	}
 
+	// The height of this block is one more than the referenced
+	// previous block.
+	blockHeight := prevNode.height + 1
+
+	coinbaseTx := block.Transactions()[0]
+	err = checkStandardCoinbaseTxIn(coinbaseTx.MsgTx(), block.Hash())
+	if err != nil {
+		return err
+	}
+
+	err = checkSerializedHeightAbe(coinbaseTx, blockHeight)
+	if err != nil {
+		return err
+	}
+
+	if blockHeight >= b.chainParams.BlockHeightMLPAUTCOMMIT {
+		//	the block should not contain transactions with earlier version
+		for i, tx := range block.Transactions() {
+			if tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_280000 {
+				return fmt.Errorf("checkBlockContextAbe: the block has height %d, but its %d -th transaction has version %d", blockHeight, i, tx.MsgTx().Version)
+			}
+		}
+	} else if blockHeight >= b.chainParams.BlockHeightMLPAUT {
+		if coinbaseTx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_280000 {
+			return fmt.Errorf("checkBlockContextAbe: the block has height %d, but its first transaction (coinbase Tx) has version %d", blockHeight, coinbaseTx.MsgTx().Version)
+		}
+	} else if blockHeight < b.chainParams.BlockHeightMLPAUT {
+		for i, tx := range block.Transactions() {
+			if tx.MsgTx().Version >= wire.TxVersion_Height_MLPAUT_280000 {
+				return fmt.Errorf("checkBlockContextAbe: the block has height %d, but its %d -th transaction has version %d", blockHeight, i, tx.MsgTx().Version)
+			}
+		}
+	}
+
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	if !fastAdd {
 
-		// The height of this block is one more than the referenced
-		// previous block.
-		blockHeight := prevNode.height + 1
+		//// The height of this block is one more than the referenced
+		//// previous block.
+		//blockHeight := prevNode.height + 1
+		//
+		//coinbaseTx := block.Transactions()[0]
+		//err = checkSerializedHeightAbe(coinbaseTx, blockHeight)
+		//if err != nil {
+		//	return err
+		//}
+		//err = checkStandardCoinbaseTxIn(coinbaseTx.MsgTx(), block.Hash(), blockHeight)
+		//if err != nil {
+		//	return err
+		//}
+		//	2024.01.03 The above check on coinbaseTx is low-cost, and for safety, we move it out of !fastAdd, to make it be checked each time.
 
-		coinbaseTx := block.Transactions()[0]
-		err = checkSerializedHeightAbe(coinbaseTx, blockHeight)
-		if err != nil {
-			return err
-		}
-		err = checkStandardCoinbaseTxIn(coinbaseTx.MsgTx(), block.Hash(), blockHeight, wire.TxVersion)
-		if err != nil {
-			return err
-		}
 		// If segwit is active, then we'll need to fully validate the
 		// new witness commitment for adherence to the rules.
 		//	todo(ABE): if witness commitment is implemented, here needs check?
@@ -1230,50 +1304,77 @@ func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blo
 
 	return nil
 }
-func checkStandardCoinbaseTxIn(coinbaseTx *wire.MsgTxAbe, blockHash *chainhash.Hash, blockHeight int32, txVersion uint32) error {
-	// one input
-	if len(coinbaseTx.TxIns) != 1 {
-		str := fmt.Sprintf("the coinbase transaction in block %s has %d input", blockHash, len(coinbaseTx.TxIns))
-		return ruleError(ErrTooManyTxInputs, str)
-	}
-	// null serial number
-	nullSn, err := abecryptoxparam.GetNullSerialNumber(txVersion)
+
+// checkStandardCoinbaseTxIn checks whether the input coinbaseTx has a standard coinbaseTxIn.
+// refactored on 2024.01.03
+// reviewed on 2024.01.03, by Alice
+func checkStandardCoinbaseTxIn(coinbaseTx *wire.MsgTxAbe, blockHash *chainhash.Hash) error {
+
+	// As the StandardCoinbaseTxIn is generated in wire package,
+	// we move the concrete checks on StandardCoinbaseTxIn into wire.CheckStandardCoinbaseTxIn.
+
+	isCb, err := coinbaseTx.IsCoinBase()
 	if err != nil {
-		return err
-	}
-	if !bytes.Equal(coinbaseTx.TxIns[0].SerialNumber, nullSn) {
-		str := fmt.Sprintf("the serial number in coinbase transaction in block %s is not zero", blockHash)
-		return ruleError(ErrBadTxInput, str)
-	}
-	// version, block hash in Ring
-	if coinbaseTx.TxIns[0].PreviousOutPointRing.Version != txVersion {
-		str := fmt.Sprintf("the version should be in coinbase transaction in block %s", blockHash)
+		str := fmt.Sprintf("checkStandardCoinbaseTxIn: error happens when calling coinbaseTx.IsCoinBase() on the coinbaseTx of block %s : %v", blockHash, err)
 		return ruleError(ErrBadTxInput, str)
 	}
 
-	if len(coinbaseTx.TxIns[0].PreviousOutPointRing.BlockHashs) == 0 {
-		str := fmt.Sprintf("the BlockHashes of coinbaseTx.TxIns[0].PreviousOutPointRing is empty")
-		return ruleError(ErrBadTxInput, str)
-	}
-	// ToDo: this is redundant, which has been checked in checkSerializedHeightAbe.
-	if binary.BigEndian.Uint32(coinbaseTx.TxIns[0].PreviousOutPointRing.BlockHashs[0][:4]) != uint32(blockHeight) {
-		str := fmt.Sprintf("the height should be in coinbase transaction in block %s", blockHash)
+	if !isCb {
+		str := fmt.Sprintf("checkStandardCoinbaseTxIn: the coinbaseTx of block %s is not a coinbaseTx", blockHash)
 		return ruleError(ErrBadTxInput, str)
 	}
 
-	// one outpoint and empty data
-	if len(coinbaseTx.TxIns[0].PreviousOutPointRing.OutPoints) != 1 {
-		str := fmt.Sprintf("the consumed outpoint in coinbase transaction in block %s is %d", blockHash, len(coinbaseTx.TxIns[0].PreviousOutPointRing.OutPoints))
+	err = wire.CheckStandardCoinbaseTxIn(coinbaseTx)
+	if err != nil {
+		str := fmt.Sprintf("checkStandardCoinbaseTxIn: error happens when calling wire.CheckStandardCoinbaseTxIn() on the coinbaseTx of block %s : %v", blockHash, err)
 		return ruleError(ErrBadTxInput, str)
 	}
-	if !coinbaseTx.TxIns[0].PreviousOutPointRing.OutPoints[0].TxHash.IsEqual(&chainhash.ZeroHash) {
-		str := fmt.Sprintf("the consumed outpoint in coinbase transaction in block %s shoudle be empty", blockHash)
-		return ruleError(ErrBadTxInput, str)
-	}
-	if coinbaseTx.TxIns[0].PreviousOutPointRing.OutPoints[0].Index != 0 {
-		str := fmt.Sprintf("the consumed outpoint in coinbase transaction in block %s shoudle be empty", blockHash)
-		return ruleError(ErrBadTxInput, str)
-	}
+
+	return nil
+
+	//// one input
+	//if len(coinbaseTx.TxIns) != 1 {
+	//	str := fmt.Sprintf("the coinbase transaction in block %s has %d input", blockHash, len(coinbaseTx.TxIns))
+	//	return ruleError(ErrTooManyTxInputs, str)
+	//}
+	//// null serial number
+	//nullSn, err := abecryptoxparam.GetNullSerialNumber(coinbaseTx.Version)
+	//if err != nil {
+	//	return err
+	//}
+	//if !bytes.Equal(coinbaseTx.TxIns[0].SerialNumber, nullSn) {
+	//	str := fmt.Sprintf("the serial number in coinbase transaction in block %s is not zero", blockHash)
+	//	return ruleError(ErrBadTxInput, str)
+	//}
+	//// version, block hash in Ring
+	//if coinbaseTx.TxIns[0].PreviousOutPointRing.Version != txVersion {
+	//	str := fmt.Sprintf("the version should be in coinbase transaction in block %s", blockHash)
+	//	return ruleError(ErrBadTxInput, str)
+	//}
+	//
+	//if len(coinbaseTx.TxIns[0].PreviousOutPointRing.BlockHashs) == 0 {
+	//	str := fmt.Sprintf("the BlockHashes of coinbaseTx.TxIns[0].PreviousOutPointRing is empty")
+	//	return ruleError(ErrBadTxInput, str)
+	//}
+	//// ToDo: this is redundant, which has been checked in checkSerializedHeightAbe.
+	//if binary.BigEndian.Uint32(coinbaseTx.TxIns[0].PreviousOutPointRing.BlockHashs[0][:4]) != uint32(blockHeight) {
+	//	str := fmt.Sprintf("the height should be in coinbase transaction in block %s", blockHash)
+	//	return ruleError(ErrBadTxInput, str)
+	//}
+
+	//// one outpoint and empty data
+	//if len(coinbaseTx.TxIns[0].PreviousOutPointRing.OutPoints) != 1 {
+	//	str := fmt.Sprintf("the consumed outpoint in coinbase transaction in block %s is %d", blockHash, len(coinbaseTx.TxIns[0].PreviousOutPointRing.OutPoints))
+	//	return ruleError(ErrBadTxInput, str)
+	//}
+	//if !coinbaseTx.TxIns[0].PreviousOutPointRing.OutPoints[0].TxHash.IsEqual(&chainhash.ZeroHash) {
+	//	str := fmt.Sprintf("the consumed outpoint in coinbase transaction in block %s shoudle be empty", blockHash)
+	//	return ruleError(ErrBadTxInput, str)
+	//}
+	//if coinbaseTx.TxIns[0].PreviousOutPointRing.OutPoints[0].Index != 0 {
+	//	str := fmt.Sprintf("the consumed outpoint in coinbase transaction in block %s shoudle be empty", blockHash)
+	//	return ruleError(ErrBadTxInput, str)
+	//}
 
 	return nil
 
@@ -1464,6 +1565,8 @@ func CheckTransactionInputs(tx *abeutil.Tx, txHeight int32, utxoView *UtxoViewpo
 //  2. For each input, check if has been spent or not (txo ring exists and no existing serial number is the same)
 //  3. For each input, check if it is mature if it consumes coinbase transaction
 //     Abe todo
+//
+// todo_DONE(MLP): review on 2024.01.04
 func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
 	// Coinbase transactions have no inputs.
 	isCb, err := IsCoinBaseAbe(tx)
@@ -1474,9 +1577,15 @@ func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *
 		return nil
 	}
 
-	// ToDo(MLP):todo
 	for txInIndex, txIn := range tx.MsgTx().TxIns {
 		// Ensure the referenced input transaction is available.
+		if len(txIn.SerialNumber) == 0 {
+			str := fmt.Sprintf("TXO Ring %s referenced from "+
+				"transaction %s:%d has a empty serialNumber", txIn.String(),
+				tx.Hash(), txInIndex)
+			return ruleError(ErrMissingTxOut, str)
+		}
+
 		utxoRing := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())
 		if utxoRing == nil || utxoRing.IsSpent(txIn.SerialNumber) {
 			str := fmt.Sprintf("TXO Ring %s referenced from "+
@@ -1694,6 +1803,8 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, autView *AUTVi
 //	  5. Ensure the block fee in coinbase is not larger than block reward plus tx fee
 //	  6. Validate the witness of each transaction (if after the checkpoint)
 //	  7. Set new best height for utxo ring view
+//
+// todo_DONE(MLP): reviewed on 2024.01.04
 func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 	view *UtxoRingViewpoint, stxos *[]*SpentTxOutAbe,
 	autView *AUTViewpoint, sauts *[]SpentAUT) error {
@@ -1750,6 +1861,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// in the block don't already exist in the utxo ring view from the database.
 	//
 	// These utxo ring entries are needed for verification of things.
+	// todo_DONE(MLP): reviewed on 2024.01.04
 	err := view.fetchInputUtxoRings(b.db, block)
 	if err != nil {
 		return err
@@ -1817,13 +1929,16 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// still relatively cheap as compared to running the scripts) checks
 	// against all the inputs when the signature operations are out of
 	// bounds.
-	var totalFees uint64
+	totalFees := uint64(0)
 	for _, tx := range transactions[1:] {
+		// todo_DONE(MLP): reviewed on 2024.01.04
+		// Did not check/prevent the case that two transactions in a block spend the same coin. It will be handled later.
 		err = CheckTransactionInputsAbe(tx, node.height, view,
 			b.chainParams)
 		if err != nil {
 			return err
 		}
+
 		autTx, ok := tx.AUTTransaction()
 		if ok {
 			if autTx == nil {
@@ -1849,10 +1964,13 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 		// provably unspendable as available utxos.  Also, the passed
 		// spent txos slice is updated to contain an entry for each
 		// spent txout in the order each transaction spends them.
+		// todo_DONE(MLP): reviewed on 2024.01.04
+		// view.connectTransaction() checks the double-spending among one block
 		err = view.connectTransaction(tx, &node.hash, stxos)
 		if err != nil {
 			return err
 		}
+
 		err = autView.connectTransaction(tx, node.height, sauts)
 		if err != nil {
 			return err
@@ -1964,6 +2082,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// prevent CPU exhaustion attacks.
 	if witnessCheck {
 		log.Debugf("Check the witness for block %s in height %d", block.Hash(), block.Height())
+		// todo_DONE(MLP): reviewed on 2024.01.04
 		err := checkBlockScriptsAbe(block, view, b.witnessCache)
 		if err != nil {
 			return err
