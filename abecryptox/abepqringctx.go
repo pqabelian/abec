@@ -582,7 +582,7 @@ func pqringctxExtractPublicRandFromTxo(pp *pqringctxapi.PublicParameter, abeTxo 
 }
 
 // pqringctxGetTxoPrivacyLevel returns the PrivacyLevel of the input wire.TxOutAbe.
-// todo: review
+// reviewed on 2024.01.04
 func pqringctxGetTxoPrivacyLevel(pp *pqringctxapi.PublicParameter, abeTxo *wire.TxOutAbe) (abecryptoxkey.PrivacyLevel, error) {
 	cryptoTxoMLP, err := pqringctxapi.DeserializeTxo(pp, abeTxo.TxoScript)
 	if err != nil {

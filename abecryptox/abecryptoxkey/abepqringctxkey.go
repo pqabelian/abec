@@ -327,7 +327,7 @@ func pqringctxCryptoAddressKeyGenByRandSeeds(pp *pqringctxapi.PublicParameter,
 
 // pqringctxGetPrivacyLevelFromCoinAddressType returns the PrivacyLevel corresponding to the input CoinAddressType.
 // Note that abepqringctxkey.go is the layer which knows the mapping between PrivacyLevel and CoinAddressType.
-// todo: review
+// reviewed on 2024.01.04
 func pqringctxGetPrivacyLevelFromCoinAddressType(coinAddressType pqringctxapi.CoinAddressType) (PrivacyLevel, error) {
 	switch coinAddressType {
 	case pqringctxapi.CoinAddressTypePublicKeyForRingPre:

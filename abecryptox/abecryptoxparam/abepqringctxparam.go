@@ -20,12 +20,14 @@ func pqringctxGetNullSerialNumber(pp *pqringctxapi.PublicParameter) []byte {
 	return pqringctxapi.GetNullSerialNumber(pp)
 }
 
-// todo: review
+// pqringctxGetTxInputMaxNum returns the allowed maximum number of TxInputs.
+// reviewed on 2024.01.03
 func pqringctxGetTxInputMaxNum(pp *pqringctxapi.PublicParameter) int {
 	return pqringctxapi.GetTxInputMaxNum(pp)
 }
 
-// todo: review
+// pqringctxGetTxOutputMaxNum returns the allowed maximum number of TxOutputs.
+// reviewed on 2024.01.03
 func pqringctxGetTxOutputMaxNum(pp *pqringctxapi.PublicParameter) int {
 	return pqringctxapi.GetTxOutputMaxNum(pp)
 }

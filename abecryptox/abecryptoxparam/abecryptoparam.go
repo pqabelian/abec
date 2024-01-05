@@ -87,7 +87,7 @@ func GetCurrentCryptoScheme() CryptoScheme {
 // Note that the transactions are generated and versified by the underlying crypto-scheme,
 // the allowed maximum number of inputs actually depends on the underlying crypto-scheme.
 // That's why txVersion is required as the input for this function.
-// todo: review
+// reviewed on 2024.01.03
 func GetTxInputMaxNum(txVersion uint32) (int, error) {
 	switch txVersion {
 	// todo: for each version, there is a corresponding CryptoScheme.
@@ -107,7 +107,7 @@ func GetTxInputMaxNum(txVersion uint32) (int, error) {
 // Note that the transactions are generated and versified by the underlying crypto-scheme,
 // the allowed maximum number of outputs actually depends on the underlying crypto-scheme.
 // That's why txVersion is required as the input for this function.
-// todo: review
+// reviewed on 2024.01.03
 func GetTxOutputMaxNum(txVersion uint32) (int, error) {
 	switch txVersion {
 	case 1: //wire.TxVersion_Height_0:
@@ -117,7 +117,7 @@ func GetTxOutputMaxNum(txVersion uint32) (int, error) {
 		return pqringctxGetTxOutputMaxNum(PQRingCTXPP), nil
 
 	default:
-		return 0, fmt.Errorf("GetTxInputMaxNum: the input txVersion (%d) is not supported", txVersion)
+		return 0, fmt.Errorf("GetTxOutputMaxNum: the input txVersion (%d) is not supported", txVersion)
 	}
 }
 

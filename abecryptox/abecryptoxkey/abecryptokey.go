@@ -158,7 +158,7 @@ func CryptoAddressKeyGenByRandSeeds(cryptoScheme abecryptoxparam.CryptoScheme, p
 }
 
 // GetPrivacyLevelFromCoinAddressType returns the PrivacyLevel corresponding to the input coinAddressType.
-// todo: review
+// reviewed on 2024.01.04
 func GetPrivacyLevelFromCoinAddressType(coinAddressType pqringctxapi.CoinAddressType) (PrivacyLevel, error) {
 	return pqringctxGetPrivacyLevelFromCoinAddressType(coinAddressType)
 }
