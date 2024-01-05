@@ -1226,16 +1226,24 @@ func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blo
 	blockHeight := prevNode.height + 1
 
 	coinbaseTx := block.Transactions()[0]
-	err = checkStandardCoinbaseTxIn(coinbaseTx.MsgTx(), block.Hash())
-	if err != nil {
-		return err
-	}
+	// coinbaseTx's structure is indeed related to the block's height. But it is indirect as below:
+	// block's height decides coinbaseTx's version, then coinbaseTx's version decides its structure.
+	// As the relation between block's height and coinbaseTx's version is checked below, and
+	// the check on coinbaseTx is conducted in CheckTransactionSanityAbe() in checkBlockSanityAbe(),
+	// here we do not regard checkStandardCoinbaseTxIn() as a part of BlockContext.
 
+	//err = checkStandardCoinbaseTxIn(coinbaseTx.MsgTx(), block.Hash())
+	//if err != nil {
+	//	return err
+	//}
+
+	// checkSerializedHeightAbe will successfully extract height from a coinbase Tx and compare with blockHeight.
 	err = checkSerializedHeightAbe(coinbaseTx, blockHeight)
 	if err != nil {
 		return err
 	}
 
+	// todo: if there are more forks, we need hard code the version check here.
 	if blockHeight >= b.chainParams.BlockHeightMLPAUTCOMMIT {
 		//	the block should not contain transactions with earlier version
 		for i, tx := range block.Transactions() {
@@ -1247,7 +1255,8 @@ func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blo
 		if coinbaseTx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_280000 {
 			return fmt.Errorf("checkBlockContextAbe: the block has height %d, but its first transaction (coinbase Tx) has version %d", blockHeight, coinbaseTx.MsgTx().Version)
 		}
-	} else if blockHeight < b.chainParams.BlockHeightMLPAUT {
+	} else {
+		//blockHeight < b.chainParams.BlockHeightMLPAUT
 		for i, tx := range block.Transactions() {
 			if tx.MsgTx().Version >= wire.TxVersion_Height_MLPAUT_280000 {
 				return fmt.Errorf("checkBlockContextAbe: the block has height %d, but its %d -th transaction has version %d", blockHeight, i, tx.MsgTx().Version)

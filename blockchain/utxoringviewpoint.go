@@ -689,7 +689,9 @@ func (entry *UtxoRingEntry) Spend(serialNumber []byte, blockHash *chainhash.Hash
 	// Mark the output as modified.
 }
 
+// UnSpend
 // normally, the unspent serialNumber should be the last one, as this function should be called in reverse order
+// reviewed on 2024.01.05
 func (entry *UtxoRingEntry) UnSpend(serialNumber []byte, blockHash *chainhash.Hash) bool {
 	for i, sn := range entry.serialNumbers {
 		if bytes.Equal(sn, serialNumber) && blockHash.IsEqual(entry.consumingBlockHashs[i]) {
@@ -1133,6 +1135,8 @@ func (view *UtxoRingViewpoint) connectTransactions(block *abeutil.BlockAbe, stxo
 // view to the block before the passed block.
 //
 //	Abe to do: use the spendJournal to collect and update utxoRing
+//
+// todo_DONE(MLP): reviewed on 2024.01.05
 func (view *UtxoRingViewpoint) disconnectTransactions(db database.DB, block *abeutil.BlockAbe, stxos []*SpentTxOutAbe) error {
 	// Sanity check the correct number of stxos are provided.
 	if len(stxos) != countSpentOutputsAbe(block) {
@@ -1161,15 +1165,15 @@ func (view *UtxoRingViewpoint) disconnectTransactions(db database.DB, block *abe
 
 		} else {
 			//	actually, can directly use the following codes to unspend
-			//	the above codes in if{} has the same effect, but with strictest check.
-			//	At initial development, the strictesct check may help find potential situations
+			//	the above codes in if{} has the same effect, but with the strictest check.
+			//	At initial development, the strictest check may help find potential situations
 			loadUtxoRing := stxo.UtxoRing.Clone()
 			loadUtxoRing.packedFlags |= tfModified
 			view.entries[loadUtxoRing.outPointRing.Hash()] = loadUtxoRing
 		}
 	}
 
-	// Update the best hash for view to the previous block since all of the
+	// Update the best hash for view to the previous block since all the
 	// transactions for the current block have been disconnected.
 	view.SetBestHash(&block.MsgBlock().Header.PrevBlock)
 	return nil

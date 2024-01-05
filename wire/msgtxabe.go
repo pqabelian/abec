@@ -1049,7 +1049,7 @@ func (msg *MsgTxAbe) IsCoinBase() (bool, error) {
 	return true, nil
 }
 
-// ExtractCoinbaseHeight extracts the block height from the input MsgTxAbe (if it is a coinbase Tx).
+// ExtractCoinbaseHeight extracts the block height from the input MsgTxAbe (only if it is a coinbase Tx).
 // Note that this function depends on the above NewStandardCoinbaseTxIn.
 // reviewed on 2024.01.02
 func ExtractCoinbaseHeight(coinbaseTx *MsgTxAbe) (int32, error) {

@@ -957,7 +957,7 @@ func (sm *SyncManager) current() bool {
 //	todo(ABE):
 //
 // handleBlockMsgAbe handles block messages from all peers.
-// todo(MLP): to review on 2024.01.04
+// todo_DONE(MLP): reviewed on 2024.01.05
 func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 	peer := bmsg.peer
 	state, exists := sm.peerStates[peer]
@@ -1051,7 +1051,7 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
 	//	todo (EthashPoW): 202207
-	// todo(MLP): review on 2024.01.03
+	// todo_DONE(MLP): reviewed on 2024.01.05
 	_, isOrphan, err := sm.chain.ProcessBlockAbe(bmsg.block, sm.ethash, behaviorFlags)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply

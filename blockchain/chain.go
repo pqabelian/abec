@@ -1088,7 +1088,9 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *abeutil.Block, view
 	return nil
 }
 
+// disconnectBlockAbe
 // Abe to do
+// todo_DONE(MLP): reviewed on 2024.01.05
 func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 	view *UtxoRingViewpoint, viewToDel *UtxoRingViewpoint,
 	autView *AUTViewpoint, infoToDel map[string]struct{}) error {
@@ -1145,10 +1147,10 @@ func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe
 		}
 
 		// Update the utxo set using the state of the utxo view.  This
-		// entails restoring all of the utxos spent and removing the new
+		// entails restoring all the utxos spent and removing the new
 		// ones created by the block.
 		//	Abe to do: Update the utxo set using the state of the utxo view.
-		//	This entails restoring all of the utxos spent
+		//	This entails restoring all the utxos spent
 		err = dbPutUtxoRingView(dbTx, view)
 		if err != nil {
 			return err
@@ -1296,7 +1298,7 @@ func countSpentOutputsAUT(block *abeutil.BlockAbe) int {
 //	      2. If block height matches the certain height, generate new utxo rings
 //	  6. Detach each block and attach each block really
 //
-// todo(MLP): review on 2024.01.04
+// todo_DONE(MLP): reviewed on 2024.01.05
 func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) error {
 	// Nothing to do if no reorganize nodes were provided.
 	if detachNodes.Len() == 0 && attachNodes.Len() == 0 {
@@ -1330,7 +1332,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 	oldBest := tip
 	newBest := tip
 
-	// All of the blocks to detach and related spend journal entries needed
+	// All the blocks to detach and related spend journal entries needed
 	// to unspend transaction outputs in the blocks being disconnected must
 	// be loaded from the database during the reorg check phase below and
 	// then they are needed again when doing the actual database updates.
@@ -1340,9 +1342,9 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 	detachSpentAUTs := make([][]SpentAUT, 0, detachNodes.Len())
 	attachBlocks := make([]*abeutil.BlockAbe, 0, attachNodes.Len())
 
-	// Disconnect all of the blocks back to the point of the fork.  This
+	// Disconnect all the blocks back to the point of the fork.  This
 	// entails loading the blocks and their associated spent txos from the
-	// database and using that information to unspend all of the spent txos
+	// database and using that information to unspend all the spent txos
 	// and remove the utxos created by the blocks.
 	view := NewUtxoRingViewpoint()
 	view.SetBestHash(&oldBest.hash)
@@ -1399,6 +1401,8 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		detachSpentTxOuts = append(detachSpentTxOuts, stxos)
 		detachSpentAUTs = append(detachSpentAUTs, sauts)
 
+		// todo_DONE(MLP): reviewed on 2024.01.05
+		// view loads all the related UtxoRingEntries of the TxIns of the transactions in block, using stxos.
 		err = view.disconnectTransactions(b.db, block, stxos)
 		if err != nil {
 			return err
@@ -1413,14 +1417,12 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		//	These utxoRings should will be deleted from database
 		//	TODO: when BlockNumPerRingGroup or TxoRingSize change, it may cause fork.
 		//	The mapping between BlockNumPerRingGroup/TxoRingSize and height is hardcoded in wire.GetBlockNumPerRingGroup/TxoRingSize.
-		//	Here we should call blockNumPerRingGroup = wire.GetBlockNumPerRingGroup()
-		//	At this moment (no fork due to BlockNumPerRingGroup/TxoRingSize change), we directly use the constant.
 		blockNumPerRingGroup := int32(wire.GetBlockNumPerRingGroupByBlockHeight(n.height))
 		//		if n.height%3 == 2 {
 		//if n.height%wire.BlockNumPerRingGroup == wire.BlockNumPerRingGroup-1 {
 		if n.height%blockNumPerRingGroup == blockNumPerRingGroup-1 {
 			viewToDelAll.SetBestHash(&n.hash)
-			//	todo(MLPAUT):
+			//	todo_DONE(MLP): reviewed on 2024.01.05
 			// err = viewToDelAll.newUtxoRingEntries(b.db, n, block)
 			err = viewToDelAll.newUtxoRingEntriesMLP(b.db, n, block)
 			if err != nil {
@@ -1435,7 +1437,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 	//	if a UtxoRing obtained by unspend (from higher blocks) is in the viewRingsToDel (from lower blocks), the UtxoRing should have len(serialNumbers) == 0
 	//	just enhance checks
 	//	and such UtxoRings should be removed from view, since view will be used in the latter attach
-	//	when attach, the utxoRings in view should not be fecthed from database, since the databse is still storing the data for old mainchain
+	//	when attaching, the utxoRings in view should not be fetched from database, since the database is still storing the data for old main chain
 	//	Note that In general, len(viewRingsToDel.entries) < len(view.entries), we range the viewRingsToDel.entries
 	/*	for outPointRingHash, utxoRingEntry := range view.entries {
 		ringToDel := viewRingsToDel.entries[outPointRingHash]
@@ -1456,6 +1458,9 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			delete(view.entries, ringHash)
 			// TODO put the ring hash to sync manager
 			// Then the sync manager clean the mempool
+		} else {
+			// This may happen, since view only loaded those appeared in TxIn.
+			// Do Nothing.
 		}
 	}
 
@@ -1472,7 +1477,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 	//
 	// NOTE: These checks could be done directly when connecting a block,
 	// however the downside to that approach is that if any of these checks
-	// fail after disconnecting some blocks or attaching others, all of the
+	// fail after disconnecting some blocks or attaching others, all the
 	// operations have to be rolled back to get the chain back into the
 	// state it was before the rule violation (or other failure).  There are
 	// at least a couple of ways accomplish that rollback, but both involve
@@ -1585,8 +1590,9 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 					return err
 				}*/
 
-		// Update the view to unspend all of the spent txos and remove
+		// Update the view to unspend all the spent txos and remove
 		// the utxos created by the block.
+		// view loaded the UtxoRingEntries appeared in TxIns of block, by using detachSpentTxOuts[].
 		err := view.disconnectTransactions(b.db, block,
 			detachSpentTxOuts[i])
 		if err != nil {
@@ -1626,10 +1632,14 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 						ringFromStxo.ringBlockHeight, ringFromStxo.outPointRing.Hash()))
 				}
 				delete(view.entries, ringHash)
+			} else {
+				// added by Alice on 2024.01.05
+				// This may happen, since view loaded only UtxoRingEntries appeared in TxIns of blocks.
 			}
 		}
 
 		// Update the database and chain state.
+		// todo_DONE(MLP): reviewed on 2024.01.05
 		err = b.disconnectBlockAbe(n, block, view, viewToDel, autView, infoToDel)
 		if err != nil {
 			return err
@@ -1638,10 +1648,16 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 	}
 
 	//	Abe to do
-	//	remove rings from the view which restored from stxos, the resuling view will be ready for attach
+	//	remove rings from the view which restored from stxos, the resulting view will be ready for attach
 	for ringHash, _ := range viewToDelAll.entries {
 		ringFromStxo := view.entries[ringHash]
 		if ringFromStxo != nil {
+			// added by Alice, on 2024.01.05
+			// This should not happen, since viewToDel above has been removed one by one.
+			// todo(MLP): review on 2024.01.06
+			return AssertError(fmt.Sprintf("unexcepted case happens: detaching utxoRing (ringHeight = %d, outPointHash = %v) fail: view still contains ringHash in viewToDelAll",
+				ringFromStxo.ringBlockHeight, ringFromStxo.outPointRing.Hash()))
+
 			if len(ringFromStxo.serialNumbers) > 0 {
 				return AssertError(fmt.Sprintf("detaching utxoRing (ringHeight = %d, outPointHash = %v) fail: the serialNumbers List should be empty, but not",
 					ringFromStxo.ringBlockHeight, ringFromStxo.outPointRing.Hash()))
@@ -1692,7 +1708,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		// if n.height%3 == 2 {
 		//if n.height%wire.BlockNumPerRingGroup == wire.BlockNumPerRingGroup-1 {
 		if n.height%blockNumPerRingGroup == blockNumPerRingGroup-1 {
-			//	todo(MLPAUT):
+			//	todo_DONE(MLP): reviewed on 2024.01.05
 			// err = view.newUtxoRingEntries(b.db, n, block)
 			err = view.newUtxoRingEntriesMLP(b.db, n, block)
 			if err != nil {
@@ -1747,7 +1763,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 //	    2. Find detachNodes and attachNode (getReorganizeNodesAbe)
 //	    3. Reorganize the chain (reorganizeChainAbe)
 //
-// todo: review on 2024.01.04
+// todo_DONE(MLP): reviewed on 2024.01.05
 func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAbe, flags BehaviorFlags) (bool, error) {
 	fastAdd := flags&BFFastAdd == BFFastAdd
 
@@ -1900,7 +1916,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 
 	// Reorganize the chain.
 	log.Infof("REORGANIZE: Block %v (seal hash %v) is causing a reorganize.", node.hash, ethash.SealHash(&block.MsgBlock().Header))
-	// todo(MLP): review on 2024.01.04
+	// todo_DONE(MLP): reviewed on 2024.01.05
 	err := b.reorganizeChainAbe(detachNodes, attachNodes)
 
 	// Either getReorganizeNodes or reorganizeChain could have made unsaved

@@ -24,7 +24,7 @@ import (
 //  6. Connect new block to the chain, including reorganization and switch main chain if needed (connectBestChainAbe)
 //  7. Send NTBlockAccepted notification
 //
-// todo: to review on 2024.01.03
+// todo_DOME(MLP): reviewed on 2024.01.05
 func (b *BlockChain) maybeAcceptBlockAbe(block *abeutil.BlockAbe, flags BehaviorFlags) (bool, error) {
 	// The height of this block is one more than the referenced previous
 	// block.
@@ -86,7 +86,7 @@ func (b *BlockChain) maybeAcceptBlockAbe(block *abeutil.BlockAbe, flags Behavior
 	// Connect the passed block to the chain while respecting proper chain
 	// selection according to the chain with the most proof of work.  This
 	// also handles validation of the transaction scripts.
-	// todo(MLP): to review on 2024.01.03
+	// todo_DONE(MLP): reviewed on 2024.01.03
 	isMainChain, err := b.connectBestChainAbe(newNode, block, flags)
 	if err != nil {
 		return false, err
