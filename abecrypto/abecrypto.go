@@ -2,6 +2,7 @@ package abecrypto
 
 import (
 	"errors"
+	"fmt"
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
@@ -357,22 +358,25 @@ func CoinbaseTxGen(abeTxOutputDescs []*AbeTxOutputDesc, coinbaseTxMsgTemplate *w
 
 }
 
-func CoinbaseTxVerify(coinbaseTx *wire.MsgTxAbe) (bool, error) {
+// CoinbaseTxVerify
+// refactored on 2024.01.06, using err == nil or not to denote valid or invalid.
+func CoinbaseTxVerify(coinbaseTx *wire.MsgTxAbe) error {
 	cryptoScheme, err := abecryptoparam.GetCryptoSchemeByTxVersion(coinbaseTx.Version)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	switch cryptoScheme {
 	case abecryptoparam.CryptoSchemePQRingCT:
-		valid, err := pqringctCoinbaseTxVerify(abecryptoparam.PQRingCTPP, coinbaseTx)
+		err = pqringctCoinbaseTxVerify(abecryptoparam.PQRingCTPP, coinbaseTx)
 		if err != nil {
-			return false, err
+			return err
 		}
-		return valid, nil
 	default:
-		return false, errors.New("CoinbaseTxVerify: Unsupported crypto scheme")
+		return fmt.Errorf("CoinbaseTxVerify: Unsupported crypto scheme")
 	}
+
+	return nil
 }
 
 // CreateTransferTxMsgTemplate creates a *wire.MsgTxAbe template, which will be used when calling TransferTxGen().
@@ -432,22 +436,25 @@ func TransferTxGen(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxO
 
 }
 
-func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail) (bool, error) {
+// TransferTxVerify
+// refactored on 2024.01.06, using err == nil or not to denote valid or invalid
+func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail) error {
 	cryptoScheme, err := abecryptoparam.GetCryptoSchemeByTxVersion(transferTx.Version)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	switch cryptoScheme {
 	case abecryptoparam.CryptoSchemePQRingCT:
-		valid, err := pqringctTransferTxVerify(abecryptoparam.PQRingCTPP, transferTx, abeTxInDetails)
+		err = pqringctTransferTxVerify(abecryptoparam.PQRingCTPP, transferTx, abeTxInDetails)
 		if err != nil {
-			return false, err
+			return err
 		}
-		return valid, nil
 	default:
-		return false, errors.New("TransferTxVerify: Unsupported crypto scheme")
+		return fmt.Errorf("TransferTxVerify: Unsupported crypto scheme")
 	}
+
+	return nil
 }
 
 // TxoCoinReceive checks whether a Txo/Coin belongs to the input cryptoAddress, and return the value if true.
