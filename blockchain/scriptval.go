@@ -127,10 +127,11 @@ func newTxValidator(utxoRingView *UtxoRingViewpoint, witnessCache *txscript.Witn
 	}
 }
 
+// ValidateTransactionScriptsAbe
 // new validate function under pqringct
 // to be discussed
 // ValidateTransactionScriptsAbe validates the input abeutil.TxAbe.
-// todo_DONE(MLP): review on 2024.01.04
+// todo_DONE(MLP): reviewed on 2024.01.04
 func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingViewpoint, witnessCache *txscript.WitnessCache) error {
 	// If transaction witness has already been validated and stored in cache, just return.
 	if witnessCache.Exists(*tx.Hash()) {
@@ -144,15 +145,16 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 
 	if isCB {
 
-		isValid, err := abecryptox.CoinbaseTxVerify(tx.MsgTx())
+		err = abecryptox.CoinbaseTxVerify(tx.MsgTx())
 		if err != nil {
 			str := fmt.Sprintf("coinbase transaction %s verify failed: %v", tx.Hash(), err)
 			return ruleError(ErrScriptValidation, str)
 		}
-		if !isValid {
-			str := fmt.Sprintf("coinbase transaction %s verify failed", tx.Hash())
-			return ruleError(ErrScriptValidation, str)
-		}
+
+		//if !isValid {
+		//	str := fmt.Sprintf("coinbase transaction %s verify failed", tx.Hash())
+		//	return ruleError(ErrScriptValidation, str)
+		//}
 
 		return nil
 	}
@@ -176,15 +178,15 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 		abeTxInDetail[i] = abecryptox.NewAbeTxInDetail(ringHash, serializedTxoList, tx.MsgTx().TxIns[i].SerialNumber)
 	}
 
-	isValid, err := abecryptox.TransferTxVerify(tx.MsgTx(), abeTxInDetail)
+	err = abecryptox.TransferTxVerify(tx.MsgTx(), abeTxInDetail)
 	if err != nil {
 		str := fmt.Sprintf("transaction %s verify failed: %v", tx.Hash(), err)
 		return ruleError(ErrScriptValidation, str)
 	}
-	if !isValid {
-		str := fmt.Sprintf("transaction %s verify failed", tx.Hash())
-		return ruleError(ErrScriptValidation, str)
-	}
+	//if !isValid {
+	//	str := fmt.Sprintf("transaction %s verify failed", tx.Hash())
+	//	return ruleError(ErrScriptValidation, str)
+	//}
 
 	// Add transaction into witness cache.
 	witnessCache.Add(*tx.Hash())
