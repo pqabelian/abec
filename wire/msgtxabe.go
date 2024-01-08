@@ -1040,10 +1040,10 @@ func (msg *MsgTxAbe) IsCoinBase() (bool, error) {
 
 	if len(txIn.PreviousOutPointRing.BlockHashs) == 0 {
 		//	This is to guarantee that coinbaseTx serialize the block height in txIn.PreviousOutPointRing.BlockHashs[0]
-		return false, nil
+		return false, fmt.Errorf("IsCoinBase: len(msg.TxIns[0].PreviousOutPointRing.BlockHashs) is 0")
 	}
 	if len(txIn.PreviousOutPointRing.OutPoints) == 0 {
-		return false, nil
+		return false, fmt.Errorf("IsCoinBase: len(msg.TxIns[0].PreviousOutPointRing.OutPoints) = 0")
 	}
 
 	return true, nil
