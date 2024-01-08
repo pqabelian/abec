@@ -49,23 +49,23 @@ func CoinbaseTxGen(abeTxOutputDescs []*AbeTxOutputDesc, coinbaseTxMsgTemplate *w
 
 // CoinbaseTxVerify verifies whether the input coinbaseTx *wire.MsgTxAbe is valid.
 // reviewed on 2023.12.21
-func CoinbaseTxVerify(coinbaseTx *wire.MsgTxAbe) (bool, error) {
+// refactored on 2024.01.08, using err == nil or not to denote valid or invalid
+// todo: review
+func CoinbaseTxVerify(coinbaseTx *wire.MsgTxAbe) error {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(coinbaseTx.Version)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	switch cryptoScheme {
 	case abecryptoxparam.CryptoSchemePQRingCT:
-		valid, err := abecrypto.CoinbaseTxVerify(coinbaseTx)
-		if err != nil {
-			return false, err
-		}
-		return valid, nil
+		return abecrypto.CoinbaseTxVerify(coinbaseTx)
+
 	case abecryptoxparam.CryptoSchemePQRingCTX:
 		return pqringctxCoinbaseTxVerify(abecryptoxparam.PQRingCTXPP, coinbaseTx)
+
 	default:
-		return false, fmt.Errorf("CoinbaseTxVerify: Unsupported crypto scheme")
+		return fmt.Errorf("CoinbaseTxVerify: crypto-scheme (%d) is not supported", cryptoScheme)
 	}
 }
 
@@ -250,11 +250,12 @@ func TransferTxGenByKeys(abeTxInputDescs []*AbeTxInputDescByKeys, abeTxOutputDes
 
 }
 
+// TransferTxVerify verifies the input transferTx.
 // todo: review
-func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail) (bool, error) {
+func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail) error {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(transferTx.Version)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	switch cryptoScheme {
@@ -265,21 +266,21 @@ func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail
 			pqringctAbeTxInDetails[i] = abecrypto.NewAbeTxInDetail(abeTxInDetail.ringId, abeTxInDetail.txoList, abeTxInDetail.serialNumber)
 		}
 
-		valid, err := abecrypto.TransferTxVerify(transferTx, pqringctAbeTxInDetails)
+		err = abecrypto.TransferTxVerify(transferTx, pqringctAbeTxInDetails)
 		if err != nil {
-			return false, err
+			return err
 		}
-		return valid, nil
 
 	case abecryptoxparam.CryptoSchemePQRingCTX:
-		valid, err := pqringctxTransferTxVerify(abecryptoxparam.PQRingCTXPP, transferTx, abeTxInDetails)
+		err = pqringctxTransferTxVerify(abecryptoxparam.PQRingCTXPP, transferTx, abeTxInDetails)
 		if err != nil {
-			return false, err
+			return err
 		}
-		return valid, nil
 	default:
-		return false, fmt.Errorf("TransferTxVerify: Unsupported crypto scheme")
+		return fmt.Errorf("TransferTxVerify: Unsupported crypto scheme")
 	}
+
+	return nil
 }
 
 //	APIs for Transactions	end
