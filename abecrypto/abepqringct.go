@@ -333,12 +333,13 @@ func pqringctCoinbaseTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 // pqringctCoinbaseTxVerify verify the input coinbaseTx.
 // The caller needs to guarantee the well-form of the input coinbaseTx *wire.MsgTxAbe, such as the TxIns.
 // This function only checks the balance proof, by calling the crypto-scheme.
-func pqringctCoinbaseTxVerify(pp *pqringct.PublicParameter, coinbaseTx *wire.MsgTxAbe) (bool, error) {
+// refactored on 2024.01.06, using err == nil or not to denote valid or invalid
+func pqringctCoinbaseTxVerify(pp *pqringct.PublicParameter, coinbaseTx *wire.MsgTxAbe) error {
 	if coinbaseTx == nil {
-		return false, nil
+		return fmt.Errorf("pqringctCoinbaseTxVerify: the input coinbaseTx is nil")
 	}
 	if len(coinbaseTx.TxOuts) <= 0 {
-		return false, nil
+		return fmt.Errorf("pqringctCoinbaseTxVerify: the number of TxOutput is 0")
 	}
 	var err error
 
@@ -349,11 +350,11 @@ func pqringctCoinbaseTxVerify(pp *pqringct.PublicParameter, coinbaseTx *wire.Msg
 	cryptoCoinbaseTx.OutputTxos = make([]*pqringct.Txo, len(coinbaseTx.TxOuts))
 	for i := 0; i < len(coinbaseTx.TxOuts); i++ {
 		if coinbaseTx.TxOuts[i].Version != coinbaseTx.Version {
-			return false, nil
+			return fmt.Errorf("pqringctCoinbaseTxVerify: coinbaseTx.TxOuts[%d].Version (%d) != coinbaseTx.Version (%d)", i, coinbaseTx.TxOuts[i].Version, coinbaseTx.Version)
 		}
 		cryptoCoinbaseTx.OutputTxos[i], err = pqringct.DeserializeTxo(pp, coinbaseTx.TxOuts[i].TxoScript)
 		if err != nil {
-			return false, err
+			return err
 		}
 	}
 
@@ -367,18 +368,15 @@ func pqringctCoinbaseTxVerify(pp *pqringct.PublicParameter, coinbaseTx *wire.Msg
 		cryptoCoinbaseTx.TxWitnessJ2, err = pqringct.DeserializeCbTxWitnessJ2(pp, coinbaseTx.TxWitness)
 	}
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	bl, err := pqringct.CoinbaseTxVerify(pp, cryptoCoinbaseTx)
+	err = pqringct.CoinbaseTxVerify(pp, cryptoCoinbaseTx)
 	if err != nil {
-		return false, err
-	}
-	if bl == false {
-		return false, nil
+		return err
 	}
 
-	return true, nil
+	return nil
 }
 
 // The caller needs to fill the Version, TxIns, TxFee, TxMemo fields of transferTxMsgTemplate.
@@ -534,19 +532,21 @@ func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 	return transferTxMsgTemplate, nil
 }
 
-func pqringctTransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail) (bool, error) {
+// pqringctTransferTxVerify
+// refactored on 2024.01.06, using err == nil or not to denote valid or invalid
+func pqringctTransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail) error {
 	if transferTx == nil {
-		return false, nil
+		return fmt.Errorf("pqringctTransferTxVerify: the input transferTx is nil")
 	}
 
 	inputNum := len(transferTx.TxIns)
 	outputNum := len(transferTx.TxOuts)
 	if inputNum <= 0 || outputNum <= 0 {
-		return false, nil
+		return fmt.Errorf("pqringctTransferTxVerify: inputNum or outputNum <= 0")
 	}
 
 	if len(abeTxInDetails) != inputNum {
-		return false, nil
+		return fmt.Errorf("pqringctTransferTxVerify: len(abeTxInDetails) != inputNum")
 	}
 
 	var err error
@@ -559,23 +559,23 @@ func pqringctTransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.Msg
 	cryptoTransferTx.Inputs = make([]*pqringct.TrTxInput, inputNum)
 	for i := 0; i < inputNum; i++ {
 		if transferTx.TxIns[i].PreviousOutPointRing.Version != inputsVersion {
-			return false, nil
+			return fmt.Errorf("pqringctTransferTxVerify: %d -th input has a ring version (%d), while the first input has a ring version (%d)", i, transferTx.TxIns[i].PreviousOutPointRing.Version, inputsVersion)
 			//	This is necessary, since the same version will ensure that when calling the cryptoscheme, there are not exceptions.
 		}
 		if bytes.Compare(abeTxInDetails[i].serialNumber, transferTx.TxIns[i].SerialNumber) != 0 {
-			return false, nil
+			return fmt.Errorf("pqringctTransferTxVerify: abeTxInDetails[%d].serialNumber (%s) and transferTx.TxIns[%d].SerialNumber (%s) are different", i, abeTxInDetails[i].serialNumber, i, transferTx.TxIns[i].SerialNumber)
 			//	This check can be removed, as the caller will provide abeTxInDetails, which are made by querying the database using the transferTx.TxIns information
 		}
 		txoList := make([]*pqringct.LgrTxo, len(abeTxInDetails[i].txoList))
 		for j := 0; j < len(abeTxInDetails[i].txoList); j++ {
 			if abeTxInDetails[i].txoList[j].Version != transferTx.TxIns[i].PreviousOutPointRing.Version {
-				return false, nil
+				return fmt.Errorf("pqringctTransferTxVerify: abeTxInDetails[%d].txoList[%d].Version (%d) is different from transferTx.TxIns[%d].PreviousOutPointRing.Version (%d)", i, j, abeTxInDetails[i].txoList[j].Version, i, transferTx.TxIns[i].PreviousOutPointRing.Version)
 				//	The Txos in the same ring should have the same version
 			}
 
 			txo, err := pp.DeserializeTxo(abeTxInDetails[i].txoList[j].TxoScript)
 			if err != nil {
-				return false, err
+				return err
 			}
 			txolid := ledgerTxoIdGen(abeTxInDetails[i].ringHash, uint8(j))
 			txoList[j] = pqringct.NewLgrTxo(txo, txolid)
@@ -591,13 +591,13 @@ func pqringctTransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.Msg
 	cryptoTransferTx.OutputTxos = make([]*pqringct.Txo, outputNum)
 	for j := 0; j < outputNum; j++ {
 		if transferTx.TxOuts[j].Version != outputsVersion {
-			return false, nil
+			return fmt.Errorf("pqringctTransferTxVerify: transferTx.TxOuts[%d].Version (%d) is different from transferTx.Version (%d)", j, transferTx.TxOuts[j].Version, transferTx.Version)
 			//	The output Txos of a transaction should have the same version as the transaction.
 		}
 
 		cryptoTransferTx.OutputTxos[j], err = pp.DeserializeTxo(transferTx.TxOuts[j].TxoScript)
 		if err != nil {
-			return false, err
+			return err
 		}
 	}
 
@@ -610,19 +610,16 @@ func pqringctTransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.Msg
 	//	TxWitness
 	cryptoTransferTx.TxWitness, err = pp.DeserializeTrTxWitness(transferTx.TxWitness)
 	if err != nil {
-		return false, nil
+		return err
 	}
 
 	// call the crypto scheme's verify algroithm
-	bl, err := pqringct.TransferTxVerify(pp, cryptoTransferTx)
+	err = pqringct.TransferTxVerify(pp, cryptoTransferTx)
 	if err != nil {
-		return false, err
-	}
-	if bl == false {
-		return false, nil
+		return err
 	}
 
-	return true, nil
+	return nil
 }
 
 func pqringctTxoCoinReceive(pp *pqringct.PublicParameter, cryptoScheme abecryptoparam.CryptoScheme, abeTxo *wire.TxOutAbe, cryptoAddress []byte, cryptoVsk []byte) (valid bool, v uint64, err error) {
