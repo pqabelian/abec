@@ -3,6 +3,7 @@ package aut
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 	"io"
@@ -28,8 +29,12 @@ const (
 	minTxInPayload = 12 + chainhash.HashSize
 )
 
-// OutPoint defines a aut data type that is used to track previous
+// OutPoint defines an aut data type that is used to track previous
 // transaction outputs.
+// todo(AUT): Hash --> TxHash
+// refer to Abel.OutPoint? or Aut.(TxHash, Index)?
+// type OutPoint wire.OutPointAbe
+// or refer to OutPointAbe in the Txs?
 type OutPoint struct {
 	Hash  chainhash.Hash
 	Index uint8
@@ -55,6 +60,7 @@ func (o OutPoint) String() string {
 
 type TransactionType = uint8
 
+// todo(AUT): hardcode rather than iota
 const (
 	Registration TransactionType = iota
 	Mint
@@ -74,8 +80,12 @@ const MaxIssuerNum = 10
 // AUTSCRIPT 0 varSize ...
 // AUTSCRIPT 1 varSize ...
 
+// todo: using constant?
 var CommonPrefix = []byte("AUTSCRIPT")
 
+// todo(AUT): Ins --> TxIns(), Outs --> TxOuts (since Ins and Outs are too short to describe clearly).
+// todo(AUT): NumIns() ? shall be removed?
+// todo(AUT): Values() ?
 type Transaction interface {
 	Type() TransactionType
 	Serialize() ([]byte, error)
@@ -87,20 +97,25 @@ type Transaction interface {
 	Values(uint8) uint64
 }
 
+// todo: Info --> AutInstance? AutDef? or AutDesc ?
+// ReRegistration will update this info? If true, this means AutState or AutMeta?
+// How to store the history AutState?
+// Use a bucket store the history AutState, and AutEntry refers to the latest?
+
 type Info struct {
-	Name               []byte
-	Memo               []byte
+	AutName            []byte
+	AutMemo            []byte
 	UpdateThreshold    uint8
 	IssueThreshold     uint8
 	PlannedTotalAmount uint64
 	ExpireHeight       int32
-	Issuers            []*chainhash.Hash
+	IssuerTokens       []*chainhash.Hash // todo(AUT): using SHA3-512, define a standalone hash in AUT. Hash(CoinAddress)?
 	UnitName           []byte
 	MinUnitName        []byte
 	UnitScale          uint64
 
 	MintedAmount uint64
-	RootCoinSet  map[OutPoint]struct{}
+	RootCoinSet  map[OutPoint]struct{} // todo(AUT): this is all or only the actives ones.
 }
 
 // Clone returns a shallow copy of the utxo entry.
@@ -163,14 +178,17 @@ func (info *Info) Clone() *Info {
 // [UnitName]
 // [MinUnitName]
 
+// todo: RegistrationTx has its TxMemo, where a user can specify.
+// and each AUT instance has its Memo (simialr to a description of the AutInstance).
+// Why this is dupliating the Info?
 type RegistrationTx struct {
-	Name                  []byte
-	Issuers               []*chainhash.Hash
+	AutName               []byte            // todo(AUT): AutName ?
+	Issuers               []*chainhash.Hash // todo(AUT): same as in Info
 	ExpireHeight          int32
 	IssuerUpdateThreshold uint8 // TODO confirm the range
 	IssueTokensThreshold  uint8
-	NumOutAutRootCoins    uint8
-	Memo                  []byte
+	OutAutRootCoinNum     uint8
+	AutMemo               []byte
 	PlannedTotalAmount    uint64
 	UnitName              []byte
 	MinUnitName           []byte
@@ -404,11 +422,11 @@ var _ Transaction = &RegistrationTx{}
 // <TxoAUTValues> an array of n integer value each one for a an AUTCoin
 // [Memo]
 type MintTx struct {
-	Name              []byte
-	NumInAutRootCoins uint8
-	NumOutAutCoins    uint8
-	TxoAUTValues      []uint64
-	Memo              []byte
+	Name             []byte
+	InAutRootCoinNum uint8
+	NumOutAutCoins   uint8
+	TxoAUTValues     []uint64
+	Memo             []byte
 
 	TxIns  []OutPoint
 	TxOuts []OutPoint
@@ -1062,6 +1080,24 @@ var ErrInValidAUTTx = errors.New("not a valid AUT transaction")
 // if success, do some sanity for AUT transaction:
 // - check amount of output of origin transaction for AUT
 // - check configuration of AUT transaction
+// todo(AUT): using []byte rather than MsgTxAbe as input?
+// In aut package, add ExtractAutTransaction function
+func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
+	// if prefix does not match
+	return nil, nil // nil means MsgTxAbe does not contain AutTransaction
+
+	//	extract
+	//	if there is err
+	return nil, fmt.Errorf("err")
+
+	return autTx, nil
+}
+
+// for each valid TrTx, ExtractAutTRansaction is called
+// if returned (autTx,  nil)
+// further proceeding
+// logic should be aut package, but database operation should be in blockchain.
+
 func DeserializeFromTx(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 	if len(tx.TxMemo) <= CommonPrefixLength {
 		return nil, ErrNonAutTx

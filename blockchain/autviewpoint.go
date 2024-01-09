@@ -43,6 +43,7 @@ const (
 // view such as whether or not it was contained in a AUT Registration Transaction, the height of
 // the block that contains the tx, whether or not it is spent, its public key
 // script, and how much it pays.
+// todo: AutEntry?
 type Entry struct {
 	info  *aut.Info
 	coins map[aut.OutPoint]*AUTCoin
@@ -52,6 +53,7 @@ func NewEntry(info *aut.Info, coins map[aut.OutPoint]*AUTCoin) *Entry {
 	return &Entry{info: info, coins: coins}
 }
 
+// todo: AddCion
 func (e *Entry) Add(outpiont aut.OutPoint, entry *AUTCoin) {
 	e.coins[outpiont] = entry
 }
@@ -137,6 +139,7 @@ func (entry *AUTCoin) Clone() *AUTCoin {
 	}
 }
 
+// todo: function name
 // NewAUTEntry returns a new AUTCoin built from the arguments.
 func NewAUTEntry(
 	name []byte, amount uint64, blockHeight int32, isRootCoin bool) *AUTCoin {
@@ -159,6 +162,8 @@ func NewAUTEntry(
 //
 // The unspent outputs are needed by other transactions for things such as
 // script validation and double spend prevention.
+//
+//	todo: using AutName as key to store AutEntries.
 type AUTViewpoint struct {
 	entries  map[string]*Entry
 	bestHash chainhash.Hash
@@ -180,6 +185,7 @@ func (view *AUTViewpoint) SetBestHash(hash *chainhash.Hash) {
 // the current state of the view.  It will return nil if the passed output does
 // not exist in the view or is otherwise not available such as when it has been
 // disconnected during a reorg.
+// todo: function name LookupAutCoin
 func (view *AUTViewpoint) LookupEntry(autNameKey string, outpoint aut.OutPoint) *AUTCoin {
 	if view.entries == nil {
 		return nil
@@ -191,6 +197,7 @@ func (view *AUTViewpoint) LookupEntry(autNameKey string, outpoint aut.OutPoint) 
 	return entry.coins[outpoint]
 }
 
+// todo: function name LookupAutDesc
 func (view *AUTViewpoint) LookupInfo(autNameKey string) *aut.Info {
 	if view.entries == nil {
 		return nil
