@@ -1214,6 +1214,7 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 }
 
 // handlePrunedBlockMsgAbe handles prunedblock messages from all peers.
+// todo_DONE(MLP): review on 2024.01.09
 func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	defer func() {
 		if bmsg.reply != nil {
