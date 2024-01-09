@@ -644,6 +644,7 @@ func (sm *SyncManager) updateSyncPeer(dcSyncPeer bool) {
 }
 
 // handleTxMsgAbe handles transaction messages from all peers.
+// todo_DONE(MLP): reviewed on 2024.01.09
 func (sm *SyncManager) handleTxMsgAbe(tmsg *txMsgAbe) {
 	peer := tmsg.peer
 	state, exists := sm.peerStates[peer]
@@ -675,6 +676,7 @@ func (sm *SyncManager) handleTxMsgAbe(tmsg *txMsgAbe) {
 
 	// Process the transaction to include validation, insertion in the
 	// memory pool, orphan handling, etc.
+	// todo_DONE(MLP): reviewed on 2024.01.09
 	acceptedTx, err := sm.txMemPool.ProcessTransactionAbe(tmsg.tx,
 		true, true, mempool.Tag(peer.ID()), false)
 

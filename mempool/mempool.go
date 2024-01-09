@@ -1690,6 +1690,8 @@ func (mp *TxPool) validateReplacement(tx *abeutil.Tx,
 //  10. Check the witness of the transaction (ValidateTransactionScriptsAbe)
 //  11. Check the AUT feature of the transaction if the memo meet the condition
 //  12. Add transaction into mempool
+//
+// todo_DONE(MLP): reviewed on 2024.01.09
 func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit, rejectDupOrphans bool, fromDiskCache bool) ([]*wire.OutPointRing, *TxDescAbe, error) {
 
 	txHash := tx.Hash()
@@ -1765,7 +1767,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 		return nil, nil, err
 	}
 
-	// Fetch all of the utxoRings referenced by the inputs
+	// Fetch all the utxoRings referenced by the inputs
 	// to this transaction.  This function also attempts to fetch the
 	// transaction itself to be used for detecting a duplicate transaction
 	// without needing to do a separate lookup.
@@ -2015,6 +2017,7 @@ func (mp *TxPool) ProcessOrphansAbe(acceptedTx *abeutil.TxAbe) {
 // the passed one being accepted.
 //
 // This function is safe for concurrent access.
+// todo_DONE(MLP): reviewed on 2024.01.09
 func (mp *TxPool) ProcessTransactionAbe(tx *abeutil.TxAbe, allowOrphan, rateLimit bool, tag Tag, fromDiskCache bool) (*TxDescAbe, error) {
 	log.Tracef("Processing transaction %v", tx.Hash())
 
@@ -2023,6 +2026,7 @@ func (mp *TxPool) ProcessTransactionAbe(tx *abeutil.TxAbe, allowOrphan, rateLimi
 	defer mp.mtx.Unlock()
 
 	// Potentially accept the transaction to the memory pool.
+	// todo_DONE(MLP): reviewed on 2024.01.09
 	missingParents, txD, err := mp.maybeAcceptTransactionAbe(tx, true, rateLimit,
 		true, fromDiskCache)
 	if err != nil {
@@ -2035,9 +2039,9 @@ func (mp *TxPool) ProcessTransactionAbe(tx *abeutil.TxAbe, allowOrphan, rateLimi
 	//	only when a new block is accepted, some orphans may go into mempool.
 	if len(missingParents) == 0 {
 
-		//	As ABE does not allow transaction to depends on the transactions which are not included in block,
+		//	As ABE does not allow transaction to depend on the transactions which are not included in block,
 		//	the orphans may go into mempool only when new blocks are appended to chain.
-		//	Here only removed the orphans thta are conflict with the acceptedTx.
+		//	Here only removed the orphans that are conflict with the acceptedTx.
 		mp.removeOrphanDoubleSpendsAbe(tx)
 
 		acceptedTx := txD
