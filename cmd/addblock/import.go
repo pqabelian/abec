@@ -89,6 +89,7 @@ func (bi *blockImporter) readBlock() ([]byte, error) {
 // block through the chain rules to ensure it follows all rules and matches
 // up to the known checkpoint.  Returns whether the block was imported along
 // with any potential errors.
+// todo_DONE(MLP): review on 2024.01.09
 func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 	// Deserialize the block which includes checks for malformed blocks.
 	block, err := abeutil.NewBlockFromBytesAbe(serializedBlock)
