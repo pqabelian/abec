@@ -64,7 +64,7 @@ func (tx *TxAbe) AUTTransaction() (aut.Transaction, bool) {
 	}
 	tx.autTxDone = true
 
-	autTx, err := aut.DeserializeFromTx(tx.MsgTx())
+	autTx, err := aut.ExtractAutTransaction(tx.MsgTx())
 	if err != nil {
 		if errors.Is(err, aut.ErrNonAutTx) {
 			tx.isAUTTx = false
@@ -79,7 +79,7 @@ func (tx *TxAbe) AUTTransaction() (aut.Transaction, bool) {
 		return nil, true
 	}
 	tx.autTx = autTx
-	tx.isAUTTx = true
+	tx.isAUTTx = autTx == nil
 	return autTx, true
 }
 

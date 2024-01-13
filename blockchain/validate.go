@@ -1672,7 +1672,7 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, autView *AUTVi
 			return errors.New("an AUT has expired")
 		}
 		// threshold
-		if uint8(autTx.NumIns()) < entry.info.IssueThreshold {
+		if uint8(len(autTx.Ins())) < entry.info.IssueThreshold {
 			return errors.New("an AUT mint transaction spend root coins but lower than threshold")
 		}
 		// input exist? double spent?
@@ -1690,7 +1690,7 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, autView *AUTVi
 	case *aut.ReRegistrationTx:
 		// check the sanity of re-registration transaction
 		// threshold
-		if uint8(autTx.NumIns()) < entry.info.UpdateThreshold {
+		if uint8(len(autTx.Ins())) < entry.info.UpdateThreshold {
 			return errors.New("an AUT re-registration transaction with root coin lower than threshold")
 		}
 		// expire height

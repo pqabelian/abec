@@ -503,15 +503,15 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *bl
 				rootCoinSet[autTransaction.TxOuts[i]] = struct{}{}
 			}
 			// register the AUT entry
-			autView.SetEntry(autTransaction.Name, blockchain.NewEntry(
+			autView.SetEntry(autTransaction.AutName, blockchain.NewEntry(
 				&aut.Info{
-					Name:               autTransaction.Name,
-					Memo:               autTransaction.Memo,
+					AutName:            autTransaction.AutName,
+					AutMemo:            autTransaction.AutMemo,
 					UpdateThreshold:    autTransaction.IssuerUpdateThreshold,
 					IssueThreshold:     autTransaction.IssueTokensThreshold,
 					PlannedTotalAmount: autTransaction.PlannedTotalAmount,
 					ExpireHeight:       autTransaction.ExpireHeight,
-					Issuers:            autTransaction.Issuers,
+					IssuerTokens:       autTransaction.IssuerTokens,
 					UnitName:           autTransaction.UnitName,
 					MinUnitName:        autTransaction.MinUnitName,
 					UnitScale:          autTransaction.UnitScale,
@@ -553,12 +553,12 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *bl
 			}
 
 			// update aut info
-			info.Memo = autTransaction.Memo
+			info.AutMemo = autTransaction.Memo
 			info.UpdateThreshold = autTransaction.IssuerUpdateThreshold
 			info.IssueThreshold = autTransaction.IssueTokensThreshold
 			info.PlannedTotalAmount = autTransaction.PlannedTotalAmount
 			info.ExpireHeight = autTransaction.ExpireHeight
-			info.Issuers = autTransaction.Issuers
+			info.IssuerTokens = autTransaction.IssuerTokens
 			info.UnitScale = autTransaction.UnitScale
 			// remove previous root coins
 			info.RootCoinSet = make(map[aut.OutPoint]struct{}, len(autTransaction.TxOuts))

@@ -899,27 +899,29 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint,
 		mp.cfg.FeeEstimator.ObserveTransaction(txD)
 	}
 
-	autTx, _ := aut.DeserializeFromTx(tx.MsgTx())
-	switch autTransaction := autTx.(type) {
-	case *aut.RegistrationTx:
-		if mp.expiredAUTTransaction[autTransaction.ExpireHeight] == nil {
-			mp.expiredAUTTransaction[autTransaction.ExpireHeight] = map[chainhash.Hash]*TxDescAbe{}
+	autTx, isAut := tx.AUTTransaction()
+	if isAut && autTx != nil {
+		switch autTransaction := autTx.(type) {
+		case *aut.RegistrationTx:
+			if mp.expiredAUTTransaction[autTransaction.ExpireHeight] == nil {
+				mp.expiredAUTTransaction[autTransaction.ExpireHeight] = map[chainhash.Hash]*TxDescAbe{}
+			}
+			mp.expiredAUTTransaction[autTransaction.ExpireHeight][*txD.Tx.Hash()] = txD
+			mp.wouldRegisterAUTName[hex.EncodeToString(autTransaction.AUTName())] = struct{}{}
+		case *aut.ReRegistrationTx:
+			if mp.expiredAUTTransaction[autTransaction.ExpireHeight] == nil {
+				mp.expiredAUTTransaction[autTransaction.ExpireHeight] = map[chainhash.Hash]*TxDescAbe{}
+			}
+			mp.expiredAUTTransaction[autTransaction.ExpireHeight][*txD.Tx.Hash()] = txD
+		case *aut.MintTx:
+			info := autView.LookupInfo(hex.EncodeToString(autTransaction.Name))
+			if mp.expiredAUTTransaction[info.ExpireHeight] == nil {
+				mp.expiredAUTTransaction[info.ExpireHeight] = map[chainhash.Hash]*TxDescAbe{}
+			}
+			mp.expiredAUTTransaction[info.ExpireHeight][*txD.Tx.Hash()] = txD
+		default:
+			// nothing to do
 		}
-		mp.expiredAUTTransaction[autTransaction.ExpireHeight][*txD.Tx.Hash()] = txD
-		mp.wouldRegisterAUTName[hex.EncodeToString(autTransaction.AUTName())] = struct{}{}
-	case *aut.ReRegistrationTx:
-		if mp.expiredAUTTransaction[autTransaction.ExpireHeight] == nil {
-			mp.expiredAUTTransaction[autTransaction.ExpireHeight] = map[chainhash.Hash]*TxDescAbe{}
-		}
-		mp.expiredAUTTransaction[autTransaction.ExpireHeight][*txD.Tx.Hash()] = txD
-	case *aut.MintTx:
-		info := autView.LookupInfo(hex.EncodeToString(autTransaction.Name))
-		if mp.expiredAUTTransaction[info.ExpireHeight] == nil {
-			mp.expiredAUTTransaction[info.ExpireHeight] = map[chainhash.Hash]*TxDescAbe{}
-		}
-		mp.expiredAUTTransaction[info.ExpireHeight][*txD.Tx.Hash()] = txD
-	default:
-		// nothing to do
 	}
 
 	return txD

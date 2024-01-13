@@ -265,13 +265,13 @@ func (view *AUTViewpoint) connectTransaction(tx *abeutil.TxAbe, blockHeight int3
 		// register the AUT entry
 		entry = NewEntry(
 			&aut.Info{
-				Name:               autTransaction.Name,
-				Memo:               autTransaction.Memo,
+				AutName:            autTransaction.AutName,
+				AutMemo:            autTransaction.AutMemo,
 				UpdateThreshold:    autTransaction.IssuerUpdateThreshold,
 				IssueThreshold:     autTransaction.IssueTokensThreshold,
 				PlannedTotalAmount: autTransaction.PlannedTotalAmount,
 				ExpireHeight:       autTransaction.ExpireHeight,
-				Issuers:            autTransaction.Issuers,
+				IssuerTokens:       autTransaction.IssuerTokens,
 				UnitName:           autTransaction.UnitName,
 				MinUnitName:        autTransaction.MinUnitName,
 				UnitScale:          autTransaction.UnitScale,
@@ -345,12 +345,12 @@ func (view *AUTViewpoint) connectTransaction(tx *abeutil.TxAbe, blockHeight int3
 		}
 
 		// update aut info
-		info.Memo = autTransaction.Memo
+		info.AutMemo = autTransaction.Memo
 		info.UpdateThreshold = autTransaction.IssuerUpdateThreshold
 		info.IssueThreshold = autTransaction.IssueTokensThreshold
 		info.PlannedTotalAmount = autTransaction.PlannedTotalAmount
 		info.ExpireHeight = autTransaction.ExpireHeight
-		info.Issuers = autTransaction.Issuers
+		info.IssuerTokens = autTransaction.IssuerTokens
 		info.UnitScale = autTransaction.UnitScale
 		// remove previous root coins
 		info.RootCoinSet = make(map[aut.OutPoint]struct{}, len(autTransaction.TxOuts))
