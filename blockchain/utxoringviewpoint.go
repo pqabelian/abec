@@ -111,9 +111,12 @@ func BuildTxoRings(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.
 		return nil, err
 	}
 
-	trTxoRings, err := buildTxoRingsFromTxos(allTransferRmTxos, ringBlockHeight, blockHashs, txoRingSize, false)
-	if err != nil {
-		return nil, err
+	var trTxoRings []*wire.TxoRing
+	if len(allTransferRmTxos) != 0 {
+		trTxoRings, err = buildTxoRingsFromTxos(allTransferRmTxos, ringBlockHeight, blockHashs, txoRingSize, false)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	rstTxoRings := make(map[wire.RingId]*wire.TxoRing, len(cbTxoRings)+len(trTxoRings))
@@ -1437,7 +1440,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 // Here txoRingSize is set as an input parameter, to avoid using the global parameter TxoRingSize.
 // txoRingSize is set by the caller which may decides the value of txoRingSize based on the wire/protocol version.
 func (view *UtxoRingViewpoint) NewUtxoRingEntriesFromTxos(ringMemberTxos []*RingMemberTxo, ringBlockHeight int32, blockhashs []*chainhash.Hash, txoRingSize int, isCoinBase bool) error {
-
+	//	TODO(MLP_AUT):  Add assert for isCoinBase == true
 	if len(ringMemberTxos) == 0 {
 		return nil
 	}
