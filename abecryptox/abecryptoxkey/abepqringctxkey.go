@@ -340,6 +340,18 @@ func pqringctxGetPrivacyLevelFromCoinAddressType(coinAddressType pqringctxapi.Co
 		return 0, fmt.Errorf("pqringctxGetPrivacyLevelFromCoinAddressType: the input CoinAddressType is not supported")
 	}
 }
+func pqringctxGetCoinAddressTypeFromPrivacyLevel(privacyLevel PrivacyLevel) (pqringctxapi.CoinAddressType, error) {
+	switch privacyLevel {
+	case PrivacyLevelRINGCTPre:
+		return pqringctxapi.CoinAddressTypePublicKeyForRingPre, nil
+	case PrivacyLevelRINGCT:
+		return pqringctxapi.CoinAddressTypePublicKeyForRing, nil
+	case PrivacyLevelPSEUDONYM:
+		return pqringctxapi.CoinAddressTypePublicKeyHashForSingle, nil
+	default:
+		return 0, fmt.Errorf("pqringctxGetCoinAddressTypeFromPrivacyLevel: the input Privacy is not supported")
+	}
+}
 
 //	APIs for AddressKey-Encode-Format	begin
 
@@ -592,3 +604,11 @@ func pqringctxCryptoValueSecretKeyParse(pp *pqringctxapi.PublicParameter, crypto
 }
 
 // APIs for AddressKey-Encode-Format	end
+
+// APIs for key size start
+
+func pqringctxGetCoinAddressSize(pp *pqringctxapi.PublicParameter, addressType pqringctxapi.CoinAddressType) (int, error) {
+	return pp.GetCoinAddressSize(addressType)
+}
+
+// APIs for key size end

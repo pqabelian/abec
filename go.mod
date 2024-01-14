@@ -15,8 +15,8 @@ require (
 	github.com/kkdai/bstream v1.0.0
 	github.com/shirou/gopsutil/v3 v3.23.7
 	github.com/syndtr/goleveldb v1.0.0
-	golang.org/x/crypto v0.1.0
-	golang.org/x/sys v0.10.0
+	golang.org/x/crypto v0.14.0
+	golang.org/x/sys v0.13.0
 )
 
 require (

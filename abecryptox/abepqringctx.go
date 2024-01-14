@@ -2,11 +2,13 @@ package abecryptox
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
+	"github.com/cryptosuite/pqringctx"
 	"github.com/cryptosuite/pqringctx/pqringctxapi"
 )
 
@@ -597,6 +599,82 @@ func pqringctxGetTxoPrivacyLevel(pp *pqringctxapi.PublicParameter, abeTxo *wire.
 	}
 
 	return abecryptoxkey.GetPrivacyLevelFromCoinAddressType(cryptoTxoMLP.CoinAddressType())
+}
+
+func pqringctTxoCoinReceive(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe, cryptoAddress []byte, cryptoVsk []byte) (valid bool, v uint64, err error) {
+	cryptoSchemeTxo, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
+	if err != nil {
+		return false, 0, err
+	}
+
+	if cryptoSchemeTxo != cryptoScheme {
+		return false, 0, errors.New("pqringctTxoCoinReceive: unmatched cryptoScheme for input Txo")
+	}
+
+	txo, err := pqringctxapi.DeserializeTxo(pp, abeTxo.TxoScript)
+	if err != nil {
+		return false, 0, err
+	}
+
+	cryptoSchemeInAddress, err := abecryptoxkey.ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
+	if err != nil || cryptoSchemeInAddress != cryptoScheme {
+		return false, 0, errors.New("pqringctTxoCoinReceive: unmatched cryptoScheme for input cryptoAddress")
+	}
+
+	cryptoSchemeInVsk, err := abecryptoxkey.ExtractCryptoSchemeFromCryptoValueSecretKey(cryptoVsk)
+	if err != nil || cryptoSchemeInVsk != cryptoScheme {
+		return false, 0, errors.New("pqringctTxoCoinReceive: unmatched cryptoScheme for Vsk")
+	}
+	privacyLevelInAddress, coinAddress, coinValuePublicKey, err := abecryptoxkey.CryptoAddressParse(cryptoAddress)
+	if err != nil {
+		return false, 0, errors.New("pqringctTxoCoinReceive: unmatched cryptoScheme for input cryptoAddress")
+	}
+	privacyLevelInVsk, coinValueSecretKey, err := abecryptoxkey.CryptoValueSecretKeyParse(cryptoVsk)
+	if privacyLevelInAddress != privacyLevelInVsk {
+		return false, 0, errors.New("pqringctTxoCoinReceive: unmatched privacy level for input cryptoAddress and cryptoVsk")
+	}
+
+	return pqringctxapi.TxoCoinReceive(pp, txo, coinAddress, coinValuePublicKey, coinValueSecretKey)
+}
+
+// For wallet
+func pqringctTxoCoinSerialNumberGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe, ringHash chainhash.Hash, txoIndexInRing uint8, cryptoSnsk []byte) ([]byte, error) {
+	// ringHash + index -> ID
+	//	// (txo, txolid) + Sksn -> sn [pqringct]
+	cryptoSchemeInTxo, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
+	if err != nil {
+		return nil, err
+	}
+
+	if cryptoSchemeInTxo != cryptoScheme {
+		return nil, errors.New("pqringctTxoCoinSerialNumberGen: unmatched cryptoScheme for input Txo")
+	}
+
+	txo, err := pqringctx.DeserializeTxo(pp, abeTxo.TxoScript)
+	if err != nil {
+		return nil, err
+	}
+
+	txolid := pqringctxLedgerTxoIdGen(ringHash, txoIndexInRing)
+
+	lgrTxo := pqringctx.NewLgrTxo(txo, txolid)
+
+	_, coinSerialNumberSecretKey, err := abecryptoxkey.CryptoSerialNumberSecretKeyParse(cryptoSnsk)
+	if err != nil {
+		return nil, errors.New("pqringctTxoCoinSerialNumberGen: unmatched cryptoScheme for Snsk")
+	}
+
+	//	lgrTxo rather than (txo,txolid) pair is used, since TransferTxGen is called on input Ledger-txos.
+	sn, err := pqringctx.LedgerTxoSerialNumberGen(pp, lgrTxo, coinSerialNumberSecretKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return sn, nil
+}
+
+func pqringctExtractCoinAddressFromTxoScript(pp *pqringctxapi.PublicParameter, script []byte) ([]byte, error) {
+	return pqringctxapi.ExtractCoinAddressFromSerializedTxo(pp, script)
 }
 
 //	APIs for Txos	end

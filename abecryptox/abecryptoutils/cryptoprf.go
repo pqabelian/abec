@@ -2,6 +2,9 @@ package abecryptoutils
 
 import (
 	_ "crypto"
+	"crypto/hmac"
+	"golang.org/x/crypto/sha3"
+	//"github.com/alexedwards/argon2id"
 )
 
 // The abecryptox-layer is responsible for generating Rand Seeds for the underling crypto-scheme.
@@ -14,5 +17,8 @@ const PRFKeyBytesLen = 64
 const PRFOutputBytesLen = 64
 
 func PRF(key []byte, input []byte) (output []byte) {
-	return nil
+	mac := hmac.New(sha3.New512, key)
+	mac.Write(input)
+	output = mac.Sum(nil)
+	return output
 }

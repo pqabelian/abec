@@ -35,6 +35,10 @@ const (
 // var PQRingCTPP = pqringct.Initialize([]byte("Welcome to Post Quantum World! From the Abelian Team"))
 var PQRingCTXPP = pqringctxapi.InitializePQRingCTX([]byte("Welcome to Post Quantum World! From the Abelian Team"))
 
+func CryptoSchemeSerializeSize(cryptoScheme CryptoScheme) int {
+	return 4
+}
+
 // SerializeCryptoScheme serialize the input CryptoScheme, using little endian to serialize an uint32 number.
 // reviewed on 2023.12.07
 func SerializeCryptoScheme(cryptoScheme CryptoScheme) []byte {
@@ -161,7 +165,7 @@ func GetCryptoSchemeParamSeedBytesLen(cryptoScheme CryptoScheme) (int, error) {
 		return pqringctxGetCryptoSchemeParamSeedBytesLen(PQRingCTXPP), nil
 
 	default:
-		return 0, fmt.Errorf("CryptoAddressKeyGen: unsupported crypto-scheme")
+		return 0, fmt.Errorf("GetCryptoSchemeParamSeedBytesLen: unsupported crypto-scheme")
 	}
 
 	return 0, nil

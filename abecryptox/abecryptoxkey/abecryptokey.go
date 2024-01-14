@@ -162,6 +162,9 @@ func CryptoAddressKeyGenByRandSeeds(cryptoScheme abecryptoxparam.CryptoScheme, p
 func GetPrivacyLevelFromCoinAddressType(coinAddressType pqringctxapi.CoinAddressType) (PrivacyLevel, error) {
 	return pqringctxGetPrivacyLevelFromCoinAddressType(coinAddressType)
 }
+func GetCoinAddressTypeFromPrivacyLevel(privacyLevel PrivacyLevel) (pqringctxapi.CoinAddressType, error) {
+	return pqringctxGetCoinAddressTypeFromPrivacyLevel(privacyLevel)
+}
 
 //	APIs for AddressKey-Encode-Format	begin
 //
@@ -486,3 +489,24 @@ func CryptoDetectorKeyParse(cryptoDetectorKey []byte) (privacyLevel PrivacyLevel
 }
 
 //	APIs for AddressKey-Encode-Format	end
+
+// APIs for key size start
+
+func GetCoinAddressSize(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel) (int, error) {
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCT:
+		//	this is to achieve back-compatibility with PQRingCT
+		return pqringctxGetCoinAddressSize(abecryptoxparam.PQRingCTXPP, pqringctxapi.CoinAddressTypePublicKeyForRingPre)
+
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+		coinAddressType, err := pqringctxGetCoinAddressTypeFromPrivacyLevel(privacyLevel)
+		if err != nil {
+			return 0, err
+		}
+		return pqringctxGetCoinAddressSize(abecryptoxparam.PQRingCTXPP, coinAddressType)
+	default:
+		return 0, fmt.Errorf("GetCoinAddressSize: unsupported crypto-scheme")
+	}
+}
+
+// APIs for key size end
