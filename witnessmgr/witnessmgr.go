@@ -167,22 +167,6 @@ func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
 		realFileNumPruned = append(realFileNumPruned, num)
 	}
 
-	f, err := os.OpenFile(wm.tLogFilename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
-	if err != nil {
-		log.Errorf("can not create a log file for recording witness history and minimum file num")
-	}
-	defer f.Close()
-	for num, info := range fileInfo {
-		f.WriteString(fmt.Sprintf("[Witness Delete History] %d(%d) at %d\n", num, info.Size(), time.Now().Unix()))
-	}
-
-	// Save delete info to database, including file size and delete time,
-	// these information may be useful in the future.
-	err = wm.chain.StoreDeleteHistory(fileInfo)
-	if err != nil {
-		return err
-	}
-
 	// Update min consecutive witness file num first in case the delete process
 	// is interrupted. Even if the delete process is interrupted accidentally later,
 	// the witness file scan process when abec is launched can still work fine.
@@ -193,13 +177,35 @@ func (wm *WitnessManager) pruneWitnessBeforeHeight(height int32) error {
 		}
 		minConsecutiveWitnessFileNum = fileNumReserved[i]
 	}
-	err = wm.chain.UpdateMinConsecutiveWitnessFileNum(minConsecutiveWitnessFileNum)
+
+	f, err := os.OpenFile(wm.tLogFilename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+	if err != nil {
+		log.Errorf("can not create a log file for recording witness history and minimum file num")
+	}
+	for num, info := range fileInfo {
+		f.WriteString(fmt.Sprintf("[Witness Delete History] %d(%d) at %d\n", num, info.Size(), time.Now().Unix()))
+	}
+	f.WriteString(fmt.Sprintf("[Minimum Consecutive Witness File Num] %d\n", minConsecutiveWitnessFileNum))
+
+	err = f.Sync()
+	if err != nil {
+		return err
+	}
+	err = f.Close()
 	if err != nil {
 		return err
 	}
 
-	f.WriteString(fmt.Sprintf("[Minimum Consecutive Witness File Num] %d\n", minConsecutiveWitnessFileNum))
-
+	// Save delete info to database, including file size and delete time,
+	// these information may be useful in the future.
+	err = wm.chain.StoreDeleteHistory(fileInfo)
+	if err != nil {
+		return err
+	}
+	err = wm.chain.UpdateMinConsecutiveWitnessFileNum(minConsecutiveWitnessFileNum)
+	if err != nil {
+		return err
+	}
 	// Store witnessServiceHeight before pruning witness in case the pruning process fails.
 	err = wm.chain.StoreWitnessServiceHeight(uint32(height))
 	if err != nil {
