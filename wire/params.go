@@ -6,6 +6,8 @@ import (
 
 // These vesion-consts are used to maintain the history TxVersion.
 const (
+	TxVersion_Unknown uint32 = 0 // the TxVersion since height 0, corresponding to CryptoSchemePQRingCT
+
 	TxVersion_Height_0 uint32 = 1 // the TxVersion since height 0, corresponding to CryptoSchemePQRingCT
 	//CryptoSchemePQRingCTV2
 	// ToDo(MLP): how about not use iota?

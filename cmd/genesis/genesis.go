@@ -66,14 +66,15 @@ func gensis() {
 	for i := 0; i < len(txOutDescs); i++ {
 		txOutDescs[i] = abecrypto.NewAbeTxOutDesc(retSerializedCryptoAddress, 205_799_813_685_247)
 	}
-	nullSerialNumer, _ := abecryptoparam.GetNullSerialNumber(wire.TxVersion)
+	txVersion := wire.TxVersion
+	nullSerialNumer, _ := abecryptoparam.GetNullSerialNumber(txVersion)
 	cbTxTemplate := &wire.MsgTxAbe{
-		Version: wire.TxVersion,
+		Version: txVersion,
 		TxIns: []*wire.TxInAbe{
 			{
 				SerialNumber: nullSerialNumer,
 				PreviousOutPointRing: wire.OutPointRing{
-					Version: wire.TxVersion,
+					Version: txVersion,
 					BlockHashs: []*chainhash.Hash{
 						&chainhash.ZeroHash,
 						&chainhash.ZeroHash,

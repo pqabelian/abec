@@ -624,7 +624,7 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 	if err != nil {
 		return err
 	}
-	txInputMaxNum, err := abecryptoparam.GetTxInputMaxNum(msg.Version)
+	txInputMaxNum, err := abecryptoxparam.GetTxInputMaxNum(msg.Version)
 	if err != nil {
 		return err
 	}

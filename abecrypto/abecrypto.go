@@ -393,7 +393,7 @@ func CoinbaseTxVerify(coinbaseTx *wire.MsgTxAbe) error {
 //	Note that these filled fields (except the Version) are independent of the underlying crypto scheme, and are specified by the issuer of a transaction.
 func CreateTransferTxMsgTemplate(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxOutputDesc, txFee uint64, txMemo []byte) (*wire.MsgTxAbe, error) {
 	//	Version
-	txMsgTemplate := wire.NewMsgTxAbe(wire.TxVersion)
+	txMsgTemplate := wire.NewMsgTxAbe(wire.TxVersion_Height_0)
 	//	Note that new Tx must use the latest/current TxVersion.
 
 	//	TxIns
