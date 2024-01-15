@@ -2,7 +2,6 @@ package blockchain
 
 import (
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
 	"math/big"
 	"time"
 )
@@ -223,10 +222,6 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 		return b.chainParams.PowLimitBits, nil
 	}
 
-	// In SimNet, do not change the difficult
-	if b.chainParams.Net == wire.SimNet && b.chainParams.FakePoW {
-		return b.chainParams.GenesisBlock.Header.Bits, nil
-	}
 	// Return the previous block's difficulty requirements if this block
 	// is not at a difficulty retarget interval.
 	if (lastNode.height+1)%b.blocksPerRetarget != 0 {

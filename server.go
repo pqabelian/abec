@@ -26,6 +26,7 @@ import (
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
 	"github.com/abesuite/abec/witnessmgr"
+	"github.com/shirou/gopsutil/v3/process"
 	"math"
 	"net"
 	"os"
@@ -1067,7 +1068,7 @@ func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<-
 			return err
 		}
 
-		wrappedTxMsg := wire.WrapMessage(tx.MsgTx())
+		wrappedTxMsg := wire.WrapMessage(tx.MsgTx(), encoding)
 		s.communicationCache.Store(msgCacheKey, wrappedTxMsg)
 		wrappedTxMsg.Use()
 		msg = wrappedTxMsg
@@ -1244,7 +1245,7 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 			return errors.New("witness block not found")
 		}
 
-		wrappedBlockMsg := wire.WrapMessage(&msgBlock)
+		wrappedBlockMsg := wire.WrapMessage(&msgBlock, encoding)
 		s.communicationCache.Store(msgCacheKey, wrappedBlockMsg)
 		wrappedBlockMsg.Use()
 		msg = wrappedBlockMsg
@@ -2184,6 +2185,9 @@ func (s *server) Start() {
 	if cfg.ExternalGenerate {
 		s.externalMiner.Start()
 	}
+
+	s.wg.Add(1)
+	go s.memUsage()
 }
 
 // Stop gracefully shuts down the server by stopping and disconnecting all
@@ -2367,6 +2371,23 @@ out:
 	s.wg.Done()
 }
 
+func (s *server) memUsage() {
+	defer s.wg.Done()
+	ticker := time.NewTicker(3 * time.Minute)
+	defer ticker.Stop()
+out:
+	for {
+		select {
+		case <-ticker.C:
+			p, _ := process.NewProcess(int32(os.Getpid()))
+			memoryInfo, _ := p.MemoryInfo()
+			srvrLog.Infof("Memory usage:rss %.2fG vms %.2fG", float64(memoryInfo.RSS)/1024/1024/1024, float64(memoryInfo.VMS)/1024/1024/1024)
+		case <-s.quit:
+			break out
+		}
+	}
+}
+
 // setupRPCListeners returns a slice of listeners that are configured for use
 // with the RPC server depending on the configuration settings for listen
 // addresses and TLS.
@@ -2530,16 +2551,17 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 
 	// Create a new block chain instance with the appropriate configuration.
 	s.chain, err = blockchain.New(&blockchain.Config{
-		NodeType:     nodeType,
-		DB:           s.db,
-		Interrupt:    interrupt,
-		ChainParams:  s.chainParams,
-		Checkpoints:  checkpoints,
-		TimeSource:   s.timeSource,
-		SigCache:     s.sigCache,
-		WitnessCache: s.witnessCache,
-		IndexManager: indexManager,
-		HashCache:    s.hashCache,
+		NodeType:            nodeType,
+		DB:                  s.db,
+		Interrupt:           interrupt,
+		ChainParams:         s.chainParams,
+		Checkpoints:         checkpoints,
+		FakePowHeightScopes: cfg.addFakePowHeightScopes,
+		TimeSource:          s.timeSource,
+		SigCache:            s.sigCache,
+		WitnessCache:        s.witnessCache,
+		IndexManager:        indexManager,
+		HashCache:           s.hashCache,
 	})
 	if err != nil {
 		return nil, err
@@ -2629,10 +2651,6 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	cfg.EthashConfig.BlockHeightStart = s.chainParams.BlockHeightEthashPoW
 	cfg.EthashConfig.EpochLength = s.chainParams.EthashEpochLength
 	s.ethash = ethash.New(cfg.EthashConfig)
-	if cfg.SimNet && cfg.EnableFakePoW {
-		s.ethash = ethash.NewFullFaker()
-		s.chainParams.FakePoW = true
-	}
 
 	s.syncManager, err = syncmgr.New(&syncmgr.Config{
 		NodeType:           cfg.nodeType,
@@ -2658,9 +2676,11 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		witnessMgrMaxReservedWitness = uint32(envWitnessMgrMaxReservedWitness)
 	}
 	s.witnessManager, err = witnessmgr.New(&witnessmgr.Config{
-		NodeType:           cfg.nodeType,
-		MaxReservedWitness: witnessMgrMaxReservedWitness,
-		Chain:              s.chain,
+		NodeType:             cfg.nodeType,
+		MaxReservedWitness:   witnessMgrMaxReservedWitness,
+		Chain:                s.chain,
+		WitnessServiceHeight: cfg.witnessServiceHeight,
+		TLogFilename:         cfg.tLogFilename,
 	})
 	if err != nil {
 		return nil, err
@@ -2685,6 +2705,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	s.cpuMiner = cpuminer.New(&cpuminer.Config{
 		ChainParams:            chainParams,
 		Ethash:                 s.ethash, // todo: (EthashPoW)
+		FakePowHeightScope:     s.chain.FakePoWHeightScopes(),
 		BlockTemplateGenerator: blockTemplateGenerator,
 		MiningAddrs:            cfg.miningAddrs,
 		HashRateWatermark:      cfg.HashRateWatermark,

@@ -1639,6 +1639,15 @@ func (tx *transaction) DeleteWitnessFiles(fileNum []uint32) ([]string, error) {
 	res := make([]string, 0)
 	for _, num := range fileNum {
 		filePath := witnessFilePath(tx.db.store.basePath, num)
+		tx.db.store.obfWitnessMutex.Lock()
+		if file, ok := tx.db.store.openWitnessFiles[num]; ok {
+			file.file.Sync()
+			file.file.Close()
+			tx.db.store.lruWitnessMutex.Lock()
+			tx.db.store.openWitnessLRU.Remove(tx.db.store.fileNumToLRUElemWitness[num])
+			tx.db.store.lruWitnessMutex.Unlock()
+		}
+		tx.db.store.obfWitnessMutex.Unlock()
 		fileState, err := os.Stat(filePath)
 		if err != nil {
 			log.Infof("Fail to delete %v: %v", filePath, err)
@@ -2602,7 +2611,7 @@ func addWitnessServiceHeight(ldb *leveldb.DB, witnessServiceHeight uint32) error
 
 // openDB opens the database at the provided path.  database.ErrDbDoesNotExist
 // is returned if the database doesn't exist and the create flag is not set.
-func openDB(dbPath string, network wire.AbelianNet, nodeType wire.NodeType, create bool) (database.DB, error) {
+func openDB(dbPath string, network wire.AbelianNet, nodeType wire.NodeType, tLogFilename string, create bool) (database.DB, error) {
 	// Error if the database doesn't exist and the create flag is not set.
 	metadataDbPath := filepath.Join(dbPath, metadataDbName)
 	dbExists := fileExists(metadataDbPath)
@@ -2639,7 +2648,7 @@ func openDB(dbPath string, network wire.AbelianNet, nodeType wire.NodeType, crea
 	store := newBlockStore(dbPath, network)
 	cache := newDbCache(ldb, store, defaultCacheSize, defaultFlushSecs)
 	pdb := &db{store: store, cache: cache}
-	err = initWitnessCursor(dbPath, pdb)
+	err = initWitnessCursor(dbPath, tLogFilename, pdb)
 	if err != nil {
 		return nil, err
 	}

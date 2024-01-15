@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/abesuite/abec/abelog"
 	"github.com/abesuite/abec/database"
+	"github.com/abesuite/abec/wire"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -28,7 +29,7 @@ func loadBlockDB() (database.DB, error) {
 	dbPath := filepath.Join(cfg.DataDir, dbName)
 
 	log.Infof("Loading block database from '%s'", dbPath)
-	db, err := database.Open(cfg.DbType, dbPath, activeNetParams.Net)
+	db, err := database.Open(cfg.DbType, dbPath, activeNetParams.Net, wire.SemiFullNode, "")
 	if err != nil {
 		// Return the error if it's not because the database doesn't
 		// exist.

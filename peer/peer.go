@@ -67,7 +67,7 @@ const (
 	stallResponseTimeout = 30 * time.Second
 
 	// WitnessPruningInterval is the value should be consistent with witnessmgr.deleteInterval
-	WitnessPruningInterval = 10
+	WitnessPruningInterval = 100
 
 	// DefaultMaxReservedWitness is the num of the normal node would reserved witness
 	DefaultMaxReservedWitness = 1000
@@ -537,11 +537,10 @@ func (p *Peer) UpdateAnnouncedHeight(newHeight int32) {
 	if p.IsNormalNode() {
 		if newHeight%WitnessPruningInterval == 0 {
 			witnessKeptStartHeight := newHeight - int32(DefaultMaxReservedWitness)
-			if witnessKeptStartHeight <= 0 {
-				return
+			if witnessKeptStartHeight >= 0 {
+				log.Infof("updating witness service height %d for peer %s", witnessKeptStartHeight, p)
+				p.witnessServiceHeight = uint32(witnessKeptStartHeight)
 			}
-			log.Infof("Start pruning witness data before height %v, please do not shut down abec", witnessKeptStartHeight)
-			p.witnessServiceHeight = uint32(witnessKeptStartHeight)
 		}
 	}
 	p.statsMtx.Unlock()
@@ -1165,6 +1164,7 @@ func (p *Peer) writeMessage(msg wire.Message, enc wire.MessageEncoding) error {
 			wrappedMsg.Done()
 			if wrappedMsg.CanDelete() {
 				p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message, enc))
+				log.Debugf("Delete wrapped message with key %s", wire.WrapMsgKey(wrappedMsg.Message, enc))
 			}
 		}
 	}()
@@ -1851,6 +1851,7 @@ out:
 			wrappedMsg.Done()
 			if wrappedMsg.CanDelete() {
 				p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message, wrappedMsg.Encoding()))
+				log.Debugf("Delete wrapped message with key %s", wire.WrapMsgKey(wrappedMsg.Message, wrappedMsg.Encoding()))
 			}
 		}
 	}
@@ -1865,6 +1866,7 @@ cleanup:
 				wrappedMsg.Done()
 				if wrappedMsg.CanDelete() {
 					p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message, wrappedMsg.Encoding()))
+					log.Debugf("Delete wrapped message with key %s", wire.WrapMsgKey(wrappedMsg.Message, wrappedMsg.Encoding()))
 				}
 			}
 		case <-p.outputInvChan:
@@ -1937,6 +1939,14 @@ out:
 				}
 				log.Infof("Sending %v%s to %s", "getdata",
 					summary, p)
+			case *wire.MsgBlockAbe:
+				// Debug summary of message.
+				summary := messageSummary(msg.msg.(*wire.MsgBlockAbe))
+				if len(summary) > 0 {
+					summary = " (" + summary + ")"
+				}
+				log.Infof("Sending %v%s to %s", "block",
+					summary, p)
 			}
 
 			p.stallControl <- stallControlMsg{sccSendMessage, msg.msg}
@@ -1987,6 +1997,7 @@ cleanup:
 				wrappedMsg.Done()
 				if wrappedMsg.CanDelete() {
 					p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message, wrappedMsg.Encoding()))
+					log.Debugf("Delete wrapped message with key %s", wire.WrapMsgKey(wrappedMsg.Message, wrappedMsg.Encoding()))
 				}
 			}
 			// no need to send on sendDoneQueue since queueHandler
@@ -2050,6 +2061,7 @@ func (p *Peer) QueueMessageWithEncoding(msg wire.Message, doneChan chan<- struct
 			wrappedMsg.Done()
 			if wrappedMsg.CanDelete() {
 				p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message, wrappedMsg.Encoding()))
+				log.Debugf("Delete wrapped message with key %s", wire.WrapMsgKey(wrappedMsg.Message, wrappedMsg.Encoding()))
 			}
 		}
 		return

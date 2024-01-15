@@ -212,6 +212,18 @@ func NewAddressRangeCmd(start uint64, end uint64) *AddressRangeCmd {
 	}
 }
 
+type ExportRangeCmd struct {
+	Start uint64
+	End   uint64
+}
+
+func NewExportRangeCmd(start uint64, end uint64) *ExportRangeCmd {
+	return &ExportRangeCmd{
+		Start: start,
+		End:   end,
+	}
+}
+
 // GetBalancesCmd defines the getbalances JSON-RPC command.
 type GetBalancesCmd struct{}
 type GenerateAddressCmd struct {
@@ -536,6 +548,18 @@ type ListUnspentAbeCmd struct {
 
 func NewListUnspentAbeCmd(min *float64, max *float64) *ListUnspentAbeCmd {
 	return &ListUnspentAbeCmd{
+		Min: min,
+		Max: max,
+	}
+}
+
+type RangeSpendableUTXOAbeCmd struct {
+	Min *uint64 `jsonrpcdefault:"0"`
+	Max *uint64 `jsonrpcdefault:"0"`
+}
+
+func NewRangeUTXOAbeCmd(min *uint64, max *uint64) *RangeSpendableUTXOAbeCmd {
+	return &RangeSpendableUTXOAbeCmd{
 		Min: min,
 		Max: max,
 	}
@@ -956,6 +980,9 @@ func init() {
 	MustRegisterCmd("listmaturecoinbasetxoabe", (*ListUnspentCoinbaseAbeCmd)(nil), flags)
 	MustRegisterCmd("listunconfirmedtxoabe", (*ListSpentButUnminedAbeCmd)(nil), flags)
 	MustRegisterCmd("listconfirmedtxoabe", (*ListSpentAndMinedAbeCmd)(nil), flags)
+
+	MustRegisterCmd("rangespendableutxo", (*RangeSpendableUTXOAbeCmd)(nil), flags)
+
 	MustRegisterCmd("listconfirmedtxs", (*ListConfirmedTxsCmd)(nil), flags)
 	MustRegisterCmd("listunconfirmedtxs", (*ListUnconfirmedTxsCmd)(nil), flags)
 	MustRegisterCmd("listinvalidtxs", (*ListInvalidTxsCmd)(nil), flags)
@@ -970,6 +997,7 @@ func init() {
 	MustRegisterCmd("listfreeaddresses", (*ListFreeAddressesCmd)(nil), flags)
 	MustRegisterCmd("addressmaxsequencenumber", (*AddressMaxSequenceNumberCmd)(nil), flags)
 	MustRegisterCmd("addressrange", (*AddressRangeCmd)(nil), flags)
+	MustRegisterCmd("exportaddresskeyrandseed", (*ExportRangeCmd)(nil), flags)
 	//MustRegisterCmd("sendtoaddress", (*SendToAddressCmd)(nil), flags)
 	//MustRegisterCmd("sendtopayee", (*SendToPayeesCmd)(nil), flags)
 	//MustRegisterCmd("setaccount", (*SetAccountCmd)(nil), flags)

@@ -506,7 +506,7 @@ func (sm *SyncManager) handleNewPeerMsg(peer *peerpkg.Peer) {
 		return
 	}
 
-	log.Infof("New valid peer %s (%s)", peer, peer.UserAgent())
+	log.Infof("New valid peer %s (%s) with height %d", peer, peer.UserAgent(), peer.StartingHeight())
 
 	// Initialize the peer state
 	isSyncCandidate := sm.isSyncCandidate(peer)
@@ -1000,6 +1000,20 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 					isCheckpointBlock = true
 				} else {
 					sm.headerList.Remove(firstNodeEl)
+				}
+			}
+		}
+	}
+
+	// for fake pow mode
+	if sm.chainParams.Net != wire.MainNet {
+		fakePoWHeightScopes := sm.chain.FakePoWHeightScopes()
+		if len(fakePoWHeightScopes) != 0 {
+			blockHeight := wire.ExtractCoinbaseHeight(bmsg.block.MsgBlock().Transactions[0])
+			for _, scope := range fakePoWHeightScopes {
+				if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
+					behaviorFlags |= blockchain.BFNoPoWCheck
+					break
 				}
 			}
 		}

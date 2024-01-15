@@ -452,7 +452,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 
 		connected, err := parseBtcdConnectedNtfnParams(ntfn.Params)
 		if err != nil {
-			log.Warnf("Received invalid btcd connected "+
+			log.Warnf("Received invalid abec connected "+
 				"notification: %v", err)
 			return
 		}
@@ -1354,9 +1354,10 @@ func (c *Client) RescanAbeEndBlockAsync(startBlock *chainhash.Hash,
 		endBlockHashStr = endBlock.String()
 	}
 
-	cmd := abejson.NewRescanAbeCmd(startBlockHashStr,&endBlockHashStr)
+	cmd := abejson.NewRescanAbeCmd(startBlockHashStr, &endBlockHashStr)
 	return c.sendCmd(cmd)
 }
+
 // RescanEndHeight rescans the block chain starting from the provided starting
 // block up to the provided ending block for transactions that pay to the
 // passed addresses and transactions which spend the passed outpoints.
@@ -1387,8 +1388,9 @@ func (c *Client) RescanEndHeight(startBlock *chainhash.Hash,
 }
 func (c *Client) RescanAbeEndHeight(startBlock *chainhash.Hash,
 	endBlock *chainhash.Hash) error {
-	return c.RescanAbeEndBlockAsync(startBlock,endBlock).Receive()
+	return c.RescanAbeEndBlockAsync(startBlock, endBlock).Receive()
 }
+
 // FutureLoadTxFilterResult is a future promise to deliver the result
 // of a LoadTxFilterAsync RPC invocation (or an applicable error).
 //

@@ -487,6 +487,18 @@ func BuildTransferTxRequestDescFromTxoRings(
 
 }
 
+func GetAndSetHeight(block *abeutil.BlockAbe) error {
+	height := block.MsgBlock().Header.Height
+	if height == 0 {
+		if len(block.MsgBlock().Transactions) == 0 {
+			return errors.New("invalid block which do not include any transaction")
+		}
+		height = wire.ExtractCoinbaseHeight(block.MsgBlock().Transactions[0])
+	}
+	block.SetHeight(height)
+	return nil
+}
+
 // BuildTransferTxRequestDescFromBlocks build from
 // 1. some input specified by outPointToSpend, the relevant txo ring would be included in blocks specified by serializedBlocksForRingGroup
 // 2. some output specified by txRequestOutputDescs,
@@ -533,7 +545,9 @@ func BuildTransferTxRequestDescFromBlocks(
 
 		//	assume the blocks are valid blocks in ledger, include:
 		// (1) the Header contains its height. Based on this, we explicitly set the height of Block.
-		blocks[i].SetHeight(blocks[i].MsgBlock().Header.Height)
+		if err = GetAndSetHeight(blocks[i]); err != nil {
+			return nil, err
+		}
 	}
 
 	blockIdx := 0
@@ -755,7 +769,9 @@ func GenerateCoinSerialNumber(
 
 		//	assume the blocks are valid blocks in ledger, include:
 		// (1) the Header contains its height. Based on this, we explicitly set the height of Block.
-		blocks[i].SetHeight(blocks[i].MsgBlock().Header.Height)
+		if err = GetAndSetHeight(blocks[i]); err != nil {
+			return nil, err
+		}
 	}
 
 	// whether all block height is valid

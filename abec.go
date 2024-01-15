@@ -127,22 +127,26 @@ func abecMain(serverChan chan<- *server) error {
 	if err != nil {
 		abecLog.Warnf("fail to acquire system info %v, use the default memory configuration", err)
 	} else {
-		if v.Total >= 32*1024*1024*1024 {
+		if v.Total >= 32*1024*1024*1024 { // 32G
 			blockchain.MaxOrphanBlocks = 160
 			mempool.MaxTransactionInMemoryNum = 1600
-		} else if v.Total >= 16*1024*1024*1024 {
+		} else if v.Total >= 16*1024*1024*1024 { // 16G
 			blockchain.MaxOrphanBlocks = 80
 			mempool.MaxTransactionInMemoryNum = 800
-		} else if v.Total >= 8*1024*1024*1024 {
+		} else if v.Total >= 8*1024*1024*1024 { // 8G
 			blockchain.MaxOrphanBlocks = 40
 			mempool.MaxTransactionInMemoryNum = 400
-		} else if v.Total >= 4*1024*1024*1024 {
+		} else if v.Total >= 4*1024*1024*1024 { // 4G
 			blockchain.MaxOrphanBlocks = 20
 			mempool.MaxTransactionInMemoryNum = 200
 		} else {
 			blockchain.MaxOrphanBlocks = 10
 			mempool.MaxTransactionInMemoryNum = 100
 		}
+		abecLog.Infof("Choose maxOrphanBlock %d and maxTransactionInMemory %d the depend on queried total RAM on this system %dGB",
+			blockchain.MaxOrphanBlocks,
+			mempool.MaxTransactionInMemoryNum,
+			v.Total/1024/1024/1024)
 	}
 
 	// Create P2P server and start it.
@@ -281,7 +285,7 @@ func loadBlockDB() (database.DB, error) {
 	removeRegressionDB(dbPath)
 
 	abecLog.Infof("Loading block database from '%s'", dbPath)
-	db, err := database.Open(cfg.DbType, dbPath, activeNetParams.Net, cfg.nodeType)
+	db, err := database.Open(cfg.DbType, dbPath, activeNetParams.Net, cfg.nodeType, filepath.Join(cfg.DataDir, "t.log"))
 	if err != nil {
 		// Return the error if it's not because the database doesn't
 		// exist.
@@ -299,10 +303,10 @@ func loadBlockDB() (database.DB, error) {
 
 		// If user does not specify node type for new node, we assume the node type is normal.
 		if cfg.nodeType == wire.UnsetNode {
-			cfg.nodeType = wire.NormalNode
-			cfg.serviceFlag = wire.SFNodeNetwork | wire.SFNodeWitness | wire.SFNodeTypeBit1 | wire.SFNodeTypeBit2
+			cfg.nodeType = wire.SemiFullNode
+			cfg.serviceFlag = wire.SFNodeNetwork | wire.SFNodeWitness | wire.SFNodeTypeBit2
 		}
-		db, err = database.Create(cfg.DbType, dbPath, activeNetParams.Net, cfg.nodeType)
+		db, err = database.Create(cfg.DbType, dbPath, activeNetParams.Net, cfg.nodeType, cfg.tLogFilename)
 		if err != nil {
 			return nil, err
 		}
@@ -327,12 +331,14 @@ func loadBlockDB() (database.DB, error) {
 	// If the user specifies a node type that is conflict with the previous node type,
 	// let them confirm this change.
 	if cfg.nodeType != nodeType {
-		fmt.Printf("Your current node type is %s, but specified node type is %s, do you want to continue"+
-			" (Y/N)? ", nodeType.String(), cfg.nodeType.String())
-		op := "N"
-		fmt.Scanln(&op)
-		if strings.TrimSpace(strings.ToLower(op)) != "y" && strings.TrimSpace(strings.ToLower(op)) != "yes" {
-			os.Exit(0)
+		if os.Getenv("ABEC_DO_NOT_ASK_FOR_NODE_TYPE_CHANGE") != "true" {
+			fmt.Printf("Your current node type is %s, but specified node type is %s, do you want to continue"+
+				" (Y/N)? ", nodeType.String(), cfg.nodeType.String())
+			op := "N"
+			fmt.Scanln(&op)
+			if strings.TrimSpace(strings.ToLower(op)) != "y" && strings.TrimSpace(strings.ToLower(op)) != "yes" {
+				os.Exit(0)
+			}
 		}
 	}
 
@@ -358,6 +364,7 @@ func loadBlockDB() (database.DB, error) {
 		return nil, err
 	}
 	abecLog.Infof("Witness service height: %v", witnessServiceHeight)
+	cfg.witnessServiceHeight = int32(witnessServiceHeight)
 
 	abecLog.Info("Block database loaded")
 	return db, nil
@@ -395,6 +402,7 @@ func main() {
 
 	// Work around defer not working after os.Exit()
 	if err := abecMain(nil); err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
 }

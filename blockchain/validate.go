@@ -877,6 +877,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, powLimi
 	// after the following checks, but there is no reason not to check the
 	// merkle root matches here.
 	// todo: (EthashPoW) use the optimized BuildMerkleTreeStoreAbeEthash()
+	log.Debugf("Verify the transaction merkle tree for block %s", block.Hash())
 	if header.Version == int32(wire.BlockVersionEthashPow) {
 		calculatedMerkleRoot, _ := BuildMerkleTreeStoreAbeEthash(block.Transactions())
 		if !header.MerkleRoot.IsEqual(calculatedMerkleRoot) {
@@ -1001,6 +1002,7 @@ func checkSerializedHeight(coinbaseTx *abeutil.Tx, wantHeight int32) error {
 }
 
 func checkSerializedHeightAbe(coinbaseTx *abeutil.TxAbe, wantHeight int32) error {
+	log.Debugf("Check the height in coinbase transaction with the block height %d", wantHeight)
 	serializedHeight, err := ExtractCoinbaseHeightAbe(coinbaseTx)
 	if err != nil {
 		return err
@@ -1716,6 +1718,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// expensive ECDSA signature check scripts.  Doing this last helps
 	// prevent CPU exhaustion attacks.
 	if witnessCheck {
+		log.Debugf("Check the witness for block %s in height %d", block.Hash(), block.Height())
 		err := checkBlockScriptsAbe(block, view, b.witnessCache)
 		if err != nil {
 			return err
