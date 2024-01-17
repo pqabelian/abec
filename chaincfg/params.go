@@ -569,7 +569,7 @@ var SimNetParams = Params{
 
 	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
 	// ToDo(MLP):
-	BlockHeightMLPAUT:       1000,
+	BlockHeightMLPAUT:       1200,
 	BlockHeightMLPAUTCOMMIT: 2000,
 }
 

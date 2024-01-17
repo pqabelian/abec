@@ -453,4 +453,26 @@ func GetCbTxWitnessSerializeSizeApprox(txVersion uint32, cryptoAddressListPayTo 
 	}
 }
 
+func GetTrTxWitnessSerializeSizeApprox(txVersion uint32, inputRingSizes []uint8,
+	coinAddresses [][]byte, inForRing uint8, inForSingleDistinct uint8,
+	outForRing uint8, inRingSizes []uint8, vPublic int64) (int, error) {
+	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
+	if err != nil {
+		return 0, err
+	}
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCT:
+		tinputRingSizes := make([]int, len(inputRingSizes))
+		for i := 0; i < len(inputRingSizes); i++ {
+			tinputRingSizes[i] = int(inputRingSizes[i])
+		}
+		return abecryptoparam.GetTrTxWitnessSerializeSizeApprox(txVersion, 0, tinputRingSizes, len(coinAddresses))
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+
+		return pqringctxGetTxWitnessTrTxSerializeSizeByDesc(abecryptoxparam.PQRingCTXPP, inForRing, inForSingleDistinct, outForRing, inRingSizes, vPublic)
+	default:
+		return 0, fmt.Errorf("GetTrTxWitnessSerializeSizeApprox: Unsupported txVersion")
+	}
+}
+
 //	APIs for TxWitness	end

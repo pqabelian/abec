@@ -13,6 +13,14 @@ type AbeTxOutputDesc struct {
 	value         uint64
 }
 
+func (a AbeTxOutputDesc) CryptoAddress() []byte {
+	return a.cryptoAddress
+}
+
+func (a AbeTxOutputDesc) Value() uint64 {
+	return a.value
+}
+
 // NewAbeTxOutDesc constructs a new AbeTxOutputDesc from the input (cryptoAddress []byte, value uint64).
 // reviewed on 2023.12.07
 func NewAbeTxOutDesc(cryptoAddress []byte, value uint64) *AbeTxOutputDesc {

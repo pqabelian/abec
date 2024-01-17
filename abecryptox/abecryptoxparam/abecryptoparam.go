@@ -125,6 +125,25 @@ func GetTxOutputMaxNum(txVersion uint32) (int, error) {
 	}
 }
 
+// GetSerialNumberSerializeSize returns the exact serialize size for SerialNumber, which is decided by the TxVersion.
+// Note that the transactions are generated and versified by the underlying crypto-scheme,
+// the approximate serialize size for SerialNumber actually depends on the underlying crypto-scheme.
+// That's why txVersion is required as the input for this function.
+func GetSerialNumberSerializeSize(txVersion uint32) (int, error) {
+	cryptoScheme, err := GetCryptoSchemeByTxVersion(txVersion)
+	if err != nil {
+		return 0, err
+	}
+	switch cryptoScheme {
+	case CryptoSchemePQRingCT:
+		return abecryptoparam.GetSerialNumberSerializeSize(txVersion)
+	case CryptoSchemePQRingCTX:
+		return pqringctxGetSerialNumberSize(PQRingCTXPP), nil
+	default:
+		return 0, fmt.Errorf("GetNullSerialNumber: Unsupported txVersion")
+	}
+}
+
 // GetNullSerialNumber return the null-serial-number.
 // Note that to be simple and back-compatible, PQRingCTX use the same null-serial-number as PQRingCT.
 // reviewed on 2023.12.07
@@ -169,6 +188,10 @@ func GetCryptoSchemeParamSeedBytesLen(cryptoScheme CryptoScheme) (int, error) {
 	}
 
 	return 0, nil
+}
+
+func GetTxoSerializeSize(coinAddress []byte) (int, error) {
+	return pqringctxapi.GetTxoSerializeSize(PQRingCTXPP, coinAddress)
 }
 
 // API for Sizes	end

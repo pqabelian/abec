@@ -14,6 +14,10 @@ func pqringctxGetCryptoSchemeParamSeedBytesLen(pp *pqringctxapi.PublicParameter)
 
 //	Transaction-related Params	begin
 
+func pqringctxGetSerialNumberSize(pp *pqringctxapi.PublicParameter) int {
+	return pqringctxapi.GetSerialNumberSize(pp)
+}
+
 // GetNullSerialNumber() return the null serial number.
 // reviewed on 2023.12.07
 func pqringctxGetNullSerialNumber(pp *pqringctxapi.PublicParameter) []byte {

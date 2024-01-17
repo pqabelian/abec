@@ -84,7 +84,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesMLP(db database.DB, node *block
 			return AssertError(fmt.Sprintf("newUtxoRingEntriesMLP: Found a hash collision (by RingId) when calling newUtxoRingEntriesMLP with blocks (hash %v, ringHeight %d, ringId %v)",
 				node.hash, ringBlockHeight, ringId))
 		} else {
-			newUtxoRingEntry := initNewUtxoRingEntryMLP(txoRing)
+			newUtxoRingEntry := InitNewUtxoRingEntryMLP(txoRing)
 			view.entries[ringId] = newUtxoRingEntry
 		}
 	}
@@ -381,9 +381,9 @@ func BuildTxoRingsMLP(blockNumPerRingGroup int, txoRingSize int, blocks []*abeut
 
 }
 
-// initNewUtxoRingEntryMLP initializes a new UtxoRingEntry from the input wire.TxoRing.
+// InitNewUtxoRingEntryMLP initializes a new UtxoRingEntry from the input wire.TxoRing.
 // reviewed on 2024.01.04
-func initNewUtxoRingEntryMLP(txoRing *wire.TxoRing) *UtxoRingEntry {
+func InitNewUtxoRingEntryMLP(txoRing *wire.TxoRing) *UtxoRingEntry {
 	utxoRingEntry := &UtxoRingEntry{
 		Version:             txoRing.Version,
 		ringBlockHeight:     txoRing.RingBlockHeight,

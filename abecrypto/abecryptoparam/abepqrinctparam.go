@@ -76,7 +76,7 @@ func pqringctCryptoSerialNumberSecretKeyParse(pp *pqringct.PublicParameter, cryp
 		return nil, fmt.Errorf("pqringctCryptoSerialNumberSecretKeyParse: the CryptoScheme of the input cryptoSnSk %d does match the input CryptoScheme %d", cryptoSchemeInSnSk, cryptoScheme)
 	}
 
-	if len(cryptoSnSk) != 4+pqringct.GetAddressPublicKeySerializeSize(pp) {
+	if len(cryptoSnSk) != 4+pqringct.GetAddressSecretKeySnSerializeSize(pp) {
 		return nil, fmt.Errorf("pqringctCryptoSerialNumberSecretKeyParse: the length of the input cryptoSnSk (%d) does match the input CryptoScheme %d", len(cryptoSnSk), cryptoScheme)
 	}
 

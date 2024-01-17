@@ -252,7 +252,7 @@ func CryptoValueSecretKeyParse(cryptoValueSecretKey []byte) (coinValueSecretKey 
 
 	switch cryptoScheme {
 	case CryptoSchemePQRingCT:
-		return pqringctCryptoValueSecretKeyParse(PQRingCTPP, cryptoScheme, coinValueSecretKey)
+		return pqringctCryptoValueSecretKeyParse(PQRingCTPP, cryptoScheme, cryptoValueSecretKey)
 
 	default:
 		return nil, fmt.Errorf("CryptoValueSecretKeyParse: non-supported cryptoScheme appears in cryptoValueSecretKey")

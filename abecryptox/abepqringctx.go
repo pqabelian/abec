@@ -616,23 +616,24 @@ func pqringctTxoCoinReceive(pp *pqringctxapi.PublicParameter, cryptoScheme abecr
 		return false, 0, err
 	}
 
-	cryptoSchemeInAddress, err := abecryptoxkey.ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
-	if err != nil || cryptoSchemeInAddress != cryptoScheme {
-		return false, 0, errors.New("pqringctTxoCoinReceive: unmatched cryptoScheme for input cryptoAddress")
-	}
+	// TODO(MLP) allow diff?
+	//cryptoSchemeInAddress, err := abecryptoxkey.ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
+	//if err != nil || cryptoSchemeInAddress != cryptoScheme {
+	//	return false, 0, errors.New("pqringctTxoCoinReceive: unmatched cryptoScheme for input cryptoAddress")
+	//}
 
-	cryptoSchemeInVsk, err := abecryptoxkey.ExtractCryptoSchemeFromCryptoValueSecretKey(cryptoVsk)
-	if err != nil || cryptoSchemeInVsk != cryptoScheme {
-		return false, 0, errors.New("pqringctTxoCoinReceive: unmatched cryptoScheme for Vsk")
-	}
-	privacyLevelInAddress, coinAddress, coinValuePublicKey, err := abecryptoxkey.CryptoAddressParse(cryptoAddress)
+	//cryptoSchemeInVsk, err := abecryptoxkey.ExtractCryptoSchemeFromCryptoValueSecretKey(cryptoVsk)
+	//if err != nil || cryptoSchemeInVsk != cryptoScheme {
+	//	return false, 0, errors.New("pqringctTxoCoinReceive: unmatched cryptoScheme for Vsk")
+	//}
+	_, coinAddress, coinValuePublicKey, err := abecryptoxkey.CryptoAddressParse(cryptoAddress)
 	if err != nil {
 		return false, 0, errors.New("pqringctTxoCoinReceive: unmatched cryptoScheme for input cryptoAddress")
 	}
-	privacyLevelInVsk, coinValueSecretKey, err := abecryptoxkey.CryptoValueSecretKeyParse(cryptoVsk)
-	if privacyLevelInAddress != privacyLevelInVsk {
-		return false, 0, errors.New("pqringctTxoCoinReceive: unmatched privacy level for input cryptoAddress and cryptoVsk")
-	}
+	_, coinValueSecretKey, err := abecryptoxkey.CryptoValueSecretKeyParse(cryptoVsk)
+	//if privacyLevelInAddress != privacyLevelInVsk {
+	//	return false, 0, errors.New("pqringctTxoCoinReceive: unmatched privacy level for input cryptoAddress and cryptoVsk")
+	//}
 
 	return pqringctxapi.TxoCoinReceive(pp, txo, coinAddress, coinValuePublicKey, coinValueSecretKey)
 }
@@ -682,6 +683,11 @@ func pqringctExtractCoinAddressFromTxoScript(pp *pqringctxapi.PublicParameter, s
 // APIs for TxWitnesses	begin
 func pqringctxGetTxWitnessCbTxSerializeSizeByDesc(pp *pqringctxapi.PublicParameter, coinAddressListPayTo [][]byte) (int, error) {
 	return pqringctxapi.GetTxWitnessCbTxSerializeSizeByDesc(pp, coinAddressListPayTo)
+}
+
+func pqringctxGetTxWitnessTrTxSerializeSizeByDesc(pp *pqringctxapi.PublicParameter, inForRing uint8, inForSingleDistinct uint8,
+	outForRing uint8, inRingSizes []uint8, vPublic int64) (int, error) {
+	return pqringctxapi.GetTxWitnessTrTxSerializeSizeByDesc(pp, inForRing, inForSingleDistinct, outForRing, inRingSizes, vPublic)
 }
 
 //	APIs for TxWitnesses	end

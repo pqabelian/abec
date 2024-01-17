@@ -409,7 +409,7 @@ func (txIn *TxInAbe) String() string {
 	// TxHash:index; TxHash:index; ...; serialNumber
 	//	index is at most 2 decimal digits; at this moment, only 1 decimal digits
 
-	snLen, err := abecryptoparam.GetSerialNumberSerializeSize(txIn.PreviousOutPointRing.Version)
+	snLen, err := abecryptoxparam.GetSerialNumberSerializeSize(txIn.PreviousOutPointRing.Version)
 	if err != nil {
 		//	todo: 202203 cannot throw err for String()
 		return err.Error()
@@ -437,7 +437,7 @@ func (txIn *TxInAbe) SerializeSize() int {
 }
 
 func GetTxInSerializeSizeApprox(ringVersion uint32, ringSize int) (uint32, error) {
-	snSize, err := abecryptoparam.GetSerialNumberSerializeSize(ringVersion)
+	snSize, err := abecryptoxparam.GetSerialNumberSerializeSize(ringVersion)
 	if err != nil {
 		return 0, err
 	}
@@ -473,7 +473,7 @@ func readTxInAbe(r io.Reader, pver uint32, version uint32, txIn *TxInAbe) error 
 
 	//txIn.SerialNumber, err = ReadVarBytes(r, pver, uint32(abecryptoparam.GetTxoSerializeSizeApprox(version)), "SerialNumber")
 	// For better performance, here we use constant to specify the maxallowedsize, rather than calling a function.
-	txIn.SerialNumber, err = ReadVarBytes(r, pver, abecryptoparam.MaxAllowedSerialNumberSize, "SerialNumber")
+	txIn.SerialNumber, err = ReadVarBytes(r, pver, abecryptoxparam.MaxAllowedSerialNumberSize, "SerialNumber")
 	if err != nil {
 		return err
 	}
@@ -648,7 +648,7 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 	if err != nil {
 		return err
 	}
-	txOutputMaxNum, err := abecryptoparam.GetTxOutputMaxNum(msg.Version)
+	txOutputMaxNum, err := abecryptoxparam.GetTxOutputMaxNum(msg.Version)
 	if err != nil {
 		return err
 	}
@@ -683,7 +683,7 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 	//	TxMemo
 	//	For better performance, we use constant to specify the maxallowed size, rather than calling a function.
 	// txMemo, err := ReadVarBytes(r, pver, uint32(abepqringctparam.GetTxMemoMaxLen(msg.Version)), "TxMemo")
-	txMemo, err := ReadVarBytes(r, pver, abecryptoparam.MaxAllowedTxMemoSize, "TxMemo")
+	txMemo, err := ReadVarBytes(r, pver, abecryptoxparam.MaxAllowedTxMemoSize, "TxMemo")
 	if err != nil {
 		return err
 	}
@@ -701,7 +701,7 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 		//	TxWitness
 		//	For better performance, we use constant to specify the maxallowed size, rather than calling a function.
 		// txWitness, err := ReadVarBytes(r, pver, uint32(abepqringctparam.GetTxWitnessMaxLen(msg.Version)), "TxWitness")
-		txWitness, err := ReadVarBytes(r, pver, abecryptoparam.MaxAllowedTxWitnessSize, "TxWitness")
+		txWitness, err := ReadVarBytes(r, pver, abecryptoxparam.MaxAllowedTxWitnessSize, "TxWitness")
 		if err != nil {
 			msg.TxWitness = nil
 		}
@@ -819,6 +819,72 @@ func (msg *MsgTxAbe) SerializeSizeFull() int {
 	n = n + VarIntSerializeSize(uint64(len(msg.TxWitness))) + len(msg.TxWitness)
 
 	return n
+}
+
+/*
+*
+Compute the size according to the Serialize function, and based on the crypto-scheme
+The result is just appropriate, will be used to compute transaction fee
+*/
+func PrecomputeTrTxConSizeMLP(txVersion uint32, inputRingVersions []uint32,
+	inputRingSizes []uint8, outputCoinAddresses [][]byte, txMemoLen uint32) (uint32, error) {
+	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
+	if err != nil {
+		return 0, err
+	}
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCT:
+		tinputRingSizes := make([]int, len(inputRingSizes))
+		for i := 0; i < len(inputRingSizes); i++ {
+			tinputRingSizes[i] = int(inputRingSizes[i])
+		}
+		return PrecomputeTrTxConSize(txVersion, inputRingVersions, tinputRingSizes, uint8(len(outputCoinAddresses)), txMemoLen)
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+
+		//	Version 4 bytes
+		n := uint32(4)
+
+		//	Inputs
+		//	serialized varint size for input
+		n = n + 1 // 1 byte for the inputRing number
+		for i := 0; i < len(inputRingSizes); i++ {
+			//n = n + GetTxInSerializeSizeApprox(inputRingVersions[i], inputRingSizes[i])
+			txInSizeApprox, err := GetTxInSerializeSizeApprox(inputRingVersions[i], int(inputRingSizes[i]))
+			if err != nil {
+				return 0, err
+			}
+			n = n + txInSizeApprox
+		}
+		/*	for _, txIn := range txIns {
+			// serialized varint size for the ring size, and (chainhash.HashSize + 1) for each OutPoint
+			n = n + uint32(txIn.SerializeSize())
+		}*/
+
+		// 	serialized varint size for output number
+		n = n + 1 // 1 byte for the output Txo Number
+		for i := 0; i < len(outputCoinAddresses); i++ {
+			txoScriptLen, err := abecryptoxparam.GetTxoSerializeSize(outputCoinAddresses[i]) // depending on the crypto-scheme, and the TxVersion
+			if err != nil {
+				return 0, err
+			}
+			n = n + uint32(4+VarIntSerializeSize(uint64(txoScriptLen))) + uint32(txoScriptLen)
+		}
+
+		/*	for _, txOut := range msg.TxOuts {
+			n = n + txOut.SerializeSize()
+		}*/
+
+		//	TxFee
+		//	use 8 (approx.)
+		n = n + 8
+
+		//	TxMemo
+		n = n + uint32(VarIntSerializeSize(uint64(txMemoLen))) + txMemoLen
+
+		return n, nil
+	default:
+		return 0, fmt.Errorf("GetTxoSerializeSize: Unsupported txVersion")
+	}
 }
 
 /*
