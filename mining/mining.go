@@ -880,7 +880,7 @@ mempoolLoop:
 
 		var autView *blockchain.AUTViewpoint
 		autTx, ok := tx.AUTTransaction()
-		if !ok {
+		if ok {
 			if autTx == nil {
 				log.Warnf("Invalid AUT Transaction %s", tx.Hash())
 				continue

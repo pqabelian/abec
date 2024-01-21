@@ -8,7 +8,6 @@ import (
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
-	"github.com/cryptosuite/pqringctx"
 	"github.com/cryptosuite/pqringctx/pqringctxapi"
 )
 
@@ -360,7 +359,7 @@ func pqringctxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme
 
 		//	coinValueSecretKey             []byte
 		var coinValueSecretKey []byte = nil
-		if abeTxInputDescs[i].cryptoVsk != nil {
+		if abeTxInputDescs[i].cryptoVsk != nil && len(abeTxInputDescs[i].cryptoVsk) != 0 {
 			privacyLevelInKey, coinValueSecretKey, err = abecryptoxkey.CryptoValueSecretKeyParse(abeTxInputDescs[i].cryptoVsk)
 			if err != nil {
 				return nil, err
@@ -377,12 +376,14 @@ func pqringctxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme
 
 		//	coinDetectorKey []byte
 		var coinDetectorKey []byte
-		privacyLevelInKey, coinDetectorKey, err = abecryptoxkey.CryptoDetectorKeyParse(abeTxInputDescs[i].cryptoDetectorKey)
-		if err != nil {
-			return nil, err
-		}
-		if privacyLevelInKey != privacyLevelInAddress {
-			return nil, fmt.Errorf("pqringctxTransferTxGen: the privacyLevel extracted from abeTxInputDescs[%d].cryptoDetectorKey and that extracted from abeTxInputDescs[%d].cryptoAddress are inconsistent", i, i)
+		if privacyLevelInAddress != abecryptoxkey.PrivacyLevelRINGCTPre {
+			privacyLevelInKey, coinDetectorKey, err = abecryptoxkey.CryptoDetectorKeyParse(abeTxInputDescs[i].cryptoDetectorKey)
+			if err != nil {
+				return nil, err
+			}
+			if privacyLevelInKey != privacyLevelInAddress {
+				return nil, fmt.Errorf("pqringctxTransferTxGen: the privacyLevel extracted from abeTxInputDescs[%d].cryptoDetectorKey and that extracted from abeTxInputDescs[%d].cryptoAddress are inconsistent", i, i)
+			}
 		}
 
 		// value
@@ -651,22 +652,25 @@ func pqringctTxoCoinSerialNumberGen(pp *pqringctxapi.PublicParameter, cryptoSche
 		return nil, errors.New("pqringctTxoCoinSerialNumberGen: unmatched cryptoScheme for input Txo")
 	}
 
-	txo, err := pqringctx.DeserializeTxo(pp, abeTxo.TxoScript)
+	txo, err := pqringctxapi.DeserializeTxo(pp, abeTxo.TxoScript)
 	if err != nil {
 		return nil, err
 	}
 
+	if txo.CoinAddressType() == pqringctxapi.CoinAddressTypePublicKeyHashForSingle {
+		return pqringctxapi.GetNullSerialNumber(pp), nil
+	}
+
 	txolid := pqringctxLedgerTxoIdGen(ringHash, txoIndexInRing)
 
-	lgrTxo := pqringctx.NewLgrTxo(txo, txolid)
+	lgrTxo := pqringctxapi.NewLgrTxo(txo, txolid)
 
 	_, coinSerialNumberSecretKey, err := abecryptoxkey.CryptoSerialNumberSecretKeyParse(cryptoSnsk)
 	if err != nil {
 		return nil, errors.New("pqringctTxoCoinSerialNumberGen: unmatched cryptoScheme for Snsk")
 	}
 
-	//	lgrTxo rather than (txo,txolid) pair is used, since TransferTxGen is called on input Ledger-txos.
-	sn, err := pqringctx.LedgerTxoSerialNumberGen(pp, lgrTxo, coinSerialNumberSecretKey)
+	sn, err := pqringctxapi.TxoCoinSerialNumberGen(pp, lgrTxo, coinSerialNumberSecretKey)
 	if err != nil {
 		return nil, err
 	}

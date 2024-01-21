@@ -355,10 +355,14 @@ func ExtractPublicRandFromTxo(abeTxo *wire.TxOutAbe) (publicRand []byte, err err
 	return nil, err
 }
 
-func ExtractCoinAddressFromTxoScript(abeTxo *wire.TxOutAbe, cryptoScheme abecryptoxparam.CryptoScheme) ([]byte, error) {
+func ExtractCoinAddressFromTxo(abeTxo *wire.TxOutAbe) ([]byte, error) {
+	cryptoSchemeByTxVersion, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
+	if err != nil {
+		return nil, err
+	}
+
 	var coinAddr []byte
-	var err error
-	switch cryptoScheme {
+	switch cryptoSchemeByTxVersion {
 	case abecryptoxparam.CryptoSchemePQRingCT:
 		return abecrypto.ExtractCoinAddressFromTxoScript(abeTxo.TxoScript, abecryptoparam.CryptoSchemePQRingCT)
 

@@ -79,8 +79,8 @@ func (tx *TxAbe) AUTTransaction() (aut.Transaction, bool) {
 		return nil, true
 	}
 	tx.autTx = autTx
-	tx.isAUTTx = autTx == nil
-	return autTx, true
+	tx.isAUTTx = autTx != nil
+	return tx.autTx, tx.isAUTTx
 }
 
 func (tx *TxAbe) InvType() wire.InvType {
