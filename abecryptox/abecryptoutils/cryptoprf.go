@@ -3,6 +3,7 @@ package abecryptoutils
 import (
 	_ "crypto"
 	"crypto/hmac"
+	"fmt"
 	"golang.org/x/crypto/sha3"
 	//"github.com/alexedwards/argon2id"
 )
@@ -16,9 +17,14 @@ import (
 const PRFKeyBytesLen = 64
 const PRFOutputBytesLen = 64
 
-func PRF(key []byte, input []byte) (output []byte) {
+func PRF(key []byte, input []byte) (output []byte, err error) {
+	if len(key) != PRFKeyBytesLen {
+		return nil, fmt.Errorf("PRF: the input key has an invalid length (%d)", len(key))
+	}
+
 	mac := hmac.New(sha3.New512, key)
 	mac.Write(input)
 	output = mac.Sum(nil)
-	return output
+
+	return output, nil
 }

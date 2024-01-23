@@ -44,10 +44,16 @@ func pqringctxCryptoAddressKeyGenByRootSeeds(pp *pqringctxapi.PublicParameter,
 	publicRand := abecryptoutils.RandomBytes(pp.GetParamKeyGenPublicRandBytesLen())
 
 	//	coinSpendKeyRandSeed
-	coinSpendKeyRandSeed := abecryptoutils.PRF(coinSpendKeyRootSeed, publicRand)
+	coinSpendKeyRandSeed, err := abecryptoutils.PRF(coinSpendKeyRootSeed, publicRand)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
 
 	//	coinDetectorKey
-	coinDetectorKey := abecryptoutils.PRF(coinDetectorRootKey, publicRand)
+	coinDetectorKey, err := abecryptoutils.PRF(coinDetectorRootKey, publicRand)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
 
 	if privacyLevel == PrivacyLevelRINGCT {
 		if len(coinSerialNumberKeyRootSeed) != abecryptoutils.PRFKeyBytesLen {
@@ -57,8 +63,14 @@ func pqringctxCryptoAddressKeyGenByRootSeeds(pp *pqringctxapi.PublicParameter,
 			return nil, nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressKeyGenByRootSeed: invalid length of coinValueKeyRootSeed (%d)", len(coinValueKeyRootSeed))
 		}
 
-		coinSerialNumberKeyRandSeed := abecryptoutils.PRF(coinSerialNumberKeyRootSeed, publicRand)
-		coinValueKeyRandSeed := abecryptoutils.PRF(coinValueKeyRootSeed, publicRand)
+		coinSerialNumberKeyRandSeed, err := abecryptoutils.PRF(coinSerialNumberKeyRootSeed, publicRand)
+		if err != nil {
+			return nil, nil, nil, nil, nil, err
+		}
+		coinValueKeyRandSeed, err := abecryptoutils.PRF(coinValueKeyRootSeed, publicRand)
+		if err != nil {
+			return nil, nil, nil, nil, nil, err
+		}
 
 		cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, cryptoDetectorKey, err = pqringctxCryptoAddressKeyGenByRandSeeds(pp, cryptoScheme, privacyLevel, coinSpendKeyRandSeed, coinSerialNumberKeyRandSeed, coinValueKeyRandSeed, coinDetectorKey, publicRand)
 		if err != nil {
@@ -122,10 +134,16 @@ func pqringctxCryptoAddressKeyReGenByRootSeedsFromPublicRand(pp *pqringctxapi.Pu
 	//publicRand := abecryptoutils.RandomBytes(pp.GetParamKeyGenPublicRandBytesLen())
 
 	//	coinSpendKeyRandSeed
-	coinSpendKeyRandSeed := abecryptoutils.PRF(coinSpendKeyRootSeed, publicRand)
+	coinSpendKeyRandSeed, err := abecryptoutils.PRF(coinSpendKeyRootSeed, publicRand)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
 
 	//	coinDetectorKey
-	coinDetectorKey := abecryptoutils.PRF(coinDetectorRootKey, publicRand)
+	coinDetectorKey, err := abecryptoutils.PRF(coinDetectorRootKey, publicRand)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
 
 	if privacyLevel == PrivacyLevelRINGCT {
 		if len(coinSerialNumberKeyRootSeed) != abecryptoutils.PRFKeyBytesLen {
@@ -135,8 +153,14 @@ func pqringctxCryptoAddressKeyReGenByRootSeedsFromPublicRand(pp *pqringctxapi.Pu
 			return nil, nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressKeyReGenByRootSeedsFromPublicRand: invalid length of coinValueKeyRootSeed (%d)", len(coinValueKeyRootSeed))
 		}
 
-		coinSerialNumberKeyRandSeed := abecryptoutils.PRF(coinSerialNumberKeyRootSeed, publicRand)
-		coinValueKeyRandSeed := abecryptoutils.PRF(coinValueKeyRootSeed, publicRand)
+		coinSerialNumberKeyRandSeed, err := abecryptoutils.PRF(coinSerialNumberKeyRootSeed, publicRand)
+		if err != nil {
+			return nil, nil, nil, nil, nil, err
+		}
+		coinValueKeyRandSeed, err := abecryptoutils.PRF(coinValueKeyRootSeed, publicRand)
+		if err != nil {
+			return nil, nil, nil, nil, nil, err
+		}
 
 		cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, cryptoDetectorKey, err = pqringctxCryptoAddressKeyGenByRandSeeds(pp, cryptoScheme, privacyLevel, coinSpendKeyRandSeed, coinSerialNumberKeyRandSeed, coinValueKeyRandSeed, coinDetectorKey, publicRand)
 		if err != nil {
@@ -187,10 +211,16 @@ func pqringctxRandSeedsGenByRootSeedsFromPublicRand(pp *pqringctxapi.PublicParam
 	//publicRand := abecryptoutils.RandomBytes(pp.GetParamKeyGenPublicRandBytesLen())
 
 	//	coinSpendKeyRandSeed
-	coinSpendKeyRandSeed = abecryptoutils.PRF(coinSpendKeyRootSeed, publicRand)
+	coinSpendKeyRandSeed, err = abecryptoutils.PRF(coinSpendKeyRootSeed, publicRand)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
 
 	//	coinDetectorKey
-	coinDetectorKey = abecryptoutils.PRF(coinDetectorRootKey, publicRand)
+	coinDetectorKey, err = abecryptoutils.PRF(coinDetectorRootKey, publicRand)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
 
 	if privacyLevel == PrivacyLevelRINGCT {
 		if len(coinSerialNumberKeyRootSeed) != abecryptoutils.PRFKeyBytesLen {
@@ -200,8 +230,14 @@ func pqringctxRandSeedsGenByRootSeedsFromPublicRand(pp *pqringctxapi.PublicParam
 			return nil, nil, nil, nil, fmt.Errorf("pqringctxRandSeedsGenByRootSeedsFromPublicRand: invalid length of coinValueKeyRootSeed (%d)", len(coinValueKeyRootSeed))
 		}
 
-		coinSerialNumberKeyRandSeed = abecryptoutils.PRF(coinSerialNumberKeyRootSeed, publicRand)
-		coinValueKeyRandSeed = abecryptoutils.PRF(coinValueKeyRootSeed, publicRand)
+		coinSerialNumberKeyRandSeed, err = abecryptoutils.PRF(coinSerialNumberKeyRootSeed, publicRand)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		coinValueKeyRandSeed, err = abecryptoutils.PRF(coinValueKeyRootSeed, publicRand)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
 
 	} else if privacyLevel == PrivacyLevelPSEUDONYM {
 		//	nothing to do, since it needs only coinSpendKeyRandSeed and coinDetectorKey
