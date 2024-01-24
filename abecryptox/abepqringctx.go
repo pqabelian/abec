@@ -686,10 +686,6 @@ func pqringctTxoCoinSerialNumberGen(pp *pqringctxapi.PublicParameter, cryptoSche
 	return sn, nil
 }
 
-func pqringctExtractCoinAddressFromTxoScript(pp *pqringctxapi.PublicParameter, script []byte) ([]byte, error) {
-	return pqringctxapi.ExtractCoinAddressFromSerializedTxo(pp, script)
-}
-
 //	APIs for Txos	end
 
 // APIs for TxWitnesses	begin

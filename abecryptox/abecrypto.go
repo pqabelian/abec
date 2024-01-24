@@ -333,6 +333,7 @@ func GetTxoSerializeSizeApprox(txVersion uint32, cryptoAddressPayTo []byte) (int
 
 // ExtractPublicRandFromTxo returns the PublicRand in the CoinAddress of the input wire.TxOutAbe.
 // reviewed on 2023.12.31
+// reviewed on 2024.01.24
 func ExtractPublicRandFromTxo(abeTxo *wire.TxOutAbe) (publicRand []byte, err error) {
 	if abeTxo == nil {
 		return nil, fmt.Errorf("ExtractPublicRandFromTxo: the input abeTxo is nil")
@@ -350,28 +351,31 @@ func ExtractPublicRandFromTxo(abeTxo *wire.TxOutAbe) (publicRand []byte, err err
 		return nil, fmt.Errorf("ExtractPublicRandFromTxo: the crypto-scheme obtained from abeTxo.Version is not CryptoSchemePQRingCTX")
 	}
 
-	return nil, err
+	// return nil, err
 }
 
-func ExtractCoinAddressFromTxo(abeTxo *wire.TxOutAbe) ([]byte, error) {
+// ExtractCoinAddressFromTxo returns the coinAddress of the input TxOutAbe.
+// refactored on 2024.01.24 by Alice.
+// todo: review
+func ExtractCoinAddressFromTxo(abeTxo *wire.TxOutAbe) (coinAddress []byte, err error) {
+	if abeTxo == nil {
+		return nil, fmt.Errorf("ExtractCoinAddressFromTxo: the input abeTxo is nil")
+	}
+
 	cryptoSchemeByTxVersion, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
 	if err != nil {
 		return nil, err
 	}
 
-	var coinAddr []byte
 	switch cryptoSchemeByTxVersion {
 	case abecryptoxparam.CryptoSchemePQRingCT:
 		return abecrypto.ExtractCoinAddressFromTxoScript(abeTxo.TxoScript, abecryptoparam.CryptoSchemePQRingCT)
 
 	case abecryptoxparam.CryptoSchemePQRingCTX:
-		coinAddr, err = pqringctExtractCoinAddressFromTxoScript(abecryptoxparam.PQRingCTXPP, abeTxo.TxoScript)
-		if err != nil {
-			return nil, err
-		}
-		return coinAddr, nil
+		return pqringctxExtractCoinAddressFromTxo(abecryptoxparam.PQRingCTXPP, abeTxo)
+
 	default:
-		return nil, fmt.Errorf("unsupported ringct version")
+		return nil, fmt.Errorf("ExtractCoinAddressFromTxo: unsupported TxOutAbe.version")
 	}
 }
 
