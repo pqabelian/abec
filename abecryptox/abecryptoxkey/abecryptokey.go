@@ -492,18 +492,19 @@ func CryptoDetectorKeyParse(cryptoDetectorKey []byte) (privacyLevel PrivacyLevel
 
 // APIs for key size start
 
+// GetCoinAddressSize returns the CoinAddressSize corresponding to the input PrivacyLevel.
+// todo: review
 func GetCoinAddressSize(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel) (int, error) {
 	switch cryptoScheme {
 	case abecryptoxparam.CryptoSchemePQRingCT:
 		//	this is to achieve back-compatibility with PQRingCT
-		return pqringctxGetCoinAddressSize(abecryptoxparam.PQRingCTXPP, pqringctxapi.CoinAddressTypePublicKeyForRingPre)
+		if privacyLevel != PrivacyLevelRINGCTPre {
+			return 0, fmt.Errorf("GetCoinAddressSize: the input cryptoScheme is CryptoSchemePQRingCT but the input privacyLevel is not PrivacyLevelRINGCTPre")
+		}
+		return pqringctxGetCoinAddressSize(abecryptoxparam.PQRingCTXPP, PrivacyLevelRINGCTPre)
 
 	case abecryptoxparam.CryptoSchemePQRingCTX:
-		coinAddressType, err := pqringctxGetCoinAddressTypeFromPrivacyLevel(privacyLevel)
-		if err != nil {
-			return 0, err
-		}
-		return pqringctxGetCoinAddressSize(abecryptoxparam.PQRingCTXPP, coinAddressType)
+		return pqringctxGetCoinAddressSize(abecryptoxparam.PQRingCTXPP, privacyLevel)
 	default:
 		return 0, fmt.Errorf("GetCoinAddressSize: unsupported crypto-scheme")
 	}
