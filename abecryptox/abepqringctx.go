@@ -569,6 +569,17 @@ func pqringctxLedgerTxoIdGen(ringId wire.RingId, index uint8) []byte {
 
 //	APIs for Txos	begin
 
+// pqringctxGetTxoPrivacyLevel returns the PrivacyLevel of the input wire.TxOutAbe.
+// reviewed on 2024.01.04
+func pqringctxGetTxoPrivacyLevel(pp *pqringctxapi.PublicParameter, abeTxo *wire.TxOutAbe) (abecryptoxkey.PrivacyLevel, error) {
+	cryptoTxoMLP, err := pqringctxapi.DeserializeTxo(pp, abeTxo.TxoScript)
+	if err != nil {
+		return 0, err
+	}
+
+	return abecryptoxkey.GetPrivacyLevelFromCoinAddressType(cryptoTxoMLP.CoinAddressType())
+}
+
 // pqringctxGetTxoSerializeSize returns the TxoSerializeSize for the input coinAddress.
 // reviewed on 2023.12.07
 // refactored on 2024.01.24 by Alice: pqringctx-Layer takes as input cryptoAddress and parses it to coinAddress.
@@ -583,12 +594,6 @@ func pqringctxGetTxoSerializeSize(pp *pqringctxapi.PublicParameter, cryptoAddres
 	return pqringctxapi.GetTxoSerializeSize(pp, coinAddress)
 }
 
-// pqringctxExtractCoinAddressFromTxo returns the CoinAddress of the input wire.TxOutAbe.
-// reviewed on 2023.12.31
-func pqringctxExtractCoinAddressFromTxo(pp *pqringctxapi.PublicParameter, abeTxo *wire.TxOutAbe) ([]byte, error) {
-	return pqringctxapi.ExtractCoinAddressFromSerializedTxo(pp, abeTxo.TxoScript)
-}
-
 // pqringctxExtractPublicRandFromTxo returns the PublicRand in the CoinAddress of the input wire.TxOutAbe.
 // reviewed on 2023.12.31
 func pqringctxExtractPublicRandFromTxo(pp *pqringctxapi.PublicParameter, abeTxo *wire.TxOutAbe) ([]byte, error) {
@@ -599,15 +604,40 @@ func pqringctxExtractPublicRandFromTxo(pp *pqringctxapi.PublicParameter, abeTxo 
 	return pqringctxapi.ExtractPublicRandFromCoinAddress(pp, coinAddress)
 }
 
-// pqringctxGetTxoPrivacyLevel returns the PrivacyLevel of the input wire.TxOutAbe.
-// reviewed on 2024.01.04
-func pqringctxGetTxoPrivacyLevel(pp *pqringctxapi.PublicParameter, abeTxo *wire.TxOutAbe) (abecryptoxkey.PrivacyLevel, error) {
-	cryptoTxoMLP, err := pqringctxapi.DeserializeTxo(pp, abeTxo.TxoScript)
-	if err != nil {
-		return 0, err
+// pqringctxExtractCoinAddressFromTxo returns the CoinAddress of the input wire.TxOutAbe.
+// reviewed on 2023.12.31
+func pqringctxExtractCoinAddressFromTxo(pp *pqringctxapi.PublicParameter, abeTxo *wire.TxOutAbe) ([]byte, error) {
+	return pqringctxapi.ExtractCoinAddressFromSerializedTxo(pp, abeTxo.TxoScript)
+}
+
+// pqringctxTxoCoinDetectByCoinDetectorRootKey use the input coinDetectorRootKey to check whether the input wire.TxOutAbe's coinAddress belongs to the owner of coinDetectorRootKey.
+// todo: review
+func pqringctxTxoCoinDetectByCoinDetectorRootKey(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe, coinDetectorRootKey []byte) (bool, error) {
+	if abeTxo == nil {
+		return false, fmt.Errorf("pqringctxTxoCoinDetectByCoinDetectorRootKey: the input abeTxo is nil")
 	}
 
-	return abecryptoxkey.GetPrivacyLevelFromCoinAddressType(cryptoTxoMLP.CoinAddressType())
+	coinAddress, err := pqringctxapi.ExtractCoinAddressFromSerializedTxo(pp, abeTxo.TxoScript)
+	if err != nil {
+		return false, err
+	}
+
+	return abecryptoxkey.CoinAddressDetectByCoinDetectorRootKey(cryptoScheme, coinAddress, coinDetectorRootKey)
+}
+
+// pqringctxTxoCoinDetectByCryptoDetectorKey use the input cryptoDetectorKey to check whether the input wire.TxOutAbe's coinAddress belongs to the owner of cryptoDetectorKey.
+// todo: review
+func pqringctxTxoCoinDetectByCryptoDetectorKey(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe, cryptoDetectorKey []byte) (bool, error) {
+	if abeTxo == nil {
+		return false, fmt.Errorf("pqringctxTxoCoinDetectByCryptoDetectorKey: the input abeTxo is nil")
+	}
+
+	coinAddress, err := pqringctxapi.ExtractCoinAddressFromSerializedTxo(pp, abeTxo.TxoScript)
+	if err != nil {
+		return false, err
+	}
+
+	return abecryptoxkey.CoinAddressDetectByCryptoDetectorKey(cryptoScheme, coinAddress, cryptoDetectorKey)
 }
 
 func pqringctTxoCoinReceive(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe, cryptoAddress []byte, cryptoVsk []byte) (valid bool, v uint64, err error) {

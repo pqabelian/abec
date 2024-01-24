@@ -51,7 +51,8 @@ func pqringctxCryptoAddressKeyGenByRootSeeds(pp *pqringctxapi.PublicParameter,
 	}
 
 	//	coinDetectorKey
-	coinDetectorKey, err := abecryptoutils.PRF(coinDetectorRootKey, publicRand)
+	// coinDetectorKey, err := abecryptoutils.PRF(coinDetectorRootKey, publicRand)
+	coinDetectorKey, err := coinDetectorKeyGenByCoinDetectorRootKeyFromPublicRand(pp, coinDetectorRootKey, publicRand)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
@@ -141,7 +142,8 @@ func pqringctxCryptoAddressKeyReGenByRootSeedsFromPublicRand(pp *pqringctxapi.Pu
 	}
 
 	//	coinDetectorKey
-	coinDetectorKey, err := abecryptoutils.PRF(coinDetectorRootKey, publicRand)
+	// coinDetectorKey, err := abecryptoutils.PRF(coinDetectorRootKey, publicRand)
+	coinDetectorKey, err := coinDetectorKeyGenByCoinDetectorRootKeyFromPublicRand(pp, coinDetectorRootKey, publicRand)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
@@ -181,7 +183,7 @@ func pqringctxCryptoAddressKeyReGenByRootSeedsFromPublicRand(pp *pqringctxapi.Pu
 	return cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, cryptoDetectorKey, nil
 }
 
-// pqringctxRandSeedsGenByRootSeedsFromPublicRand generates (Rand Seeds, coinDetectorKey) from the input/given (Root Seeds, coinDetectorKey) and PublicRand.
+// pqringctxRandSeedsGenByRootSeedsFromPublicRand generates (Rand Seeds, coinDetectorKey) from the input/given (Root Seeds, coinDetectorRootKey) and PublicRand.
 // pqringctxRandSeedsGenByRootSeedsFromPublicRand has the same inputs as pqringctxCryptoAddressKeyReGenByRootSeedsFromPublicRand, but outputs the internal (Rand Seeds, coinDetectorKey),
 // rather than the final (CryptoAddress, Crypto-Keys).
 // The output (Rand Seeds, coinDetectorKey) can be used to call pqringctxCryptoAddressKeyGenByRandSeeds to generate the final (CryptoAddress, Crypto-Keys).
@@ -218,7 +220,8 @@ func pqringctxRandSeedsGenByRootSeedsFromPublicRand(pp *pqringctxapi.PublicParam
 	}
 
 	//	coinDetectorKey
-	coinDetectorKey, err = abecryptoutils.PRF(coinDetectorRootKey, publicRand)
+	// coinDetectorKey, err = abecryptoutils.PRF(coinDetectorRootKey, publicRand)
+	coinDetectorKey, err = coinDetectorKeyGenByCoinDetectorRootKeyFromPublicRand(pp, coinDetectorRootKey, publicRand)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -394,12 +397,12 @@ func pqringctxCryptoDetectorKeyParse(pp *pqringctxapi.PublicParameter, cryptoSch
 	coinDetectorKey []byte,
 	err error) {
 
-	cryptoSchemeInCryptoSpSk, err := ExtractCryptoSchemeFromCryptoDetectorKey(cryptoDetectorKey)
+	cryptoSchemeInCryptoDetectorKey, err := ExtractCryptoSchemeFromCryptoDetectorKey(cryptoDetectorKey)
 	if err != nil {
 		return 0, nil, err
 	}
 
-	if cryptoSchemeInCryptoSpSk != cryptoScheme {
+	if cryptoSchemeInCryptoDetectorKey != cryptoScheme {
 		return 0, nil, fmt.Errorf("pqringctxCryptoDetectorKeyParse: the input cryptoScheme does not match the cryptoScheme extracted from the input cryptoDetectorKey")
 	}
 
@@ -636,6 +639,33 @@ func pqringctxCryptoValueSecretKeyParse(pp *pqringctxapi.PublicParameter, crypto
 	return privacyLevel, coinValueSecretKey, nil
 }
 
+// pqringctxCoinAddressDetectByCoinDetectorRootKey checks whether coinAddress belongs to the owner of coinDetectorRootKey.
+// todo: review
+func pqringctxCoinAddressDetectByCoinDetectorRootKey(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, coinAddress []byte, coinDetectorRootKey []byte) (bool, error) {
+
+	publicRand, err := pqringctxapi.ExtractPublicRandFromCoinAddress(pp, coinAddress)
+	if err != nil {
+		return false, err
+	}
+	coinDetectorKey, err := coinDetectorKeyGenByCoinDetectorRootKeyFromPublicRand(pp, coinDetectorRootKey, publicRand)
+	if err != nil {
+		return false, err
+	}
+
+	return pqringctxapi.DetectCoinAddress(pp, coinAddress, coinDetectorKey)
+}
+
+// pqringctxCoinAddressDetectByCryptoDetectorKey checks whether coinAddress belongs to the owner of cryptoDetectorKey.
+// todo: review
+func pqringctxCoinAddressDetectByCryptoDetectorKey(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, coinAddress []byte, cryptoDetectorKey []byte) (bool, error) {
+	_, coinDetectorKey, err := pqringctxCryptoDetectorKeyParse(pp, cryptoScheme, cryptoDetectorKey)
+	if err != nil {
+		return false, err
+	}
+
+	return pqringctxapi.DetectCoinAddress(pp, coinAddress, coinDetectorKey)
+}
+
 // APIs for AddressKey-Encode-Format	end
 
 // APIs for key size start
@@ -655,3 +685,28 @@ func pqringctxGetCoinAddressSize(pp *pqringctxapi.PublicParameter, privacyLevel 
 }
 
 // APIs for key size end
+
+//	helper functions	begin
+//
+// coinDetectorKeyGenByCoinDetectorRootKeyFromPublicRand generates CoinDetectorKey from the input coinDetectorRootKey and PublicRand.
+// NOTE: this should be consistent with
+// todo: review
+func coinDetectorKeyGenByCoinDetectorRootKeyFromPublicRand(pp *pqringctxapi.PublicParameter, coinDetectorRootKey []byte, publicRand []byte) (coinDetectorKey []byte, err error) {
+
+	//// choose PublicRand
+	//publicRand := abecryptoutils.RandomBytes(pp.GetParamKeyGenPublicRandBytesLen())
+
+	if len(publicRand) != pqringctxapi.GetParamKeyGenPublicRandBytesLen(pp) {
+		return nil, fmt.Errorf("pqringctxCoinDetectorKeyGenByCoinDetectorRootKeyFromPublicRand: the input publicRand has an invalid length (%d)", len(publicRand))
+	}
+
+	//	coinDetectorKey
+	coinDetectorKey, err = abecryptoutils.PRF(coinDetectorRootKey, publicRand)
+	if err != nil {
+		return nil, err
+	}
+
+	return coinDetectorKey, nil
+}
+
+//	helper functions	end

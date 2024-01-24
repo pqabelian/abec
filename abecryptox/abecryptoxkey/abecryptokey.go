@@ -116,7 +116,7 @@ func RandSeedsGenByRootSeedsFromPublicRand(cryptoScheme abecryptoxparam.CryptoSc
 		return nil, nil, nil, nil, fmt.Errorf("RandSeedsGenByRootSeedsFromPublicRand: cryptoScheme (%d) is not supported", cryptoScheme)
 	}
 
-	return nil, nil, nil, nil, err
+	// return nil, nil, nil, nil, err
 }
 
 // CryptoAddressKeyGenByRandSeeds generates (cryptoAddress, cryptoKeys) from the input Rand Seeds, coinDetectorKey, and Public Rand.
@@ -483,6 +483,30 @@ func CryptoDetectorKeyParse(cryptoDetectorKey []byte) (privacyLevel PrivacyLevel
 
 	return privacyLevel, coinDetectorKey, nil
 
+}
+
+// CoinAddressDetectByCoinDetectorRootKey
+// todo: review
+func CoinAddressDetectByCoinDetectorRootKey(cryptoScheme abecryptoxparam.CryptoScheme, coinAddress []byte, coinDetectorRootKey []byte) (bool, error) {
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+		return pqringctxCoinAddressDetectByCoinDetectorRootKey(abecryptoxparam.PQRingCTXPP, cryptoScheme, coinAddress, coinDetectorRootKey)
+
+	default:
+		return false, fmt.Errorf("CoinAddressDetectByCoinDetectorRootKey: unsupported crypto-scheme (%d)", cryptoScheme)
+	}
+}
+
+// CoinAddressDetectByCryptoDetectorKey
+// todo: review
+func CoinAddressDetectByCryptoDetectorKey(cryptoScheme abecryptoxparam.CryptoScheme, coinAddress []byte, cryptoDetectorKey []byte) (bool, error) {
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+		return pqringctxCoinAddressDetectByCryptoDetectorKey(abecryptoxparam.PQRingCTXPP, cryptoScheme, coinAddress, cryptoDetectorKey)
+
+	default:
+		return false, fmt.Errorf("CoinAddressDetectByCryptoDetectorKey: unsupported crypto-scheme (%d)", cryptoScheme)
+	}
 }
 
 //	APIs for AddressKey-Encode-Format	end
