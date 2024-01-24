@@ -162,9 +162,6 @@ func CryptoAddressKeyGenByRandSeeds(cryptoScheme abecryptoxparam.CryptoScheme, p
 func GetPrivacyLevelFromCoinAddressType(coinAddressType pqringctxapi.CoinAddressType) (PrivacyLevel, error) {
 	return pqringctxGetPrivacyLevelFromCoinAddressType(coinAddressType)
 }
-func GetCoinAddressTypeFromPrivacyLevel(privacyLevel PrivacyLevel) (pqringctxapi.CoinAddressType, error) {
-	return pqringctxGetCoinAddressTypeFromPrivacyLevel(privacyLevel)
-}
 
 //	APIs for AddressKey-Encode-Format	begin
 //

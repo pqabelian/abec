@@ -381,21 +381,6 @@ func pqringctxGetPrivacyLevelFromCoinAddressType(coinAddressType pqringctxapi.Co
 	}
 }
 
-// pqringctxGetCoinAddressTypeFromPrivacyLevel returns the CoinAddressType corresponding to the input privacyLevel.
-// reviewed on 2024.01.24
-func pqringctxGetCoinAddressTypeFromPrivacyLevel(privacyLevel PrivacyLevel) (pqringctxapi.CoinAddressType, error) {
-	switch privacyLevel {
-	case PrivacyLevelRINGCTPre:
-		return pqringctxapi.CoinAddressTypePublicKeyForRingPre, nil
-	case PrivacyLevelRINGCT:
-		return pqringctxapi.CoinAddressTypePublicKeyForRing, nil
-	case PrivacyLevelPSEUDONYM:
-		return pqringctxapi.CoinAddressTypePublicKeyHashForSingle, nil
-	default:
-		return 0, fmt.Errorf("pqringctxGetCoinAddressTypeFromPrivacyLevel: the input Privacy is not supported")
-	}
-}
-
 // mapping between PrivacyLevel and CoinAddressType	end
 
 //	APIs for AddressKey-Encode-Format	begin
