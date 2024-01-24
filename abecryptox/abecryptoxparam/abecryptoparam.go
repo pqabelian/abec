@@ -35,7 +35,9 @@ const (
 // var PQRingCTPP = pqringct.Initialize([]byte("Welcome to Post Quantum World! From the Abelian Team"))
 var PQRingCTXPP = pqringctxapi.InitializePQRingCTX([]byte("Welcome to Post Quantum World! From the Abelian Team"))
 
-func CryptoSchemeSerializeSize(cryptoScheme CryptoScheme) int {
+// CryptoSchemeSerializeSize returns the serialize size for CryptoScheme.
+// reviewed on 2024.01.24
+func CryptoSchemeSerializeSize() int {
 	return 4
 }
 
