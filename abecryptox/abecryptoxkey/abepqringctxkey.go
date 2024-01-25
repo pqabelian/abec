@@ -639,33 +639,6 @@ func pqringctxCryptoValueSecretKeyParse(pp *pqringctxapi.PublicParameter, crypto
 	return privacyLevel, coinValueSecretKey, nil
 }
 
-// pqringctxCoinAddressDetectByCoinDetectorRootKey checks whether coinAddress belongs to the owner of coinDetectorRootKey.
-// todo: review
-func pqringctxCoinAddressDetectByCoinDetectorRootKey(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, coinAddress []byte, coinDetectorRootKey []byte) (bool, error) {
-
-	publicRand, err := pqringctxapi.ExtractPublicRandFromCoinAddress(pp, coinAddress)
-	if err != nil {
-		return false, err
-	}
-	coinDetectorKey, err := coinDetectorKeyGenByCoinDetectorRootKeyFromPublicRand(pp, coinDetectorRootKey, publicRand)
-	if err != nil {
-		return false, err
-	}
-
-	return pqringctxapi.DetectCoinAddress(pp, coinAddress, coinDetectorKey)
-}
-
-// pqringctxCoinAddressDetectByCryptoDetectorKey checks whether coinAddress belongs to the owner of cryptoDetectorKey.
-// todo: review
-func pqringctxCoinAddressDetectByCryptoDetectorKey(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, coinAddress []byte, cryptoDetectorKey []byte) (bool, error) {
-	_, coinDetectorKey, err := pqringctxCryptoDetectorKeyParse(pp, cryptoScheme, cryptoDetectorKey)
-	if err != nil {
-		return false, err
-	}
-
-	return pqringctxapi.DetectCoinAddress(pp, coinAddress, coinDetectorKey)
-}
-
 // APIs for AddressKey-Encode-Format	end
 
 // APIs for key size start

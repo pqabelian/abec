@@ -623,7 +623,18 @@ func pqringctxTxoCoinDetectByCoinDetectorRootKey(pp *pqringctxapi.PublicParamete
 		return false, err
 	}
 
-	return abecryptoxkey.CoinAddressDetectByCoinDetectorRootKey(cryptoScheme, coinAddress, coinDetectorRootKey)
+	//	extract publicRand and generate coinDetectorKey
+	//	NOTE: the codes here must be consistent with that in abecryptoxkey/abepqringctxkey.go
+	publicRand, err := pqringctxapi.ExtractPublicRandFromCoinAddress(pp, coinAddress)
+	if err != nil {
+		return false, err
+	}
+	coinDetectorKey, err := abecryptoutils.PRF(coinDetectorRootKey, publicRand)
+	if err != nil {
+		return false, err
+	}
+
+	return pqringctxapi.DetectCoinAddress(pp, coinAddress, coinDetectorKey)
 }
 
 // pqringctxTxoCoinDetectByCryptoDetectorKey use the input cryptoDetectorKey to check whether the input wire.TxOutAbe's coinAddress belongs to the owner of cryptoDetectorKey.
@@ -638,7 +649,12 @@ func pqringctxTxoCoinDetectByCryptoDetectorKey(pp *pqringctxapi.PublicParameter,
 		return false, err
 	}
 
-	return abecryptoxkey.CoinAddressDetectByCryptoDetectorKey(cryptoScheme, coinAddress, cryptoDetectorKey)
+	_, coinDetectorKey, err := abecryptoxkey.CryptoDetectorKeyParse(cryptoDetectorKey)
+	if err != nil {
+		return false, err
+	}
+
+	return pqringctxapi.DetectCoinAddress(pp, coinAddress, coinDetectorKey)
 }
 
 // pqringctxTxoCoinReceiveByRootSeeds checks whether the input abeTxo *wire.TxOutAbe belongs to the owner of the input coinDetectorRootKey, and if true,

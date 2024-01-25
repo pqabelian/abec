@@ -485,30 +485,6 @@ func CryptoDetectorKeyParse(cryptoDetectorKey []byte) (privacyLevel PrivacyLevel
 
 }
 
-// CoinAddressDetectByCoinDetectorRootKey
-// todo: review
-func CoinAddressDetectByCoinDetectorRootKey(cryptoScheme abecryptoxparam.CryptoScheme, coinAddress []byte, coinDetectorRootKey []byte) (bool, error) {
-	switch cryptoScheme {
-	case abecryptoxparam.CryptoSchemePQRingCTX:
-		return pqringctxCoinAddressDetectByCoinDetectorRootKey(abecryptoxparam.PQRingCTXPP, cryptoScheme, coinAddress, coinDetectorRootKey)
-
-	default:
-		return false, fmt.Errorf("CoinAddressDetectByCoinDetectorRootKey: unsupported crypto-scheme (%d)", cryptoScheme)
-	}
-}
-
-// CoinAddressDetectByCryptoDetectorKey
-// todo: review
-func CoinAddressDetectByCryptoDetectorKey(cryptoScheme abecryptoxparam.CryptoScheme, coinAddress []byte, cryptoDetectorKey []byte) (bool, error) {
-	switch cryptoScheme {
-	case abecryptoxparam.CryptoSchemePQRingCTX:
-		return pqringctxCoinAddressDetectByCryptoDetectorKey(abecryptoxparam.PQRingCTXPP, cryptoScheme, coinAddress, cryptoDetectorKey)
-
-	default:
-		return false, fmt.Errorf("CoinAddressDetectByCryptoDetectorKey: unsupported crypto-scheme (%d)", cryptoScheme)
-	}
-}
-
 //	APIs for AddressKey-Encode-Format	end
 
 // APIs for key size start
