@@ -706,15 +706,21 @@ func pqringctxTxoCoinReceiveByRootSeeds(pp *pqringctxapi.PublicParameter, crypto
 		return false, 0, nil
 	}
 
-	//	generate (coinValuePublicKey, coinValueSecretKey)
-	//	NOTE: the codes here must be consistent with that in abecryptoxkey/abepqringctxkey.go
-	coinValueKeyRandSeed, err := abecryptoutils.PRF(coinValueKeyRootSeed, publicRand)
-	if err != nil {
-		return false, 0, err
-	}
-	coinValuePublicKey, coinValueSecretKey, err := pqringctxapi.CoinValueKeyGen(pp, coinValueKeyRandSeed)
-	if err != nil {
-		return false, 0, err
+	var coinValuePublicKey, coinValueSecretKey []byte
+	if len(coinValueKeyRootSeed) != 0 {
+		//	generate (coinValuePublicKey, coinValueSecretKey)
+		//	NOTE: the codes here must be consistent with that in abecryptoxkey/abepqringctxkey.go
+		coinValueKeyRandSeed, err := abecryptoutils.PRF(coinValueKeyRootSeed, publicRand)
+		if err != nil {
+			return false, 0, err
+		}
+		coinValuePublicKey, coinValueSecretKey, err = pqringctxapi.CoinValueKeyGen(pp, coinValueKeyRandSeed)
+		if err != nil {
+			return false, 0, err
+		}
+	} else {
+		coinValuePublicKey = nil
+		coinValueSecretKey = nil
 	}
 
 	return pqringctxapi.TxoCoinReceive(pp, txoMLP, coinAddressInTxo, coinValuePublicKey, coinValueSecretKey)
@@ -755,11 +761,17 @@ func pqringctxTxoCoinReceiveByRandSeeds(pp *pqringctxapi.PublicParameter, crypto
 		return false, 0, nil
 	}
 
-	//	generate (coinValuePublicKey, coinValueSecretKey)
-	//	NOTE: the codes here must be consistent with that in abecryptoxkey/abepqringctxkey.go
-	coinValuePublicKey, coinValueSecretKey, err := pqringctxapi.CoinValueKeyGen(pp, coinValueKeyRandSeed)
-	if err != nil {
-		return false, 0, err
+	var coinValuePublicKey, coinValueSecretKey []byte
+	if len(coinValueKeyRandSeed) != 0 {
+		//	generate (coinValuePublicKey, coinValueSecretKey)
+		//	NOTE: the codes here must be consistent with that in abecryptoxkey/abepqringctxkey.go
+		coinValuePublicKey, coinValueSecretKey, err = pqringctxapi.CoinValueKeyGen(pp, coinValueKeyRandSeed)
+		if err != nil {
+			return false, 0, err
+		}
+	} else {
+		coinValuePublicKey = nil
+		coinValueSecretKey = nil
 	}
 
 	return pqringctxapi.TxoCoinReceive(pp, txoMLP, coinAddressInTxo, coinValuePublicKey, coinValueSecretKey)
@@ -783,12 +795,20 @@ func pqringctxTxoCoinReceiveByKeys(pp *pqringctxapi.PublicParameter, cryptoSchem
 	if err != nil {
 		return false, 0, err
 	}
-	privacyLevelInCryptoValueSecretKey, coinValueSecretKey, err := abecryptoxkey.CryptoValueSecretKeyParse(cryptoValueSecretKey)
-	if err != nil {
-		return false, 0, err
-	}
-	if privacyLevelInCryptoAddress != privacyLevelInCryptoValueSecretKey {
-		return false, 0, errors.New("pqringctxTxoCoinReceiveByKeys: the privacyLevel in cryptoValueSecretKey does not match that in cryptoAddress")
+
+	var coinValueSecretKey []byte
+	if len(cryptoValueSecretKey) != 0 {
+		// for Txo on Pseudonym-privacy Address, the cryptoValueSecretKey is nil
+		privacyLevelInCryptoValueSecretKey, coinValueSecretKeyTemp, err := abecryptoxkey.CryptoValueSecretKeyParse(cryptoValueSecretKey)
+		if err != nil {
+			return false, 0, err
+		}
+		if privacyLevelInCryptoAddress != privacyLevelInCryptoValueSecretKey {
+			return false, 0, errors.New("pqringctxTxoCoinReceiveByKeys: the privacyLevel in cryptoValueSecretKey does not match that in cryptoAddress")
+		}
+		coinValueSecretKey = coinValueSecretKeyTemp
+	} else {
+		coinValueSecretKey = nil
 	}
 
 	//	NOTE: As the abepqringctx-layer obtained TxoMLP (associated in crypto-TransferTx/CoinbaseTx) and serialized it to abeTxo.TxoScript,
