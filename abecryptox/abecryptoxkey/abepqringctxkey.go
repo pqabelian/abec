@@ -647,11 +647,11 @@ func pqringctxCryptoValueSecretKeyParse(pp *pqringctxapi.PublicParameter, crypto
 func pqringctxGetCoinAddressSize(pp *pqringctxapi.PublicParameter, privacyLevel PrivacyLevel) (int, error) {
 	switch privacyLevel {
 	case PrivacyLevelRINGCTPre:
-		return pp.GetCoinAddressSize(pqringctx.CoinAddressTypePublicKeyForRingPre)
+		return pqringctxapi.GetCoinAddressSize(pp, pqringctx.CoinAddressTypePublicKeyForRingPre)
 	case PrivacyLevelRINGCT:
-		return pp.GetCoinAddressSize(pqringctx.CoinAddressTypePublicKeyForRing)
+		return pqringctxapi.GetCoinAddressSize(pp, pqringctx.CoinAddressTypePublicKeyForRing)
 	case PrivacyLevelPSEUDONYM:
-		return pp.GetCoinAddressSize(pqringctx.CoinAddressTypePublicKeyHashForSingle)
+		return pqringctxapi.GetCoinAddressSize(pp, pqringctx.CoinAddressTypePublicKeyHashForSingle)
 	default:
 		return 0, fmt.Errorf("pqringctxGetCoinAddressSize: the input PrivacyLevel is not supported")
 	}
