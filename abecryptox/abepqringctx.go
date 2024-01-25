@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/abesuite/abec/abecryptox/abecryptoutils"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/chainhash"
@@ -640,41 +641,148 @@ func pqringctxTxoCoinDetectByCryptoDetectorKey(pp *pqringctxapi.PublicParameter,
 	return abecryptoxkey.CoinAddressDetectByCryptoDetectorKey(cryptoScheme, coinAddress, cryptoDetectorKey)
 }
 
-func pqringctTxoCoinReceive(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe, cryptoAddress []byte, cryptoVsk []byte) (valid bool, v uint64, err error) {
-	cryptoSchemeTxo, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
+// pqringctxTxoCoinReceiveByRootSeeds checks whether the input abeTxo *wire.TxOutAbe belongs to the owner of the input coinDetectorRootKey, and if true,
+// it extracts the value of abeTxo using the input coinValueKeyRootSeed.
+// Note that it is the responsibility of the caller or user to make sure the coinValueKeyRootSeed is for the input abeTxo.
+// todo: review
+func pqringctxTxoCoinReceiveByRootSeeds(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe,
+	coinValueKeyRootSeed []byte, coinDetectorRootKey []byte) (valid bool, value uint64, err error) {
+
+	cryptoSchemeInTxo, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
+	if err != nil {
+		return false, 0, err
+	}
+	if cryptoSchemeInTxo != cryptoScheme {
+		return false, 0, errors.New("pqringctxTxoCoinReceiveByRootSeeds: unmatched cryptoScheme for the input Txo")
+	}
+
+	//	NOTE: As the abepqringctx-layer obtained TxoMLP (associated in crypto-TransferTx/CoinbaseTx) and serialized it to abeTxo.TxoScript,
+	//	here abepqringctx-layer calls crypto-scheme using TxoMLP.
+	txoMLP, err := pqringctxapi.DeserializeTxo(pp, abeTxo.TxoScript)
+	if err != nil {
+		return false, 0, err
+	}
+	coinAddressInTxo, err := pqringctxapi.GetCoinAddressFromTxo(pp, txoMLP)
 	if err != nil {
 		return false, 0, err
 	}
 
-	if cryptoSchemeTxo != cryptoScheme {
-		return false, 0, errors.New("pqringctTxoCoinReceive: unmatched cryptoScheme for input Txo")
-	}
-
-	txo, err := pqringctxapi.DeserializeTxo(pp, abeTxo.TxoScript)
+	//	extract publicRand for later coinAddressDetect and coinValueKeyGen
+	//	NOTE: the codes here must be consistent with that in abecryptoxkey/abepqringctxkey.go
+	publicRand, err := pqringctxapi.ExtractPublicRandFromCoinAddress(pp, coinAddressInTxo)
 	if err != nil {
 		return false, 0, err
 	}
 
-	// TODO(MLP) allow diff?
-	//cryptoSchemeInAddress, err := abecryptoxkey.ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
-	//if err != nil || cryptoSchemeInAddress != cryptoScheme {
-	//	return false, 0, errors.New("pqringctTxoCoinReceive: unmatched cryptoScheme for input cryptoAddress")
-	//}
-
-	//cryptoSchemeInVsk, err := abecryptoxkey.ExtractCryptoSchemeFromCryptoValueSecretKey(cryptoVsk)
-	//if err != nil || cryptoSchemeInVsk != cryptoScheme {
-	//	return false, 0, errors.New("pqringctTxoCoinReceive: unmatched cryptoScheme for Vsk")
-	//}
-	_, coinAddress, coinValuePublicKey, err := abecryptoxkey.CryptoAddressParse(cryptoAddress)
+	//	generate coinDetectorKey and detect coinAddress
+	//	NOTE: the codes here must be consistent with that in abecryptoxkey/abepqringctxkey.go
+	coinDetectorKey, err := abecryptoutils.PRF(coinDetectorRootKey, publicRand)
 	if err != nil {
-		return false, 0, errors.New("pqringctTxoCoinReceive: unmatched cryptoScheme for input cryptoAddress")
+		return false, 0, err
 	}
-	_, coinValueSecretKey, err := abecryptoxkey.CryptoValueSecretKeyParse(cryptoVsk)
-	//if privacyLevelInAddress != privacyLevelInVsk {
-	//	return false, 0, errors.New("pqringctTxoCoinReceive: unmatched privacy level for input cryptoAddress and cryptoVsk")
-	//}
 
-	return pqringctxapi.TxoCoinReceive(pp, txo, coinAddress, coinValuePublicKey, coinValueSecretKey)
+	//	check whether the coinAddress of abeTxo belongs to the owner of coinDetectorKey.
+	valid, err = pqringctxapi.DetectCoinAddress(pp, coinAddressInTxo, coinDetectorKey)
+	if err != nil {
+		return false, 0, err
+	}
+	if !valid {
+		return false, 0, nil
+	}
+
+	//	generate (coinValuePublicKey, coinValueSecretKey)
+	//	NOTE: the codes here must be consistent with that in abecryptoxkey/abepqringctxkey.go
+	coinValueKeyRandSeed, err := abecryptoutils.PRF(coinValueKeyRootSeed, publicRand)
+	if err != nil {
+		return false, 0, err
+	}
+	coinValuePublicKey, coinValueSecretKey, err := pqringctxapi.CoinValueKeyGen(pp, coinValueKeyRandSeed)
+	if err != nil {
+		return false, 0, err
+	}
+
+	return pqringctxapi.TxoCoinReceive(pp, txoMLP, coinAddressInTxo, coinValuePublicKey, coinValueSecretKey)
+}
+
+// pqringctxTxoCoinReceiveByRandSeeds checks whether the input abeTxo *wire.TxOutAbe belongs to the owner of the input coinDetectorKey, and if true,
+// it extracts the value of abeTxo using the input coinValueKeyRandSeed.
+// Note that it is the responsibility of the caller or user to make sure the coinValueKeyRandSeed is for the input abeTxo.
+// todo: review
+func pqringctxTxoCoinReceiveByRandSeeds(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe,
+	coinValueKeyRandSeed []byte, coinDetectorKey []byte) (valid bool, value uint64, err error) {
+	cryptoSchemeInTxo, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
+	if err != nil {
+		return false, 0, err
+	}
+
+	if cryptoSchemeInTxo != cryptoScheme {
+		return false, 0, errors.New("pqringctxTxoCoinReceiveByRandSeeds: unmatched cryptoScheme for the input Txo")
+	}
+
+	//	NOTE: As the abepqringctx-layer obtained TxoMLP (associated in crypto-TransferTx/CoinbaseTx) and serialized it to abeTxo.TxoScript,
+	//	here abepqringctx-layer calls crypto-scheme using TxoMLP.
+	txoMLP, err := pqringctxapi.DeserializeTxo(pp, abeTxo.TxoScript)
+	if err != nil {
+		return false, 0, err
+	}
+	coinAddressInTxo, err := pqringctxapi.GetCoinAddressFromTxo(pp, txoMLP)
+	if err != nil {
+		return false, 0, err
+	}
+
+	//	check whether the coinAddress of abeTxo belongs to the owner of coinDetectorKey.
+	valid, err = pqringctxapi.DetectCoinAddress(pp, coinAddressInTxo, coinDetectorKey)
+	if err != nil {
+		return false, 0, err
+	}
+	if !valid {
+		return false, 0, nil
+	}
+
+	//	generate (coinValuePublicKey, coinValueSecretKey)
+	//	NOTE: the codes here must be consistent with that in abecryptoxkey/abepqringctxkey.go
+	coinValuePublicKey, coinValueSecretKey, err := pqringctxapi.CoinValueKeyGen(pp, coinValueKeyRandSeed)
+	if err != nil {
+		return false, 0, err
+	}
+
+	return pqringctxapi.TxoCoinReceive(pp, txoMLP, coinAddressInTxo, coinValuePublicKey, coinValueSecretKey)
+}
+
+// pqringctxTxoCoinReceiveByKeys checks whether the input abeTxo *wire.TxOutAbe belongs to the owner of the input cryptoAddress, and if true,
+// it extracts the value of abeTxo using the input cryptoValueSecretKey (if it indeed corresponds to the cryptoAddress).
+// todo: review
+func pqringctxTxoCoinReceiveByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe,
+	cryptoAddress []byte, cryptoValueSecretKey []byte) (valid bool, value uint64, err error) {
+	cryptoSchemeInTxo, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
+	if err != nil {
+		return false, 0, err
+	}
+
+	if cryptoSchemeInTxo != cryptoScheme {
+		return false, 0, errors.New("pqringctxTxoCoinReceiveByKeys: unmatched cryptoScheme for the input Txo")
+	}
+
+	privacyLevelInCryptoAddress, coinAddress, coinValuePublicKey, err := abecryptoxkey.CryptoAddressParse(cryptoAddress)
+	if err != nil {
+		return false, 0, err
+	}
+	privacyLevelInCryptoValueSecretKey, coinValueSecretKey, err := abecryptoxkey.CryptoValueSecretKeyParse(cryptoValueSecretKey)
+	if err != nil {
+		return false, 0, err
+	}
+	if privacyLevelInCryptoAddress != privacyLevelInCryptoValueSecretKey {
+		return false, 0, errors.New("pqringctxTxoCoinReceiveByKeys: the privacyLevel in cryptoValueSecretKey does not match that in cryptoAddress")
+	}
+
+	//	NOTE: As the abepqringctx-layer obtained TxoMLP (associated in crypto-TransferTx/CoinbaseTx) and serialized it to abeTxo.TxoScript,
+	//	here abepqringctx-layer calls crypto-scheme using TxoMLP.
+	txoMLP, err := pqringctxapi.DeserializeTxo(pp, abeTxo.TxoScript)
+	if err != nil {
+		return false, 0, err
+	}
+
+	return pqringctxapi.TxoCoinReceive(pp, txoMLP, coinAddress, coinValuePublicKey, coinValueSecretKey)
 }
 
 // For wallet
