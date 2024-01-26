@@ -710,6 +710,10 @@ func pqringctxTxoCoinReceiveByRootSeeds(pp *pqringctxapi.PublicParameter, crypto
 	if len(coinValueKeyRootSeed) != 0 {
 		//	generate (coinValuePublicKey, coinValueSecretKey)
 		//	NOTE: the codes here must be consistent with that in abecryptoxkey/abepqringctxkey.go
+		if len(coinValueKeyRootSeed) != abecryptoutils.PRFKeyBytesLen {
+			return false, 0, fmt.Errorf("pqringctxTxoCoinReceiveByRootSeeds: invalid length of coinValueKeyRootSeed (%d)", len(coinValueKeyRootSeed))
+		}
+
 		coinValueKeyRandSeed, err := abecryptoutils.PRF(coinValueKeyRootSeed, publicRand)
 		if err != nil {
 			return false, 0, err
@@ -846,44 +850,242 @@ func pqringctxPseudonymTxoCoinParse(pp *pqringctxapi.PublicParameter, cryptoSche
 	return pqringctxapi.PseudonymTxoCoinParse(pp, txoMLP)
 }
 
-// For wallet
-func pqringctTxoCoinSerialNumberGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe, ringHash chainhash.Hash, txoIndexInRing uint8, cryptoSnsk []byte) ([]byte, error) {
-	// ringHash + index -> ID
-	//	// (txo, txolid) + Sksn -> sn [pqringct]
+// pqringctxTxoCoinSerialNumberGenByRootSeed generates serialNumber for the input LgrTxoMLP, using the input coinSerialNumberKeyRootSeed.
+// NOTE: the input coinSerialNumberKeyRootSeed could be nil, for example, when the input TxOutAbe is on a Pseudonym-Privacy address.
+// todo: review
+func pqringctxTxoCoinSerialNumberGenByRootSeed(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
+	abeTxo *wire.TxOutAbe, ringId wire.RingId, txoIndexInRing uint8, coinSerialNumberKeyRootSeed []byte) ([]byte, error) {
+	// ringId + index -> ID
+	//	// (txo, txolid) + serialNumberSecretKey -> sn [pqringctx]
 	cryptoSchemeInTxo, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
 	if err != nil {
 		return nil, err
 	}
 
 	if cryptoSchemeInTxo != cryptoScheme {
-		return nil, errors.New("pqringctTxoCoinSerialNumberGen: unmatched cryptoScheme for input Txo")
+		return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRootSeed: the cryptoScheme (%d) corresponding to abeTxo.Version does not match the input cryptoScheme (%d)", cryptoSchemeInTxo, cryptoScheme)
 	}
 
-	txo, err := pqringctxapi.DeserializeTxo(pp, abeTxo.TxoScript)
+	txoMLP, err := pqringctxapi.DeserializeTxo(pp, abeTxo.TxoScript)
 	if err != nil {
 		return nil, err
 	}
+	coinAddressType := txoMLP.CoinAddressType()
 
-	if txo.CoinAddressType() == pqringctxapi.CoinAddressTypePublicKeyHashForSingle {
-		return pqringctxapi.GetNullSerialNumber(pp), nil
+	txolid := pqringctxLedgerTxoIdGen(ringId, txoIndexInRing)
+
+	lgrTxo := pqringctxapi.NewLgrTxo(txoMLP, txolid)
+
+	var coinSerialNumberSecretKey []byte
+	// The cryptoSerialNumberSecretKey could be nil, for example, for Pseudonym-Privacy Txo.
+	if len(coinSerialNumberKeyRootSeed) != 0 {
+		if coinAddressType != pqringctxapi.CoinAddressTypePublicKeyForRing {
+			//	NOTE: only CoinAddressTypePublicKeyForRing address has coinSerialNumberKeyRandSeed
+			return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRootSeed: coinSerialNumberKeyRandSeed is not nil/emprty, but the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyForRing", coinAddressType)
+		}
+
+		//	extract publicRand and generate coinSerialNumberSecretKey
+		//	NOTE: the codes here must be consistent with that in abecryptoxkey/abepqringctxkey.go
+		coinAddress, err := pqringctxapi.GetCoinAddressFromTxo(pp, txoMLP)
+		if err != nil {
+			return nil, err
+		}
+		publicRand, err := pqringctxapi.ExtractPublicRandFromCoinAddress(pp, coinAddress)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(coinSerialNumberKeyRootSeed) != abecryptoutils.PRFKeyBytesLen {
+			return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRootSeed: invalid length of coinSerialNumberKeyRootSeed (%d)", len(coinSerialNumberKeyRootSeed))
+		}
+		coinSerialNumberKeyRandSeed, err := abecryptoutils.PRF(coinSerialNumberKeyRootSeed, publicRand)
+		if err != nil {
+			return nil, err
+		}
+
+		coinSerialNumberSecretKey, err = pqringctxapi.CoinAddressKeyForPKRingGenSerialNumberKeyPart(pp, coinSerialNumberKeyRandSeed)
+		if err != nil {
+			return nil, err
+		}
+
+	} else {
+		if coinAddressType != pqringctxapi.CoinAddressTypePublicKeyHashForSingle {
+			return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRootSeed: coinSerialNumberKeyRandSeed is nil/emprty, while the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyHashForSingle", coinAddressType)
+		}
+
+		coinSerialNumberSecretKey = nil
 	}
 
-	txolid := pqringctxLedgerTxoIdGen(ringHash, txoIndexInRing)
-
-	lgrTxo := pqringctxapi.NewLgrTxo(txo, txolid)
-
-	_, coinSerialNumberSecretKey, err := abecryptoxkey.CryptoSerialNumberSecretKeyParse(cryptoSnsk)
-	if err != nil {
-		return nil, errors.New("pqringctTxoCoinSerialNumberGen: unmatched cryptoScheme for Snsk")
-	}
-
-	sn, err := pqringctxapi.TxoCoinSerialNumberGen(pp, lgrTxo, coinSerialNumberSecretKey)
+	//	lgrTxo rather than (txo,txolid) pair is used, since TransferTxGen is called on input Ledger-txos.
+	sn, err := pqringctxapi.LedgerTxoSerialNumberGen(pp, lgrTxo, coinSerialNumberSecretKey)
 	if err != nil {
 		return nil, err
 	}
 
 	return sn, nil
 }
+
+// pqringctxTxoCoinSerialNumberGenByRandSeed generates serialNumber for the input LgrTxoMLP, using the input coinSerialNumberKeyRandSeed.
+// NOTE: the input coinSerialNumberKeyRandSeed could be nil, for example, when the input TxOutAbe is on a Pseudonym-Privacy address.
+// todo: review
+func pqringctxTxoCoinSerialNumberGenByRandSeed(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
+	abeTxo *wire.TxOutAbe, ringId wire.RingId, txoIndexInRing uint8, coinSerialNumberKeyRandSeed []byte) ([]byte, error) {
+	// ringId + index -> ID
+	//	// (txo, txolid) + serialNumberSecretKey -> sn [pqringctx]
+	cryptoSchemeInTxo, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
+	if err != nil {
+		return nil, err
+	}
+
+	if cryptoSchemeInTxo != cryptoScheme {
+		return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRandSeed: the cryptoScheme (%d) corresponding to abeTxo.Version does not match the input cryptoScheme (%d)", cryptoSchemeInTxo, cryptoScheme)
+	}
+
+	txoMLP, err := pqringctxapi.DeserializeTxo(pp, abeTxo.TxoScript)
+	if err != nil {
+		return nil, err
+	}
+	coinAddressType := txoMLP.CoinAddressType()
+
+	txolid := pqringctxLedgerTxoIdGen(ringId, txoIndexInRing)
+
+	lgrTxo := pqringctxapi.NewLgrTxo(txoMLP, txolid)
+
+	var coinSerialNumberSecretKey []byte
+	// The cryptoSerialNumberSecretKey could be nil, for example, for Pseudonym-Privacy Txo.
+	if len(coinSerialNumberKeyRandSeed) != 0 {
+		if coinAddressType != pqringctxapi.CoinAddressTypePublicKeyForRing {
+			//	NOTE: only CoinAddressTypePublicKeyForRing address has coinSerialNumberKeyRandSeed
+			return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRandSeed: coinSerialNumberKeyRandSeed is not nil/emprty, but the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyForRing", coinAddressType)
+		}
+
+		//	generate coinSerialNumberSecretKey
+		//	NOTE: the codes here must be consistent with that in abecryptoxkey/abepqringctxkey.go
+		coinSerialNumberSecretKey, err = pqringctxapi.CoinAddressKeyForPKRingGenSerialNumberKeyPart(pp, coinSerialNumberKeyRandSeed)
+		if err != nil {
+			return nil, err
+		}
+
+	} else {
+		if coinAddressType != pqringctxapi.CoinAddressTypePublicKeyHashForSingle {
+			return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRandSeed: coinSerialNumberKeyRandSeed is nil/emprty, while the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyHashForSingle", coinAddressType)
+		}
+
+		coinSerialNumberSecretKey = nil
+	}
+
+	//	lgrTxo rather than (txo,txolid) pair is used, since TransferTxGen is called on input Ledger-txos.
+	sn, err := pqringctxapi.LedgerTxoSerialNumberGen(pp, lgrTxo, coinSerialNumberSecretKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return sn, nil
+}
+
+// pqringctxTxoCoinSerialNumberGenByKey generates serialNumber for the input LgrTxoMLP, using the input coinSerialNumberSecretKey.
+// NOTE: the input cryptoSerialNumberSecretKey could be nil, for example, when the input TxOutAbe is on a Pseudonym-Privacy address.
+// todo: review
+func pqringctxTxoCoinSerialNumberGenByKey(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
+	abeTxo *wire.TxOutAbe, ringId wire.RingId, txoIndexInRing uint8, cryptoSerialNumberSecretKey []byte) ([]byte, error) {
+	// ringId + index -> ID
+	//	// (txo, txolid) + serialNumberSecretKey -> sn [pqringctx]
+	cryptoSchemeInTxo, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
+	if err != nil {
+		return nil, err
+	}
+
+	if cryptoSchemeInTxo != cryptoScheme {
+		return nil, fmt.Errorf("pqringctTxoCoinSerialNumberGenByKey: the cryptoScheme (%d) corresponding to abeTxo.Version does not match the input cryptoScheme (%d)", cryptoSchemeInTxo, cryptoScheme)
+	}
+
+	txoMLP, err := pqringctxapi.DeserializeTxo(pp, abeTxo.TxoScript)
+	if err != nil {
+		return nil, err
+	}
+	coinAddressType := txoMLP.CoinAddressType()
+
+	txolid := pqringctxLedgerTxoIdGen(ringId, txoIndexInRing)
+
+	lgrTxo := pqringctxapi.NewLgrTxo(txoMLP, txolid)
+
+	var coinSerialNumberSecretKey []byte
+	// The cryptoSerialNumberSecretKey could be nil, for example, for Pseudonym-Privacy Txo.
+	if len(cryptoSerialNumberSecretKey) != 0 {
+		var privacyLevel abecryptoxkey.PrivacyLevel
+		privacyLevel, coinSerialNumberSecretKey, err = abecryptoxkey.CryptoSerialNumberSecretKeyParse(cryptoSerialNumberSecretKey)
+		if err != nil {
+			return nil, err
+		}
+
+		if privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre {
+			if coinAddressType != pqringctxapi.CoinAddressTypePublicKeyForRingPre {
+				return nil, fmt.Errorf("pqringctTxoCoinSerialNumberGenByKey: cryptoSerialNumberSecretKey is not nil/emprty and the extracted privacyLevel is PrivacyLevelRINGCTPre, but the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyForRingPre", coinAddressType)
+			}
+		} else if privacyLevel == abecryptoxkey.PrivacyLevelRINGCT {
+			if coinAddressType != pqringctxapi.CoinAddressTypePublicKeyForRing {
+				return nil, fmt.Errorf("pqringctTxoCoinSerialNumberGenByKey: cryptoSerialNumberSecretKey is not nil/emprty and the extracted privacyLevel is PrivacyLevelRINGCT, but the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyForRing", coinAddressType)
+			}
+		} else {
+			return nil, fmt.Errorf("pqringctTxoCoinSerialNumberGenByKey: cryptoSerialNumberSecretKey is not nil/emprty, but the extracted privacyLevel (%d) is not PrivacyLevelRINGCTPre or PrivacyLevelRINGCT", privacyLevel)
+		}
+
+	} else {
+		if coinAddressType != pqringctxapi.CoinAddressTypePublicKeyHashForSingle {
+			return nil, fmt.Errorf("pqringctTxoCoinSerialNumberGenByKey: cryptoSerialNumberSecretKey is nil/emprty, but the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyHashForSingle", coinAddressType)
+		}
+
+		coinSerialNumberSecretKey = nil
+	}
+
+	//	lgrTxo rather than (txo,txolid) pair is used, since TransferTxGen is called on input Ledger-txos.
+	sn, err := pqringctxapi.LedgerTxoSerialNumberGen(pp, lgrTxo, coinSerialNumberSecretKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return sn, nil
+}
+
+// todo: remove this.
+//// For wallet
+//func pqringctTxoCoinSerialNumberGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe, ringHash chainhash.Hash, txoIndexInRing uint8, cryptoSnsk []byte) ([]byte, error) {
+//	// ringHash + index -> ID
+//	//	// (txo, txolid) + Sksn -> sn [pqringct]
+//	cryptoSchemeInTxo, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	if cryptoSchemeInTxo != cryptoScheme {
+//		return nil, errors.New("pqringctTxoCoinSerialNumberGen: unmatched cryptoScheme for input Txo")
+//	}
+//
+//	txo, err := pqringctxapi.DeserializeTxo(pp, abeTxo.TxoScript)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	if txo.CoinAddressType() == pqringctxapi.CoinAddressTypePublicKeyHashForSingle {
+//		return pqringctxapi.GetNullSerialNumber(pp), nil
+//	}
+//
+//	txolid := pqringctxLedgerTxoIdGen(ringHash, txoIndexInRing)
+//
+//	lgrTxo := pqringctxapi.NewLgrTxo(txo, txolid)
+//
+//	_, coinSerialNumberSecretKey, err := abecryptoxkey.CryptoSerialNumberSecretKeyParse(cryptoSnsk)
+//	if err != nil {
+//		return nil, errors.New("pqringctTxoCoinSerialNumberGen: unmatched cryptoScheme for Snsk")
+//	}
+//
+//	sn, err := pqringctxapi.TxoCoinSerialNumberGen(pp, lgrTxo, coinSerialNumberSecretKey)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return sn, nil
+//}
 
 //	APIs for Txos	end
 
