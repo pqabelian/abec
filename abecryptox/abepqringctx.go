@@ -669,7 +669,7 @@ func pqringctxTxoCoinReceiveByRootSeeds(pp *pqringctxapi.PublicParameter, crypto
 		return false, 0, err
 	}
 	if cryptoSchemeInTxo != cryptoScheme {
-		return false, 0, errors.New("pqringctxTxoCoinReceiveByRootSeeds: unmatched cryptoScheme for the input Txo")
+		return false, 0, fmt.Errorf("pqringctxTxoCoinReceiveByRootSeeds: unmatched cryptoScheme for the input Txo")
 	}
 
 	//	NOTE: As the abepqringctx-layer obtained TxoMLP (associated in crypto-TransferTx/CoinbaseTx) and serialized it to abeTxo.TxoScript,
@@ -738,7 +738,7 @@ func pqringctxTxoCoinReceiveByRandSeeds(pp *pqringctxapi.PublicParameter, crypto
 	}
 
 	if cryptoSchemeInTxo != cryptoScheme {
-		return false, 0, errors.New("pqringctxTxoCoinReceiveByRandSeeds: unmatched cryptoScheme for the input Txo")
+		return false, 0, fmt.Errorf("pqringctxTxoCoinReceiveByRandSeeds: unmatched cryptoScheme for the input Txo")
 	}
 
 	//	NOTE: As the abepqringctx-layer obtained TxoMLP (associated in crypto-TransferTx/CoinbaseTx) and serialized it to abeTxo.TxoScript,
@@ -788,7 +788,7 @@ func pqringctxTxoCoinReceiveByKeys(pp *pqringctxapi.PublicParameter, cryptoSchem
 	}
 
 	if cryptoSchemeInTxo != cryptoScheme {
-		return false, 0, errors.New("pqringctxTxoCoinReceiveByKeys: unmatched cryptoScheme for the input Txo")
+		return false, 0, fmt.Errorf("pqringctxTxoCoinReceiveByKeys: unmatched cryptoScheme for the input Txo")
 	}
 
 	privacyLevelInCryptoAddress, coinAddress, coinValuePublicKey, err := abecryptoxkey.CryptoAddressParse(cryptoAddress)
@@ -819,6 +819,31 @@ func pqringctxTxoCoinReceiveByKeys(pp *pqringctxapi.PublicParameter, cryptoSchem
 	}
 
 	return pqringctxapi.TxoCoinReceive(pp, txoMLP, coinAddress, coinValuePublicKey, coinValueSecretKey)
+}
+
+// pqringctxPseudonymTxoCoinParse parses the input (Pseudonym-Privacy) TxoMLP to its (coinAddress, coinValue) pair, and
+// return an err if it is not a Pseudonym-Privacy Txo.
+// todo: review
+func pqringctxPseudonymTxoCoinParse(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe) (
+	coinAddress []byte, value uint64, err error) {
+
+	cryptoSchemeInTxo, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if cryptoSchemeInTxo != cryptoScheme {
+		return nil, 0, fmt.Errorf("pqringctxTxoCoinReceiveByKeys: unmatched cryptoScheme for the input Txo")
+	}
+
+	//	NOTE: As the abepqringctx-layer obtained TxoMLP (associated in crypto-TransferTx/CoinbaseTx) and serialized it to abeTxo.TxoScript,
+	//	here abepqringctx-layer calls crypto-scheme using TxoMLP.
+	txoMLP, err := pqringctxapi.DeserializeTxo(pp, abeTxo.TxoScript)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return pqringctxapi.PseudonymTxoCoinParse(pp, txoMLP)
 }
 
 // For wallet
