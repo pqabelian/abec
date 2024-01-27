@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
-	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/chainhash"
 	"io"
@@ -827,7 +826,7 @@ func (msg *MsgTxAbe) SerializeSizeFull() int {
 // The result is just appropriate, which will be used to compute transaction fee.
 // todo: review
 func PrecomputeTrTxConSizeMLP(txVersion uint32, inputRingVersions []uint32,
-	inputRingSizes []uint8, cryptoAddressListPayTo [][]byte, txMemoLen uint32) (uint32, error) {
+	inputRingSizes []uint8, coinAddressListPayTo [][]byte, txMemoLen uint32) (uint32, error) {
 
 	if txVersion < TxVersion_Height_MLPAUT_280000 {
 		return 0, fmt.Errorf("PrecomputeTrTxConSizeMLP: txVersion (%d) is older than TxVersion_Height_MLPAUT_280000 (%d)", txVersion, TxVersion_Height_MLPAUT_280000)
@@ -864,13 +863,8 @@ func PrecomputeTrTxConSizeMLP(txVersion uint32, inputRingVersions []uint32,
 
 	// 	serialized varInt size for output number
 	n = n + 1 // 1 byte for the output Txo Number
-	for i := 0; i < len(cryptoAddressListPayTo); i++ {
-		_, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(cryptoAddressListPayTo[i])
-		if err != nil {
-			return 0, err
-		}
-
-		txoScriptLen, err := abecryptoxparam.GetTxoSerializeSizeApprox(txVersion, coinAddress) // depending on the crypto-scheme, and the TxVersion
+	for i := 0; i < len(coinAddressListPayTo); i++ {
+		txoScriptLen, err := abecryptoxparam.GetTxoSerializeSizeApprox(txVersion, coinAddressListPayTo[i]) // depending on the crypto-scheme, and the TxVersion
 		if err != nil {
 			return 0, err
 		}
