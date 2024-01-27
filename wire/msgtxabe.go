@@ -436,6 +436,8 @@ func (txIn *TxInAbe) SerializeSize() int {
 	return VarIntSerializeSize(uint64(snLen)) + snLen + txIn.PreviousOutPointRing.SerializeSize()
 }
 
+// GetTxInSerializeSizeApprox
+// todo: review
 func GetTxInSerializeSizeApprox(ringVersion uint32, ringSize int) (uint32, error) {
 	snSize, err := abecryptoxparam.GetSerialNumberSerializeSize(ringVersion)
 	if err != nil {
@@ -444,8 +446,7 @@ func GetTxInSerializeSizeApprox(ringVersion uint32, ringSize int) (uint32, error
 
 	blockNum, err := GetBlockNumPerRingGroupByRingVersion(ringVersion)
 	if err != nil {
-		str := fmt.Sprintf("cannot get the block numberock number with  version %d", ringVersion)
-		return 0, messageError("readOutPointRing", str)
+		return 0, fmt.Errorf("GetTxInSerializeSizeApprox: error happens when getting the block numberock number with version %d: %v", ringVersion, err)
 	}
 	n := uint32(VarIntSerializeSize(uint64(snSize))) + uint32(snSize) + // 1 byte for the length of serialNumber
 		4 + //	4 bytes for the ring version
@@ -821,70 +822,68 @@ func (msg *MsgTxAbe) SerializeSizeFull() int {
 	return n
 }
 
-/*
-*
-Compute the size according to the Serialize function, and based on the crypto-scheme
-The result is just appropriate, will be used to compute transaction fee
-*/
+// PrecomputeTrTxConSizeMLP computec the size according to the Serialize function, and based on the crypto-scheme.
+// The result is just appropriate, which will be used to compute transaction fee.
+// todo: review
 func PrecomputeTrTxConSizeMLP(txVersion uint32, inputRingVersions []uint32,
-	inputRingSizes []uint8, outputCoinAddresses [][]byte, txMemoLen uint32) (uint32, error) {
-	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
-	if err != nil {
-		return 0, err
+	inputRingSizes []uint8, cryptoAddressListPayTo [][]byte, txMemoLen uint32) (uint32, error) {
+
+	if txVersion < TxVersion_Height_MLPAUT_280000 {
+		return 0, fmt.Errorf("PrecomputeTrTxConSizeMLP: txVersion (%d) is older than TxVersion_Height_MLPAUT_280000 (%d)", txVersion, TxVersion_Height_MLPAUT_280000)
 	}
-	switch cryptoScheme {
-	case abecryptoxparam.CryptoSchemePQRingCT:
-		tinputRingSizes := make([]int, len(inputRingSizes))
-		for i := 0; i < len(inputRingSizes); i++ {
-			tinputRingSizes[i] = int(inputRingSizes[i])
-		}
-		return PrecomputeTrTxConSize(txVersion, inputRingVersions, tinputRingSizes, uint8(len(outputCoinAddresses)), txMemoLen)
-	case abecryptoxparam.CryptoSchemePQRingCTX:
 
-		//	Version 4 bytes
-		n := uint32(4)
+	inputNum := len(inputRingVersions)
 
-		//	Inputs
-		//	serialized varint size for input
-		n = n + 1 // 1 byte for the inputRing number
-		for i := 0; i < len(inputRingSizes); i++ {
-			//n = n + GetTxInSerializeSizeApprox(inputRingVersions[i], inputRingSizes[i])
-			txInSizeApprox, err := GetTxInSerializeSizeApprox(inputRingVersions[i], int(inputRingSizes[i]))
-			if err != nil {
-				return 0, err
-			}
-			n = n + txInSizeApprox
-		}
-		/*	for _, txIn := range txIns {
-			// serialized varint size for the ring size, and (chainhash.HashSize + 1) for each OutPoint
-			n = n + uint32(txIn.SerializeSize())
-		}*/
-
-		// 	serialized varint size for output number
-		n = n + 1 // 1 byte for the output Txo Number
-		for i := 0; i < len(outputCoinAddresses); i++ {
-			txoScriptLen, err := abecryptoxparam.GetTxoSerializeSize(outputCoinAddresses[i]) // depending on the crypto-scheme, and the TxVersion
-			if err != nil {
-				return 0, err
-			}
-			n = n + uint32(4+VarIntSerializeSize(uint64(txoScriptLen))) + uint32(txoScriptLen)
-		}
-
-		/*	for _, txOut := range msg.TxOuts {
-			n = n + txOut.SerializeSize()
-		}*/
-
-		//	TxFee
-		//	use 8 (approx.)
-		n = n + 8
-
-		//	TxMemo
-		n = n + uint32(VarIntSerializeSize(uint64(txMemoLen))) + txMemoLen
-
-		return n, nil
-	default:
-		return 0, fmt.Errorf("GetTxoSerializeSize: Unsupported txVersion")
+	if inputNum == 0 {
+		return 0, fmt.Errorf("PrecomputeTrTxConSizeMLP: the input inputRingVersions is nil/empty")
 	}
+
+	if len(inputRingSizes) != inputNum {
+		return 0, fmt.Errorf("PrecomputeTrTxConSizeMLP: len(inputRingVersions) (%d) != len(inputRingSizes) (%d)", len(inputRingVersions), len(inputRingSizes))
+	}
+
+	//	Version 4 bytes
+	n := uint32(4)
+
+	//	Inputs
+	//	serialized varInt size for input
+	n = n + 1 // 1 byte for the number of input
+	for i := 0; i < inputNum; i++ {
+		//n = n + GetTxInSerializeSizeApprox(inputRingVersions[i], inputRingSizes[i])
+		txInSizeApprox, err := GetTxInSerializeSizeApprox(inputRingVersions[i], int(inputRingSizes[i]))
+		if err != nil {
+			return 0, err
+		}
+		n = n + txInSizeApprox
+	}
+	/*	for _, txIn := range txIns {
+		// serialized varint size for the ring size, and (chainhash.HashSize + 1) for each OutPoint
+		n = n + uint32(txIn.SerializeSize())
+	}*/
+
+	// 	serialized varInt size for output number
+	n = n + 1 // 1 byte for the output Txo Number
+	for i := 0; i < len(cryptoAddressListPayTo); i++ {
+		txoScriptLen, err := abecryptoxparam.GetTxoSerializeSizeApprox(txVersion, cryptoAddressListPayTo[i]) // depending on the crypto-scheme, and the TxVersion
+		if err != nil {
+			return 0, err
+		}
+		n = n + uint32(4+VarIntSerializeSize(uint64(txoScriptLen))) + uint32(txoScriptLen)
+	}
+
+	/*	for _, txOut := range msg.TxOuts {
+		n = n + txOut.SerializeSize()
+	}*/
+
+	//	TxFee
+	//	use 8 (approx.)
+	n = n + 8
+
+	//	TxMemo
+	n = n + uint32(VarIntSerializeSize(uint64(txMemoLen))) + txMemoLen
+
+	return n, nil
+
 }
 
 /*

@@ -168,6 +168,26 @@ func GetNullSerialNumber(txVersion uint32) ([]byte, error) {
 	}
 }
 
+// GetTxoSerializeSizeApprox
+// todo: review
+func GetTxoSerializeSizeApprox(txVersion uint32, cryptoAddressPayTo []byte) (int, error) {
+	cryptoScheme, err := GetCryptoSchemeByTxVersion(txVersion)
+	if err != nil {
+		return 0, err
+	}
+
+	switch cryptoScheme {
+	case CryptoSchemePQRingCT:
+		return abecryptoparam.GetTxoSerializeSizeApprox(txVersion)
+
+	case CryptoSchemePQRingCTX:
+		return pqringctxGetTxoSerializeSize(PQRingCTXPP, cryptoAddressPayTo)
+
+	default:
+		return 0, fmt.Errorf("GetTxoSerializeSizeApprox: the cryptoScheme (%d) corresponding to the input txVersion (%d) is not supported", cryptoScheme, txVersion)
+	}
+}
+
 //	Transaction-related Params	end
 
 // APIs providing params of underlying CryptoScheme		begin
@@ -194,10 +214,6 @@ func GetCryptoSchemeParamSeedBytesLen(cryptoScheme CryptoScheme) (int, error) {
 	}
 
 	return 0, nil
-}
-
-func GetTxoSerializeSize(coinAddress []byte) (int, error) {
-	return pqringctxapi.GetTxoSerializeSize(PQRingCTXPP, coinAddress)
 }
 
 // API for Sizes	end

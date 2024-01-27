@@ -1,6 +1,7 @@
 package abecryptoxparam
 
 import (
+	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/cryptosuite/pqringctx/pqringctxapi"
 )
 
@@ -24,6 +25,18 @@ func pqringctxGetSerialNumberSerializeSize(pp *pqringctxapi.PublicParameter) int
 // reviewed on 2023.12.07
 func pqringctxGetNullSerialNumber(pp *pqringctxapi.PublicParameter) []byte {
 	return pqringctxapi.GetNullSerialNumber(pp)
+}
+
+// pqringctxGetTxoSerializeSize
+// todo: review
+func pqringctxGetTxoSerializeSize(pp *pqringctxapi.PublicParameter, cryptoAddressPayTo []byte) (int, error) {
+
+	_, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(cryptoAddressPayTo)
+	if err != nil {
+		return 0, err
+	}
+
+	return pqringctxapi.GetTxoSerializeSize(pp, coinAddress)
 }
 
 // pqringctxGetTxInputMaxNum returns the allowed maximum number of TxInputs.
