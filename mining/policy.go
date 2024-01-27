@@ -160,6 +160,7 @@ func CalcPriority(tx *wire.MsgTx, utxoView *blockchain.UtxoViewpoint, nextBlockH
 // CalcPriorityAbe returns a transaction priority given a transaction and the sum
 // of each of its input values multiplied by their age (# of confirmations).
 // abe todo
+// sum of all txo confirmation / serialize size
 func CalcPriorityAbe(tx *wire.MsgTxAbe, utxoRingView *blockchain.UtxoRingViewpoint, nextBlockHeight int32) float64 {
 
 	inputValueAge := calcInputValueAgeAbe(tx, utxoRingView, nextBlockHeight)

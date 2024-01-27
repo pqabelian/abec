@@ -1263,7 +1263,7 @@ func countSpentOutputsAUT(block *abeutil.BlockAbe) int {
 	// Exclude the transfer transaction which is not an AUT transaction
 	var num = 0
 	for _, tx := range block.Transactions()[1:] {
-		if autTx, ok := tx.AUTTransaction(); ok {
+		if autTx, isAUTTx := tx.AUTTransaction(); isAUTTx {
 			if autTx.Type() < aut.ReRegistration {
 				// it seems that we do not need saut for those type
 			}
@@ -1795,6 +1795,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 		autView := NewAUTViewpoint()
 		autView.SetBestHash(parentHash)
 		sauts := make([]SpentAUT, 0, countSpentOutputsAUT(block))
+
 		if !fastAdd || b.nodeType == wire.FullNode {
 			// todo_DONE(MLP): reviewed on 2024.01.04
 			err := b.checkConnectBlockAbe(node, block, view, &stxos, autView, &sauts)

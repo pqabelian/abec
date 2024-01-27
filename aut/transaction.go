@@ -2,7 +2,11 @@ package aut
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
+	"fmt"
+	"github.com/abesuite/abec/abecryptox"
+	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 	"io"
@@ -73,7 +77,7 @@ const MaxNameLength = 20
 const MaxMemoLength = 20
 const MaxUnitLength = 20
 const MaxMinUnitLength = 20
-
+const MaxIssuerTokenLength = 194 // TODO
 const MaxIssuerNum = 10
 
 // AUTSCRIPT 0 varSize ...
@@ -95,22 +99,29 @@ type Transaction interface {
 	Value(uint8) uint64
 }
 
+//const HashSize = 64
+
 // todo: Info --> AutInstance? AutDef? or AutDesc ?
 // ReRegistration will update this info? If true, this means AutState or AutMeta?
 // How to store the history AutState?
 // Use a bucket store the history AutState, and AutEntry refers to the latest?
+//type AUTHash [HashSize]byte
+
+//func Hash(b []byte) AUTHash {
+//	return AUTHash(sha3.Sum512(b))
+//}
 
 type Info struct {
 	AutName            []byte
-	AutMemo            []byte
+	IssuerTokens       [][]byte //[] crypto address // todo(AUT): using SHA3-512, define a standalone hash in AUT. Hash(CoinAddress)?
 	UpdateThreshold    uint8
 	IssueThreshold     uint8
 	PlannedTotalAmount uint64
 	ExpireHeight       int32
-	IssuerTokens       []*chainhash.Hash // todo(AUT): using SHA3-512, define a standalone hash in AUT. Hash(CoinAddress)?
 	UnitName           []byte
 	MinUnitName        []byte
 	UnitScale          uint64
+	AutMemo            []byte
 
 	MintedAmount uint64
 	RootCoinSet  map[OutPoint]struct{} // todo(AUT): this is all or only the actives ones.
@@ -129,7 +140,7 @@ func (info *Info) Clone() *Info {
 		IssueThreshold:     info.IssueThreshold,
 		PlannedTotalAmount: info.PlannedTotalAmount,
 		ExpireHeight:       info.ExpireHeight,
-		IssuerTokens:       make([]*chainhash.Hash, len(info.IssuerTokens)),
+		IssuerTokens:       make([][]byte, len(info.IssuerTokens)),
 		UnitName:           make([]byte, len(info.UnitName)),
 		MinUnitName:        make([]byte, len(info.MinUnitName)),
 		UnitScale:          info.UnitScale,
@@ -140,7 +151,6 @@ func (info *Info) Clone() *Info {
 	copy(cloned.AutMemo, info.AutMemo)
 
 	for i := 0; i < len(info.IssuerTokens); i++ {
-		cloned.IssuerTokens[i] = &chainhash.Hash{}
 		copy(cloned.IssuerTokens[i][:], info.IssuerTokens[i][:])
 	}
 
@@ -180,11 +190,11 @@ func (info *Info) Clone() *Info {
 // and each AUT instance has its Memo (simialr to a description of the AutInstance).
 // Why this is dupliating the Info?
 type RegistrationTx struct {
-	AutName               []byte            // todo(AUT): AutName ?
-	IssuerTokens          []*chainhash.Hash // todo(AUT): same as in Info
+	AutName               []byte   // todo(AUT): AutName ?
+	IssuerTokens          [][]byte // todo(AUT): same as in Info
 	ExpireHeight          int32
-	IssuerUpdateThreshold uint8 // TODO confirm the range
 	IssueTokensThreshold  uint8
+	IssuerUpdateThreshold uint8 // TODO confirm the range
 	OutAutRootCoinNum     uint8
 	AutMemo               []byte
 	PlannedTotalAmount    uint64
@@ -224,7 +234,7 @@ func (tx *RegistrationTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 	for _, issuer := range tx.IssuerTokens {
-		_, err = b.Write(issuer[:])
+		err = wire.WriteVarBytes(&b, 0, issuer[:])
 		if err != nil {
 			return nil, err
 		}
@@ -314,10 +324,9 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 		return err
 	}
 
-	tx.IssuerTokens = make([]*chainhash.Hash, numIssuer)
+	tx.IssuerTokens = make([][]byte, numIssuer)
 	for i := 0; i < len(tx.IssuerTokens); i++ {
-		tx.IssuerTokens[i] = &chainhash.Hash{}
-		_, err = r.Read(tx.IssuerTokens[i][:])
+		tx.IssuerTokens[i], err = wire.ReadVarBytes(r, 0, MaxIssuerTokenLength, "issuerToken")
 		if err != nil {
 			return err
 		}
@@ -426,8 +435,9 @@ type MintTx struct {
 	TxoAUTValues     []uint64
 	Memo             []byte
 
-	TxIns  []OutPoint
-	TxOuts []OutPoint
+	TxIns          []OutPoint
+	TxOuts         []OutPoint
+	IssuerTokenNum uint8
 }
 
 func (tx *MintTx) Type() TransactionType {
@@ -587,7 +597,7 @@ var _ Transaction = &MintTx{}
 // <Number of AUTRootCoins>  A number n  Explicitly specify the 0~(n-1)-th TXO of this transaction as RootCoins  All other TXOs are regarded as normal AbelianCoins.
 type ReRegistrationTx struct {
 	Name                  []byte
-	IssuerTokens          []*chainhash.Hash
+	IssuerTokens          [][]byte
 	ExpireHeight          int32
 	IssuerUpdateThreshold uint8 // TODO confirm the range
 	IssueTokensThreshold  uint8
@@ -597,8 +607,9 @@ type ReRegistrationTx struct {
 	PlannedTotalAmount    uint64
 	UnitScale             uint64
 
-	TxIns  []OutPoint
-	TxOuts []OutPoint
+	TxIns          []OutPoint
+	TxOuts         []OutPoint
+	IssuerTokenNum uint8
 }
 
 func (tx *ReRegistrationTx) Type() TransactionType {
@@ -628,7 +639,7 @@ func (tx *ReRegistrationTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 	for _, issuer := range tx.IssuerTokens {
-		_, err = b.Write(issuer[:])
+		err = wire.WriteVarBytes(&b, 0, issuer)
 		if err != nil {
 			return nil, err
 		}
@@ -711,10 +722,9 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 		return err
 	}
 
-	tx.IssuerTokens = make([]*chainhash.Hash, numIssuer)
+	tx.IssuerTokens = make([][]byte, numIssuer)
 	for i := 0; i < len(tx.IssuerTokens); i++ {
-		tx.IssuerTokens[i] = &chainhash.Hash{}
-		_, err = r.Read(tx.IssuerTokens[i][:])
+		tx.IssuerTokens[i], err = wire.ReadVarBytes(r, 0, MaxIssuerTokenLength, "issuerToken")
 		if err != nil {
 			return err
 		}
@@ -1127,20 +1137,49 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 			return nil, ErrInValidAUTTx
 		}
 		autTransaction.TxOuts = make([]OutPoint, 0, autTransaction.OutAutRootCoinNum)
+		txHash := tx.TxHash()
+
+		existIssuerTokens := map[string]struct{}{}
 		for i := 0; i < int(autTransaction.OutAutRootCoinNum); i++ {
+			txOut := tx.TxOuts[i]
+			coinAddress, err := CheckTxoSanity(txHash, i, txOut)
+			if err != nil {
+				return nil, err
+			}
+
+			if _, ok := existIssuerTokens[hex.EncodeToString(coinAddress)]; !ok {
+				existIssuerTokens[hex.EncodeToString(coinAddress)] = struct{}{}
+			}
+
 			autTransaction.TxOuts = append(autTransaction.TxOuts, OutPoint{
-				TxHash: tx.TxHash(),
+				TxHash: txHash,
 				Index:  uint8(i),
 			})
 		}
 
-		// TODO Check the distinct issue tokens
-
 		// configuration conflict
-		if autTransaction.OutAutRootCoinNum < autTransaction.IssueTokensThreshold ||
-			autTransaction.OutAutRootCoinNum < autTransaction.IssuerUpdateThreshold {
-			return nil, errors.New("an AUT with invalid threshold")
+		if len(existIssuerTokens) < int(autTransaction.IssueTokensThreshold) ||
+			len(existIssuerTokens) < int(autTransaction.IssuerUpdateThreshold) {
+			return nil, fmt.Errorf("the num of exist tokens less than configurated threshold from transaction %s", txHash)
 		}
+
+		// compare claimed issueTokens
+		for i := 0; i < len(autTransaction.IssuerTokens); i++ {
+			privacyLevel, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(autTransaction.IssuerTokens[i])
+			if err != nil {
+				return nil, fmt.Errorf("fail to parse %d-th issuer token for aut from transaction %s", i, txHash)
+			}
+			if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
+				return nil, fmt.Errorf("specified %d-th issuer token is invalid for aut from transaction %s", i, txHash)
+			}
+			key := hex.EncodeToString(coinAddress)
+			if _, ok := existIssuerTokens[key]; !ok {
+				return nil, fmt.Errorf("the claimed issuer tokens claims duplicate issuer token or "+
+					"claims non-exist issuer tken in root coin from transaction %s", txHash)
+			}
+			delete(existIssuerTokens, key)
+		}
+
 		if autTransaction.UnitScale > autTransaction.PlannedTotalAmount {
 			return nil, errors.New("an AUT with invalid unit scale")
 		}
@@ -1148,6 +1187,7 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 	case *MintTx:
 		// invalid configurations can exit early
 		// TODO need to check the length of outpoint ring?
+		// TODO check the num of issue token?
 		if int(autTransaction.InAutRootCoinNum) > len(tx.TxIns) {
 			return nil, ErrInValidAUTTx
 		}
@@ -1163,10 +1203,18 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 		if int(autTransaction.OutAutCoinNum) > len(tx.TxOuts) {
 			return nil, ErrInValidAUTTx
 		}
+
 		autTransaction.TxOuts = make([]OutPoint, 0, autTransaction.OutAutCoinNum)
+		txHash := tx.TxHash()
 		for i := 0; i < int(autTransaction.OutAutCoinNum); i++ {
+			txOut := tx.TxOuts[i]
+			_, err := CheckTxoSanity(txHash, i, txOut)
+			if err != nil {
+				return nil, err
+			}
+
 			autTransaction.TxOuts = append(autTransaction.TxOuts, OutPoint{
-				TxHash: tx.TxHash(),
+				TxHash: txHash,
 				Index:  uint8(i),
 			})
 		}
@@ -1174,6 +1222,7 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 	case *ReRegistrationTx:
 		// invalid configurations can exit early
 		// TODO need to check the length of outpoint ring?
+		// TODO check the num of issue token?
 		if int(autTransaction.InAutRootCoinNum) > len(tx.TxIns) {
 			return nil, ErrInValidAUTTx
 		}
@@ -1190,11 +1239,40 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 			return nil, ErrInValidAUTTx
 		}
 		autTransaction.TxOuts = make([]OutPoint, 0, autTransaction.OutAutRootCoinNum)
+		txHash := tx.TxHash()
+
+		existIssuerTokens := map[string]struct{}{}
 		for i := 0; i < int(autTransaction.OutAutRootCoinNum); i++ {
+			txOut := tx.TxOuts[i]
+			coinAddress, err := CheckTxoSanity(txHash, i, txOut)
+			if err != nil {
+				return nil, err
+			}
+
+			if _, ok := existIssuerTokens[hex.EncodeToString(coinAddress)]; !ok {
+				existIssuerTokens[hex.EncodeToString(coinAddress)] = struct{}{}
+			}
+
 			autTransaction.TxOuts = append(autTransaction.TxOuts, OutPoint{
-				TxHash: tx.TxHash(),
+				TxHash: txHash,
 				Index:  uint8(i),
 			})
+		}
+
+		// configuration conflict
+		if len(existIssuerTokens) < int(autTransaction.IssueTokensThreshold) ||
+			len(existIssuerTokens) < int(autTransaction.IssuerUpdateThreshold) {
+			return nil, fmt.Errorf("the num of exist tokens less than configurated threshold from transaction %s", txHash)
+		}
+
+		// compare claim issueTokens
+		for i := 0; i < len(autTransaction.IssuerTokens); i++ {
+			key := hex.EncodeToString(autTransaction.IssuerTokens[i])
+			if _, ok := existIssuerTokens[hex.EncodeToString(autTransaction.IssuerTokens[i])]; !ok {
+				return nil, fmt.Errorf("the claimed issuer tokens claims duplicate issuer token or "+
+					"claims non-exist issuer tken in root coin from transaction %s", txHash)
+			}
+			delete(existIssuerTokens, key)
 		}
 
 		// configuration conflict
@@ -1222,14 +1300,19 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 			return nil, ErrInValidAUTTx
 		}
 		autTransaction.TxOuts = make([]OutPoint, 0, autTransaction.OutAutCoinNum)
+
+		txHash := tx.TxHash()
 		for i := 0; i < int(autTransaction.OutAutCoinNum); i++ {
-			// TODO check the value is 1
-			//ExtractValueFromScript(tx.TxOuts[i].TxoScript)
+			_, err = CheckTxoSanity(txHash, i, tx.TxOuts[i])
+			if err != nil {
+				return nil, err
+			}
 			autTransaction.TxOuts = append(autTransaction.TxOuts, OutPoint{
-				TxHash: tx.TxHash(),
+				TxHash: txHash,
 				Index:  uint8(i),
 			})
 		}
+
 	case *BurnTx:
 		// invalid configurations can exit early
 		if int(autTransaction.InAutCoinNum) > len(tx.TxIns) {
@@ -1247,4 +1330,22 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 	}
 
 	return autTx, nil
+}
+
+func CheckTxoSanity(txHash chainhash.Hash, outputIndex int, txOut *wire.TxOutAbe) ([]byte, error) {
+	privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
+	if err != nil {
+		return nil, fmt.Errorf("fail to extract the privacy level from transaction %s:%s", txHash, err.Error())
+	}
+	if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
+		return nil, fmt.Errorf("invalid privacy level to %d-th output from transaction %s", outputIndex, txHash)
+	}
+	coinAddress, coinValue, err := abecryptox.PseudonymTxoCoinParse(txOut)
+	if err != nil {
+		return nil, fmt.Errorf("fail to parse %d-th output as an pseudonym txo from transaction %s", outputIndex, txHash)
+	}
+	if coinValue != 1 {
+		return nil, fmt.Errorf("invalid value from %d-th output from transaction %s as AUT coin", outputIndex, txHash)
+	}
+	return coinAddress, nil
 }

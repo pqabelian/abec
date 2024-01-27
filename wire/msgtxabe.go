@@ -1040,6 +1040,11 @@ func NewStandardCoinbaseTxIn(nextBlockHeight int32, txVersion uint32) (*TxInAbe,
 }
 
 // CheckStandardCoinbaseTxIn checks whether the input MsgTxAbe is a coinbaseTx and has standard TxIn as designed.
+// 1. The transaction should be a coinbase i.e. IsCoinBase() must return true, it means only one input
+// 2. the input ring of the transaction should have consistent version with transaction
+// 3. the block hashes in input ring should be consistent version with GetBlockNumPerRingGroupByRingVersion
+// 4. the txos in ring would be only one, and it must be zeroHash:zeroIndex
+//
 // reviewed on 2024.01.05
 func CheckStandardCoinbaseTxIn(coinbaseTx *MsgTxAbe) error {
 	isCb, err := coinbaseTx.IsCoinBase()
