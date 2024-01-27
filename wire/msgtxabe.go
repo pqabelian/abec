@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
+	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/chainhash"
 	"io"
@@ -864,7 +865,12 @@ func PrecomputeTrTxConSizeMLP(txVersion uint32, inputRingVersions []uint32,
 	// 	serialized varInt size for output number
 	n = n + 1 // 1 byte for the output Txo Number
 	for i := 0; i < len(cryptoAddressListPayTo); i++ {
-		txoScriptLen, err := abecryptoxparam.GetTxoSerializeSizeApprox(txVersion, cryptoAddressListPayTo[i]) // depending on the crypto-scheme, and the TxVersion
+		_, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(cryptoAddressListPayTo[i])
+		if err != nil {
+			return 0, err
+		}
+
+		txoScriptLen, err := abecryptoxparam.GetTxoSerializeSizeApprox(txVersion, coinAddress) // depending on the crypto-scheme, and the TxVersion
 		if err != nil {
 			return 0, err
 		}
