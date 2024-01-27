@@ -126,13 +126,14 @@ func GetTxOutputMaxNum(txVersion uint32) (int, error) {
 // Note that the transactions are generated and versified by the underlying crypto-scheme,
 // the approximate serialize size for SerialNumber actually depends on the underlying crypto-scheme.
 // That's why txVersion is required as the input for this function.
+// reviewed on 2024.01.27
 func GetSerialNumberSerializeSize(txVersion uint32) (int, error) {
 	switch txVersion {
 	case 1:
 		//	CryptoSchemePQRingCT
 		return pqringct.GetSerialNumberSerializeSize(PQRingCTPP), nil
 	default:
-		return 0, errors.New("GetCbTxWitnessSerializeSizeApprox: Unsupported txVersion")
+		return 0, errors.New("GetSerialNumberSerializeSize: Unsupported txVersion")
 	}
 }
 

@@ -129,20 +129,24 @@ func GetTxOutputMaxNum(txVersion uint32) (int, error) {
 
 // GetSerialNumberSerializeSize returns the exact serialize size for SerialNumber, which is decided by the TxVersion.
 // Note that the transactions are generated and versified by the underlying crypto-scheme,
-// the approximate serialize size for SerialNumber actually depends on the underlying crypto-scheme.
+// the serialize size for SerialNumber actually depends on the underlying crypto-scheme.
 // That's why txVersion is required as the input for this function.
+// todo: review
 func GetSerialNumberSerializeSize(txVersion uint32) (int, error) {
 	cryptoScheme, err := GetCryptoSchemeByTxVersion(txVersion)
 	if err != nil {
 		return 0, err
 	}
+
 	switch cryptoScheme {
 	case CryptoSchemePQRingCT:
 		return abecryptoparam.GetSerialNumberSerializeSize(txVersion)
+
 	case CryptoSchemePQRingCTX:
-		return pqringctxGetSerialNumberSize(PQRingCTXPP), nil
+		return pqringctxGetSerialNumberSerializeSize(PQRingCTXPP), nil
+
 	default:
-		return 0, fmt.Errorf("GetNullSerialNumber: Unsupported txVersion")
+		return 0, fmt.Errorf("GetSerialNumberSerializeSize: the cryptoScheme (%d) correspodning to input txVersion (%d) is not supported", cryptoScheme, txVersion)
 	}
 }
 

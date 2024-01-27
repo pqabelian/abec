@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abecrypto/abecryptoparam"
+	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
@@ -1905,7 +1905,7 @@ func GetExtraNonceOffset(tx *wire.MsgTxAbe) (int64, error) {
 	//	serialized varint size for input
 	res += wire.VarIntSerializeSize(uint64(len(tx.TxIns)))
 	//snLen := abepqringctparam.GetTxoSerialNumberLen(tx.TxIns[0].PreviousOutPointRing.Version)
-	snLen, err := abecryptoparam.GetSerialNumberSerializeSize(tx.TxIns[0].PreviousOutPointRing.Version)
+	snLen, err := abecryptoxparam.GetSerialNumberSerializeSize(tx.TxIns[0].PreviousOutPointRing.Version)
 	if err != nil {
 		return 0, err
 	}
