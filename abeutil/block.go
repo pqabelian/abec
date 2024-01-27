@@ -355,8 +355,8 @@ func (b *BlockAbe) AUTTransactions() []aut.Transaction {
 		if isCb {
 			continue
 		}
-		autTx, ok := txAbe.AUTTransaction()
-		if !ok {
+		autTx, isAUTTx := txAbe.AUTTransaction()
+		if !isAUTTx {
 			continue
 		}
 		if autTx == nil {

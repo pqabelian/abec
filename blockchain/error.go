@@ -232,6 +232,8 @@ const (
 
 	// ErrWitnessMissing indicates that the witness of the block is missing.
 	ErrWitnessMissing
+
+	ErrTxVersionForAUT
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.

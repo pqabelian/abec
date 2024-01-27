@@ -50,28 +50,22 @@ func (view *UtxoRingViewpoint) newUtxoRingEntriesMLP(db database.DB, node *block
 	ringBlockHeight := block.Height()
 	blockNum := blockNumPerRingGroup
 	//	read blocks from database
-	nodeTmp := node
-	blockTmp := block
+	prevNode := node.parent
 	blocks := make([]*abeutil.BlockAbe, blockNum)
-	for i := blockNum - 1; i >= 0; i-- {
-		blocks[i] = blockTmp
-		if i == 0 {
-			break
-		}
-
-		nodeTmp = nodeTmp.parent
-		if nodeTmp == nil {
+	blocks[blockNum-1] = block
+	for i := blockNum - 2; i >= 0; i-- {
+		if prevNode == nil {
 			return AssertError("newUtxoRingEntriesMLP: newUtxoRingEntriesMLP is called with node that does not have (BlockNumPerRingGroup-1) previous successive blocks in database")
 		}
-
 		err := db.View(func(dbTx database.Tx) error {
 			var err error
-			blockTmp, err = dbFetchBlockByNodeAbe(dbTx, nodeTmp)
+			blocks[i], err = dbFetchBlockByNodeAbe(dbTx, prevNode)
 			return err
 		})
 		if err != nil {
 			return err
 		}
+		prevNode = prevNode.parent
 	}
 
 	newTxoRings, err := BuildTxoRingsMLP(blockNum, txoRingSize, blocks)

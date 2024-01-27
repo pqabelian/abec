@@ -432,9 +432,9 @@ func checkTransactionStandardAbe(tx *abeutil.TxAbe, maxTxVersion int32) error {
 
 	// The transaction must be a currently supported version.
 	msgTx := tx.MsgTx()
-	if msgTx.Version > uint32(maxTxVersion) || msgTx.Version < 1 {
+	if msgTx.Version > uint32(maxTxVersion) || msgTx.Version < wire.TxVersion_Height_0 {
 		str := fmt.Sprintf("transaction version %d is not in the "+
-			"valid range of %d-%d", msgTx.Version, 1,
+			"valid range of %d-%d", msgTx.Version, wire.TxVersion_Height_0,
 			maxTxVersion)
 		return txRuleError(wire.RejectNonstandard, str)
 	}

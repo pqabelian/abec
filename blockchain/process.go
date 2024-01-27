@@ -175,6 +175,14 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.
 	// Perform preliminary sanity checks on the block and its transactions.
 	//	todo (EthashPoW): 202207
 	// todo_DONE(MLP): reviewed on 2024.01.03, by Alice
+	// from higher level to low:
+	// block header firstly -> block size -> transaction hash -> merkle root -> every transaction
+	// 1. block header santity:
+	// 2. size of serialized block
+	// 3. only on coinbase transaction
+	// 4. no duplicated transaction
+	// 5. merkle tree root
+	// 6. transaction sanity (input,output,fee,serialized size, ring+sn, aut)
 	err = checkBlockSanityAbe(block, ethashObj, b.chainParams.PowLimit, b.timeSource, flags)
 	if err != nil {
 		return false, false, err

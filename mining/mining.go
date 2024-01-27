@@ -268,7 +268,7 @@ func mergeAUTView(viewA *blockchain.AUTViewpoint, viewB *blockchain.AUTViewpoint
 
 	viewAEntries := viewA.Entries()
 	if viewAEntries == nil {
-		viewAEntries = make(map[string]*blockchain.Entry)
+		viewAEntries = make(map[string]*blockchain.AUTEntry)
 	}
 	for autNameKeys, entry := range viewB.Entries() {
 		existAUTInfo := viewAEntries[autNameKeys]
@@ -471,6 +471,7 @@ func spendTransaction(utxoView *blockchain.UtxoViewpoint, tx *abeutil.Tx, height
 }
 
 // todo(ABE): the block is unknown yet, use hainhash.ZeroHash as the block hash consuming the serialNumber
+// Move this function to blockchain package
 func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *blockchain.AUTViewpoint, tx *abeutil.TxAbe) error {
 	for _, txIn := range tx.MsgTx().TxIns {
 		entry := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())
@@ -479,8 +480,8 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *bl
 		}
 	}
 	// AUT
-	autTx, ok := tx.AUTTransaction()
-	if ok {
+	autTx, isAUTTx := tx.AUTTransaction()
+	if isAUTTx {
 		if autTx == nil {
 			return aut.ErrInValidAUTTx
 		}
@@ -503,7 +504,7 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *bl
 				rootCoinSet[autTransaction.TxOuts[i]] = struct{}{}
 			}
 			// register the AUT entry
-			autView.SetEntry(autTransaction.AutName, blockchain.NewEntry(
+			autView.SetEntry(autTransaction.AutName, blockchain.NewAUTEntry(
 				&aut.Info{
 					AutName:            autTransaction.AutName,
 					AutMemo:            autTransaction.AutMemo,
@@ -538,7 +539,7 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *bl
 					return errors.New("an AUT mint transaction try to mint amount exceed planned")
 				}
 				wouldMintedAmount += autTransaction.TxoAUTValues[i]
-				entry.Add(autTransaction.TxOuts[i], blockchain.NewAUTEntry(autTransaction.Name, autTransaction.TxoAUTValues[i], -1, false))
+				entry.Add(autTransaction.TxOuts[i], blockchain.NewAUTCoin(autTransaction.Name, autTransaction.TxoAUTValues[i], -1, false))
 			}
 			info.MintedAmount = wouldMintedAmount
 
@@ -589,7 +590,7 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *bl
 					totalOutValue+autTransaction.TxoAUTValues[i] > info.PlannedTotalAmount {
 					return errors.New("an AUT transfer transaction try to overflow amount")
 				}
-				entry.Add(autTransaction.TxOuts[i], blockchain.NewAUTEntry(autTransaction.Name, autTransaction.TxoAUTValues[i], 0, false))
+				entry.Add(autTransaction.TxOuts[i], blockchain.NewAUTCoin(autTransaction.Name, autTransaction.TxoAUTValues[i], 0, false))
 			}
 			if totalInputValue != totalOutValue {
 				return errors.New("an AUT transfer transaction try to break-balance amount")
@@ -795,6 +796,7 @@ func (g *BlkTmplGenerator) NewBlockTemplate(cryptoAddressPayTo []byte) (*BlockTe
 	}
 	subsidy := blockchain.CalcBlockSubsidy(nextBlockHeight, g.chainParams)
 
+	// TODO review from here 20240125
 	// Get the current source transactions and create a priority queue to
 	// hold the transactions which are ready for inclusion into a block
 	// along with some priority related and fee metadata.  Reserve the same
@@ -864,6 +866,15 @@ mempoolLoop:
 			continue
 		}
 
+		// TODO replace with this one?
+		err = blockchain.CheckTransactionInputsAbe(tx, nextBlockHeight, utxoRings, g.chainParams)
+		if err != nil {
+			log.Tracef("Skipping tx %s because it "+
+				"references unspent output %s "+
+				"which is not available",
+				tx.Hash(), err)
+			continue mempoolLoop
+		}
 		// ToDo(MLP):todo
 		// If utxoRing of one of the transaction inputs does not exist,
 		// skip this transaction.
@@ -878,114 +889,19 @@ mempoolLoop:
 			}
 		}
 
-		var autView *blockchain.AUTViewpoint
-		autTx, ok := tx.AUTTransaction()
-		if ok {
-			if autTx == nil {
-				log.Warnf("Invalid AUT Transaction %s", tx.Hash())
-				continue
-			}
-			autView, err = g.chain.FetchAUTView(tx)
-			if err != nil {
-				log.Warnf("Unable to fetch aut view for tx %s: %v",
-					tx.Hash(), err)
-				continue
-			}
+		autView, err := g.chain.FetchAUTView(tx)
+		if err != nil {
+			log.Warnf("Unable to fetch aut view for tx %s: %v",
+				tx.Hash(), err)
+			continue
+		}
 
-			entryKey := hex.EncodeToString(autTx.AUTName())
-			autEntry := autView.AUTEntries(entryKey)
-			if autTx.Type() == aut.Registration {
-				if autEntry != nil {
-					log.Tracef("Skipping tx %s because the aut "+
-						"transaction register a repeat AUT whose name has "+
-						"been registered by previous transaction",
-						tx.Hash())
-					continue
-				}
-			} else {
-				if autEntry == nil {
-					log.Tracef("Skipping tx %s because "+
-						"the AUT transaction try to operate with "+
-						"non-existing AUT",
-						tx.Hash())
-					continue
-				}
-			}
-
-			switch autTransaction := autTx.(type) {
-			case *aut.RegistrationTx:
-				if autTransaction.ExpireHeight < nextBlockHeight {
-					log.Tracef("Skipping tx %s because the aut "+
-						"transaction specify the expire height lower than "+
-						"current block height %d",
-						tx.Hash(), nextBlockHeight)
-					continue
-				}
-
-			case *aut.ReRegistrationTx:
-				info := autEntry.Info()
-				if info.ExpireHeight < nextBlockHeight {
-					log.Tracef("Skipping tx %s because "+
-						"the expire height of aut lower than "+
-						"current block height %d",
-						tx.Hash(), nextBlockHeight)
-					continue mempoolLoop
-				}
-				for i := 0; i < len(autTransaction.TxIns); i++ {
-					if _, exist := info.RootCoinSet[autTransaction.TxIns[i]]; !exist {
-						log.Tracef("Skipping tx %s because it "+
-							"references unspent AUT Root coin %s "+
-							"which is not available",
-							tx.Hash(), autTransaction.TxIns[i].String())
-						continue mempoolLoop
-					}
-				}
-			case *aut.MintTx:
-				info := autEntry.Info()
-				if info.ExpireHeight < nextBlockHeight {
-					log.Tracef("Skipping tx %s because "+
-						"the expire height of aut lower than "+
-						"current block height %d",
-						tx.Hash(), nextBlockHeight)
-					continue mempoolLoop
-				}
-				for i := 0; i < len(autTransaction.TxIns); i++ {
-					if _, exist := info.RootCoinSet[autTransaction.TxIns[i]]; !exist {
-						log.Tracef("Skipping tx %s because it "+
-							"references unspent AUT Root coin %s "+
-							"which is not available",
-							tx.Hash(), autTransaction.TxIns[i].String())
-						continue mempoolLoop
-					}
-				}
-			case *aut.TransferTx:
-				coins := autEntry.AUTCoins()
-				for i := 0; i < len(autTransaction.TxIns); i++ {
-					if _, exist := coins[autTransaction.TxIns[i]]; !exist {
-						log.Tracef("Skipping tx %s because it "+
-							"references unspent AUT coin %s "+
-							"which is not available",
-							tx.Hash(), autTransaction.TxIns[i].String())
-						continue mempoolLoop
-					}
-				}
-			case *aut.BurnTx:
-				coins := autEntry.AUTCoins()
-				for i := 0; i < len(autTransaction.TxIns); i++ {
-					if _, exist := coins[autTransaction.TxIns[i]]; !exist {
-						log.Tracef("Skipping tx %s because it "+
-							"references unspent AUT coin %s "+
-							"which is not available",
-							tx.Hash(), autTransaction.TxIns[i].String())
-						continue mempoolLoop
-					}
-				}
-			default:
-				log.Tracef("Skipping tx %s because its "+
-					"AUT transaction is unknwon type which should not be reached here",
-					tx.Hash())
-				continue mempoolLoop
-			}
+		err = blockchain.CheckTransactionInputsAUT(tx, nextBlockHeight, autView, g.chainParams)
+		if err != nil {
+			log.Debugf("Skipping tx %s because it "+
+				"is a invalid AUT transaction: %v",
+				tx.Hash(), err)
+			continue
 		}
 
 		prioItem := &txPrioItemAbe{tx: tx}

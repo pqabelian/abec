@@ -1654,12 +1654,11 @@ func deserializeAUTInfo(serialized []byte) (*aut.Info, error) {
 		return nil, err
 	}
 
-	info.IssuerTokens = make([]*chainhash.Hash, issuerNum)
+	info.IssuerTokens = make([][]byte, issuerNum)
 	for i := uint64(0); i < issuerNum; i++ {
-		info.IssuerTokens[i] = &chainhash.Hash{}
-		n, err := buff.Read(info.IssuerTokens[i][:])
-		if err != nil || n != chainhash.HashSize {
-			return nil, errors.New("error to write issuer hash")
+		info.IssuerTokens[i], err = wire.ReadVarBytes(buff, 0, aut.MaxIssuerTokenLength, "issuerToken")
+		if err != nil {
+			return nil, errors.New("error to write issuer token")
 		}
 	}
 	info.UnitName, err = wire.ReadVarBytes(buff, 0, aut.MaxUnitLength, "memo")
