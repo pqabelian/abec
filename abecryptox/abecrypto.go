@@ -605,25 +605,34 @@ func GetCbTxWitnessSerializeSizeApprox(txVersion uint32, cryptoAddressListPayTo 
 	}
 }
 
-func GetTrTxWitnessSerializeSizeApprox(txVersion uint32, inputRingSizes []uint8,
-	coinAddresses [][]byte, inForRing uint8, inForSingleDistinct uint8,
-	outForRing uint8, inRingSizes []uint8, vPublic int64) (int, error) {
+// GetTrTxWitnessSerializeSizeApprox returns the approximate serialize size for TransferTxWitness,
+// which is decided by the TxVersion and description of the input and output.
+// Note that the transactions are generated and versified by the underlying crypto-scheme,
+// the approximate serialize size for TransferTxWitness actually depends on the underlying crypto-scheme.
+// That's why txVersion is required as the input for this function.
+// todo: review
+func GetTrTxWitnessSerializeSizeApprox(txVersion uint32,
+	inForRing uint8, inForSingleDistinct uint8, inRingSizes []uint8,
+	outForRing uint8, vPublic int64) (int, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
 	if err != nil {
 		return 0, err
 	}
+
 	switch cryptoScheme {
 	case abecryptoxparam.CryptoSchemePQRingCT:
-		tinputRingSizes := make([]int, len(inputRingSizes))
-		for i := 0; i < len(inputRingSizes); i++ {
-			tinputRingSizes[i] = int(inputRingSizes[i])
-		}
-		return abecryptoparam.GetTrTxWitnessSerializeSizeApprox(txVersion, 0, tinputRingSizes, len(coinAddresses))
-	case abecryptoxparam.CryptoSchemePQRingCTX:
 
+		inputRingSizes := make([]int, len(inRingSizes))
+		for i := 0; i < len(inputRingSizes); i++ {
+			inputRingSizes[i] = int(inRingSizes[i])
+		}
+		return abecryptoparam.GetTrTxWitnessSerializeSizeApprox(txVersion, txVersion, inputRingSizes, int(outForRing))
+
+	case abecryptoxparam.CryptoSchemePQRingCTX:
 		return pqringctxGetTxWitnessTrTxSerializeSizeByDesc(abecryptoxparam.PQRingCTXPP, inForRing, inForSingleDistinct, outForRing, inRingSizes, vPublic)
+
 	default:
-		return 0, fmt.Errorf("GetTrTxWitnessSerializeSizeApprox: Unsupported txVersion")
+		return 0, fmt.Errorf("GetTrTxWitnessSerializeSizeApprox: the input txVersion (%d) is not supported", txVersion)
 	}
 }
 
