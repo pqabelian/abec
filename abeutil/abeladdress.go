@@ -35,6 +35,8 @@ type AbelAddress interface {
 	//	CryptoAddress() returns the cryptoAddress
 	CryptoAddress() []byte
 
+	CryptoScheme() abecryptoxparam.CryptoScheme
+
 	// IsForNet returns whether or not the address is associated with the passed Abelian network.
 	// Each abec net (such as mainnet, testnet) has a chaincfg.Params instance object,
 	// where particular parameters (such as genesis block, block-reward etc.) are set.
@@ -76,6 +78,7 @@ func DecodeAbelAddress(addrStr string) (AbelAddress, error) {
 		if err != nil {
 			return nil, err
 		}
+		instAddr.cryptoScheme = cryptoScheme
 
 		return instAddr, nil
 	case abecryptoxparam.CryptoSchemePQRingCTX:
@@ -84,6 +87,7 @@ func DecodeAbelAddress(addrStr string) (AbelAddress, error) {
 		if err != nil {
 			return nil, err
 		}
+		instAddr.cryptoScheme = cryptoScheme
 
 		return instAddr, nil
 	default:

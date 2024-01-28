@@ -493,7 +493,11 @@ func GetAndSetHeight(block *abeutil.BlockAbe) error {
 		if len(block.MsgBlock().Transactions) == 0 {
 			return errors.New("invalid block which do not include any transaction")
 		}
-		height = wire.ExtractCoinbaseHeight(block.MsgBlock().Transactions[0])
+		var err error
+		height, err = wire.ExtractCoinbaseHeight(block.MsgBlock().Transactions[0])
+		if err != nil {
+			return err
+		}
 	}
 	block.SetHeight(height)
 	return nil
@@ -548,7 +552,6 @@ func BuildTransferTxRequestDescFromBlocks(
 		if err = GetAndSetHeight(blocks[i]); err != nil {
 			return nil, err
 		}
-		blocks[i].SetHeight(height)
 	}
 
 	blockIdx := 0
