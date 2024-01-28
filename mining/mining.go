@@ -489,12 +489,12 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *bl
 		entries := autView.Entries()
 		entry, exist := entries[autNameKey]
 		if autTx.Type() == aut.Registration {
-			if exist {
-				return errors.New("an non-registration AUT transaction try to register a existing AUT name ")
+			if exist && entry != nil && entry.Info() != nil {
+				return errors.New("an registration AUT transaction try to register AUT entry with an existing AUT name ")
 			}
 		} else {
-			if !exist {
-				return errors.New("an non-registration AUT transaction try to operate on a non-existing aut")
+			if !exist || entry == nil || entry.Info() == nil {
+				return errors.New("an non-registration AUT transaction try to operate on non-existing AUT entry")
 			}
 		}
 		switch autTransaction := autTx.(type) {
@@ -903,7 +903,7 @@ mempoolLoop:
 			continue
 		}
 
-		err = blockchain.CheckTransactionInputsAUT(tx, nextBlockHeight, autView, g.chainParams)
+		err = blockchain.CheckTransactionInputsAUT(tx, nextBlockHeight, utxoRings, autView, g.chainParams)
 		if err != nil {
 			log.Debugf("Skipping tx %s because it "+
 				"is a invalid AUT transaction: %v",
@@ -1025,7 +1025,7 @@ mempoolLoop:
 			continue
 		}
 
-		err = blockchain.CheckTransactionInputsAUT(tx, nextBlockHeight, blockAUTView, g.chainParams)
+		err = blockchain.CheckTransactionInputsAUT(tx, nextBlockHeight, blockUtxoRings, blockAUTView, g.chainParams)
 		if err != nil {
 			log.Tracef("Skipping tx %s due to error in "+
 				"CheckTransactionInputsAUT: %v", tx.Hash(), err)

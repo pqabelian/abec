@@ -492,6 +492,12 @@ func spentAUTSerializeSize(stxo SpentAUT) int {
 		size = serializeSizeVLQ(uint64(len(*updated)))
 		for _, token := range *updated {
 			size += serializeSizeVLQ(spentAUTHeaderCode(&token))
+			if token.Height > 0 {
+				// The legacy v1 spend journal format conditionally tracked the
+				// containing transaction version when the height was non-zero,
+				// so this is required for backwards compat.
+				size += serializeSizeVLQ(0)
+			}
 			size += compressedAUTSize(token.Amount)
 		}
 	case *UpdateAUTInfo:
@@ -501,15 +507,16 @@ func spentAUTSerializeSize(stxo SpentAUT) int {
 		size += 1
 		if sizeBefore != 0 {
 			size += serializeSizeVLQ(uint64(sizeBefore)) + sizeBefore
+			size += serializeSizeVLQ(uint64(len(updated.Before.RootCoinSet)))
+			size += len(updated.Before.RootCoinSet) * (chainhash.HashSize + 1)
 		}
-		size += serializeSizeVLQ(uint64(len(updated.Before.RootCoinSet)))
-		size += len(updated.Before.RootCoinSet) * (chainhash.HashSize + 1)
 
 		// +1 to represent nil
 		sizeAfter := serializeAUTInfoSize(updated.After)
 		size += 1 + serializeSizeVLQ(uint64(sizeAfter)) + sizeAfter
 		size += serializeSizeVLQ(uint64(len(updated.After.RootCoinSet)))
 		size += len(updated.After.RootCoinSet) * (chainhash.HashSize + 1)
+
 	}
 	return size
 }
@@ -535,7 +542,6 @@ func putSpentAUT(target []byte, stxo SpentAUT) int {
 	offset := 0
 	switch updated := stxo.(type) {
 	case *SpentAUTTokens:
-		offset += putVLQ(target, 0)
 		offset += putVLQ(target, uint64(len(*updated)))
 		for i := 0; i < len(*updated); i++ {
 			token := (*updated)[i]
@@ -591,9 +597,9 @@ func putSpentAUT(target []byte, stxo SpentAUT) int {
 		vlqSizeLen := putVLQ(target, encodedSize)
 		offset += vlqSizeLen
 		copy(target[offset:], serializedAfter)
-		vlqSizeLen = putVLQ(target, uint64(len(updated.Before.RootCoinSet)))
+		vlqSizeLen = putVLQ(target, uint64(len(updated.After.RootCoinSet)))
 		offset += vlqSizeLen
-		for point := range updated.Before.RootCoinSet {
+		for point := range updated.After.RootCoinSet {
 			copy(target[offset:], point.TxHash[:])
 			offset += chainhash.HashSize
 			target[offset] = point.Index
@@ -1404,34 +1410,28 @@ func serializeAUTInfoSize(info *aut.Info) int {
 	if info == nil {
 		return 0
 	}
-	return wire.VarIntSerializeSize(uint64(len(info.AutName))) + len(info.AutName) +
+	n := wire.VarIntSerializeSize(uint64(len(info.AutName))) + len(info.AutName) +
 		wire.VarIntSerializeSize(uint64(len(info.AutMemo))) + len(info.AutMemo) +
 		1 +
 		1 +
 		wire.VarIntSerializeSize(info.PlannedTotalAmount) +
 		wire.VarIntSerializeSize(uint64(info.ExpireHeight)) +
-		wire.VarIntSerializeSize(uint64(len(info.IssuerTokens))) + chainhash.HashSize*len(info.IssuerTokens) +
-		wire.VarIntSerializeSize(uint64(len(info.UnitName))) + len(info.UnitName) +
+		wire.VarIntSerializeSize(uint64(len(info.IssuerTokens)))
+	for i := 0; i < len(info.IssuerTokens); i++ {
+		n += wire.VarIntSerializeSize(uint64(len(info.IssuerTokens[i]))) + len(info.IssuerTokens[i])
+	}
+	n += wire.VarIntSerializeSize(uint64(len(info.UnitName))) + len(info.UnitName) +
 		wire.VarIntSerializeSize(uint64(len(info.MinUnitName))) + len(info.MinUnitName) +
 		wire.VarIntSerializeSize(info.UnitScale) +
 		wire.VarIntSerializeSize(info.MintedAmount)
+	return n
 }
 func serializeAUTInfo(info *aut.Info) ([]byte, error) {
 	if info == nil {
 		return nil, errors.New("nil pointer to aut.Info for serialize")
 	}
 	// Calculate the size needed to serialize AUT info.
-	size := wire.VarIntSerializeSize(uint64(len(info.AutName))) + len(info.AutName) +
-		wire.VarIntSerializeSize(uint64(len(info.AutMemo))) + len(info.AutMemo) +
-		1 +
-		1 +
-		wire.VarIntSerializeSize(info.PlannedTotalAmount) +
-		wire.VarIntSerializeSize(uint64(info.ExpireHeight)) +
-		wire.VarIntSerializeSize(uint64(len(info.IssuerTokens))) + chainhash.HashSize*len(info.IssuerTokens) +
-		wire.VarIntSerializeSize(uint64(len(info.UnitName))) + len(info.UnitName) +
-		wire.VarIntSerializeSize(uint64(len(info.MinUnitName))) + len(info.MinUnitName) +
-		wire.VarIntSerializeSize(info.UnitScale) +
-		wire.VarIntSerializeSize(info.MintedAmount)
+	size := serializeAUTInfoSize(info)
 
 	// Serialize the header code followed by the compressed unspent
 	// transaction output.
@@ -1467,9 +1467,9 @@ func serializeAUTInfo(info *aut.Info) ([]byte, error) {
 		return nil, err
 	}
 	for i := 0; i < len(info.IssuerTokens); i++ {
-		n, err := buff.Write(info.IssuerTokens[i][:])
-		if err != nil || n != chainhash.HashSize {
-			return nil, errors.New("error to write issuer hash")
+		err = wire.WriteVarBytes(buff, 0, info.IssuerTokens[i])
+		if err != nil {
+			return nil, errors.New("error to write issuer token")
 		}
 	}
 	err = wire.WriteVarBytes(buff, 0, info.UnitName)
@@ -1591,19 +1591,7 @@ func deserializeAUTCoin(serialized []byte) (*AUTCoin, error) {
 	}
 	offset += readSize
 
-	nameLength, readSize := deserializeVLQ(serialized[offset:])
-	offset += readSize
-	if offset+int(nameLength) > len(serialized) {
-		if err != nil {
-			return nil, errDeserialize(fmt.Sprintf("unable to decode "+
-				"utxo: %v", err))
-		}
-	}
-	name := make([]byte, nameLength)
-	copy(name, serialized[offset:offset+int(nameLength)])
-
 	entry := &AUTCoin{
-		name:        name,
 		amount:      amount,
 		blockHeight: blockHeight,
 		packedFlags: 0,
@@ -1959,7 +1947,7 @@ func dbPutAUTView(dbTx database.Tx, view *AUTViewpoint) error {
 			return err
 		}
 
-		rootCoinSet := make([]*aut.OutPoint, len(entry.info.RootCoinSet))
+		rootCoinSet := make([]*aut.OutPoint, 0, len(entry.info.RootCoinSet))
 		for rootCoin := range entry.info.RootCoinSet {
 			rootCoinSet = append(rootCoinSet, &aut.OutPoint{
 				TxHash: rootCoin.TxHash,

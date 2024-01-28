@@ -777,8 +777,42 @@ type AUTPair struct {
 	Address string `json:"address"`
 	Value   uint64 `json:"value"`
 }
+
+// registeraut register testname - 3 5000 1 1 1000000 dollar cent 1
 type RegisterAUTTransactionCmd struct {
-	AUTType      string
+	AUTName      string
+	IssuerTokens []string // specify issuer tokens
+	IssuerTimes  int
+
+	ExpireHeight          int32
+	IssuerTokenThreshold  uint8
+	IssuerUpdateThreshold uint8
+	PlannedTotalAmount    uint64
+	UnitName              string
+	MinUnitName           string
+	UnitScale             uint64
+}
+
+func NewRegisterAUTTransactionCmd(autName string,
+	issuerTokens []string, issuerTimes int, expireHeight int32,
+	issuerTokenThreshold uint8, IssuerUpdateThreshold uint8, plannedTotalAmount uint64,
+	unitName string, minUnitName string, unitScale uint64) *RegisterAUTTransactionCmd {
+	return &RegisterAUTTransactionCmd{
+		AUTName:               autName,
+		IssuerTokens:          issuerTokens,
+		IssuerTimes:           issuerTimes,
+		ExpireHeight:          expireHeight,
+		IssuerTokenThreshold:  issuerTokenThreshold,
+		IssuerUpdateThreshold: IssuerUpdateThreshold,
+		PlannedTotalAmount:    plannedTotalAmount,
+		UnitName:              unitName,
+		MinUnitName:           minUnitName,
+		UnitScale:             unitScale,
+	}
+}
+
+// registeraut register testname - 3 5000 1 1 1000000 dollar cent 1
+type ReRegisterAUTTransactionCmd struct {
 	AUTName      string
 	IssuerTokens []string // specify issuer tokens
 	IssuerTimes  int
@@ -792,44 +826,37 @@ type RegisterAUTTransactionCmd struct {
 	UnitScale             uint64
 
 	AUTIssuerUpdateThreshold uint8
-	// For blockchain layer
-	//ChangeAddress string
 }
 
-func NewRegisterAUTTransactionCmd(autType string, autName string,
+func NewReRegisterAUTTransactionCmd(autName string,
 	issuerTokens []string, issuerTimes int, expireHeight int32,
 	issuerTokenThreshold uint8, IssuerUpdateThreshold uint8, plannedTotalAmount uint64,
-	unitName string, minUnitName string, unitScale uint64, autIssuerUpdateThreshold uint8, changeAddress string) *RegisterAUTTransactionCmd {
-	return &RegisterAUTTransactionCmd{
-		AUTType:               autType,
-		AUTName:               autName,
-		IssuerTokens:          issuerTokens,
-		IssuerTimes:           issuerTimes,
-		ExpireHeight:          expireHeight,
-		IssuerTokenThreshold:  issuerTokenThreshold,
-		IssuerUpdateThreshold: IssuerUpdateThreshold,
-		PlannedTotalAmount:    plannedTotalAmount,
-		UnitName:              unitName,
-		MinUnitName:           minUnitName,
-		UnitScale:             unitScale,
-
+	unitName string, minUnitName string, unitScale uint64, autIssuerUpdateThreshold uint8) *ReRegisterAUTTransactionCmd {
+	return &ReRegisterAUTTransactionCmd{
+		AUTName:                  autName,
+		IssuerTokens:             issuerTokens,
+		IssuerTimes:              issuerTimes,
+		ExpireHeight:             expireHeight,
+		IssuerTokenThreshold:     issuerTokenThreshold,
+		IssuerUpdateThreshold:    IssuerUpdateThreshold,
+		PlannedTotalAmount:       plannedTotalAmount,
+		UnitName:                 unitName,
+		MinUnitName:              minUnitName,
+		UnitScale:                unitScale,
 		AUTIssuerUpdateThreshold: autIssuerUpdateThreshold,
-		//ChangeAddress:         changeAddress,
 	}
 }
 
 type IssueAUTTransactionCmd struct {
-	AUTType string
 	AUTName string
 	Outputs []AUTPair
 
 	AUTIssueThreshold uint8
 }
 
-func NewIssueAUTTransactionCmd(autType string, autName string,
+func NewIssueAUTTransactionCmd(autName string,
 	outputs []AUTPair, autIssuerTokenThreshold uint8) *IssueAUTTransactionCmd {
 	return &IssueAUTTransactionCmd{
-		AUTType:           autType,
 		AUTName:           autName,
 		Outputs:           outputs,
 		AUTIssueThreshold: autIssuerTokenThreshold,
@@ -838,7 +865,6 @@ func NewIssueAUTTransactionCmd(autType string, autName string,
 }
 
 type TransferAUTTransactionCmd struct {
-	AUTType string
 	AUTName string
 	Outputs []AUTPair
 
@@ -848,10 +874,9 @@ type TransferAUTTransactionCmd struct {
 	//ChangeAddress string
 }
 
-func NewTransferAUTTransactionCmd(autType string, autName string,
+func NewTransferAUTTransactionCmd(autName string,
 	outputs []AUTPair, autChangeAddress string, changeAddress string) *TransferAUTTransactionCmd {
 	return &TransferAUTTransactionCmd{
-		AUTType:          autType,
 		AUTName:          autName,
 		Outputs:          outputs,
 		AUTChangeAddress: autChangeAddress,
@@ -1080,8 +1105,9 @@ func init() {
 	//MustRegisterCmd("sendmany", (*SendManyCmd)(nil), flags)
 	MustRegisterCmd("sendtoaddressesabe", (*SendToAddressAbeCmd)(nil), flags)
 	MustRegisterCmd("registeraut", (*RegisterAUTTransactionCmd)(nil), flags)
+	MustRegisterCmd("reregisteraut", (*ReRegisterAUTTransactionCmd)(nil), flags)
 	MustRegisterCmd("issueaut", (*IssueAUTTransactionCmd)(nil), flags)
-	MustRegisterCmd("sendtoaddressabeaut", (*TransferAUTTransactionCmd)(nil), flags)
+	MustRegisterCmd("transferaut", (*TransferAUTTransactionCmd)(nil), flags)
 	MustRegisterCmd("generateaddressabe", (*GenerateAddressCmd)(nil), flags)
 	MustRegisterCmd("listfreeaddresses", (*ListFreeAddressesCmd)(nil), flags)
 	MustRegisterCmd("addressmaxsequencenumber", (*AddressMaxSequenceNumberCmd)(nil), flags)

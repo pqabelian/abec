@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/aut"
@@ -1636,7 +1637,7 @@ func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *
 	return nil
 }
 
-func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, autView *AUTViewpoint, chainParams *chaincfg.Params) error {
+func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRingViewpoint, autView *AUTViewpoint, chainParams *chaincfg.Params) error {
 	if tx == nil {
 		return fmt.Errorf("CheckTransactionInputsAUT: a nil transaction")
 	}
@@ -1651,11 +1652,11 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, autView *AUTVi
 	autNameKey := hex.EncodeToString(autTx.AUTName())
 	autEntry, exist := autView.entries[autNameKey]
 	if autTx.Type() == aut.Registration {
-		if exist {
+		if exist && autEntry != nil && autEntry.info != nil {
 			return errors.New("an registration AUT transaction try to register AUT entry with an existing AUT name ")
 		}
 	} else {
-		if !exist {
+		if !exist || autEntry == nil || autEntry.info == nil {
 			return errors.New("an non-registration AUT transaction try to operate on non-existing AUT entry")
 		}
 	}
@@ -1687,13 +1688,9 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, autView *AUTVi
 			return fmt.Errorf("transaction %s try to mint at height %d but "+
 				"the AUT entry claim its expire height %d", tx.Hash(), txHeight, autEntry.info.ExpireHeight)
 		}
-		// issue threshold
-		if autTransaction.IssuerTokenNum < autEntry.info.IssueThreshold {
-			return fmt.Errorf("transaction %s try to mint with %d issue token but "+
-				"the AUT entry claim its issue threshold %d", tx.Hash(), autTransaction.IssuerTokenNum, autEntry.info.IssueThreshold)
-		}
 
 		// duplicated input or double spending?
+		consumedIssueTokens := map[string]struct{}{}
 		willConsumedRootCoins := map[aut.OutPoint]struct{}{}
 		for i := 0; i < len(autTransaction.TxIns); i++ {
 			// spend non-exist or double spending
@@ -1708,6 +1705,42 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, autView *AUTVi
 					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index)
 			}
 			willConsumedRootCoins[autTransaction.TxIns[i]] = struct{}{}
+
+			utxoRing := view.LookupEntry(tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash())
+			if utxoRing == nil {
+				return fmt.Errorf("transaction %s try to mint at height %d but "+
+					"the consumed UTXO at Ring %s not exist", tx.Hash(), txHeight, tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash())
+			}
+			coinAddress, err := aut.CheckTxoSanity(autTransaction.TxIns[i].TxHash, i, utxoRing.txOuts[i])
+			if err != nil {
+				return fmt.Errorf("transaction %s try to mint at height %d but "+
+					"the consumed UTXO at Ring %s is not a valid output", tx.Hash(), txHeight, tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash())
+			}
+			if _, ok := consumedIssueTokens[hex.EncodeToString(coinAddress)]; !ok {
+				consumedIssueTokens[hex.EncodeToString(coinAddress)] = struct{}{}
+			}
+		}
+		allIssuerTokens := map[string]struct{}{}
+		for i := 0; i < len(autEntry.info.IssuerTokens); i++ {
+			privacyLevel, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(autEntry.info.IssuerTokens[i])
+			if err != nil {
+				return fmt.Errorf("fail to parse %d-th issuer token in aut %s", i, string(autEntry.info.AutName))
+			}
+			if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
+				return fmt.Errorf("specified %d-th issuer token is invalid in aut %s", i, string(autEntry.info.AutName))
+			}
+			allIssuerTokens[hex.EncodeToString(coinAddress)] = struct{}{}
+		}
+		for issuerToken := range consumedIssueTokens {
+			if _, ok := allIssuerTokens[issuerToken]; !ok {
+				return fmt.Errorf("transaction %s try to mint at height %d with "+
+					"issue token but it do not exist in its registration", tx.Hash(), txHeight)
+			}
+		}
+		// check the input issuer token and issue token in info
+		if len(consumedIssueTokens) < int(autEntry.info.IssueThreshold) {
+			return fmt.Errorf("transaction %s try to mint with %d issue token but "+
+				"the AUT entry claim its issue threshold %d", tx.Hash(), len(consumedIssueTokens), autEntry.info.IssueThreshold)
 		}
 
 		// value
@@ -1742,13 +1775,8 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, autView *AUTVi
 				autTransaction.ExpireHeight, txHeight)
 		}
 
-		// issue threshold
-		if autTransaction.IssuerTokenNum < autEntry.info.UpdateThreshold {
-			return fmt.Errorf("transaction %s try to re-register with %d issue token but "+
-				"the AUT entry claim its update threshold %d", tx.Hash(), autTransaction.IssuerTokenNum, autEntry.info.UpdateThreshold)
-		}
-
 		// duplicated input or double spending?
+		consumedIssueTokens := map[string]struct{}{}
 		willConsumedRootCoins := map[aut.OutPoint]struct{}{}
 		for i := 0; i < len(autTransaction.TxIns); i++ {
 			// spend non-exist or double spending
@@ -1763,6 +1791,42 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, autView *AUTVi
 					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index)
 			}
 			willConsumedRootCoins[autTransaction.TxIns[i]] = struct{}{}
+
+			utxoRing := view.LookupEntry(tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash())
+			if utxoRing == nil {
+				return fmt.Errorf("transaction %s try to re-register at height %d but "+
+					"the consumed UTXO at Ring %s not exist", tx.Hash(), txHeight, tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash())
+			}
+			coinAddress, err := aut.CheckTxoSanity(autTransaction.TxIns[i].TxHash, i, utxoRing.txOuts[i])
+			if err != nil {
+				return fmt.Errorf("transaction %s try to re-register at height %d but "+
+					"the consumed UTXO at Ring %s is not a valid output", tx.Hash(), txHeight, tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash())
+			}
+			if _, ok := consumedIssueTokens[hex.EncodeToString(coinAddress)]; !ok {
+				consumedIssueTokens[hex.EncodeToString(coinAddress)] = struct{}{}
+			}
+		}
+		allIssuerTokens := map[string]struct{}{}
+		for i := 0; i < len(autEntry.info.IssuerTokens); i++ {
+			privacyLevel, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(autEntry.info.IssuerTokens[i])
+			if err != nil {
+				return fmt.Errorf("fail to parse %d-th issuer token in aut %s", i, string(autEntry.info.AutName))
+			}
+			if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
+				return fmt.Errorf("specified %d-th issuer token is invalid in aut %s", i, string(autEntry.info.AutName))
+			}
+			allIssuerTokens[hex.EncodeToString(coinAddress)] = struct{}{}
+		}
+		for issuerToken := range consumedIssueTokens {
+			if _, ok := allIssuerTokens[issuerToken]; !ok {
+				return fmt.Errorf("transaction %s try to re-register at height %d with "+
+					"issue token but it do not exist in its registration", tx.Hash(), txHeight)
+			}
+		}
+		// check the input issuer token and issue token in info
+		if len(consumedIssueTokens) < int(autEntry.info.IssueThreshold) {
+			return fmt.Errorf("transaction %s try to mint with %d issue token but "+
+				"the AUT entry claim its issue threshold %d", tx.Hash(), len(consumedIssueTokens), autEntry.info.IssueThreshold)
 		}
 
 		// check updated AUT info
@@ -2005,7 +2069,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 			if autTx == nil {
 				return aut.ErrInValidAUTTx
 			}
-			err = CheckTransactionInputsAUT(tx, node.height, autView,
+			err = CheckTransactionInputsAUT(tx, node.height, view, autView,
 				b.chainParams)
 			if err != nil {
 				return err

@@ -1838,8 +1838,8 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 		}
 		// check whether the mempool has the AUT transaction would register a AUT with the same name
 		if autTx.Type() == aut.Registration {
-			if existTxHash, exist := mp.registeredAUTName[hex.EncodeToString(autTx.AUTName())]; exist {
-				str := fmt.Sprintf("transaction %v has register the same name AUT earlier than transaction %v", existTxHash, txHash)
+			if registerAUTTxHash, exist := mp.registeredAUTName[hex.EncodeToString(autTx.AUTName())]; exist {
+				str := fmt.Sprintf("transaction %v has register the same name AUT earlier than transaction %v", registerAUTTxHash, txHash)
 				return nil, nil, txRuleError(wire.RejectInvalid, str)
 			}
 		}
@@ -1849,7 +1849,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 		// - whether the specified AUT exists
 		// - check existence of input
 		// - check balance for output and input
-		err = blockchain.CheckTransactionInputsAUT(tx, nextBlockHeight, autView, mp.cfg.ChainParams)
+		err = blockchain.CheckTransactionInputsAUT(tx, nextBlockHeight, utxoRingView, autView, mp.cfg.ChainParams)
 		if err != nil {
 			if cerr, ok := err.(blockchain.RuleError); ok {
 				return nil, nil, chainRuleError(cerr)

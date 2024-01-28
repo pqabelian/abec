@@ -77,7 +77,7 @@ const MaxNameLength = 20
 const MaxMemoLength = 20
 const MaxUnitLength = 20
 const MaxMinUnitLength = 20
-const MaxIssuerTokenLength = 194 // TODO
+const MaxIssuerTokenLength = 198 // TODO
 const MaxIssuerNum = 10
 
 // AUTSCRIPT 0 varSize ...
@@ -325,10 +325,14 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 	}
 
 	tx.IssuerTokens = make([][]byte, numIssuer)
+	existIssuerTokens := map[string]struct{}{}
 	for i := 0; i < len(tx.IssuerTokens); i++ {
 		tx.IssuerTokens[i], err = wire.ReadVarBytes(r, 0, MaxIssuerTokenLength, "issuerToken")
 		if err != nil {
 			return err
+		}
+		if _, ok := existIssuerTokens[hex.EncodeToString(tx.IssuerTokens[i])]; ok {
+			return ErrInValidAUTTx
 		}
 	}
 
@@ -435,9 +439,8 @@ type MintTx struct {
 	TxoAUTValues     []uint64
 	Memo             []byte
 
-	TxIns          []OutPoint
-	TxOuts         []OutPoint
-	IssuerTokenNum uint8
+	TxIns  []OutPoint
+	TxOuts []OutPoint
 }
 
 func (tx *MintTx) Type() TransactionType {
@@ -566,7 +569,6 @@ func (tx *MintTx) Deserialize(r io.Reader) error {
 	return nil
 }
 func (tx *MintTx) AUTName() []byte {
-
 	return tx.Name
 }
 func (tx *MintTx) NumIns() int {
@@ -607,9 +609,8 @@ type ReRegistrationTx struct {
 	PlannedTotalAmount    uint64
 	UnitScale             uint64
 
-	TxIns          []OutPoint
-	TxOuts         []OutPoint
-	IssuerTokenNum uint8
+	TxIns  []OutPoint
+	TxOuts []OutPoint
 }
 
 func (tx *ReRegistrationTx) Type() TransactionType {
@@ -723,10 +724,14 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 	}
 
 	tx.IssuerTokens = make([][]byte, numIssuer)
+	existIssuerTokens := map[string]struct{}{}
 	for i := 0; i < len(tx.IssuerTokens); i++ {
 		tx.IssuerTokens[i], err = wire.ReadVarBytes(r, 0, MaxIssuerTokenLength, "issuerToken")
 		if err != nil {
 			return err
+		}
+		if _, ok := existIssuerTokens[hex.EncodeToString(tx.IssuerTokens[i])]; ok {
+			return ErrInValidAUTTx
 		}
 	}
 
@@ -1139,7 +1144,7 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 		autTransaction.TxOuts = make([]OutPoint, 0, autTransaction.OutAutRootCoinNum)
 		txHash := tx.TxHash()
 
-		existIssuerTokens := map[string]struct{}{}
+		existCoinAddresses := map[string]struct{}{}
 		for i := 0; i < int(autTransaction.OutAutRootCoinNum); i++ {
 			txOut := tx.TxOuts[i]
 			coinAddress, err := CheckTxoSanity(txHash, i, txOut)
@@ -1147,8 +1152,8 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 				return nil, err
 			}
 
-			if _, ok := existIssuerTokens[hex.EncodeToString(coinAddress)]; !ok {
-				existIssuerTokens[hex.EncodeToString(coinAddress)] = struct{}{}
+			if _, ok := existCoinAddresses[hex.EncodeToString(coinAddress)]; !ok {
+				existCoinAddresses[hex.EncodeToString(coinAddress)] = struct{}{}
 			}
 
 			autTransaction.TxOuts = append(autTransaction.TxOuts, OutPoint{
@@ -1158,11 +1163,14 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 		}
 
 		// configuration conflict
-		if len(existIssuerTokens) < int(autTransaction.IssueTokensThreshold) ||
-			len(existIssuerTokens) < int(autTransaction.IssuerUpdateThreshold) {
+		if len(existCoinAddresses) < int(autTransaction.IssueTokensThreshold) ||
+			len(existCoinAddresses) < int(autTransaction.IssuerUpdateThreshold) {
 			return nil, fmt.Errorf("the num of exist tokens less than configurated threshold from transaction %s", txHash)
 		}
 
+		if len(existCoinAddresses) != len(autTransaction.IssuerTokens) {
+			return nil, fmt.Errorf("unmatched issuer tokens and outputs for aut root coin")
+		}
 		// compare claimed issueTokens
 		for i := 0; i < len(autTransaction.IssuerTokens); i++ {
 			privacyLevel, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(autTransaction.IssuerTokens[i])
@@ -1173,11 +1181,14 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 				return nil, fmt.Errorf("specified %d-th issuer token is invalid for aut from transaction %s", i, txHash)
 			}
 			key := hex.EncodeToString(coinAddress)
-			if _, ok := existIssuerTokens[key]; !ok {
+			if _, ok := existCoinAddresses[key]; !ok {
 				return nil, fmt.Errorf("the claimed issuer tokens claims duplicate issuer token or "+
 					"claims non-exist issuer tken in root coin from transaction %s", txHash)
 			}
-			delete(existIssuerTokens, key)
+			delete(existCoinAddresses, key)
+		}
+		if len(existCoinAddresses) != 0 {
+			return nil, fmt.Errorf("unmatched issuer tokens and outputs for aut root coin")
 		}
 
 		if autTransaction.UnitScale > autTransaction.PlannedTotalAmount {
@@ -1241,7 +1252,7 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 		autTransaction.TxOuts = make([]OutPoint, 0, autTransaction.OutAutRootCoinNum)
 		txHash := tx.TxHash()
 
-		existIssuerTokens := map[string]struct{}{}
+		existCoinAddresses := map[string]struct{}{}
 		for i := 0; i < int(autTransaction.OutAutRootCoinNum); i++ {
 			txOut := tx.TxOuts[i]
 			coinAddress, err := CheckTxoSanity(txHash, i, txOut)
@@ -1249,8 +1260,8 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 				return nil, err
 			}
 
-			if _, ok := existIssuerTokens[hex.EncodeToString(coinAddress)]; !ok {
-				existIssuerTokens[hex.EncodeToString(coinAddress)] = struct{}{}
+			if _, ok := existCoinAddresses[hex.EncodeToString(coinAddress)]; !ok {
+				existCoinAddresses[hex.EncodeToString(coinAddress)] = struct{}{}
 			}
 
 			autTransaction.TxOuts = append(autTransaction.TxOuts, OutPoint{
@@ -1260,19 +1271,25 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 		}
 
 		// configuration conflict
-		if len(existIssuerTokens) < int(autTransaction.IssueTokensThreshold) ||
-			len(existIssuerTokens) < int(autTransaction.IssuerUpdateThreshold) {
+		if len(existCoinAddresses) < int(autTransaction.IssueTokensThreshold) ||
+			len(existCoinAddresses) < int(autTransaction.IssuerUpdateThreshold) {
 			return nil, fmt.Errorf("the num of exist tokens less than configurated threshold from transaction %s", txHash)
 		}
 
+		if len(existCoinAddresses) != len(autTransaction.IssuerTokens) {
+			return nil, fmt.Errorf("unmatched issuer tokens and outputs for aut root coin")
+		}
 		// compare claim issueTokens
 		for i := 0; i < len(autTransaction.IssuerTokens); i++ {
 			key := hex.EncodeToString(autTransaction.IssuerTokens[i])
-			if _, ok := existIssuerTokens[hex.EncodeToString(autTransaction.IssuerTokens[i])]; !ok {
+			if _, ok := existCoinAddresses[hex.EncodeToString(autTransaction.IssuerTokens[i])]; !ok {
 				return nil, fmt.Errorf("the claimed issuer tokens claims duplicate issuer token or "+
 					"claims non-exist issuer tken in root coin from transaction %s", txHash)
 			}
-			delete(existIssuerTokens, key)
+			delete(existCoinAddresses, key)
+		}
+		if len(existCoinAddresses) != 0 {
+			return nil, fmt.Errorf("unmatched issuer tokens and outputs for aut root coin")
 		}
 
 		// configuration conflict

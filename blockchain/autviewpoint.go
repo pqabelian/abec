@@ -1,7 +1,6 @@
 package blockchain
 
 import (
-	"bytes"
 	"encoding/hex"
 	"errors"
 	"github.com/abesuite/abec/abeutil"
@@ -249,12 +248,12 @@ func (view *AUTViewpoint) connectTransaction(tx *abeutil.TxAbe, blockHeight int3
 	autNameKey := hex.EncodeToString(autTx.AUTName())
 	entry, exist := view.entries[autNameKey]
 	if autTx.Type() == aut.Registration {
-		if exist {
-			return errors.New("an non-registration AUT transaction try to register a existing AUT name ")
+		if exist && entry != nil && entry.info != nil {
+			return errors.New("an registration AUT transaction try to register AUT entry with an existing AUT name ")
 		}
 	} else {
-		if !exist {
-			return errors.New("an non-registration AUT transaction try to operate on a non-existing aut")
+		if !exist || entry == nil || entry.info == nil {
+			return errors.New("an non-registration AUT transaction try to operate on non-existing AUT entry")
 		}
 	}
 	switch autTransaction := autTx.(type) {
@@ -608,8 +607,16 @@ func (view *AUTViewpoint) fetchAUTMain(db database.DB, outpoints map[aut.OutPoin
 			if err != nil {
 				return err
 			}
+			if info != nil {
+				view.entries[autNameKey] = &AUTEntry{
+					info: info,
+				}
+			}
+		}
+
+		if view.entries[autNameKey] == nil {
 			view.entries[autNameKey] = &AUTEntry{
-				info: info,
+				info: nil,
 			}
 		}
 
@@ -623,10 +630,11 @@ func (view *AUTViewpoint) fetchAUTMain(db database.DB, outpoints map[aut.OutPoin
 				return err
 			}
 
-			if !bytes.Equal(entry.name, autName) {
-				return errors.New("unmatched AUT name and info")
+			if entry == nil {
+				continue
 			}
 
+			entry.name = autName
 			view.entries[autNameKey].coins[outpoint] = entry
 		}
 
