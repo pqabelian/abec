@@ -2,7 +2,6 @@ package abecryptox
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"github.com/abesuite/abec/abecryptox/abecryptoutils"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
@@ -360,7 +359,7 @@ func pqringctxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme
 
 		//	coinValueSecretKey             []byte
 		var coinValueSecretKey []byte = nil
-		if abeTxInputDescs[i].cryptoVsk != nil && len(abeTxInputDescs[i].cryptoVsk) != 0 {
+		if abeTxInputDescs[i].cryptoVsk != nil {
 			privacyLevelInKey, coinValueSecretKey, err = abecryptoxkey.CryptoValueSecretKeyParse(abeTxInputDescs[i].cryptoVsk)
 			if err != nil {
 				return nil, err
@@ -808,7 +807,7 @@ func pqringctxTxoCoinReceiveByKeys(pp *pqringctxapi.PublicParameter, cryptoSchem
 			return false, 0, err
 		}
 		if privacyLevelInCryptoAddress != privacyLevelInCryptoValueSecretKey {
-			return false, 0, errors.New("pqringctxTxoCoinReceiveByKeys: the privacyLevel in cryptoValueSecretKey does not match that in cryptoAddress")
+			return false, 0, fmt.Errorf("pqringctxTxoCoinReceiveByKeys: the privacyLevel in cryptoValueSecretKey does not match that in cryptoAddress")
 		}
 		coinValueSecretKey = coinValueSecretKeyTemp
 	} else {
