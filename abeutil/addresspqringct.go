@@ -216,6 +216,9 @@ func (instAddr *InstanceAddress) String() string {
 func (instAddr *InstanceAddress) CryptoAddress() []byte {
 	return instAddr.cryptoAddress
 }
+func (instAddr *InstanceAddress) CryptoScheme() abecryptoxparam.CryptoScheme {
+	return instAddr.cryptoScheme
+}
 
 func (instAddr *InstanceAddress) IsForNet(netParam *chaincfg.Params) bool {
 	return instAddr.netID == netParam.AbelAddressNetId

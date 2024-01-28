@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/blockchain/indexers"
@@ -2703,6 +2704,15 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	blockTemplateGenerator := mining.NewBlkTmplGenerator(&policy,
 		s.chainParams, s.txMemPool, s.chain, s.timeSource,
 		s.sigCache, s.hashCache, s.witnessCache)
+	if s.chain.BestSnapshot().Height+1 < s.chainParams.BlockHeightMLPAUT {
+		// Check address, disallow higher address with crypto scheme
+		for i := 0; i < len(cfg.miningAddrs); i++ {
+			if cfg.miningAddrs[i].CryptoScheme() != abecryptoxparam.CryptoSchemePQRingCT {
+				return nil, fmt.Errorf("address with crypto scheme address is disallow until height %d", s.chainParams.BlockHeightMLPAUT)
+			}
+		}
+	}
+
 	s.cpuMiner = cpuminer.New(&cpuminer.Config{
 		ChainParams:            chainParams,
 		Ethash:                 s.ethash, // todo: (EthashPoW)
