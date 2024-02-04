@@ -1684,10 +1684,10 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 
 	case *aut.MintTx:
 		// expired?
-		if autEntry.info.ExpireHeight < txHeight {
-			return fmt.Errorf("transaction %s try to mint at height %d but "+
-				"the AUT entry claim its expire height %d", tx.Hash(), txHeight, autEntry.info.ExpireHeight)
-		}
+		//if autEntry.info.ExpireHeight < txHeight {
+		//	return fmt.Errorf("transaction %s try to mint at height %d but "+
+		//		"the AUT entry claim its expire height %d", tx.Hash(), txHeight, autEntry.info.ExpireHeight)
+		//}
 
 		// duplicated input or double spending?
 		consumedIssueTokens := map[string]struct{}{}

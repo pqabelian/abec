@@ -908,12 +908,6 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint,
 				mp.expiredHeightAUT[autTransaction.ExpireHeight] = map[chainhash.Hash]*TxDescAbe{}
 			}
 			mp.expiredHeightAUT[autTransaction.ExpireHeight][*txD.Tx.Hash()] = txD
-		case *aut.MintTx:
-			info := autView.LookupInfo(hex.EncodeToString(autTransaction.Name))
-			if mp.expiredHeightAUT[info.ExpireHeight] == nil {
-				mp.expiredHeightAUT[info.ExpireHeight] = map[chainhash.Hash]*TxDescAbe{}
-			}
-			mp.expiredHeightAUT[info.ExpireHeight][*txD.Tx.Hash()] = txD
 		default:
 			// nothing to do
 		}
