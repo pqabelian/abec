@@ -539,7 +539,7 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *bl
 					return errors.New("an AUT mint transaction try to mint amount exceed planned")
 				}
 				wouldMintedAmount += autTransaction.TxoAUTValues[i]
-				entry.Add(autTransaction.TxOuts[i], blockchain.NewAUTCoin(autTransaction.Name, autTransaction.TxoAUTValues[i], -1, false))
+				entry.Add(autTransaction.TxOuts[i], blockchain.NewAUTCoin(autTransaction.AutName, autTransaction.TxoAUTValues[i], -1, false))
 			}
 			info.MintedAmount = wouldMintedAmount
 
@@ -590,7 +590,7 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *bl
 					totalOutValue+autTransaction.TxoAUTValues[i] > info.PlannedTotalAmount {
 					return errors.New("an AUT transfer transaction try to overflow amount")
 				}
-				entry.Add(autTransaction.TxOuts[i], blockchain.NewAUTCoin(autTransaction.Name, autTransaction.TxoAUTValues[i], 0, false))
+				entry.Add(autTransaction.TxOuts[i], blockchain.NewAUTCoin(autTransaction.AutName, autTransaction.TxoAUTValues[i], 0, false))
 			}
 			if totalInputValue != totalOutValue {
 				return errors.New("an AUT transfer transaction try to break-balance amount")
@@ -613,7 +613,7 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *bl
 				token.Spend()
 				burnedValues += token.Amount()
 			}
-			if info.MintedAmount-burnedValues > 0 || info.MintedAmount-burnedValues > info.MintedAmount {
+			if info.MintedAmount-burnedValues > info.MintedAmount { // overflow
 				return errors.New("an AUT transfer transaction try to overflow token")
 			}
 			info.MintedAmount -= burnedValues

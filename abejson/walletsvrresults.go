@@ -50,6 +50,9 @@ type InfoWalletResult struct {
 	PaytxFee        float64 `json:"paytxfee"`
 	RelayFee        float64 `json:"relayfee"`
 	Errors          string  `json:"errors"`
+
+	AUTBalances  map[string]uint64 `json:"aut_balances"`
+	AUTRootCoins map[string]uint64 `json:"aut_root_coins"`
 }
 
 // ListTransactionsResult models the data from the listtransactions command.

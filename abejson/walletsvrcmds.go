@@ -599,6 +599,18 @@ func NewListSpentAndMinedAbeCmd(min *float64, max *float64) *ListSpentAndMinedAb
 	}
 }
 
+type ListAUTCoinsCmd struct {
+	AUTName      *string
+	RootCoinOnly *bool
+}
+
+func NewListAUTCoinsCmd(autName *string, rootCoinOnly *bool) *ListAUTCoinsCmd {
+	return &ListAUTCoinsCmd{
+		AUTName:      autName,
+		RootCoinOnly: rootCoinOnly,
+	}
+}
+
 type ListConfirmedTxsCmd struct {
 	Verbose *int `jsonrpcdefault:"0"`
 }
@@ -811,43 +823,7 @@ func NewRegisterAUTTransactionCmd(autName string,
 	}
 }
 
-// registeraut register testname - 3 5000 1 1 1000000 dollar cent 1
-type ReRegisterAUTTransactionCmd struct {
-	AUTName      string
-	IssuerTokens []string // specify issuer tokens
-	IssuerTimes  int
-
-	ExpireHeight          int32
-	IssuerTokenThreshold  uint8
-	IssuerUpdateThreshold uint8
-	PlannedTotalAmount    uint64
-	UnitName              string
-	MinUnitName           string
-	UnitScale             uint64
-
-	AUTIssuerUpdateThreshold uint8
-}
-
-func NewReRegisterAUTTransactionCmd(autName string,
-	issuerTokens []string, issuerTimes int, expireHeight int32,
-	issuerTokenThreshold uint8, IssuerUpdateThreshold uint8, plannedTotalAmount uint64,
-	unitName string, minUnitName string, unitScale uint64, autIssuerUpdateThreshold uint8) *ReRegisterAUTTransactionCmd {
-	return &ReRegisterAUTTransactionCmd{
-		AUTName:                  autName,
-		IssuerTokens:             issuerTokens,
-		IssuerTimes:              issuerTimes,
-		ExpireHeight:             expireHeight,
-		IssuerTokenThreshold:     issuerTokenThreshold,
-		IssuerUpdateThreshold:    IssuerUpdateThreshold,
-		PlannedTotalAmount:       plannedTotalAmount,
-		UnitName:                 unitName,
-		MinUnitName:              minUnitName,
-		UnitScale:                unitScale,
-		AUTIssuerUpdateThreshold: autIssuerUpdateThreshold,
-	}
-}
-
-type IssueAUTTransactionCmd struct {
+type MintAUTTransactionCmd struct {
 	AUTName string
 	Outputs []AUTPair
 
@@ -855,8 +831,8 @@ type IssueAUTTransactionCmd struct {
 }
 
 func NewIssueAUTTransactionCmd(autName string,
-	outputs []AUTPair, autIssuerTokenThreshold uint8) *IssueAUTTransactionCmd {
-	return &IssueAUTTransactionCmd{
+	outputs []AUTPair, autIssuerTokenThreshold uint8) *MintAUTTransactionCmd {
+	return &MintAUTTransactionCmd{
 		AUTName:           autName,
 		Outputs:           outputs,
 		AUTIssueThreshold: autIssuerTokenThreshold,
@@ -881,6 +857,56 @@ func NewTransferAUTTransactionCmd(autName string,
 		Outputs:          outputs,
 		AUTChangeAddress: autChangeAddress,
 		//ChangeAddress:    changeAddress,
+	}
+}
+
+// registeraut register testname - 3 5000 1 1 1000000 dollar cent 1
+type ReRegisterAUTTransactionCmd struct {
+	AUTName      string
+	IssuerTokens []string // specify issuer tokens
+	IssuerTimes  int
+
+	ExpireHeight          int32
+	IssuerTokenThreshold  uint8
+	IssuerUpdateThreshold uint8
+	PlannedTotalAmount    uint64
+	//UnitName              string
+	//MinUnitName           string
+	UnitScale uint64
+
+	AUTIssuerUpdateThreshold uint8
+}
+
+func NewReRegisterAUTTransactionCmd(autName string,
+	issuerTokens []string, issuerTimes int, expireHeight int32,
+	issuerTokenThreshold uint8, IssuerUpdateThreshold uint8, plannedTotalAmount uint64,
+	/*unitName string, minUnitName string,*/ unitScale uint64, autIssuerUpdateThreshold uint8) *ReRegisterAUTTransactionCmd {
+	return &ReRegisterAUTTransactionCmd{
+		AUTName:               autName,
+		IssuerTokens:          issuerTokens,
+		IssuerTimes:           issuerTimes,
+		ExpireHeight:          expireHeight,
+		IssuerTokenThreshold:  issuerTokenThreshold,
+		IssuerUpdateThreshold: IssuerUpdateThreshold,
+		PlannedTotalAmount:    plannedTotalAmount,
+		//UnitName:                 unitName,
+		//MinUnitName:              minUnitName,
+		UnitScale:                unitScale,
+		AUTIssuerUpdateThreshold: autIssuerUpdateThreshold,
+	}
+}
+
+// burnaut register testname - 3 5000 1 1 1000000 dollar cent 1
+type BurnAUTTransactionCmd struct {
+	AUTName        string
+	UTXOSpescified string
+}
+
+func NewBurnAUTTransactionCmd(autName string,
+	utxoSpescified string) *BurnAUTTransactionCmd {
+	return &BurnAUTTransactionCmd{
+		AUTName:        autName,
+		UTXOSpescified: utxoSpescified,
 	}
 }
 
@@ -1092,6 +1118,8 @@ func init() {
 	MustRegisterCmd("listunconfirmedtxoabe", (*ListSpentButUnminedAbeCmd)(nil), flags)
 	MustRegisterCmd("listconfirmedtxoabe", (*ListSpentAndMinedAbeCmd)(nil), flags)
 
+	MustRegisterCmd("listautcoins", (*ListAUTCoinsCmd)(nil), flags)
+
 	MustRegisterCmd("rangespendableutxo", (*RangeSpendableUTXOAbeCmd)(nil), flags)
 
 	MustRegisterCmd("listconfirmedtxs", (*ListConfirmedTxsCmd)(nil), flags)
@@ -1105,9 +1133,10 @@ func init() {
 	//MustRegisterCmd("sendmany", (*SendManyCmd)(nil), flags)
 	MustRegisterCmd("sendtoaddressesabe", (*SendToAddressAbeCmd)(nil), flags)
 	MustRegisterCmd("registeraut", (*RegisterAUTTransactionCmd)(nil), flags)
-	MustRegisterCmd("reregisteraut", (*ReRegisterAUTTransactionCmd)(nil), flags)
-	MustRegisterCmd("issueaut", (*IssueAUTTransactionCmd)(nil), flags)
+	MustRegisterCmd("mintaut", (*MintAUTTransactionCmd)(nil), flags)
 	MustRegisterCmd("transferaut", (*TransferAUTTransactionCmd)(nil), flags)
+	MustRegisterCmd("reregisteraut", (*ReRegisterAUTTransactionCmd)(nil), flags)
+	MustRegisterCmd("burnaut", (*BurnAUTTransactionCmd)(nil), flags)
 	MustRegisterCmd("generateaddressabe", (*GenerateAddressCmd)(nil), flags)
 	MustRegisterCmd("listfreeaddresses", (*ListFreeAddressesCmd)(nil), flags)
 	MustRegisterCmd("addressmaxsequencenumber", (*AddressMaxSequenceNumberCmd)(nil), flags)

@@ -293,6 +293,19 @@ func (view *AUTViewpoint) connectTransaction(tx *abeutil.TxAbe, blockHeight int3
 			*sauts = append(*sauts, stxo)
 		}
 
+		log.Infof(`Register AUT with name %s with following configuration:
+UpdateThreshold: %v,
+IssueThreshold: %v,
+PlannedTotalAmount: %v,
+ExpireHeight: %v,
+IssuerTokens: %v,
+UnitName: %v,
+MinUnitName: %v,
+UnitScale: %v,	
+`, string(autTransaction.AutName), autTransaction.IssuerUpdateThreshold, autTransaction.IssueTokensThreshold,
+			autTransaction.PlannedTotalAmount, autTransaction.ExpireHeight, autTransaction.IssuerTokens,
+			string(autTransaction.UnitName), string(autTransaction.MinUnitName), autTransaction.UnitScale)
+
 	case *aut.MintTx:
 		info := entry.Info()
 		var currentSauts = (SpentAUTTokens)(make([]SpentAUTToken, 0, len(autTransaction.TxIns)))
@@ -326,13 +339,16 @@ func (view *AUTViewpoint) connectTransaction(tx *abeutil.TxAbe, blockHeight int3
 				return errors.New("an AUT mint transaction try to mint amount exceed planned")
 			}
 			wouldMintedAmount += autTransaction.TxoAUTValues[i]
-			entry.Add(autTransaction.TxOuts[i], NewAUTCoin(autTransaction.Name, autTransaction.TxoAUTValues[i], blockHeight, false))
+			entry.Add(autTransaction.TxOuts[i], NewAUTCoin(autTransaction.AutName, autTransaction.TxoAUTValues[i], blockHeight, false))
 		}
 		if info.MintedAmount+wouldMintedAmount < info.MintedAmount {
 			return errors.New("an AUT mint transaction try to mint amount exceed planned")
 		}
-		info.MintedAmount += wouldMintedAmount
 
+		log.Infof(`Mint AUT for name %s (minted amount %d /planned total amount %d) with %d issuer tokens to mint %d AUT coins`, string(autTransaction.AutName),
+			info.MintedAmount, info.PlannedTotalAmount, len(autTransaction.TxIns), wouldMintedAmount)
+
+		info.MintedAmount += wouldMintedAmount
 	case *aut.ReRegistrationTx:
 		// input exist? double spent?
 		info := entry.info
@@ -369,6 +385,21 @@ func (view *AUTViewpoint) connectTransaction(tx *abeutil.TxAbe, blockHeight int3
 			}
 			*sauts = append(*sauts, stxo)
 		}
+		log.Infof(`Re-register AUT with name %s with following configuration:
+UpdateThreshold: %v -> %v,
+IssueThreshold: %v -> %v,
+PlannedTotalAmount: %v -> %v,
+ExpireHeight: %v -> %v,
+IssuerTokens: %v -> %v,
+UnitScale: %v -> %v`, string(autTransaction.AutName),
+			originInfo.UpdateThreshold, autTransaction.IssuerUpdateThreshold,
+			originInfo.IssueThreshold, autTransaction.IssueTokensThreshold,
+			originInfo.PlannedTotalAmount, autTransaction.PlannedTotalAmount,
+			originInfo.ExpireHeight, autTransaction.ExpireHeight,
+			originInfo.IssuerTokens, autTransaction.IssuerTokens,
+			originInfo.UnitScale, autTransaction.UnitScale,
+			//len(originInfo.RootCoinSet), autTransaction.OutAutRootCoinNum,
+		)
 
 	case *aut.TransferTx:
 		// check the sanity of transfer transaction
@@ -394,6 +425,7 @@ func (view *AUTViewpoint) connectTransaction(tx *abeutil.TxAbe, blockHeight int3
 				}
 				currentSauts = append(currentSauts, stxo)
 			}
+			totalInputValue += token.Amount()
 		}
 		if sauts != nil {
 			// Populate the stxo details using the utxo entry.
@@ -408,13 +440,18 @@ func (view *AUTViewpoint) connectTransaction(tx *abeutil.TxAbe, blockHeight int3
 				totalOutValue+autTransaction.TxoAUTValues[i] > info.PlannedTotalAmount {
 				return errors.New("an AUT transfer transaction try to overflow amount")
 			}
-			entry.Add(autTransaction.TxOuts[i], NewAUTCoin(autTransaction.Name, autTransaction.TxoAUTValues[i], 0, false))
+			totalOutValue += autTransaction.TxoAUTValues[i]
+			entry.Add(autTransaction.TxOuts[i], NewAUTCoin(autTransaction.AutName, autTransaction.TxoAUTValues[i], 0, false))
 		}
 		if totalInputValue != totalOutValue {
 			return errors.New("an AUT transfer transaction try to break-balance amount")
 		}
 
+		log.Infof(`Transfer for name %s (minted amount %d /planned total amount %d) %d AUT coins`, string(autTransaction.AutName),
+			info.MintedAmount, info.PlannedTotalAmount, totalOutValue)
+
 	case *aut.BurnTx:
+		info := entry.Info()
 		var currentSauts = (SpentAUTTokens)(make([]SpentAUTToken, 0, len(autTransaction.TxIns)))
 		burnedValues := uint64(0)
 		for i := 0; i < len(autTransaction.TxIns); i++ {
@@ -443,6 +480,8 @@ func (view *AUTViewpoint) connectTransaction(tx *abeutil.TxAbe, blockHeight int3
 			// Populate the stxo details using the utxo entry.
 			*sauts = append(*sauts, &currentSauts)
 		}
+		log.Infof(`Burn for name %s (minted amount %d /planned total amount %d) %d AUT coins`, string(autTransaction.AutName),
+			info.MintedAmount, info.PlannedTotalAmount, burnedValues)
 
 	default:
 		return errors.New("unreachable")

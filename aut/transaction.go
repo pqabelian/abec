@@ -151,6 +151,7 @@ func (info *Info) Clone() *Info {
 	copy(cloned.AutMemo, info.AutMemo)
 
 	for i := 0; i < len(info.IssuerTokens); i++ {
+		cloned.IssuerTokens[i] = make([]byte, len(info.IssuerTokens[i]))
 		copy(cloned.IssuerTokens[i][:], info.IssuerTokens[i][:])
 	}
 
@@ -433,7 +434,7 @@ var _ Transaction = &RegistrationTx{}
 // <TxoAUTValues> an array of n integer value each one for a an AUTCoin
 // [Memo]
 type MintTx struct {
-	Name             []byte
+	AutName          []byte
 	InAutRootCoinNum uint8
 	OutAutCoinNum    uint8
 	TxoAUTValues     []uint64
@@ -460,7 +461,7 @@ func (tx *MintTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	err = wire.WriteVarBytes(&b, 0, tx.Name)
+	err = wire.WriteVarBytes(&b, 0, tx.AutName)
 	if err != nil {
 		return nil, err
 	}
@@ -519,11 +520,11 @@ func (tx *MintTx) Deserialize(r io.Reader) error {
 		return ErrInValidAUTTx
 	}
 
-	tx.Name, err = wire.ReadVarBytes(r, 0, MaxNameLength, "name")
+	tx.AutName, err = wire.ReadVarBytes(r, 0, MaxNameLength, "name")
 	if err != nil {
 		return err
 	}
-	if len(tx.Name) == 0 {
+	if len(tx.AutName) == 0 {
 		return ErrInValidAUTTx
 	}
 
@@ -562,14 +563,14 @@ func (tx *MintTx) Deserialize(r io.Reader) error {
 		return err
 	}
 
-	if len(tx.Name) > MaxNameLength ||
+	if len(tx.AutName) > MaxNameLength ||
 		len(tx.Memo) > MaxMemoLength {
 		return errors.New("an AUT with invalid length of name")
 	}
 	return nil
 }
 func (tx *MintTx) AUTName() []byte {
-	return tx.Name
+	return tx.AutName
 }
 func (tx *MintTx) NumIns() int {
 	return len(tx.TxIns)
@@ -598,7 +599,7 @@ var _ Transaction = &MintTx{}
 // <IssueTokensThreshold>  An integer mint_t <= N
 // <Number of AUTRootCoins>  A number n  Explicitly specify the 0~(n-1)-th TXO of this transaction as RootCoins  All other TXOs are regarded as normal AbelianCoins.
 type ReRegistrationTx struct {
-	Name                  []byte
+	AutName               []byte
 	IssuerTokens          [][]byte
 	ExpireHeight          int32
 	IssuerUpdateThreshold uint8 // TODO confirm the range
@@ -630,7 +631,7 @@ func (tx *ReRegistrationTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	err = wire.WriteVarBytes(&b, 0, tx.Name)
+	err = wire.WriteVarBytes(&b, 0, tx.AutName)
 	if err != nil {
 		return nil, err
 	}
@@ -709,11 +710,11 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 		return ErrInValidAUTTx
 	}
 
-	tx.Name, err = wire.ReadVarBytes(r, 0, MaxNameLength, "name")
+	tx.AutName, err = wire.ReadVarBytes(r, 0, MaxNameLength, "name")
 	if err != nil {
 		return err
 	}
-	if len(tx.Name) == 0 {
+	if len(tx.AutName) == 0 {
 		return ErrInValidAUTTx
 	}
 
@@ -761,6 +762,12 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 	if err != nil {
 		return err
 	}
+	tx.InAutRootCoinNum = oneByte[0]
+
+	_, err = r.Read(oneByte)
+	if err != nil {
+		return err
+	}
 	tx.OutAutRootCoinNum = oneByte[0]
 
 	tx.Memo, err = wire.ReadVarBytes(r, 0, MaxMemoLength, "memo")
@@ -778,7 +785,7 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 		return err
 	}
 
-	if len(tx.Name) > MaxNameLength || len(tx.Memo) > MaxMemoLength {
+	if len(tx.AutName) > MaxNameLength || len(tx.Memo) > MaxMemoLength {
 		return errors.New("an AUT with invalid length of name")
 	}
 	if len(tx.IssuerTokens) > MaxIssuerNum ||
@@ -792,7 +799,7 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 	return nil
 }
 func (tx *ReRegistrationTx) AUTName() []byte {
-	return tx.Name
+	return tx.AutName
 }
 func (tx *ReRegistrationTx) NumIns() int {
 	return len(tx.TxIns)
@@ -816,7 +823,7 @@ var _ Transaction = &ReRegistrationTx{}
 // <TxoAUTValues> an array of n integer value, each one for a AUTCoin-TXO
 // [Memo]
 type TransferTx struct {
-	Name          []byte
+	AutName       []byte
 	InAutCoinNum  uint8
 	OutAutCoinNum uint8
 	TxoAUTValues  []uint64
@@ -843,7 +850,7 @@ func (tx *TransferTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	err = wire.WriteVarBytes(&b, 0, tx.Name)
+	err = wire.WriteVarBytes(&b, 0, tx.AutName)
 	if err != nil {
 		return nil, err
 	}
@@ -905,11 +912,11 @@ func (tx *TransferTx) Deserialize(r io.Reader) error {
 		return ErrInValidAUTTx
 	}
 
-	tx.Name, err = wire.ReadVarBytes(r, 0, MaxNameLength, "name")
+	tx.AutName, err = wire.ReadVarBytes(r, 0, MaxNameLength, "name")
 	if err != nil {
 		return err
 	}
-	if len(tx.Name) == 0 {
+	if len(tx.AutName) == 0 {
 		return ErrInValidAUTTx
 	}
 
@@ -953,7 +960,7 @@ func (tx *TransferTx) Deserialize(r io.Reader) error {
 	return nil
 }
 func (tx *TransferTx) AUTName() []byte {
-	return tx.Name
+	return tx.AutName
 }
 func (tx *TransferTx) NumIns() int {
 	return len(tx.TxIns)
@@ -980,7 +987,7 @@ var _ Transaction = &TransferTx{}
 // <Name>  a string
 // [Memo]
 type BurnTx struct {
-	Name         []byte
+	AutName      []byte
 	InAutCoinNum uint8
 	Memo         []byte
 
@@ -1007,7 +1014,7 @@ func (tx *BurnTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	err = wire.WriteVarBytes(&b, 0, tx.Name)
+	err = wire.WriteVarBytes(&b, 0, tx.AutName)
 	if err != nil {
 		return nil, err
 	}
@@ -1045,11 +1052,11 @@ func (tx *BurnTx) Deserialize(r io.Reader) error {
 		return ErrInValidAUTTx
 	}
 
-	tx.Name, err = wire.ReadVarBytes(r, 0, MaxNameLength, "name")
+	tx.AutName, err = wire.ReadVarBytes(r, 0, MaxNameLength, "name")
 	if err != nil {
 		return err
 	}
-	if len(tx.Name) == 0 {
+	if len(tx.AutName) == 0 {
 		return ErrInValidAUTTx
 	}
 
@@ -1070,7 +1077,7 @@ func (tx *BurnTx) Deserialize(r io.Reader) error {
 	return nil
 }
 func (tx *BurnTx) AUTName() []byte {
-	return tx.Name
+	return tx.AutName
 }
 func (tx *BurnTx) NumIns() int {
 	return len(tx.TxIns)
@@ -1279,10 +1286,17 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 		if len(existCoinAddresses) != len(autTransaction.IssuerTokens) {
 			return nil, fmt.Errorf("unmatched issuer tokens and outputs for aut root coin")
 		}
-		// compare claim issueTokens
+		// compare claimed issueTokens
 		for i := 0; i < len(autTransaction.IssuerTokens); i++ {
-			key := hex.EncodeToString(autTransaction.IssuerTokens[i])
-			if _, ok := existCoinAddresses[hex.EncodeToString(autTransaction.IssuerTokens[i])]; !ok {
+			privacyLevel, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(autTransaction.IssuerTokens[i])
+			if err != nil {
+				return nil, fmt.Errorf("fail to parse %d-th issuer token for aut from transaction %s", i, txHash)
+			}
+			if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
+				return nil, fmt.Errorf("specified %d-th issuer token is invalid for aut from transaction %s", i, txHash)
+			}
+			key := hex.EncodeToString(coinAddress)
+			if _, ok := existCoinAddresses[key]; !ok {
 				return nil, fmt.Errorf("the claimed issuer tokens claims duplicate issuer token or "+
 					"claims non-exist issuer tken in root coin from transaction %s", txHash)
 			}
@@ -1290,12 +1304,6 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 		}
 		if len(existCoinAddresses) != 0 {
 			return nil, fmt.Errorf("unmatched issuer tokens and outputs for aut root coin")
-		}
-
-		// configuration conflict
-		if autTransaction.OutAutRootCoinNum < autTransaction.IssueTokensThreshold ||
-			autTransaction.OutAutRootCoinNum < autTransaction.IssuerUpdateThreshold {
-			return nil, errors.New("an AUT with invalid threshold")
 		}
 	case *TransferTx:
 		// invalid configurations can exit early
