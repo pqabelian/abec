@@ -118,6 +118,7 @@ type BlockChain struct {
 	// FakePoWHeightScopes keeps the fake pow in height range
 	// which would ONLY set by non-mainnet
 	fakePoWHeightScopes []BlockHeightScope
+	workedHeightScope   []BlockHeightScope
 
 	db           database.DB
 	chainParams  *chaincfg.Params
@@ -215,7 +216,11 @@ type BlockChain struct {
 }
 
 func (b *BlockChain) FakePoWHeightScopes() []BlockHeightScope {
-	return b.fakePoWHeightScopes
+	res := make([]BlockHeightScope, 0, len(b.workedHeightScope)+len(b.fakePoWHeightScopes))
+	res = append(res, b.workedHeightScope...)
+	res = append(res, b.fakePoWHeightScopes...)
+
+	return res
 }
 
 // HaveBlock returns whether or not the chain instance has the block represented
