@@ -65,15 +65,18 @@ type TransactionType = uint8
 
 // todo(AUT): hardcode rather than iota
 const (
-	Registration   TransactionType = 0
-	Mint                           = 1
-	ReRegistration                 = 2
-	Transfer                       = 3
-	Burn                           = 4
+	Registration TransactionType = 0
+	// todo(Alice): ecah needs to specify the type.
+	Mint           = 1
+	ReRegistration = 2
+	Transfer       = 3
+	Burn           = 4
 )
 
 const CommonPrefixLength = 9
 const MaxNameLength = 20
+
+// todo(Alice): MaxAutMemoLength, MaxTxMemoLength
 const MaxMemoLength = 20
 const MaxUnitLength = 20
 const MaxMinUnitLength = 20
@@ -94,8 +97,10 @@ type Transaction interface {
 	Serialize() ([]byte, error)
 	Deserialize(io.Reader) error
 	AUTName() []byte
+	// ToDo(Alice): TxIns, TxOuts
 	Ins() []OutPoint
 	Outs() []OutPoint
+	// ToDo(Alice): ?? why have this? ValueAt(uint8)?
 	Value(uint8) uint64
 }
 
@@ -133,6 +138,7 @@ func (info *Info) Clone() *Info {
 		return nil
 	}
 
+	// ToDo(Alice): by the same order as the definition?
 	cloned := &Info{
 		AutName:            make([]byte, len(info.AutName)),
 		AutMemo:            make([]byte, len(info.AutMemo)),
@@ -190,6 +196,7 @@ func (info *Info) Clone() *Info {
 // todo: RegistrationTx has its TxMemo, where a user can specify.
 // and each AUT instance has its Memo (simialr to a description of the AutInstance).
 // Why this is dupliating the Info?
+// todo(Alice): for the common fields, using the same order as the definition, the particular fields
 type RegistrationTx struct {
 	AutName               []byte   // todo(AUT): AutName ?
 	IssuerTokens          [][]byte // todo(AUT): same as in Info
@@ -202,6 +209,7 @@ type RegistrationTx struct {
 	UnitName              []byte
 	MinUnitName           []byte
 	UnitScale             uint64
+	// todo(Alice): besides AutMemo to initialize the AUT, should have TxMemo to memo this transaction.
 
 	TxIns  []OutPoint
 	TxOuts []OutPoint
@@ -212,6 +220,8 @@ func (tx *RegistrationTx) Type() TransactionType {
 }
 
 func (tx *RegistrationTx) Serialize() ([]byte, error) {
+	// todo(Alice): initialize a space first
+	// w := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
 	var b bytes.Buffer
 	var err error
 
@@ -225,6 +235,7 @@ func (tx *RegistrationTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
+	// todo(Alice): why use wire package? Note that common.go has these functions
 	err = wire.WriteVarBytes(&b, 0, tx.AutName)
 	if err != nil {
 		return nil, err
@@ -291,6 +302,7 @@ func (tx *RegistrationTx) AUTName() []byte {
 	return tx.AutName
 }
 func (tx *RegistrationTx) Deserialize(r io.Reader) error {
+	// todo(Alice): use bytes.NewReader()?
 	var err error
 
 	commprefix := make([]byte, len(CommonPrefix))
@@ -426,6 +438,7 @@ func (tx *RegistrationTx) Value(uint8) uint64 {
 	return 0
 }
 
+// todo(Alice): Why have this?
 var _ Transaction = &RegistrationTx{}
 
 // Flag = ”AUTMint”
@@ -448,6 +461,9 @@ func (tx *MintTx) Type() TransactionType {
 	return Mint
 }
 func (tx *MintTx) Serialize() ([]byte, error) {
+	// todo(Alice): initialize a space first
+	// w := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+
 	var b bytes.Buffer
 	var err error
 
@@ -461,6 +477,7 @@ func (tx *MintTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
+	// todo(Alice): why use wire package?
 	err = wire.WriteVarBytes(&b, 0, tx.AutName)
 	if err != nil {
 		return nil, err
@@ -476,6 +493,7 @@ func (tx *MintTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
+	// todo(Alice): add a simple santiy-check on the consistence bewteen OutAutCoinNum and len(TxoAUTValues)
 	err = wire.WriteVarInt(&b, 0, uint64(len(tx.TxoAUTValues)))
 	if err != nil {
 		return nil, err
@@ -501,6 +519,7 @@ func (tx *MintTx) Serialize() ([]byte, error) {
 }
 func (tx *MintTx) Deserialize(r io.Reader) error {
 	var err error
+	// todo(Alice): use bytes.NewReader()?
 
 	commprefix := make([]byte, len(CommonPrefix))
 	_, err = r.Read(commprefix)
@@ -563,6 +582,7 @@ func (tx *MintTx) Deserialize(r io.Reader) error {
 		return err
 	}
 
+	// todo(Alice): MaxAutTxMemo
 	if len(tx.AutName) > MaxNameLength ||
 		len(tx.Memo) > MaxMemoLength {
 		return errors.New("an AUT with invalid length of name")
@@ -572,6 +592,8 @@ func (tx *MintTx) Deserialize(r io.Reader) error {
 func (tx *MintTx) AUTName() []byte {
 	return tx.AutName
 }
+
+// todo(Alice): remove this?
 func (tx *MintTx) NumIns() int {
 	return len(tx.TxIns)
 }
@@ -599,6 +621,8 @@ var _ Transaction = &MintTx{}
 // <IssueTokensThreshold>  An integer mint_t <= N
 // <Number of AUTRootCoins>  A number n  Explicitly specify the 0~(n-1)-th TXO of this transaction as RootCoins  All other TXOs are regarded as normal AbelianCoins.
 type ReRegistrationTx struct {
+	// todo(Alice): for the common fields with RegistrationTx, use the same order; then particular fields
+	// AutMemo, and AutTxMemo
 	AutName               []byte
 	IssuerTokens          [][]byte
 	ExpireHeight          int32
@@ -618,6 +642,9 @@ func (tx *ReRegistrationTx) Type() TransactionType {
 	return ReRegistration
 }
 func (tx *ReRegistrationTx) Serialize() ([]byte, error) {
+	// todo(Alice): initialize a space first
+	// w := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+
 	var b bytes.Buffer
 	var err error
 
@@ -631,6 +658,7 @@ func (tx *ReRegistrationTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
+	// todo(Alice): why use wire.
 	err = wire.WriteVarBytes(&b, 0, tx.AutName)
 	if err != nil {
 		return nil, err
@@ -692,6 +720,8 @@ func (tx *ReRegistrationTx) Serialize() ([]byte, error) {
 func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 	var err error
 
+	// todo(Alice): use bytes.NewReader()?
+
 	commprefix := make([]byte, len(CommonPrefix))
 	_, err = r.Read(commprefix)
 	if err != nil {
@@ -734,6 +764,7 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 		if _, ok := existIssuerTokens[hex.EncodeToString(tx.IssuerTokens[i])]; ok {
 			return ErrInValidAUTTx
 		}
+		// todo(Alice): did not put into existIssuerTokens? as existIssuerTokens is used to detect repeated tokens
 	}
 
 	var expireHeight uint64
@@ -788,11 +819,15 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 	if len(tx.AutName) > MaxNameLength || len(tx.Memo) > MaxMemoLength {
 		return errors.New("an AUT with invalid length of name")
 	}
+	// todo(Alice): AutMemo, AutTxMemo
+
 	if len(tx.IssuerTokens) > MaxIssuerNum ||
 		int(tx.IssueTokensThreshold) > len(tx.IssuerTokens) ||
 		int(tx.IssuerUpdateThreshold) > len(tx.IssuerTokens) {
 		return errors.New("an AUT with invalid threshold")
 	}
+
+	// todo(Alice): is this check necessary?
 	if tx.UnitScale > tx.PlannedTotalAmount {
 		return errors.New("an AUT with invalid scale")
 	}
@@ -801,6 +836,8 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 func (tx *ReRegistrationTx) AUTName() []byte {
 	return tx.AutName
 }
+
+// todo(Alice): remove this?
 func (tx *ReRegistrationTx) NumIns() int {
 	return len(tx.TxIns)
 }
@@ -827,7 +864,7 @@ type TransferTx struct {
 	InAutCoinNum  uint8
 	OutAutCoinNum uint8
 	TxoAUTValues  []uint64
-	Memo          []byte
+	Memo          []byte // todo(Alice): how about TxMemo?
 
 	TxIns  []OutPoint
 	TxOuts []OutPoint
@@ -837,6 +874,9 @@ func (tx *TransferTx) Type() TransactionType {
 	return Transfer
 }
 func (tx *TransferTx) Serialize() ([]byte, error) {
+	// todo(Alice): initialize a space first
+	// w := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+
 	var b bytes.Buffer
 	var err error
 
@@ -884,6 +924,7 @@ func (tx *TransferTx) Serialize() ([]byte, error) {
 		}
 	}
 
+	// todo(Alice): why use wire?
 	err = wire.WriteVarBytes(&b, 0, tx.Memo)
 	if err != nil {
 		return nil, err
@@ -893,6 +934,8 @@ func (tx *TransferTx) Serialize() ([]byte, error) {
 }
 func (tx *TransferTx) Deserialize(r io.Reader) error {
 	var err error
+
+	// todo(Alice): use bytes.NewReader()? which supports ReadByte
 
 	commprefix := make([]byte, len(CommonPrefix))
 	_, err = r.Read(commprefix)
@@ -989,7 +1032,7 @@ var _ Transaction = &TransferTx{}
 type BurnTx struct {
 	AutName      []byte
 	InAutCoinNum uint8
-	Memo         []byte
+	Memo         []byte // 	// todo(Alice): how about TxMemo?
 
 	TxIns  []OutPoint
 	TxOuts []OutPoint
@@ -1001,6 +1044,9 @@ func (tx *BurnTx) Type() TransactionType {
 	return Burn
 }
 func (tx *BurnTx) Serialize() ([]byte, error) {
+	// todo(Alice): initialize a space first
+	// w := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+
 	var b bytes.Buffer
 	var err error
 
@@ -1014,6 +1060,7 @@ func (tx *BurnTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
+	// todo(Alice): why use wire
 	err = wire.WriteVarBytes(&b, 0, tx.AutName)
 	if err != nil {
 		return nil, err
@@ -1033,7 +1080,7 @@ func (tx *BurnTx) Serialize() ([]byte, error) {
 }
 func (tx *BurnTx) Deserialize(r io.Reader) error {
 	var err error
-
+	// todo(Alice): use bytes.NewReader()? which supports ReadByte
 	commprefix := make([]byte, len(CommonPrefix))
 	_, err = r.Read(commprefix)
 	if err != nil {
@@ -1079,6 +1126,8 @@ func (tx *BurnTx) Deserialize(r io.Reader) error {
 func (tx *BurnTx) AUTName() []byte {
 	return tx.AutName
 }
+
+// todo(Alice): remove this?
 func (tx *BurnTx) NumIns() int {
 	return len(tx.TxIns)
 }
@@ -1151,6 +1200,7 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 		autTransaction.TxOuts = make([]OutPoint, 0, autTransaction.OutAutRootCoinNum)
 		txHash := tx.TxHash()
 
+		//	todo(Alice): should not have coinAddress at this layer, how to match the token and actual coin address
 		existCoinAddresses := map[string]struct{}{}
 		for i := 0; i < int(autTransaction.OutAutRootCoinNum); i++ {
 			txOut := tx.TxOuts[i]
