@@ -654,7 +654,7 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 		return err
 	}
 	if txoNum > uint64(txOutputMaxNum) {
-		str := fmt.Sprintf("The numner of inputs exceeds the allowd max number [txInNum %d, max %d]", txoNum,
+		str := fmt.Sprintf("The numner of inputs exceeds the allowd max number [txoNum %d, max %d]", txoNum,
 			txOutputMaxNum)
 		return messageError("MsgTx.BtcDecode", str)
 	}
@@ -822,9 +822,9 @@ func (msg *MsgTxAbe) SerializeSizeFull() int {
 	return n
 }
 
-// PrecomputeTrTxConSizeMLP computec the size according to the Serialize function, and based on the crypto-scheme.
+// PrecomputeTrTxConSizeMLP computes the size according to the Serialize function, and based on the crypto-scheme.
 // The result is just appropriate, which will be used to compute transaction fee.
-// todo: review
+// reviewed on 2024.02.28 by Alice
 func PrecomputeTrTxConSizeMLP(txVersion uint32, inputRingVersions []uint32,
 	inputRingSizes []uint8, coinAddressListPayTo [][]byte, txMemoLen uint32) (uint32, error) {
 
@@ -886,11 +886,8 @@ func PrecomputeTrTxConSizeMLP(txVersion uint32, inputRingVersions []uint32,
 
 }
 
-/*
-*
-Compute the size according to the Serialize function, and based on the crypto-scheme
-The result is just appropriate, will be used to compute transaction fee
-*/
+// PrecomputeTrTxConSize Compute the size according to the Serialize function, and based on the crypto-scheme.
+// The result is just appropriate, will be used to compute transaction fee.
 func PrecomputeTrTxConSize(txVersion uint32, inputRingVersions []uint32, inputRingSizes []int, outputTxoNum uint8, txMemoLen uint32) (uint32, error) {
 	//	Version 4 bytes
 	n := uint32(4)
@@ -965,8 +962,8 @@ func (msg *MsgTxAbe) SerializeFull(w io.Writer) error {
 // encoded transaction is the same in both instances, but there is a distinct
 // difference and separating the two allows the API to be flexible enough to
 // deal with changes.
-// todo: re-write the serialize/deserialze, even they are the same as encode/decode
-// todo: serialize/deserialze should call the serialize of the components
+// todo: re-write the serialize/deserialize, even they are the same as encode/decode
+// todo: serialize/deserialize should call the serialize of the components
 func (msg *MsgTxAbe) Deserialize(r io.Reader) error {
 	return msg.BtcDecode(r, 0, WitnessEncoding)
 }
@@ -1271,10 +1268,10 @@ func (txoRing *TxoRing) Deserialize(r io.Reader) error {
 		return err
 	}
 	if ringSize > uint64(expectedRingSize) {
-		return errTxoRingDeserialize("The TxoRing to be deseralized has a ring size greater than the allowed max value")
+		return errTxoRingDeserialize("The TxoRing to be deserialized has a ring size greater than the allowed max value")
 	}
 	if ringSize != uint64(len(txoRing.OutPointRing.OutPoints)) {
-		return errTxoRingDeserialize("The TxoRing to be deseralized has a ring size does not match the size in OutPointRing")
+		return errTxoRingDeserialize("The TxoRing to be deserialized has a ring size does not match the size in OutPointRing")
 	}
 
 	txoRing.TxOuts = make([]*TxOutAbe, ringSize)
