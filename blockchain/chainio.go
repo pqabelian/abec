@@ -338,8 +338,8 @@ func (spentTxo *SpentTxOutAbe) Deserialize(r io.Reader) error {
 
 type SpentAUTType int
 
-const UpdateInfo SpentAUTType = 0
 const ConsumeToken SpentAUTType = 0
+const UpdateInfo SpentAUTType = 1
 
 type SpentAUT interface {
 	Type() SpentAUTType
@@ -492,12 +492,6 @@ func spentAUTSerializeSize(stxo SpentAUT) int {
 		size += serializeSizeVLQ(uint64(len(*updated)))
 		for _, token := range *updated {
 			size += serializeSizeVLQ(spentAUTHeaderCode(&token))
-			if token.Height > 0 {
-				// The legacy v1 spend journal format conditionally tracked the
-				// containing transaction version when the height was non-zero,
-				// so this is required for backwards compat.
-				size += serializeSizeVLQ(0)
-			}
 			size += compressedAUTSize(token.Amount)
 		}
 	case *UpdateAUTInfo:
@@ -553,12 +547,6 @@ func putSpentAUT(target []byte, stxo SpentAUT) int {
 			token := (*updated)[i]
 			headerCode := spentAUTHeaderCode(&token)
 			offset += putVLQ(target[offset:], headerCode)
-			if token.Height > 0 {
-				// The legacy v1 spend journal format conditionally tracked the
-				// containing transaction version when the height was non-zero,
-				// so this is required for backwards compat.
-				offset += putVLQ(target[offset:], 0)
-			}
 			offset += putCompressedAUT(target[offset:], token.Amount)
 		}
 	case *UpdateAUTInfo:
@@ -675,10 +663,10 @@ func decodeSpentTxOut(serialized []byte, stxo *SpentTxOut) (int, error) {
 	return offset, nil
 }
 
-func decodeSpentAUT(serialized []byte, saut SpentAUT) (int, error) {
+func decodeSpentAUT(serialized []byte) (SpentAUT, int, error) {
 	// Ensure there are bytes to decode.
 	if len(serialized) == 0 {
-		return 0, errDeserialize("no serialized bytes")
+		return nil, 0, errDeserialize("no serialized bytes")
 	}
 	stxoType, offset := deserializeVLQ(serialized)
 	switch stxoType {
@@ -686,11 +674,11 @@ func decodeSpentAUT(serialized []byte, saut SpentAUT) (int, error) {
 		numSpendAUTToken, n := deserializeVLQ(serialized[offset:])
 		offset += n
 		if offset >= len(serialized) {
-			return offset, errDeserialize("unexpected end of data after " +
+			return nil, offset, errDeserialize("unexpected end of data after " +
 				"header code")
 		}
 
-		res := (SpentAUTTokens)(make([]SpentAUTToken, 0, numSpendAUTToken))
+		res := (SpentAUTTokens)(make([]SpentAUTToken, numSpendAUTToken))
 		for i := uint64(0); i < numSpendAUTToken; i++ {
 			// Decode the header code.
 			//
@@ -700,7 +688,7 @@ func decodeSpentAUT(serialized []byte, saut SpentAUT) (int, error) {
 			code, n = deserializeVLQ(serialized[offset:])
 			offset += n
 			if offset >= len(serialized) {
-				return offset, errDeserialize("unexpected end of data after " +
+				return nil, offset, errDeserialize("unexpected end of data after " +
 					"header code")
 			}
 			res[i].IsRootCoin = code&0x01 != 0
@@ -711,14 +699,13 @@ func decodeSpentAUT(serialized []byte, saut SpentAUT) (int, error) {
 			offset += bytesRead
 			res[i].Amount = decompressTxOutAmount(compressedAmount)
 		}
-		saut = &res
-		return offset, nil
+		return &res, offset, nil
 	case 1:
 		res := UpdateAUTInfo{}
 		code, n := deserializeVLQ(serialized[offset:])
 		offset += n
 		if offset >= len(serialized) {
-			return offset, errDeserialize("unexpected end of data after " +
+			return nil, offset, errDeserialize("unexpected end of data after " +
 				"header code")
 		}
 		res.IsReRegistration = code&0x01 != 0
@@ -733,13 +720,13 @@ func decodeSpentAUT(serialized []byte, saut SpentAUT) (int, error) {
 			sizeOfInfo, bytesRead := deserializeVLQ(serialized[offset:])
 			offset += bytesRead
 			if offset >= len(serialized) {
-				return offset, errDeserialize("unexpected end of data " +
+				return nil, offset, errDeserialize("unexpected end of data " +
 					"after reserved")
 			}
 
 			res.Before, err = deserializeAUTInfo(serialized[offset : offset+int(sizeOfInfo)])
 			if err != nil {
-				return offset, errDeserialize("unexpected end of data " +
+				return nil, offset, errDeserialize("unexpected end of data " +
 					"after reserved")
 			}
 			offset += int(sizeOfInfo)
@@ -747,13 +734,13 @@ func decodeSpentAUT(serialized []byte, saut SpentAUT) (int, error) {
 			numRootCoin, bytesRead := deserializeVLQ(serialized[offset:])
 			offset += bytesRead
 			if offset >= len(serialized) {
-				return offset, errDeserialize("unexpected end of data " +
+				return nil, offset, errDeserialize("unexpected end of data " +
 					"after reserved")
 			}
 			res.Before.RootCoinSet = make(map[aut.OutPoint]struct{}, numRootCoin)
 			for i := 0; i < int(numRootCoin); i++ {
 				point := aut.OutPoint{}
-				copy(serialized[offset:], point.TxHash[:])
+				copy(point.TxHash[:], serialized[offset:])
 				offset += chainhash.HashSize
 				point.Index = serialized[offset]
 				offset += 1
@@ -769,12 +756,12 @@ func decodeSpentAUT(serialized []byte, saut SpentAUT) (int, error) {
 			sizeOfInfo, bytesRead := deserializeVLQ(serialized[offset:])
 			offset += bytesRead
 			if offset >= len(serialized) {
-				return offset, errDeserialize("unexpected end of data " +
+				return nil, offset, errDeserialize("unexpected end of data " +
 					"after reserved")
 			}
 			res.After, err = deserializeAUTInfo(serialized[offset : offset+int(sizeOfInfo)])
 			if err != nil {
-				return offset, errDeserialize("unexpected end of data " +
+				return nil, offset, errDeserialize("unexpected end of data " +
 					"after reserved")
 			}
 			offset += int(sizeOfInfo)
@@ -782,27 +769,24 @@ func decodeSpentAUT(serialized []byte, saut SpentAUT) (int, error) {
 			numRootCoin, bytesRead := deserializeVLQ(serialized[offset:])
 			offset += bytesRead
 			if offset >= len(serialized) {
-				return offset, errDeserialize("unexpected end of data " +
+				return nil, offset, errDeserialize("unexpected end of data " +
 					"after reserved")
 			}
 			res.After.RootCoinSet = make(map[aut.OutPoint]struct{}, numRootCoin)
 			for i := 0; i < int(numRootCoin); i++ {
 				point := aut.OutPoint{}
-				copy(serialized[offset:], point.TxHash[:])
+				copy(point.TxHash[:], serialized[offset:])
 				offset += chainhash.HashSize
 				point.Index = serialized[offset]
 				offset += 1
 				res.After.RootCoinSet[point] = struct{}{}
 			}
 		}
-		saut = &res
+		return &res, offset, nil
 
 	default:
 		panic("unreachable")
 	}
-
-	return offset, nil
-
 }
 
 // deserializeSpendJournalEntry decodes the passed serialized byte slice into a
@@ -937,8 +921,9 @@ func deserializeSpendJournalEntryAUT(serialized []byte, txns []aut.Transaction) 
 	offset := 0
 	stxos := make([]SpentAUT, numStxos)
 	for txIdx := len(txns) - 1; txIdx > -1; txIdx-- {
-		n, err := decodeSpentAUT(serialized[offset:], stxos[stxoIdx])
+		stxo, n, err := decodeSpentAUT(serialized[offset:])
 		offset += n
+		stxos[txIdx] = stxo
 		if err != nil {
 			return nil, errDeserialize(fmt.Sprintf("unable "+
 				"to decode saut for %v", err))

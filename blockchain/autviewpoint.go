@@ -527,27 +527,62 @@ func (view *AUTViewpoint) disconnectTransactions(db database.DB, block *abeutil.
 	stxoIdx := len(sauts) - 1
 	autTransactions := block.AUTTransactions()
 	for txIdx := len(autTransactions) - 1; txIdx > -1; txIdx-- {
-		autNameKey := hex.EncodeToString(autTransactions[txIdx].AUTName())
+		autTransaction := autTransactions[txIdx]
+		autName := autTransaction.AUTName()
+		autNameKey := hex.EncodeToString(autName)
+
+		if view.entries[autNameKey] == nil {
+			err := view.fetchAUTMain(db, nil, autName)
+			if err != nil {
+				return err
+			}
+		}
+		outpoints := map[aut.OutPoint]struct{}{}
+		autTxType := autTransaction.Type()
+		if autTxType == aut.Registration { // consume nothing
+
+		} else if autTxType == aut.Mint { // consume root coin, and generated coins
+			for _, point := range autTransaction.Outs() {
+				outpoints[point] = struct{}{}
+			}
+		} else if autTxType == aut.ReRegistration { // consume root coin, and generate root coin
+
+		} else if autTxType == aut.Transfer { // consume coin, and generate coin
+			for _, point := range autTransaction.Outs() {
+				outpoints[point] = struct{}{}
+			}
+			for _, point := range autTransaction.Ins() {
+				outpoints[point] = struct{}{}
+			}
+		} else if autTxType == aut.Burn { // consume coin
+			for _, point := range autTransaction.Ins() {
+				outpoints[point] = struct{}{}
+			}
+		} else {
+			return errors.New("non-supported aut transaction type")
+		}
+		if len(outpoints) != 0 {
+			err := view.fetchAUTMain(db, outpoints, autName)
+			if err != nil {
+				return err
+			}
+		}
 		entry := view.entries[autNameKey]
-		switch autTransaction := autTransactions[txIdx].(type) {
+
+		switch autTx := autTransaction.(type) {
 		case *aut.RegistrationTx:
 			infoToDel[autNameKey] = struct{}{}
 			stxoIdx -= 1
 		case *aut.MintTx:
 			// Restore inputs
-			for _, in := range autTransaction.TxIns {
+			for _, in := range autTx.TxIns {
 				entry.info.RootCoinSet[in] = struct{}{}
 			}
 			// Remove outputs
 			totalMintedAmount := uint64(0)
-			for i := 0; i < len(autTransaction.TxoAUTValues); i++ {
-				if totalMintedAmount+autTransaction.TxoAUTValues[i] < totalMintedAmount || // overflow
-					totalMintedAmount+autTransaction.TxoAUTValues[i] < autTransaction.TxoAUTValues[i] || // overflow
-					totalMintedAmount+autTransaction.TxoAUTValues[i] > entry.info.PlannedTotalAmount {
-					return errors.New("an AUT mint transaction try to mint amount exceed planned")
-				}
-				totalMintedAmount += autTransaction.TxoAUTValues[i]
-				entry.coins[autTransaction.TxOuts[i]].Spend()
+			for i := 0; i < len(autTx.TxoAUTValues); i++ {
+				totalMintedAmount += autTx.TxoAUTValues[i]
+				entry.coins[autTx.TxOuts[i]].Spend()
 			}
 			entry.info.MintedAmount -= totalMintedAmount
 			stxoIdx -= 1
@@ -559,10 +594,10 @@ func (view *AUTViewpoint) disconnectTransactions(db database.DB, block *abeutil.
 		case *aut.TransferTx:
 			consumedAutCoins := sauts[stxoIdx].(*SpentAUTTokens)
 			for i, coin := range *consumedAutCoins {
-				entry.coins[autTransaction.TxIns[i]] = NewAUTCoin(autTransactions[txIdx].AUTName(), coin.Amount, coin.Height, false)
+				entry.coins[autTx.TxIns[i]] = NewAUTCoin(autTx.AUTName(), coin.Amount, coin.Height, false)
 			}
-			for i := 0; i < len(autTransaction.TxOuts); i++ {
-				entry.coins[autTransaction.TxOuts[i]].Spend()
+			for i := 0; i < len(autTx.TxOuts); i++ {
+				entry.coins[autTx.TxOuts[i]].Spend()
 			}
 			stxoIdx -= 1
 
@@ -570,7 +605,7 @@ func (view *AUTViewpoint) disconnectTransactions(db database.DB, block *abeutil.
 			consumedAutCoins := sauts[stxoIdx].(*SpentAUTTokens)
 			burnedAmount := uint64(0)
 			for i, coin := range *consumedAutCoins {
-				entry.coins[autTransaction.TxIns[i]] = NewAUTCoin(autTransactions[txIdx].AUTName(), coin.Amount, coin.Height, false)
+				entry.coins[autTx.TxIns[i]] = NewAUTCoin(autTx.AUTName(), coin.Amount, coin.Height, false)
 				burnedAmount += coin.Amount
 			}
 			entry.info.MintedAmount += burnedAmount
