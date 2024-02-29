@@ -114,6 +114,59 @@ func findCandidates(chain *blockchain.BlockChain, latestHash *chainhash.Hash) ([
 	return candidates, nil
 }
 
+func CheckCandidates(chain *blockchain.BlockChain, height int32) (bool, error) {
+	// Start with the latest block of the main chain.
+	blockHash, err := chain.BlockHashByHeight(height)
+	if err != nil {
+		return false, err
+	}
+
+	block, err := chain.BlockByHashAbe(blockHash)
+	if err != nil {
+		return false, err
+	}
+
+	// Get the latest known checkpoint.
+	latestCheckpoint := chain.LatestCheckpoint()
+	if latestCheckpoint == nil {
+		// Set the latest checkpoint to the genesis block if there isn't
+		// already one.
+		latestCheckpoint = &chaincfg.Checkpoint{
+			Hash:   activeNetParams.GenesisHash,
+			Height: 0,
+		}
+	}
+
+	// The latest known block must be at least the last known checkpoint
+	// plus required checkpoint confirmations.
+	checkpointConfirmations := int32(blockchain.CheckpointConfirmations)
+	requiredHeight := latestCheckpoint.Height + checkpointConfirmations
+	if block.Height() < requiredHeight {
+		return false, fmt.Errorf("the block database is only at height "+
+			"%d which is less than the latest checkpoint height "+
+			"of %d plus required confirmations of %d",
+			block.Height(), latestCheckpoint.Height,
+			checkpointConfirmations)
+	}
+
+	// For the first checkpoint, the required height is any block after the
+	// genesis block, so long as the chain has at least the required number
+	// of confirmations (which is enforced above).
+	if len(activeNetParams.Checkpoints) == 0 {
+		requiredHeight = 1
+	}
+
+	// Indeterminate progress setup.
+	fmt.Print("Checking for candidates")
+	// Determine if this block is a checkpoint candidate.
+	isCandidate, err := chain.IsCheckpointCandidateAbe(block)
+	if err != nil {
+		return false, err
+	}
+
+	return isCandidate, nil
+}
+
 // showCandidate display a checkpoint candidate using and output format
 // determined by the configuration parameters.  The Go syntax output
 // uses the format the chain code expects for checkpoints added to the list.
@@ -154,6 +207,17 @@ func main() {
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to initialize chain: %v\n", err)
+		return
+	}
+
+	if len(cfg.Heights) != 0 {
+		for i := 0; i < len(cfg.Heights); i++ {
+			isCandidate, err := CheckCandidates(chain, cfg.Heights[i])
+			if err != nil {
+				panic(err)
+			}
+			fmt.Printf("height = %d, %t\n", cfg.Heights[i], isCandidate)
+		}
 		return
 	}
 
