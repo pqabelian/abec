@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/mining/externalminer"
 	"github.com/abesuite/abec/witnessmgr"
@@ -72,6 +73,7 @@ var (
 	txmpLog = backendLog.Logger("TXMP")
 	ethhLog = backendLog.Logger("ETHH")
 	wmgrLog = backendLog.Logger("WMGR")
+	utilLog = backendLog.Logger("UTIL")
 )
 
 // Initialize package-global logger variables.
@@ -90,6 +92,7 @@ func init() {
 	mempool.UseLogger(txmpLog)
 	ethash.UseLogger(ethhLog)
 	witnessmgr.UseLogger(wmgrLog)
+	abeutil.UseLogger(utilLog)
 }
 
 // subsystemLoggers maps each subsystem identifier to its associated logger.
@@ -111,6 +114,7 @@ var subsystemLoggers = map[string]abelog.Logger{
 	"TXMP": txmpLog,
 	"ETHH": ethhLog,
 	"WMGR": wmgrLog,
+	"UTIL": utilLog,
 }
 
 // initLogRotator initializes the logging rotater to write logs to logFile and
