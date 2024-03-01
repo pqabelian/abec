@@ -480,11 +480,11 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *bl
 		}
 	}
 	// AUT
-	autTx, isAUTTx := tx.AUTTransaction()
-	if isAUTTx {
-		if autTx == nil {
-			return aut.ErrInValidAUTTx
-		}
+	autTx, err := tx.AUTTransaction()
+	if err != nil {
+		return err
+	}
+	if autTx != nil {
 		autNameKey := hex.EncodeToString(autTx.AUTName())
 		entries := autView.Entries()
 		entry, exist := entries[autNameKey]
@@ -903,12 +903,14 @@ mempoolLoop:
 			continue
 		}
 
-		err = blockchain.CheckTransactionInputsAUT(tx, nextBlockHeight, utxoRings, autView, g.chainParams)
-		if err != nil {
-			log.Debugf("Skipping tx %s because it "+
-				"is a invalid AUT transaction: %v",
-				tx.Hash(), err)
-			continue
+		if autView != nil {
+			err = blockchain.CheckTransactionInputsAUT(tx, nextBlockHeight, utxoRings, autView, g.chainParams)
+			if err != nil {
+				log.Debugf("Skipping tx %s because it "+
+					"contains an invalid AUT transaction: %v",
+					tx.Hash(), err)
+				continue
+			}
 		}
 
 		prioItem := &txPrioItemAbe{tx: tx}

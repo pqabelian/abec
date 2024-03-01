@@ -332,6 +332,9 @@ func (b *BlockAbe) Transactions() []*TxAbe {
 	return b.transactions
 }
 
+// AUTTransactions returns the AutTransaction hosted by the transaction in the block.
+// If they have been parsed, just return, otherwise, parse and return.
+// refactored by Alice on 2024.03.01
 func (b *BlockAbe) AUTTransactions() []aut.Transaction {
 	// Return transactions if they have ALL already been generated.  This
 	// flag is necessary because the wrapped transactions are lazily
@@ -347,16 +350,21 @@ func (b *BlockAbe) AUTTransactions() []aut.Transaction {
 
 	// Generate and cache the wrapped autTransactions for all that haven't
 	// already been done.
-	for _, txAbe := range b.Transactions() {
+	for i, txAbe := range b.Transactions() {
 		isCb, err := txAbe.IsCoinBase()
 		if err != nil {
+			//	this should not happen
+			log.Warnf("AUTTransactions: error happens when calling IsCoinBase() on the %d-th transaction of the block: %v", i, err)
 			continue
 		}
 		if isCb {
 			continue
 		}
-		autTx, isAUTTx := txAbe.AUTTransaction()
-		if !isAUTTx {
+
+		autTx, err := txAbe.AUTTransaction()
+		if err != nil {
+			//	this should not happen
+			log.Warnf("AUTTransactions: error happens when getting AutTransaction from the %d-th transaction (%s) of the block: %v", i, txAbe.Hash(), err)
 			continue
 		}
 		if autTx == nil {

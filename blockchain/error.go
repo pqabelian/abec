@@ -234,6 +234,8 @@ const (
 	ErrWitnessMissing
 
 	ErrTxVersionForAUT
+
+	ErrAUTBadForm
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
@@ -284,6 +286,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrInvalidAncestorBlock:              "ErrInvalidAncestorBlock",
 	ErrPrevBlockNotBest:                  "ErrPrevBlockNotBest",
 	ErrWitnessMissing:                    "ErrWitnessMissing",
+	ErrAUTBadForm:                        "ErrAUTBadForm",
 }
 
 // String returns the ErrorCode as a human-readable name.

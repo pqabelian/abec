@@ -751,12 +751,17 @@ func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 		os.Remove(name)
 		atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
 	}
-	autTx, isAUTTx := tx.AUTTransaction()
-	if !isAUTTx {
+
+	autTx, err := tx.AUTTransaction()
+	if err != nil {
+		// This should not happen, since mempool should accept tx which has error on extracting AutTransaction.
+		log.Warnf("removeTransactionAbe: error happens when extracting AutTransaction from Tx %s: %v", tx.Hash(), err)
 		return
 	}
-	if autTx.Type() == aut.Registration {
-		delete(mp.registeredAUTName, hex.EncodeToString(autTx.AUTName()))
+	if autTx != nil {
+		if autTx.Type() == aut.Registration {
+			delete(mp.registeredAUTName, hex.EncodeToString(autTx.AUTName()))
+		}
 	}
 }
 
@@ -894,8 +899,12 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint,
 		mp.cfg.FeeEstimator.ObserveTransaction(txD)
 	}
 
-	autTx, isAUTTx := tx.AUTTransaction()
-	if isAUTTx && autTx != nil {
+	autTx, err := tx.AUTTransaction()
+	if err != nil {
+		// This should not happen, since before addTransactionAbe, the transaction should have been checked
+		log.Warnf("addTransactionAbe: fail to add Tx %s to mempool, since error happens when extracting AutTransaction: %v", tx.Hash(), err)
+	}
+	if autTx != nil {
 		switch autTransaction := autTx.(type) {
 		case *aut.RegistrationTx:
 			if mp.expiredHeightAUT[autTransaction.ExpireHeight] == nil {
@@ -1824,12 +1833,12 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 		return nil, nil, err
 	}
 
-	autTx, isAUTTx := tx.AUTTransaction()
-	if isAUTTx {
-		if autTx == nil {
-			str := fmt.Sprintf("transaction %v has invalid AUT info", txHash)
-			return nil, nil, txRuleError(wire.RejectInvalid, str)
-		}
+	autTx, err := tx.AUTTransaction()
+	if err != nil {
+		str := fmt.Sprintf("transaction %v has invalid AUT info", txHash)
+		return nil, nil, txRuleError(wire.RejectAutBadForm, str)
+	}
+	if autTx != nil {
 		// check whether the mempool has the AUT transaction would register a AUT with the same name
 		if autTx.Type() == aut.Registration {
 			if registerAUTTxHash, exist := mp.registeredAUTName[hex.EncodeToString(autTx.AUTName())]; exist {

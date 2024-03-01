@@ -2,7 +2,6 @@ package abeutil
 
 import (
 	"bytes"
-	"errors"
 	"github.com/abesuite/abec/aut"
 	"io"
 
@@ -58,29 +57,42 @@ func (tx *TxAbe) MsgTx() *wire.MsgTxAbe {
 // when failed:
 // - if the origin transaction can not be an AUT transaction, set the fields autTx to nil, and isAUTTx to false
 // - if the origin transaction can be an AUT transaction but conflict with sanity, set the fields autTx to nil, and isAUTTx to true
-func (tx *TxAbe) AUTTransaction() (aut.Transaction, bool) {
+// refactored by Alice, on 2024.02.29, to return err if there is
+func (tx *TxAbe) AUTTransaction() (aut.Transaction, error) {
 	if tx.autTxDone {
-		return tx.autTx, tx.isAUTTx
+		return tx.autTx, nil
 	}
 	tx.autTxDone = true
 
 	autTx, err := aut.ExtractAutTransaction(tx.MsgTx())
 	if err != nil {
-		if errors.Is(err, aut.ErrNonAutTx) {
-			tx.isAUTTx = false
-			tx.autTx = nil
-			return nil, false
-		}
-		if errors.Is(err, aut.ErrInValidAUTTx) {
-			tx.isAUTTx = true
-			tx.autTx = nil
-			return nil, true
-		}
-		return nil, true
+		//if errors.Is(err, aut.ErrNonAutTx) {
+		//	tx.isAUTTx = false
+		//	tx.autTx = nil
+		//	return nil, false
+		//}
+		//if errors.Is(err, aut.ErrInValidAUTTx) {
+		//	tx.isAUTTx = true
+		//	tx.autTx = nil
+		//	return nil, true
+		//}
+		//return nil, true
+
+		return nil, err
 	}
-	tx.autTx = autTx
-	tx.isAUTTx = autTx != nil
-	return tx.autTx, tx.isAUTTx
+
+	//tx.autTx = autTx
+	//tx.isAUTTx = autTx != nil
+
+	if autTx != nil {
+		tx.autTx = autTx
+		tx.isAUTTx = true
+	} else {
+		tx.autTx = nil
+		tx.isAUTTx = false
+	}
+
+	return tx.autTx, nil
 }
 
 func (tx *TxAbe) InvType() wire.InvType {

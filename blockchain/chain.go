@@ -1268,12 +1268,25 @@ func countSpentOutputsAUT(block *abeutil.BlockAbe) int {
 	// Exclude the transfer transaction which is not an AUT transaction
 	var num = 0
 	for _, tx := range block.Transactions()[1:] {
-		if autTx, isAUTTx := tx.AUTTransaction(); isAUTTx {
+		//if autTx, isAUTTx := tx.AUTTransaction(); isAUTTx {
+		//	if autTx.Type() < aut.ReRegistration {
+		//		// it seems that we do not need saut for those type
+		//	}
+		//	num++
+		//}
+
+		autTx, err := tx.AUTTransaction()
+		if err != nil {
+			//	This should not happen
+			log.Warnf("countSpentOutputsAUT: error happens when extracting AutTransaction from Tx %s: %v", tx.Hash(), err)
+		}
+		if autTx != nil {
 			if autTx.Type() < aut.ReRegistration {
 				// it seems that we do not need saut for those type
 			}
 			num++
 		}
+
 	}
 	return num
 }

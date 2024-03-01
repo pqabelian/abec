@@ -237,12 +237,12 @@ func (view *AUTViewpoint) addAUTToken(autNameKey string, outpoint aut.OutPoint, 
 // view does not contain the required utxos.
 // TODO Check consistence with mining.spendTransactionAbe
 func (view *AUTViewpoint) connectTransaction(tx *abeutil.TxAbe, blockHeight int32, sauts *[]SpentAUT) error {
-	autTx, isAUTTx := tx.AUTTransaction()
-	if !isAUTTx {
-		return nil
+	autTx, err := tx.AUTTransaction()
+	if err != nil {
+		return err
 	}
 	if autTx == nil {
-		return aut.ErrInValidAUTTx
+		return nil
 	}
 
 	autNameKey := hex.EncodeToString(autTx.AUTName())
@@ -727,23 +727,23 @@ func (view *AUTViewpoint) fetchInputAUTUtxos(db database.DB, block *abeutil.Bloc
 		// which has no inputs) collecting them into sets of what is needed and
 		// what is already known (in-flight).
 		neededSet := make(map[aut.OutPoint]struct{}) // it is not in the same block
-		autTx, isAUTTx := tx.AUTTransaction()
-		if !isAUTTx {
-			continue
-		}
-		if autTx == nil {
-			return aut.ErrInValidAUTTx
-		}
-		autNameKey := hex.EncodeToString(autTx.AUTName())
-		for _, txIn := range autTx.Ins() {
-			autEntry := view.LookupEntry(autNameKey, txIn)
-			if autEntry == nil {
-				neededSet[txIn] = struct{}{}
-			}
-		}
-		err := view.fetchAUTMain(db, neededSet, autTx.AUTName())
+		autTx, err := tx.AUTTransaction()
 		if err != nil {
+			//	if a tx.AUTTransaction() returns error, such a transaction should not be accepted by mempool or a block.
 			return err
+		}
+		if autTx != nil {
+			autNameKey := hex.EncodeToString(autTx.AUTName())
+			for _, txIn := range autTx.Ins() {
+				autEntry := view.LookupEntry(autNameKey, txIn)
+				if autEntry == nil {
+					neededSet[txIn] = struct{}{}
+				}
+			}
+			err = view.fetchAUTMain(db, neededSet, autTx.AUTName())
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -758,24 +758,26 @@ func NewAUTViewpoint() *AUTViewpoint {
 	}
 }
 
-// FetchUtxoView loads unspent transaction outputs for the inputs referenced by
+// FetchAUTView loads unspent transaction outputs for the inputs referenced by
 // the passed transaction from the point of view of the end of the main chain.
 // It also attempts to fetch the utxos for the outputs of the transaction itself
 // so the returned view can be examined for duplicate transactions.
 //
 // This function is safe for concurrent access however the returned view is NOT.
-func (b *BlockChain) FetchAUTView(originTx *abeutil.TxAbe) (*AUTViewpoint, error) {
+// refactored by Alice 2024.03.01
+func (b *BlockChain) FetchAUTView(hostTx *abeutil.TxAbe) (*AUTViewpoint, error) {
 	// Create a set of needed outputs based on those referenced by the
 	// inputs of the passed transaction and the outputs of the transaction
 	// itself.
 
-	autTx, isAUTTx := originTx.AUTTransaction()
-	if !isAUTTx {
-		return nil, nil
+	autTx, err := hostTx.AUTTransaction()
+	if err != nil {
+		return nil, err
 	}
 	if autTx == nil {
-		return nil, aut.ErrInValidAUTTx
+		return nil, nil
 	}
+
 	view := NewAUTViewpoint()
 	neededSet := make(map[aut.OutPoint]struct{})
 	switch autTx.Type() {
@@ -795,7 +797,7 @@ func (b *BlockChain) FetchAUTView(originTx *abeutil.TxAbe) (*AUTViewpoint, error
 		}
 	default:
 		log.Errorf("unreachable code")
-		return nil, errors.New("unknown aut transaction type")
+		return nil, errors.New("FetchAUTView: unknown aut transaction type")
 	}
 
 	// no output need to be fetched
@@ -806,7 +808,7 @@ func (b *BlockChain) FetchAUTView(originTx *abeutil.TxAbe) (*AUTViewpoint, error
 	// Request the utxos from the point of view of the end of the main
 	// chain.
 	b.chainLock.RLock()
-	err := view.fetchAUTMain(b.db, neededSet, autTx.AUTName())
+	err = view.fetchAUTMain(b.db, neededSet, autTx.AUTName())
 	b.chainLock.RUnlock()
 	return view, err
 }

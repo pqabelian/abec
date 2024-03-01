@@ -537,11 +537,12 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 	}
 
 	// todo(MLPAUT): to review
-	autTransaction, isAUTTx := tx.AUTTransaction()
-	if isAUTTx {
-		if autTransaction == nil {
-			return aut.ErrInValidAUTTx
-		}
+	autTransaction, err := tx.AUTTransaction()
+	if err != nil {
+		str := fmt.Sprintf("error hapeens when extracting AutTransaction from Tx %s: %v", tx.Hash(), err)
+		return ruleError(ErrAUTBadForm, str)
+	}
+	if autTransaction != nil {
 
 		if tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_280000 {
 			return ruleError(ErrTxVersionForAUT, "transaction "+
@@ -1637,16 +1638,19 @@ func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *
 	return nil
 }
 
+// CheckTransactionInputsAUT
+// refactored by Alice on 2024.03.01
 func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRingViewpoint, autView *AUTViewpoint, chainParams *chaincfg.Params) error {
 	if tx == nil {
 		return fmt.Errorf("CheckTransactionInputsAUT: a nil transaction")
 	}
-	autTx, isAUTTx := tx.AUTTransaction()
-	if !isAUTTx {
-		return nil
+	autTx, err := tx.AUTTransaction()
+	if err != nil {
+		return fmt.Errorf("CheckTransactionInputsAUT: error happens when extract AutTRansaction from the input abeutil.TxAbe: %v", err)
 	}
 	if autTx == nil {
-		return aut.ErrInValidAUTTx
+		// As this function is for AUT, so it should be called on a Tx without hosting AutTransaction.
+		return fmt.Errorf("CheckTransactionInputsAUT: the input abeutil.TxAbe does not contain a valid AutTransaction")
 	}
 
 	autNameKey := hex.EncodeToString(autTx.AUTName())
@@ -1694,7 +1698,7 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 		willConsumedRootCoins := map[aut.OutPoint]struct{}{}
 		for i := 0; i < len(autTransaction.TxIns); i++ {
 			// spend non-exist or double spending
-			if _, isAUTTx = autEntry.info.RootCoinSet[autTransaction.TxIns[i]]; !isAUTTx {
+			if _, isAUTTx := autEntry.info.RootCoinSet[autTransaction.TxIns[i]]; !isAUTTx {
 				return fmt.Errorf("transaction %s try to mint with unknown root coin <%s:%d>",
 					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index)
 			}
@@ -1780,7 +1784,7 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 		willConsumedRootCoins := map[aut.OutPoint]struct{}{}
 		for i := 0; i < len(autTransaction.TxIns); i++ {
 			// spend non-exist or double spending
-			if _, isAUTTx = autEntry.info.RootCoinSet[autTransaction.TxIns[i]]; !isAUTTx {
+			if _, isAUTTx := autEntry.info.RootCoinSet[autTransaction.TxIns[i]]; !isAUTTx {
 				return fmt.Errorf("transaction %s try to re-register with unknown root coin <%s:%d>",
 					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index)
 			}
@@ -1879,7 +1883,7 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 		willBurnedCoins := map[aut.OutPoint]struct{}{}
 		for i := 0; i < len(autTransaction.TxIns); i++ {
 			// spend non-exist or double spending
-			if _, isAUTTx = autEntry.coins[autTransaction.TxIns[i]]; !isAUTTx {
+			if _, isAUTTx := autEntry.coins[autTransaction.TxIns[i]]; !isAUTTx {
 				return fmt.Errorf("transaction %s try to burn with unknown coin <%s:%d>",
 					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index)
 			}
@@ -2064,11 +2068,11 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 			return err
 		}
 
-		autTx, isAUTTx := tx.AUTTransaction()
-		if isAUTTx {
-			if autTx == nil {
-				return aut.ErrInValidAUTTx
-			}
+		autTx, err := tx.AUTTransaction()
+		if err != nil {
+			return err
+		}
+		if autTx != nil {
 			err = CheckTransactionInputsAUT(tx, node.height, view, autView,
 				b.chainParams)
 			if err != nil {
