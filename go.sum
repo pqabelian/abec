@@ -11,10 +11,8 @@ github.com/cryptosuite/liboqs-go v0.9.5-alpha h1:mmCyD1gZRnm6sD214ylg0h17I37BmY8
 github.com/cryptosuite/liboqs-go v0.9.5-alpha/go.mod h1:LzuvuQAJHbED51lHoYr91rBbKRdv2MewGcVCwjE1JCk=
 github.com/cryptosuite/pqringct v0.11.12-alpha h1:ZJ8dLTTpF5tDUs09WgX2JqkI3+4eTFduyxv9hmYr53U=
 github.com/cryptosuite/pqringct v0.11.12-alpha/go.mod h1:LVtvih9kNVHzAX60qzOqO6TAIjurfNKYWICRDUegjkg=
-github.com/cryptosuite/pqringctx v0.11.12 h1:V21cyEiU7Csx51wZ4VjNmkngxxCpwDRm9OkusAtvHP0=
-github.com/cryptosuite/pqringctx v0.11.12/go.mod h1:6MXcMlhH5nHipQN9lQQi665KJd+4bPCrhLQK5xGifZo=
-github.com/cryptosuite/pqringctx v0.11.13-0.20240129142709-a68ef7937f77 h1:4YROIgbrAwjazOs00ozo9JHCYvUplyYqC3/RivhREaA=
-github.com/cryptosuite/pqringctx v0.11.13-0.20240129142709-a68ef7937f77/go.mod h1:6MXcMlhH5nHipQN9lQQi665KJd+4bPCrhLQK5xGifZo=
+github.com/cryptosuite/pqringctx v0.11.13 h1:4tRUUc4GzmElMzfJ4IRsXcMlm5/X+eufVfHcTEXqHNU=
+github.com/cryptosuite/pqringctx v0.11.13/go.mod h1:6MXcMlhH5nHipQN9lQQi665KJd+4bPCrhLQK5xGifZo=
 github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1 h1:vN3Cibtye7f3YuPvrJWG4Kp/jrb/XfxS5oIwl8XZBQY=
 github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1/go.mod h1:mJeCa86eOqj3kCJO+O4245Wnq5U07P9K9RfJplI8bQ4=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
