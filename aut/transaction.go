@@ -1157,6 +1157,7 @@ var ErrInValidAUTTx = errors.New("not a valid AUT transaction")
 // logic should be aut package, but database operation should be in blockchain.
 
 func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
+	// could not be an AUT transaction
 	if len(tx.TxMemo) <= CommonPrefixLength {
 		return nil, nil
 	}

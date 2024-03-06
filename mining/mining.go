@@ -1029,7 +1029,7 @@ mempoolLoop:
 
 		err = blockchain.CheckTransactionInputsAUT(tx, nextBlockHeight, blockUtxoRings, blockAUTView, g.chainParams)
 		if err != nil {
-			log.Tracef("Skipping tx %s due to error in "+
+			log.Debugf("Skipping tx %s due to error in "+
 				"CheckTransactionInputsAUT: %v", tx.Hash(), err)
 			continue
 		}

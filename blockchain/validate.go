@@ -543,7 +543,6 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		return ruleError(ErrAUTBadForm, str)
 	}
 	if autTransaction != nil {
-
 		if tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_280000 {
 			return ruleError(ErrTxVersionForAUT, "transaction "+
 				"contains AUT but it has invalid version")
@@ -1650,7 +1649,8 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 	}
 	if autTx == nil {
 		// As this function is for AUT, so it should be called on a Tx without hosting AutTransaction.
-		return fmt.Errorf("CheckTransactionInputsAUT: the input abeutil.TxAbe does not contain a valid AutTransaction")
+		log.Debugf("CheckTransactionInputsAUT: the input abeutil.TxAbe does not contain a valid AutTransaction")
+		return nil
 	}
 
 	autNameKey := hex.EncodeToString(autTx.AUTName())
