@@ -1027,11 +1027,19 @@ mempoolLoop:
 			continue
 		}
 
-		err = blockchain.CheckTransactionInputsAUT(tx, nextBlockHeight, blockUtxoRings, blockAUTView, g.chainParams)
+		autTx, err := tx.AUTTransaction()
 		if err != nil {
-			log.Debugf("Skipping tx %s due to error in "+
-				"CheckTransactionInputsAUT: %v", tx.Hash(), err)
+			log.Tracef("Skipping tx %s due to error in "+
+				"AUTTransaction: %v", tx.Hash(), err)
 			continue
+		}
+		if autTx != nil {
+			err = blockchain.CheckTransactionInputsAUT(tx, nextBlockHeight, blockUtxoRings, blockAUTView, g.chainParams)
+			if err != nil {
+				log.Debugf("Skipping tx %s due to error in "+
+					"CheckTransactionInputsAUT: %v", tx.Hash(), err)
+				continue
+			}
 		}
 
 		// Spend the transaction inputs in the block utxoRing view and add

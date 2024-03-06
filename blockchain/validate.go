@@ -1649,8 +1649,7 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 	}
 	if autTx == nil {
 		// As this function is for AUT, so it should be called on a Tx without hosting AutTransaction.
-		log.Debugf("CheckTransactionInputsAUT: the input abeutil.TxAbe does not contain a valid AutTransaction")
-		return nil
+		return fmt.Errorf("CheckTransactionInputsAUT: the input abeutil.TxAbe does not contain a valid AutTransaction")
 	}
 
 	autNameKey := hex.EncodeToString(autTx.AUTName())
