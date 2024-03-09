@@ -628,7 +628,7 @@ func pqringctxTxoCoinDetectByCoinDetectorRootKey(pp *pqringctxapi.PublicParamete
 	if err != nil {
 		return false, err
 	}
-	coinDetectorKey, err := abecryptoutils.PRF(coinDetectorRootKey, publicRand)
+	coinDetectorKey, err := abecryptoutils.KDF(coinDetectorRootKey, publicRand)
 	if err != nil {
 		return false, err
 	}
@@ -691,7 +691,7 @@ func pqringctxTxoCoinReceiveByRootSeeds(pp *pqringctxapi.PublicParameter, crypto
 
 	//	generate coinDetectorKey and detect coinAddress
 	//	NOTE: the codes here must be consistent with that in abecryptoxkey/abepqringctxkey.go
-	coinDetectorKey, err := abecryptoutils.PRF(coinDetectorRootKey, publicRand)
+	coinDetectorKey, err := abecryptoutils.KDF(coinDetectorRootKey, publicRand)
 	if err != nil {
 		return false, 0, err
 	}
@@ -713,7 +713,7 @@ func pqringctxTxoCoinReceiveByRootSeeds(pp *pqringctxapi.PublicParameter, crypto
 			return false, 0, fmt.Errorf("pqringctxTxoCoinReceiveByRootSeeds: invalid length of coinValueKeyRootSeed (%d)", len(coinValueKeyRootSeed))
 		}
 
-		coinValueKeyRandSeed, err := abecryptoutils.PRF(coinValueKeyRootSeed, publicRand)
+		coinValueKeyRandSeed, err := abecryptoutils.KDF(coinValueKeyRootSeed, publicRand)
 		if err != nil {
 			return false, 0, err
 		}
@@ -897,7 +897,7 @@ func pqringctxTxoCoinSerialNumberGenByRootSeed(pp *pqringctxapi.PublicParameter,
 		if len(coinSerialNumberKeyRootSeed) != abecryptoutils.PRFKeyBytesLen {
 			return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRootSeed: invalid length of coinSerialNumberKeyRootSeed (%d)", len(coinSerialNumberKeyRootSeed))
 		}
-		coinSerialNumberKeyRandSeed, err := abecryptoutils.PRF(coinSerialNumberKeyRootSeed, publicRand)
+		coinSerialNumberKeyRandSeed, err := abecryptoutils.KDF(coinSerialNumberKeyRootSeed, publicRand)
 		if err != nil {
 			return nil, err
 		}

@@ -45,13 +45,13 @@ func pqringctxCryptoAddressKeyGenByRootSeeds(pp *pqringctxapi.PublicParameter,
 	publicRand := abecryptoutils.RandomBytes(pp.GetParamKeyGenPublicRandBytesLen())
 
 	//	coinSpendKeyRandSeed
-	coinSpendKeyRandSeed, err := abecryptoutils.PRF(coinSpendKeyRootSeed, publicRand)
+	coinSpendKeyRandSeed, err := abecryptoutils.KDF(coinSpendKeyRootSeed, publicRand)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
 
 	//	coinDetectorKey
-	// coinDetectorKey, err := abecryptoutils.PRF(coinDetectorRootKey, publicRand)
+	// coinDetectorKey, err := abecryptoutils.KDF(coinDetectorRootKey, publicRand)
 	coinDetectorKey, err := coinDetectorKeyGenByCoinDetectorRootKeyFromPublicRand(pp, coinDetectorRootKey, publicRand)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
@@ -65,11 +65,11 @@ func pqringctxCryptoAddressKeyGenByRootSeeds(pp *pqringctxapi.PublicParameter,
 			return nil, nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressKeyGenByRootSeed: invalid length of coinValueKeyRootSeed (%d)", len(coinValueKeyRootSeed))
 		}
 
-		coinSerialNumberKeyRandSeed, err := abecryptoutils.PRF(coinSerialNumberKeyRootSeed, publicRand)
+		coinSerialNumberKeyRandSeed, err := abecryptoutils.KDF(coinSerialNumberKeyRootSeed, publicRand)
 		if err != nil {
 			return nil, nil, nil, nil, nil, err
 		}
-		coinValueKeyRandSeed, err := abecryptoutils.PRF(coinValueKeyRootSeed, publicRand)
+		coinValueKeyRandSeed, err := abecryptoutils.KDF(coinValueKeyRootSeed, publicRand)
 		if err != nil {
 			return nil, nil, nil, nil, nil, err
 		}
@@ -136,13 +136,13 @@ func pqringctxCryptoAddressKeyReGenByRootSeedsFromPublicRand(pp *pqringctxapi.Pu
 	//publicRand := abecryptoutils.RandomBytes(pp.GetParamKeyGenPublicRandBytesLen())
 
 	//	coinSpendKeyRandSeed
-	coinSpendKeyRandSeed, err := abecryptoutils.PRF(coinSpendKeyRootSeed, publicRand)
+	coinSpendKeyRandSeed, err := abecryptoutils.KDF(coinSpendKeyRootSeed, publicRand)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
 
 	//	coinDetectorKey
-	// coinDetectorKey, err := abecryptoutils.PRF(coinDetectorRootKey, publicRand)
+	// coinDetectorKey, err := abecryptoutils.KDF(coinDetectorRootKey, publicRand)
 	coinDetectorKey, err := coinDetectorKeyGenByCoinDetectorRootKeyFromPublicRand(pp, coinDetectorRootKey, publicRand)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
@@ -156,11 +156,11 @@ func pqringctxCryptoAddressKeyReGenByRootSeedsFromPublicRand(pp *pqringctxapi.Pu
 			return nil, nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressKeyReGenByRootSeedsFromPublicRand: invalid length of coinValueKeyRootSeed (%d)", len(coinValueKeyRootSeed))
 		}
 
-		coinSerialNumberKeyRandSeed, err := abecryptoutils.PRF(coinSerialNumberKeyRootSeed, publicRand)
+		coinSerialNumberKeyRandSeed, err := abecryptoutils.KDF(coinSerialNumberKeyRootSeed, publicRand)
 		if err != nil {
 			return nil, nil, nil, nil, nil, err
 		}
-		coinValueKeyRandSeed, err := abecryptoutils.PRF(coinValueKeyRootSeed, publicRand)
+		coinValueKeyRandSeed, err := abecryptoutils.KDF(coinValueKeyRootSeed, publicRand)
 		if err != nil {
 			return nil, nil, nil, nil, nil, err
 		}
@@ -214,13 +214,13 @@ func pqringctxRandSeedsGenByRootSeedsFromPublicRand(pp *pqringctxapi.PublicParam
 	//publicRand := abecryptoutils.RandomBytes(pp.GetParamKeyGenPublicRandBytesLen())
 
 	//	coinSpendKeyRandSeed
-	coinSpendKeyRandSeed, err = abecryptoutils.PRF(coinSpendKeyRootSeed, publicRand)
+	coinSpendKeyRandSeed, err = abecryptoutils.KDF(coinSpendKeyRootSeed, publicRand)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
 
 	//	coinDetectorKey
-	// coinDetectorKey, err = abecryptoutils.PRF(coinDetectorRootKey, publicRand)
+	// coinDetectorKey, err = abecryptoutils.KDF(coinDetectorRootKey, publicRand)
 	coinDetectorKey, err = coinDetectorKeyGenByCoinDetectorRootKeyFromPublicRand(pp, coinDetectorRootKey, publicRand)
 	if err != nil {
 		return nil, nil, nil, nil, err
@@ -234,11 +234,11 @@ func pqringctxRandSeedsGenByRootSeedsFromPublicRand(pp *pqringctxapi.PublicParam
 			return nil, nil, nil, nil, fmt.Errorf("pqringctxRandSeedsGenByRootSeedsFromPublicRand: invalid length of coinValueKeyRootSeed (%d)", len(coinValueKeyRootSeed))
 		}
 
-		coinSerialNumberKeyRandSeed, err = abecryptoutils.PRF(coinSerialNumberKeyRootSeed, publicRand)
+		coinSerialNumberKeyRandSeed, err = abecryptoutils.KDF(coinSerialNumberKeyRootSeed, publicRand)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
-		coinValueKeyRandSeed, err = abecryptoutils.PRF(coinValueKeyRootSeed, publicRand)
+		coinValueKeyRandSeed, err = abecryptoutils.KDF(coinValueKeyRootSeed, publicRand)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -674,7 +674,7 @@ func coinDetectorKeyGenByCoinDetectorRootKeyFromPublicRand(pp *pqringctxapi.Publ
 	}
 
 	//	coinDetectorKey
-	coinDetectorKey, err = abecryptoutils.PRF(coinDetectorRootKey, publicRand)
+	coinDetectorKey, err = abecryptoutils.KDF(coinDetectorRootKey, publicRand)
 	if err != nil {
 		return nil, err
 	}
