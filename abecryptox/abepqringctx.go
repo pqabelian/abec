@@ -880,7 +880,7 @@ func pqringctxTxoCoinSerialNumberGenByRootSeed(pp *pqringctxapi.PublicParameter,
 	if len(coinSerialNumberKeyRootSeed) != 0 {
 		if coinAddressType != pqringctxapi.CoinAddressTypePublicKeyForRing {
 			//	NOTE: only CoinAddressTypePublicKeyForRing address has coinSerialNumberKeyRandSeed
-			return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRootSeed: coinSerialNumberKeyRandSeed is not nil/emprty, but the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyForRing", coinAddressType)
+			return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRootSeed: coinSerialNumberKeyRandSeed is not nil/empty, but the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyForRing", coinAddressType)
 		}
 
 		//	extract publicRand and generate coinSerialNumberSecretKey
@@ -909,7 +909,7 @@ func pqringctxTxoCoinSerialNumberGenByRootSeed(pp *pqringctxapi.PublicParameter,
 
 	} else {
 		if coinAddressType != pqringctxapi.CoinAddressTypePublicKeyHashForSingle {
-			return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRootSeed: coinSerialNumberKeyRandSeed is nil/emprty, while the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyHashForSingle", coinAddressType)
+			return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRootSeed: coinSerialNumberKeyRandSeed is nil/empty, while the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyHashForSingle", coinAddressType)
 		}
 
 		coinSerialNumberSecretKey = nil
@@ -955,7 +955,7 @@ func pqringctxTxoCoinSerialNumberGenByRandSeed(pp *pqringctxapi.PublicParameter,
 	if len(coinSerialNumberKeyRandSeed) != 0 {
 		if coinAddressType != pqringctxapi.CoinAddressTypePublicKeyForRing {
 			//	NOTE: only CoinAddressTypePublicKeyForRing address has coinSerialNumberKeyRandSeed
-			return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRandSeed: coinSerialNumberKeyRandSeed is not nil/emprty, but the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyForRing", coinAddressType)
+			return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRandSeed: coinSerialNumberKeyRandSeed is not nil/empty, but the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyForRing", coinAddressType)
 		}
 
 		//	generate coinSerialNumberSecretKey
@@ -967,7 +967,7 @@ func pqringctxTxoCoinSerialNumberGenByRandSeed(pp *pqringctxapi.PublicParameter,
 
 	} else {
 		if coinAddressType != pqringctxapi.CoinAddressTypePublicKeyHashForSingle {
-			return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRandSeed: coinSerialNumberKeyRandSeed is nil/emprty, while the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyHashForSingle", coinAddressType)
+			return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRandSeed: coinSerialNumberKeyRandSeed is nil/empty, while the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyHashForSingle", coinAddressType)
 		}
 
 		coinSerialNumberSecretKey = nil
@@ -1019,19 +1019,19 @@ func pqringctxTxoCoinSerialNumberGenByKey(pp *pqringctxapi.PublicParameter, cryp
 
 		if privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre {
 			if coinAddressType != pqringctxapi.CoinAddressTypePublicKeyForRingPre {
-				return nil, fmt.Errorf("pqringctTxoCoinSerialNumberGenByKey: cryptoSerialNumberSecretKey is not nil/emprty and the extracted privacyLevel is PrivacyLevelRINGCTPre, but the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyForRingPre", coinAddressType)
+				return nil, fmt.Errorf("pqringctTxoCoinSerialNumberGenByKey: cryptoSerialNumberSecretKey is not nil/empty and the extracted privacyLevel is PrivacyLevelRINGCTPre, but the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyForRingPre", coinAddressType)
 			}
 		} else if privacyLevel == abecryptoxkey.PrivacyLevelRINGCT {
 			if coinAddressType != pqringctxapi.CoinAddressTypePublicKeyForRing {
-				return nil, fmt.Errorf("pqringctTxoCoinSerialNumberGenByKey: cryptoSerialNumberSecretKey is not nil/emprty and the extracted privacyLevel is PrivacyLevelRINGCT, but the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyForRing", coinAddressType)
+				return nil, fmt.Errorf("pqringctTxoCoinSerialNumberGenByKey: cryptoSerialNumberSecretKey is not nil/empty and the extracted privacyLevel is PrivacyLevelRINGCT, but the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyForRing", coinAddressType)
 			}
 		} else {
-			return nil, fmt.Errorf("pqringctTxoCoinSerialNumberGenByKey: cryptoSerialNumberSecretKey is not nil/emprty, but the extracted privacyLevel (%d) is not PrivacyLevelRINGCTPre or PrivacyLevelRINGCT", privacyLevel)
+			return nil, fmt.Errorf("pqringctTxoCoinSerialNumberGenByKey: cryptoSerialNumberSecretKey is not nil/empty, but the extracted privacyLevel (%d) is not PrivacyLevelRINGCTPre or PrivacyLevelRINGCT", privacyLevel)
 		}
 
 	} else {
 		if coinAddressType != pqringctxapi.CoinAddressTypePublicKeyHashForSingle {
-			return nil, fmt.Errorf("pqringctTxoCoinSerialNumberGenByKey: cryptoSerialNumberSecretKey is nil/emprty, but the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyHashForSingle", coinAddressType)
+			return nil, fmt.Errorf("pqringctTxoCoinSerialNumberGenByKey: cryptoSerialNumberSecretKey is nil/empty, but the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyHashForSingle", coinAddressType)
 		}
 
 		coinSerialNumberSecretKey = nil
