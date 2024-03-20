@@ -300,7 +300,7 @@ func pqringctxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme
 			return nil, err
 		}
 		if bytes.Compare(coinAddressFromCryptoAddress, coinAddressInCoin) != 0 {
-			return nil, fmt.Errorf("pqringctxTransferTxGen: the coinAddress extracted from abeTxInputDescs[%d].cryptoAddress and that extracted from abeTxInputDescs[%d].txoRing.TxOuts[%].TxoScript are inconsistent", i, i, sidx)
+			return nil, fmt.Errorf("pqringctxTransferTxGen: the coinAddress extracted from abeTxInputDescs[%d].cryptoAddress and that extracted from abeTxInputDescs[%d].txoRing.TxOuts[%d].TxoScript are inconsistent", i, i, sidx)
 		}
 
 		//	coinSpendSecretKey []byte
