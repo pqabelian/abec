@@ -701,6 +701,18 @@ func NewMoveCmd(fromAccount, toAccount string, amount float64, minConf *int, com
 	}
 }
 
+type GetAddrBalanceCmd struct {
+	Start uint64
+	End   uint64
+}
+
+func NewGetAddrBalanceCmd(start, end uint64) *GetAddrBalanceCmd {
+	return &GetAddrBalanceCmd{
+		Start: start,
+		End:   end,
+	}
+}
+
 // SendFromCmd defines the sendfrom JSON-RPC command.
 type SendFromCmd struct {
 	FromAccount string
@@ -990,6 +1002,8 @@ func init() {
 	MustRegisterCmd("lockunspent", (*LockUnspentCmd)(nil), flags)
 	MustRegisterCmd("gettxhashfromreqeust", (*GetTxHashFromReqeustCmd)(nil), flags)
 	MustRegisterCmd("move", (*MoveCmd)(nil), flags) // TODO
+	MustRegisterCmd("getaddrbalance", (*GetAddrBalanceCmd)(nil), flags)
+
 	//MustRegisterCmd("sendfrom", (*SendFromCmd)(nil), flags)
 	//MustRegisterCmd("sendmany", (*SendManyCmd)(nil), flags)
 	MustRegisterCmd("sendtoaddressesabe", (*SendToAddressAbeCmd)(nil), flags)
