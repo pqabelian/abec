@@ -1,6 +1,6 @@
 module github.com/pqabelian/abec
 
-go 1.18
+go 1.22
 
 require (
 	github.com/abesuite/abec v0.0.0-00010101000000-000000000000
