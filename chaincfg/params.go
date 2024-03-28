@@ -224,7 +224,7 @@ type Params struct {
 	// ToDo(MLP):
 	BlockHeightMLPAUT int32
 	// BlockHeightMLPAUTCOMMIT specifies the block height
-	// from which new transactions with version before TxVersion_Height_MLPAUT_280000 will not be accepted anymore.
+	// from which new transactions with version before TxVersion_Height_MLPAUT_300000 will not be accepted anymore.
 	BlockHeightMLPAUTCOMMIT int32
 }
 
@@ -328,7 +328,7 @@ var MainNetParams = Params{
 
 	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
 	// ToDo(MLP):
-	BlockHeightMLPAUT:       280000,
+	BlockHeightMLPAUT:       300000,
 	BlockHeightMLPAUTCOMMIT: 320000,
 }
 
@@ -405,7 +405,7 @@ var RegressionNetParams = Params{
 
 	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
 	// ToDo(MLP):
-	BlockHeightMLPAUT:       280000,
+	BlockHeightMLPAUT:       300000,
 	BlockHeightMLPAUTCOMMIT: 320000,
 }
 
@@ -489,7 +489,7 @@ var TestNet3Params = Params{
 
 	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
 	// ToDo(MLP):
-	BlockHeightMLPAUT:       280000,
+	BlockHeightMLPAUT:       300000,
 	BlockHeightMLPAUTCOMMIT: 320000,
 }
 

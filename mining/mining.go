@@ -786,7 +786,7 @@ func (g *BlkTmplGenerator) NewBlockTemplate(cryptoAddressPayTo []byte) (*BlockTe
 	if nextBlockHeight < g.chainParams.BlockHeightMLPAUT {
 		txVersion = wire.TxVersion_Height_0
 	} else {
-		txVersion = wire.TxVersion_Height_MLPAUT_280000
+		txVersion = wire.TxVersion_Height_MLPAUT_300000
 	}
 	// At this moment, we do not need to support output for coinbaseTx,
 	// since it will require the mechanism on separating the total output value to the multiple output Txos.
@@ -852,14 +852,14 @@ mempoolLoop:
 
 		// ToDo(MLP):
 		if nextBlockHeight >= g.chainParams.BlockHeightMLPAUTCOMMIT {
-			if tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_280000 {
+			if tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_300000 {
 				log.Tracef("Skipping tx %s, since from block %d, transactions with version %d will not be mined any more", tx.Hash(), g.chainParams.BlockHeightMLPAUTCOMMIT, tx.MsgTx().Version)
 				continue
 			}
 		} else if nextBlockHeight >= g.chainParams.BlockHeightMLPAUT {
 			// nothing to do
 		} else { // height lower than the fork for MLPAUT
-			if tx.MsgTx().Version >= wire.TxVersion_Height_MLPAUT_280000 {
+			if tx.MsgTx().Version >= wire.TxVersion_Height_MLPAUT_300000 {
 				log.Tracef("Skipping tx %s, transactions with version %d would not be mined until height %d", tx.Hash(), tx.MsgTx().Version, g.chainParams.BlockHeightMLPAUT)
 				continue
 			}

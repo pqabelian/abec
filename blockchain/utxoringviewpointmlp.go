@@ -120,9 +120,9 @@ func BuildTxoRingsMLP(blockNumPerRingGroup int, txoRingSize int, blocks []*abeut
 	}
 
 	//	2023.12.24 MLP Fork
-	//	With the MLP_Fork, there are two TxVersions, say, TxVersion_Height_0 and TxVersion_Height_MLPAUT_280000,
+	//	With the MLP_Fork, there are two TxVersions, say, TxVersion_Height_0 and TxVersion_Height_MLPAUT_300000,
 	//	For TxVersion_Height_0, all Txos have the same privacy-level: RingCTPre, and all these Txos will be collected together and divided into rings.
-	//	For TxVersion_Height_MLPAUT_280000, the Txos may have three privacy-level, say, RingCTPre, RingCT, and Pseudonym,
+	//	For TxVersion_Height_MLPAUT_300000, the Txos may have three privacy-level, say, RingCTPre, RingCT, and Pseudonym,
 	//		the Txos of RingCTPre and RingCT will be collected together and divided into rings,
 	//		the Txos of Pseudonym will be collected and divided into rings with size 1.
 	//	NOTE: when there are more cases ,we need to hard code the ring-building process here.
@@ -183,7 +183,7 @@ func BuildTxoRingsMLP(blockNumPerRingGroup int, txoRingSize int, blocks []*abeut
 			case wire.TxVersion_Height_0:
 				allCoinbaseRmTxoWithTxVersionInit = append(allCoinbaseRmTxoWithTxVersionInit, ringMemberTxo)
 
-			case wire.TxVersion_Height_MLPAUT_280000:
+			case wire.TxVersion_Height_MLPAUT_300000:
 				privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
 				if err != nil {
 					return nil, err
@@ -238,7 +238,7 @@ func BuildTxoRingsMLP(blockNumPerRingGroup int, txoRingSize int, blocks []*abeut
 				case wire.TxVersion_Height_0:
 					allTransferRmTxoWithTxVersionInit = append(allTransferRmTxoWithTxVersionInit, ringMemberTxo)
 
-				case wire.TxVersion_Height_MLPAUT_280000:
+				case wire.TxVersion_Height_MLPAUT_300000:
 					privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
 					if err != nil {
 						return nil, err
