@@ -70,7 +70,7 @@ func GetCryptoSchemeByTxVersion(txVersion uint32) (CryptoScheme, error) {
 	switch txVersion {
 	case 1: // wire.TxVersion_Height_0
 		return CryptoSchemePQRingCT, nil
-	case 2: // wire.TxVersion_Height_MLPAUT_280000
+	case 2: // wire.TxVersion_Height_MLPAUT_300000
 		return CryptoSchemePQRingCTX, nil
 	default:
 		return 0, fmt.Errorf("GetCryptoSchemeByTxVersion: Unsupported TxVersion")
@@ -101,7 +101,7 @@ func GetTxInputMaxNum(txVersion uint32) (int, error) {
 	case 1: // wire.TxVersion_Height_0:
 		return abecryptoparam.GetTxInputMaxNum(txVersion)
 
-	case 2: // wire.TxVersion_Height_MLPAUT_280000:
+	case 2: // wire.TxVersion_Height_MLPAUT_300000:
 		return pqringctxGetTxInputMaxNum(PQRingCTXPP), nil
 
 	default:
@@ -119,7 +119,7 @@ func GetTxOutputMaxNum(txVersion uint32) (int, error) {
 	case 1: //wire.TxVersion_Height_0:
 		return abecryptoparam.GetTxOutputMaxNum(txVersion)
 
-	case 2: //wire.TxVersion_Height_MLPAUT_280000:
+	case 2: //wire.TxVersion_Height_MLPAUT_300000:
 		return pqringctxGetTxOutputMaxNum(PQRingCTXPP), nil
 
 	default:

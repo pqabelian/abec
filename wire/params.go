@@ -4,14 +4,14 @@ import (
 	"errors"
 )
 
-// These vesion-consts are used to maintain the history TxVersion.
+// These version-constants are used to maintain the history TxVersion.
 const (
 	TxVersion_Unknown uint32 = 0 // the TxVersion since height 0, corresponding to CryptoSchemePQRingCT
 
 	TxVersion_Height_0 uint32 = 1 // the TxVersion since height 0, corresponding to CryptoSchemePQRingCT
 	//CryptoSchemePQRingCTV2
 	// ToDo(MLP): how about not use iota?
-	TxVersion_Height_MLPAUT_280000 uint32 = 2
+	TxVersion_Height_MLPAUT_300000 uint32 = 2
 )
 
 const (
@@ -39,7 +39,7 @@ const (
 	// ToDo(MLP):
 	//	TxVersion = 1
 	// TxVersion = TxVersion_Height_0
-	TxVersion = TxVersion_Height_MLPAUT_280000
+	TxVersion = TxVersion_Height_MLPAUT_300000
 
 	//	todo: (EthashPow) BlockVersionEthashPow
 	// BlockVersionEthashPow is the block version which changed block to use EthashPoW
@@ -80,7 +80,7 @@ func GetBlockNumPerRingGroupByRingVersion(version uint32) (uint8, error) {
 	switch version {
 	case TxVersion_Height_0:
 		return BlockNumPerRingGroup, nil
-	case TxVersion_Height_MLPAUT_280000:
+	case TxVersion_Height_MLPAUT_300000:
 		return BlockNumPerRingGroup, nil
 
 	default:
@@ -102,7 +102,7 @@ func GetTxoRingSizeByRingVersion(version uint32) (uint8, error) {
 	switch version {
 	case TxVersion_Height_0:
 		return TxoRingSize, nil
-	case TxVersion_Height_MLPAUT_280000:
+	case TxVersion_Height_MLPAUT_300000:
 		return TxoRingSize, nil
 
 	default:

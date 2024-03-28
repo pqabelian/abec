@@ -491,7 +491,7 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 
 		if txIn.PreviousOutPointRing.Version != msgTx.Version {
 			// todo: when there are more cases of TxVersion, we may need hardcode more cases here.
-			if txIn.PreviousOutPointRing.Version == wire.TxVersion_Height_0 && msgTx.Version == wire.TxVersion_Height_MLPAUT_280000 {
+			if txIn.PreviousOutPointRing.Version == wire.TxVersion_Height_0 && msgTx.Version == wire.TxVersion_Height_MLPAUT_300000 {
 				//	allowed case, nothing to do
 			} else {
 				str := fmt.Sprintf("transaction's %d -th input refers to an OutPointRing with ring version "+
@@ -543,7 +543,7 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		return ruleError(ErrAUTBadForm, str)
 	}
 	if autTransaction != nil {
-		if tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_280000 {
+		if tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_300000 {
 			return ruleError(ErrTxVersionForAUT, "transaction "+
 				"contains AUT but it has invalid version")
 		}
@@ -560,7 +560,7 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		txOuts := tx.MsgTx().TxOuts
 		// TODO_DONE extract output to check chain rule for AUT in package aut
 		for i := range autTransaction.Outs() {
-			if txOuts[i].Version < wire.TxVersion_Height_MLPAUT_280000 {
+			if txOuts[i].Version < wire.TxVersion_Height_MLPAUT_300000 {
 				return ruleError(ErrTxVersionForAUT, "transaction "+
 					"contains AUT but it has invalid version")
 			}
@@ -1258,18 +1258,18 @@ func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blo
 	if blockHeight >= b.chainParams.BlockHeightMLPAUTCOMMIT {
 		//	the block should not contain transactions with earlier version
 		for i, tx := range block.Transactions() {
-			if tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_280000 {
+			if tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_300000 {
 				return fmt.Errorf("checkBlockContextAbe: the block has height %d, but its %d -th transaction has version %d", blockHeight, i, tx.MsgTx().Version)
 			}
 		}
 	} else if blockHeight >= b.chainParams.BlockHeightMLPAUT {
-		if coinbaseTx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_280000 {
+		if coinbaseTx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_300000 {
 			return fmt.Errorf("checkBlockContextAbe: the block has height %d, but its first transaction (coinbase Tx) has version %d", blockHeight, coinbaseTx.MsgTx().Version)
 		}
 	} else {
 		//blockHeight < b.chainParams.BlockHeightMLPAUT
 		for i, tx := range block.Transactions() {
-			if tx.MsgTx().Version >= wire.TxVersion_Height_MLPAUT_280000 {
+			if tx.MsgTx().Version >= wire.TxVersion_Height_MLPAUT_300000 {
 				return fmt.Errorf("checkBlockContextAbe: the block has height %d, but its %d -th transaction has version %d", blockHeight, i, tx.MsgTx().Version)
 			}
 		}

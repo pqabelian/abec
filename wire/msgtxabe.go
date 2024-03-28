@@ -828,8 +828,8 @@ func (msg *MsgTxAbe) SerializeSizeFull() int {
 func PrecomputeTrTxConSizeMLP(txVersion uint32, inputRingVersions []uint32,
 	inputRingSizes []uint8, coinAddressListPayTo [][]byte, txMemoLen uint32) (uint32, error) {
 
-	if txVersion < TxVersion_Height_MLPAUT_280000 {
-		return 0, fmt.Errorf("PrecomputeTrTxConSizeMLP: txVersion (%d) is older than TxVersion_Height_MLPAUT_280000 (%d)", txVersion, TxVersion_Height_MLPAUT_280000)
+	if txVersion < TxVersion_Height_MLPAUT_300000 {
+		return 0, fmt.Errorf("PrecomputeTrTxConSizeMLP: txVersion (%d) is older than TxVersion_Height_MLPAUT_300000 (%d)", txVersion, TxVersion_Height_MLPAUT_300000)
 	}
 
 	inputNum := len(inputRingVersions)
