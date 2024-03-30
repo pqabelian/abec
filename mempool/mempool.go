@@ -760,7 +760,7 @@ func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 	}
 	if autTx != nil {
 		if autTx.Type() == aut.Registration {
-			delete(mp.registeredAUTName, hex.EncodeToString(autTx.AUTName()))
+			delete(mp.registeredAUTName, hex.EncodeToString(autTx.AUTIdentifier()))
 		}
 	}
 }
@@ -911,7 +911,7 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint,
 				mp.expiredHeightAUT[autTransaction.ExpireHeight] = map[chainhash.Hash]*TxDescAbe{}
 			}
 			mp.expiredHeightAUT[autTransaction.ExpireHeight][*txD.Tx.Hash()] = txD
-			mp.registeredAUTName[hex.EncodeToString(autTransaction.AUTName())] = *tx.Hash()
+			mp.registeredAUTName[hex.EncodeToString(autTransaction.AUTIdentifier())] = *tx.Hash()
 		case *aut.ReRegistrationTx:
 			if mp.expiredHeightAUT[autTransaction.ExpireHeight] == nil {
 				mp.expiredHeightAUT[autTransaction.ExpireHeight] = map[chainhash.Hash]*TxDescAbe{}
@@ -1841,7 +1841,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	if autTx != nil {
 		// check whether the mempool has the AUT transaction would register a AUT with the same name
 		if autTx.Type() == aut.Registration {
-			if registerAUTTxHash, exist := mp.registeredAUTName[hex.EncodeToString(autTx.AUTName())]; exist {
+			if registerAUTTxHash, exist := mp.registeredAUTName[hex.EncodeToString(autTx.AUTIdentifier())]; exist {
 				str := fmt.Sprintf("transaction %v has register the same name AUT earlier than transaction %v", registerAUTTxHash, txHash)
 				return nil, nil, txRuleError(wire.RejectInvalid, str)
 			}

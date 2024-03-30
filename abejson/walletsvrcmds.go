@@ -792,9 +792,10 @@ type AUTPair struct {
 
 // registeraut register testname - 3 5000 1 1 1000000 dollar cent 1
 type RegisterAUTTransactionCmd struct {
-	AUTName      string
-	IssuerTokens []string // specify issuer tokens
-	IssuerTimes  int
+	AUTIdentifier string
+	AUTSymbol     string
+	IssuerTokens  []string // specify issuer tokens
+	IssuerTimes   int
 
 	ExpireHeight          int32
 	IssuerTokenThreshold  uint8
@@ -805,12 +806,13 @@ type RegisterAUTTransactionCmd struct {
 	UnitScale             uint64
 }
 
-func NewRegisterAUTTransactionCmd(autName string,
+func NewRegisterAUTTransactionCmd(autIdentifier string, autSymbol string,
 	issuerTokens []string, issuerTimes int, expireHeight int32,
 	issuerTokenThreshold uint8, IssuerUpdateThreshold uint8, plannedTotalAmount uint64,
 	unitName string, minUnitName string, unitScale uint64) *RegisterAUTTransactionCmd {
 	return &RegisterAUTTransactionCmd{
-		AUTName:               autName,
+		AUTIdentifier:         autIdentifier,
+		AUTSymbol:             autSymbol,
 		IssuerTokens:          issuerTokens,
 		IssuerTimes:           issuerTimes,
 		ExpireHeight:          expireHeight,
@@ -824,16 +826,16 @@ func NewRegisterAUTTransactionCmd(autName string,
 }
 
 type MintAUTTransactionCmd struct {
-	AUTName string
-	Outputs []AUTPair
+	AUTIdentifier string
+	Outputs       []AUTPair
 
 	AUTIssueThreshold uint8
 }
 
-func NewIssueAUTTransactionCmd(autName string,
+func NewIssueAUTTransactionCmd(autIdentifier string,
 	outputs []AUTPair, autIssuerTokenThreshold uint8) *MintAUTTransactionCmd {
 	return &MintAUTTransactionCmd{
-		AUTName:           autName,
+		AUTIdentifier:     autIdentifier,
 		Outputs:           outputs,
 		AUTIssueThreshold: autIssuerTokenThreshold,
 		//ChangeAddress:    changeAddress,
@@ -841,8 +843,8 @@ func NewIssueAUTTransactionCmd(autName string,
 }
 
 type TransferAUTTransactionCmd struct {
-	AUTName string
-	Outputs []AUTPair
+	AUTIdentifier string
+	Outputs       []AUTPair
 
 	AUTChangeAddress string
 
@@ -850,10 +852,10 @@ type TransferAUTTransactionCmd struct {
 	//ChangeAddress string
 }
 
-func NewTransferAUTTransactionCmd(autName string,
+func NewTransferAUTTransactionCmd(autIdentifier string,
 	outputs []AUTPair, autChangeAddress string, changeAddress string) *TransferAUTTransactionCmd {
 	return &TransferAUTTransactionCmd{
-		AUTName:          autName,
+		AUTIdentifier:    autIdentifier,
 		Outputs:          outputs,
 		AUTChangeAddress: autChangeAddress,
 		//ChangeAddress:    changeAddress,
@@ -862,9 +864,10 @@ func NewTransferAUTTransactionCmd(autName string,
 
 // registeraut register testname - 3 5000 1 1 1000000 dollar cent 1
 type ReRegisterAUTTransactionCmd struct {
-	AUTName      string
-	IssuerTokens []string // specify issuer tokens
-	IssuerTimes  int
+	AUTIdentifier string
+	AUTSymbol     string
+	IssuerTokens  []string // specify issuer tokens
+	IssuerTimes   int
 
 	ExpireHeight          int32
 	IssuerTokenThreshold  uint8
@@ -877,12 +880,13 @@ type ReRegisterAUTTransactionCmd struct {
 	AUTIssuerUpdateThreshold uint8
 }
 
-func NewReRegisterAUTTransactionCmd(autName string,
+func NewReRegisterAUTTransactionCmd(autIdentifier string, autSymbol string,
 	issuerTokens []string, issuerTimes int, expireHeight int32,
 	issuerTokenThreshold uint8, IssuerUpdateThreshold uint8, plannedTotalAmount uint64,
 	/*unitName string, minUnitName string,*/ unitScale uint64, autIssuerUpdateThreshold uint8) *ReRegisterAUTTransactionCmd {
 	return &ReRegisterAUTTransactionCmd{
-		AUTName:               autName,
+		AUTIdentifier:         autIdentifier,
+		AUTSymbol:             autSymbol,
 		IssuerTokens:          issuerTokens,
 		IssuerTimes:           issuerTimes,
 		ExpireHeight:          expireHeight,
@@ -898,14 +902,14 @@ func NewReRegisterAUTTransactionCmd(autName string,
 
 // burnaut register testname - 3 5000 1 1 1000000 dollar cent 1
 type BurnAUTTransactionCmd struct {
-	AUTName        string
+	AUTIdentifier  string
 	UTXOSpescified string
 }
 
-func NewBurnAUTTransactionCmd(autName string,
+func NewBurnAUTTransactionCmd(autIdentifier string,
 	utxoSpescified string) *BurnAUTTransactionCmd {
 	return &BurnAUTTransactionCmd{
-		AUTName:        autName,
+		AUTIdentifier:  autIdentifier,
 		UTXOSpescified: utxoSpescified,
 	}
 }

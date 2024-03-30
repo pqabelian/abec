@@ -346,8 +346,8 @@ type SpentAUT interface {
 }
 
 type UpdateAUTInfo struct {
-	Before *aut.Info
-	After  *aut.Info
+	Before *aut.MetaInfo
+	After  *aut.MetaInfo
 
 	// Height is the height of the the block containing the creating tx.
 	Height int32
@@ -716,7 +716,7 @@ func decodeSpentAUT(serialized []byte) (SpentAUT, int, error) {
 			offset += 1
 		} else {
 			offset += 1
-			res.Before = &aut.Info{}
+			res.Before = &aut.MetaInfo{}
 			sizeOfInfo, bytesRead := deserializeVLQ(serialized[offset:])
 			offset += bytesRead
 			if offset >= len(serialized) {
@@ -752,7 +752,7 @@ func decodeSpentAUT(serialized []byte) (SpentAUT, int, error) {
 			offset += 1
 		} else {
 			offset += 1
-			res.After = &aut.Info{}
+			res.After = &aut.MetaInfo{}
 			sizeOfInfo, bytesRead := deserializeVLQ(serialized[offset:])
 			offset += bytesRead
 			if offset >= len(serialized) {
@@ -1393,11 +1393,12 @@ func serializeAUTCoin(entry *AUTCoin) ([]byte, error) {
 
 	return serialized, nil
 }
-func serializeAUTInfoSize(info *aut.Info) int {
+func serializeAUTInfoSize(info *aut.MetaInfo) int {
 	if info == nil {
 		return 0
 	}
-	n := wire.VarIntSerializeSize(uint64(len(info.AutName))) + len(info.AutName) +
+	n := wire.VarIntSerializeSize(uint64(len(info.AutIdentifier))) + len(info.AutIdentifier) +
+		wire.VarIntSerializeSize(uint64(len(info.AutSymbol))) + len(info.AutSymbol) +
 		wire.VarIntSerializeSize(uint64(len(info.AutMemo))) + len(info.AutMemo) +
 		1 +
 		1 +
@@ -1413,9 +1414,9 @@ func serializeAUTInfoSize(info *aut.Info) int {
 		wire.VarIntSerializeSize(info.MintedAmount)
 	return n
 }
-func serializeAUTInfo(info *aut.Info) ([]byte, error) {
+func serializeAUTInfo(info *aut.MetaInfo) ([]byte, error) {
 	if info == nil {
-		return nil, errors.New("nil pointer to aut.Info for serialize")
+		return nil, errors.New("nil pointer to aut.Instance for serialize")
 	}
 	// Calculate the size needed to serialize AUT info.
 	size := serializeAUTInfoSize(info)
@@ -1423,7 +1424,11 @@ func serializeAUTInfo(info *aut.Info) ([]byte, error) {
 	// Serialize the header code followed by the compressed unspent
 	// transaction output.
 	buff := bytes.NewBuffer(make([]byte, 0, size))
-	err := wire.WriteVarBytes(buff, 0, info.AutName)
+	err := wire.WriteVarBytes(buff, 0, info.AutIdentifier)
+	if err != nil {
+		return nil, err
+	}
+	err = wire.WriteVarBytes(buff, 0, info.AutSymbol)
 	if err != nil {
 		return nil, err
 	}
@@ -1590,13 +1595,17 @@ func deserializeAUTCoin(serialized []byte) (*AUTCoin, error) {
 	return entry, nil
 }
 
-func deserializeAUTInfo(serialized []byte) (*aut.Info, error) {
+func deserializeAUTInfo(serialized []byte) (*aut.MetaInfo, error) {
 	// Serialize the header code followed by the compressed unspent
 	// transaction output.
-	info := &aut.Info{}
+	info := &aut.MetaInfo{}
 	var err error
 	buff := bytes.NewReader(serialized)
-	info.AutName, err = wire.ReadVarBytes(buff, 0, aut.MaxNameLength, "name")
+	info.AutIdentifier, err = wire.ReadVarBytes(buff, 0, aut.IdentifierLength, "identifier")
+	if err != nil {
+		return nil, err
+	}
+	info.AutSymbol, err = wire.ReadVarBytes(buff, 0, aut.MaxSymbolLength, "symbol")
 	if err != nil {
 		return nil, err
 	}
@@ -1823,7 +1832,7 @@ func dbFetchAUTEntry(dbTx database.Tx, outpoint aut.OutPoint) (*AUTCoin, error) 
 	return entry, nil
 }
 
-func dbFetchAUTInfo(dbTx database.Tx, key []byte) (*aut.Info, error) {
+func dbFetchAUTMetaInfo(dbTx database.Tx, key []byte) (*aut.MetaInfo, error) {
 	// Fetch the unspent transaction output information for the passed
 	// transaction output.  Return now when there is no entry.
 	autInfoBucket := dbTx.Metadata().Bucket(autInfoBucketName)
@@ -1920,7 +1929,7 @@ func dbPutAUTView(dbTx database.Tx, view *AUTViewpoint) error {
 	autRootCoinBucket := dbTx.Metadata().Bucket(autRootCoinBucketName)
 	for autNameKey, entry := range view.entries {
 		// Serialize and store the utxo entry.
-		serializedAUTInfo, err := serializeAUTInfo(entry.info)
+		serializedAUTInfo, err := serializeAUTInfo(entry.metadata)
 		if err != nil {
 			return err
 		}
@@ -1934,8 +1943,8 @@ func dbPutAUTView(dbTx database.Tx, view *AUTViewpoint) error {
 			return err
 		}
 
-		rootCoinSet := make([]*aut.OutPoint, 0, len(entry.info.RootCoinSet))
-		for rootCoin := range entry.info.RootCoinSet {
+		rootCoinSet := make([]*aut.OutPoint, 0, len(entry.metadata.RootCoinSet))
+		for rootCoin := range entry.metadata.RootCoinSet {
 			rootCoinSet = append(rootCoinSet, &aut.OutPoint{
 				TxHash: rootCoin.TxHash,
 				Index:  rootCoin.Index,

@@ -74,7 +74,8 @@ const (
 )
 
 const CommonPrefixLength = 9
-const MaxNameLength = 20
+const IdentifierLength = 64 // identifier
+const MaxSymbolLength = 64  // symbol
 
 // todo(Alice): MaxAutMemoLength, MaxTxMemoLength
 const MaxMemoLength = 20
@@ -96,12 +97,12 @@ type Transaction interface {
 	Type() TransactionType
 	Serialize() ([]byte, error)
 	Deserialize(io.Reader) error
-	AUTName() []byte
+	AUTIdentifier() []byte
 	// ToDo(Alice): TxIns, TxOuts
-	Ins() []OutPoint
-	Outs() []OutPoint
+	TxInputs() []OutPoint
+	TxOutputs() []OutPoint
 	// ToDo(Alice): ?? why have this? ValueAt(uint8)?
-	Value(uint8) uint64
+	ValueAt(uint8) uint64
 }
 
 //const HashSize = 64
@@ -116,8 +117,9 @@ type Transaction interface {
 //	return AUTHash(sha3.Sum512(b))
 //}
 
-type Info struct {
-	AutName            []byte
+type MetaInfo struct {
+	AutIdentifier      []byte // unique identifier
+	AutSymbol          []byte
 	IssuerTokens       [][]byte //[] crypto address // todo(AUT): using SHA3-512, define a standalone hash in AUT. Hash(CoinAddress)?
 	UpdateThreshold    uint8
 	IssueThreshold     uint8
@@ -133,14 +135,15 @@ type Info struct {
 }
 
 // Clone returns a shallow copy of the utxo entry.
-func (info *Info) Clone() *Info {
+func (info *MetaInfo) Clone() *MetaInfo {
 	if info == nil {
 		return nil
 	}
 
 	// ToDo(Alice): by the same order as the definition?
-	cloned := &Info{
-		AutName:            make([]byte, len(info.AutName)),
+	cloned := &MetaInfo{
+		AutIdentifier:      make([]byte, len(info.AutIdentifier)),
+		AutSymbol:          make([]byte, len(info.AutSymbol)),
 		AutMemo:            make([]byte, len(info.AutMemo)),
 		UpdateThreshold:    info.UpdateThreshold,
 		IssueThreshold:     info.IssueThreshold,
@@ -153,7 +156,8 @@ func (info *Info) Clone() *Info {
 		MintedAmount:       info.MintedAmount,
 		RootCoinSet:        make(map[OutPoint]struct{}, len(info.RootCoinSet)),
 	}
-	copy(cloned.AutName, info.AutName)
+	copy(cloned.AutIdentifier, info.AutIdentifier)
+	copy(cloned.AutSymbol, info.AutSymbol)
 	copy(cloned.AutMemo, info.AutMemo)
 
 	for i := 0; i < len(info.IssuerTokens); i++ {
@@ -198,7 +202,8 @@ func (info *Info) Clone() *Info {
 // Why this is dupliating the Info?
 // todo(Alice): for the common fields, using the same order as the definition, the particular fields
 type RegistrationTx struct {
-	AutName               []byte   // todo(AUT): AutName ?
+	AutIdentifier         []byte   // identifier
+	AutSymbol             []byte   // symbol
 	IssuerTokens          [][]byte // todo(AUT): same as in Info
 	ExpireHeight          int32
 	IssueTokensThreshold  uint8
@@ -235,24 +240,28 @@ func (tx *RegistrationTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	// todo(Alice): why use wire package? Note that common.go has these functions
-	err = wire.WriteVarBytes(&b, 0, tx.AutName)
+	err = WriteVarBytes(&b, 0, tx.AutIdentifier)
 	if err != nil {
 		return nil, err
 	}
 
-	err = wire.WriteVarInt(&b, 0, uint64(len(tx.IssuerTokens)))
+	err = WriteVarBytes(&b, 0, tx.AutSymbol)
+	if err != nil {
+		return nil, err
+	}
+
+	err = WriteVarInt(&b, 0, uint64(len(tx.IssuerTokens)))
 	if err != nil {
 		return nil, err
 	}
 	for _, issuer := range tx.IssuerTokens {
-		err = wire.WriteVarBytes(&b, 0, issuer[:])
+		err = WriteVarBytes(&b, 0, issuer[:])
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	err = wire.WriteVarInt(&b, 0, uint64(tx.ExpireHeight))
+	err = WriteVarInt(&b, 0, uint64(tx.ExpireHeight))
 	if err != nil {
 		return nil, err
 	}
@@ -272,34 +281,34 @@ func (tx *RegistrationTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	err = wire.WriteVarBytes(&b, 0, tx.AutMemo)
+	err = WriteVarBytes(&b, 0, tx.AutMemo)
 	if err != nil {
 		return nil, err
 	}
 
-	err = wire.WriteVarInt(&b, 0, tx.PlannedTotalAmount)
+	err = WriteVarInt(&b, 0, tx.PlannedTotalAmount)
 	if err != nil {
 		return nil, err
 	}
 
-	err = wire.WriteVarBytes(&b, 0, tx.UnitName)
+	err = WriteVarBytes(&b, 0, tx.UnitName)
 	if err != nil {
 		return nil, err
 	}
-	err = wire.WriteVarBytes(&b, 0, tx.MinUnitName)
+	err = WriteVarBytes(&b, 0, tx.MinUnitName)
 	if err != nil {
 		return nil, err
 	}
 
-	err = wire.WriteVarInt(&b, 0, tx.UnitScale)
+	err = WriteVarInt(&b, 0, tx.UnitScale)
 	if err != nil {
 		return nil, err
 	}
 
 	return b.Bytes(), nil
 }
-func (tx *RegistrationTx) AUTName() []byte {
-	return tx.AutName
+func (tx *RegistrationTx) AUTIdentifier() []byte {
+	return tx.AutIdentifier
 }
 func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 	// todo(Alice): use bytes.NewReader()?
@@ -323,16 +332,24 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 		return ErrInValidAUTTx
 	}
 
-	tx.AutName, err = wire.ReadVarBytes(r, 0, MaxNameLength, "name")
+	tx.AutIdentifier, err = ReadVarBytes(r, 0, IdentifierLength, "name")
 	if err != nil {
 		return err
 	}
-	if len(tx.AutName) == 0 {
+	if len(tx.AutIdentifier) == 0 {
+		return ErrInValidAUTTx
+	}
+
+	tx.AutSymbol, err = ReadVarBytes(r, 0, MaxSymbolLength, "symbol")
+	if err != nil {
+		return err
+	}
+	if len(tx.AutSymbol) == 0 {
 		return ErrInValidAUTTx
 	}
 
 	var numIssuer uint64
-	numIssuer, err = wire.ReadVarInt(r, 0)
+	numIssuer, err = ReadVarInt(r, 0)
 	if err != nil {
 		return err
 	}
@@ -340,7 +357,7 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 	tx.IssuerTokens = make([][]byte, numIssuer)
 	existIssuerTokens := map[string]struct{}{}
 	for i := 0; i < len(tx.IssuerTokens); i++ {
-		tx.IssuerTokens[i], err = wire.ReadVarBytes(r, 0, MaxIssuerTokenLength, "issuerToken")
+		tx.IssuerTokens[i], err = ReadVarBytes(r, 0, MaxIssuerTokenLength, "issuerToken")
 		if err != nil {
 			return err
 		}
@@ -350,7 +367,7 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 	}
 
 	var expireHeight uint64
-	expireHeight, err = wire.ReadVarInt(r, 0)
+	expireHeight, err = ReadVarInt(r, 0)
 	if err != nil {
 		return err
 	}
@@ -377,17 +394,17 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 	}
 	tx.OutAutRootCoinNum = oneByte[0]
 
-	tx.AutMemo, err = wire.ReadVarBytes(r, 0, MaxMemoLength, "memo")
+	tx.AutMemo, err = ReadVarBytes(r, 0, MaxMemoLength, "memo")
 	if err != nil {
 		return err
 	}
 
-	tx.PlannedTotalAmount, err = wire.ReadVarInt(r, 0)
+	tx.PlannedTotalAmount, err = ReadVarInt(r, 0)
 	if err != nil {
 		return err
 	}
 
-	tx.UnitName, err = wire.ReadVarBytes(r, 0, MaxUnitLength, "unit")
+	tx.UnitName, err = ReadVarBytes(r, 0, MaxUnitLength, "unit")
 	if err != nil {
 		return err
 	}
@@ -395,7 +412,7 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 		return ErrInValidAUTTx
 	}
 
-	tx.MinUnitName, err = wire.ReadVarBytes(r, 0, MaxMinUnitLength, "minUnit")
+	tx.MinUnitName, err = ReadVarBytes(r, 0, MaxMinUnitLength, "minUnit")
 	if err != nil {
 		return err
 	}
@@ -403,12 +420,13 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 		return ErrInValidAUTTx
 	}
 
-	tx.UnitScale, err = wire.ReadVarInt(r, 0)
+	tx.UnitScale, err = ReadVarInt(r, 0)
 	if err != nil {
 		return err
 	}
 
-	if len(tx.AutName) > MaxNameLength ||
+	if len(tx.AutIdentifier) != IdentifierLength ||
+		len(tx.AutSymbol) > MaxSymbolLength ||
 		len(tx.AutMemo) > MaxMemoLength ||
 		len(tx.UnitName) > MaxUnitLength ||
 		len(tx.MinUnitName) > MaxMinUnitLength {
@@ -427,14 +445,14 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 func (tx *RegistrationTx) NumIns() int {
 	return len(tx.TxIns)
 }
-func (tx *RegistrationTx) Ins() []OutPoint {
+func (tx *RegistrationTx) TxInputs() []OutPoint {
 	return tx.TxIns
 }
 
-func (tx *RegistrationTx) Outs() []OutPoint {
+func (tx *RegistrationTx) TxOutputs() []OutPoint {
 	return tx.TxOuts
 }
-func (tx *RegistrationTx) Value(uint8) uint64 {
+func (tx *RegistrationTx) ValueAt(uint8) uint64 {
 	return 0
 }
 
@@ -447,7 +465,7 @@ var _ Transaction = &RegistrationTx{}
 // <TxoAUTValues> an array of n integer value each one for a an AUTCoin
 // [Memo]
 type MintTx struct {
-	AutName          []byte
+	AutIdentifier    []byte
 	InAutRootCoinNum uint8
 	OutAutCoinNum    uint8
 	TxoAUTValues     []uint64
@@ -477,8 +495,7 @@ func (tx *MintTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	// todo(Alice): why use wire package?
-	err = wire.WriteVarBytes(&b, 0, tx.AutName)
+	err = WriteVarBytes(&b, 0, tx.AutIdentifier)
 	if err != nil {
 		return nil, err
 	}
@@ -494,7 +511,7 @@ func (tx *MintTx) Serialize() ([]byte, error) {
 	}
 
 	// todo(Alice): add a simple santiy-check on the consistence bewteen OutAutCoinNum and len(TxoAUTValues)
-	err = wire.WriteVarInt(&b, 0, uint64(len(tx.TxoAUTValues)))
+	err = WriteVarInt(&b, 0, uint64(len(tx.TxoAUTValues)))
 	if err != nil {
 		return nil, err
 	}
@@ -503,13 +520,13 @@ func (tx *MintTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 	for _, value := range tx.TxoAUTValues {
-		err = wire.WriteVarInt(&b, 0, value)
+		err = WriteVarInt(&b, 0, value)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	err = wire.WriteVarBytes(&b, 0, tx.Memo)
+	err = WriteVarBytes(&b, 0, tx.Memo)
 	if err != nil {
 		return nil, err
 	}
@@ -539,11 +556,11 @@ func (tx *MintTx) Deserialize(r io.Reader) error {
 		return ErrInValidAUTTx
 	}
 
-	tx.AutName, err = wire.ReadVarBytes(r, 0, MaxNameLength, "name")
+	tx.AutIdentifier, err = ReadVarBytes(r, 0, IdentifierLength, "identifier")
 	if err != nil {
 		return err
 	}
-	if len(tx.AutName) == 0 {
+	if len(tx.AutIdentifier) == 0 {
 		return ErrInValidAUTTx
 	}
 
@@ -571,40 +588,40 @@ func (tx *MintTx) Deserialize(r io.Reader) error {
 
 	tx.TxoAUTValues = make([]uint64, numOutAutCoins)
 	for i := 0; i < len(tx.TxoAUTValues); i++ {
-		tx.TxoAUTValues[i], err = wire.ReadVarInt(r, 0)
+		tx.TxoAUTValues[i], err = ReadVarInt(r, 0)
 		if err != nil {
 			return err
 		}
 	}
 
-	tx.Memo, err = wire.ReadVarBytes(r, 0, MaxMemoLength, "memo")
+	tx.Memo, err = ReadVarBytes(r, 0, MaxMemoLength, "memo")
 	if err != nil {
 		return err
 	}
 
 	// todo(Alice): MaxAutTxMemo
-	if len(tx.AutName) > MaxNameLength ||
+	if len(tx.AutIdentifier) != IdentifierLength ||
 		len(tx.Memo) > MaxMemoLength {
 		return errors.New("an AUT with invalid length of name")
 	}
 	return nil
 }
-func (tx *MintTx) AUTName() []byte {
-	return tx.AutName
+func (tx *MintTx) AUTIdentifier() []byte {
+	return tx.AutIdentifier
 }
 
 // todo(Alice): remove this?
 func (tx *MintTx) NumIns() int {
 	return len(tx.TxIns)
 }
-func (tx *MintTx) Ins() []OutPoint {
+func (tx *MintTx) TxInputs() []OutPoint {
 	return tx.TxIns
 }
 
-func (tx *MintTx) Outs() []OutPoint {
+func (tx *MintTx) TxOutputs() []OutPoint {
 	return tx.TxOuts
 }
-func (tx *MintTx) Value(idx uint8) uint64 {
+func (tx *MintTx) ValueAt(idx uint8) uint64 {
 	if int(idx) < len(tx.TxoAUTValues) {
 		return tx.TxoAUTValues[idx]
 	}
@@ -623,7 +640,8 @@ var _ Transaction = &MintTx{}
 type ReRegistrationTx struct {
 	// todo(Alice): for the common fields with RegistrationTx, use the same order; then particular fields
 	// AutMemo, and AutTxMemo
-	AutName               []byte
+	AutIdentifier         []byte
+	AutSymbol             []byte // symbol
 	IssuerTokens          [][]byte
 	ExpireHeight          int32
 	IssuerUpdateThreshold uint8 // TODO confirm the range
@@ -658,24 +676,27 @@ func (tx *ReRegistrationTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	// todo(Alice): why use wire.
-	err = wire.WriteVarBytes(&b, 0, tx.AutName)
+	err = WriteVarBytes(&b, 0, tx.AutIdentifier)
+	if err != nil {
+		return nil, err
+	}
+	err = WriteVarBytes(&b, 0, tx.AutSymbol)
 	if err != nil {
 		return nil, err
 	}
 
-	err = wire.WriteVarInt(&b, 0, uint64(len(tx.IssuerTokens)))
+	err = WriteVarInt(&b, 0, uint64(len(tx.IssuerTokens)))
 	if err != nil {
 		return nil, err
 	}
 	for _, issuer := range tx.IssuerTokens {
-		err = wire.WriteVarBytes(&b, 0, issuer)
+		err = WriteVarBytes(&b, 0, issuer)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	err = wire.WriteVarInt(&b, 0, uint64(tx.ExpireHeight))
+	err = WriteVarInt(&b, 0, uint64(tx.ExpireHeight))
 	if err != nil {
 		return nil, err
 	}
@@ -700,17 +721,17 @@ func (tx *ReRegistrationTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	err = wire.WriteVarBytes(&b, 0, tx.Memo)
+	err = WriteVarBytes(&b, 0, tx.Memo)
 	if err != nil {
 		return nil, err
 	}
 
-	err = wire.WriteVarInt(&b, 0, tx.PlannedTotalAmount)
+	err = WriteVarInt(&b, 0, tx.PlannedTotalAmount)
 	if err != nil {
 		return nil, err
 	}
 
-	err = wire.WriteVarInt(&b, 0, tx.UnitScale)
+	err = WriteVarInt(&b, 0, tx.UnitScale)
 	if err != nil {
 		return nil, err
 	}
@@ -740,16 +761,23 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 		return ErrInValidAUTTx
 	}
 
-	tx.AutName, err = wire.ReadVarBytes(r, 0, MaxNameLength, "name")
+	tx.AutIdentifier, err = ReadVarBytes(r, 0, IdentifierLength, "identifier")
 	if err != nil {
 		return err
 	}
-	if len(tx.AutName) == 0 {
+	if len(tx.AutIdentifier) == 0 {
+		return ErrInValidAUTTx
+	}
+	tx.AutSymbol, err = ReadVarBytes(r, 0, IdentifierLength, "symbol")
+	if err != nil {
+		return err
+	}
+	if len(tx.AutSymbol) == 0 {
 		return ErrInValidAUTTx
 	}
 
 	var numIssuer uint64
-	numIssuer, err = wire.ReadVarInt(r, 0)
+	numIssuer, err = ReadVarInt(r, 0)
 	if err != nil {
 		return err
 	}
@@ -757,7 +785,7 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 	tx.IssuerTokens = make([][]byte, numIssuer)
 	existIssuerTokens := map[string]struct{}{}
 	for i := 0; i < len(tx.IssuerTokens); i++ {
-		tx.IssuerTokens[i], err = wire.ReadVarBytes(r, 0, MaxIssuerTokenLength, "issuerToken")
+		tx.IssuerTokens[i], err = ReadVarBytes(r, 0, MaxIssuerTokenLength, "issuerToken")
 		if err != nil {
 			return err
 		}
@@ -768,7 +796,7 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 	}
 
 	var expireHeight uint64
-	expireHeight, err = wire.ReadVarInt(r, 0)
+	expireHeight, err = ReadVarInt(r, 0)
 	if err != nil {
 		return err
 	}
@@ -801,22 +829,22 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 	}
 	tx.OutAutRootCoinNum = oneByte[0]
 
-	tx.Memo, err = wire.ReadVarBytes(r, 0, MaxMemoLength, "memo")
+	tx.Memo, err = ReadVarBytes(r, 0, MaxMemoLength, "memo")
 	if err != nil {
 		return err
 	}
 
-	tx.PlannedTotalAmount, err = wire.ReadVarInt(r, 0)
+	tx.PlannedTotalAmount, err = ReadVarInt(r, 0)
 	if err != nil {
 		return err
 	}
 
-	tx.UnitScale, err = wire.ReadVarInt(r, 0)
+	tx.UnitScale, err = ReadVarInt(r, 0)
 	if err != nil {
 		return err
 	}
 
-	if len(tx.AutName) > MaxNameLength || len(tx.Memo) > MaxMemoLength {
+	if len(tx.AutIdentifier) != IdentifierLength || len(tx.Memo) > MaxMemoLength {
 		return errors.New("an AUT with invalid length of name")
 	}
 	// todo(Alice): AutMemo, AutTxMemo
@@ -833,22 +861,22 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 	}
 	return nil
 }
-func (tx *ReRegistrationTx) AUTName() []byte {
-	return tx.AutName
+func (tx *ReRegistrationTx) AUTIdentifier() []byte {
+	return tx.AutIdentifier
 }
 
 // todo(Alice): remove this?
 func (tx *ReRegistrationTx) NumIns() int {
 	return len(tx.TxIns)
 }
-func (tx *ReRegistrationTx) Ins() []OutPoint {
+func (tx *ReRegistrationTx) TxInputs() []OutPoint {
 	return tx.TxIns
 }
 
-func (tx *ReRegistrationTx) Outs() []OutPoint {
+func (tx *ReRegistrationTx) TxOutputs() []OutPoint {
 	return tx.TxOuts
 }
-func (tx *ReRegistrationTx) Value(uint8) uint64 {
+func (tx *ReRegistrationTx) ValueAt(uint8) uint64 {
 	return 0
 }
 
@@ -860,7 +888,7 @@ var _ Transaction = &ReRegistrationTx{}
 // <TxoAUTValues> an array of n integer value, each one for a AUTCoin-TXO
 // [Memo]
 type TransferTx struct {
-	AutName       []byte
+	AutIdentifier []byte
 	InAutCoinNum  uint8
 	OutAutCoinNum uint8
 	TxoAUTValues  []uint64
@@ -890,7 +918,7 @@ func (tx *TransferTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	err = wire.WriteVarBytes(&b, 0, tx.AutName)
+	err = WriteVarBytes(&b, 0, tx.AutIdentifier)
 	if err != nil {
 		return nil, err
 	}
@@ -909,7 +937,7 @@ func (tx *TransferTx) Serialize() ([]byte, error) {
 		return nil, ErrInValidAUTTx
 	}
 
-	err = wire.WriteVarInt(&b, 0, uint64(len(tx.TxoAUTValues)))
+	err = WriteVarInt(&b, 0, uint64(len(tx.TxoAUTValues)))
 	if err != nil {
 		return nil, err
 	}
@@ -918,14 +946,13 @@ func (tx *TransferTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 	for _, value := range tx.TxoAUTValues {
-		err = wire.WriteVarInt(&b, 0, value)
+		err = WriteVarInt(&b, 0, value)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	// todo(Alice): why use wire?
-	err = wire.WriteVarBytes(&b, 0, tx.Memo)
+	err = WriteVarBytes(&b, 0, tx.Memo)
 	if err != nil {
 		return nil, err
 	}
@@ -955,11 +982,11 @@ func (tx *TransferTx) Deserialize(r io.Reader) error {
 		return ErrInValidAUTTx
 	}
 
-	tx.AutName, err = wire.ReadVarBytes(r, 0, MaxNameLength, "name")
+	tx.AutIdentifier, err = ReadVarBytes(r, 0, IdentifierLength, "identifier")
 	if err != nil {
 		return err
 	}
-	if len(tx.AutName) == 0 {
+	if len(tx.AutIdentifier) == 0 {
 		return ErrInValidAUTTx
 	}
 
@@ -975,7 +1002,7 @@ func (tx *TransferTx) Deserialize(r io.Reader) error {
 	}
 	tx.OutAutCoinNum = oneByte[0]
 
-	numOutAutCoins, err := wire.ReadVarInt(r, 0)
+	numOutAutCoins, err := ReadVarInt(r, 0)
 	if err != nil {
 		return err
 	}
@@ -986,38 +1013,39 @@ func (tx *TransferTx) Deserialize(r io.Reader) error {
 
 	tx.TxoAUTValues = make([]uint64, numOutAutCoins)
 	for i := 0; i < len(tx.TxoAUTValues); i++ {
-		tx.TxoAUTValues[i], err = wire.ReadVarInt(r, 0)
+		tx.TxoAUTValues[i], err = ReadVarInt(r, 0)
 		if err != nil {
 			return err
 		}
 	}
 
-	tx.Memo, err = wire.ReadVarBytes(r, 0, MaxMemoLength, "memo")
+	tx.Memo, err = ReadVarBytes(r, 0, MaxMemoLength, "memo")
 	if err != nil {
 		return err
 	}
 
-	if len(tx.Memo) > MaxMemoLength {
+	if len(tx.AutIdentifier) != IdentifierLength ||
+		len(tx.Memo) > MaxMemoLength {
 		return errors.New("an AUT with invalid length of name")
 	}
 	return nil
 }
-func (tx *TransferTx) AUTName() []byte {
-	return tx.AutName
+func (tx *TransferTx) AUTIdentifier() []byte {
+	return tx.AutIdentifier
 }
 func (tx *TransferTx) NumIns() int {
 	return len(tx.TxIns)
 }
 
-func (tx *TransferTx) Ins() []OutPoint {
+func (tx *TransferTx) TxInputs() []OutPoint {
 	return tx.TxIns
 }
 
-func (tx *TransferTx) Outs() []OutPoint {
+func (tx *TransferTx) TxOutputs() []OutPoint {
 	return tx.TxOuts
 
 }
-func (tx *TransferTx) Value(idx uint8) uint64 {
+func (tx *TransferTx) ValueAt(idx uint8) uint64 {
 	if int(idx) < len(tx.TxoAUTValues) {
 		return tx.TxoAUTValues[idx]
 	}
@@ -1030,9 +1058,9 @@ var _ Transaction = &TransferTx{}
 // <Name>  a string
 // [Memo]
 type BurnTx struct {
-	AutName      []byte
-	InAutCoinNum uint8
-	Memo         []byte // 	// todo(Alice): how about TxMemo?
+	AutIdentifier []byte
+	InAutCoinNum  uint8
+	Memo          []byte // 	// todo(Alice): how about TxMemo?
 
 	TxIns  []OutPoint
 	TxOuts []OutPoint
@@ -1061,7 +1089,7 @@ func (tx *BurnTx) Serialize() ([]byte, error) {
 	}
 
 	// todo(Alice): why use wire
-	err = wire.WriteVarBytes(&b, 0, tx.AutName)
+	err = WriteVarBytes(&b, 0, tx.AutIdentifier)
 	if err != nil {
 		return nil, err
 	}
@@ -1071,7 +1099,7 @@ func (tx *BurnTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	err = wire.WriteVarBytes(&b, 0, tx.Memo)
+	err = WriteVarBytes(&b, 0, tx.Memo)
 	if err != nil {
 		return nil, err
 	}
@@ -1099,11 +1127,11 @@ func (tx *BurnTx) Deserialize(r io.Reader) error {
 		return ErrInValidAUTTx
 	}
 
-	tx.AutName, err = wire.ReadVarBytes(r, 0, MaxNameLength, "name")
+	tx.AutIdentifier, err = ReadVarBytes(r, 0, IdentifierLength, "identifier")
 	if err != nil {
 		return err
 	}
-	if len(tx.AutName) == 0 {
+	if len(tx.AutIdentifier) == 0 {
 		return ErrInValidAUTTx
 	}
 
@@ -1113,32 +1141,33 @@ func (tx *BurnTx) Deserialize(r io.Reader) error {
 	}
 	tx.InAutCoinNum = oneByte[0]
 
-	tx.Memo, err = wire.ReadVarBytes(r, 0, MaxMemoLength, "memo")
+	tx.Memo, err = ReadVarBytes(r, 0, MaxMemoLength, "memo")
 	if err != nil {
 		return err
 	}
 
-	if len(tx.Memo) > MaxMemoLength {
+	if len(tx.AutIdentifier) != IdentifierLength ||
+		len(tx.Memo) > MaxMemoLength {
 		return errors.New("an AUT with invalid length of name")
 	}
 	return nil
 }
-func (tx *BurnTx) AUTName() []byte {
-	return tx.AutName
+func (tx *BurnTx) AUTIdentifier() []byte {
+	return tx.AutIdentifier
 }
 
 // todo(Alice): remove this?
 func (tx *BurnTx) NumIns() int {
 	return len(tx.TxIns)
 }
-func (tx *BurnTx) Ins() []OutPoint {
+func (tx *BurnTx) TxInputs() []OutPoint {
 	return tx.TxIns
 }
 
-func (tx *BurnTx) Outs() []OutPoint {
+func (tx *BurnTx) TxOutputs() []OutPoint {
 	return nil
 }
-func (tx *BurnTx) Value(uint8) uint64 {
+func (tx *BurnTx) ValueAt(uint8) uint64 {
 	return 0
 }
 

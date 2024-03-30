@@ -485,15 +485,15 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *bl
 		return err
 	}
 	if autTx != nil {
-		autNameKey := hex.EncodeToString(autTx.AUTName())
+		autIdentifierKey := hex.EncodeToString(autTx.AUTIdentifier())
 		entries := autView.Entries()
-		entry, exist := entries[autNameKey]
+		entry, exist := entries[autIdentifierKey]
 		if autTx.Type() == aut.Registration {
-			if exist && entry != nil && entry.Info() != nil {
+			if exist && entry != nil && entry.Metadata() != nil {
 				return errors.New("an registration AUT transaction try to register AUT entry with an existing AUT name ")
 			}
 		} else {
-			if !exist || entry == nil || entry.Info() == nil {
+			if !exist || entry == nil || entry.Metadata() == nil {
 				return errors.New("an non-registration AUT transaction try to operate on non-existing AUT entry")
 			}
 		}
@@ -504,9 +504,10 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *bl
 				rootCoinSet[autTransaction.TxOuts[i]] = struct{}{}
 			}
 			// register the AUT entry
-			autView.SetEntry(autTransaction.AutName, blockchain.NewAUTEntry(
-				&aut.Info{
-					AutName:            autTransaction.AutName,
+			autView.SetEntry(autTransaction.AutIdentifier, blockchain.NewAUTEntry(
+				&aut.MetaInfo{
+					AutIdentifier:      autTransaction.AutIdentifier,
+					AutSymbol:          autTransaction.AutSymbol,
 					AutMemo:            autTransaction.AutMemo,
 					UpdateThreshold:    autTransaction.IssuerUpdateThreshold,
 					IssueThreshold:     autTransaction.IssueTokensThreshold,
@@ -523,7 +524,7 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *bl
 			))
 
 		case *aut.MintTx:
-			info := entry.Info()
+			info := entry.Metadata()
 			for i := 0; i < len(autTransaction.TxIns); i++ {
 				if _, ok := info.RootCoinSet[autTransaction.TxIns[i]]; !ok {
 					return errors.New("an AUT transaction with non-existing/spent root coin")
@@ -539,13 +540,13 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *bl
 					return errors.New("an AUT mint transaction try to mint amount exceed planned")
 				}
 				wouldMintedAmount += autTransaction.TxoAUTValues[i]
-				entry.Add(autTransaction.TxOuts[i], blockchain.NewAUTCoin(autTransaction.AutName, autTransaction.TxoAUTValues[i], -1, false))
+				entry.Add(autTransaction.TxOuts[i], blockchain.NewAUTCoin(autTransaction.AutIdentifier, autTransaction.TxoAUTValues[i], -1, false))
 			}
 			info.MintedAmount = wouldMintedAmount
 
 		case *aut.ReRegistrationTx:
 			// input exist? double spent?
-			info := entry.Info()
+			info := entry.Metadata()
 			for i := 0; i < len(autTransaction.TxIns); i++ {
 				if _, ok := info.RootCoinSet[autTransaction.TxIns[i]]; !ok {
 					return errors.New("an AUT transaction with non-existing/spent root coin")
@@ -554,6 +555,7 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *bl
 			}
 
 			// update aut info
+			info.AutSymbol = autTransaction.AutSymbol
 			info.AutMemo = autTransaction.Memo
 			info.UpdateThreshold = autTransaction.IssuerUpdateThreshold
 			info.IssueThreshold = autTransaction.IssueTokensThreshold
@@ -570,7 +572,7 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *bl
 		case *aut.TransferTx:
 			// check the sanity of transfer transaction
 			// balance between inputs and outputs
-			info := entry.Info()
+			info := entry.Metadata()
 			totalInputValue := uint64(0)
 			for i := 0; i < len(autTransaction.TxIns); i++ {
 				token := entry.LookupCoin(autTransaction.TxIns[i])
@@ -590,14 +592,14 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *bl
 					totalOutValue+autTransaction.TxoAUTValues[i] > info.PlannedTotalAmount {
 					return errors.New("an AUT transfer transaction try to overflow amount")
 				}
-				entry.Add(autTransaction.TxOuts[i], blockchain.NewAUTCoin(autTransaction.AutName, autTransaction.TxoAUTValues[i], 0, false))
+				entry.Add(autTransaction.TxOuts[i], blockchain.NewAUTCoin(autTransaction.AutIdentifier, autTransaction.TxoAUTValues[i], 0, false))
 			}
 			if totalInputValue != totalOutValue {
 				return errors.New("an AUT transfer transaction try to break-balance amount")
 			}
 
 		case *aut.BurnTx:
-			info := entry.Info()
+			info := entry.Metadata()
 			burnedValues := uint64(0)
 			for i := 0; i < len(autTransaction.TxIns); i++ {
 				token := entry.LookupCoin(autTransaction.TxIns[i])
@@ -850,6 +852,10 @@ mempoolLoop:
 			continue
 		}
 
+		// mainnet [0    -    55999] [56000     -    279999] [280000   -    321999]
+		// testnet [0    -    55999] [56000     -    279999] [280000   -    321999]
+		// simnet  [0    -    299  ] [300       -    999   ] [1000     -    1999  ]
+		//             1                    1/2                  2
 		// ToDo(MLP):
 		if nextBlockHeight >= g.chainParams.BlockHeightMLPAUTCOMMIT {
 			if tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_300000 {
