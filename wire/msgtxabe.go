@@ -365,7 +365,8 @@ func WriteTxOutAbe(w io.Writer, pver uint32, version uint32, txOut *TxOutAbe) er
 // (TxInAbe).
 func ReadTxOutAbe(r io.Reader, pver uint32, version uint32, txOut *TxOutAbe) error {
 	//	todo: 2023.03.31 this read does not exactly match the corresponding write operation.
-	err := readElement(r, &txOut.Version)
+	var err error
+	txOut.Version, err = binarySerializer.Uint32(r, littleEndian)
 	if err != nil {
 		return err
 	}
