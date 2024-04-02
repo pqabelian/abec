@@ -51,6 +51,18 @@ func CryptoAddressKeyGen(randSeed []byte, cryptoScheme abecryptoxparam.CryptoSch
 	//return nil, nil, nil, nil, nil
 }
 
+func CryptoAddressKeySeedGen(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel) (retCryptoAddressKeySeed []byte, err error) {
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCT:
+		return abecrypto.CryptoAddressKeySeedGen(abecryptoparam.CryptoSchemePQRingCT)
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+		return pqringctxCryptoAddressKeySeedGen(abecryptoxparam.PQRingCTXPP, cryptoScheme, privacyLevel)
+
+	default:
+		return nil, fmt.Errorf("CryptoAddressSeedKeyGen: unsupported crypto-scheme")
+	}
+}
+
 // CryptoAddressKeyGenByRootSeeds generates a (cryptoAddress, cryptoKeys) for the input (Root Seeds, CoinDetectorRootKey).
 // CryptoAddressKeyGenByRootSeeds is a randomized algorithm.
 // reviewed on 2023.12.30
@@ -487,6 +499,175 @@ func CryptoDetectorKeyParse(cryptoDetectorKey []byte) (privacyLevel PrivacyLevel
 
 //	APIs for AddressKey-Encode-Format	end
 
+// APIs for verification start
+func CryptoAddressKeysVerify(cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk []byte, cryptoVsk []byte, cryptoDetectorKey []byte) (bool, error) {
+	cryptoScheme, err := ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
+	if err != nil {
+		return false, fmt.Errorf("CryptoAddressKeysVerify: can not extract crypto scheme in cryptoAddress: %v", err)
+	}
+
+	privacyLevel, coinAddress, coinValuePublicKey, err := CryptoAddressParse(cryptoAddress)
+	if err != nil {
+		return false, fmt.Errorf("CryptoAddressKeysVerify: can not parse cryptoAddress: %v", err)
+	}
+
+	//	check the cryptoScheme in cryptoSpsk.
+	cryptoSchemeInSpsk, err := ExtractCryptoSchemeFromCryptoSpendSecretKey(cryptoSpsk)
+	if err != nil {
+		return false, fmt.Errorf("CryptoAddressKeysVerify: can not extract crypto scheme in cryptoSpsk: %v", err)
+	}
+	if cryptoSchemeInSpsk != cryptoScheme {
+		return false, fmt.Errorf("CryptoAddressKeysVerify: unmacthed cryptoScheme in cryptoSpsk and cryptoAddress: %d vs %d", cryptoSchemeInSpsk, cryptoScheme)
+	}
+	privacyLevelInSpsk, coinSpendSecretKey, err := CryptoSpendSecretKeyParse(cryptoSpsk)
+	if err != nil {
+		return false, fmt.Errorf("CryptoAddressKeysVerify: can not parse cryptoSpsk: %v", err)
+	}
+	if privacyLevelInSpsk != privacyLevel {
+		return false, fmt.Errorf("CryptoAddressKeysVerify: unmacthed privacyLevel in cryptoSpsk and cryptoAddress: %d vs %d", privacyLevelInSpsk, privacyLevel)
+	}
+
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCT:
+		if privacyLevel != PrivacyLevelRINGCTPre {
+			return false, fmt.Errorf("CryptoAddressKeysVerify: (cryptoScheme, privacyLevel) in cryptoAddress, "+
+				"expect (%d,%d), but got (%d,%d)", abecryptoxparam.CryptoSchemePQRingCT, PrivacyLevelRINGCTPre,
+				cryptoScheme, privacyLevel)
+		}
+
+		cryptoSchemeInSnsk, err := ExtractCryptoSchemeFromCryptoSerialNumberSecretKey(cryptoSnsk)
+		if err != nil {
+			return false, fmt.Errorf("CryptoAddressKeysVerify: can not extract crypto scheme in cryptoSnsk: %v", err)
+		}
+		if cryptoSchemeInSnsk != cryptoScheme {
+			return false, fmt.Errorf("CryptoAddressKeysVerify: unmacthed cryptoScheme in cryptoSnsk and cryptoAddress: %d vs %d", cryptoSchemeInSnsk, cryptoScheme)
+		}
+		privacyLevelInSnsk, coinSerialNumberSecretKey, err := CryptoSerialNumberSecretKeyParse(cryptoSnsk)
+		if err != nil {
+			return false, fmt.Errorf("CryptoAddressKeysVerify: can not parse cryptoSnsk: %v", err)
+		}
+		if privacyLevelInSnsk != privacyLevel {
+			return false, fmt.Errorf("CryptoAddressKeysVerify: unmacthed privacyLevel in cryptoSnsk and cryptoAddress: %d vs %d", privacyLevelInSnsk, privacyLevel)
+		}
+
+		cryptoSchemeInVsk, err := ExtractCryptoSchemeFromCryptoValueSecretKey(cryptoVsk)
+		if err != nil {
+			return false, fmt.Errorf("CryptoAddressKeysVerify: can not extract crypto scheme in cryptoVsk: %v", err)
+		}
+		if cryptoSchemeInVsk != cryptoScheme {
+			return false, fmt.Errorf("CryptoAddressKeysVerify: unmacthed cryptoScheme in cryptoVsk and cryptoAddress: %d vs %d", cryptoSchemeInVsk, cryptoScheme)
+		}
+		privacyLevelInVsk, coinValueSecretKey, err := CryptoValueSecretKeyParse(cryptoVsk)
+		if err != nil {
+			return false, fmt.Errorf("CryptoAddressKeysVerify: can not parse cryptoVsk: %v", err)
+		}
+		if privacyLevelInVsk != privacyLevel {
+			return false, fmt.Errorf("CryptoAddressKeysVerify: unmacthed privacyLevel in cryptoVsk and cryptoAddress: %d vs %d", privacyLevelInVsk, privacyLevel)
+		}
+
+		valid, hints := abecrypto.VerifyCryptoAddressSpsnsk(coinAddress, coinSpendSecretKey, coinSerialNumberSecretKey)
+		if !valid {
+			return false, fmt.Errorf("%s", hints)
+		}
+
+		return pqringctxCoinValueKeyVerify(abecryptoxparam.PQRingCTXPP, coinValuePublicKey, coinValueSecretKey)
+
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+		if privacyLevel != PrivacyLevelRINGCT && privacyLevel != PrivacyLevelPSEUDONYM {
+			return false, fmt.Errorf("CryptoAddressKeysVerify: (cryptoScheme, privacyLevel) in cryptoAddress, "+
+				"expect (%d,%d) or (%d,%d), but got (%d,%d)", abecryptoxparam.CryptoSchemePQRingCTX, PrivacyLevelRINGCT,
+				abecryptoxparam.CryptoSchemePQRingCTX, PrivacyLevelPSEUDONYM,
+				cryptoScheme, privacyLevel)
+		}
+
+		cryptoSchemeInDetectorKey, err := ExtractCryptoSchemeFromCryptoDetectorKey(cryptoDetectorKey)
+		if err != nil {
+			return false, fmt.Errorf("CryptoAddressKeysVerify: can not extract crypto scheme in cryptoDetectorKey: %v", err)
+		}
+		if cryptoSchemeInDetectorKey != cryptoScheme {
+			return false, fmt.Errorf("CryptoAddressKeysVerify: unmacthed cryptoScheme in cryptoDetectorKey and cryptoAddress: %d vs %d", cryptoSchemeInDetectorKey, cryptoScheme)
+		}
+		privacyLevelInDetectorKey, coinDetectorKey, err := CryptoDetectorKeyParse(cryptoSnsk)
+		if err != nil {
+			return false, fmt.Errorf("CryptoAddressKeysVerify: can not parse cryptoDetectorKey: %v", err)
+		}
+		if privacyLevelInDetectorKey != privacyLevel {
+			return false, fmt.Errorf("CryptoAddressKeysVerify: unmacthed privacyLevel in cryptoDetectorKey and cryptoAddress: %d vs %d", privacyLevelInDetectorKey, privacyLevel)
+		}
+
+		if privacyLevel == PrivacyLevelPSEUDONYM {
+			return pqringctxCoinAddressKeyForPKHSingleVerify(abecryptoxparam.PQRingCTXPP, coinAddress, coinSpendSecretKey, coinDetectorKey)
+		}
+
+		cryptoSchemeInSnsk, err := ExtractCryptoSchemeFromCryptoSerialNumberSecretKey(cryptoSnsk)
+		if err != nil {
+			return false, fmt.Errorf("CryptoAddressKeysVerify: can not extract crypto scheme in cryptoSnsk: %v", err)
+		}
+		if cryptoSchemeInSnsk != cryptoScheme {
+			return false, fmt.Errorf("CryptoAddressKeysVerify: unmacthed cryptoScheme in cryptoSnsk and cryptoAddress: %d vs %d", cryptoSchemeInSnsk, cryptoScheme)
+		}
+		privacyLevelInSnsk, coinSerialNumberSecretKey, err := CryptoSerialNumberSecretKeyParse(cryptoSnsk)
+		if err != nil {
+			return false, fmt.Errorf("CryptoAddressKeysVerify: can not parse cryptoSnsk: %v", err)
+		}
+		if privacyLevelInSnsk != privacyLevel {
+			return false, fmt.Errorf("CryptoAddressKeysVerify: unmacthed privacyLevel in cryptoSnsk and cryptoAddress: %d vs %d", privacyLevelInSnsk, privacyLevel)
+		}
+
+		cryptoSchemeInVsk, err := ExtractCryptoSchemeFromCryptoValueSecretKey(cryptoVsk)
+		if err != nil {
+			return false, fmt.Errorf("CryptoAddressKeysVerify: can not extract crypto scheme in cryptoVsk: %v", err)
+		}
+		if cryptoSchemeInVsk != cryptoScheme {
+			return false, fmt.Errorf("CryptoAddressKeysVerify: unmacthed cryptoScheme in cryptoVsk and cryptoAddress: %d vs %d", abecryptoparam.CryptoScheme(cryptoSchemeInVsk), cryptoScheme)
+		}
+		privacyLevelInVsk, coinValueSecretKey, err := CryptoValueSecretKeyParse(cryptoVsk)
+		if err != nil {
+			return false, fmt.Errorf("CryptoAddressKeysVerify: can not parse cryptoVsk: %v", err)
+		}
+		if privacyLevelInVsk != privacyLevel {
+			return false, fmt.Errorf("CryptoAddressKeysVerify: unmacthed privacyLevel in cryptoVsk and cryptoAddress: %d vs %d", abecryptoparam.CryptoScheme(privacyLevelInVsk), privacyLevel)
+		}
+		valid, err := pqringctxCoinValueKeyVerify(abecryptoxparam.PQRingCTXPP, coinValuePublicKey, coinValueSecretKey)
+		if !valid {
+			return false, err
+		}
+		return pqringctxCoinAddressKeyForPKRingVerify(abecryptoxparam.PQRingCTXPP, coinAddress, coinSpendSecretKey, coinSerialNumberSecretKey, coinDetectorKey)
+
+	default:
+		return false, fmt.Errorf("CryptoAddressKeysVerify: expect crypto scheme %d or %d in cryptoAddress, but got %d", abecryptoxparam.CryptoSchemePQRingCT, abecryptoxparam.CryptoSchemePQRingCTX, cryptoScheme)
+	}
+}
+
+// CheckCryptoAddress checks whether the input cryptoAddress is well-formed.
+func CheckCryptoAddress(cryptoAddress []byte) (valid bool, err error) {
+	privacyLevel, coinAddress, coinValuePublicKey, err := CryptoAddressParse(cryptoAddress)
+	if err != nil {
+		return false, fmt.Errorf("CheckCryptoAddress: can not parse cryptoAddress: %s", err)
+	}
+	coinAddressSize, err := pqringctxGetCoinAddressSize(abecryptoxparam.PQRingCTXPP, privacyLevel)
+	if err != nil {
+		return false, fmt.Errorf("CheckCryptoAddress: fail to got size of coin address: %s", err)
+	}
+	if len(coinAddress) != coinAddressSize {
+		return false, fmt.Errorf("CheckCryptoAddress: expect size of coin address %d, but got %d", coinAddressSize, len(coinAddress))
+	}
+
+	if privacyLevel == PrivacyLevelPSEUDONYM {
+		coinValuePublicKeySize, err := pqringctxGetCoinValuePublicKeySize(abecryptoxparam.PQRingCTXPP, privacyLevel)
+		if err != nil {
+			return false, fmt.Errorf("CheckCryptoAddress: fail to get size of coin valud public key address: %s", err)
+		}
+		if len(coinValuePublicKey) != coinValuePublicKeySize {
+			return false, fmt.Errorf("CheckCryptoAddress: expect size of coin value public key %d, but got %d", coinValuePublicKeySize, len(coinValuePublicKey))
+		}
+	}
+
+	return true, nil
+}
+
+// APIs for verification end
+
 // APIs for key size start
 
 // GetCoinAddressSize returns the CoinAddressSize corresponding to the input PrivacyLevel.
@@ -502,6 +683,25 @@ func GetCoinAddressSize(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel 
 
 	case abecryptoxparam.CryptoSchemePQRingCTX:
 		return pqringctxGetCoinAddressSize(abecryptoxparam.PQRingCTXPP, privacyLevel)
+	default:
+		return 0, fmt.Errorf("GetCoinAddressSize: unsupported crypto-scheme")
+	}
+}
+
+func GetCoinValuePublicKeySize(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel) (int, error) {
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCT:
+		//	this is to achieve back-compatibility with PQRingCT
+		if privacyLevel != PrivacyLevelRINGCTPre {
+			return 0, fmt.Errorf("GetCoinValuePublicKeySize: the input cryptoScheme is CryptoSchemePQRingCT but the input privacyLevel is not PrivacyLevelRINGCTPre")
+		}
+		return pqringctxGetCoinValuePublicKeySize(abecryptoxparam.PQRingCTXPP, PrivacyLevelRINGCTPre)
+
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+		if privacyLevel == PrivacyLevelRINGCTPre {
+			return 0, fmt.Errorf("GetCoinValuePublicKeySize: the input cryptoScheme is CryptoSchemePQRingCTX but the input privacyLevel is PrivacyLevelRINGCTPre")
+		}
+		return pqringctxGetCoinValuePublicKeySize(abecryptoxparam.PQRingCTXPP, PrivacyLevelRINGCT)
 	default:
 		return 0, fmt.Errorf("GetCoinAddressSize: unsupported crypto-scheme")
 	}

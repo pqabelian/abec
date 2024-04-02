@@ -1,12 +1,40 @@
 package abecryptoxkey
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/abesuite/abec/abecryptox/abecryptoutils"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/cryptosuite/pqringctx"
 	"github.com/cryptosuite/pqringctx/pqringctxapi"
 )
+
+func pqringctxCryptoAddressKeySeedGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
+	privacyLevel PrivacyLevel) (pqringctCryptoAddressKeySeed []byte, err error) {
+	expectedSeedLen := pqringctx.GetParamSeedBytesLen(pp)
+	var seed []byte
+
+	//	For PQRingCTX, the CryptoAddressKeySeed may need contain one or two seeds, one for address part and one for value part.
+	switch privacyLevel {
+	case PrivacyLevelRINGCT:
+		//coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey
+		seed = abecryptoutils.RandomBytes(4 * expectedSeedLen)
+	case PrivacyLevelPSEUDONYM:
+		// coinSpendKeyRootSeed, 0..0, 0..0, coinDetectorRootKey
+		seed = abecryptoutils.RandomBytes(expectedSeedLen)
+		seed = append(seed, bytes.Repeat([]byte{'0'}, expectedSeedLen)...)
+		seed = append(seed, bytes.Repeat([]byte{'0'}, expectedSeedLen)...)
+		seed = append(seed, abecryptoutils.RandomBytes(expectedSeedLen)...)
+	default:
+		return nil, fmt.Errorf("Unsupported privacy level")
+	}
+
+	serializeCryptoScheme := abecryptoxparam.SerializeCryptoScheme(cryptoScheme)
+	pqringctCryptoAddressKeySeed = make([]byte, 0, 4+expectedSeedLen)
+	pqringctCryptoAddressKeySeed = append(pqringctCryptoAddressKeySeed, serializeCryptoScheme...)
+	pqringctCryptoAddressKeySeed = append(pqringctCryptoAddressKeySeed, seed...)
+	return pqringctCryptoAddressKeySeed, nil
+}
 
 // pqringctxCryptoAddressKeyGenByRootSeeds generates (CryptoAddress, CryptoKeys) for the input Root Seeds and the CoinDetectorRootKey.
 // This is a randomized algorithm, in particular,
@@ -366,6 +394,19 @@ func pqringctxCryptoAddressKeyGenByRandSeeds(pp *pqringctxapi.PublicParameter,
 	}
 }
 
+func pqringctxCoinAddressKeyForPKRingVerify(pp *pqringctxapi.PublicParameter, coinAddress []byte,
+	coinSpendSecretKey []byte, coinSerialNumberSecretKey []byte, coinDetectorKey []byte) (bool, error) {
+	return pqringctxapi.CoinAddressKeyForPKRingVerify(pp, coinAddress, coinSpendSecretKey, coinSerialNumberSecretKey, coinDetectorKey)
+}
+func pqringctxCoinAddressKeyForPKHSingleVerify(pp *pqringctxapi.PublicParameter, coinAddress []byte,
+	coinSpendSecretKey []byte, coinDetectorKey []byte) (bool, error) {
+	return pqringctxapi.CoinAddressKeyForPKHSingleVerify(pp, coinAddress, coinSpendSecretKey, coinDetectorKey)
+}
+func pqringctxCoinValueKeyVerify(pp *pqringctxapi.PublicParameter,
+	coinValuePublicKey []byte, coinValueSecretKey []byte) (bool, error) {
+	return pqringctxapi.CoinValueKeyVerify(pp, coinValuePublicKey, coinValueSecretKey)
+}
+
 // mapping between PrivacyLevel and CoinAddressType	begin
 
 // pqringctxGetPrivacyLevelFromCoinAddressType returns the PrivacyLevel corresponding to the input CoinAddressType.
@@ -654,6 +695,17 @@ func pqringctxGetCoinAddressSize(pp *pqringctxapi.PublicParameter, privacyLevel 
 		return pqringctxapi.GetCoinAddressSize(pp, pqringctx.CoinAddressTypePublicKeyHashForSingle)
 	default:
 		return 0, fmt.Errorf("pqringctxGetCoinAddressSize: the input PrivacyLevel is not supported")
+	}
+}
+
+func pqringctxGetCoinValuePublicKeySize(pp *pqringctxapi.PublicParameter, privacyLevel PrivacyLevel) (int, error) {
+	switch privacyLevel {
+	case PrivacyLevelRINGCTPre:
+		return pqringctxapi.GetCoinValuePublicKeySize(pp), nil
+	case PrivacyLevelRINGCT:
+		return pqringctxapi.GetCoinValuePublicKeySize(pp), nil
+	default:
+		return 0, fmt.Errorf("pqringctxGetCoinValuePublicKeySize: the input PrivacyLevel is not supported")
 	}
 }
 
