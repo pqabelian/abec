@@ -294,7 +294,8 @@ func (view *AUTViewpoint) connectTransaction(tx *abeutil.TxAbe, blockHeight int3
 			*sauts = append(*sauts, stxo)
 		}
 
-		log.Infof(`Register AUT with name %s with following configuration:
+		log.Infof(`Register AUT with identifier %s with following configuration:
+Symbol: %v,
 UpdateThreshold: %v,
 IssueThreshold: %v,
 PlannedTotalAmount: %v,
@@ -303,7 +304,7 @@ IssuerTokens: %v,
 UnitName: %v,
 MinUnitName: %v,
 UnitScale: %v,	
-`, string(autTransaction.AutIdentifier), autTransaction.IssuerUpdateThreshold, autTransaction.IssueTokensThreshold,
+`, string(autTransaction.AutIdentifier), string(autTransaction.AutSymbol), autTransaction.IssuerUpdateThreshold, autTransaction.IssueTokensThreshold,
 			autTransaction.PlannedTotalAmount, autTransaction.ExpireHeight, autTransaction.IssuerTokens,
 			string(autTransaction.UnitName), string(autTransaction.MinUnitName), autTransaction.UnitScale)
 

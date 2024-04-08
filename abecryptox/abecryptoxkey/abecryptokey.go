@@ -51,15 +51,15 @@ func CryptoAddressKeyGen(randSeed []byte, cryptoScheme abecryptoxparam.CryptoSch
 	//return nil, nil, nil, nil, nil
 }
 
-func CryptoAddressKeySeedGen(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel) (retCryptoAddressKeySeed []byte, err error) {
+func CryptoAddressKeySeedGen(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel) (
+	coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte,
+	coinDetectorRootKey []byte, err error) {
 	switch cryptoScheme {
-	case abecryptoxparam.CryptoSchemePQRingCT:
-		return abecrypto.CryptoAddressKeySeedGen(abecryptoparam.CryptoSchemePQRingCT)
 	case abecryptoxparam.CryptoSchemePQRingCTX:
 		return pqringctxCryptoAddressKeySeedGen(abecryptoxparam.PQRingCTXPP, cryptoScheme, privacyLevel)
 
 	default:
-		return nil, fmt.Errorf("CryptoAddressSeedKeyGen: unsupported crypto-scheme")
+		return nil, nil, nil, nil, fmt.Errorf("CryptoAddressSeedKeyGen: unsupported crypto-scheme")
 	}
 }
 

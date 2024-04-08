@@ -24,9 +24,17 @@ func GetCryptoSchemeByTxVersion(txVersion uint32) (CryptoScheme, error) {
 /*
 * CryptoAddressKeySeedGen generates a cryptoAddressKeySeed for current cryptoScheme, say PQRingCTX.
  */
-func CryptoAddressKeySeedGen(privacyLevel PrivacyLevel) (cryptoAddressKeySeed []byte, err error) {
-	cryptoScheme := abecryptoxparam.GetCurrentCryptoScheme()
-	return abecryptoxkey.CryptoAddressKeySeedGen(cryptoScheme, privacyLevel)
+func CryptoAddressKeySeedGen(cryptoScheme CryptoScheme, privacyLevel PrivacyLevel) (coinSpendKeyRootSeed []byte,
+	coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte, coinDetectorRootKey []byte, err error) {
+	cryptoScheme = abecryptoxparam.GetCurrentCryptoScheme()
+	coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed,
+		coinValueKeyRootSeed, coinDetectorRootKey, err = abecryptoxkey.CryptoAddressKeySeedGen(cryptoScheme, privacyLevel)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	return coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed,
+		coinDetectorRootKey, nil
 }
 
 func CryptoAddressKeyGenByRootSeeds(cryptoScheme CryptoScheme, privacyLevel PrivacyLevel,

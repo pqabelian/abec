@@ -1147,8 +1147,8 @@ mempoolLoop:
 		return nil, err
 	}
 
-	log.Debugf("Created new block template (%d transactions, %d in "+
-		"fees, %d size, target difficulty "+"%064x)", len(msgBlock.Transactions), totalFee, blockSize, blockchain.CompactToBig(msgBlock.Header.Bits))
+	log.Debugf("Created new block template (version %08x,%d transactions, %d in "+
+		"fees, %d size, target difficulty "+"%064x)", msgBlock.Header.Version, len(msgBlock.Transactions), totalFee, blockSize, blockchain.CompactToBig(msgBlock.Header.Bits))
 
 	return &BlockTemplate{
 		BlockAbe:        &msgBlock,

@@ -1,7 +1,6 @@
 package abecryptoxkey
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/abesuite/abec/abecryptox/abecryptoutils"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
@@ -10,30 +9,23 @@ import (
 )
 
 func pqringctxCryptoAddressKeySeedGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
-	privacyLevel PrivacyLevel) (pqringctCryptoAddressKeySeed []byte, err error) {
+	privacyLevel PrivacyLevel) (coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte,
+	coinDetectorRootKey []byte, err error) {
 	expectedSeedLen := pqringctx.GetParamSeedBytesLen(pp)
-	var seed []byte
 
 	//	For PQRingCTX, the CryptoAddressKeySeed may need contain one or two seeds, one for address part and one for value part.
 	switch privacyLevel {
 	case PrivacyLevelRINGCT:
 		//coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey
-		seed = abecryptoutils.RandomBytes(4 * expectedSeedLen)
+		return abecryptoutils.RandomBytes(expectedSeedLen), abecryptoutils.RandomBytes(expectedSeedLen),
+			abecryptoutils.RandomBytes(expectedSeedLen), abecryptoutils.RandomBytes(expectedSeedLen), nil
 	case PrivacyLevelPSEUDONYM:
 		// coinSpendKeyRootSeed, 0..0, 0..0, coinDetectorRootKey
-		seed = abecryptoutils.RandomBytes(expectedSeedLen)
-		seed = append(seed, bytes.Repeat([]byte{'0'}, expectedSeedLen)...)
-		seed = append(seed, bytes.Repeat([]byte{'0'}, expectedSeedLen)...)
-		seed = append(seed, abecryptoutils.RandomBytes(expectedSeedLen)...)
+		return abecryptoutils.RandomBytes(expectedSeedLen), nil, nil,
+			abecryptoutils.RandomBytes(expectedSeedLen), nil
 	default:
-		return nil, fmt.Errorf("Unsupported privacy level")
+		return nil, nil, nil, nil, fmt.Errorf("Unsupported privacy level")
 	}
-
-	serializeCryptoScheme := abecryptoxparam.SerializeCryptoScheme(cryptoScheme)
-	pqringctCryptoAddressKeySeed = make([]byte, 0, 4+expectedSeedLen)
-	pqringctCryptoAddressKeySeed = append(pqringctCryptoAddressKeySeed, serializeCryptoScheme...)
-	pqringctCryptoAddressKeySeed = append(pqringctCryptoAddressKeySeed, seed...)
-	return pqringctCryptoAddressKeySeed, nil
 }
 
 // pqringctxCryptoAddressKeyGenByRootSeeds generates (CryptoAddress, CryptoKeys) for the input Root Seeds and the CoinDetectorRootKey.

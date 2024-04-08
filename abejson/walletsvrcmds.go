@@ -600,14 +600,14 @@ func NewListSpentAndMinedAbeCmd(min *float64, max *float64) *ListSpentAndMinedAb
 }
 
 type ListAUTCoinsCmd struct {
-	AUTName      *string
-	RootCoinOnly *bool
+	AUTIdentifier *string
+	RootCoinOnly  *bool
 }
 
-func NewListAUTCoinsCmd(autName *string, rootCoinOnly *bool) *ListAUTCoinsCmd {
+func NewListAUTCoinsCmd(autIdentifier *string, rootCoinOnly *bool) *ListAUTCoinsCmd {
 	return &ListAUTCoinsCmd{
-		AUTName:      autName,
-		RootCoinOnly: rootCoinOnly,
+		AUTIdentifier: autIdentifier,
+		RootCoinOnly:  rootCoinOnly,
 	}
 }
 

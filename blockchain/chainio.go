@@ -1609,7 +1609,7 @@ func deserializeAUTInfo(serialized []byte) (*aut.MetaInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	info.AutMemo, err = wire.ReadVarBytes(buff, 0, aut.MaxMemoLength, "memo")
+	info.AutMemo, err = wire.ReadVarBytes(buff, 0, aut.MaxAUTMemoLength, "memo")
 	if err != nil {
 		return nil, err
 	}

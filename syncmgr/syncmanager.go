@@ -1270,6 +1270,26 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 		}
 	}
 
+	// for fake pow mode
+	if sm.chainParams.Net != wire.MainNet {
+		fakePoWHeightScopes := sm.chain.FakePoWHeightScopes()
+		if len(fakePoWHeightScopes) != 0 {
+			blockHeight, err := wire.ExtractCoinbaseHeight(bmsg.block.MsgPrunedBlock().CoinbaseTx)
+			if err != nil {
+				log.Infof("Rejected block %v from %s: error happens wire.ExtractCoinbaseHeight(bmsg.block.MsgBlock().Transactions[0]): %v", blockHash, peer, err)
+				peer.Disconnect()
+				return
+			}
+
+			for _, scope := range fakePoWHeightScopes {
+				if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
+					behaviorFlags |= blockchain.BFNoPoWCheck
+					break
+				}
+			}
+		}
+	}
+
 	// Remove block from request maps. Either chain will know about it and
 	// so we shouldn't have any more instances of trying to fetch it, or we
 	// will fail the insert and thus we'll retry next time we get an inv.

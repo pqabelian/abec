@@ -1165,20 +1165,20 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 		//	todo: when more versions appear, we need to refactor here.
 		if header.Height < b.chainParams.BlockHeightMLPAUT {
 			if header.Version != int32(wire.BlockVersionEthashPow) {
-				str := fmt.Sprintf("block has height %d, it should have version %d for EthashPoW, rather than the old version %d", header.Height, int32(wire.BlockVersionEthashPow), header.Version)
+				str := fmt.Sprintf("block has height %d, it should have version %08x for EthashPoW, rather than the old version %08x", header.Height, int32(wire.BlockVersionEthashPow), header.Version)
 				return ruleError(ErrMismatchedBlockHeightAndVersion, str)
 			}
 		} else {
 			// header.Height >= b.chainParams.BlockHeightMLPAUT
 			if header.Version != int32(wire.BlockVersionMLPAUT) {
-				str := fmt.Sprintf("block has height %d, it should have version %d for MLPAUT, rather than the old version %d", header.Height, int32(wire.BlockVersionMLPAUT), header.Version)
+				str := fmt.Sprintf("block has height %d, it should have version %08x for MLPAUT, rather than the old version %08x", header.Height, int32(wire.BlockVersionMLPAUT), header.Version)
 				return ruleError(ErrMismatchedBlockHeightAndVersion, str)
 			}
 		} // ToDo(MLP): when more versions appear, we need to add here
 
 	} else { // blockHeight < b.chainParams.BlockHeightEthashPoW
 		if header.Version != int32(BlockVersionInitial) {
-			str := fmt.Sprintf("block has height %d, it should have version %d, rather than the version %d", header.Height, int32(BlockVersionInitial), header.Version)
+			str := fmt.Sprintf("block has height %d, it should have version %08x, rather than the version %08x", header.Height, int32(BlockVersionInitial), header.Version)
 			return ruleError(ErrMismatchedBlockHeightAndVersion, str)
 		}
 	}

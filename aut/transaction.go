@@ -78,7 +78,7 @@ const IdentifierLength = 64 // identifier
 const MaxSymbolLength = 64  // symbol
 
 // todo(Alice): MaxAutMemoLength, MaxTxMemoLength
-const MaxMemoLength = 20
+const MaxAUTMemoLength = 20
 const MaxUnitLength = 20
 const MaxMinUnitLength = 20
 const MaxIssuerTokenLength = 198 // TODO
@@ -332,7 +332,7 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 		return ErrInValidAUTTx
 	}
 
-	tx.AutIdentifier, err = ReadVarBytes(r, 0, IdentifierLength, "name")
+	tx.AutIdentifier, err = ReadVarBytes(r, 0, IdentifierLength, "identifier")
 	if err != nil {
 		return err
 	}
@@ -394,7 +394,7 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 	}
 	tx.OutAutRootCoinNum = oneByte[0]
 
-	tx.AutMemo, err = ReadVarBytes(r, 0, MaxMemoLength, "memo")
+	tx.AutMemo, err = ReadVarBytes(r, 0, MaxAUTMemoLength, "memo")
 	if err != nil {
 		return err
 	}
@@ -427,7 +427,7 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 
 	if len(tx.AutIdentifier) != IdentifierLength ||
 		len(tx.AutSymbol) > MaxSymbolLength ||
-		len(tx.AutMemo) > MaxMemoLength ||
+		len(tx.AutMemo) > MaxAUTMemoLength ||
 		len(tx.UnitName) > MaxUnitLength ||
 		len(tx.MinUnitName) > MaxMinUnitLength {
 		return errors.New("an AUT with invalid length of name")
@@ -594,14 +594,14 @@ func (tx *MintTx) Deserialize(r io.Reader) error {
 		}
 	}
 
-	tx.Memo, err = ReadVarBytes(r, 0, MaxMemoLength, "memo")
+	tx.Memo, err = ReadVarBytes(r, 0, MaxAUTMemoLength, "memo")
 	if err != nil {
 		return err
 	}
 
 	// todo(Alice): MaxAutTxMemo
 	if len(tx.AutIdentifier) != IdentifierLength ||
-		len(tx.Memo) > MaxMemoLength {
+		len(tx.Memo) > MaxAUTMemoLength {
 		return errors.New("an AUT with invalid length of name")
 	}
 	return nil
@@ -829,7 +829,7 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 	}
 	tx.OutAutRootCoinNum = oneByte[0]
 
-	tx.Memo, err = ReadVarBytes(r, 0, MaxMemoLength, "memo")
+	tx.Memo, err = ReadVarBytes(r, 0, MaxAUTMemoLength, "memo")
 	if err != nil {
 		return err
 	}
@@ -844,7 +844,7 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 		return err
 	}
 
-	if len(tx.AutIdentifier) != IdentifierLength || len(tx.Memo) > MaxMemoLength {
+	if len(tx.AutIdentifier) != IdentifierLength || len(tx.Memo) > MaxAUTMemoLength {
 		return errors.New("an AUT with invalid length of name")
 	}
 	// todo(Alice): AutMemo, AutTxMemo
@@ -1019,13 +1019,13 @@ func (tx *TransferTx) Deserialize(r io.Reader) error {
 		}
 	}
 
-	tx.Memo, err = ReadVarBytes(r, 0, MaxMemoLength, "memo")
+	tx.Memo, err = ReadVarBytes(r, 0, MaxAUTMemoLength, "memo")
 	if err != nil {
 		return err
 	}
 
 	if len(tx.AutIdentifier) != IdentifierLength ||
-		len(tx.Memo) > MaxMemoLength {
+		len(tx.Memo) > MaxAUTMemoLength {
 		return errors.New("an AUT with invalid length of name")
 	}
 	return nil
@@ -1141,13 +1141,13 @@ func (tx *BurnTx) Deserialize(r io.Reader) error {
 	}
 	tx.InAutCoinNum = oneByte[0]
 
-	tx.Memo, err = ReadVarBytes(r, 0, MaxMemoLength, "memo")
+	tx.Memo, err = ReadVarBytes(r, 0, MaxAUTMemoLength, "memo")
 	if err != nil {
 		return err
 	}
 
 	if len(tx.AutIdentifier) != IdentifierLength ||
-		len(tx.Memo) > MaxMemoLength {
+		len(tx.Memo) > MaxAUTMemoLength {
 		return errors.New("an AUT with invalid length of name")
 	}
 	return nil
