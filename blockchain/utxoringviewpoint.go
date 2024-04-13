@@ -121,7 +121,7 @@ func BuildTxoRings(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.
 
 	rstTxoRings := make(map[wire.RingId]*wire.TxoRing, len(cbTxoRings)+len(trTxoRings))
 
-	for _, txoRing := range cbTxoRings {
+	for i, txoRing := range cbTxoRings {
 		//ringHash := txoRing.outPointRing.Hash()
 		ringId := txoRing.RingId()
 		if _, ok := rstTxoRings[ringId]; ok {
@@ -130,8 +130,9 @@ func BuildTxoRings(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.
 		} else {
 			rstTxoRings[ringId] = txoRing
 		}
+		log.Debugf("BuildTxoRings: cbTxoRings[%d], ring size = %d", i, len(txoRing.TxOuts))
 	}
-	for _, txoRing := range trTxoRings {
+	for i, txoRing := range trTxoRings {
 		//ringHash := txoRing.outPointRing.Hash()
 		ringId := txoRing.RingId()
 		if _, ok := rstTxoRings[ringId]; ok {
@@ -140,6 +141,7 @@ func BuildTxoRings(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.
 		} else {
 			rstTxoRings[ringId] = txoRing
 		}
+		log.Debugf("BuildTxoRings: trTxoRings[%d], ring size = %d", i, len(txoRing.TxOuts))
 	}
 
 	return rstTxoRings, nil
@@ -1456,6 +1458,11 @@ func (view *UtxoRingViewpoint) NewUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 		} else {
 			view.entries[outPointRingHash] = utxoRingEntry
 		}
+		if isCoinBase {
+			log.Debugf("NewUtxoRingEntriesFromTxos: build coinbase txo rings with size = %d", len(utxoRingEntry.txOuts))
+		} else {
+			log.Debugf("NewUtxoRingEntriesFromTxos: build transfer txo rings with size = %d", len(utxoRingEntry.txOuts))
+		}
 	}
 
 	remainderTxoNum = txoNum - normalRingNum*txoRingSize
@@ -1480,6 +1487,11 @@ func (view *UtxoRingViewpoint) NewUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 		} else {
 			view.entries[outPointRingHash1] = utxoRingEntry1
 		}
+		if isCoinBase {
+			log.Debugf("NewUtxoRingEntriesFromTxos: build coinbase txo rings with size = %d", len(utxoRingEntry1.txOuts))
+		} else {
+			log.Debugf("NewUtxoRingEntriesFromTxos: build transfer txo rings with size = %d", len(utxoRingEntry1.txOuts))
+		}
 
 		// rings with size2
 		start = start + ringSize1
@@ -1494,6 +1506,11 @@ func (view *UtxoRingViewpoint) NewUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 				"with the UtxoRings generated with block (height %d)", view.bestHash, ringBlockHeight, existingUtxoRing.ringBlockHeight))
 		} else {
 			view.entries[outPointRingHash2] = utxoRingEntry2
+		}
+		if isCoinBase {
+			log.Debugf("NewUtxoRingEntriesFromTxos: build coinbase txo rings with size = %d", len(utxoRingEntry2.txOuts))
+		} else {
+			log.Debugf("NewUtxoRingEntriesFromTxos: build transfer txo rings with size = %d", len(utxoRingEntry2.txOuts))
 		}
 
 	} else if remainderTxoNum > 0 {
@@ -1510,6 +1527,11 @@ func (view *UtxoRingViewpoint) NewUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 				"with the UtxoRings generated with block (height %d)", view.bestHash, ringBlockHeight, existingUtxoRing.ringBlockHeight))
 		} else {
 			view.entries[outPointRingHash] = utxoRingEntry
+		}
+		if isCoinBase {
+			log.Debugf("NewUtxoRingEntriesFromTxos: build coinbase txo rings with size = %d", len(utxoRingEntry.txOuts))
+		} else {
+			log.Debugf("NewUtxoRingEntriesFromTxos: build transfer txo rings with size = %d", len(utxoRingEntry.txOuts))
 		}
 	}
 

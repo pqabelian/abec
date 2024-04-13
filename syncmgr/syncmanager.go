@@ -1253,6 +1253,19 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 			}
 		}
 	}
+	// for fake pow mode
+	if sm.chainParams.Net != wire.MainNet {
+		fakePoWHeightScopes := sm.chain.FakePoWHeightScopes()
+		if len(fakePoWHeightScopes) != 0 {
+			blockHeight := wire.ExtractCoinbaseHeight(bmsg.block.MsgPrunedBlock().CoinbaseTx)
+			for _, scope := range fakePoWHeightScopes {
+				if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
+					behaviorFlags |= blockchain.BFNoPoWCheck
+					break
+				}
+			}
+		}
+	}
 
 	// Remove block from request maps. Either chain will know about it and
 	// so we shouldn't have any more instances of trying to fetch it, or we
