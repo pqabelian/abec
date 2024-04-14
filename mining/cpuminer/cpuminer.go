@@ -247,7 +247,9 @@ func (m *CPUMiner) submitBlock(block *abeutil.BlockAbe) bool {
 	//	in pqringct-Abelian, the TxFee field of CoinbaseTx is used to store the invalue
 	inValue := block.MsgBlock().Transactions[0].TxFee
 	log.Infof("Block submitted via CPU miner accepted (version %08x, hash %v, seal hash %v, "+"height %d, "+
-		"amount %v)", block.MsgBlock().Header.Version, block.Hash(), ethash.SealHash(&block.MsgBlock().Header), block.Height(), abeutil.Amount(inValue))
+		"amount %v, stripped size %d bytes, full size %d bytes)",
+		block.MsgBlock().Header.Version, block.Hash(), ethash.SealHash(&block.MsgBlock().Header), block.Height(), abeutil.Amount(inValue),
+		block.MsgBlock().SerializeSizeStripped(), block.MsgBlock().SerializeSize())
 	return true
 }
 
