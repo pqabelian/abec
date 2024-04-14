@@ -246,8 +246,8 @@ func (m *CPUMiner) submitBlock(block *abeutil.BlockAbe) bool {
 
 	//	in pqringct-Abelian, the TxFee field of CoinbaseTx is used to store the invalue
 	inValue := block.MsgBlock().Transactions[0].TxFee
-	log.Infof("Block submitted via CPU miner accepted (hash %v, seal hash %v, "+"height %d, "+
-		"amount %v)", block.Hash(), ethash.SealHash(&block.MsgBlock().Header), block.Height(), abeutil.Amount(inValue))
+	log.Infof("Block submitted via CPU miner accepted (version %08x, hash %v, seal hash %v, "+"height %d, "+
+		"amount %v)", block.MsgBlock().Header.Version, block.Hash(), ethash.SealHash(&block.MsgBlock().Header), block.Height(), abeutil.Amount(inValue))
 	return true
 }
 
@@ -308,8 +308,8 @@ func (m *CPUMiner) submitBlockEthash(block *abeutil.BlockAbe) bool {
 
 	//	in pqringct-Abelian, the TxFee field of CoinbaseTx is used to store the invalue
 	inValue := block.MsgBlock().Transactions[0].TxFee
-	log.Infof("Block submitted via CPU miner accepted (hash %v, "+"seal Hash %v, "+"height %d, "+
-		"amount %v)", block.Hash(), ethash.SealHash(&block.MsgBlock().Header), block.Height(), abeutil.Amount(inValue))
+	log.Infof("Block submitted via CPU miner accepted (version %08x, hash %v, "+"seal Hash %v, "+"height %d, "+
+		"amount %v)", block.MsgBlock().Header.Version, block.Hash(), ethash.SealHash(&block.MsgBlock().Header), block.Height(), abeutil.Amount(inValue))
 	return true
 }
 
