@@ -2,7 +2,7 @@ package blockchain
 
 import (
 	"encoding/hex"
-	"errors"
+	"fmt"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/chainhash"
@@ -27,15 +27,15 @@ const (
 
 // data structure
 // AUTSCRIPT | AUT Version | VarSize | AUT TX TYPE |
-// 													 AUT NAME | issuers | PLANNED  | threshold ..
+// 													 AUT IDENTIFIER | AUT Symbol | issuers | PLANNED  | threshold ..
 // 													  n | value | ... | value | memo
 // 													            issuers |  PLANNED  | threshold ..
 // 													  issuers | threshold
 //
 
-// Register (txhash,index) -> (aut_name,root_coin)
-// Mint (txhash,index)  -> AUT Coin (AUT NAME)
-// Transfer Abelian TXO  -> AUT Coin (AUT NAME)
+// Register (txhash,index) -> (aut_identifier,root_coin)
+// Mint (txhash,index)  -> AUT Coin (AUT IDENTIFIER)
+// Transfer Abelian TXO  -> AUT Coin (AUT IDENTIFIER)
 //
 
 // AUTCoin houses details about an AUT Transaction output in a AUT
@@ -54,6 +54,9 @@ func NewAUTEntry(metadata *aut.MetaInfo, coins map[aut.OutPoint]*AUTCoin) *AUTEn
 
 // todo: AddCion
 func (e *AUTEntry) Add(outpiont aut.OutPoint, entry *AUTCoin) {
+	if e.coins == nil {
+		e.coins = make(map[aut.OutPoint]*AUTCoin)
+	}
 	e.coins[outpiont] = entry
 }
 
@@ -69,7 +72,7 @@ func (e *AUTEntry) LookupCoin(point aut.OutPoint) *AUTCoin {
 }
 
 type AUTCoin struct {
-	name []byte
+	identifier []byte
 	// NOTE: Additions, deletions, or modifications to the order of the
 	// definitions in this struct should not be changed without considering
 	// how it affects alignment on 64-bit platforms.  The current order is
@@ -141,13 +144,14 @@ func (entry *AUTCoin) Clone() *AUTCoin {
 // todo: function name
 // NewAUTCoin returns a new AUTCoin built from the arguments.
 func NewAUTCoin(
-	name []byte, amount uint64, blockHeight int32, isRootCoin bool) *AUTCoin {
+	identifier []byte, amount uint64, blockHeight int32, isRootCoin bool) *AUTCoin {
 	var flag autFlags = atfModified
 	if isRootCoin {
 		flag |= atfRootCoin
 	}
 
 	return &AUTCoin{
+		identifier:  identifier,
 		amount:      amount,
 		blockHeight: blockHeight,
 		packedFlags: flag,
@@ -162,7 +166,7 @@ func NewAUTCoin(
 // The unspent outputs are needed by other transactions for things such as
 // script validation and double spend prevention.
 //
-//	todo: using AutName as key to store AutEntries.
+//	todo: using AutIdentifier as key to store AutEntries.
 type AUTViewpoint struct {
 	entries  map[string]*AUTEntry
 	bestHash chainhash.Hash
@@ -180,16 +184,16 @@ func (view *AUTViewpoint) SetBestHash(hash *chainhash.Hash) {
 	view.bestHash = *hash
 }
 
-// LookupEntry returns information about a given transaction output according to
+// LookupAutCoin returns information about a given transaction output according to
 // the current state of the view.  It will return nil if the passed output does
 // not exist in the view or is otherwise not available such as when it has been
 // disconnected during a reorg.
 // todo: function name LookupAutCoin
-func (view *AUTViewpoint) LookupEntry(autNameKey string, outpoint aut.OutPoint) *AUTCoin {
+func (view *AUTViewpoint) LookupAUTCoin(autIdentifierKey string, outpoint aut.OutPoint) *AUTCoin {
 	if view.entries == nil {
 		return nil
 	}
-	entry, ok := view.entries[autNameKey]
+	entry, ok := view.entries[autIdentifierKey]
 	if !ok {
 		return nil
 	}
@@ -197,11 +201,11 @@ func (view *AUTViewpoint) LookupEntry(autNameKey string, outpoint aut.OutPoint) 
 }
 
 // todo: function name LookupAutDesc
-func (view *AUTViewpoint) LookupInfo(autNameKey string) *aut.MetaInfo {
+func (view *AUTViewpoint) LookupAUTMetaInfo(autIdentifierKey string) *aut.MetaInfo {
 	if view.entries == nil {
 		return nil
 	}
-	entry, ok := view.entries[autNameKey]
+	entry, ok := view.entries[autIdentifierKey]
 	if !ok {
 		return nil
 	}
@@ -212,19 +216,19 @@ func (view *AUTViewpoint) LookupInfo(autNameKey string) *aut.MetaInfo {
 // unspendable.  When the view already has an entry for the output, it will be
 // marked unspent.  All fields will be updated for existing entries since it's
 // possible it has changed during a reorg.
-func (view *AUTViewpoint) addAUTToken(autNameKey string, outpoint aut.OutPoint, amount uint64, blockHeight int32) {
+func (view *AUTViewpoint) addAUTToken(autIdentifierKey string, outpoint aut.OutPoint, amount uint64, blockHeight int32) {
 	// if the tx is not existing in the utxoentry, create a new one. otherwise update the height of view
 	// Update existing entries.  All fields are updated because it's
 	// possible (although extremely unlikely) that the existing entry is
 	// being replaced by a different transaction with the same hash.  This
 	// is allowed so long as the previous transaction is fully spent.
-	_, ok := view.entries[autNameKey]
+	_, ok := view.entries[autIdentifierKey]
 	if !ok {
 		log.Errorf("unreachable, invalid addAUTToken is called")
 		return
 	}
 	autEntry := new(AUTCoin)
-	view.entries[autNameKey].coins[outpoint] = autEntry
+	view.entries[autIdentifierKey].coins[outpoint] = autEntry
 	autEntry.amount = amount
 	autEntry.blockHeight = blockHeight
 	autEntry.packedFlags = atfModified
@@ -249,11 +253,11 @@ func (view *AUTViewpoint) connectTransaction(tx *abeutil.TxAbe, blockHeight int3
 	entry, exist := view.entries[autIdentifierKey]
 	if autTx.Type() == aut.Registration {
 		if exist && entry != nil && entry.metadata != nil {
-			return errors.New("an registration AUT transaction try to register AUT entry with an existing AUT name ")
+			return fmt.Errorf("an registration AUT transaction %s try to register AUT entry with an existing AUT identified by %s", tx.Hash(), string(autTx.AUTIdentifier()))
 		}
 	} else {
 		if !exist || entry == nil || entry.metadata == nil {
-			return errors.New("an non-registration AUT transaction try to operate on non-existing AUT entry")
+			return fmt.Errorf("an non-registration AUT transaction %s try to operate on non-existing AUT entry identified by %s", tx.Hash(), string(autTx.AUTIdentifier()))
 		}
 	}
 	switch autTransaction := autTx.(type) {
@@ -313,7 +317,10 @@ UnitScale: %v,
 		var currentSauts = (SpentAUTTokens)(make([]SpentAUTToken, 0, len(autTransaction.TxIns)))
 		for i := 0; i < len(autTransaction.TxIns); i++ {
 			if _, ok := info.RootCoinSet[autTransaction.TxIns[i]]; !ok {
-				return errors.New("an AUT transaction with non-existing/spent root coin")
+				return fmt.Errorf("an mint AUT transaction %s try to mint AUT with "+
+					"non-existing/spent root coin (%s,%d) for AUT identified by %s",
+					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index,
+					string(autTx.AUTIdentifier()))
 			}
 			delete(info.RootCoinSet, autTransaction.TxIns[i])
 			if sauts != nil {
@@ -338,17 +345,18 @@ UnitScale: %v,
 			if wouldMintedAmount+autTransaction.TxoAUTValues[i] < wouldMintedAmount || // overflow
 				wouldMintedAmount+autTransaction.TxoAUTValues[i] < autTransaction.TxoAUTValues[i] || // overflow
 				wouldMintedAmount+autTransaction.TxoAUTValues[i] > info.PlannedTotalAmount {
-				return errors.New("an AUT mint transaction try to mint amount exceed planned")
+				return fmt.Errorf("an mint AUT transaction %s try to mint AUT exceed planned amount %d for AUT identified by %s", tx.Hash(), info.PlannedTotalAmount, string(autTx.AUTIdentifier()))
 			}
 			wouldMintedAmount += autTransaction.TxoAUTValues[i]
 			entry.Add(autTransaction.TxOuts[i], NewAUTCoin(autTransaction.AutIdentifier, autTransaction.TxoAUTValues[i], blockHeight, false))
 		}
 		if info.MintedAmount+wouldMintedAmount < info.MintedAmount {
-			return errors.New("an AUT mint transaction try to mint amount exceed planned")
+			return fmt.Errorf("an mint AUT transaction %s try to mint AUT exceed planned amount %d for AUT identified by %s", tx.Hash(), info.PlannedTotalAmount, string(autTx.AUTIdentifier()))
 		}
 
-		log.Infof(`Mint AUT for name %s (minted amount %d /planned total amount %d) with %d issuer tokens to mint %d AUT coins`, string(autTransaction.AutIdentifier),
-			info.MintedAmount, info.PlannedTotalAmount, len(autTransaction.TxIns), wouldMintedAmount)
+		log.Infof(`Mint %d AUT coins for identifier %s (minted amount %d /planned total amount %d) with %d issuer tokens`,
+			wouldMintedAmount, string(autTransaction.AutIdentifier),
+			info.MintedAmount, info.PlannedTotalAmount, len(autTransaction.TxIns))
 
 		info.MintedAmount += wouldMintedAmount
 	case *aut.ReRegistrationTx:
@@ -357,7 +365,10 @@ UnitScale: %v,
 		originInfo := view.entries[autIdentifierKey].metadata.Clone()
 		for i := 0; i < len(autTransaction.TxIns); i++ {
 			if _, ok := metadata.RootCoinSet[autTransaction.TxIns[i]]; !ok {
-				return errors.New("an AUT transaction with non-existing/spent root coin")
+				return fmt.Errorf("an re-registration AUT transaction %s try to mint AUT "+
+					"with non-existing/spent root coin (%s,%d) for AUT identified by %s",
+					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index,
+					string(autTx.AUTIdentifier()))
 			}
 			delete(metadata.RootCoinSet, autTransaction.TxIns[i])
 		}
@@ -414,10 +425,16 @@ UnitScale: %v -> %v`, string(autTransaction.AutIdentifier),
 		for i := 0; i < len(autTransaction.TxIns); i++ {
 			token := entry.LookupCoin(autTransaction.TxIns[i])
 			if token == nil {
-				return errors.New("an AUT transfer transaction try to spend non-existing/burn token")
+				return fmt.Errorf("an transfer AUT transaction %s try to spend "+
+					"non-existing/burn token (%s,%d) for AUT identified by %s",
+					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index,
+					string(autTx.AUTIdentifier()))
 			}
 			if token.IsSpent() {
-				return errors.New("an AUT transfer transaction try to spend spent token")
+				return fmt.Errorf("an transfer AUT transaction %s try to spend "+
+					"spent token (%s,%d) for AUT identified by %s",
+					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index,
+					string(autTx.AUTIdentifier()))
 			}
 			token.Spend()
 			if sauts != nil {
@@ -442,16 +459,20 @@ UnitScale: %v -> %v`, string(autTransaction.AutIdentifier),
 				totalOutValue+autTransaction.TxoAUTValues[i] < autTransaction.TxoAUTValues[i] || // overflow
 				totalOutValue+autTransaction.TxoAUTValues[i] > info.MintedAmount ||
 				totalOutValue+autTransaction.TxoAUTValues[i] > info.PlannedTotalAmount {
-				return errors.New("an AUT transfer transaction try to overflow amount")
+				return fmt.Errorf("an transfer AUT transaction %s try to overflow "+
+					"planned amount %d for AUT identified by %s",
+					tx.Hash(), info.PlannedTotalAmount, string(autTx.AUTIdentifier()))
 			}
 			totalOutValue += autTransaction.TxoAUTValues[i]
-			entry.Add(autTransaction.TxOuts[i], NewAUTCoin(autTransaction.AutIdentifier, autTransaction.TxoAUTValues[i], 0, false))
+			entry.Add(autTransaction.TxOuts[i], NewAUTCoin(autTransaction.AutIdentifier, autTransaction.TxoAUTValues[i], blockHeight, false))
 		}
 		if totalInputValue != totalOutValue {
-			return errors.New("an AUT transfer transaction try to break-balance amount")
+			return fmt.Errorf("an transfer AUT transaction %s try to unbalance "+
+				"input %d and output %d for AUT identified by %s",
+				tx.Hash(), totalInputValue, totalOutValue, string(autTx.AUTIdentifier()))
 		}
 
-		log.Infof(`Transfer for name %s (minted amount %d /planned total amount %d) %d AUT coins`, string(autTransaction.AutIdentifier),
+		log.Infof(`Transfer for identifier %s (minted amount %d /planned total amount %d) %d AUT coins`, string(autTransaction.AutIdentifier),
 			info.MintedAmount, info.PlannedTotalAmount, totalOutValue)
 
 	case *aut.BurnTx:
@@ -461,13 +482,21 @@ UnitScale: %v -> %v`, string(autTransaction.AutIdentifier),
 		for i := 0; i < len(autTransaction.TxIns); i++ {
 			token := entry.LookupCoin(autTransaction.TxIns[i])
 			if token == nil {
-				return errors.New("an AUT transfer transaction try to spend non-existing/burn token")
+				return fmt.Errorf("an burn AUT transaction %s try to spend"+
+					" non-existing/burn token (%s,%d) for AUT identified by %s",
+					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index,
+					string(autTx.AUTIdentifier()))
 			}
 			if token.IsSpent() {
-				return errors.New("an AUT transfer transaction try to spend spent token")
+				return fmt.Errorf("an burn AUT transaction %s try to spend"+
+					" spent token (%s,%d) for AUT identified by %s",
+					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index,
+					string(autTx.AUTIdentifier()))
 			}
 			if burnedValues+token.Amount() <= burnedValues {
-				return errors.New("an AUT transfer transaction try to spend overflow token")
+				return fmt.Errorf("an burn AUT transaction %s try to overflow"+
+					" for AUT identified by %s",
+					tx.Hash(), string(autTx.AUTIdentifier()))
 			}
 			token.Spend()
 			if sauts != nil {
@@ -484,11 +513,11 @@ UnitScale: %v -> %v`, string(autTransaction.AutIdentifier),
 			// Populate the stxo details using the utxo entry.
 			*sauts = append(*sauts, &currentSauts)
 		}
-		log.Infof(`Burn for name %s (minted amount %d /planned total amount %d) %d AUT coins`, string(autTransaction.AutIdentifier),
+		log.Infof(`Burn for identifier %s (minted amount %d /planned total amount %d) %d AUT coins`, string(autTransaction.AutIdentifier),
 			info.MintedAmount, info.PlannedTotalAmount, burnedValues)
 
 	default:
-		return errors.New("unreachable")
+		return fmt.Errorf("aut transaction %s with unknown type %d", tx.Hash(), autTx.Type())
 	}
 
 	return nil
@@ -501,7 +530,7 @@ UnitScale: %v -> %v`, string(autTransaction.AutIdentifier),
 // append an entry for each spent txout.
 func (view *AUTViewpoint) connectTransactions(block *abeutil.BlockAbe, stxos *[]SpentAUT) error {
 	for _, tx := range block.Transactions() {
-		err := view.connectTransaction(tx, block.Height(), stxos)
+		err := view.connectTransaction(tx, block.MsgBlock().Header.Height, stxos)
 		if err != nil {
 			return err
 		}
@@ -532,11 +561,11 @@ func (view *AUTViewpoint) disconnectTransactions(db database.DB, block *abeutil.
 	autTransactions := block.AUTTransactions()
 	for txIdx := len(autTransactions) - 1; txIdx > -1; txIdx-- {
 		autTransaction := autTransactions[txIdx]
-		autName := autTransaction.AUTIdentifier()
-		autNameKey := hex.EncodeToString(autName)
+		autIdentifier := autTransaction.AUTIdentifier()
+		autIdentifierKey := hex.EncodeToString(autIdentifier)
 
-		if view.entries[autNameKey] == nil {
-			err := view.fetchAUTMain(db, nil, autName)
+		if view.entries[autIdentifierKey] == nil {
+			err := view.fetchAUTMain(db, nil, autIdentifier, autTransaction.Type())
 			if err != nil {
 				return err
 			}
@@ -563,19 +592,20 @@ func (view *AUTViewpoint) disconnectTransactions(db database.DB, block *abeutil.
 				outpoints[point] = struct{}{}
 			}
 		} else {
-			return errors.New("non-supported aut transaction type")
+			return fmt.Errorf("found an aut transaction with unknown type %d when "+
+				"disconnecting transactions in block %s", autTransaction.Type(), block.Hash())
 		}
 		if len(outpoints) != 0 {
-			err := view.fetchAUTMain(db, outpoints, autName)
+			err := view.fetchAUTMain(db, outpoints, autIdentifier, autTransaction.Type())
 			if err != nil {
 				return err
 			}
 		}
-		entry := view.entries[autNameKey]
+		entry := view.entries[autIdentifierKey]
 
 		switch autTx := autTransaction.(type) {
 		case *aut.RegistrationTx:
-			infoToDel[autNameKey] = struct{}{}
+			infoToDel[autIdentifierKey] = struct{}{}
 			stxoIdx -= 1
 		case *aut.MintTx:
 			// Restore inputs
@@ -630,15 +660,15 @@ func (view *AUTViewpoint) Entries() map[string]*AUTEntry {
 	return view.entries
 }
 
-func (view *AUTViewpoint) AUTEntries(autNameKey string) *AUTEntry {
-	return view.entries[autNameKey]
+func (view *AUTViewpoint) AUTEntries(autIdentifierKey string) *AUTEntry {
+	return view.entries[autIdentifierKey]
 }
 
 func (view *AUTViewpoint) SetEntries(entries map[string]*AUTEntry) {
 	view.entries = entries
 }
-func (view *AUTViewpoint) SetEntry(autName []byte, entry *AUTEntry) {
-	view.entries[hex.EncodeToString(autName)] = entry
+func (view *AUTViewpoint) SetEntry(autIdentifierKey []byte, entry *AUTEntry) {
+	view.entries[hex.EncodeToString(autIdentifierKey)] = entry
 }
 
 // commit prunes all entries marked modified that are now fully spent and marks
@@ -664,10 +694,9 @@ func (view *AUTViewpoint) commit() {
 // Upon completion of this function, the view will contain an entry for each
 // requested outpoint.  Spent outputs, or those which otherwise don't exist,
 // will result in a nil entry in the view.
-func (view *AUTViewpoint) fetchAUTMain(db database.DB, outpoints map[aut.OutPoint]struct{}, autName []byte) error {
-	// Nothing to do if there are no requested outputs.
-	if len(outpoints) == 0 && len(autName) == 0 {
-		return nil
+func (view *AUTViewpoint) fetchAUTMain(db database.DB, outpoints map[aut.OutPoint]struct{}, autIdentifier []byte, autTxType aut.TransactionType) error {
+	if len(autIdentifier) != aut.IdentifierLength {
+		return fmt.Errorf("invalid aut identifier:%v", autIdentifier)
 	}
 
 	// Load the requested set of unspent transaction outputs from the point
@@ -677,43 +706,61 @@ func (view *AUTViewpoint) fetchAUTMain(db database.DB, outpoints map[aut.OutPoin
 	// will result in nil entries in the view.  This is intentionally done
 	// so other code can use the presence of an entry in the store as a way
 	// to unnecessarily avoid attempting to reload it from the database.
-	autNameKey := hex.EncodeToString(autName)
+	autIdentifierKey := hex.EncodeToString(autIdentifier)
 	return db.View(func(dbTx database.Tx) error {
-		if _, ok := view.entries[autNameKey]; !ok {
+		if _, ok := view.entries[autIdentifierKey]; !ok {
 			// fetch aut info with root coin
-			metadata, err := dbFetchAUTMetaInfo(dbTx, autName)
+			metadata, err := dbFetchAUTMetaInfo(dbTx, autIdentifier)
 			if err != nil {
 				return err
 			}
+			// try to fetch the aut with specified identifier
+			if autTxType != aut.Registration && metadata == nil {
+				return fmt.Errorf("non-registration aut transaction with type %d should not operate on "+
+					"unknown AUT identified %s", autTxType, autIdentifier)
+			}
 			if metadata != nil {
-				view.entries[autNameKey] = &AUTEntry{
+				view.entries[autIdentifierKey] = &AUTEntry{
 					metadata: metadata,
 				}
 			}
 		}
 
-		if view.entries[autNameKey] == nil {
-			view.entries[autNameKey] = &AUTEntry{
+		if autTxType == aut.Registration {
+			if len(outpoints) != 0 {
+				return fmt.Errorf("registration aut transaction should not fetch token, but it try fetch %d tokens for AUT identified %s ",
+					len(outpoints), autIdentifier)
+			}
+			if entry, ok := view.entries[autIdentifierKey]; ok || entry != nil {
+				return fmt.Errorf("registration aut transaction try to register AUT  identified by %s which already exists",
+					autIdentifier)
+			}
+			view.entries[autIdentifierKey] = &AUTEntry{
 				metadata: nil,
 			}
+			return nil
 		}
 
-		if view.entries[autNameKey].coins == nil {
-			view.entries[autNameKey].coins = make(map[aut.OutPoint]*AUTCoin, len(outpoints))
-		}
 		// fetch aut coin
-		for outpoint := range outpoints {
-			entry, err := dbFetchAUTEntry(dbTx, outpoint)
-			if err != nil {
-				return err
+		if autTxType == aut.Mint || autTxType == aut.ReRegistration {
+			for outpoint := range outpoints {
+				if _, ok := view.entries[autIdentifierKey].metadata.RootCoinSet[outpoint]; !ok {
+					return fmt.Errorf("mint/reregistration aut transaction try to operate on AUT identified by %s "+
+						"with non-exist/spent root coin (%s,%d)", autIdentifier, outpoint.TxHash, outpoint.Index)
+				}
 			}
-
-			if entry == nil {
-				continue
+		} else {
+			if view.entries[autIdentifierKey].coins == nil {
+				view.entries[autIdentifierKey].coins = make(map[aut.OutPoint]*AUTCoin, len(outpoints))
 			}
+			for outpoint := range outpoints {
+				entry, err := dbFetchAUTEntry(dbTx, outpoint)
+				if err != nil {
+					return err
+				}
 
-			entry.name = autName
-			view.entries[autNameKey].coins[outpoint] = entry
+				view.entries[autIdentifierKey].coins[outpoint] = entry
+			}
 		}
 
 		return nil
@@ -737,14 +784,14 @@ func (view *AUTViewpoint) fetchInputAUTUtxos(db database.DB, block *abeutil.Bloc
 			return err
 		}
 		if autTx != nil {
-			autNameKey := hex.EncodeToString(autTx.AUTIdentifier())
+			autIdentifierKey := hex.EncodeToString(autTx.AUTIdentifier())
 			for _, txIn := range autTx.TxInputs() {
-				autEntry := view.LookupEntry(autNameKey, txIn)
-				if autEntry == nil {
+				autCoin := view.LookupAUTCoin(autIdentifierKey, txIn)
+				if autCoin == nil {
 					neededSet[txIn] = struct{}{}
 				}
 			}
-			err = view.fetchAUTMain(db, neededSet, autTx.AUTIdentifier())
+			err = view.fetchAUTMain(db, neededSet, autTx.AUTIdentifier(), autTx.Type())
 			if err != nil {
 				return err
 			}
@@ -786,7 +833,7 @@ func (b *BlockChain) FetchAUTView(hostTx *abeutil.TxAbe) (*AUTViewpoint, error) 
 	neededSet := make(map[aut.OutPoint]struct{})
 	switch autTx.Type() {
 	case aut.Registration:
-		// try fetch the AUT with same name
+		// try fetch the AUT with same identifier
 		// aut root coin store with AUT
 	case aut.Mint:
 		// aut root coin store with AUT
@@ -800,8 +847,7 @@ func (b *BlockChain) FetchAUTView(hostTx *abeutil.TxAbe) (*AUTViewpoint, error) 
 			neededSet[outpoint] = struct{}{}
 		}
 	default:
-		log.Errorf("unreachable code")
-		return nil, errors.New("FetchAUTView: unknown aut transaction type")
+		return nil, fmt.Errorf("aut transaction %s with unknown type %d", hostTx.Hash(), autTx.Type())
 	}
 
 	// no output need to be fetched
@@ -812,7 +858,7 @@ func (b *BlockChain) FetchAUTView(hostTx *abeutil.TxAbe) (*AUTViewpoint, error) 
 	// Request the utxos from the point of view of the end of the main
 	// chain.
 	b.chainLock.RLock()
-	err = view.fetchAUTMain(b.db, neededSet, autTx.AUTIdentifier())
+	err = view.fetchAUTMain(b.db, neededSet, autTx.AUTIdentifier(), autTx.Type())
 	b.chainLock.RUnlock()
 	return view, err
 }

@@ -318,7 +318,10 @@ func BuildTxoRingsMLP(blockNumPerRingGroup int, txoRingSize int, blocks []*abeut
 		} else {
 			rstTxoRings[ringId] = txoRing
 		}
-		log.Debugf("BuildTxoRingsMLP: cbTxoRingsWithTxVersionInit[%d], ring size = %d", i, len(txoRing.TxOuts))
+		log.Debugf("BuildTxoRingsMLP: cbTxoRingsWithTxVersionInit[%d], ring size = %d, , ring id = %s", i, len(txoRing.TxOuts), txoRing.RingId())
+		for index, outpoint := range txoRing.OutPointRing.OutPoints {
+			log.Debugf("\t[%d] (%s,%d)", index, outpoint.TxHash, outpoint.Index)
+		}
 	}
 	for i, txoRing := range trTxoRingsWithTxVersionInit {
 		ringId := txoRing.RingId()
@@ -328,7 +331,10 @@ func BuildTxoRingsMLP(blockNumPerRingGroup int, txoRingSize int, blocks []*abeut
 		} else {
 			rstTxoRings[ringId] = txoRing
 		}
-		log.Debugf("BuildTxoRingsMLP: trTxoRingsWithTxVersionInit[%d], ring size = %d", i, len(txoRing.TxOuts))
+		log.Debugf("BuildTxoRingsMLP: trTxoRingsWithTxVersionInit[%d], ring size = %d, ring id = %s", i, len(txoRing.TxOuts), txoRing.RingId())
+		for index, outpoint := range txoRing.OutPointRing.OutPoints {
+			log.Debugf("\t[%d] (%s,%d)", index, outpoint.TxHash, outpoint.Index)
+		}
 	}
 	for i, txoRing := range cbTxoRingsWithTxVersionMLPAUTRCT {
 		ringId := txoRing.RingId()
@@ -338,7 +344,10 @@ func BuildTxoRingsMLP(blockNumPerRingGroup int, txoRingSize int, blocks []*abeut
 		} else {
 			rstTxoRings[ringId] = txoRing
 		}
-		log.Debugf("BuildTxoRingsMLP: cbTxoRingsWithTxVersionMLPAUTRCT[%d], ring size = %d", i, len(txoRing.TxOuts))
+		log.Debugf("BuildTxoRingsMLP: cbTxoRingsWithTxVersionMLPAUTRCT[%d], ring size = %d, ring id = %s", i, len(txoRing.TxOuts), txoRing.RingId())
+		for index, outpoint := range txoRing.OutPointRing.OutPoints {
+			log.Debugf("\t[%d] (%s,%d)", index, outpoint.TxHash, outpoint.Index)
+		}
 	}
 	for i, txoRing := range trTxoRingsWithTxVersionMLPAUTRCT {
 		ringId := txoRing.RingId()
@@ -348,7 +357,10 @@ func BuildTxoRingsMLP(blockNumPerRingGroup int, txoRingSize int, blocks []*abeut
 		} else {
 			rstTxoRings[ringId] = txoRing
 		}
-		log.Debugf("BuildTxoRingsMLP: trTxoRingsWithTxVersionMLPAUTRCT[%d], ring size = %d", i, len(txoRing.TxOuts))
+		log.Debugf("BuildTxoRingsMLP: trTxoRingsWithTxVersionMLPAUTRCT[%d], ring size = %d, ring id = %s", i, len(txoRing.TxOuts), txoRing.RingId())
+		for index, outpoint := range txoRing.OutPointRing.OutPoints {
+			log.Debugf("\t[%d] (%s,%d)", index, outpoint.TxHash, outpoint.Index)
+		}
 	}
 	for i, txoRing := range cbTxoRingsWithTxVersionMLPAUTSDN {
 		ringId := txoRing.RingId()
@@ -358,7 +370,10 @@ func BuildTxoRingsMLP(blockNumPerRingGroup int, txoRingSize int, blocks []*abeut
 		} else {
 			rstTxoRings[ringId] = txoRing
 		}
-		log.Debugf("BuildTxoRingsMLP: cbTxoRingsWithTxVersionMLPAUTSDN[%d], ring size = %d", i, len(txoRing.TxOuts))
+		log.Debugf("BuildTxoRingsMLP: cbTxoRingsWithTxVersionMLPAUTSDN[%d], ring size = %d, ring id = %s", i, len(txoRing.TxOuts), txoRing.RingId())
+		for index, outpoint := range txoRing.OutPointRing.OutPoints {
+			log.Debugf("\t[%d] (%s,%d)", index, outpoint.TxHash, outpoint.Index)
+		}
 	}
 	for i, txoRing := range trTxoRingsWithTxVersionMLPAUTSDN {
 		ringId := txoRing.RingId()
@@ -368,7 +383,10 @@ func BuildTxoRingsMLP(blockNumPerRingGroup int, txoRingSize int, blocks []*abeut
 		} else {
 			rstTxoRings[ringId] = txoRing
 		}
-		log.Debugf("BuildTxoRingsMLP: trTxoRingsWithTxVersionMLPAUTSDN[%d], ring size = %d", i, len(txoRing.TxOuts))
+		log.Debugf("BuildTxoRingsMLP: trTxoRingsWithTxVersionMLPAUTSDN[%d], ring size = %d, ring id = %s", i, len(txoRing.TxOuts), txoRing.RingId())
+		for index, outpoint := range txoRing.OutPointRing.OutPoints {
+			log.Debugf("\t[%d] (%s,%d)", index, outpoint.TxHash, outpoint.Index)
+		}
 	}
 
 	return rstTxoRings, nil

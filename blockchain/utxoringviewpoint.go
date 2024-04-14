@@ -1105,6 +1105,7 @@ func (view *UtxoRingViewpoint) connectTransaction(tx *abeutil.TxAbe, blockhash *
 		// entry.Spend(txIn.SerialNumber, blockhash) puts the input txIn.SerialNumber into entry.serialNumbers, so that
 		// if there are double-spending among multiple transactions in one block, it will be detected in previous entry.IsSpent(txIn.SerialNumber).
 		entry.Spend(txIn.SerialNumber, blockhash)
+		log.Debugf("consume txo Ring %s with serial number %v in block (hash %s)", entry.outPointRing.RingId().String(), txIn.SerialNumber, blockhash)
 	}
 
 	// Add the transaction's outputs as available utxos.

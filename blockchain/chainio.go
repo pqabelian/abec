@@ -1326,9 +1326,7 @@ func autEntryHeaderCode(entry *AUTCoin) (uint64, error) {
 		return 0, AssertError("attempt to serialize spent utxo header")
 	}
 
-	// As described in the serialization format comments, the header code
-	// encodes the height shifted over one bit and the coinbase flag in the
-	// lowest bit.
+	// like utxo serialization, the lowest bit is for root coin
 	headerCode := uint64(entry.BlockHeight()) << 1
 	if entry.IsRootCoin() {
 		headerCode |= 0x01
@@ -1379,17 +1377,18 @@ func serializeAUTCoin(entry *AUTCoin) ([]byte, error) {
 
 	// Calculate the size needed to serialize the entry.
 	size := serializeSizeVLQ(headerCode) +
-		compressedAUTSize(entry.Amount()) +
-		serializeSizeVLQ(uint64(len(entry.name))) +
-		len(entry.name)
+		serializeSizeVLQ(compressTxOutAmount(entry.Amount())) +
+		serializeSizeVLQ(uint64(len(entry.identifier))) +
+		len(entry.identifier)
 
 	// Serialize the header code followed by the compressed unspent
 	// transaction output.
 	serialized := make([]byte, size)
 	offset := putVLQ(serialized, headerCode)
 	offset += putCompressedAUT(serialized[offset:], entry.Amount())
-	offset += putVLQ(serialized[offset:], uint64(len(entry.name)))
-	copy(serialized[offset:], entry.name)
+	offset += putVLQ(serialized[offset:], uint64(len(entry.identifier)))
+	copy(serialized[offset:], entry.identifier[:])
+	offset += len(entry.identifier)
 
 	return serialized, nil
 }
@@ -1570,7 +1569,7 @@ func deserializeAUTCoin(serialized []byte) (*AUTCoin, error) {
 
 	// Decode the header code.
 	//
-	// Bit 0 indicates whether the containing transaction is a coinbase.
+	// Bit 0 indicates whether the token is a root coin.
 	// Bits 1-x encode height of containing transaction.
 	isRootCoin := code&0x01 != 0
 	blockHeight := int32(code >> 1)
@@ -1579,11 +1578,18 @@ func deserializeAUTCoin(serialized []byte) (*AUTCoin, error) {
 	amount, readSize, err := decodeCompressedAUT(serialized[offset:])
 	if err != nil {
 		return nil, errDeserialize(fmt.Sprintf("unable to decode "+
-			"utxo: %v", err))
+			"aut coin: %v", err))
 	}
 	offset += readSize
-
+	identifierSize, n := deserializeVLQ(serialized[offset:])
+	offset += n
+	if offset+int(identifierSize) > len(serialized) {
+		return nil, errDeserialize("unexpected end of data after header for aut coin")
+	}
+	identifier := serialized[offset : offset+int(identifierSize)]
+	offset += int(identifierSize)
 	entry := &AUTCoin{
+		identifier:  identifier,
 		amount:      amount,
 		blockHeight: blockHeight,
 		packedFlags: 0,

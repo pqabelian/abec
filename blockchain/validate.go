@@ -1600,17 +1600,17 @@ func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *
 	for txInIndex, txIn := range tx.MsgTx().TxIns {
 		// Ensure the referenced input transaction is available.
 		if len(txIn.SerialNumber) == 0 {
-			str := fmt.Sprintf("TXO Ring %s referenced from "+
-				"transaction %s:%d has a empty serialNumber", txIn.String(),
+			str := fmt.Sprintf("TXO Ring %s (txIn %s) referenced from "+
+				"transaction %s:%d has a empty serialNumber", txIn.PreviousOutPointRing.RingId(), txIn.String(),
 				tx.Hash(), txInIndex)
 			return ruleError(ErrMissingTxOut, str)
 		}
 
 		utxoRing := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())
 		if utxoRing == nil || utxoRing.IsSpent(txIn.SerialNumber) {
-			str := fmt.Sprintf("TXO Ring %s referenced from "+
+			str := fmt.Sprintf("TXO Ring %s (txIn %s) referenced from "+
 				"transaction %s:%d either does not exist or "+
-				"has already been spent", txIn.String(),
+				"has already been spent", txIn.PreviousOutPointRing.RingId(), txIn.String(),
 				tx.Hash(), txInIndex)
 			return ruleError(ErrMissingTxOut, str)
 			// Abe to do: update the ErrMissingTxOut to ErrMissingTxOutRing
