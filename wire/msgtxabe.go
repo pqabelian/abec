@@ -1006,22 +1006,26 @@ func NewStandardCoinbaseTxIn(nextBlockHeight int32, txVersion uint32) (*TxInAbe,
 	// the ring version is set the same as the transaction.
 	previousOutPointRing.Version = txVersion
 	// If the wire.BlockNumPerRingGroup changes, we need to hard code here.
+	numBlockForRing, err := GetBlockNumPerRingGroupByRingVersion(previousOutPointRing.Version)
+	if err != nil {
+		return nil, err
+	}
+	if numBlockForRing == 0 {
+		return nil, fmt.Errorf("the number of block for ring should be greater than 0")
+	}
 	// As so far (MLPAUT_Fork), wire.BlockNumPerRingGroup = 3
-	previousOutPointRing.BlockHashs = make([]*chainhash.Hash, 3)
+	previousOutPointRing.BlockHashs = make([]*chainhash.Hash, numBlockForRing)
 
+	// for the first block hash, the first 4 bytes is used for height in big endian
 	hash0 := chainhash.Hash{}
 	binary.BigEndian.PutUint32(hash0[0:4], uint32(nextBlockHeight))
 	//	todo: (EthashPoW) validity check of coinbaseTx should check this: the first 4 bytes is the block height.
 
-	//hash1 := chainhash.Hash{}
-	//binary.BigEndian.PutUint64(hash1[0:8], extraNonce)
-	hash1 := chainhash.ZeroHash
-	hash2 := chainhash.ZeroHash
-	//	todo: (EthashPoW) validity check of coinbaseTx will not check these two hashes, to leave it free
-
 	previousOutPointRing.BlockHashs[0] = &hash0
-	previousOutPointRing.BlockHashs[1] = &hash1
-	previousOutPointRing.BlockHashs[2] = &hash2
+	//	todo: (EthashPoW) validity check of coinbaseTx will not check these remain hashes, to leave it free
+	for i := 1; i < int(numBlockForRing); i++ {
+		previousOutPointRing.BlockHashs[i] = &chainhash.ZeroHash
+	}
 
 	//	The 'empty' ring contains only 1 empty outpoint.
 	previousOutPointRing.OutPoints = make([]*OutPointAbe, 1)

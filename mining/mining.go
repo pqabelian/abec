@@ -859,7 +859,7 @@ mempoolLoop:
 		// ToDo(MLP):
 		if nextBlockHeight >= g.chainParams.BlockHeightMLPAUTCOMMIT {
 			if tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_300000 {
-				log.Tracef("Skipping tx %s, since from block %d, transactions with version %d will not be mined any more", tx.Hash(), g.chainParams.BlockHeightMLPAUTCOMMIT, tx.MsgTx().Version)
+				log.Tracef("Skipping tx %s, since from block with height %d, transactions with version %d will not be mined any more", tx.Hash(), g.chainParams.BlockHeightMLPAUTCOMMIT, tx.MsgTx().Version)
 				continue
 			}
 		} else if nextBlockHeight >= g.chainParams.BlockHeightMLPAUT {
@@ -962,6 +962,7 @@ mempoolLoop:
 		tx := prioItem.tx
 
 		// Enforce maximum block weight.  Also check for overflow.
+		// transaction size without witness
 		txSize := uint32(tx.MsgTx().SerializeSize())
 		blockPlusTxSize := blockSize + txSize
 		if blockPlusTxSize < blockSize || blockPlusTxSize >= g.policy.BlockMaxSize {
