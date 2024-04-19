@@ -528,7 +528,11 @@ func checkProofOfWork(header *wire.BlockHeader, ethash *ethash.Ethash, powLimit 
 		// The block hash must be less than the claimed target.
 		// todo: (EthashPoW)
 		// It is necessary to use header.Version, rather than the Height as the branch condition.
-		if header.Version == int32(wire.BlockVersionEthashPow) {
+		if header.Version > int32(wire.BlockVersionEthashPow) {
+			str := fmt.Sprintf("Unknown version %#08x with height %d than highest known version %#08x", header.Version, header.Height, wire.BlockVersionEthashPow)
+			log.Warnf(str)
+			return ruleError(ErrMismatchedBlockHeightAndVersion, str)
+		} else if header.Version == int32(wire.BlockVersionEthashPow) {
 			err := ethash.VerifySeal(header, target)
 			if err != nil {
 				return err
@@ -878,7 +882,11 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, powLimi
 	// merkle root matches here.
 	// todo: (EthashPoW) use the optimized BuildMerkleTreeStoreAbeEthash()
 	log.Debugf("Verify the transaction merkle tree for block %s", block.Hash())
-	if header.Version == int32(wire.BlockVersionEthashPow) {
+	if header.Version > int32(wire.BlockVersionEthashPow) {
+		str := fmt.Sprintf("Unknown version %#08x with height %d than highest known version %#08x", header.Version, header.Height, wire.BlockVersionEthashPow)
+		log.Warnf(str)
+		return ruleError(ErrMismatchedBlockHeightAndVersion, str)
+	} else if header.Version == int32(wire.BlockVersionEthashPow) {
 		calculatedMerkleRoot, _ := BuildMerkleTreeStoreAbeEthash(block.Transactions())
 		if !header.MerkleRoot.IsEqual(calculatedMerkleRoot) {
 			str := fmt.Sprintf("block merkle root is invalid - block "+
@@ -1071,7 +1079,10 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 		}
 		//	todo: when more versions appear, we need to refactor here.
 		if header.Version != int32(wire.BlockVersionEthashPow) {
-			str := fmt.Sprintf("block has height %d, it should have version %d for EthashPoW, rather than the old version %d", header.Height, int32(wire.BlockVersionEthashPow), header.Version)
+			if header.Version > int32(wire.BlockVersionEthashPow) {
+				log.Warnf("Unknown version %#08x with height %d than highest known version %#08x", header.Version, header.Height, wire.BlockVersionEthashPow)
+			}
+			str := fmt.Sprintf("block has height %d, it should have version %d for EthashPoW, rather than the version %d", header.Height, int32(wire.BlockVersionEthashPow), header.Version)
 			return ruleError(ErrMismatchedBlockHeightAndVersion, str)
 		}
 	}

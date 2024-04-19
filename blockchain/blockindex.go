@@ -142,6 +142,9 @@ func (b *BlockChain) initBlockNode(node *blockNode, blockHeader *wire.BlockHeade
 			}
 			//	todo: when more versions appear, we need to refactor here.
 			if blockHeader.Version != int32(wire.BlockVersionEthashPow) {
+				if blockHeader.Version > int32(wire.BlockVersionEthashPow) {
+					log.Warnf("Unknown version %#08x with height %d than highest known version %#08x", blockHeader.Version, blockHeader.Height, wire.BlockVersionEthashPow)
+				}
 				str := fmt.Sprintf("block has height %d, it should have version %d for EthashPoW, rather than the old version %d", blockHeader.Height, int32(wire.BlockVersionEthashPow), blockHeader.Version)
 				return ruleError(ErrMismatchedBlockHeightAndVersion, str)
 			}

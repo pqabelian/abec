@@ -542,9 +542,11 @@ func (msg *MsgBlock) SerializeSize() int {
 	// transactions.
 	// todo: (EthashPow)
 	// n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
-	n := blockHeaderLen
-	if msg.Header.Version == int32(BlockVersionEthashPow) {
-		n = blockHeaderLenEthash
+	n := blockHeaderLenEthash
+	if msg.Header.Version > int32(BlockVersionEthashPow) {
+		log.Warnf("Unknown version %#08x with height %d than highest known version %#08x", msg.Header.Version, msg.Header.Height, BlockVersionEthashPow)
+	} else {
+		n = blockHeaderLen
 	}
 	n += VarIntSerializeSize(uint64(len(msg.Transactions)))
 
@@ -562,9 +564,11 @@ func (msg *MsgBlock) SerializeSizeStripped() int {
 	// transactions.
 	//	todo: (EthashPoW)
 	//n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
-	n := blockHeaderLen
-	if msg.Header.Version == int32(BlockVersionEthashPow) {
-		n = blockHeaderLenEthash
+	n := blockHeaderLenEthash
+	if msg.Header.Version > int32(BlockVersionEthashPow) {
+		log.Warnf("Unknown version %#08x with height %d than highest known version %#08x", msg.Header.Version, msg.Header.Height, BlockVersionEthashPow)
+	} else {
+		n = blockHeaderLen
 	}
 	n += VarIntSerializeSize(uint64(len(msg.Transactions)))
 
@@ -579,9 +583,11 @@ func (msg *MsgBlockAbe) SerializeSizeStripped() int {
 	// transactions.
 	// todo: (EthashPoW)
 	//n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
-	n := blockHeaderLen
-	if msg.Header.Version == int32(BlockVersionEthashPow) {
-		n = blockHeaderLenEthash
+	n := blockHeaderLenEthash
+	if msg.Header.Version > int32(BlockVersionEthashPow) {
+		log.Warnf("Unknown version %#08x with height %d than highest known version %#08x", msg.Header.Version, msg.Header.Height, BlockVersionEthashPow)
+	} else {
+		n = blockHeaderLen
 	}
 	n += VarIntSerializeSize(uint64(len(msg.Transactions)))
 
@@ -627,9 +633,11 @@ func (msg *MsgBlockAbe) SerializeSize() int {
 	// transactions.
 	// todo: (EthashPoW)
 	// n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
-	n := blockHeaderLen
-	if msg.Header.Version == int32(BlockVersionEthashPow) {
-		n = blockHeaderLenEthash
+	n := blockHeaderLenEthash
+	if msg.Header.Version > int32(BlockVersionEthashPow) {
+		log.Warnf("Unknown version %#08x with height %d than highest known version %#08x", msg.Header.Version, msg.Header.Height, BlockVersionEthashPow)
+	} else {
+		n = blockHeaderLen
 	}
 	n += VarIntSerializeSize(uint64(len(msg.Transactions)))
 

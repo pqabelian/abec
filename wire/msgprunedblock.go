@@ -132,9 +132,11 @@ func (msg *MsgPrunedBlock) SerializeSize() int {
 	// transactions.
 	// todo: (EthashPow)
 	// n := blockHeaderLen + msg.CoinbaseTx.SerializeSizeFull() + VarIntSerializeSize(uint64(len(msg.TransactionHashes))) + len(msg.TransactionHashes)*32 + len(msg.WitnessHashs)*32
-	n := blockHeaderLen
-	if msg.Header.Version == int32(BlockVersionEthashPow) {
-		n = blockHeaderLenEthash
+	n := blockHeaderLenEthash
+	if msg.Header.Version > int32(BlockVersionEthashPow) {
+		log.Warnf("Unknown version %#08x with height %d than highest known version %#08x", msg.Header.Version, msg.Header.Height, BlockVersionEthashPow)
+	} else {
+		n = blockHeaderLen
 	}
 	n += msg.CoinbaseTx.SerializeSizeFull() + VarIntSerializeSize(uint64(len(msg.TransactionHashes))) + len(msg.TransactionHashes)*32 + len(msg.WitnessHashs)*32
 
