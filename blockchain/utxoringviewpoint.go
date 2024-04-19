@@ -1000,9 +1000,13 @@ func (b *BlockChain) FetchUtxoRingView(tx *abeutil.TxAbe) (*UtxoRingViewpoint, e
 	// Request the utxos from the point of view of the end of the main
 	// chain.
 	view := NewUtxoRingViewpoint()
-	b.chainLock.RLock()
-	err = view.fetchUtxoRingsMain(b.db, neededSet)
-	b.chainLock.RUnlock()
+	func() {
+		b.chainLock.RLock()
+		defer b.chainLock.RUnlock()
+
+		err = view.fetchUtxoRingsMain(b.db, neededSet)
+	}()
+
 	return view, err
 }
 
@@ -1166,7 +1170,7 @@ func (view *UtxoRingViewpoint) disconnectTransactions(db database.DB, block *abe
 				return AssertError("disconnectTransactions called with bad " +
 					"spent transaction out information: the resulting Utxo of unspending is different from the one in STXO")
 			}
-
+			log.Debugf("try resume UTXORing %s with serial number %s", stxo.UtxoRing.outPointRing.Hash(), stxo.SerialNumber)
 		} else {
 			//	actually, can directly use the following codes to unspend
 			//	the above codes in if{} has the same effect, but with the strictest check.
@@ -1174,6 +1178,7 @@ func (view *UtxoRingViewpoint) disconnectTransactions(db database.DB, block *abe
 			loadUtxoRing := stxo.UtxoRing.Clone()
 			loadUtxoRing.packedFlags |= tfModified
 			view.entries[loadUtxoRing.outPointRing.Hash()] = loadUtxoRing
+			log.Debugf("try resume UTXORing %s from stxos", stxo.UtxoRing.outPointRing.Hash())
 		}
 	}
 

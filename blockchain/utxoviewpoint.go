@@ -568,11 +568,11 @@ func (view *UtxoViewpoint) fetchInputUtxos(db database.DB, block *abeutil.Block)
 			// than the actual position of the transaction within
 			// the block due to skipping the coinbase.
 			originHash := &txIn.PreviousOutPoint.Hash
-			if inFlightIndex, ok := txInFlight[*originHash]; ok &&    //spend the previous transaction in the same block
+			if inFlightIndex, ok := txInFlight[*originHash]; ok && //spend the previous transaction in the same block
 				i >= inFlightIndex {
 
 				originTx := transactions[inFlightIndex]
-				view.AddTxOuts(originTx, block.Height())     // put all tx outputs into view point
+				view.AddTxOuts(originTx, block.Height()) // put all tx outputs into view point
 				continue
 			}
 
@@ -622,9 +622,13 @@ func (b *BlockChain) FetchUtxoView(tx *abeutil.Tx) (*UtxoViewpoint, error) {
 	// Request the utxos from the point of view of the end of the main
 	// chain.
 	view := NewUtxoViewpoint()
-	b.chainLock.RLock()
-	err := view.fetchUtxosMain(b.db, neededSet)
-	b.chainLock.RUnlock()
+	var err error
+	func() {
+		b.chainLock.RLock()
+		defer b.chainLock.RUnlock()
+		err = view.fetchUtxosMain(b.db, neededSet)
+	}()
+
 	return view, err
 }
 

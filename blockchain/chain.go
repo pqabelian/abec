@@ -805,10 +805,12 @@ func (b *BlockChain) connectBlock(node *blockNode, block *abeutil.Block,
 	// Notify the caller that the block was connected to the main chain.
 	// The caller would typically want to react with actions such as
 	// updating wallets.
-	b.chainLock.Unlock()
-	b.sendNotification(NTBlockConnected, block)
-	b.chainLock.Lock()
+	func() {
+		b.chainLock.Unlock()
+		defer b.chainLock.Lock()
 
+		b.sendNotification(NTBlockConnected, block)
+	}()
 	return nil
 }
 
@@ -912,7 +914,7 @@ func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 			return err
 		}
 
-		err = dbPutAUTView(dbTx, autView)
+		err = dbPutAUTView(dbTx, autView, node.height, node.hash)
 		if err != nil {
 			return err
 		}
@@ -967,9 +969,12 @@ func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 	// Notify the caller that the block was connected to the main chain.
 	// The caller would typically want to react with actions such as
 	// updating wallets.
-	b.chainLock.Unlock()
-	b.sendNotification(NTBlockConnected, block)
-	b.chainLock.Lock()
+	func() {
+		b.chainLock.Unlock()
+		defer b.chainLock.Lock()
+
+		b.sendNotification(NTBlockConnected, block)
+	}()
 
 	return nil
 }
@@ -1086,9 +1091,11 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *abeutil.Block, view
 	// Notify the caller that the block was disconnected from the main
 	// chain.  The caller would typically want to react with actions such as
 	// updating wallets.
-	b.chainLock.Unlock()
-	b.sendNotification(NTBlockDisconnected, block)
-	b.chainLock.Lock()
+	func() {
+		b.chainLock.Unlock()
+		defer b.chainLock.Lock()
+		b.sendNotification(NTBlockDisconnected, block)
+	}()
 
 	return nil
 }
@@ -1168,13 +1175,13 @@ func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe
 			return err
 		}
 
-		err = dbPutAUTView(dbTx, autView)
+		err = dbPutAUTView(dbTx, autView, node.height, node.hash)
 		if err != nil {
 			return err
 		}
 
 		// remove the new AUT with registration transaction
-		err = dbRemoveAUTInfo(dbTx, infoToDel)
+		err = dbRemoveAUTInfo(dbTx, infoToDel, node.height, node.hash)
 		if err != nil {
 			return err
 		}
@@ -1186,9 +1193,20 @@ func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe
 			return err
 		}
 
+		// TODO(MLPAUT) transfer spent aut information to indexer manager
+		_, err = dbFetchSpendJournalEntryAUT(dbTx, block)
+		if err != nil {
+			return err
+		}
+
 		// Update the transaction spend journal by removing the record
 		// that contains all txos spent by the block.
 		err = dbRemoveSpendJournalEntry(dbTx, block.Hash())
+		if err != nil {
+			return err
+		}
+
+		err = dbRemoveSpendJournalEntryAUT(dbTx, block.Hash())
 		if err != nil {
 			return err
 		}
@@ -1215,6 +1233,7 @@ func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe
 	//	Abe to do: Note that some rings committed to tha database may be deleted in next(previous) block's disconnection.
 	//	The checks can detect abnormal cases. The deleted rings will be removed from view after all blocks are disconnected.
 	view.commit()
+	autView.commit()
 
 	// This node's parent is now the end of the best chain.
 	b.bestChain.SetTip(node.parent)
@@ -1235,13 +1254,16 @@ func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe
 	for hash, _ := range viewToDel.entries {
 		invalidRingHashs = append(invalidRingHashs, hash)
 	}
-	b.chainLock.Unlock()
-	b.sendNotification(NTBlockDisconnected, block)
-	if len(invalidRingHashs) != 0 {
-		b.sendNotification(NTInvalidRing, invalidRingHashs)
-	}
-	b.chainLock.Lock()
 
+	func() {
+		b.chainLock.Unlock()
+		defer b.chainLock.Lock()
+
+		b.sendNotification(NTBlockDisconnected, block)
+		if len(invalidRingHashs) != 0 {
+			b.sendNotification(NTInvalidRing, invalidRingHashs)
+		}
+	}()
 	return nil
 }
 
@@ -1282,7 +1304,7 @@ func countSpentOutputsAUT(block *abeutil.BlockAbe) int {
 		}
 		if autTx != nil {
 			if autTx.Type() < aut.ReRegistration {
-				// it seems that we do not need saut for those type
+				// just record them, but it seems that do not need saut for those type
 			}
 			num++
 		}
@@ -1371,10 +1393,13 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 
 	autView := NewAUTViewpoint()
 	autView.SetBestHash(&oldBest.hash)
-	autInfoToDel := map[string]struct{}{}
+	var autInfoToDel map[string]struct{}
 
 	for e := detachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
+		blockHeader := n.Header()
+		log.Debugf("DETACH: Block %s (seal hash %s, height %d) is trying to detach", n.hash, ethash.SealHash(&blockHeader), n.height)
+
 		var block *abeutil.BlockAbe
 		err := b.db.View(func(dbTx database.Tx) error {
 			var err error
@@ -1426,7 +1451,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			return err
 		}
 
-		err = autView.disconnectTransactions(b.db, block, sauts, autInfoToDel)
+		autInfoToDel, err = autView.disconnectTransactions(b.db, block, sauts)
 		if err != nil {
 			return err
 		}
@@ -1482,6 +1507,15 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		}
 	}
 
+	for autIdentifierKey := range autInfoToDel {
+		entry := autView.entries[autIdentifierKey]
+		if entry != nil {
+			delete(autView.entries, autIdentifierKey)
+		} else {
+			// ?
+		}
+	}
+
 	// Set the fork point only if there are nodes to attach since otherwise
 	// blocks are only being disconnected and thus there is no fork point.
 	var forkNode *blockNode
@@ -1503,6 +1537,8 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 	// issues before ever modifying the chain.
 	for e := attachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
+		blockHeader := n.Header()
+		log.Debugf("ATTACH: Block %s (seal hash %s, height %d) is trying to attach", n.hash, ethash.SealHash(&blockHeader), n.height)
 
 		var block *abeutil.BlockAbe
 		err := b.db.View(func(dbTx database.Tx) error {
@@ -1531,6 +1567,15 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 				return err
 			}
 
+			err = autView.fetchInputAUTUtxos(b.db, block)
+			if err != nil {
+				return err
+			}
+
+			err = autView.connectTransactions(block, nil)
+			if err != nil {
+				return err
+			}
 			/*			newBest = n
 						continue*/
 		} else {
@@ -1595,10 +1640,11 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 	for i, e := 0, detachNodes.Front(); e != nil; i, e = i+1, e.Next() {
 		n := e.Value.(*blockNode)
 		block := detachBlocks[i]
+		log.Debugf("DETACH: Block %s (seal hash %s, height %d) is detaching", n.hash, ethash.SealHash(&block.MsgBlock().Header), n.height)
 
 		viewToDel := NewUtxoRingViewpoint()
 		viewToDel.SetBestHash(block.Hash())
-		infoToDel := map[string]struct{}{}
+		var infoToDel map[string]struct{}
 
 		//	Abe to do: why to read from databse, we can directly use the SpendJournal to obtain the related UtxoRings
 		// Load all of the utxos referenced by the block that aren't
@@ -1611,14 +1657,12 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		// Update the view to unspend all the spent txos and remove
 		// the utxos created by the block.
 		// view loaded the UtxoRingEntries appeared in TxIns of block, by using detachSpentTxOuts[].
-		err := view.disconnectTransactions(b.db, block,
-			detachSpentTxOuts[i])
+		err := view.disconnectTransactions(b.db, block, detachSpentTxOuts[i])
 		if err != nil {
 			return err
 		}
 
-		err = autView.disconnectTransactions(b.db, block,
-			detachSpentAUTs[i], infoToDel)
+		infoToDel, err = autView.disconnectTransactions(b.db, block, detachSpentAUTs[i])
 		if err != nil {
 			return err
 		}
@@ -1656,6 +1700,15 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			}
 		}
 
+		for autIdentifierKey := range infoToDel {
+			entry := autView.entries[autIdentifierKey]
+			if entry != nil {
+				delete(autView.entries, autIdentifierKey)
+			} else {
+				// ?
+			}
+		}
+
 		// Update the database and chain state.
 		// todo_DONE(MLP): reviewed on 2024.01.05
 		err = b.disconnectBlockAbe(n, block, view, viewToDel, autView, infoToDel)
@@ -1688,6 +1741,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 	for i, e := 0, attachNodes.Front(); e != nil; i, e = i+1, e.Next() {
 		n := e.Value.(*blockNode)
 		block := attachBlocks[i]
+		log.Debugf("ATTACH: Block %s (seal hash %s, height %d) is attaching", n.hash, ethash.SealHash(&block.MsgBlock().Header), n.height)
 
 		// Load all of the utxos referenced by the block that aren't
 		// already in the view.
@@ -1934,7 +1988,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 	detachNodes, attachNodes := b.getReorganizeNodesAbe(node)
 
 	// Reorganize the chain.
-	log.Infof("REORGANIZE: Block %v (seal hash %v) is causing a reorganize.", node.hash, ethash.SealHash(&block.MsgBlock().Header))
+	log.Infof("REORGANIZE: Block %v (seal hash %v) at height %d is causing a reorganize.", node.hash, ethash.SealHash(&block.MsgBlock().Header), node.height)
 	// todo_DONE(MLP): reviewed on 2024.01.05
 	err := b.reorganizeChainAbe(detachNodes, attachNodes)
 
@@ -2037,9 +2091,9 @@ func (b *BlockChain) MainChainHasBlock(hash *chainhash.Hash) bool {
 // This function is safe for concurrent access.
 func (b *BlockChain) BlockLocatorFromHash(hash *chainhash.Hash) BlockLocator {
 	b.chainLock.RLock()
+	defer b.chainLock.RUnlock()
 	node := b.index.LookupNode(hash)
 	locator := b.bestChain.blockLocator(node)
-	b.chainLock.RUnlock()
 	return locator
 }
 
@@ -2049,8 +2103,9 @@ func (b *BlockChain) BlockLocatorFromHash(hash *chainhash.Hash) BlockLocator {
 // This function is safe for concurrent access.
 func (b *BlockChain) LatestBlockLocator() (BlockLocator, error) {
 	b.chainLock.RLock()
+	defer b.chainLock.RUnlock()
+
 	locator := b.bestChain.BlockLocator(nil)
-	b.chainLock.RUnlock()
 	return locator, nil
 }
 
@@ -2319,8 +2374,9 @@ func (b *BlockChain) locateBlocks(locator BlockLocator, hashStop *chainhash.Hash
 // This function is safe for concurrent access.
 func (b *BlockChain) LocateBlocks(locator BlockLocator, hashStop *chainhash.Hash, maxHashes uint32) ([]chainhash.Hash, []int32) {
 	b.chainLock.RLock()
+	defer b.chainLock.RUnlock()
+
 	hashes, heights := b.locateBlocks(locator, hashStop, maxHashes)
-	b.chainLock.RUnlock()
 	return hashes, heights
 }
 
@@ -2364,8 +2420,9 @@ func (b *BlockChain) locateHeaders(locator BlockLocator, hashStop *chainhash.Has
 // This function is safe for concurrent access.
 func (b *BlockChain) LocateHeaders(locator BlockLocator, hashStop *chainhash.Hash) []wire.BlockHeader {
 	b.chainLock.RLock()
+	defer b.chainLock.RUnlock()
+
 	headers := b.locateHeaders(locator, hashStop, wire.MaxBlockHeadersPerMsg)
-	b.chainLock.RUnlock()
 	return headers
 }
 

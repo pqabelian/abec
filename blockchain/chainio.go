@@ -1110,13 +1110,13 @@ func dbPutSpendJournalEntryAbe(dbTx database.Tx, blockHash *chainhash.Hash, stxo
 }
 
 func dbPutSpendJournalEntryAUT(dbTx database.Tx, blockHash *chainhash.Hash, sauts []SpentAUT) error {
-	spendBucket := dbTx.Metadata().Bucket(autSpendJournalBucketName)
+	autSpendBucket := dbTx.Metadata().Bucket(autSpendJournalBucketName)
 	serialized := serializeSpendJournalEntryAUT(sauts)
 	if len(serialized) == 0 {
 		return nil
 	}
 
-	return spendBucket.Put(blockHash[:], serialized)
+	return autSpendBucket.Put(blockHash[:], serialized)
 }
 
 // dbRemoveSpendJournalEntry uses an existing database transaction to remove the
@@ -1124,6 +1124,10 @@ func dbPutSpendJournalEntryAUT(dbTx database.Tx, blockHash *chainhash.Hash, saut
 func dbRemoveSpendJournalEntry(dbTx database.Tx, blockHash *chainhash.Hash) error {
 	spendBucket := dbTx.Metadata().Bucket(spendJournalBucketName)
 	return spendBucket.Delete(blockHash[:])
+}
+func dbRemoveSpendJournalEntryAUT(dbTx database.Tx, blockHash *chainhash.Hash) error {
+	autSpendBucket := dbTx.Metadata().Bucket(autSpendJournalBucketName)
+	return autSpendBucket.Delete(blockHash[:])
 }
 
 func serializeDeletedHistory(filesize int64, deletedTime int64) []byte {
@@ -1806,6 +1810,9 @@ func dbFetchAUTEntry(dbTx database.Tx, outpoint aut.OutPoint) (*AUTCoin, error) 
 	// transaction output.  Return now when there is no entry.
 	key := autOutpointKey(outpoint)
 	autCoinBucket := dbTx.Metadata().Bucket(autCoinBucketName)
+	if autCoinBucket == nil {
+		return nil, nil
+	}
 	serializedUtxo := autCoinBucket.Get(*key)
 	recycleAUTOutpointKey(key)
 	if serializedUtxo == nil {
@@ -1929,11 +1936,22 @@ func dbPutUtxoView(dbTx database.Tx, view *UtxoViewpoint) error {
 	return nil
 }
 
-func dbPutAUTView(dbTx database.Tx, view *AUTViewpoint) error {
+func dbPutAUTView(dbTx database.Tx, view *AUTViewpoint, blockHeight int32, blockHash chainhash.Hash) error {
 	autCoinBucket := dbTx.Metadata().Bucket(autCoinBucketName)
 	autInfoBucket := dbTx.Metadata().Bucket(autInfoBucketName)
 	autRootCoinBucket := dbTx.Metadata().Bucket(autRootCoinBucketName)
 	for autNameKey, entry := range view.entries {
+		log.Debugf(`AUT identified by %s with following configuration would be stored at height %d (block hash %s):
+	Symbol: %s, IssuerTokens: %v, UpdateThreshold: %v, IssueThreshold: %v,
+	PlannedTotalAmount: %v, ExpireHeight: %v, UnitName: %v, MinUnitName: %v, UnitScale: %v,
+	Memo: %v, MintedAmount: %v, RootCoinSet: %v`,
+			string(entry.metadata.AutIdentifier), blockHeight, blockHash,
+			string(entry.metadata.AutSymbol), entry.metadata.IssuerTokens,
+			entry.metadata.UpdateThreshold, entry.metadata.IssueThreshold,
+			entry.metadata.PlannedTotalAmount, entry.metadata.ExpireHeight,
+			entry.metadata.UnitName, entry.metadata.MinUnitName, entry.metadata.UnitScale,
+			entry.metadata.AutMemo, entry.metadata.MintedAmount, entry.metadata.RootCoinSet)
+
 		// Serialize and store the utxo entry.
 		serializedAUTInfo, err := serializeAUTInfo(entry.metadata)
 		if err != nil {
@@ -1957,6 +1975,9 @@ func dbPutAUTView(dbTx database.Tx, view *AUTViewpoint) error {
 			})
 		}
 		serializedRootCoinSet, err := serializeAUTRootCoinSet(rootCoinSet)
+		if err != nil {
+			return err
+		}
 		err = autRootCoinBucket.Put(autName, serializedRootCoinSet)
 		if err != nil {
 			return err
@@ -1967,7 +1988,6 @@ func dbPutAUTView(dbTx database.Tx, view *AUTViewpoint) error {
 			if coin == nil || !coin.isModified() {
 				continue
 			}
-
 			// Remove the utxo entry if it is spent.
 			if coin.IsSpent() {
 				key := autOutpointKey(outpoint)
@@ -1976,6 +1996,11 @@ func dbPutAUTView(dbTx database.Tx, view *AUTViewpoint) error {
 				if err != nil {
 					return err
 				}
+				log.Debugf(`the token (%s,%d) with %d amount in AUT identified by %s is spent at height %d (block hash %s):`,
+					outpoint.TxHash.String(), outpoint.Index,
+					coin.amount,
+					string(entry.metadata.AutIdentifier),
+					blockHeight, blockHash)
 
 				continue
 			}
@@ -1994,6 +2019,10 @@ func dbPutAUTView(dbTx database.Tx, view *AUTViewpoint) error {
 			if err != nil {
 				return err
 			}
+			log.Debugf(`the token (%s,%d) with %d amount in AUT identified by %s is stored at height %d (block hash %s):`,
+				outpoint.TxHash.String(), outpoint.Index,
+				coin.amount, string(entry.metadata.AutIdentifier),
+				blockHeight, blockHash)
 		}
 
 	}
@@ -2023,7 +2052,7 @@ func dbPutUtxoRingView(dbTx database.Tx, view *UtxoRingViewpoint) error {
 			if err != nil {
 				return err
 			}
-
+			log.Debugf("delete output point ring with key %s", outPointRingHash.String())
 			continue
 		}
 
@@ -2041,6 +2070,7 @@ func dbPutUtxoRingView(dbTx database.Tx, view *UtxoRingViewpoint) error {
 		if err != nil {
 			return err
 		}
+		log.Debugf("store output point ring %d bytes with key %s", len(serialized), outPointRingHash.String())
 	}
 
 	return nil
@@ -2061,33 +2091,35 @@ func dbRemoveUtxoRingView(dbTx database.Tx, view *UtxoRingViewpoint) error {
 		if err != nil {
 			return err
 		}
-
+		log.Debugf("delete output point ring with key %s", outPointRingHash.String())
 	}
 
 	return nil
 }
 
-func dbRemoveAUTInfo(dbTx database.Tx, infoToDel map[string]struct{}) error {
+func dbRemoveAUTInfo(dbTx database.Tx, infoToDel map[string]struct{}, blockHeight int32, blockHash chainhash.Hash) error {
 	autInfoBucket := dbTx.Metadata().Bucket(autInfoBucketName)
 	autRootCoinBucket := dbTx.Metadata().Bucket(autRootCoinBucketName)
 	autCoinBucket := dbTx.Metadata().Bucket(autCoinBucketName)
 
-	for autNameKey, _ := range infoToDel {
-		autName, _ := hex.DecodeString(autNameKey)
-		err := autInfoBucket.Delete(autName)
+	for autIdentifierKey, _ := range infoToDel {
+		autIdentifier, _ := hex.DecodeString(autIdentifierKey)
+		err := autInfoBucket.Delete(autIdentifier)
 		if err != nil {
 			return err
 		}
 
-		err = autRootCoinBucket.Delete(autName)
+		err = autRootCoinBucket.Delete(autIdentifier)
 		if err != nil {
 			return err
 		}
 
-		err = autCoinBucket.Delete(autName)
+		err = autCoinBucket.Delete(autIdentifier)
 		if err != nil {
 			return err
 		}
+		log.Debugf(`AUT identified by %s would be deleted at height %d (block hash %s)`,
+			string(autIdentifier), blockHeight, blockHash.String())
 	}
 
 	return nil

@@ -1607,10 +1607,15 @@ func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *
 		}
 
 		utxoRing := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())
-		if utxoRing == nil || utxoRing.IsSpent(txIn.SerialNumber) {
+		if utxoRing == nil {
 			str := fmt.Sprintf("TXO Ring %s (txIn %s) referenced from "+
-				"transaction %s:%d either does not exist or "+
-				"has already been spent", txIn.PreviousOutPointRing.RingId(), txIn.String(),
+				"transaction %s:%d does not exist", txIn.PreviousOutPointRing.RingId(), txIn.String(),
+				tx.Hash(), txInIndex)
+			return ruleError(ErrMissingTxOut, str)
+		}
+		if utxoRing.IsSpent(txIn.SerialNumber) {
+			str := fmt.Sprintf("TXO Ring %s (txIn %s) referenced from "+
+				"transaction %s:%d has already been spent", txIn.PreviousOutPointRing.RingId(), txIn.String(),
 				tx.Hash(), txInIndex)
 			return ruleError(ErrMissingTxOut, str)
 			// Abe to do: update the ErrMissingTxOut to ErrMissingTxOutRing
@@ -1697,12 +1702,12 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 		willConsumedRootCoins := map[aut.OutPoint]struct{}{}
 		for i := 0; i < len(autTransaction.TxIns); i++ {
 			// spend non-exist or double spending
-			if _, isAUTTx := autEntry.metadata.RootCoinSet[autTransaction.TxIns[i]]; !isAUTTx {
+			if _, existOutpoint := autEntry.metadata.RootCoinSet[autTransaction.TxIns[i]]; !existOutpoint {
 				return fmt.Errorf("transaction %s try to mint with unknown root coin <%s:%d>",
 					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index)
 			}
 
-			// duplicate
+			// check whether duplicate
 			if _, ok := willConsumedRootCoins[autTransaction.TxIns[i]]; ok {
 				return fmt.Errorf("transaction %s try to mint with repeated root coin <%s:%d>",
 					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index)
@@ -1770,7 +1775,7 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 		// expire height
 		if autEntry.metadata.ExpireHeight < txHeight {
 			return fmt.Errorf("transaction %s try to re-register at height %d but "+
-				"the AUT entry claim its expire height %d", tx.Hash(), txHeight, autEntry.metadata.ExpireHeight)
+				"the AUT entry claim its expire height %d when last registered", tx.Hash(), txHeight, autEntry.metadata.ExpireHeight)
 		}
 		if autTransaction.ExpireHeight < txHeight {
 			return fmt.Errorf("transaction %s try to re-register an AUT "+
@@ -1854,6 +1859,9 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 			if _, ok := willConsumedTokens[autTransaction.TxIns[i]]; ok {
 				return fmt.Errorf("transaction %s try to spend with repeat token <%s:%d>",
 					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index)
+			}
+			if token == nil {
+				return AssertError(fmt.Sprintf("transaction %s try to spend non-existing token", tx.Hash()))
 			}
 
 			willConsumedTokens[autTransaction.TxIns[i]] = struct{}{}
