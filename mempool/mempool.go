@@ -1839,7 +1839,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 		return nil, nil, txRuleError(wire.RejectAutBadForm, str)
 	}
 	if autTx != nil {
-		// check whether the mempool has the AUT transaction would register a AUT with the same name
+		// check whether the mempool has the AUT transaction would register an AUT with the same name
 		if autTx.Type() == aut.Registration {
 			if registerAUTTxHash, exist := mp.registeredAUTName[hex.EncodeToString(autTx.AUTIdentifier())]; exist {
 				str := fmt.Sprintf("transaction %v has register the same name AUT earlier than transaction %v", registerAUTTxHash, txHash)
@@ -1863,8 +1863,9 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 
 	txD := mp.addTransactionAbe(utxoRingView, autView, tx, bestHeight, txFee, fromDiskCache)
 
-	log.Debugf("Accepted transaction %v (input %d, output %d) (pool size: %v)", txHash,
-		len(tx.MsgTx().TxIns), len(tx.MsgTx().TxOuts), len(mp.poolAbe))
+	log.Debugf("Accepted transaction %v (input %d, output %d, serialized size %d bytes, full size %d bytes) "+
+		"(pool size: %v)", txHash, len(tx.MsgTx().TxIns), len(tx.MsgTx().TxOuts),
+		tx.MsgTx().SerializeSize(), tx.MsgTx().SerializeSizeFull(), len(mp.poolAbe))
 
 	return nil, txD, nil
 }
@@ -1892,9 +1893,9 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 func (mp *TxPool) MaybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit bool) ([]*wire.OutPointRing, *TxDescAbe, error) {
 	// Protect concurrent access.
 	mp.mtx.Lock()
-	missingParents, txD, err := mp.maybeAcceptTransactionAbe(tx, isNew, rateLimit, true, false)
-	mp.mtx.Unlock()
+	defer mp.mtx.Unlock()
 
+	missingParents, txD, err := mp.maybeAcceptTransactionAbe(tx, isNew, rateLimit, true, false)
 	return missingParents, txD, err
 }
 

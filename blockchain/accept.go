@@ -95,9 +95,11 @@ func (b *BlockChain) maybeAcceptBlockAbe(block *abeutil.BlockAbe, flags Behavior
 	// Notify the caller that the new block was accepted into the block
 	// chain.  The caller would typically want to react by relaying the
 	// inventory to other peers.
-	b.chainLock.Unlock()
-	b.sendNotification(NTBlockAccepted, block)
-	b.chainLock.Lock()
+	func() {
+		b.chainLock.Unlock()
+		defer b.chainLock.Lock()
+		b.sendNotification(NTBlockAccepted, block)
+	}()
 
 	return isMainChain, nil
 }
