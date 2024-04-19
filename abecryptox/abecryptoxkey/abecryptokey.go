@@ -628,11 +628,11 @@ func CryptoAddressKeysVerify(cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk
 		if privacyLevelInVsk != privacyLevel {
 			return false, fmt.Errorf("CryptoAddressKeysVerify: unmacthed privacyLevel in cryptoVsk and cryptoAddress: %d vs %d", abecryptoparam.CryptoScheme(privacyLevelInVsk), privacyLevel)
 		}
-		valid, err := pqringctxCoinValueKeyVerify(abecryptoxparam.PQRingCTXPP, coinValuePublicKey, coinValueSecretKey)
+		valid, err := pqringctxCoinAddressKeyForPKRingVerify(abecryptoxparam.PQRingCTXPP, coinAddress, coinSpendSecretKey, coinSerialNumberSecretKey, coinDetectorKey)
 		if !valid {
 			return false, err
 		}
-		return pqringctxCoinAddressKeyForPKRingVerify(abecryptoxparam.PQRingCTXPP, coinAddress, coinSpendSecretKey, coinSerialNumberSecretKey, coinDetectorKey)
+		return pqringctxCoinValueKeyVerify(abecryptoxparam.PQRingCTXPP, coinValuePublicKey, coinValueSecretKey)
 
 	default:
 		return false, fmt.Errorf("CryptoAddressKeysVerify: expect crypto scheme %d or %d in cryptoAddress, but got %d", abecryptoxparam.CryptoSchemePQRingCT, abecryptoxparam.CryptoSchemePQRingCTX, cryptoScheme)
@@ -653,7 +653,7 @@ func CheckCryptoAddress(cryptoAddress []byte) (valid bool, err error) {
 		return false, fmt.Errorf("CheckCryptoAddress: expect size of coin address %d, but got %d", coinAddressSize, len(coinAddress))
 	}
 
-	if privacyLevel == PrivacyLevelPSEUDONYM {
+	if privacyLevel != PrivacyLevelPSEUDONYM {
 		coinValuePublicKeySize, err := pqringctxGetCoinValuePublicKeySize(abecryptoxparam.PQRingCTXPP, privacyLevel)
 		if err != nil {
 			return false, fmt.Errorf("CheckCryptoAddress: fail to get size of coin valud public key address: %s", err)
