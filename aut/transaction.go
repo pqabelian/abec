@@ -131,7 +131,8 @@ type MetaInfo struct {
 	AutMemo            []byte
 
 	MintedAmount uint64
-	RootCoinSet  map[OutPoint]struct{} // todo(AUT): this is all or only the actives ones.
+	// only records active root coin
+	RootCoinSet map[OutPoint]struct{} // todo(AUT): this is all or only the actives ones.
 }
 
 // Clone returns a shallow copy of the utxo entry.
@@ -144,15 +145,15 @@ func (info *MetaInfo) Clone() *MetaInfo {
 	cloned := &MetaInfo{
 		AutIdentifier:      make([]byte, len(info.AutIdentifier)),
 		AutSymbol:          make([]byte, len(info.AutSymbol)),
-		AutMemo:            make([]byte, len(info.AutMemo)),
+		IssuerTokens:       make([][]byte, len(info.IssuerTokens)),
 		UpdateThreshold:    info.UpdateThreshold,
 		IssueThreshold:     info.IssueThreshold,
 		PlannedTotalAmount: info.PlannedTotalAmount,
 		ExpireHeight:       info.ExpireHeight,
-		IssuerTokens:       make([][]byte, len(info.IssuerTokens)),
 		UnitName:           make([]byte, len(info.UnitName)),
 		MinUnitName:        make([]byte, len(info.MinUnitName)),
 		UnitScale:          info.UnitScale,
+		AutMemo:            make([]byte, len(info.AutMemo)),
 		MintedAmount:       info.MintedAmount,
 		RootCoinSet:        make(map[OutPoint]struct{}, len(info.RootCoinSet)),
 	}
