@@ -1,7 +1,6 @@
 package blockchain
 
 import (
-	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/txscript"
@@ -187,7 +186,7 @@ func (view *UtxoViewpoint) addTxOut(outpoint wire.OutPoint, txOut *wire.TxOut, i
 // it exists and is not provably unspendable.  When the view already has an
 // entry for the output, it will be marked unspent.  All fields will be updated
 // for existing entries since it's possible it has changed during a reorg.
-func (view *UtxoViewpoint) AddTxOut(tx *abeutil.Tx, txOutIdx uint32, blockHeight int32) {
+/*func (view *UtxoViewpoint) AddTxOut(tx *abeutil.Tx, txOutIdx uint32, blockHeight int32) {
 	// Can't add an output for an out of bounds index.
 	if txOutIdx >= uint32(len(tx.MsgTx().TxOut)) {
 		return
@@ -220,7 +219,7 @@ func (view *UtxoViewpoint) AddTxOuts(tx *abeutil.Tx, blockHeight int32) {
 		prevOut.Index = uint32(txOutIdx)
 		view.addTxOut(prevOut, txOut, isCoinBase, blockHeight)
 	}
-}
+}*/
 
 /*// connectTransaction updates the view by adding all new utxos created by the
 // passed transaction and marking all utxos that the transactions spend as
@@ -602,7 +601,7 @@ func NewUtxoViewpoint() *UtxoViewpoint {
 // so the returned view can be examined for duplicate transactions.
 //
 // This function is safe for concurrent access however the returned view is NOT.
-func (b *BlockChain) FetchUtxoView(tx *abeutil.Tx) (*UtxoViewpoint, error) {
+/*func (b *BlockChain) FetchUtxoView(tx *abeutil.Tx) (*UtxoViewpoint, error) {
 	// Create a set of needed outputs based on those referenced by the
 	// inputs of the passed transaction and the outputs of the transaction
 	// itself.
@@ -625,7 +624,7 @@ func (b *BlockChain) FetchUtxoView(tx *abeutil.Tx) (*UtxoViewpoint, error) {
 	err := view.fetchUtxosMain(b.db, neededSet)
 	b.chainLock.RUnlock()
 	return view, err
-}
+}*/
 
 // FetchUtxoEntry loads and returns the requested unspent transaction output
 // from the point of view of the end of the main chain.

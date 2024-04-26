@@ -70,7 +70,7 @@ type Config struct {
 
 	// FetchUtxoView defines the function to use to fetch unspent
 	// transaction output information.
-	FetchUtxoView func(*abeutil.Tx) (*blockchain.UtxoViewpoint, error)
+	//FetchUtxoView func(*abeutil.Tx) (*blockchain.UtxoViewpoint, error)
 
 	FetchUtxoRingView func(*abeutil.TxAbe) (*blockchain.UtxoRingViewpoint, error)
 
@@ -86,7 +86,7 @@ type Config struct {
 	// CalcSequenceLock defines the function to use in order to generate
 	// the current sequence lock for the given transaction using the passed
 	// utxo view.
-	CalcSequenceLock func(*abeutil.Tx, *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error)
+	//CalcSequenceLock func(*abeutil.Tx, *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error)
 
 	// IsDeploymentActive returns true if the target deploymentID is
 	// active, and false otherwise. The mempool uses this function to gauge
@@ -161,13 +161,13 @@ type Policy struct {
 
 // TxDesc is a descriptor containing a transaction in the mempool along with
 // additional metadata.
-type TxDesc struct {
+/*type TxDesc struct {
 	mining.TxDesc
 
 	// StartingPriority is the priority of the transaction when it was added
 	// to the pool.
 	StartingPriority float64
-}
+}*/
 
 type TxDescAbe struct {
 	mining.TxDescAbe
@@ -180,11 +180,11 @@ type TxDescAbe struct {
 // orphanTx is normal transaction that references an ancestor transaction
 // that is not yet available.  It also contains additional information related
 // to it such as an expiration time to help prevent caching the orphan forever.
-type orphanTx struct {
+/*type orphanTx struct {
 	tx         *abeutil.Tx
 	tag        Tag
 	expiration time.Time
-}
+}*/
 
 type orphanTxAbe struct {
 	tx         *abeutil.TxAbe
@@ -199,14 +199,15 @@ type TxPool struct {
 	// The following variables must only be used atomically.
 	lastUpdated int64 // last time pool was updated
 
-	mtx           sync.RWMutex
-	cfg           Config
-	pool          map[chainhash.Hash]*TxDesc //	Abe todo: [txHash]TxDsec, the txs in pool, keyed by tx's hash
+	mtx sync.RWMutex
+	cfg Config
+	/*pool          map[chainhash.Hash]*TxDesc //	Abe todo: [txHash]TxDsec, the txs in pool, keyed by tx's hash
 	orphans       map[chainhash.Hash]*orphanTx
 	orphansByPrev map[wire.OutPoint]map[chainhash.Hash]*abeutil.Tx
 	outpoints     map[wire.OutPoint]*abeutil.Tx //	Abe todo: [outPoint]Tx, outPoint is one of the TxIn of Tx
-	pennyTotal    float64                       // exponentially decaying total for penny spends.
-	lastPennyUnix int64                         // unix time of last ``penny spend''
+	*/
+	pennyTotal    float64 // exponentially decaying total for penny spends.
+	lastPennyUnix int64   // unix time of last ``penny spend''
 
 	// nextExpireScan is the time after which the orphan pool will be
 	// scanned in order to evict orphans.  This is NOT a hard deadline as
@@ -232,7 +233,7 @@ var _ mining.TxSource = (*TxPool)(nil)
 // RemoveOrphan.  See the comment for RemoveOrphan for more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *TxPool) removeOrphan(tx *abeutil.Tx, removeRedeemers bool) {
+/*func (mp *TxPool) removeOrphan(tx *abeutil.Tx, removeRedeemers bool) {
 	// Nothing to do if passed tx is not an orphan.
 	txHash := tx.Hash()
 	otx, exists := mp.orphans[*txHash]
@@ -267,7 +268,7 @@ func (mp *TxPool) removeOrphan(tx *abeutil.Tx, removeRedeemers bool) {
 
 	// Remove the transaction from the orphan pool.
 	delete(mp.orphans, *txHash)
-}
+}*/
 
 // todo(ABE): ABE does not allow transactions to spend the TXOs of the transactions that are not included in block.
 func (mp *TxPool) removeOrphanAbe(tx *abeutil.TxAbe) {
@@ -321,7 +322,7 @@ func (mp *TxPool) RemoveOrphanAbe(tx *abeutil.TxAbe) {
 // identifier.
 //
 // This function is safe for concurrent access.
-func (mp *TxPool) RemoveOrphansByTag(tag Tag) uint64 {
+/*func (mp *TxPool) RemoveOrphansByTag(tag Tag) uint64 {
 	var numEvicted uint64
 	mp.mtx.Lock()
 	for _, otx := range mp.orphans {
@@ -332,7 +333,7 @@ func (mp *TxPool) RemoveOrphansByTag(tag Tag) uint64 {
 	}
 	mp.mtx.Unlock()
 	return numEvicted
-}
+}*/
 
 // limitNumOrphans limits the number of orphan transactions by evicting a random
 // orphan if adding a new one would cause it to overflow the max allowed.
@@ -416,7 +417,7 @@ func (mp *TxPool) limitNumOrphansAbe() error {
 
 	// Nothing to do if adding another orphan will not cause the pool to
 	// exceed the limit.
-	if len(mp.orphans)+1 <= mp.cfg.Policy.MaxOrphanTxs {
+	if len(mp.orphansAbe)+1 <= mp.cfg.Policy.MaxOrphanTxs {
 		return nil
 	}
 
@@ -1326,13 +1327,13 @@ func (mp *TxPool) txConflictsAbe(tx *abeutil.TxAbe) map[chainhash.Hash]*abeutil.
 // CheckSpend checks whether the passed outpoint is already spent by a
 // transaction in the mempool. If that's the case the spending transaction will
 // be returned, if not nil will be returned.
-func (mp *TxPool) CheckSpend(op wire.OutPoint) *abeutil.Tx {
+/*func (mp *TxPool) CheckSpend(op wire.OutPoint) *abeutil.Tx {
 	mp.mtx.RLock()
 	txR := mp.outpoints[op]
 	mp.mtx.RUnlock()
 
 	return txR
-}
+}*/
 
 // fetchInputUtxos loads utxo details about the input transactions referenced by
 // the passed transaction.  First, it loads the details form the viewpoint of
@@ -2165,12 +2166,12 @@ func (mp *TxPool) RemoveTransactionAbeByRingHash(hash chainhash.Hash) {
 // transactions until they are mined into a block.
 func New(cfg *Config) *TxPool {
 	return &TxPool{
-		cfg:            *cfg,
-		pool:           make(map[chainhash.Hash]*TxDesc),
-		orphans:        make(map[chainhash.Hash]*orphanTx),
-		orphansByPrev:  make(map[wire.OutPoint]map[chainhash.Hash]*abeutil.Tx),
+		cfg: *cfg,
+		//pool:           make(map[chainhash.Hash]*TxDesc),
+		//orphans:        make(map[chainhash.Hash]*orphanTx),
+		//orphansByPrev:  make(map[wire.OutPoint]map[chainhash.Hash]*abeutil.Tx),
 		nextExpireScan: time.Now().Add(orphanExpireScanInterval),
-		outpoints:      make(map[wire.OutPoint]*abeutil.Tx),
+		//outpoints:      make(map[wire.OutPoint]*abeutil.Tx),
 
 		poolAbe:          make(map[chainhash.Hash]*TxDescAbe),
 		diskPool:         make(map[chainhash.Hash]struct{}),

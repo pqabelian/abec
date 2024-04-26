@@ -382,7 +382,7 @@ type SequenceLock struct {
 // the candidate transaction to be included in a block.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) CalcSequenceLock(tx *abeutil.Tx, utxoView *UtxoViewpoint, mempool bool) (*SequenceLock, error) {
+/*func (b *BlockChain) CalcSequenceLock(tx *abeutil.Tx, utxoView *UtxoViewpoint, mempool bool) (*SequenceLock, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
 
@@ -501,7 +501,7 @@ func (b *BlockChain) calcSequenceLock(node *blockNode, tx *abeutil.Tx, utxoView 
 	}
 
 	return sequenceLock, nil
-}
+}*/
 
 // LockTimeToSequence converts the passed relative locktime to a sequence
 // number in accordance to BIP-68.

@@ -1,7 +1,6 @@
 package rpcclient
 
 import (
-	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -101,8 +100,7 @@ type NotificationHandlers struct {
 	// NotifyBlocks has been made to register for the notification and the
 	// function is non-nil.  Its parameters differ from OnBlockConnected: it
 	// receives the block's height, header, and relevant transactions.
-	OnFilteredBlockConnected func(height int32, header *wire.BlockHeader,
-		txs []*abeutil.Tx)
+	//OnFilteredBlockConnected func(height int32, header *wire.BlockHeader, txs []*abeutil.Tx)
 
 	// OnBlockDisconnected is invoked when a block is disconnected from the
 	// longest (best) chain.  It will only be invoked if a preceding call to
@@ -118,7 +116,7 @@ type NotificationHandlers struct {
 	// preceding NotifyBlocks has been made to register for the notification
 	// and the call to function is non-nil.  Its parameters differ from
 	// OnBlockDisconnected: it receives the block's height and header.
-	OnFilteredBlockDisconnected func(height int32, header *wire.BlockHeader)
+	//OnFilteredBlockDisconnected func(height int32, header *wire.BlockHeader)
 
 	//	todo(ABE): ABE does not support OutPointSpent and addressReceive notifications.
 	// OnRecvTx is invoked when a transaction that receives funds to a
@@ -128,7 +126,7 @@ type NotificationHandlers struct {
 	// made to register for the notification and the function is non-nil.
 	//
 	// Deprecated: Use OnRelevantTxAccepted instead.
-	OnRecvTx func(transaction *abeutil.Tx, details *abejson.BlockDetails)
+	//OnRecvTx func(transaction *abeutil.Tx, details *abejson.BlockDetails)
 
 	//	todo(ABE): ABE does not support OutPointSpent and addressRecive notifications.
 	// OnRedeemingTx is invoked when a transaction that spends a registered
@@ -143,7 +141,7 @@ type NotificationHandlers struct {
 	// this to invoked indirectly as the result of a NotifyReceived call.
 	//
 	// Deprecated: Use OnRelevantTxAccepted instead.
-	OnRedeemingTx func(transaction *abeutil.Tx, details *abejson.BlockDetails)
+	//OnRedeemingTx func(transaction *abeutil.Tx, details *abejson.BlockDetails)
 
 	//	todo(ABE): ABE does not support filter.
 	// OnRelevantTxAccepted is invoked when an unmined transaction passes
@@ -564,7 +562,7 @@ func parseChainNtfnParams(params []json.RawMessage) (*chainhash.Hash,
 //
 // NOTE: This is a btcd extension ported from github.com/decred/dcrrpcclient
 // and requires a websocket connection.
-func parseFilteredBlockConnectedParams(params []json.RawMessage) (int32,
+/*func parseFilteredBlockConnectedParams(params []json.RawMessage) (int32,
 	*wire.BlockHeader, []*abeutil.Tx, error) {
 
 	if len(params) < 3 {
@@ -647,7 +645,7 @@ func parseFilteredBlockDisconnectedParams(params []json.RawMessage) (int32,
 	}
 
 	return blockHeight, &blockHeader, nil
-}
+}*/
 
 func parseHexParam(param json.RawMessage) ([]byte, error) {
 	var s string
@@ -671,7 +669,7 @@ func parseRelevantTxAcceptedParams(params []json.RawMessage) (transaction []byte
 // parseChainTxNtfnParams parses out the transaction and optional details about
 // the block it's mined in from the parameters of recvtx and redeemingtx
 // notifications.
-func parseChainTxNtfnParams(params []json.RawMessage) (*abeutil.Tx,
+/*func parseChainTxNtfnParams(params []json.RawMessage) (*abeutil.Tx,
 	*abejson.BlockDetails, error) {
 
 	if len(params) == 0 || len(params) > 2 {
@@ -710,7 +708,7 @@ func parseChainTxNtfnParams(params []json.RawMessage) (*abeutil.Tx,
 	// nicer types for details about the block (block hash as a
 	// chainhash.Hash, block time as a time.Time, etc.).
 	return abeutil.NewTx(&msgTx), block, nil
-}
+}*/
 
 // parseRescanProgressParams parses out the height of the last rescanned block
 // from the parameters of rescanfinished and rescanprogress notifications.

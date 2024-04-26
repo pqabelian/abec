@@ -441,7 +441,7 @@ func (r FutureSubmitBlockResult) Receive() error {
 // returned instance.
 //
 // See SubmitBlock for the blocking version and more details.
-func (c *Client) SubmitBlockAsync(block *abeutil.Block, options *abejson.SubmitBlockOptions) FutureSubmitBlockResult {
+/*func (c *Client) SubmitBlockAsync(block *abeutil.Block, options *abejson.SubmitBlockOptions) FutureSubmitBlockResult {
 	blockHex := ""
 	if block != nil {
 		blockBytes, err := block.Bytes()
@@ -459,7 +459,7 @@ func (c *Client) SubmitBlockAsync(block *abeutil.Block, options *abejson.SubmitB
 // SubmitBlock attempts to submit a new block into the bitcoin network.
 func (c *Client) SubmitBlock(block *abeutil.Block, options *abejson.SubmitBlockOptions) error {
 	return c.SubmitBlockAsync(block, options).Receive()
-}
+}*/
 
 // FutureGetBlockTemplateResponse is a future promise to deliver the result of a
 // GetBlockTemplateAsync RPC invocation (or an applicable error).

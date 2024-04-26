@@ -18,13 +18,13 @@ const TxAbeIndexUnknown = -1
 // manipulation of raw transactions.  It also memoizes the hash for the
 // transaction on its first access so subsequent accesses don't have to repeat
 // the relatively expensive hashing operations.
-type Tx struct {
+/*type Tx struct {
 	msgTx         *wire.MsgTx     // Underlying MsgTx
 	txHash        *chainhash.Hash // Cached transaction hash
 	txHashWitness *chainhash.Hash // Cached transaction witness hash
 	txHasWitness  *bool           // If the transaction has witness data
 	txIndex       int             // Position within a block or TxIndexUnknown
-}
+}*/
 
 type TxAbe struct {
 	msgTx         *wire.MsgTxAbe  // Underlying MsgTx
@@ -37,10 +37,10 @@ type TxAbe struct {
 }
 
 // MsgTx returns the underlying wire.MsgTx for the transaction.
-func (t *Tx) MsgTx() *wire.MsgTx {
+/*func (t *Tx) MsgTx() *wire.MsgTx {
 	// Return the cached transaction.
 	return t.msgTx
-}
+}*/
 
 func (tx *TxAbe) MsgTx() *wire.MsgTxAbe {
 	// Return the cached transaction.
@@ -61,7 +61,7 @@ func (tx *TxAbe) IsCoinBase() (bool, error) {
 // Hash returns the hash of the transaction.  This is equivalent to
 // calling TxHash on the underlying wire.MsgTx, however it caches the
 // result so subsequent calls are more efficient.
-func (t *Tx) Hash() *chainhash.Hash {
+/*func (t *Tx) Hash() *chainhash.Hash {
 	// Return the cached hash if it has already been generated.
 	if t.txHash != nil {
 		return t.txHash
@@ -71,7 +71,7 @@ func (t *Tx) Hash() *chainhash.Hash {
 	hash := t.msgTx.TxHash()
 	t.txHash = &hash
 	return &hash
-}
+}*/
 
 func (tx *TxAbe) Hash() *chainhash.Hash {
 	// Return the cached hash if it has already been generated.
@@ -160,9 +160,9 @@ func (tx *TxAbe) Index() int {
 }
 
 // SetIndex sets the index of the transaction in within a block.
-func (t *Tx) SetIndex(index int) {
+/*func (t *Tx) SetIndex(index int) {
 	t.txIndex = index
-}
+}*/
 
 func (tx *TxAbe) SetIndex(index int) {
 	tx.txIndex = index
@@ -170,12 +170,12 @@ func (tx *TxAbe) SetIndex(index int) {
 
 // NewTx returns a new instance of a bitcoin transaction given an underlying
 // wire.MsgTx.  See Tx.
-func NewTx(msgTx *wire.MsgTx) *Tx {
+/*func NewTx(msgTx *wire.MsgTx) *Tx {
 	return &Tx{
 		msgTx:   msgTx,
 		txIndex: TxIndexUnknown,
 	}
-}
+}*/
 
 func NewTxAbe(msgTx *wire.MsgTxAbe) *TxAbe {
 	return &TxAbe{
@@ -186,10 +186,10 @@ func NewTxAbe(msgTx *wire.MsgTxAbe) *TxAbe {
 
 // NewTxFromBytes returns a new instance of a bitcoin transaction given the
 // serialized bytes.  See Tx.
-func NewTxFromBytes(serializedTx []byte) (*Tx, error) {
+/*func NewTxFromBytes(serializedTx []byte) (*Tx, error) {
 	br := bytes.NewReader(serializedTx)
 	return NewTxFromReader(br)
-}
+}*/
 
 func NewTxAbeFromBytes(serializedTx []byte) (*TxAbe, error) {
 	br := bytes.NewReader(serializedTx)
@@ -198,7 +198,7 @@ func NewTxAbeFromBytes(serializedTx []byte) (*TxAbe, error) {
 
 // NewTxFromReader returns a new instance of a bitcoin transaction given a
 // Reader to deserialize the transaction.  See Tx.
-func NewTxFromReader(r io.Reader) (*Tx, error) {
+/*func NewTxFromReader(r io.Reader) (*Tx, error) {
 	// Deserialize the bytes into a MsgTx.
 	var msgTx wire.MsgTx
 	err := msgTx.Deserialize(r)
@@ -211,7 +211,7 @@ func NewTxFromReader(r io.Reader) (*Tx, error) {
 		txIndex: TxIndexUnknown,
 	}
 	return &t, nil
-}
+}*/
 
 func NewTxAbeFromReader(r io.Reader) (*TxAbe, error) {
 	// Deserialize the bytes into a MsgTx.

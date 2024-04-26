@@ -13,7 +13,6 @@ import (
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/consensus/ethash"
-	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
 )
 
@@ -116,9 +115,9 @@ func IsCoinBaseTx(msgTx *wire.MsgTx) bool {
 //
 // This function only differs from IsCoinBaseTx in that it works with a higher
 // level util transaction as opposed to a raw wire transaction.
-func IsCoinBase(tx *abeutil.Tx) bool {
+/*func IsCoinBase(tx *abeutil.Tx) bool {
 	return IsCoinBaseTx(tx.MsgTx())
-}
+}*/
 
 func IsCoinBaseAbe(tx *abeutil.TxAbe) (bool, error) {
 	return tx.MsgTx().IsCoinBase()
@@ -538,15 +537,15 @@ func checkProofOfWork(header *wire.BlockHeader, ethash *ethash.Ethash, powLimit 
 // CheckProofOfWork ensures the block header bits which indicate the target
 // difficulty is in min/max range and that the block hash is less than the
 // target difficulty as claimed.
-func CheckProofOfWork(block *abeutil.Block, powLimit *big.Int) error {
+/*func CheckProofOfWork(block *abeutil.Block, powLimit *big.Int) error {
 	return checkProofOfWork(&block.MsgBlock().Header, nil, powLimit, BFNone)
-}
+}*/
 
 // CountSigOps returns the number of signature operations for all transaction
 // input and output scripts in the provided transaction.  This uses the
 // quicker, but imprecise, signature operation counting mechanism from
 // txscript.
-func CountSigOps(tx *abeutil.Tx) int {
+/*func CountSigOps(tx *abeutil.Tx) int {
 	msgTx := tx.MsgTx()
 
 	// Accumulate the number of signature operations in all transaction
@@ -618,7 +617,7 @@ func CountP2SHSigOps(tx *abeutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint)
 	}
 
 	return totalSigOps, nil
-}
+}*/
 
 // checkBlockHeaderSanity performs some preliminary checks on a block header to
 // ensure it is sane before continuing with processing.  These checks are

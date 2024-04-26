@@ -5,10 +5,7 @@
 package blockchain
 
 import (
-	"fmt"
-
 	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
 )
 
@@ -105,7 +102,7 @@ func GetTransactionWeightAbe(tx *abeutil.TxAbe) int64 {
 // legacy sig op count scaled according to the WitnessScaleFactor, the sig op
 // count for all p2sh inputs scaled by the WitnessScaleFactor, and finally the
 // unscaled sig op count for any inputs spending witness programs.
-func GetSigOpCost(tx *abeutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint, bip16, segWit bool) (int, error) {
+/*func GetSigOpCost(tx *abeutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint, bip16, segWit bool) (int, error) {
 	numSigOps := CountSigOps(tx) * WitnessScaleFactor
 	if bip16 {
 		numP2SHSigOps, err := CountP2SHSigOps(tx, isCoinBaseTx, utxoView)
@@ -139,4 +136,4 @@ func GetSigOpCost(tx *abeutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint, bi
 	}
 
 	return numSigOps, nil
-}
+}*/

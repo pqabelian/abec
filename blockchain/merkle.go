@@ -1,7 +1,6 @@
 package blockchain
 
 import (
-	"bytes"
 	"math"
 
 	"github.com/abesuite/abec/abeutil"
@@ -107,7 +106,7 @@ func HashMerkleBranchesEthash(left *chainhash.Hash, right *chainhash.Hash) *chai
 // using witness transaction id's rather than regular transaction id's. This
 // also presents an additional case wherein the wtxid of the coinbase transaction
 // is the zeroHash.
-func BuildMerkleTreeStore(transactions []*abeutil.Tx, witness bool) []*chainhash.Hash {
+/*func BuildMerkleTreeStore(transactions []*abeutil.Tx, witness bool) []*chainhash.Hash {
 	// Calculate how many entries are required to hold the binary merkle
 	// tree as a linear array and create an array of that size.
 	nextPoT := nextPowerOfTwo(len(transactions))
@@ -158,7 +157,7 @@ func BuildMerkleTreeStore(transactions []*abeutil.Tx, witness bool) []*chainhash
 	}
 
 	return merkles
-}
+}*/
 
 // BuildMerkleTreeStoreAbe creates a merkle tree from a slice of transactions,
 // stores it using a linear array, and returns a slice of the backing array.  A
@@ -344,7 +343,7 @@ func ComputeMerkleRootBySiblingHashes(siblingHashes []*chainhash.Hash) *chainhas
 // boolean indicating if the witness root was located within any of the txOut's
 // in the passed transaction. The witness commitment is stored as the data push
 // for an OP_RETURN with special magic bytes to aide in location.
-func ExtractWitnessCommitment(tx *abeutil.Tx) ([]byte, bool) {
+/*func ExtractWitnessCommitment(tx *abeutil.Tx) ([]byte, bool) {
 	// The witness commitment *must* be located within one of the coinbase
 	// transaction's outputs.
 	if !IsCoinBase(tx) {
@@ -371,7 +370,7 @@ func ExtractWitnessCommitment(tx *abeutil.Tx) ([]byte, bool) {
 	}
 
 	return nil, false
-}
+}*/
 
 // Abe to do
 /*func ExtractWitnessCommitmentAbe(tx *abeutil.TxAbe) ([]byte, bool) {

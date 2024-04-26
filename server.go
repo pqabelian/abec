@@ -2631,13 +2631,13 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		},
 		ChainParams: chainParams,
 		//	todo(ABE):
-		FetchUtxoView:     s.chain.FetchUtxoView,
+		//FetchUtxoView:     s.chain.FetchUtxoView,
 		FetchUtxoRingView: s.chain.FetchUtxoRingView,
 		BestHeight:        func() int32 { return s.chain.BestSnapshot().Height },
 		MedianTimePast:    func() time.Time { return s.chain.BestSnapshot().MedianTime },
-		CalcSequenceLock: func(tx *abeutil.Tx, view *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error) {
+		/*CalcSequenceLock: func(tx *abeutil.Tx, view *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error) {
 			return s.chain.CalcSequenceLock(tx, view, true)
-		},
+		},*/
 		IsDeploymentActive: s.chain.IsDeploymentActive,
 		SigCache:           s.sigCache,
 		HashCache:          s.hashCache,

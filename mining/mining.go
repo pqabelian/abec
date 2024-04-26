@@ -33,7 +33,7 @@ const (
 
 // TxDesc is a descriptor about a transaction in a transaction source along with
 // additional metadata.
-type TxDesc struct {
+/*type TxDesc struct {
 	// Tx is the transaction associated with the entry.
 	Tx *abeutil.Tx
 
@@ -49,7 +49,7 @@ type TxDesc struct {
 
 	// FeePerKB is the fee the transaction pays in Satoshi per 1000 bytes.
 	FeePerKB int64
-}
+}*/
 
 type TxDescAbe struct {
 	// Tx is the transaction associated with the entry.
@@ -266,7 +266,7 @@ func standardCoinbaseScript(nextBlockHeight int32, extraNonce uint64) ([]byte, e
 //
 // See the comment for NewBlockTemplate for more information about why the nil
 // address handling is useful.
-func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockHeight int32, addr abeutil.Address) (*abeutil.Tx, error) {
+/*func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockHeight int32, addr abeutil.Address) (*abeutil.Tx, error) {
 	// Create the script to pay to the provided payment address if one was
 	// specified.  Otherwise create a script that allows the coinbase to be
 	// redeemable by anyone.
@@ -300,7 +300,7 @@ func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockH
 		PkScript: pkScript,
 	})
 	return abeutil.NewTx(tx), nil
-}
+}*/
 
 //	TODO(ABE): may be the total number of  outputs of coinbase transaction should be confined to 1,
 //	 it will need to modify the process of checking block and transaction

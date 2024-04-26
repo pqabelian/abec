@@ -26,7 +26,7 @@ func (e OutOfRangeError) Error() string {
 // manipulation of raw blocks.  It also memoizes hashes for the block and its
 // transactions on their first access so subsequent accesses don't have to
 // repeat the relatively expensive hashing operations.
-type Block struct {
+/*type Block struct {
 	msgBlock                 *wire.MsgBlock  // Underlying MsgBlock
 	serializedBlock          []byte          // Serialized bytes for the block
 	serializedBlockNoWitness []byte          // Serialized bytes for block w/o witness data
@@ -34,7 +34,7 @@ type Block struct {
 	blockHeight              int32           // Height in the main block chain
 	transactions             []*Tx           // Transactions
 	txnsGenerated            bool            // ALL wrapped transactions generated
-}
+}*/
 
 // Abe to do
 type BlockAbe struct {
@@ -79,10 +79,10 @@ func (b *NeedSetResult) MsgNeedSetResult() *wire.MsgNeedSetResult {
 }
 
 // MsgBlock returns the underlying wire.MsgBlock for the Block.
-func (b *Block) MsgBlock() *wire.MsgBlock {
+/*func (b *Block) MsgBlock() *wire.MsgBlock {
 	// Return the cached block.
 	return b.msgBlock
-}
+}*/
 
 // Abe to do
 func (b *BlockAbe) MsgBlock() *wire.MsgBlockAbe {
@@ -97,7 +97,7 @@ func (b *PrunedBlock) MsgPrunedBlock() *wire.MsgPrunedBlock {
 // Bytes returns the serialized bytes for the Block.  This is equivalent to
 // calling Serialize on the underlying wire.MsgBlock, however it caches the
 // result so subsequent calls are more efficient.
-func (b *Block) Bytes() ([]byte, error) {
+/*func (b *Block) Bytes() ([]byte, error) {
 	// Return the cached serialized bytes if it has already been generated.
 	if len(b.serializedBlock) != 0 {
 		return b.serializedBlock, nil
@@ -114,7 +114,7 @@ func (b *Block) Bytes() ([]byte, error) {
 	// Cache the serialized bytes and return them.
 	b.serializedBlock = serializedBlock
 	return serializedBlock, nil
-}
+}*/
 
 func (b *BlockAbe) Bytes() ([]byte, error) {
 	// Return the cached serialized bytes if it has already been generated.
