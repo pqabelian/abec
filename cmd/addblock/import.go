@@ -3,6 +3,10 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+	"io"
+	"sync"
+	"time"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/blockchain/indexers"
@@ -10,9 +14,6 @@ import (
 	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/wire"
-	"io"
-	"sync"
-	"time"
 )
 
 var zeroHash = chainhash.Hash{}

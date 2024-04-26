@@ -6,6 +6,7 @@ package blockchain
 
 import (
 	"fmt"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
@@ -49,7 +50,7 @@ const (
 // Currently the weight metric is simply the sum of the block's serialized size
 // without any witness data scaled proportionally by the WitnessScaleFactor,
 // and the block's serialized size including any witness data.
-func GetBlockWeight(blk *abeutil.Block) int64 {
+/*func GetBlockWeight(blk *abeutil.Block) int64 {
 	msgBlock := blk.MsgBlock()
 
 	baseSize := msgBlock.SerializeSizeStripped()
@@ -57,9 +58,9 @@ func GetBlockWeight(blk *abeutil.Block) int64 {
 
 	// (baseSize * 3) + totalSize
 	return int64((baseSize * (WitnessScaleFactor - 1)) + totalSize)
-}
+}*/
 
-//	Abe to do
+// Abe to do
 func GetBlockWeightAbe(blk *abeutil.BlockAbe) int64 {
 	msgBlock := blk.MsgBlock()
 
@@ -70,7 +71,7 @@ func GetBlockWeightAbe(blk *abeutil.BlockAbe) int64 {
 	return int64((baseSize * (WitnessScaleFactor - 1)) + totalSize)
 }
 
-// GetTransactionWeight computes the value of the weight metric for a given
+/*// GetTransactionWeight computes the value of the weight metric for a given
 // transaction. Currently the weight metric is simply the sum of the
 // transactions's serialized size without any witness data scaled
 // proportionally by the WitnessScaleFactor, and the transaction's serialized
@@ -83,11 +84,11 @@ func GetTransactionWeight(tx *abeutil.Tx) int64 {
 
 	// (baseSize * 3) + totalSize
 	return int64((baseSize * (WitnessScaleFactor - 1)) + totalSize)
-}
+}*/
 
-//	todo(ABE): the caller mya convert the result to int32, why not return 'int32' directly?
-//	in ABE, we directly use the size, rather than the witness, since the witness size is roughly proportional to the basic size.
-//	If we also use weight, we need to set the factor according to more details.
+// todo(ABE): the caller mya convert the result to int32, why not return 'int32' directly?
+// in ABE, we directly use the size, rather than the witness, since the witness size is roughly proportional to the basic size.
+// If we also use weight, we need to set the factor according to more details.
 func GetTransactionWeightAbe(tx *abeutil.TxAbe) int64 {
 	msgTx := tx.MsgTx()
 

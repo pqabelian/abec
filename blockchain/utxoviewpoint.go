@@ -1,7 +1,6 @@
 package blockchain
 
 import (
-	"fmt"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/database"
@@ -47,11 +46,11 @@ type UtxoEntry struct {
 	packedFlags txoFlags
 }
 
-// isModified returns whether or not the output has been modified since it was
+/*// isModified returns whether or not the output has been modified since it was
 // loaded.
 func (entry *UtxoEntry) isModified() bool {
 	return entry.packedFlags&tfModified == tfModified
-}
+}*/
 
 // IsCoinBase returns whether or not the output was contained in a coinbase
 // transaction.
@@ -223,7 +222,7 @@ func (view *UtxoViewpoint) AddTxOuts(tx *abeutil.Tx, blockHeight int32) {
 	}
 }
 
-// connectTransaction updates the view by adding all new utxos created by the
+/*// connectTransaction updates the view by adding all new utxos created by the
 // passed transaction and marking all utxos that the transactions spend as
 // spent.  In addition, when the 'stxos' argument is not nil, it will be updated
 // to append an entry for each spent txout.  An error will be returned if the
@@ -450,7 +449,7 @@ func (view *UtxoViewpoint) disconnectTransactions(db database.DB, block *abeutil
 	// transactions for the current block have been disconnected.
 	view.SetBestHash(&block.MsgBlock().Header.PrevBlock)
 	return nil
-}
+}*/
 
 // RemoveEntry removes the given transaction output from the current state of
 // the view.  It will have no effect if the passed output does not exist in the
@@ -464,7 +463,7 @@ func (view *UtxoViewpoint) Entries() map[wire.OutPoint]*UtxoEntry {
 	return view.entries
 }
 
-// commit prunes all entries marked modified that are now fully spent and marks
+/*// commit prunes all entries marked modified that are now fully spent and marks
 // all entries as unmodified.
 func (view *UtxoViewpoint) commit() {
 	for outpoint, entry := range view.entries {
@@ -475,7 +474,7 @@ func (view *UtxoViewpoint) commit() {
 
 		entry.packedFlags ^= tfModified
 	}
-}
+}*/
 
 // fetchUtxosMain fetches unspent transaction output data about the provided
 // set of outpoints from the point of view of the end of the main chain at the
@@ -511,7 +510,7 @@ func (view *UtxoViewpoint) fetchUtxosMain(db database.DB, outpoints map[wire.Out
 	})
 }
 
-// fetchUtxos loads the unspent transaction outputs for the provided set of
+/*// fetchUtxos loads the unspent transaction outputs for the provided set of
 // outputs into the view from the database as needed unless they already exist
 // in the view in which case they are ignored.
 func (view *UtxoViewpoint) fetchUtxos(db database.DB, outpoints map[wire.OutPoint]struct{}) error {
@@ -568,11 +567,11 @@ func (view *UtxoViewpoint) fetchInputUtxos(db database.DB, block *abeutil.Block)
 			// than the actual position of the transaction within
 			// the block due to skipping the coinbase.
 			originHash := &txIn.PreviousOutPoint.Hash
-			if inFlightIndex, ok := txInFlight[*originHash]; ok &&    //spend the previous transaction in the same block
+			if inFlightIndex, ok := txInFlight[*originHash]; ok && //spend the previous transaction in the same block
 				i >= inFlightIndex {
 
 				originTx := transactions[inFlightIndex]
-				view.AddTxOuts(originTx, block.Height())     // put all tx outputs into view point
+				view.AddTxOuts(originTx, block.Height()) // put all tx outputs into view point
 				continue
 			}
 
@@ -588,7 +587,7 @@ func (view *UtxoViewpoint) fetchInputUtxos(db database.DB, block *abeutil.Block)
 
 	// Request the input utxos from the database.
 	return view.fetchUtxosMain(db, neededSet)
-}
+}*/
 
 // NewUtxoViewpoint returns a new empty unspent transaction output view.
 func NewUtxoViewpoint() *UtxoViewpoint {

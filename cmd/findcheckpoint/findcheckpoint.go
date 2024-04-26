@@ -2,14 +2,15 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/database"
 	_ "github.com/abesuite/abec/database/ffldb"
 	"github.com/abesuite/abec/wire"
-	"os"
-	"path/filepath"
 )
 
 const blockDbNamePrefix = "blocks"

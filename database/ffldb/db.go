@@ -5,16 +5,17 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/database"
-	"github.com/abesuite/abec/database/internal/treap"
-	"github.com/abesuite/abec/wire"
 	"os"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"sync"
+
+	"github.com/abesuite/abec/abeutil"
+	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/database"
+	"github.com/abesuite/abec/database/internal/treap"
+	"github.com/abesuite/abec/wire"
 
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/comparer"
@@ -1171,7 +1172,8 @@ func (tx *transaction) hasBlockAbe(hash *chainhash.Hash) bool {
 
 	return tx.hasKey(bucketizedKey(blockIdxBucketID, hash[:]))
 }
-func (tx *transaction) hasWitness(hash *chainhash.Hash) bool {
+
+/*func (tx *transaction) hasWitness(hash *chainhash.Hash) bool {
 	// Return true if the block is pending to be written on commit since
 	// it exists from the viewpoint of this transaction.
 	if _, exists := tx.pendingBlocksAbe[*hash]; exists {
@@ -1179,7 +1181,7 @@ func (tx *transaction) hasWitness(hash *chainhash.Hash) bool {
 	}
 
 	return tx.hasKey(bucketizedKey(witnessIdxBucketID, hash[:]))
-}
+}*/
 
 // StoreBlock stores the provided block into the database.  There are no checks
 // to ensure the block connects to a previous block, contains double spends, or
@@ -1192,7 +1194,7 @@ func (tx *transaction) hasWitness(hash *chainhash.Hash) bool {
 //   - ErrTxClosed if the transaction has already been closed
 //
 // This function is part of the database.Tx interface implementation.
-func (tx *transaction) StoreBlock(block *abeutil.Block) error {
+/*func (tx *transaction) StoreBlock(block *abeutil.Block) error {
 	// Ensure transaction state is valid.
 	if err := tx.checkClosed(); err != nil {
 		return err
@@ -1232,7 +1234,7 @@ func (tx *transaction) StoreBlock(block *abeutil.Block) error {
 	log.Tracef("Added block %s to pending blocks", blockHash)
 
 	return nil
-}
+}*/
 
 func (tx *transaction) StoreBlockAbe(block *abeutil.BlockAbe) error {
 	// Ensure transaction state is valid.
@@ -1331,7 +1333,7 @@ func (tx *transaction) HasBlockAbe(hash *chainhash.Hash) (bool, error) {
 //   - ErrTxClosed if the transaction has already been closed
 //
 // This function is part of the database.Tx interface implementation.
-func (tx *transaction) HasBlocks(hashes []chainhash.Hash) ([]bool, error) {
+/*func (tx *transaction) HasBlocks(hashes []chainhash.Hash) ([]bool, error) {
 	// Ensure transaction state is valid.
 	if err := tx.checkClosed(); err != nil {
 		return nil, err
@@ -1343,7 +1345,7 @@ func (tx *transaction) HasBlocks(hashes []chainhash.Hash) ([]bool, error) {
 	}
 
 	return results, nil
-}
+}*/
 
 // fetchBlockRow fetches the metadata stored in the block index for the provided
 // hash.  It will return ErrBlockNotFound if there is no entry.
@@ -2004,7 +2006,7 @@ func (tx *transaction) writePendingAndCommit() error {
 	}
 
 	// Loop through all of the pending blocks to store and write them.
-	for _, blockData := range tx.pendingBlockData {
+	/*for _, blockData := range tx.pendingBlockData {
 		log.Tracef("Storing block %s", blockData.hash)
 		location, err := tx.db.store.writeBlock(blockData.bytes)
 		if err != nil {
@@ -2022,7 +2024,7 @@ func (tx *transaction) writePendingAndCommit() error {
 			rollback()
 			return err
 		}
-	}
+	}*/
 
 	// Loop through all of the pending blocks to store and write them.
 	for _, blockData := range tx.pendingBlockAbeData {
@@ -2080,8 +2082,8 @@ func (tx *transaction) writePendingAndCommit() error {
 
 // FetchNodeType fetch node type from meta data.
 func (tx *transaction) FetchNodeType() (wire.NodeType, error) {
-	var nodeType []byte
-	nodeType = tx.Metadata().Get(nodeTypeKeyName)
+	//var nodeType []byte
+	nodeType := tx.Metadata().Get(nodeTypeKeyName)
 	if nodeType == nil {
 		return 0, errors.New("node type does not exist")
 	}

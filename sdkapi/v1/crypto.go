@@ -3,6 +3,7 @@ package v1
 import (
 	"bytes"
 	"errors"
+
 	"github.com/abesuite/abec/abecrypto"
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/wire"

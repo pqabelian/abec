@@ -4,13 +4,14 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/abesuite/abec/abecrypto"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
-	"testing"
-	"time"
 )
 
 func TestBlkTmplGenerator_UpdateExtraNonceAbe(t *testing.T) {

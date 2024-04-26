@@ -3,6 +3,7 @@ package rpcclient
 import (
 	"encoding/json"
 	"errors"
+
 	"github.com/abesuite/abec/abejson"
 )
 

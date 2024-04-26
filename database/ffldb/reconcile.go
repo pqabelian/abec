@@ -2,9 +2,10 @@ package ffldb
 
 import (
 	"fmt"
+	"hash/crc32"
+
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/wire"
-	"hash/crc32"
 )
 
 // The serialized write cursor location format is:

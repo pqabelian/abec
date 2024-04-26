@@ -1,8 +1,9 @@
 package netaddrmgr
 
 import (
-	"github.com/abesuite/abec/wire"
 	"time"
+
+	"github.com/abesuite/abec/wire"
 )
 
 // KnownNetAddress tracks information about a known network address that is used

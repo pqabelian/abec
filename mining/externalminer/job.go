@@ -3,11 +3,12 @@ package externalminer
 import (
 	"encoding/binary"
 	"encoding/hex"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/mining"
 	"math/big"
 	"strings"
 	"time"
+
+	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/mining"
 )
 
 type SharedBlockTemplate struct {

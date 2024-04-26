@@ -2,11 +2,12 @@ package blockchain
 
 import (
 	"fmt"
+	"runtime"
+	"time"
+
 	"github.com/abesuite/abec/abecrypto"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/txscript"
-	"runtime"
-	"time"
 )
 
 // txValidateItem holds a transaction to validate.

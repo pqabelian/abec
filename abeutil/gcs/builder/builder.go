@@ -3,11 +3,11 @@ package builder
 import (
 	"crypto/rand"
 	"fmt"
+	"math"
+
 	"github.com/abesuite/abec/abeutil/gcs"
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
-	"math"
 )
 
 const (
@@ -290,7 +290,7 @@ func WithRandomKey() *GCSBuilder {
 // BuildBasicFilter builds a basic GCS filter from a block. A basic GCS filter
 // will contain all the previous output scripts spent by inputs within a block,
 // as well as the data pushes within all the outputs created within a block.
-func BuildBasicFilter(block *wire.MsgBlock, prevOutScripts [][]byte) (*gcs.Filter, error) {
+/*func BuildBasicFilter(block *wire.MsgBlock, prevOutScripts [][]byte) (*gcs.Filter, error) {
 	blockHash := block.BlockHash()
 	b := WithKeyHash(&blockHash)
 
@@ -333,7 +333,7 @@ func BuildBasicFilter(block *wire.MsgBlock, prevOutScripts [][]byte) (*gcs.Filte
 	}
 
 	return b.Build()
-}
+}*/
 
 // Abe to do
 func BuildBasicFilterAbe(block *wire.MsgBlockAbe, prevOutScripts [][]byte) (*gcs.Filter, error) {

@@ -7,12 +7,13 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/wire"
-	"os"
-	"path/filepath"
 
 	_ "github.com/abesuite/abec/database/ffldb"
 )

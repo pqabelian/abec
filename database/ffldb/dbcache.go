@@ -3,12 +3,13 @@ package ffldb
 import (
 	"bytes"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/abesuite/abec/database/internal/treap"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/util"
-	"sync"
-	"time"
 )
 
 const (

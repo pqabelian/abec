@@ -2,8 +2,9 @@ package wire
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/chainhash"
 	"io"
+
+	"github.com/abesuite/abec/chainhash"
 )
 
 type MsgNeedSetResult struct {

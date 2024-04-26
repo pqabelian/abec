@@ -2,8 +2,9 @@ package wire
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/chainhash"
 	"io"
+
+	"github.com/abesuite/abec/chainhash"
 )
 
 // MaxBlockLocatorsPerMsg is the maximum number of block locator hashes allowed

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"

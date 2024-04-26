@@ -1,6 +1,8 @@
 package main
 
 import (
+	"sync/atomic"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chainhash"
@@ -8,7 +10,6 @@ import (
 	"github.com/abesuite/abec/peer"
 	"github.com/abesuite/abec/syncmgr"
 	"github.com/abesuite/abec/wire"
-	"sync/atomic"
 )
 
 // rpcPeer provides a peer for use with the RPC server and implements the

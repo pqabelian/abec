@@ -3,6 +3,7 @@ package indexers
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chainhash"
@@ -63,7 +64,7 @@ func dbFetchIndexerTip(dbTx database.Tx, idxKey []byte) (*chainhash.Hash, int32,
 // given block using the provided indexer and updates the tip of the indexer
 // accordingly.  An error will be returned if the current tip for the indexer is
 // not the previous block for the passed block.
-func dbIndexConnectBlock(dbTx database.Tx, indexer Indexer, block *abeutil.Block,
+/*func dbIndexConnectBlock(dbTx database.Tx, indexer Indexer, block *abeutil.Block,
 	stxo []blockchain.SpentTxOut) error {
 
 	// Assert that the block being connected properly connects to the
@@ -87,9 +88,9 @@ func dbIndexConnectBlock(dbTx database.Tx, indexer Indexer, block *abeutil.Block
 
 	// Update the current index tip.
 	return dbPutIndexerTip(dbTx, idxKey, block.Hash(), block.Height())
-}
+}*/
 
-//	Abe to do
+// Abe to do
 func dbIndexConnectBlockAbe(dbTx database.Tx, indexer Indexer, block *abeutil.BlockAbe,
 	stxo []*blockchain.SpentTxOutAbe) error {
 
@@ -121,7 +122,7 @@ func dbIndexConnectBlockAbe(dbTx database.Tx, indexer Indexer, block *abeutil.Bl
 // given block using the provided indexer and updates the tip of the indexer
 // accordingly.  An error will be returned if the current tip for the indexer is
 // not the passed block.
-func dbIndexDisconnectBlock(dbTx database.Tx, indexer Indexer, block *abeutil.Block,
+/*func dbIndexDisconnectBlock(dbTx database.Tx, indexer Indexer, block *abeutil.Block,
 	stxo []blockchain.SpentTxOut) error {
 
 	// Assert that the block being disconnected is the current tip of the
@@ -147,7 +148,7 @@ func dbIndexDisconnectBlock(dbTx database.Tx, indexer Indexer, block *abeutil.Bl
 	// Update the current index tip.
 	prevHash := &block.MsgBlock().Header.PrevBlock
 	return dbPutIndexerTip(dbTx, idxKey, prevHash, block.Height()-1)
-}
+}*/
 
 func dbIndexDisconnectBlockAbe(dbTx database.Tx, indexer Indexer, block *abeutil.BlockAbe,
 	stxo []*blockchain.SpentTxOutAbe) error {
@@ -551,7 +552,7 @@ func dbFetchTx(dbTx database.Tx, hash *chainhash.Hash) (*wire.MsgTx, error) {
 // checks, and invokes each indexer.
 //
 // This is part of the blockchain.IndexManager interface.
-func (m *Manager) ConnectBlock(dbTx database.Tx, block *abeutil.Block,
+/*func (m *Manager) ConnectBlock(dbTx database.Tx, block *abeutil.Block,
 	stxos []blockchain.SpentTxOut) error {
 
 	// Call each of the currently active optional indexes with the block
@@ -563,10 +564,10 @@ func (m *Manager) ConnectBlock(dbTx database.Tx, block *abeutil.Block,
 		}
 	}
 	return nil
-}
+}*/
 
-//	Abe to do
-//	Really Need TO DO
+// Abe to do
+// Really Need TO DO
 func (m *Manager) ConnectBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe,
 	stxos []*blockchain.SpentTxOutAbe) error {
 
@@ -587,7 +588,7 @@ func (m *Manager) ConnectBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe,
 // the index entries associated with the block.
 //
 // This is part of the blockchain.IndexManager interface.
-func (m *Manager) DisconnectBlock(dbTx database.Tx, block *abeutil.Block,
+/*func (m *Manager) DisconnectBlock(dbTx database.Tx, block *abeutil.Block,
 	stxo []blockchain.SpentTxOut) error {
 
 	// Call each of the currently active optional indexes with the block
@@ -599,9 +600,9 @@ func (m *Manager) DisconnectBlock(dbTx database.Tx, block *abeutil.Block,
 		}
 	}
 	return nil
-}
+}*/
 
-//	todo(ABE.MUST)
+// todo(ABE.MUST)
 func (m *Manager) DisconnectBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe,
 	stxo []*blockchain.SpentTxOutAbe) error {
 

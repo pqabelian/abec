@@ -3,13 +3,14 @@ package witnessmgr
 import (
 	"errors"
 	"fmt"
+	"os"
+	"sync"
+	"time"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/peer"
 	"github.com/abesuite/abec/wire"
-	"os"
-	"sync"
-	"time"
 )
 
 // witnessPruningInterval is the number of blocks between each delete operation.

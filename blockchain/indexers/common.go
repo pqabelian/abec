@@ -3,6 +3,7 @@ package indexers
 import (
 	"encoding/binary"
 	"errors"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/database"
@@ -46,7 +47,7 @@ type Indexer interface {
 	// main chain. The set of output spent within a block is also passed in
 	// so indexers can access the pevious output scripts input spent if
 	// required.
-	ConnectBlock(database.Tx, *abeutil.Block, []blockchain.SpentTxOut) error
+	//ConnectBlock(database.Tx, *abeutil.Block, []blockchain.SpentTxOut) error
 	//	ToDo(ABE)
 	ConnectBlockAbe(database.Tx, *abeutil.BlockAbe, []*blockchain.SpentTxOutAbe) error
 
@@ -54,7 +55,7 @@ type Indexer interface {
 	// the main chain. The set of outputs scripts that were spent within
 	// this block is also returned so indexers can clean up the prior index
 	// state for this block
-	DisconnectBlock(database.Tx, *abeutil.Block, []blockchain.SpentTxOut) error
+	//DisconnectBlock(database.Tx, *abeutil.Block, []blockchain.SpentTxOut) error
 	//	ToDo(ABE)
 	DisconnectBlockAbe(database.Tx, *abeutil.BlockAbe, []*blockchain.SpentTxOutAbe) error
 }

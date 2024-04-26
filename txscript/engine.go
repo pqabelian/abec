@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
+	"math/big"
+
 	"github.com/abesuite/abec/btcec"
 	"github.com/abesuite/abec/wire"
-	"math/big"
 )
 
 // ScriptFlags is a bitmask defining additional operations or tests that will be

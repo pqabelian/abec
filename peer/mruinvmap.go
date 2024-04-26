@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"container/list"
 	"fmt"
-	"github.com/abesuite/abec/wire"
 	"sync"
+
+	"github.com/abesuite/abec/wire"
 )
 
 // mruInventoryMap provides a concurrency safe map that is limited to a maximum

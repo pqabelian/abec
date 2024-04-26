@@ -7,9 +7,10 @@ package main
 import (
 	"encoding/hex"
 	"errors"
+	"time"
+
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/database"
-	"time"
 )
 
 // fetchBlockCmd defines the configuration options for the fetchblock command.

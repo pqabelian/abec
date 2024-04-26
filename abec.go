@@ -6,13 +6,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/blockchain"
-	"github.com/abesuite/abec/blockchain/indexers"
-	"github.com/abesuite/abec/database"
-	"github.com/abesuite/abec/limits"
-	"github.com/abesuite/abec/mempool"
-	"github.com/abesuite/abec/wire"
-	"github.com/shirou/gopsutil/v3/mem"
 	"net"
 	"net/http"
 	"os"
@@ -21,6 +14,14 @@ import (
 	"runtime/debug"
 	"runtime/pprof"
 	"strings"
+
+	"github.com/abesuite/abec/blockchain"
+	"github.com/abesuite/abec/blockchain/indexers"
+	"github.com/abesuite/abec/database"
+	"github.com/abesuite/abec/limits"
+	"github.com/abesuite/abec/mempool"
+	"github.com/abesuite/abec/wire"
+	"github.com/shirou/gopsutil/v3/mem"
 )
 
 const (
@@ -344,8 +345,7 @@ func loadBlockDB() (database.DB, error) {
 
 	// Insert new node type into database.
 	err = db.Update(func(dbTx database.Tx) error {
-		var err error
-		err = dbTx.StoreNodeType(cfg.nodeType)
+		err := dbTx.StoreNodeType(cfg.nodeType)
 		return err
 	})
 	if err != nil {

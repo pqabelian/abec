@@ -2,11 +2,12 @@ package blockchain
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/database"
-	"time"
 )
 
 // BehaviorFlags is a bitmask defining tweaks to the normal behavior when

@@ -1,8 +1,9 @@
 package wire
 
 import (
-	"github.com/abesuite/abec/abelog"
 	"strings"
+
+	"github.com/abesuite/abec/abelog"
 )
 
 const (

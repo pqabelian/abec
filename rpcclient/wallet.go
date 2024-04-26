@@ -2,12 +2,13 @@ package rpcclient
 
 import (
 	"encoding/json"
+	"strconv"
+
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
-	"strconv"
 )
 
 // *****************************
@@ -574,9 +575,9 @@ func (c *Client) NewSendToAddressAbeAsync(payees []string, amount []abeutil.Amou
 //
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
-func (c *Client) SendToAddress(address abeutil.Address, amount abeutil.Amount) (*chainhash.Hash, error) {
+/*func (c *Client) SendToAddress(address abeutil.Address, amount abeutil.Amount) (*chainhash.Hash, error) {
 	return c.SendToAddressAsync(address, amount).Receive()
-}
+}*/
 func (c *Client) SendToPayees(payees []string, amount []abeutil.Amount, scaleToFeeSatPerKb *float64, feeSpecified *float64, utxoSpecified *string, minconf *int, comment *string) (*chainhash.Hash, error) {
 	return c.SendToPayeesAsync(payees, amount, minconf, scaleToFeeSatPerKb, feeSpecified, utxoSpecified, comment).Receive()
 }
@@ -1673,9 +1674,9 @@ func (c *Client) GetBalancesAbeMinconfAsync(minconf int) FutureGetBalancesAbeRes
 }
 
 // GetBalances returns the available balances from the server.
-func (c *Client) GetBalances() (*abejson.GetBalancesResult, error) {
+/*func (c *Client) GetBalances() (*abejson.GetBalancesResult, error) {
 	return c.GetBalancesAsync().Receive()
-}
+}*/
 func (c *Client) GetBalancesAbe() (*abejson.GetBalancesAbeResult, error) {
 	return c.GetBalancesAbeAsync().Receive()
 }

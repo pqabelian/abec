@@ -1,9 +1,10 @@
 package blockchain
 
 import (
+	"math"
+
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/wire"
-	"math"
 )
 
 const (

@@ -2,16 +2,17 @@ package main
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/abejson"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/jessevdk/go-flags"
 	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/abesuite/abec/abejson"
+	"github.com/abesuite/abec/abeutil"
+	"github.com/abesuite/abec/chaincfg"
+	"github.com/jessevdk/go-flags"
 )
 
 const (

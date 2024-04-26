@@ -3,6 +3,11 @@ package cpuminer
 import (
 	"errors"
 	"fmt"
+	"math/rand"
+	"runtime"
+	"sync"
+	"time"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chaincfg"
@@ -10,10 +15,6 @@ import (
 	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/mining"
 	"github.com/abesuite/abec/wire"
-	"math/rand"
-	"runtime"
-	"sync"
-	"time"
 )
 
 const (

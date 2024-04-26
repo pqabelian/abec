@@ -3,6 +3,7 @@ package abecrypto
 import (
 	"errors"
 	"fmt"
+
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
@@ -230,7 +231,7 @@ func CheckCryptoAddress(cryptoAddress []byte) (valid bool, hints string) {
 		return false, "CheckCryptoAddress: non-supported cryptoScheme appears in cryptoAddress"
 	}
 
-	return true, ""
+	//return true, ""
 }
 
 // ExtractCryptoSchemeFromCryptoAddressSpsk extracts cryptoScheme from cryptoAddress
@@ -281,7 +282,7 @@ func VerifyCryptoAddressSpsnsk(cryptoAddress []byte, cryptoSpsk []byte, cryptoSn
 		return false, "VerifyCryptoAddressSpsnsk: non-supported cryptoScheme appears in cryptoAddress"
 	}
 
-	return true, ""
+	//return true, ""
 }
 
 func VerifyCryptoAddressVsk(cryptoAddress []byte, cryptoVsk []byte) (ok bool, hints string) {
@@ -298,7 +299,7 @@ func VerifyCryptoAddressVsk(cryptoAddress []byte, cryptoVsk []byte) (ok bool, hi
 		return false, "VerifyCryptoAddressVsk: non-supported cryptoScheme appears in cryptoAddress"
 	}
 
-	return true, ""
+	//return true, ""
 }
 
 // To be self-contained, this function checks the validity of CryptoAddress first.

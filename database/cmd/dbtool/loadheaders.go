@@ -1,9 +1,10 @@
 package main
 
 import (
+	"time"
+
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/database"
-	"time"
 )
 
 // headersCmd defines the configuration options for the loadheaders command.

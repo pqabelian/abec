@@ -1,8 +1,9 @@
 package txscript
 
 import (
-	"github.com/abesuite/abec/chainhash"
 	"sync"
+
+	"github.com/abesuite/abec/chainhash"
 )
 
 // WitnessCache implements a transaction witness verification cache with a randomized

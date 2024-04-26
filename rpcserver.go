@@ -9,6 +9,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"math/big"
+	"math/rand"
+	"net"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
@@ -26,18 +39,6 @@ import (
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
 	"github.com/gorilla/websocket"
-	"io"
-	"io/ioutil"
-	"math/big"
-	"math/rand"
-	"net"
-	"net/http"
-	"os"
-	"strconv"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 // API version constants
@@ -125,10 +126,10 @@ var rpcHandlers map[string]commandHandler
 var rpcHandlersBeforeInit = map[string]commandHandler{
 	"addnode": handleAddNode,
 	//	todo(ABE.MUST)
-	"createrawtransaction":    handleCreateRawTransactionAbe,
+	//"createrawtransaction":    handleCreateRawTransactionAbe,
 	"createrawtransactionAbe": handleCreateRawTransactionAbe,
 	"debuglevel":              handleDebugLevel,
-	"decoderawtransaction":    handleDecodeRawTransaction,
+	//"decoderawtransaction":    handleDecodeRawTransaction,
 	"decoderawtransactionAbe": handleDecodeRawTransactionAbe,
 	"decodescript":            handleDecodeScript,
 	"estimatefee":             handleEstimateFee,
@@ -173,7 +174,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	//	todo(ABE.MUST): However, in ABE, each address is one-time (by stealth address), it does not make sense to search by address.
 	//	todo(ABE.MUST): ABE provides txoIndex which support searching by Txo(txid,index).
 	//	"searchrawtransactions": handleSearchRawTransactions,
-	"sendrawtransaction":    handleSendRawTransactionAbe,
+	//"sendrawtransaction":    handleSendRawTransactionAbe,
 	"sendrawtransactionabe": handleSendRawTransactionAbe,
 	"setgenerate":           handleSetGenerate,
 	"stop":                  handleStop,
@@ -546,10 +547,13 @@ func messageToHex(msg wire.Message) (string, error) {
 	return hex.EncodeToString(buf.Bytes()), nil
 }
 
-// handleCreateRawTransaction handles createrawtransaction commands.
+/*// handleCreateRawTransaction handles createrawtransaction commands.
 //
 //	todo(ABE):
-func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+//
+// func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+func handleCreateRawTransaction(s *rpcServer, cmd interface{}) (interface{}, error) {
+
 	c := cmd.(*abejson.CreateRawTransactionCmd)
 
 	// Validate the locktime, if given.
@@ -652,7 +656,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 		return nil, err
 	}
 	return mtxHex, nil
-}
+}*/
 
 // TODO(abe):this function will be design to use ring hash to generate a transaction
 func handleCreateRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
@@ -804,7 +808,7 @@ func handleDebugLevel(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 
 // witnessToHex formats the passed witness stack as a slice of hex-encoded
 // strings to be used in a JSON response.
-func witnessToHex(witness wire.TxWitness) []string {
+/*func witnessToHex(witness wire.TxWitness) []string {
 	// Ensure nil is returned when there are no entries versus an empty
 	// slice so it can properly be omitted as necessary.
 	if len(witness) == 0 {
@@ -817,7 +821,7 @@ func witnessToHex(witness wire.TxWitness) []string {
 	}
 
 	return result
-}
+}*/
 
 //func witnessToHexAbe(txWitness *wire.TxWitnessAbe) []string {
 //	// Ensure nil is returned when there are no entries versus an empty
@@ -838,7 +842,7 @@ func witnessToHex(witness wire.TxWitness) []string {
 // transaction.
 //
 //	todo(ABE):
-func createVinList(mtx *wire.MsgTx) []abejson.Vin {
+/*func createVinList(mtx *wire.MsgTx) []abejson.Vin {
 	// Coinbase transactions only have a single txin by definition.
 	vinList := make([]abejson.Vin, len(mtx.TxIn))
 	if blockchain.IsCoinBaseTx(mtx) {
@@ -870,7 +874,7 @@ func createVinList(mtx *wire.MsgTx) []abejson.Vin {
 	}
 
 	return vinList
-}
+}*/
 
 func createVinListAbe(mtx *wire.MsgTxAbe) []abejson.TxIn {
 	// Coinbase transactions only have a single txin by definition.
@@ -906,7 +910,7 @@ func createVinListAbe(mtx *wire.MsgTxAbe) []abejson.TxIn {
 // transaction.
 //
 //	todo(ABE)
-func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap map[string]struct{}) []abejson.Vout {
+/*func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap map[string]struct{}) []abejson.Vout {
 	voutList := make([]abejson.Vout, 0, len(mtx.TxOut))
 	for i, v := range mtx.TxOut {
 		// The disassembled string will contain [error] inline if the
@@ -954,7 +958,7 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap
 	}
 
 	return voutList
-}
+}*/
 
 func createVoutListAbe(mtx *wire.MsgTxAbe, chainParams *chaincfg.Params) []abejson.TxOutAbe {
 	voutList := make([]abejson.TxOutAbe, 0, len(mtx.TxOuts))
@@ -972,7 +976,7 @@ func createVoutListAbe(mtx *wire.MsgTxAbe, chainParams *chaincfg.Params) []abejs
 	return voutList
 }
 
-// createTxRawResult converts the passed transaction and associated parameters
+/*// createTxRawResult converts the passed transaction and associated parameters
 // to a raw transaction JSON object.
 func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 	txHash string, blkHeader *wire.BlockHeader, blkHash string,
@@ -1005,7 +1009,7 @@ func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 	}
 
 	return txReply, nil
-}
+}*/
 
 // todo(ABE.MUST)
 func createTxRawResultAbe(chainParams *chaincfg.Params, mtx *wire.MsgTxAbe,
@@ -1046,7 +1050,7 @@ func createTxRawResultAbe(chainParams *chaincfg.Params, mtx *wire.MsgTxAbe,
 // handleDecodeRawTransaction handles decoderawtransaction commands.
 //
 //	todo(ABE):
-func handleDecodeRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+/*func handleDecodeRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.DecodeRawTransactionCmd)
 
 	// Deserialize the transaction.
@@ -1076,7 +1080,7 @@ func handleDecodeRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 		Vout:     createVoutList(&mtx, s.cfg.ChainParams, nil),
 	}
 	return txReply, nil
-}
+}*/
 
 func handleDecodeRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.DecodeRawTransactionCmdAbe)
@@ -1370,7 +1374,7 @@ func getDifficultyRatio(bits uint32, params *chaincfg.Params) float64 {
 	return diff
 }
 
-// handleGetBlock implements the getblock command.
+/*// handleGetBlock implements the getblock command.
 func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.GetBlockCmd)
 
@@ -1471,7 +1475,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	}
 
 	return blockReply, nil
-}
+}*/
 
 func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	var c *abejson.GetBlockAbeCmd
@@ -1598,7 +1602,7 @@ func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	return blockReply, nil
 }
 
-// softForkStatus converts a ThresholdState state into a human readable string
+/*// softForkStatus converts a ThresholdState state into a human readable string
 // corresponding to the particular state.
 func softForkStatus(state blockchain.ThresholdState) (string, error) {
 	switch state {
@@ -1615,7 +1619,7 @@ func softForkStatus(state blockchain.ThresholdState) (string, error) {
 	default:
 		return "", fmt.Errorf("unknown deployment state: %v", state)
 	}
-}
+}*/
 
 // handleGetBlockChainInfo implements the getblockchaininfo command.
 func handleGetBlockChainInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
@@ -1734,7 +1738,7 @@ func encodeTemplateID(prevHash *chainhash.Hash, lastGenerated time.Time) string 
 	return fmt.Sprintf("%s-%d", prevHash.String(), lastGenerated.Unix())
 }
 
-// decodeTemplateID decodes an ID that is used to uniquely identify a block
+/*// decodeTemplateID decodes an ID that is used to uniquely identify a block
 // template.  This is mainly used as a mechanism to track when to update clients
 // that are using long polling for block templates.  The ID consists of the
 // previous block hash for the associated template and the time the associated
@@ -1755,7 +1759,7 @@ func decodeTemplateID(templateID string) (*chainhash.Hash, int64, error) {
 	}
 
 	return prevHash, lastGenerated, nil
-}
+}*/
 
 // notifyLongPollers notifies any channels that have been registered to be
 // notified when block templates are stale.
@@ -1821,7 +1825,7 @@ func (state *gbtWorkState) NotifyBlockConnected(blockHash *chainhash.Hash) {
 // pool to notify any long poll clients with a new block template when their
 // existing block template is stale due to enough time passing and the contents
 // of the memory pool changing.
-func (state *gbtWorkState) NotifyMempoolTx(lastUpdated time.Time) {
+/*func (state *gbtWorkState) NotifyMempoolTx(lastUpdated time.Time) {
 	go func() {
 		state.Lock()
 		defer state.Unlock()
@@ -1838,7 +1842,7 @@ func (state *gbtWorkState) NotifyMempoolTx(lastUpdated time.Time) {
 			state.notifyLongPollers(state.prevHash, lastUpdated)
 		}
 	}()
-}
+}*/
 
 // todo(ABE):
 func (state *gbtWorkState) NotifyMempoolTxAbe(lastUpdated time.Time) {
@@ -1859,7 +1863,7 @@ func (state *gbtWorkState) NotifyMempoolTxAbe(lastUpdated time.Time) {
 	}()
 }
 
-// templateUpdateChan returns a channel that will be closed once the block
+/*// templateUpdateChan returns a channel that will be closed once the block
 // template associated with the passed previous hash and last generated time
 // is stale.  The function will return existing channels for duplicate
 // parameters which allows multiple clients to wait for the same block template
@@ -1885,7 +1889,7 @@ func (state *gbtWorkState) templateUpdateChan(prevHash *chainhash.Hash, lastGene
 	}
 
 	return c
-}
+}*/
 
 // GetExtraNonceOffset is a helper function which calculate the offset of extra nonce
 // in coinbase transaction.
@@ -2053,8 +2057,10 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 			template.ValidPayAddress = true
 
 			// Update the merkle root.
-			block := abeutil.NewBlock(template.Block)
-			merkles := blockchain.BuildMerkleTreeStore(block.Transactions(), false)
+			//block := abeutil.NewBlock(template.Block)
+			block := abeutil.NewBlockAbe(template.BlockAbe)
+			//merkles := blockchain.BuildMerkleTreeStore(block.Transactions(), false)
+			merkles := blockchain.BuildMerkleTreeStoreAbe(block.Transactions(), false)
 			template.Block.Header.MerkleRoot = *merkles[len(merkles)-1]
 		}
 
@@ -2212,7 +2218,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 	return &reply, nil
 }
 
-// handleGetBlockTemplateLongPoll is a helper for handleGetBlockTemplateRequest
+/*// handleGetBlockTemplateLongPoll is a helper for handleGetBlockTemplateRequest
 // which deals with handling long polling for block templates.  When a caller
 // sends a request with a long poll ID that was previously returned, a response
 // is not sent until the caller should stop working on the previous block
@@ -2306,7 +2312,7 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 	}
 
 	return result, nil
-}
+}*/
 
 // checkMiningAddrValidity check if the given mining address is valid,
 // including checking the netID and the verify hash.
@@ -4112,7 +4118,7 @@ func handlePing(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 // handleSendRawTransaction implements the sendrawtransaction command.
 //
 //	todo(ABE): done and need clear
-func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+/*func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.SendRawTransactionCmd)
 	// Deserialize and send off to tx relay
 	hexStr := c.HexTx
@@ -4180,20 +4186,7 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 		}
 	}
 
-	// When the transaction was accepted it should be the first item in the
-	// returned array of accepted transactions.  The only way this will not
-	// be true is if the API for ProcessTransaction changes and this code is
-	// not properly updated, but ensure the condition holds as a safeguard.
-	//
-	// Also, since an error is being returned to the caller, ensure the
-	// transaction is removed from the memory pool.
-	/*	if len(acceptedTxs) == 0 || !acceptedTxs[0].Tx.Hash().IsEqual(tx.Hash()) {
-		s.cfg.TxMemPool.RemoveTransactionBTCD(tx, true)
 
-		errStr := fmt.Sprintf("transaction %v is not in accepted list",
-			tx.Hash())
-		return nil, internalRPCError(errStr, "")
-	}*/
 
 	// Generate and relay inventory vectors for all newly accepted
 	// transactions into the memory pool due to the original being
@@ -4213,7 +4206,7 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 	s.cfg.ConnMgr.AddRebroadcastInventory(iv, txD)
 
 	return tx.Hash().String(), nil
-}
+}*/
 
 func handleSendRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	var c *abejson.SendRawTransactionAbeCmd
@@ -4782,7 +4775,7 @@ func (s *rpcServer) RequestedProcessShutdown() <-chan struct{} {
 // NotifyNewTransactions notifies both websocket and getblocktemplate long
 // poll clients of the passed transactions.  This function should be called
 // whenever new transactions are added to the mempool.
-func (s *rpcServer) NotifyNewTransactions(txns []*mempool.TxDesc) {
+/*func (s *rpcServer) NotifyNewTransactions(txns []*mempool.TxDesc) {
 	for _, txD := range txns {
 		// Notify websocket clients about mempool transactions.
 		s.ntfnMgr.NotifyMempoolTx(txD.Tx, true)
@@ -4791,7 +4784,7 @@ func (s *rpcServer) NotifyNewTransactions(txns []*mempool.TxDesc) {
 		// about stale block templates due to the new transaction.
 		s.gbtWorkState.NotifyMempoolTx(s.cfg.TxMemPool.LastUpdated())
 	}
-}
+}*/
 
 // todo(ABE):
 func (s *rpcServer) NotifyNewTransactionsAbe(txns []*mempool.TxDescAbe) {

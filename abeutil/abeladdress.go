@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/chaincfg"
 )

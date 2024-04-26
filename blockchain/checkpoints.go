@@ -2,25 +2,25 @@ package blockchain
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/txscript"
-	"time"
 )
 
 // CheckpointConfirmations is the number of blocks before the end of the current
 // best block chain that a good checkpoint candidate must be.
 const CheckpointConfirmations = 4000
 
-// newHashFromStr converts the passed big-endian hex string into a
+/*// newHashFromStr converts the passed big-endian hex string into a
 // chainhash.Hash.  It only differs from the one available in chainhash in that
 // it ignores the error since it will only (and must only) be called with
 // hard-coded, and therefore known good, hashes.
 func newHashFromStr(hexStr string) *chainhash.Hash {
 	hash, _ := chainhash.NewHashFromStr(hexStr)
 	return hash
-}
+}*/
 
 // Checkpoints returns a slice of checkpoints (regardless of whether they are
 // already known).  When there are no checkpoints for the chain, it will return
@@ -164,7 +164,7 @@ func (b *BlockChain) findPreviousCheckpoint() (*blockNode, error) {
 
 // isNonstandardTransaction determines whether a transaction contains any
 // scripts which are not one of the standard types.
-func isNonstandardTransaction(tx *abeutil.Tx) bool {
+/*func isNonstandardTransaction(tx *abeutil.Tx) bool {
 	// Check all of the output public key scripts for non-standard scripts.
 	for _, txOut := range tx.MsgTx().TxOut {
 		scriptClass := txscript.GetScriptClass(txOut.PkScript)
@@ -173,7 +173,7 @@ func isNonstandardTransaction(tx *abeutil.Tx) bool {
 		}
 	}
 	return false
-}
+}*/
 
 // IsCheckpointCandidate returns whether or not the passed block is a good
 // checkpoint candidate.
@@ -192,7 +192,7 @@ func isNonstandardTransaction(tx *abeutil.Tx) bool {
 // decision and then manually added to the list of checkpoints for a network.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) IsCheckpointCandidate(block *abeutil.Block) (bool, error) {
+/*func (b *BlockChain) IsCheckpointCandidate(block *abeutil.Block) (bool, error) {
 	b.chainLock.RLock()
 	defer b.chainLock.RUnlock()
 
@@ -253,7 +253,7 @@ func (b *BlockChain) IsCheckpointCandidate(block *abeutil.Block) (bool, error) {
 
 	// All of the checks passed, so the block is a candidate.
 	return true, nil
-}
+}*/
 
 // IsCheckpointCandidateAbe returns whether or not the passed block is a good
 // checkpoint candidate.

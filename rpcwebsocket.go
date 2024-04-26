@@ -9,13 +9,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
+	"sync"
+	"time"
+
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/wire"
 	"github.com/gorilla/websocket"
-	"io"
-	"sync"
-	"time"
 )
 
 const (
@@ -222,7 +223,7 @@ func (m *wsNotificationManager) NotifyBlockDisconnected(block *abeutil.BlockAbe)
 // notification manager for transaction notification processing.  If
 // isNew is true, the tx is is a new transaction, rather than one
 // added to the mempool during a reorg.
-func (m *wsNotificationManager) NotifyMempoolTx(tx *abeutil.Tx, isNew bool) {
+/*func (m *wsNotificationManager) NotifyMempoolTx(tx *abeutil.Tx, isNew bool) {
 	n := &notificationTxAcceptedByMempool{
 		isNew: isNew,
 		tx:    tx,
@@ -236,7 +237,7 @@ func (m *wsNotificationManager) NotifyMempoolTx(tx *abeutil.Tx, isNew bool) {
 	case m.queueNotification <- n:
 	case <-m.quit:
 	}
-}
+}*/
 
 // Abe to do
 func (m *wsNotificationManager) NotifyMempoolTxAbe(tx *abeutil.TxAbe, isNew bool) {
@@ -469,10 +470,10 @@ func (m *wsNotificationManager) NotifyMempoolTxAbe(tx *abeutil.TxAbe, isNew bool
 type notificationBlockConnected abeutil.BlockAbe
 type notificationBlockDisconnected abeutil.BlockAbe
 
-type notificationTxAcceptedByMempool struct {
+/*type notificationTxAcceptedByMempool struct {
 	isNew bool
 	tx    *abeutil.Tx
-}
+}*/
 
 // todo (ABE):
 type notificationTxAcceptedByMempoolAbe struct {
@@ -770,7 +771,7 @@ func (m *wsNotificationManager) UnregisterBlockUpdates(wsc *wsClient) {
 // block updates when a block is connected to the main chain.
 //
 //	todo(ABE):
-func (*wsNotificationManager) notifyBlockConnected(clients map[chan struct{}]*wsClient,
+/*func (*wsNotificationManager) notifyBlockConnected(clients map[chan struct{}]*wsClient,
 	block *abeutil.Block) {
 
 	// Notify interested websocket clients about the connected block.
@@ -785,7 +786,7 @@ func (*wsNotificationManager) notifyBlockConnected(clients map[chan struct{}]*ws
 	for _, wsc := range clients {
 		wsc.QueueNotification(marshalledJSON)
 	}
-}
+}*/
 
 func (*wsNotificationManager) notifyBlockConnectedAbe(clients map[chan struct{}]*wsClient,
 	block *abeutil.BlockAbe) {
@@ -809,7 +810,7 @@ func (*wsNotificationManager) notifyBlockConnectedAbe(clients map[chan struct{}]
 // reorganize).
 //
 //	ToDo(ABE)
-func (*wsNotificationManager) notifyBlockDisconnected(clients map[chan struct{}]*wsClient, block *abeutil.Block) {
+/*func (*wsNotificationManager) notifyBlockDisconnected(clients map[chan struct{}]*wsClient, block *abeutil.Block) {
 	// Skip notification creation if no clients have requested block
 	// connected/disconnected notifications.
 	if len(clients) == 0 {
@@ -828,7 +829,7 @@ func (*wsNotificationManager) notifyBlockDisconnected(clients map[chan struct{}]
 	for _, wsc := range clients {
 		wsc.QueueNotification(marshalledJSON)
 	}
-}
+}*/
 
 func (*wsNotificationManager) notifyBlockDisconnectedAbe(clients map[chan struct{}]*wsClient, block *abeutil.BlockAbe) {
 	// Skip notification creation if no clients have requested block
@@ -1132,12 +1133,12 @@ func (m *wsNotificationManager) UnregisterNewMempoolTxsUpdates(wsc *wsClient) {
 // txHexString returns the serialized transaction encoded in hexadecimal.
 //
 //	todo(ABE)
-func txHexString(tx *wire.MsgTx) string {
+/*func txHexString(tx *wire.MsgTx) string {
 	buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
 	// Ignore Serialize's error, as writing to a bytes.buffer cannot fail.
 	tx.Serialize(buf)
 	return hex.EncodeToString(buf.Bytes())
-}
+}*/
 
 func txHexStringAbe(tx *wire.MsgTxAbe) string {
 	buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
@@ -1150,7 +1151,7 @@ func txHexStringAbe(tx *wire.MsgTxAbe) string {
 // from a block and a transaction's block index.
 //
 //	todo(ABE):
-func blockDetails(block *abeutil.Block, txIndex int) *abejson.BlockDetails {
+/*func blockDetails(block *abeutil.Block, txIndex int) *abejson.BlockDetails {
 	if block == nil {
 		return nil
 	}
@@ -1160,7 +1161,7 @@ func blockDetails(block *abeutil.Block, txIndex int) *abejson.BlockDetails {
 		Index:  txIndex,
 		Time:   block.MsgBlock().Header.Timestamp.Unix(),
 	}
-}
+}*/
 
 func blockDetailsAbe(block *abeutil.BlockAbe, txIndex int) *abejson.BlockDetails {
 	if block == nil {

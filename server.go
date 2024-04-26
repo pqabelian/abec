@@ -7,6 +7,18 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
+	"net"
+	"os"
+	"path/filepath"
+	"runtime"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/blockchain/indexers"
@@ -27,17 +39,6 @@ import (
 	"github.com/abesuite/abec/wire"
 	"github.com/abesuite/abec/witnessmgr"
 	"github.com/shirou/gopsutil/v3/process"
-	"math"
-	"net"
-	"os"
-	"path/filepath"
-	"runtime"
-	"sort"
-	"strconv"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 const (
@@ -1111,7 +1112,7 @@ func (s *server) pushNeedSetResultMsg(sp *serverPeer, blockHash chainhash.Hash,
 	return nil
 }
 
-// pushBlockMsg sends a block message for the provided block hash to the
+/*// pushBlockMsg sends a block message for the provided block hash to the
 // connected peer.  An error is returned if the block hash is not known.
 //
 //	todo(ABE):
@@ -1182,7 +1183,7 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan cha
 		sp.continueHash = nil
 	}
 	return nil
-}
+}*/
 
 // server.cache wire.Message + []byte
 func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
@@ -2916,6 +2917,7 @@ func initListeners(amgr *netaddrmgr.NetAddrManager, listenAddrs []string, servic
 
 	var nat NAT
 	if len(cfg.ExternalIPs) != 0 {
+
 		defaultPort, err := strconv.ParseUint(activeNetParams.DefaultPort, 10, 16)
 		if err != nil {
 			srvrLog.Errorf("Can not parse default port %s for active chain: %v",

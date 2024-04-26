@@ -6,11 +6,12 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"github.com/abesuite/abec/abejson"
-	"github.com/abesuite/go-socks/socks"
 	"io/ioutil"
 	"net"
 	"net/http"
+
+	"github.com/abesuite/abec/abejson"
+	"github.com/abesuite/go-socks/socks"
 )
 
 // newHTTPClient returns a new HTTP client that is configured according to the

@@ -2,6 +2,7 @@ package ffldb
 
 import (
 	"fmt"
+
 	"github.com/abesuite/abec/abelog"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/wire"

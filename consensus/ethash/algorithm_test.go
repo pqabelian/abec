@@ -6,15 +6,16 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/abesuite/abec/chainhash"
-	"golang.org/x/crypto/sha3"
 	"math/big"
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/abesuite/abec/chainhash"
+	"golang.org/x/crypto/sha3"
 )
 
-//	the original parameter of EthashPoW
+// the original parameter of EthashPoW
 const (
 	datasetInitBytesEth   = 1 << 30 // Bytes in dataset at genesis
 	datasetGrowthBytesEth = 1 << 23 //	1 << 23       // dataset growth per epoch

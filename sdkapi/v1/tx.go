@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
+
 	"github.com/abesuite/abec/abecrypto"
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
-	"io"
 )
 
 // type OutPoint wire.OutPointAbe

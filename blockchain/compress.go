@@ -167,7 +167,7 @@ const (
 	numSpecialScripts = 6
 )
 
-// isPubKeyHash returns whether or not the passed public key script is a
+/*// isPubKeyHash returns whether or not the passed public key script is a
 // standard pay-to-pubkey-hash script along with the pubkey hash it is paying to
 // if it is.
 func isPubKeyHash(script []byte) (bool, []byte) {
@@ -233,9 +233,9 @@ func isPubKey(script []byte) (bool, []byte) {
 	}
 
 	return false, nil
-}
+}*/
 
-// compressedScriptSize returns the number of bytes the passed script would take
+/*// compressedScriptSize returns the number of bytes the passed script would take
 // when encoded with the domain specific compression algorithm described above.
 func compressedScriptSize(pkScript []byte) int {
 	// Pay-to-pubkey-hash script.
@@ -258,7 +258,7 @@ func compressedScriptSize(pkScript []byte) int {
 	// encoded as a variable length quantity.
 	return serializeSizeVLQ(uint64(len(pkScript)+numSpecialScripts)) +
 		len(pkScript)
-}
+}*/
 
 // decodeCompressedScriptSize treats the passed serialized bytes as a compressed
 // script, possibly followed by other data, and returns the number of bytes it
@@ -287,7 +287,7 @@ func decodeCompressedScriptSize(serialized []byte) int {
 	return int(scriptSize)
 }
 
-// putCompressedScript compresses the passed script according to the domain
+/*// putCompressedScript compresses the passed script according to the domain
 // specific compression algorithm described above directly into the passed
 // target byte slice.  The target byte slice must be at least large enough to
 // handle the number of bytes returned by the compressedScriptSize function or
@@ -331,7 +331,7 @@ func putCompressedScript(target, pkScript []byte) int {
 	vlqSizeLen := putVLQ(target, encodedSize)
 	copy(target[vlqSizeLen:], pkScript)
 	return vlqSizeLen + len(pkScript)
-}
+}*/
 
 // decompressScript returns the original script obtained by decompressing the
 // passed compressed script according to the domain specific compression
@@ -454,7 +454,7 @@ func decompressScript(compressedPkScript []byte) []byte {
 //   1000000000 (5) -> 10       (1)           * 10.00000000 BTC
 // -----------------------------------------------------------------------------
 
-// compressTxOutAmount compresses the passed amount according to the domain
+/*// compressTxOutAmount compresses the passed amount according to the domain
 // specific compression algorithm described above.
 func compressTxOutAmount(amount uint64) uint64 {
 	// No need to do any work if it's zero.
@@ -481,7 +481,7 @@ func compressTxOutAmount(amount uint64) uint64 {
 	// The compressed result for an exponent of 9 is:
 	// 1 + 10*(n-1) + e   ==   10 + 10*(n-1)
 	return 10 + 10*(amount-1)
-}
+}*/
 
 // decompressTxOutAmount returns the original amount the passed compressed
 // amount represents according to the domain specific compression algorithm
@@ -537,7 +537,7 @@ func decompressTxOutAmount(amount uint64) uint64 {
 //     compressed script   []byte   variable
 // -----------------------------------------------------------------------------
 
-// compressedTxOutSize returns the number of bytes the passed transaction output
+/*// compressedTxOutSize returns the number of bytes the passed transaction output
 // fields would take when encoded with the format described above.
 func compressedTxOutSize(amount uint64, pkScript []byte) int {
 	return serializeSizeVLQ(compressTxOutAmount(amount)) +
@@ -553,7 +553,7 @@ func putCompressedTxOut(target []byte, amount uint64, pkScript []byte) int {
 	offset := putVLQ(target, compressTxOutAmount(amount))
 	offset += putCompressedScript(target[offset:], pkScript)
 	return offset
-}
+}*/
 
 // decodeCompressedTxOut decodes the passed compressed txout, possibly followed
 // by other data, into its uncompressed amount and script and returns them along

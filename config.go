@@ -10,8 +10,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/consensus/ethash"
-	"github.com/abesuite/abec/wire"
+
 	"io"
 	"net"
 	"os"
@@ -27,10 +26,12 @@ import (
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/connmgr"
+	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/database"
 	_ "github.com/abesuite/abec/database/ffldb"
 	"github.com/abesuite/abec/mempool"
 	"github.com/abesuite/abec/peer"
+	"github.com/abesuite/abec/wire"
 	"github.com/abesuite/go-socks/socks"
 	flags "github.com/jessevdk/go-flags"
 )

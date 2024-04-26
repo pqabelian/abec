@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
-	"golang.org/x/crypto/sha3"
 	"math/big"
 	"runtime"
 	"time"
+
+	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/wire"
+	"golang.org/x/crypto/sha3"
 )
 
 // Various error messages to mark blocks invalid. These should be private to
@@ -30,9 +31,11 @@ var (
 
 // VerifySeal checks whether a block(header) satisfies the PoW difficulty requirements,
 // either using the usual ethash cache for it, or alternatively using a full DAG to make it faster.
+//
 //	VerifySeal() define the consensus rules.
 //	As the target rule may depend on the block chain, Ethash leaves the difficulty computation to block chain module.
-//func (ethash *Ethash) VerifySeal(header *wire.BlockHeader, target *big.Int, fulldag bool) error {
+//
+// func (ethash *Ethash) VerifySeal(header *wire.BlockHeader, target *big.Int, fulldag bool) error {
 func (ethash *Ethash) VerifySeal(header *wire.BlockHeader, target *big.Int) error {
 
 	//	ethash.config.VerifyByFullDAG allows to configure a mining machine to use fullDAG to have faster verification.
@@ -107,27 +110,27 @@ func (ethash *Ethash) VerifySeal(header *wire.BlockHeader, target *big.Int) erro
 	return nil
 }
 
-//	Dataset() packages the dataset() function, and allow outsider can call this function.
-//	This is to allow the caller can have the dataset for specified block height, then can call other function, such as TrySeal.
-//	This function takes blockHeight as input, since the epoch and dataset mechanism are defined in ethash, and do not need to be known by the caller.
+// Dataset() packages the dataset() function, and allow outsider can call this function.
+// This is to allow the caller can have the dataset for specified block height, then can call other function, such as TrySeal.
+// This function takes blockHeight as input, since the epoch and dataset mechanism are defined in ethash, and do not need to be known by the caller.
 func (ethash *Ethash) Dataset(blockHeight int32) *dataset {
 	//epoch := epoch(blockHeight)
 	epoch := int((blockHeight - ethash.config.BlockHeightStart) / ethash.config.EpochLength)
 	return ethash.dataset(epoch, false)
 }
 
-//	TrySeal() tris nonce to test whether the nonce generates a valid sealHash which lies in the scope specified by target,
-//	i.e., satisfying the consensus rules defined by VerifySeal().
-//	If the input nonce is valid, the block header will be updated, i.e., the MixDigest and NonceExt are set.
-//	To enable multiple calls on TrySeal() to use the same "dataset *dataset", this function takes "dataset *dataset" as an input,
-//	so that the miner can obtain a "dataset *dataset" by calling (ethash *Ethash) Dataset(blockHeight int32) and then call this function.
-//	To avoid the unnecessary computation of contentHash, this function takes contentHash as input,
-//	which should be computed by the caller on the input "header *wire.BlockHeader".
-//	That is, it is the responsibility of the caller to provide the dataset, contentHash, and target, corresponding to the input block header,
-//	and header *wire.BlockHeader is actually responsible to take the MixDigest and NonceExt out (if they are valid).
-//	To mine, TrySeal() will be called highly frequently.
-//	TrySeal() just provides a reference implementation for mining, i.e., finding valid EthashPoW solutions.
-//	Note that, the consensus rules are defined by VerifySeal(), and any nonce, whatever how it is found, is fine, as long as it satisfies the rules defined by VerifySeal().
+// TrySeal() tris nonce to test whether the nonce generates a valid sealHash which lies in the scope specified by target,
+// i.e., satisfying the consensus rules defined by VerifySeal().
+// If the input nonce is valid, the block header will be updated, i.e., the MixDigest and NonceExt are set.
+// To enable multiple calls on TrySeal() to use the same "dataset *dataset", this function takes "dataset *dataset" as an input,
+// so that the miner can obtain a "dataset *dataset" by calling (ethash *Ethash) Dataset(blockHeight int32) and then call this function.
+// To avoid the unnecessary computation of contentHash, this function takes contentHash as input,
+// which should be computed by the caller on the input "header *wire.BlockHeader".
+// That is, it is the responsibility of the caller to provide the dataset, contentHash, and target, corresponding to the input block header,
+// and header *wire.BlockHeader is actually responsible to take the MixDigest and NonceExt out (if they are valid).
+// To mine, TrySeal() will be called highly frequently.
+// TrySeal() just provides a reference implementation for mining, i.e., finding valid EthashPoW solutions.
+// Note that, the consensus rules are defined by VerifySeal(), and any nonce, whatever how it is found, is fine, as long as it satisfies the rules defined by VerifySeal().
 func TrySeal(dataset *dataset, contentHash chainhash.Hash, nonceExt uint64, target *big.Int, header *wire.BlockHeader) bool {
 
 	// Compute the PoW value of this nonce
@@ -161,14 +164,14 @@ func TrySeal(dataset *dataset, contentHash chainhash.Hash, nonceExt uint64, targ
 	return false
 }
 
-//	There are two hashes in one TrySeal (actually in hashimoto()), one for naive hash, and one on input the mixDigest computed from DAG.
-//	While the later one takes much more time than the former one, we only count the later one for hash rate.
-//	Or, in other words, the hast times means the number of tried nonce.
+// There are two hashes in one TrySeal (actually in hashimoto()), one for naive hash, and one on input the mixDigest computed from DAG.
+// While the later one takes much more time than the former one, we only count the later one for hash rate.
+// Or, in other words, the hast times means the number of tried nonce.
 const HashPerTrySeal = 1 //2
 
-//	SealHash() returns the sealHash of the input block header.
-//	The algorithm codes are consistent with the codes in hashimoto().
-//	This algorithm is used only where sealHash is needed independently, for example, for display.
+// SealHash() returns the sealHash of the input block header.
+// The algorithm codes are consistent with the codes in hashimoto().
+// This algorithm is used only where sealHash is needed independently, for example, for display.
 func SealHash(header *wire.BlockHeader) chainhash.Hash {
 	if header == nil || header.Version < wire.BlockVersionEthashPow {
 		return chainhash.InvalidHash
@@ -190,8 +193,8 @@ func SealHash(header *wire.BlockHeader) chainhash.Hash {
 	return chainhash.ChainHash(append(seed[:], header.MixDigest[:]...))
 }
 
-//	VerifySealFast() perform a quick verification on whether (nonceExt, mixDigest) forms a seal of contextHash with respect to target.
-//	This algorithm is used to check the validity of nonceExt at a low cost, to prevent DOS attack.
+// VerifySealFast() perform a quick verification on whether (nonceExt, mixDigest) forms a seal of contextHash with respect to target.
+// This algorithm is used to check the validity of nonceExt at a low cost, to prevent DOS attack.
 func VerifySealFast(contentHash chainhash.Hash, nonceExt uint64, mixDigest chainhash.Hash, target *big.Int) bool {
 	// Combine contentHash + nonce into a 64 byte seed
 	seedTmp := make([]byte, chainhash.HashSize+8)
@@ -221,6 +224,7 @@ func VerifySealFast(contentHash chainhash.Hash, nonceExt uint64, mixDigest chain
 }
 
 // hashToBig converts a chainhash.Hash into a big.Int that can be used to perform math comparisons.
+//
 //	Note that the input is a chainhash.Hash ([32]byte) rather than a pointer,
 //	the reverse in this function will not affect the content of the caller.
 func hashToBig(hash chainhash.Hash) *big.Int {
@@ -233,7 +237,7 @@ func hashToBig(hash chainhash.Hash) *big.Int {
 	return new(big.Int).SetBytes(hash[:])
 }
 
-//	PrepareDatasetForUpdate() is used only for preparing the initial dataset when upgrading.
+// PrepareDatasetForUpdate() is used only for preparing the initial dataset when upgrading.
 func (ethash *Ethash) PrepareDatasetForUpdate() {
 	ethash.dataset(0, true)
 }

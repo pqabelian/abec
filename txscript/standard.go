@@ -2,6 +2,7 @@ package txscript
 
 import (
 	"fmt"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/wire"
@@ -412,10 +413,10 @@ func payToPubKeyScript(serializedPubKey []byte) ([]byte, error) {
 		AddOp(OP_CHECKSIG).Script()
 }
 
-func payToDerivedPubKeyScript(serializedPubKey []byte) ([]byte, error) {
+/*func payToDerivedPubKeyScript(serializedPubKey []byte) ([]byte, error) {
 	return NewScriptBuilder().AddData(serializedPubKey).
 		AddOp(OP_CHECKSIG).Script()
-}
+}*/
 
 // PayToAddrScript creates a new script to pay a transaction output to a the
 // specified address.
@@ -464,7 +465,7 @@ func PayToAddrScript(addr abeutil.Address) ([]byte, error) {
 	return nil, scriptError(ErrUnsupportedAddress, str)
 }
 
-//	todo(ABE): use the txoGen replace this function
+// todo(ABE): use the txoGen replace this function
 func PayToAddressScriptAbe(maddr abeutil.MasterAddress) ([]byte, error) {
 	// Create the script to pay to the provided payment address if one was
 	// specified.  Otherwise create a script that allows the coinbase to be
@@ -503,7 +504,7 @@ func ExtractAddressFromScriptAbe(script []byte) (res *abeutil.DerivedAddressSalr
 	return
 }
 
-//	todo(ABE): with this function, it may allow more ways to generate the AddressScript
+// todo(ABE): with this function, it may allow more ways to generate the AddressScript
 func BuildAddressScript(daddr abeutil.DerivedAddress) ([]byte, error) {
 	const nilAddrErrStr = "unable to generate payment AddressScript for nil address"
 

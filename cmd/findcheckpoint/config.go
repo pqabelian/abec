@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/wire"
 	"github.com/jessevdk/go-flags"
-	"os"
-	"path/filepath"
 )
 
 const (

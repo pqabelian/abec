@@ -20,9 +20,6 @@ package ethash
 
 import (
 	"encoding/binary"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/common/bitutil"
-	"golang.org/x/crypto/sha3"
 	"hash"
 	"math/big"
 	"reflect"
@@ -31,6 +28,10 @@ import (
 	"sync/atomic"
 	"time"
 	"unsafe"
+
+	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/common/bitutil"
+	"golang.org/x/crypto/sha3"
 )
 
 const EthashSeedStr = "the seed string for cache and dataset"
@@ -76,6 +77,7 @@ func cacheSize(epoch int) uint64 {
 // calcCacheSize() calculates the cache size for epoch. The cache size grows linearly,
 // however, we always take the highest prime below the linearly growing threshold in order
 // to reduce the risk of accidental regularities leading to cyclic behavior.
+//
 //	The cache size grows linearly in two phases respectively, fast-growth phase and normal-growth phase.
 func calcCacheSize(epoch int) uint64 {
 	//size := cacheInitBytes + cacheGrowthBytes*uint64(epoch) - hashBytes

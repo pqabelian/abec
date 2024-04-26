@@ -8,9 +8,6 @@ import (
 	"container/list"
 	"encoding/binary"
 	"fmt"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/database"
-	"github.com/abesuite/abec/wire"
 	"hash/crc32"
 	"io"
 	"os"
@@ -18,6 +15,10 @@ import (
 	"regexp"
 	"strconv"
 	"sync"
+
+	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/database"
+	"github.com/abesuite/abec/wire"
 )
 
 const (

@@ -7,10 +7,11 @@ package main
 import (
 	"encoding/hex"
 	"errors"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/database"
 	"strconv"
 	"time"
+
+	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/database"
 )
 
 // blockRegionCmd defines the configuration options for the fetchblockregion

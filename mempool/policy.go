@@ -2,11 +2,10 @@ package mempool
 
 import (
 	"fmt"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
-	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
-	"time"
 )
 
 const (
@@ -56,7 +55,7 @@ const (
 // calcMinRequiredTxRelayFee returns the minimum transaction fee required for a
 // transaction with the passed serialized size to be accepted into the memory
 // pool and relayed.
-func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee abeutil.Amount) int64 {
+/*func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee abeutil.Amount) int64 {
 	// Calculate the minimum fee for a transaction to be allowed into the
 	// mempool and relayed by scaling the base fee (which is the minimum
 	// free transaction relay fee).  minRelayTxFee is in Satoshi/kB so
@@ -75,7 +74,7 @@ func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee abeutil.Amoun
 	}
 
 	return minFee
-}
+}*/
 
 func calcMinRequiredTxRelayFeeAbe(serializedSize int64, minRelayTxFee abeutil.Amount) uint64 {
 	// Calculate the minimum fee for a transaction to be allowed into the
@@ -108,7 +107,7 @@ func calcMinRequiredTxRelayFeeAbe(serializedSize int64, minRelayTxFee abeutil.Am
 // not perform those checks because the script engine already does this more
 // accurately and concisely via the txscript.ScriptVerifyCleanStack and
 // txscript.ScriptVerifySigPushOnly flags.
-func checkInputsStandard(tx *abeutil.Tx, utxoView *blockchain.UtxoViewpoint) error {
+/*func checkInputsStandard(tx *abeutil.Tx, utxoView *blockchain.UtxoViewpoint) error {
 	// NOTE: The reference implementation also does a coinbase check here,
 	// but coinbases have already been rejected prior to calling this
 	// function so no need to recheck.
@@ -139,7 +138,7 @@ func checkInputsStandard(tx *abeutil.Tx, utxoView *blockchain.UtxoViewpoint) err
 	}
 
 	return nil
-}
+}*/
 
 // Abe to do
 func checkInputsStandardAbe(tx *abeutil.TxAbe, utxoRingView *blockchain.UtxoRingViewpoint) error {
@@ -180,7 +179,7 @@ func checkInputsStandardAbe(tx *abeutil.TxAbe, utxoRingView *blockchain.UtxoRing
 // A standard public key script is one that is a recognized form, and for
 // multi-signature scripts, only contains from 1 to maxStandardMultiSigKeys
 // public keys.
-func checkPkScriptStandard(pkScript []byte, scriptClass txscript.ScriptClass) error {
+/*func checkPkScriptStandard(pkScript []byte, scriptClass txscript.ScriptClass) error {
 	switch scriptClass {
 	case txscript.MultiSigTy:
 		numPubKeys, numSigs, err := txscript.CalcMultiSigStats(pkScript)
@@ -223,14 +222,14 @@ func checkPkScriptStandard(pkScript []byte, scriptClass txscript.ScriptClass) er
 	}
 
 	return nil
-}
+}*/
 
 // isDust returns whether or not the passed transaction output amount is
 // considered dust or not based on the passed minimum transaction relay fee.
 // Dust is defined in terms of the minimum transaction relay fee.  In
 // particular, if the cost to the network to spend coins is more than 1/3 of the
 // minimum transaction relay fee, it is considered dust.
-func isDust(txOut *wire.TxOut, minRelayTxFee abeutil.Amount) bool {
+/*func isDust(txOut *wire.TxOut, minRelayTxFee abeutil.Amount) bool {
 	// Unspendable outputs are considered dust.
 	if txscript.IsUnspendable(txOut.PkScript) {
 		return true
@@ -319,7 +318,7 @@ func isDust(txOut *wire.TxOut, minRelayTxFee abeutil.Amount) bool {
 	// The following is equivalent to (value/totalSize) * (1/3) * 1000
 	// without needing to do floating point math.
 	return txOut.Value*1000/(3*int64(totalSize)) < int64(minRelayTxFee)
-}
+}*/
 
 // checkTransactionStandard performs a series of checks on a transaction to
 // ensure it is a "standard" transaction.  A standard transaction is one that
@@ -328,7 +327,7 @@ func isDust(txOut *wire.TxOut, minRelayTxFee abeutil.Amount) bool {
 // finalized, conforming to more stringent size constraints, having scripts
 // of recognized forms, and not containing "dust" outputs (those that are
 // so small it costs more to process them than they are worth).
-func checkTransactionStandard(tx *abeutil.Tx, height int32,
+/*func checkTransactionStandard(tx *abeutil.Tx, height int32,
 	medianTimePast time.Time, minRelayTxFee abeutil.Amount,
 	maxTxVersion int32) error {
 
@@ -419,7 +418,7 @@ func checkTransactionStandard(tx *abeutil.Tx, height int32,
 	}
 
 	return nil
-}
+}*/
 
 // checkTransactionStandardAbe performs a series of checks on a transaction to
 // ensure it is a "standard" transaction.  A standard transaction is one that
@@ -458,14 +457,14 @@ func checkTransactionStandardAbe(tx *abeutil.TxAbe, maxTxVersion int32) error {
 // transaction's virtual size is based off its weight, creating a discount for
 // any witness data it contains, proportional to the current
 // blockchain.WitnessScaleFactor value.
-func GetTxVirtualSize(tx *abeutil.Tx) int64 {
+/*func GetTxVirtualSize(tx *abeutil.Tx) int64 {
 	// vSize := (weight(tx) + 3) / 4
 	//       := (((baseSize * 3) + totalSize) + 3) / 4
 	// We add 3 here as a way to compute the ceiling of the prior arithmetic
 	// to 4. The division by 4 creates a discount for wit witness data.
 	return (blockchain.GetTransactionWeight(tx) + (blockchain.WitnessScaleFactor - 1)) /
 		blockchain.WitnessScaleFactor
-}
+}*/
 
 func GetTxVirtualSizeAbe(tx *abeutil.TxAbe) int64 {
 	// vSize := (weight(tx) + 3) / 4

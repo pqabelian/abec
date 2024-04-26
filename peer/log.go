@@ -2,12 +2,13 @@ package peer
 
 import (
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/abesuite/abec/abelog"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
-	"strings"
-	"time"
 )
 
 const (

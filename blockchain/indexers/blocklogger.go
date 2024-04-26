@@ -1,10 +1,11 @@
 package indexers
 
 import (
-	"github.com/abesuite/abec/abelog"
-	"github.com/abesuite/abec/abeutil"
 	"sync"
 	"time"
+
+	"github.com/abesuite/abec/abelog"
+	"github.com/abesuite/abec/abeutil"
 )
 
 // blockProgressLogger provides periodic logging for other services in order
@@ -22,8 +23,9 @@ type blockProgressLogger struct {
 
 // newBlockProgressLogger returns a new block progress logger.
 // The progress message is templated as follows:
-//  {progressAction} {numProcessed} {blocks|block} in the last {timePeriod}
-//  ({numTxs}, height {lastBlockHeight}, {lastBlockTimeStamp})
+//
+//	{progressAction} {numProcessed} {blocks|block} in the last {timePeriod}
+//	({numTxs}, height {lastBlockHeight}, {lastBlockTimeStamp})
 func newBlockProgressLogger(progressMessage string, logger abelog.Logger) *blockProgressLogger {
 	return &blockProgressLogger{
 		lastBlockLogTime: time.Now(),
@@ -35,7 +37,7 @@ func newBlockProgressLogger(progressMessage string, logger abelog.Logger) *block
 // LogBlockHeight logs a new block height as an information message to show
 // progress to the user. In order to prevent spam, it limits logging to one
 // message every 10 seconds with duration and totals included.
-func (b *blockProgressLogger) LogBlockHeightBTCD(block *abeutil.Block) {
+/*func (b *blockProgressLogger) LogBlockHeightBTCD(block *abeutil.Block) {
 	b.Lock()
 	defer b.Unlock()
 
@@ -68,7 +70,7 @@ func (b *blockProgressLogger) LogBlockHeightBTCD(block *abeutil.Block) {
 	b.receivedLogBlocks = 0
 	b.receivedLogTx = 0
 	b.lastBlockLogTime = now
-}
+}*/
 
 func (b *blockProgressLogger) LogBlockHeight(block *abeutil.BlockAbe) {
 	b.Lock()

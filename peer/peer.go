@@ -5,13 +5,6 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/blockchain"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
-	"github.com/abesuite/go-socks/socks"
-	"github.com/abesuite/go-spew/spew"
-	"github.com/decred/dcrd/lru"
 	"io"
 	"math/rand"
 	"net"
@@ -20,6 +13,14 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/abesuite/abec/blockchain"
+	"github.com/abesuite/abec/chaincfg"
+	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/wire"
+	"github.com/abesuite/go-socks/socks"
+	"github.com/abesuite/go-spew/spew"
+	"github.com/decred/dcrd/lru"
 )
 
 const (

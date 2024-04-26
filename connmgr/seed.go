@@ -2,12 +2,13 @@ package connmgr
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/wire"
 	mrand "math/rand"
 	"net"
 	"strconv"
 	"time"
+
+	"github.com/abesuite/abec/chaincfg"
+	"github.com/abesuite/abec/wire"
 )
 
 const (

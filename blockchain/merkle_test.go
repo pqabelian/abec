@@ -2,9 +2,10 @@ package blockchain
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/chainhash"
 	"math"
 	"testing"
+
+	"github.com/abesuite/abec/chainhash"
 )
 
 func TestNextPowerOfTwo(t *testing.T) {

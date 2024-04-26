@@ -2,11 +2,11 @@ package blockchain
 
 import (
 	"bytes"
-	"fmt"
+	"math"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/txscript"
-	"math"
 )
 
 const (
@@ -405,7 +405,7 @@ func ExtractWitnessCommitment(tx *abeutil.Tx) ([]byte, bool) {
 
 // ValidateWitnessCommitment validates the witness commitment (if any) found
 // within the coinbase transaction of the passed block.
-func ValidateWitnessCommitment(blk *abeutil.Block) error {
+/*func ValidateWitnessCommitment(blk *abeutil.Block) error {
 	// If the block doesn't have any transactions at all, then we won't be
 	// able to extract a commitment from the non-existent coinbase
 	// transaction. So we exit early here.
@@ -460,6 +460,7 @@ func ValidateWitnessCommitment(blk *abeutil.Block) error {
 	// the extracted witnessCommitment is equal to:
 	// SHA256(witnessMerkleRoot || witnessNonce). Where witnessNonce is the
 	// coinbase transaction's only witness item.
+	//witnessMerkleTree := BuildMerkleTreeStore(blk.Transactions(), true)
 	witnessMerkleTree := BuildMerkleTreeStore(blk.Transactions(), true)
 	witnessMerkleRoot := witnessMerkleTree[len(witnessMerkleTree)-1]
 
@@ -476,4 +477,4 @@ func ValidateWitnessCommitment(blk *abeutil.Block) error {
 	}
 
 	return nil
-}
+}*/

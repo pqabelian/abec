@@ -2,10 +2,11 @@ package main
 
 import (
 	"errors"
-	"github.com/abesuite/abec/abejson"
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/abesuite/abec/abejson"
 )
 
 // helpDescsEnUS defines the English descriptions used for the help strings.

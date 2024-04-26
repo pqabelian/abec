@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/jessevdk/go-flags"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/abesuite/abec/abeutil"
+	"github.com/jessevdk/go-flags"
 )
 
 type config struct {

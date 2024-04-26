@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
@@ -388,7 +389,7 @@ func (c *Client) SendRawTransactionAsync(tx *wire.MsgTx, allowHighFees bool) Fut
 	return c.sendCmd(cmd)
 }
 
-//TODO(abe): need to complete this function including the struct and Handler function in rpc server
+// TODO(abe): need to complete this function including the struct and Handler function in rpc server
 func (c *Client) SendRawTransactionAbeAsync(tx *wire.MsgTxAbe, allowHighFees bool) FutureSendRawTransactionAbeResult {
 	txHex := ""
 	if tx != nil {
@@ -419,9 +420,9 @@ func (c *Client) SendRawTransactionAbeAsync(tx *wire.MsgTxAbe, allowHighFees boo
 
 // SendRawTransaction submits the encoded transaction to the server which will
 // then relay it to the network.
-func (c *Client) SendRawTransaction(tx *wire.MsgTx, allowHighFees bool) (*chainhash.Hash, error) {
+/*func (c *Client) SendRawTransaction(tx *wire.MsgTx, allowHighFees bool) (*chainhash.Hash, error) {
 	return c.SendRawTransactionAsync(tx, allowHighFees).Receive()
-}
+}*/
 func (c *Client) SendRawTransactionAbe(tx *wire.MsgTxAbe, allowHighFees bool) (*chainhash.Hash, error) {
 	return c.SendRawTransactionAbeAsync(tx, allowHighFees).Receive()
 }

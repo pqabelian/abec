@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
@@ -367,7 +368,8 @@ func pqringctCoinbaseTxVerify(pp *pqringct.PublicParameter, coinbaseTx *wire.Msg
 	if err != nil {
 		return false, err
 	}
-	if bl == false {
+	//if bl == false {
+	if !bl {
 		return false, nil
 	}
 
@@ -555,7 +557,8 @@ func pqringctTransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.Msg
 			return false, nil
 			//	This is necessary, since the same version will ensure that when calling the cryptoscheme, there are not exceptions.
 		}
-		if bytes.Compare(abeTxInDetails[i].serialNumber, transferTx.TxIns[i].SerialNumber) != 0 {
+		//if bytes.Compare(abeTxInDetails[i].serialNumber, transferTx.TxIns[i].SerialNumber) != 0 {
+		if !bytes.Equal(abeTxInDetails[i].serialNumber, transferTx.TxIns[i].SerialNumber) {
 			return false, nil
 			//	This check can be removed, as the caller will provide abeTxInDetails, which are made by querying the database using the transferTx.TxIns information
 		}
@@ -611,7 +614,8 @@ func pqringctTransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.Msg
 	if err != nil {
 		return false, err
 	}
-	if bl == false {
+	//if bl == false {
+	if !bl {
 		return false, nil
 	}
 

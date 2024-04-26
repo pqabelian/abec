@@ -7,14 +7,15 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/database"
-	"github.com/abesuite/abec/wire"
 	"io"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/abesuite/abec/abeutil"
+	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/database"
+	"github.com/abesuite/abec/wire"
 )
 
 // importCmd defines the configuration options for the insecureimport command.
@@ -107,7 +108,8 @@ func (bi *blockImporter) readBlock() ([]byte, error) {
 // NOTE: This is not a safe import as it does not verify chain rules.
 func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 	// Deserialize the block which includes checks for malformed blocks.
-	block, err := abeutil.NewBlockFromBytes(serializedBlock)
+	//block, err := abeutil.NewBlockFromBytes(serializedBlock)
+	block, err := abeutil.NewBlockFromBytesAbe(serializedBlock)
 	if err != nil {
 		return false, err
 	}
@@ -149,7 +151,8 @@ func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 
 	// Put the blocks into the database with no checking of chain rules.
 	err = bi.db.Update(func(tx database.Tx) error {
-		return tx.StoreBlock(block)
+		//return tx.StoreBlock(block)
+		return tx.StoreBlockAbe(block)
 	})
 	if err != nil {
 		return false, err

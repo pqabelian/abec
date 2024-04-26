@@ -6,11 +6,12 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"hash"
+
 	"github.com/abesuite/abec/btcec"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 	"golang.org/x/crypto/ripemd160"
-	"hash"
 )
 
 // An opcode defines the information related to a txscript opcode.  opfunc, if

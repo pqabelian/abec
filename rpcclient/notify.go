@@ -6,9 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
-	"time"
 
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
@@ -1271,12 +1272,12 @@ func (c *Client) RescanAbeAsync(startBlock *chainhash.Hash) FutureRescanResult {
 // NOTE: This is a btcd extension and requires a websocket connection.
 //
 // Deprecated: Use RescanBlocks instead.
-func (c *Client) Rescan(startBlock *chainhash.Hash,
+/*func (c *Client) Rescan(startBlock *chainhash.Hash,
 	addresses []abeutil.Address,
 	outpoints []*wire.OutPoint) error {
 
 	return c.RescanAsync(startBlock, addresses, outpoints).Receive()
-}
+}*/
 func (c *Client) RescanAbe(startBlock *chainhash.Hash) error {
 
 	return c.RescanAbeAsync(startBlock).Receive()

@@ -1,9 +1,10 @@
 package txscript
 
 import (
+	"sync"
+
 	"github.com/abesuite/abec/btcec"
 	"github.com/abesuite/abec/chainhash"
-	"sync"
 )
 
 // sigCacheEntry represents an entry in the SigCache. Entries within the

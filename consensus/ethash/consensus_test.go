@@ -4,11 +4,12 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/abesuite/abec/chainhash"
-	"golang.org/x/crypto/sha3"
 	"math/big"
 	"testing"
 	"time"
+
+	"github.com/abesuite/abec/chainhash"
+	"golang.org/x/crypto/sha3"
 )
 
 func hashToBigTest1(hash *chainhash.Hash) *big.Int {

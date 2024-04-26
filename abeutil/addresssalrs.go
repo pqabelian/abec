@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
+
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/abecrypto/abesalrs"
 )
@@ -60,7 +61,7 @@ func (maddr *MasterAddressSalrs) String() string {
 	return hex.EncodeToString(maddr.Serialize())
 }
 
-//	ParseMasterAddressSalrs is the reverse function for String()
+// ParseMasterAddressSalrs is the reverse function for String()
 func ParseMasterAddressSalrsFromStr(serializedStr string) (*MasterAddressSalrs, error) {
 	serialized, err := hex.DecodeString(serializedStr)
 	if err != nil {
@@ -156,7 +157,7 @@ func (daddr *DerivedAddressSalrs) String() string {
 	return hex.EncodeToString(daddr.Serialize())
 }
 
-//	ParseDerivedAddressSalrs is the reverse function for String()
+// ParseDerivedAddressSalrs is the reverse function for String()
 func ParseDerivedAddressSalrsFromStr(serializedStr string) (*DerivedAddressSalrs, error) {
 	serialized, err := hex.DecodeString(serializedStr)
 	if err != nil {

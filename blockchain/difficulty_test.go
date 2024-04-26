@@ -3,9 +3,10 @@ package blockchain
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/abesuite/abec/chainhash"
 	"math/big"
 	"testing"
+
+	"github.com/abesuite/abec/chainhash"
 )
 
 func TestHashAndBigInt(t *testing.T) {

@@ -6,11 +6,12 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/mining/externalminer"
 	"github.com/abesuite/abec/witnessmgr"
-	"os"
-	"path/filepath"
 
 	"github.com/abesuite/abec/abelog"
 	"github.com/abesuite/abec/blockchain"

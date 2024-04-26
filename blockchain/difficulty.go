@@ -1,9 +1,10 @@
 package blockchain
 
 import (
-	"github.com/abesuite/abec/chainhash"
 	"math/big"
 	"time"
+
+	"github.com/abesuite/abec/chainhash"
 )
 
 var (

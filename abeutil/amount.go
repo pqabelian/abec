@@ -71,6 +71,7 @@ func round(f float64) Amount {
 // For creating a new Amount with an int64 value which denotes a quantity of Satoshi,
 // do a simple type conversion from type int64 to Amount.
 // See GoDoc for example: http://godoc.org/github.com/btcsuite/btcutil#example-Amount
+//
 //	todo(ABE):
 func NewAmount(f float64) (Amount, error) {
 	// The amount is only considered invalid if it cannot be represented

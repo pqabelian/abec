@@ -4,10 +4,11 @@
 package database
 
 import (
+	"os"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
-	"os"
 )
 
 // Cursor represents a cursor over key/value pairs and nested buckets of a
@@ -227,7 +228,7 @@ type Tx interface {
 	//   - ErrTxClosed if the transaction has already been closed
 	//
 	// Other errors are possible depending on the implementation.
-	StoreBlock(block *abeutil.Block) error
+	//StoreBlock(block *abeutil.Block) error
 	StoreBlockAbe(block *abeutil.BlockAbe) error
 
 	// HasBlock returns whether or not a block with the given hash exists
@@ -249,7 +250,7 @@ type Tx interface {
 	//   - ErrTxClosed if the transaction has already been closed
 	//
 	// Other errors are possible depending on the implementation.
-	HasBlocks(hashes []chainhash.Hash) ([]bool, error)
+	//HasBlocks(hashes []chainhash.Hash) ([]bool, error)
 
 	// FetchBlockHeader returns the raw serialized bytes for the block
 	// header identified by the given hash.  The raw bytes are in the format

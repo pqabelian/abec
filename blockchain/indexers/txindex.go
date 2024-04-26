@@ -3,6 +3,7 @@ package indexers
 import (
 	"errors"
 	"fmt"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chainhash"
@@ -238,7 +239,7 @@ func dbFetchTxIndexEntry(dbTx database.Tx, txHash *chainhash.Hash) (*database.Bl
 
 // dbAddTxIndexEntries uses an existing database transaction to add a
 // transaction index entry for every transaction in the passed block.
-func dbAddTxIndexEntries(dbTx database.Tx, block *abeutil.Block, blockID uint32) error {
+/*func dbAddTxIndexEntries(dbTx database.Tx, block *abeutil.Block, blockID uint32) error {
 	// The offset and length of the transactions within the serialized
 	// block.
 	txLocs, err := block.TxLoc()
@@ -265,9 +266,9 @@ func dbAddTxIndexEntries(dbTx database.Tx, block *abeutil.Block, blockID uint32)
 	}
 
 	return nil
-}
+}*/
 
-//	Abe to do
+// Abe to do
 func dbAddTxIndexEntriesAbe(dbTx database.Tx, block *abeutil.BlockAbe, blockID uint32) error {
 	// The offset and length of the transactions within the serialized
 	// block.
@@ -312,7 +313,7 @@ func dbRemoveTxIndexEntry(dbTx database.Tx, txHash *chainhash.Hash) error {
 
 // dbRemoveTxIndexEntries uses an existing database transaction to remove the
 // latest transaction entry for every transaction in the passed block.
-func dbRemoveTxIndexEntries(dbTx database.Tx, block *abeutil.Block) error {
+/*func dbRemoveTxIndexEntries(dbTx database.Tx, block *abeutil.Block) error {
 	for _, tx := range block.Transactions() {
 		err := dbRemoveTxIndexEntry(dbTx, tx.Hash())
 		if err != nil {
@@ -321,9 +322,9 @@ func dbRemoveTxIndexEntries(dbTx database.Tx, block *abeutil.Block) error {
 	}
 
 	return nil
-}
+}*/
 
-//	ToDo(ABE):
+// ToDo(ABE):
 func dbRemoveTxIndexEntriesAbe(dbTx database.Tx, block *abeutil.BlockAbe) error {
 	for _, tx := range block.Transactions() {
 		err := dbRemoveTxIndexEntry(dbTx, tx.Hash())
@@ -444,7 +445,7 @@ func (idx *TxIndex) Create(dbTx database.Tx) error {
 // for every transaction in the passed block.
 //
 // This is part of the Indexer interface.
-func (idx *TxIndex) ConnectBlock(dbTx database.Tx, block *abeutil.Block,
+/*func (idx *TxIndex) ConnectBlock(dbTx database.Tx, block *abeutil.Block,
 	stxos []blockchain.SpentTxOut) error {
 
 	// Increment the internal block ID to use for the block being connected
@@ -462,9 +463,9 @@ func (idx *TxIndex) ConnectBlock(dbTx database.Tx, block *abeutil.Block,
 	}
 	idx.curBlockID = newBlockID
 	return nil
-}
+}*/
 
-//	todo(ABE.MUST)
+// todo(ABE.MUST)
 func (idx *TxIndex) ConnectBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe,
 	stxos []*blockchain.SpentTxOutAbe) error {
 
@@ -490,7 +491,7 @@ func (idx *TxIndex) ConnectBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe,
 // hash-to-transaction mapping for every transaction in the block.
 //
 // This is part of the Indexer interface.
-func (idx *TxIndex) DisconnectBlock(dbTx database.Tx, block *abeutil.Block,
+/*func (idx *TxIndex) DisconnectBlock(dbTx database.Tx, block *abeutil.Block,
 	stxos []blockchain.SpentTxOut) error {
 
 	// Remove all of the transactions in the block from the index.
@@ -505,9 +506,9 @@ func (idx *TxIndex) DisconnectBlock(dbTx database.Tx, block *abeutil.Block,
 	}
 	idx.curBlockID--
 	return nil
-}
+}*/
 
-//	ToDo(ABE.MUST):
+// ToDo(ABE.MUST):
 func (idx *TxIndex) DisconnectBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe,
 	stxos []*blockchain.SpentTxOutAbe) error {
 

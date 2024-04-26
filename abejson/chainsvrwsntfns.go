@@ -219,12 +219,12 @@ type RedeemingTxNtfn struct {
 //
 // Deprecated: Use NewRelevantTxAcceptedNtfn and
 // NewFilteredBlockConnectedNtfn instead.
-func NewRedeemingTxNtfn(hexTx string, block *BlockDetails) *RedeemingTxNtfn {
+/*func NewRedeemingTxNtfn(hexTx string, block *BlockDetails) *RedeemingTxNtfn {
 	return &RedeemingTxNtfn{
 		HexTx: hexTx,
 		Block: block,
 	}
-}
+}*/
 
 func NewRedeemingTxNtfnAbe(hexTx string, block *BlockDetails) *RedeemingTxNtfn {
 	return &RedeemingTxNtfn{
@@ -331,11 +331,11 @@ type TxAcceptedVerboseNtfnAbe struct {
 // txacceptedverbose JSON-RPC notification.
 //
 //	todo(ABE):
-func NewTxAcceptedVerboseNtfn(rawTx TxRawResult) *TxAcceptedVerboseNtfn {
+/*func NewTxAcceptedVerboseNtfn(rawTx TxRawResult) *TxAcceptedVerboseNtfn {
 	return &TxAcceptedVerboseNtfn{
 		RawTx: rawTx,
 	}
-}
+}*/
 
 func NewTxAcceptedVerboseNtfnAbe(rawTx TxRawResultAbe) *TxAcceptedVerboseNtfnAbe {
 	return &TxAcceptedVerboseNtfnAbe{

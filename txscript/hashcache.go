@@ -1,10 +1,12 @@
 package txscript
 
 import (
+	"sync"
+
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
-	"sync"
 )
+
 // TODO(abe):this sig cache and hash cache can be used in abe, but the principle need to figure out.
 // TxSigHashes houses the partial set of sighashes introduced within BIP0143.
 // This partial set of sighashes may be re-used within each input across a

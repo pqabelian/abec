@@ -4,11 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/abesuite/abec/abecrypto/abecryptoparam"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/database"
-	"github.com/abesuite/abec/wire"
 	"io"
 	"math/big"
 	"os"
@@ -17,6 +12,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/abesuite/abec/abecrypto/abecryptoparam"
+	"github.com/abesuite/abec/abeutil"
+	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/database"
+	"github.com/abesuite/abec/wire"
 )
 
 const (
@@ -28,7 +29,7 @@ const (
 
 	// latestUtxoSetBucketVersion is the current version of the utxo set
 	// bucket that is used to track all unspent outputs.
-	latestUtxoSetBucketVersion = 2
+	//latestUtxoSetBucketVersion = 2
 	//	todo(ABE)
 	latestUtxoRingSetBucketVersion = 1
 
@@ -128,12 +129,14 @@ func isDeserializeErr(err error) bool {
 	return ok
 }
 
+/*
 // isDbBucketNotFoundErr returns whether or not the passed error is a
 // database.Error with an error code of database.ErrBucketNotFound.
 func isDbBucketNotFoundErr(err error) bool {
 	dbErr, ok := err.(database.Error)
 	return ok && dbErr.ErrorCode == database.ErrBucketNotFound
 }
+*/
 
 // dbFetchVersion fetches an individual version with the given key from the
 // metadata bucket.  It is primarily used to track versions on entities such as
@@ -328,7 +331,7 @@ func (spentTxo *SpentTxOutAbe) Deserialize(r io.Reader) error {
 // main chain.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) FetchSpendJournal(targetBlock *abeutil.Block) ([]SpentTxOut, error) {
+/*func (b *BlockChain) FetchSpendJournal(targetBlock *abeutil.Block) ([]SpentTxOut, error) {
 	b.chainLock.RLock()
 	defer b.chainLock.RUnlock()
 
@@ -344,7 +347,7 @@ func (b *BlockChain) FetchSpendJournal(targetBlock *abeutil.Block) ([]SpentTxOut
 	}
 
 	return spendEntries, nil
-}
+}*/
 
 func (b *BlockChain) FetchSpendJournalAbe(targetBlock *abeutil.BlockAbe) ([]*SpentTxOutAbe, error) {
 	b.chainLock.RLock()
@@ -364,7 +367,7 @@ func (b *BlockChain) FetchSpendJournalAbe(targetBlock *abeutil.BlockAbe) ([]*Spe
 	return spendEntries, nil
 }
 
-// spentTxOutHeaderCode returns the calculated header code to be used when
+/*// spentTxOutHeaderCode returns the calculated header code to be used when
 // serializing the provided stxo entry.
 func spentTxOutHeaderCode(stxo *SpentTxOut) uint64 {
 	// As described in the serialization format comments, the header code
@@ -406,7 +409,7 @@ func putSpentTxOut(target []byte, stxo *SpentTxOut) int {
 	}
 	return offset + putCompressedTxOut(target[offset:], uint64(stxo.Amount),
 		stxo.PkScript)
-}
+}*/
 
 // decodeSpentTxOut decodes the passed serialized stxo entry, possibly followed
 // by other data, into the passed stxo struct.  It returns the number of bytes
@@ -461,7 +464,7 @@ func decodeSpentTxOut(serialized []byte, stxo *SpentTxOut) (int, error) {
 // Since the serialization format is not self describing, as noted in the
 // format comments, this function also requires the transactions that spend the
 // txouts.
-func deserializeSpendJournalEntry(serialized []byte, txns []*wire.MsgTx) ([]SpentTxOut, error) {
+/*func deserializeSpendJournalEntry(serialized []byte, txns []*wire.MsgTx) ([]SpentTxOut, error) {
 	// Calculate the total number of stxos.
 	var numStxos int
 	for _, tx := range txns {
@@ -508,7 +511,7 @@ func deserializeSpendJournalEntry(serialized []byte, txns []*wire.MsgTx) ([]Spen
 	}
 
 	return stxos, nil
-}
+}*/
 
 // Abe to do
 func deserializeSpendJournalEntryAbe(serialized []byte, txns []*wire.MsgTxAbe) ([]*SpentTxOutAbe, error) {
@@ -564,7 +567,7 @@ func deserializeSpendJournalEntryAbe(serialized []byte, txns []*wire.MsgTxAbe) (
 	return stxos, nil
 }
 
-// serializeSpendJournalEntry serializes all of the passed spent txouts into a
+/*// serializeSpendJournalEntry serializes all of the passed spent txouts into a
 // single byte slice according to the format described in detail above.
 func serializeSpendJournalEntry(stxos []SpentTxOut) []byte {
 	if len(stxos) == 0 {
@@ -586,7 +589,7 @@ func serializeSpendJournalEntry(stxos []SpentTxOut) []byte {
 	}
 
 	return serialized
-}
+}*/
 
 // Abe to do
 func serializeSpendJournalEntryAbe(stxos []*SpentTxOutAbe) ([]byte, error) {
@@ -619,7 +622,7 @@ func serializeSpendJournalEntryAbe(stxos []*SpentTxOutAbe) ([]byte, error) {
 // NOTE: Legacy entries will not have the coinbase flag or height set unless it
 // was the final output spend in the containing transaction.  It is up to the
 // caller to handle this properly by looking the information up in the utxo set.
-func dbFetchSpendJournalEntry(dbTx database.Tx, block *abeutil.Block) ([]SpentTxOut, error) {
+/*func dbFetchSpendJournalEntry(dbTx database.Tx, block *abeutil.Block) ([]SpentTxOut, error) {
 	// Exclude the coinbase transaction since it can't spend anything.
 	spendBucket := dbTx.Metadata().Bucket(spendJournalBucketName)
 	serialized := spendBucket.Get(block.Hash()[:])
@@ -641,7 +644,7 @@ func dbFetchSpendJournalEntry(dbTx database.Tx, block *abeutil.Block) ([]SpentTx
 	}
 
 	return stxos, nil
-}
+}*/
 
 // Abe to do
 func dbFetchSpendJournalEntryAbe(dbTx database.Tx, block *abeutil.BlockAbe) ([]*SpentTxOutAbe, error) {
@@ -668,7 +671,7 @@ func dbFetchSpendJournalEntryAbe(dbTx database.Tx, block *abeutil.BlockAbe) ([]*
 	return stxos, nil
 }
 
-// dbPutSpendJournalEntry uses an existing database transaction to update the
+/*// dbPutSpendJournalEntry uses an existing database transaction to update the
 // spend journal entry for the given block hash using the provided slice of
 // spent txouts.   The spent txouts slice must contain an entry for every txout
 // the transactions in the block spend in the order they are spent.
@@ -676,7 +679,7 @@ func dbPutSpendJournalEntry(dbTx database.Tx, blockHash *chainhash.Hash, stxos [
 	spendBucket := dbTx.Metadata().Bucket(spendJournalBucketName)
 	serialized := serializeSpendJournalEntry(stxos)
 	return spendBucket.Put(blockHash[:], serialized)
-}
+}*/
 
 func dbPutSpendJournalEntryAbe(dbTx database.Tx, blockHash *chainhash.Hash, stxos []*SpentTxOutAbe) error {
 	spendBucket := dbTx.Metadata().Bucket(spendJournalBucketName)
@@ -853,7 +856,7 @@ func recycleOutPointRingKey(key *[]byte) {
 	outPointRingKeyPool.Put(key)
 }
 
-// utxoEntryHeaderCode returns the calculated header code to be used when
+/*// utxoEntryHeaderCode returns the calculated header code to be used when
 // serializing the provided utxo entry.
 func utxoEntryHeaderCode(entry *UtxoEntry) (uint64, error) {
 	if entry.IsSpent() {
@@ -869,9 +872,9 @@ func utxoEntryHeaderCode(entry *UtxoEntry) (uint64, error) {
 	}
 
 	return headerCode, nil
-}
+}*/
 
-// serializeUtxoEntry returns the entry serialized to a format that is suitable
+/*// serializeUtxoEntry returns the entry serialized to a format that is suitable
 // for long-term storage.  The format is described in detail above.
 func serializeUtxoEntry(entry *UtxoEntry) ([]byte, error) {
 	// Spent outputs have no serialization.
@@ -897,7 +900,7 @@ func serializeUtxoEntry(entry *UtxoEntry) ([]byte, error) {
 		entry.PkScript())
 
 	return serialized, nil
-}
+}*/
 
 // Abe to do
 func serializeUtxoRingEntry(entry *UtxoRingEntry) ([]byte, error) {
@@ -964,7 +967,7 @@ func deserializeUtxoRingEntry(serialized []byte) (*UtxoRingEntry, error) {
 
 }
 
-// dbFetchUtxoEntryByHash attempts to find and fetch a utxo for the given hash.
+/*// dbFetchUtxoEntryByHash attempts to find and fetch a utxo for the given hash.
 // It uses a cursor and seek to try and do this as efficiently as possible.
 //
 // When there are no entries for the provided hash, nil will be returned for the
@@ -994,7 +997,7 @@ func dbFetchUtxoEntryByHash(dbTx database.Tx, hash *chainhash.Hash) (*UtxoEntry,
 	}
 
 	return deserializeUtxoEntry(cursor.Value())
-}
+}*/
 
 // dbFetchUtxoEntry uses an existing database transaction to fetch the specified
 // transaction output from the utxo set.
@@ -1076,7 +1079,7 @@ func dbFetchUtxoRingEntry(dbTx database.Tx, outPointRingHash chainhash.Hash) (*U
 	return entry, nil
 }
 
-// dbPutUtxoView uses an existing database transaction to update the utxo set
+/*// dbPutUtxoView uses an existing database transaction to update the utxo set
 // in the database based on the provided utxo view contents and state.  In
 // particular, only the entries that have been marked as modified are written
 // to the database.
@@ -1117,7 +1120,7 @@ func dbPutUtxoView(dbTx database.Tx, view *UtxoViewpoint) error {
 	}
 
 	return nil
-}
+}*/
 
 // dbPutUtxoRingView uses an existing database transaction to update the utxo ring set
 // in the database based on the provided utxo ring view contents and state.  In
@@ -1254,7 +1257,7 @@ func dbFetchHeightByHash(dbTx database.Tx, hash *chainhash.Hash) (int32, error) 
 	return int32(byteOrder.Uint32(serializedHeight)), nil
 }
 
-// dbFetchHashByHeight uses an existing database transaction to retrieve the
+/*// dbFetchHashByHeight uses an existing database transaction to retrieve the
 // hash for the provided height from the index.
 func dbFetchHashByHeight(dbTx database.Tx, height int32) (*chainhash.Hash, error) {
 	var serializedHeight [4]byte
@@ -1271,7 +1274,7 @@ func dbFetchHashByHeight(dbTx database.Tx, height int32) (*chainhash.Hash, error
 	var hash chainhash.Hash
 	copy(hash[:], hashBytes)
 	return &hash, nil
-}
+}*/
 
 // -----------------------------------------------------------------------------
 // The best chain state consists of the best block hash and height, the total
@@ -1825,7 +1828,7 @@ func deserializeBlockRow(blockRow []byte) (*wire.BlockHeader, blockStatus, error
 	return &header, blockStatus(statusByte), nil
 }
 
-// dbFetchHeaderByHash uses an existing database transaction to retrieve the
+/*// dbFetchHeaderByHash uses an existing database transaction to retrieve the
 // block header for the provided hash.
 func dbFetchHeaderByHash(dbTx database.Tx, hash *chainhash.Hash) (*wire.BlockHeader, error) {
 	headerBytes, err := dbTx.FetchBlockHeader(hash)
@@ -1851,12 +1854,12 @@ func dbFetchHeaderByHeight(dbTx database.Tx, height int32) (*wire.BlockHeader, e
 	}
 
 	return dbFetchHeaderByHash(dbTx, hash)
-}
+}*/
 
 // dbFetchBlockByNode uses an existing database transaction to retrieve the
 // raw block for the provided node, deserialize it, and return a btcutil.Block
 // with the height set.
-func dbFetchBlockByNode(dbTx database.Tx, node *blockNode) (*abeutil.Block, error) {
+/*func dbFetchBlockByNode(dbTx database.Tx, node *blockNode) (*abeutil.Block, error) {
 	// Load the raw block bytes from the database.
 	blockBytes, err := dbTx.FetchBlock(&node.hash)
 	if err != nil {
@@ -1871,7 +1874,7 @@ func dbFetchBlockByNode(dbTx database.Tx, node *blockNode) (*abeutil.Block, erro
 	block.SetHeight(node.height)
 
 	return block, nil
-}
+}*/
 
 func dbFetchBlockByNodeAbe(dbTx database.Tx, node *blockNode) (*abeutil.BlockAbe, error) {
 	// Load the raw block bytes from the database.
@@ -1922,7 +1925,7 @@ func dbStoreBlockNode(dbTx database.Tx, node *blockNode) error {
 	return blockIndexBucket.Put(key, value)
 }
 
-// dbStoreBlock stores the provided block in the database if it is not already
+/*// dbStoreBlock stores the provided block in the database if it is not already
 // there. The full block data is written to ffldb.
 func dbStoreBlock(dbTx database.Tx, block *abeutil.Block) error {
 	hasBlock, err := dbTx.HasBlock(block.Hash())
@@ -1933,7 +1936,7 @@ func dbStoreBlock(dbTx database.Tx, block *abeutil.Block) error {
 		return nil
 	}
 	return dbTx.StoreBlock(block)
-}
+}*/
 
 // Abe to do
 func dbStoreBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe) error {
@@ -1962,7 +1965,7 @@ func blockIndexKey(blockHash *chainhash.Hash, blockHeight uint32) []byte {
 // This function is safe for concurrent access.
 //
 //	todo(ABE):
-func (b *BlockChain) BlockByHeightBTCD(blockHeight int32) (*abeutil.Block, error) {
+/*func (b *BlockChain) BlockByHeightBTCD(blockHeight int32) (*abeutil.Block, error) {
 	// Lookup the block height in the best chain.
 	node := b.bestChain.NodeByHeight(blockHeight)
 	if node == nil {
@@ -1978,7 +1981,7 @@ func (b *BlockChain) BlockByHeightBTCD(blockHeight int32) (*abeutil.Block, error
 		return err
 	})
 	return block, err
-}
+}*/
 
 func (b *BlockChain) BlockByHeight(blockHeight int32) (*abeutil.BlockAbe, error) {
 	// Lookup the block height in the best chain.
@@ -2002,7 +2005,7 @@ func (b *BlockChain) BlockByHeight(blockHeight int32) (*abeutil.BlockAbe, error)
 // the appropriate chain height set.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) BlockByHash(hash *chainhash.Hash) (*abeutil.Block, error) {
+/*func (b *BlockChain) BlockByHash(hash *chainhash.Hash) (*abeutil.Block, error) {
 	// Lookup the block hash in block index and ensure it is in the best
 	// chain.
 	node := b.index.LookupNode(hash)
@@ -2019,7 +2022,7 @@ func (b *BlockChain) BlockByHash(hash *chainhash.Hash) (*abeutil.Block, error) {
 		return err
 	})
 	return block, err
-}
+}*/
 
 func (b *BlockChain) BlockByHashAbe(hash *chainhash.Hash) (*abeutil.BlockAbe, error) {
 	// Lookup the block hash in block index and ensure it is in the best
@@ -2120,8 +2123,7 @@ func (b *BlockChain) UpdateMinConsecutiveWitnessFileNum(num uint32) error {
 	if num > currentNum {
 		log.Debugf("Update min consecutive witness file num from %v to %v", currentNum, num)
 		err := b.db.Update(func(dbTx database.Tx) error {
-			var err error
-			err = dbTx.StoreMinConsecutiveWitnessFileNum(num)
+			err := dbTx.StoreMinConsecutiveWitnessFileNum(num)
 			return err
 		})
 		if err != nil {
@@ -2147,8 +2149,8 @@ func (b *BlockChain) FetchMinExistingWitnessFileNum() (uint32, error) {
 // StoreMinExistingWitnessFileNum store the minExistingWitnessFileNum.
 func (b *BlockChain) StoreMinExistingWitnessFileNum(num uint32) error {
 	err := b.db.Update(func(dbTx database.Tx) error {
-		var err error
-		err = dbTx.StoreMinExistingWitnessFileNum(num)
+		//var err error
+		err := dbTx.StoreMinExistingWitnessFileNum(num)
 		return err
 	})
 	return err

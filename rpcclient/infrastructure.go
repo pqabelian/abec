@@ -9,9 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abejson"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/gorilla/websocket"
 	"io"
 	"io/ioutil"
 	"math"
@@ -23,6 +20,10 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/abesuite/abec/abejson"
+	"github.com/abesuite/abec/chaincfg"
+	"github.com/gorilla/websocket"
 
 	"github.com/abesuite/go-socks/socks"
 )

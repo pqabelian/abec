@@ -3,16 +3,17 @@ package externalminer
 import (
 	"bytes"
 	"errors"
+	"math/rand"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/mining"
-	"math/rand"
-	"strings"
-	"sync"
-	"time"
 )
 
 const (

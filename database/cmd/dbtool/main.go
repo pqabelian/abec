@@ -1,13 +1,14 @@
 package main
 
 import (
-	"github.com/abesuite/abec/abelog"
-	"github.com/abesuite/abec/database"
-	"github.com/abesuite/abec/wire"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/abesuite/abec/abelog"
+	"github.com/abesuite/abec/database"
+	"github.com/abesuite/abec/wire"
 
 	flags "github.com/jessevdk/go-flags"
 )

@@ -4,6 +4,12 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math"
+	"os"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
@@ -13,11 +19,6 @@ import (
 	"github.com/abesuite/abec/mining"
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
-	"math"
-	"os"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 const (
@@ -304,11 +305,11 @@ func (mp *TxPool) removeOrphanAbe(tx *abeutil.TxAbe) {
 // previous orphan index.
 //
 // This function is safe for concurrent access.
-func (mp *TxPool) RemoveOrphan(tx *abeutil.Tx) {
+/*func (mp *TxPool) RemoveOrphan(tx *abeutil.Tx) {
 	mp.mtx.Lock()
 	mp.removeOrphan(tx, false)
 	mp.mtx.Unlock()
-}
+}*/
 
 func (mp *TxPool) RemoveOrphanAbe(tx *abeutil.TxAbe) {
 	mp.mtx.Lock()
@@ -337,7 +338,7 @@ func (mp *TxPool) RemoveOrphansByTag(tag Tag) uint64 {
 // orphan if adding a new one would cause it to overflow the max allowed.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *TxPool) limitNumOrphans() error {
+/*func (mp *TxPool) limitNumOrphans() error {
 	// Scan through the orphan pool and remove any expired orphans when it's
 	// time.  This is done for efficiency so the scan only happens
 	// periodically instead of on every orphan added to the pool.
@@ -384,7 +385,7 @@ func (mp *TxPool) limitNumOrphans() error {
 	}
 
 	return nil
-}
+}*/
 
 func (mp *TxPool) limitNumOrphansAbe() error {
 	// Scan through the orphan pool and remove any expired orphans when it's
@@ -438,7 +439,7 @@ func (mp *TxPool) limitNumOrphansAbe() error {
 // addOrphan adds an orphan transaction to the orphan pool.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *TxPool) addOrphan(tx *abeutil.Tx, tag Tag) {
+/*func (mp *TxPool) addOrphan(tx *abeutil.Tx, tag Tag) {
 	// Nothing to do if no orphans are allowed.
 	if mp.cfg.Policy.MaxOrphanTxs <= 0 {
 		return
@@ -464,7 +465,7 @@ func (mp *TxPool) addOrphan(tx *abeutil.Tx, tag Tag) {
 
 	log.Debugf("Stored orphan transaction %v (total: %d)", tx.Hash(),
 		len(mp.orphans))
-}
+}*/
 
 func (mp *TxPool) addOrphanAbe(tx *abeutil.TxAbe, tag Tag) {
 	// Nothing to do if no orphans are allowed.
@@ -503,7 +504,7 @@ func (mp *TxPool) addOrphanAbe(tx *abeutil.TxAbe, tag Tag) {
 // maybeAddOrphan potentially adds an orphan to the orphan pool.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *TxPool) maybeAddOrphan(tx *abeutil.Tx, tag Tag) error {
+/*func (mp *TxPool) maybeAddOrphan(tx *abeutil.Tx, tag Tag) error {
 	// Ignore orphan transactions that are too large.  This helps avoid
 	// a memory exhaustion attack based on sending a lot of really large
 	// orphans.  In the case there is a valid transaction larger than this,
@@ -526,7 +527,7 @@ func (mp *TxPool) maybeAddOrphan(tx *abeutil.Tx, tag Tag) error {
 	mp.addOrphan(tx, tag)
 
 	return nil
-}
+}*/
 
 // todo (ABE):
 func (mp *TxPool) maybeAddOrphanAbe(tx *abeutil.TxAbe, tag Tag) error {
@@ -562,14 +563,14 @@ func (mp *TxPool) maybeAddOrphanAbe(tx *abeutil.TxAbe, tag Tag) error {
 // that orphans also spend.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *TxPool) removeOrphanDoubleSpends(tx *abeutil.Tx) {
+/*func (mp *TxPool) removeOrphanDoubleSpends(tx *abeutil.Tx) {
 	msgTx := tx.MsgTx()
 	for _, txIn := range msgTx.TxIn {
 		for _, orphan := range mp.orphansByPrev[txIn.PreviousOutPoint] {
 			mp.removeOrphan(orphan, true)
 		}
 	}
-}
+}*/
 
 func (mp *TxPool) removeOrphanDoubleSpendsAbe(tx *abeutil.TxAbe) {
 	msgTx := tx.MsgTx()
@@ -592,13 +593,13 @@ func (mp *TxPool) removeOrphanDoubleSpendsAbe(tx *abeutil.TxAbe) {
 // exists in the main pool.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *TxPool) isTransactionInPoolBTCD(hash *chainhash.Hash) bool {
+/*func (mp *TxPool) isTransactionInPoolBTCD(hash *chainhash.Hash) bool {
 	if _, exists := mp.pool[*hash]; exists {
 		return true
 	}
 
 	return false
-}
+}*/
 
 func (mp *TxPool) isTransactionInMemPool(hash *chainhash.Hash) bool {
 	if _, exists := mp.poolAbe[*hash]; exists {
@@ -634,13 +635,13 @@ func (mp *TxPool) IsTransactionInPool(hash *chainhash.Hash) bool {
 // in the orphan pool.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *TxPool) isOrphanInPoolBTCD(hash *chainhash.Hash) bool {
+/*func (mp *TxPool) isOrphanInPoolBTCD(hash *chainhash.Hash) bool {
 	if _, exists := mp.orphans[*hash]; exists {
 		return true
 	}
 
 	return false
-}
+}*/
 
 func (mp *TxPool) isOrphanInPoolAbe(hash *chainhash.Hash) bool {
 	if _, exists := mp.orphansAbe[*hash]; exists {
@@ -690,7 +691,7 @@ func (mp *TxPool) HaveTransaction(hash *chainhash.Hash) bool {
 // RemoveTransaction.  See the comment for RemoveTransaction for more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *TxPool) removeTransactionBTCD(tx *abeutil.Tx, removeRedeemers bool) {
+/*func (mp *TxPool) removeTransactionBTCD(tx *abeutil.Tx, removeRedeemers bool) {
 	txHash := tx.Hash()
 	if removeRedeemers {
 		// Remove any transactions which rely on this one.
@@ -711,7 +712,7 @@ func (mp *TxPool) removeTransactionBTCD(tx *abeutil.Tx, removeRedeemers bool) {
 		delete(mp.pool, *txHash)
 		atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
 	}
-}
+}*/
 
 // todo(ABE):
 func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
@@ -771,7 +772,7 @@ func (mp *TxPool) RemoveTransactionAbe(tx *abeutil.TxAbe) {
 // contain transactions which were previously unknown to the memory pool.
 //
 // This function is safe for concurrent access.
-func (mp *TxPool) RemoveDoubleSpends(tx *abeutil.Tx) {
+/*func (mp *TxPool) RemoveDoubleSpends(tx *abeutil.Tx) {
 	// Protect concurrent access.
 	mp.mtx.Lock()
 	for _, txIn := range tx.MsgTx().TxIn {
@@ -782,7 +783,7 @@ func (mp *TxPool) RemoveDoubleSpends(tx *abeutil.Tx) {
 		}
 	}
 	mp.mtx.Unlock()
-}
+}*/
 
 // todo(ABE):
 func (mp *TxPool) RemoveDoubleSpendsAbe(tx *abeutil.TxAbe) {
@@ -895,7 +896,7 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 // chain.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *TxPool) checkPoolDoubleSpend(tx *abeutil.Tx) (bool, error) {
+/*func (mp *TxPool) checkPoolDoubleSpend(tx *abeutil.Tx) (bool, error) {
 	var isReplacement bool
 	for _, txIn := range tx.MsgTx().TxIn {
 		conflict, ok := mp.outpoints[txIn.PreviousOutPoint]
@@ -917,7 +918,7 @@ func (mp *TxPool) checkPoolDoubleSpend(tx *abeutil.Tx) (bool, error) {
 	}
 
 	return isReplacement, nil
-}
+}*/
 
 //		todo(ABE): ABE does not allow replacement.
 //	 The double-spend check rule is completely different from btc
@@ -1041,7 +1042,7 @@ func (mp *TxPool) txMonitor() {
 // transactions we've already determined don't signal replacement.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *TxPool) signalsReplacement(tx *abeutil.Tx,
+/*func (mp *TxPool) signalsReplacement(tx *abeutil.Tx,
 	cache map[chainhash.Hash]struct{}) bool {
 
 	// If a cache was not provided, we'll initialize one now to use for the
@@ -1077,7 +1078,7 @@ func (mp *TxPool) signalsReplacement(tx *abeutil.Tx,
 	}
 
 	return false
-}
+}*/
 
 func (mp *TxPool) signalsReplacementAbe(tx *abeutil.TxAbe,
 	cache map[chainhash.Hash]struct{}) bool {
@@ -1127,7 +1128,7 @@ func (mp *TxPool) signalsReplacementAbe(tx *abeutil.TxAbe,
 // transactions we've already determined ancestors of.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *TxPool) txAncestors(tx *abeutil.Tx,
+/*func (mp *TxPool) txAncestors(tx *abeutil.Tx,
 	cache map[chainhash.Hash]map[chainhash.Hash]*abeutil.Tx) map[chainhash.Hash]*abeutil.Tx {
 
 	// If a cache was not provided, we'll initialize one now to use for the
@@ -1160,7 +1161,7 @@ func (mp *TxPool) txAncestors(tx *abeutil.Tx,
 
 	return ancestors
 }
-
+*/
 // Abe to do
 // This function is compliacted in ABE.
 func (mp *TxPool) txAncestorsAbe(tx *abeutil.TxAbe,
@@ -1204,7 +1205,7 @@ func (mp *TxPool) txAncestorsAbe(tx *abeutil.TxAbe,
 // descendants of.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *TxPool) txDescendants(tx *abeutil.Tx,
+/*func (mp *TxPool) txDescendants(tx *abeutil.Tx,
 	cache map[chainhash.Hash]map[chainhash.Hash]*abeutil.Tx) map[chainhash.Hash]*abeutil.Tx {
 
 	// If a cache was not provided, we'll initialize one now to use for the
@@ -1240,7 +1241,7 @@ func (mp *TxPool) txDescendants(tx *abeutil.Tx,
 	}
 
 	return descendants
-}
+}*/
 
 // Abe to do
 // in ABE, finding the descendents is comnplicated
@@ -1291,7 +1292,7 @@ func (mp *TxPool) txDescendantsAbe(tx *abeutil.TxAbe,
 // support.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *TxPool) txConflicts(tx *abeutil.Tx) map[chainhash.Hash]*abeutil.Tx {
+/*func (mp *TxPool) txConflicts(tx *abeutil.Tx) map[chainhash.Hash]*abeutil.Tx {
 	conflicts := make(map[chainhash.Hash]*abeutil.Tx)
 	for _, txIn := range tx.MsgTx().TxIn {
 		conflict, ok := mp.outpoints[txIn.PreviousOutPoint]
@@ -1304,7 +1305,7 @@ func (mp *TxPool) txConflicts(tx *abeutil.Tx) map[chainhash.Hash]*abeutil.Tx {
 		}
 	}
 	return conflicts
-}
+}*/
 
 // todo (ABE): ABE does not support replacement, remove this
 func (mp *TxPool) txConflictsAbe(tx *abeutil.TxAbe) map[chainhash.Hash]*abeutil.TxAbe {
@@ -1339,7 +1340,7 @@ func (mp *TxPool) CheckSpend(op wire.OutPoint) *abeutil.Tx {
 // transaction pool.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *TxPool) fetchInputUtxos(tx *abeutil.Tx) (*blockchain.UtxoViewpoint, error) {
+/*func (mp *TxPool) fetchInputUtxos(tx *abeutil.Tx) (*blockchain.UtxoViewpoint, error) {
 	utxoView, err := mp.cfg.FetchUtxoView(tx)
 	if err != nil {
 		return nil, err
@@ -1362,7 +1363,7 @@ func (mp *TxPool) fetchInputUtxos(tx *abeutil.Tx) (*blockchain.UtxoViewpoint, er
 	}
 
 	return utxoView, nil
-}
+}*/
 
 func (mp *TxPool) fetchInputUtxoRingsAbe(tx *abeutil.TxAbe) (*blockchain.UtxoRingViewpoint, error) {
 	utxoRingView, err := mp.cfg.FetchUtxoRingView(tx)
@@ -1428,7 +1429,7 @@ func (mp *TxPool) FetchTransaction(txHash *chainhash.Hash) (*abeutil.TxAbe, erro
 // went wrong.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *TxPool) validateReplacement(tx *abeutil.Tx,
+/*func (mp *TxPool) validateReplacement(tx *abeutil.Tx,
 	txFee int64) (map[chainhash.Hash]*abeutil.Tx, error) {
 
 	// First, we'll make sure the set of conflicting transactions doesn't
@@ -1514,7 +1515,7 @@ func (mp *TxPool) validateReplacement(tx *abeutil.Tx,
 	}
 
 	return conflicts, nil
-}
+}*/
 
 // validateReplacement determines whether a transaction is deemed as a valid
 // replacement of all of its conflicts according to the RBF policy. If it is
@@ -2029,7 +2030,7 @@ func (mp *TxPool) TxHashes() []*chainhash.Hash {
 // This function is safe for concurrent access.
 //
 //	todo(ABE):
-func (mp *TxPool) TxDescs() []*TxDesc {
+/*func (mp *TxPool) TxDescs() []*TxDesc {
 	mp.mtx.RLock()
 	descs := make([]*TxDesc, len(mp.pool))
 	i := 0
@@ -2040,7 +2041,7 @@ func (mp *TxPool) TxDescs() []*TxDesc {
 	mp.mtx.RUnlock()
 
 	return descs
-}
+}*/
 
 func (mp *TxPool) TxDescsAbe() []*TxDescAbe {
 	mp.mtx.RLock()

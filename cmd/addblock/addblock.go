@@ -1,15 +1,16 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
+
 	"github.com/abesuite/abec/abelog"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/blockchain/indexers"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/limits"
 	"github.com/abesuite/abec/wire"
-	"os"
-	"path/filepath"
-	"runtime"
 )
 
 const (

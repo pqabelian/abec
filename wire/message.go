@@ -3,9 +3,10 @@ package wire
 import (
 	"bytes"
 	"fmt"
-	"github.com/abesuite/abec/chainhash"
 	"io"
 	"unicode/utf8"
+
+	"github.com/abesuite/abec/chainhash"
 )
 
 // MessageHeaderSize is the number of bytes in a bitcoin message header.

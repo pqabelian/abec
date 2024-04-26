@@ -1,10 +1,11 @@
 package syncmgr
 
 import (
-	"github.com/abesuite/abec/abelog"
-	"github.com/abesuite/abec/abeutil"
 	"sync"
 	"time"
+
+	"github.com/abesuite/abec/abelog"
+	"github.com/abesuite/abec/abeutil"
 )
 
 // blockProgressLogger provides periodic logging for other services in order
@@ -22,8 +23,9 @@ type blockProgressLogger struct {
 
 // newBlockProgressLogger returns a new block progress logger.
 // The progress message is templated as follows:
-//  {progressAction} {numProcessed} {blocks|block} in the last {timePeriod}
-//  ({numTxs}, height {lastBlockHeight}, {lastBlockTimeStamp})
+//
+//	{progressAction} {numProcessed} {blocks|block} in the last {timePeriod}
+//	({numTxs}, height {lastBlockHeight}, {lastBlockTimeStamp})
 func newBlockProgressLogger(progressMessage string, logger abelog.Logger) *blockProgressLogger {
 	return &blockProgressLogger{
 		lastBlockLogTime: time.Now(),

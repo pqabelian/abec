@@ -15,6 +15,7 @@ import (
 const MaxBlockHeaderPayload = 16 + (chainhash.HashSize * 2)
 
 //	todo: (EthashPoW)
+//
 // Version 4 bytes + Timestamp 4 bytes + Bits 4 bytes + NonceExt 8 bytes + Height 4 bytes
 // PrevBlock, MerkleRoot, and MixDigest hashes
 const MaxBlockHeaderPayloadEthash = 24 + (chainhash.HashSize * 3)
@@ -83,6 +84,7 @@ func (h *BlockHeader) BlockHash() chainhash.Hash {
 }
 
 // todo: (EthashPoW)
+//
 //	We separate this as a standalone funciton, since when mining, this funciton will be called very frequently.
 //	In mining, this funciton, rather than the original BlockHash() is called.
 //	Actually, this method is not called in mining. Just keeping here for completeness.
@@ -176,7 +178,7 @@ func NewBlockHeader(version int32, prevHash, merkleRootHash *chainhash.Hash,
 	}
 }
 
-//	todo: (EthashPoW)
+// todo: (EthashPoW)
 func NewBlockHeaderEthash(version int32, prevHash, merkleRootHash *chainhash.Hash,
 	bits uint32, height int32, nonceExt uint64, mixDigest *chainhash.Hash) *BlockHeader {
 
@@ -197,6 +199,7 @@ func NewBlockHeaderEthash(version int32, prevHash, merkleRootHash *chainhash.Has
 // readBlockHeader reads a bitcoin block header from r.  See Deserialize for
 // decoding block headers stored to disk, such as in a database, as opposed to
 // decoding from the wire.
+//
 //	todo: (EthashPoW)
 func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
 
@@ -222,6 +225,7 @@ func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
 // writeBlockHeader writes a bitcoin block header to w.  See Serialize for
 // encoding block headers to be stored to disk, such as in a database, as
 // opposed to encoding for the wire.
+//
 //	todo: (EthashPoW)
 func writeBlockHeader(w io.Writer, pver uint32, bh *BlockHeader) error {
 	sec := uint32(bh.Timestamp.Unix())

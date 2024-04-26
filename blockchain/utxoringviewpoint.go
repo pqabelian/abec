@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"sort"
+
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/wire"
-	"io"
-	"sort"
 )
 
 // BuildTxoRings apply a chain-rule to organize the Txos of input blocks to TxoRings.
@@ -473,7 +474,7 @@ func (entry *UtxoRingEntry) Serialize(w io.Writer) error {
 
 	//	ring size
 	if len(entry.txOuts) != len(entry.outPointRing.OutPoints) {
-		return AssertError(fmt.Sprintf("The size of txOuts does not match the numner of OutPoints"))
+		return AssertError("The size of txOuts does not match the numner of OutPoints")
 	}
 	err = wire.WriteVarInt(w, 0, uint64(len(entry.txOuts)))
 	if err != nil {
@@ -501,7 +502,7 @@ func (entry *UtxoRingEntry) Serialize(w io.Writer) error {
 
 	//	number of consumed (serialNumbers)
 	if len(entry.serialNumbers) > len(entry.txOuts) {
-		return AssertError(fmt.Sprintf("The size of consumed serialNumbers exceeds the ring size"))
+		return AssertError("The size of consumed serialNumbers exceeds the ring size")
 	}
 	err = wire.WriteVarInt(w, 0, uint64(len(entry.serialNumbers)))
 	if err != nil {
@@ -514,7 +515,7 @@ func (entry *UtxoRingEntry) Serialize(w io.Writer) error {
 		}
 	}
 	if len(entry.consumingBlockHashs) != len(entry.serialNumbers) {
-		return AssertError(fmt.Sprintf("The number of consumed serialNumbers does not mathc the number of corresponidng block hashes"))
+		return AssertError("The number of consumed serialNumbers does not mathc the number of corresponidng block hashes")
 	}
 	for _, consumingBlockHash := range entry.consumingBlockHashs {
 		_, err = w.Write(consumingBlockHash[:])

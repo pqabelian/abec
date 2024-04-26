@@ -9,12 +9,13 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/big"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/abeutil/base58"
 	"github.com/abesuite/abec/btcec"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
-	"math/big"
 )
 
 const (

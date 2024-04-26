@@ -2,8 +2,9 @@ package wire
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/chainhash"
 	"testing"
+
+	"github.com/abesuite/abec/chainhash"
 )
 
 func TestOutPointAbe_OutPointId(t *testing.T) {

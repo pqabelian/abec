@@ -6,10 +6,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abecrypto/abecryptoparam"
-	"github.com/abesuite/abec/chainhash"
 	"io"
 	"strconv"
+
+	"github.com/abesuite/abec/abecrypto/abecryptoparam"
+	"github.com/abesuite/abec/chainhash"
 )
 
 // borrow something from msgtx.go

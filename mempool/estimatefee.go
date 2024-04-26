@@ -5,15 +5,16 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/mining"
 	"io"
 	"math"
 	"math/rand"
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/abesuite/abec/abeutil"
+	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/mining"
 )
 
 const (

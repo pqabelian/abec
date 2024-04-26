@@ -3,8 +3,9 @@ package wire
 import (
 	"bytes"
 	"fmt"
-	"github.com/abesuite/abec/chainhash"
 	"testing"
+
+	"github.com/abesuite/abec/chainhash"
 )
 
 func TestBlockHeader_BlockHash(t *testing.T) {

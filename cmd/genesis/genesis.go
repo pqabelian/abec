@@ -3,15 +3,16 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
+	"log"
+	"os"
+	"time"
+
 	"github.com/abesuite/abec/abecrypto"
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
-	"log"
-	"os"
-	"time"
 )
 
 func main() {
