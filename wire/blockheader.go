@@ -213,12 +213,10 @@ func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
 		return err
 	}
 
-	//	read the remainder fields according to the version
-	if bh.Version > int32(BlockVersionEthashPow) {
-		str := fmt.Sprintf("Unknown version %#08x with height %d than highest known version %#08x", bh.Version, bh.Height, BlockVersionEthashPow)
-		log.Warnf(str)
-		return fmt.Errorf("unsupported block version: %v", str)
-	} else if bh.Version == int32(BlockVersionEthashPow) {
+	// read the remainder fields according to the version
+	// NOTE for greater-equal(>=): block struct would not be changed but block version may
+	// be changed to support underlying modifications
+	if bh.Version >= int32(BlockVersionEthashPow) {
 		return readElements(r, &bh.PrevBlock, &bh.MerkleRoot,
 			(*uint32Time)(&bh.Timestamp), &bh.Bits, &bh.Height, &bh.NonceExt, &bh.MixDigest)
 	}
