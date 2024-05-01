@@ -46,12 +46,16 @@ func (cmd *fetchBlockCmd) Execute(args []string) error {
 	return db.View(func(tx database.Tx) error {
 		log.Infof("Fetching block %s", blockHash)
 		startTime := time.Now()
-		blockBytes, err := tx.FetchBlock(blockHash)
+		blockBytes, witnessesBytes, err := tx.FetchBlockAbe(blockHash)
 		if err != nil {
 			return err
 		}
 		log.Infof("Loaded block in %v", time.Since(startTime))
 		log.Infof("Block Hex: %s", hex.EncodeToString(blockBytes))
+		log.Infof("Witness Hex: ")
+		for i, witnessesByte := range witnessesBytes {
+			log.Infof("[%d] %s ", i, hex.EncodeToString(witnessesByte))
+		}
 		return nil
 	})
 }

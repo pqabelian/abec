@@ -66,7 +66,7 @@ type FutureGetRawTransactionResult chan *response
 
 // Receive waits for the response promised by the future and returns a
 // transaction given its hash.
-func (r FutureGetRawTransactionResult) Receive() (*abeutil.Tx, error) {
+func (r FutureGetRawTransactionResult) Receive() (*abeutil.TxAbe, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -86,11 +86,11 @@ func (r FutureGetRawTransactionResult) Receive() (*abeutil.Tx, error) {
 	}
 
 	// Deserialize the transaction and return it.
-	var msgTx wire.MsgTx
+	var msgTx wire.MsgTxAbe
 	if err := msgTx.Deserialize(bytes.NewReader(serializedTx)); err != nil {
 		return nil, err
 	}
-	return abeutil.NewTx(&msgTx), nil
+	return abeutil.NewTxAbe(&msgTx), nil
 }
 
 // GetRawTransactionAsync returns an instance of a type that can be used to get
@@ -112,7 +112,7 @@ func (c *Client) GetRawTransactionAsync(txHash *chainhash.Hash) FutureGetRawTran
 //
 // See GetRawTransactionVerbose to obtain additional information about the
 // transaction.
-func (c *Client) GetRawTransaction(txHash *chainhash.Hash) (*abeutil.Tx, error) {
+func (c *Client) GetRawTransaction(txHash *chainhash.Hash) (*abeutil.TxAbe, error) {
 	return c.GetRawTransactionAsync(txHash).Receive()
 }
 

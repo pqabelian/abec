@@ -322,18 +322,18 @@ func (mp *TxPool) RemoveOrphanAbe(tx *abeutil.TxAbe) {
 // identifier.
 //
 // This function is safe for concurrent access.
-/*func (mp *TxPool) RemoveOrphansByTag(tag Tag) uint64 {
+func (mp *TxPool) RemoveOrphansByTag(tag Tag) uint64 {
 	var numEvicted uint64
 	mp.mtx.Lock()
-	for _, otx := range mp.orphans {
+	for _, otx := range mp.orphansAbe {
 		if otx.tag == tag {
-			mp.removeOrphan(otx.tx, true)
+			mp.removeOrphanAbe(otx.tx)
 			numEvicted++
 		}
 	}
 	mp.mtx.Unlock()
 	return numEvicted
-}*/
+}
 
 // limitNumOrphans limits the number of orphan transactions by evicting a random
 // orphan if adding a new one would cause it to overflow the max allowed.
@@ -985,37 +985,41 @@ func (mp *TxPool) txMonitor() {
 			for i := 0; i < len(filenames) && len(mp.poolAbe) < MaxTransactionInMemoryNum; i++ {
 				name := filenames[i]
 				log.Infof("loading some transactions from %s", name)
-				f, err = os.OpenFile(name, os.O_RDONLY, 0644)
-				if err != nil {
-					continue
-				}
-				size := make([]byte, 8)
-				for {
-					// [transaction_size] [transaction_content]
-					_, err = f.Read(size)
+				func() {
+					f, err = os.OpenFile(name, os.O_RDONLY, 0644)
 					if err != nil {
-						break
+						return
 					}
-					contentSize := binary.LittleEndian.Uint64(size)
-					content := make([]byte, contentSize)
-					_, err = f.Read(content)
-					if err != nil {
-						break
+					defer f.Close()
+
+					size := make([]byte, 8)
+					for {
+						// [transaction_size] [transaction_content]
+						_, err = f.Read(size)
+						if err != nil {
+							break
+						}
+						contentSize := binary.LittleEndian.Uint64(size)
+						content := make([]byte, contentSize)
+						_, err = f.Read(content)
+						if err != nil {
+							break
+						}
+						buffer := bytes.NewBuffer(content)
+						msgTx := &wire.MsgTxAbe{}
+						err = msgTx.DeserializeFull(buffer)
+						if err != nil {
+							break
+						}
+						tx := abeutil.NewTxAbe(msgTx)
+						log.Infof("load transaction %s from file %s", msgTx.TxHash(), name)
+						_, err = mp.ProcessTransactionAbe(tx, false, false, 0, true)
+						if err != nil {
+							break
+						}
 					}
-					buffer := bytes.NewBuffer(content)
-					msgTx := &wire.MsgTxAbe{}
-					err = msgTx.DeserializeFull(buffer)
-					if err != nil {
-						break
-					}
-					tx := abeutil.NewTxAbe(msgTx)
-					log.Infof("load transaction %s from file %s", msgTx.TxHash(), name)
-					_, err = mp.ProcessTransactionAbe(tx, false, false, 0, true)
-					if err != nil {
-						break
-					}
-				}
-				f.Close()
+				}()
+
 				log.Infof("finish loading transactions from file %s, remove it...", name)
 				os.Remove(name)
 				f = nil
@@ -1996,7 +2000,7 @@ func (mp *TxPool) ProcessTransactionAbe(tx *abeutil.TxAbe, allowOrphan, rateLimi
 // This function is safe for concurrent access.
 func (mp *TxPool) Count() int {
 	mp.mtx.RLock()
-	count := len(mp.pool) + len(mp.diskPool)
+	count := len(mp.poolAbe) + len(mp.diskPool)
 	mp.mtx.RUnlock()
 
 	return count
@@ -2008,9 +2012,9 @@ func (mp *TxPool) Count() int {
 // This function is safe for concurrent access.
 func (mp *TxPool) TxHashes() []*chainhash.Hash {
 	mp.mtx.RLock()
-	hashes := make([]*chainhash.Hash, len(mp.pool)+len(mp.diskPool))
+	hashes := make([]*chainhash.Hash, len(mp.poolAbe)+len(mp.diskPool))
 	i := 0
-	for hash := range mp.pool {
+	for hash := range mp.poolAbe {
 		hashCopy := hash
 		hashes[i] = &hashCopy
 		i++

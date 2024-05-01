@@ -989,8 +989,8 @@ type transaction struct {
 
 	// Blocks that need to be stored on commit.  The pendingBlocks map is
 	// kept to allow quick lookups of pending data by block hash.
-	pendingBlocks       map[chainhash.Hash]int
-	pendingBlockData    []pendingBlock
+	//pendingBlocks       map[chainhash.Hash]int
+	//pendingBlockData    []pendingBlock
 	pendingBlocksAbe    map[chainhash.Hash]int
 	pendingBlockAbeData []pendingBlockAbe
 
@@ -1153,15 +1153,15 @@ func (tx *transaction) Metadata() database.Bucket {
 }
 
 // hasBlock returns whether or not a block with the given hash exists.
-func (tx *transaction) hasBlock(hash *chainhash.Hash) bool {
+/*func (tx *transaction) hasBlock(hash *chainhash.Hash) bool {
 	// Return true if the block is pending to be written on commit since
 	// it exists from the viewpoint of this transaction.
-	if _, exists := tx.pendingBlocks[*hash]; exists {
+	if _, exists := tx.pendingBlocksAbe[*hash]; exists {
 		return true
 	}
 
 	return tx.hasKey(bucketizedKey(blockIdxBucketID, hash[:]))
-}
+}*/
 
 func (tx *transaction) hasBlockAbe(hash *chainhash.Hash) bool {
 	// Return true if the block is pending to be written on commit since
@@ -1307,14 +1307,14 @@ func (tx *transaction) StoreBlockAbe(block *abeutil.BlockAbe) error {
 //   - ErrTxClosed if the transaction has already been closed
 //
 // This function is part of the database.Tx interface implementation.
-func (tx *transaction) HasBlock(hash *chainhash.Hash) (bool, error) {
+/*func (tx *transaction) HasBlock(hash *chainhash.Hash) (bool, error) {
 	// Ensure transaction state is valid.
 	if err := tx.checkClosed(); err != nil {
 		return false, err
 	}
 
 	return tx.hasBlock(hash), nil
-}
+}*/
 
 // todo(ABE):
 func (tx *transaction) HasBlockAbe(hash *chainhash.Hash) (bool, error) {
@@ -1323,7 +1323,7 @@ func (tx *transaction) HasBlockAbe(hash *chainhash.Hash) (bool, error) {
 		return false, err
 	}
 
-	return tx.hasBlock(hash), nil
+	return tx.hasBlockAbe(hash), nil
 }
 
 // HasBlocks returns whether or not the blocks with the provided hashes
@@ -1453,8 +1453,8 @@ func (tx *transaction) FetchBlock(hash *chainhash.Hash) ([]byte, error) {
 
 	// When the block is pending to be written on commit return the bytes
 	// from there.
-	if idx, exists := tx.pendingBlocks[*hash]; exists {
-		return tx.pendingBlockData[idx].bytes, nil
+	if idx, exists := tx.pendingBlocksAbe[*hash]; exists {
+		return tx.pendingBlockAbeData[idx].bytesNoWitness, nil
 	}
 
 	// Lookup the location of the block in the files from the block index.
@@ -1482,7 +1482,7 @@ func (tx *transaction) FetchBlockAbe(hash *chainhash.Hash) ([]byte, [][]byte, er
 
 	// When the block is pending to be written on commit return the bytes
 	// from there.
-	if idx, exists := tx.pendingBlocks[*hash]; exists {
+	if idx, exists := tx.pendingBlocksAbe[*hash]; exists {
 		return tx.pendingBlockAbeData[idx].bytesNoWitness, tx.pendingBlockAbeData[idx].bytesWitness, nil
 	}
 
@@ -1528,7 +1528,7 @@ func (tx *transaction) FetchBlockWithoutWitness(hash *chainhash.Hash) ([]byte, e
 
 	// When the block is pending to be written on commit return the bytes
 	// from there.
-	if idx, exists := tx.pendingBlocks[*hash]; exists {
+	if idx, exists := tx.pendingBlocksAbe[*hash]; exists {
 		return tx.pendingBlockAbeData[idx].bytesNoWitness, nil
 	}
 
@@ -1582,7 +1582,7 @@ func (tx *transaction) FetchBlocks(hashes []chainhash.Hash) ([][]byte, error) {
 	blocks := make([][]byte, len(hashes))
 	for i := range hashes {
 		var err error
-		blocks[i], err = tx.FetchBlock(&hashes[i])
+		blocks[i], _, err = tx.FetchBlockAbe(&hashes[i])
 		if err != nil {
 			return nil, err
 		}
@@ -1949,8 +1949,8 @@ func (tx *transaction) close() {
 	tx.closed = true
 
 	// Clear pending blocks that would have been written on commit.
-	tx.pendingBlocks = nil
-	tx.pendingBlockData = nil
+	//tx.pendingBlocks = nil
+	//tx.pendingBlockData = nil
 
 	tx.pendingBlocksAbe = nil
 	tx.pendingBlockAbeData = nil

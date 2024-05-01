@@ -1940,7 +1940,7 @@ func dbStoreBlock(dbTx database.Tx, block *abeutil.Block) error {
 
 // Abe to do
 func dbStoreBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe) error {
-	hasBlock, err := dbTx.HasBlock(block.Hash())
+	hasBlock, err := dbTx.HasBlockAbe(block.Hash())
 	if err != nil {
 		return err
 	}

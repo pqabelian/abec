@@ -358,7 +358,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 			// error.
 			var block *abeutil.BlockAbe
 			err := m.db.View(func(dbTx database.Tx) error {
-				blockBytes, err := dbTx.FetchBlock(hash)
+				blockBytes, err := dbTx.FetchBlockWithoutWitness(hash)
 				if err != nil {
 					return err
 				}

@@ -239,7 +239,7 @@ type Tx interface {
 	//   - ErrTxClosed if the transaction has already been closed
 	//
 	// Other errors are possible depending on the implementation.
-	HasBlock(hash *chainhash.Hash) (bool, error)
+	//HasBlock(hash *chainhash.Hash) (bool, error)
 	HasBlockAbe(hash *chainhash.Hash) (bool, error)
 
 	// HasBlocks returns whether or not the blocks with the provided hashes
@@ -317,7 +317,7 @@ type Tx interface {
 	// has ended results in undefined behavior.  This constraint prevents
 	// additional data copies and allows support for memory-mapped database
 	// implementations.
-	FetchBlock(hash *chainhash.Hash) ([]byte, error)
+	//FetchBlock(hash *chainhash.Hash) ([]byte, error)
 	FetchBlockAbe(hash *chainhash.Hash) ([]byte, [][]byte, error)
 	FetchBlockWithoutWitness(hash *chainhash.Hash) ([]byte, error)
 
