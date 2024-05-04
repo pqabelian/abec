@@ -784,3 +784,182 @@
 		}
 		```
 
+02/05/2024
+# wire
+1. [wire/msgblock.go](https://github.com/JingnanHe/abec-cleancode/blob/main/abec/wire/msgblock.go#L18) severl pairs sans Abe vs with Abe
+   ```go
+	const defaultTransactionAlloc = 2048
+	const defaultTransactionAllocAbe = 2048
+
+	// MaxBlocksPerMsg is the maximum number of blocks allowed per message.
+	const MaxBlocksPerMsg = 500
+	const MaxBlocksPerMsgAbe = 500
+
+	// MaxBlockPayload is the maximum bytes a block message can be in bytes.
+	// After Segregated Witness, the max block payload has been raised to 4MB.
+	const MaxBlockPayload = 4000000
+
+	// MaxBlockPayloadAbe is the maximum bytes a block message can be in bytes.
+	// todo: The max block payload in abe is 8MB. However, it seems that there is bug in transaction
+	// serialization currently. Hence, the MaxBlockPayload is temporarily  set as 800MB.
+	const MaxBlockPayloadAbe = 800000000
+
+	// maxTxPerBlock is the maximum number of transactions that could
+	// possibly fit into a block.
+	const maxTxPerBlock = (MaxBlockPayload / minTxPayload) + 1
+	const maxTxPerBlockAbe = (MaxBlockPayloadAbe / TxPayloadMinSize) + 1
+
+	// TxLoc holds locator data for the offset and length of where a transaction is
+	// located within a MsgBlock data buffer.
+	type TxLoc struct {
+		TxStart int
+		TxLen   int
+	}
+	type TxAbeLoc struct {
+		TxStart      int
+		TxLen        int
+		WitnessStart int
+		WitnessLen   int
+	}
+
+	// MsgBlock implements the Message interface and represents an abe
+	// block message.  It is used to deliver block and transaction information in
+	// response to a getdata message (MsgGetData) for a given block hash.
+	type MsgBlock struct {
+		Header       BlockHeader
+		Transactions []*MsgTx
+	}
+
+	// MsgBlockAbe implements the Message interface and represents an abe
+	// block message.  It is used to deliver block and transaction information in
+	// response to a getdata message (MsgGetData) for a given block hash.
+	type MsgBlockAbe struct {
+		Header       BlockHeader
+		Transactions []*MsgTxAbe
+		WitnessHashs []*chainhash.Hash
+	}
+   ```
+   - `defaultTransactionAlloc` is used in 
+  
+     	- [wire/msgprunedblock.go](https://github.com/JingnanHe/abec-cleancode/blob/main/abec/wire/msgprunedblock.go#L174) `func NewMsgBlockPrunedFromMsgBlockAbe(block *MsgBlockAbe)` change to defaultTransactionAllocAbe?
+			```go
+			func NewMsgBlockPrunedFromMsgBlockAbe(block *MsgBlockAbe) (*MsgPrunedBlock, error) {
+			res := &MsgPrunedBlock{
+					Header:            block.Header,
+					CoinbaseTx:        block.Transactions[0],
+					TransactionHashes: make([]chainhash.Hash, 0, defaultTransactionAlloc),
+					WitnessHashs:      make([]chainhash.Hash, 0, defaultTransactionAlloc),
+				}
+				...
+			}
+			```
+		- used in & deleted [wire/msgblock.go](https://github.com/JingnanHe/abec-cleancode/blob/main/abec/wire/msgblock.go#L698) `func NewMsgBlock(blockHeader *BlockHeader) *MsgBlock`
+		- used in & deleted [wire/msgblock.go](https://github.com/JingnanHe/abec-cleancode/blob/main/abec/wire/msgblock.go#L96) `func (msg *MsgBlockAbe) ClearTransactions() `
+   - `MaxBlocksPerMsg` is used in // ?? `MaxBlocksPerMsgAbe` is not in use
+     - [server.go](https://github.com/JingnanHe/abec-cleancode/blob/main/abec/server.go#L724) `func (sp *serverPeer) OnGetBlocks(_ *peer.Peer, msg *wire.MsgGetBlocks)`
+		```go
+		func (sp *serverPeer) OnGetBlocks(_ *peer.Peer, msg 	*wire.MsgGetBlocks) {
+			hashList, heights := chain.LocateBlocks(msg.BlockLocatorHashes, &msg.HashStop,
+		wire.MaxBlocksPerMsg) // from the start node to hash stop node or max blockhash
+			...
+			// Send the inventory message if there is anything to send.
+			if len(invMsg.InvList) > 0 {
+				invListLen := len(invMsg.InvList)
+				if invListLen == wire.MaxBlocksPerMsg {
+					// Intentionally use a copy of the final hash so there
+					// is not a reference into the inventory slice which
+					// would prevent the entire slice from being eligible
+					// for GC as soon as it's sent.
+					continueHash := invMsg.InvList[invListLen-1].Hash
+					sp.continueHash = &continueHash // the last one hash in the inv message
+				}
+				sp.QueueMessage(invMsg, nil)
+			}
+		}
+		```
+      	where OnGetBlocks is used in [server.go](https://github.com/JingnanHe/abec-cleancode/blob/main/abec/server.go#L1803) `func newPeerConfig(sp *serverPeer) *peer.Config` didn't use OnGetBlocks? or change to MaxBlocksPerMsgAbe?
+		```go
+		func newPeerConfig(sp *serverPeer) *peer.Config {
+			return &peer.Config{
+				...
+				OnGetBlocks:     sp.OnGetBlocks,
+				...
+			}
+			...
+		}
+		```
+	- `MaxBlockPayload = 4000000` and `MaxBlockPayloadAbe = 800000000` are different, s.t. `maxTxPerBlock` and `maxTxPerBlockAbe` are different
+	- deleted `type TxLoc struct`
+	- `MsgBlock` used in
+		- [mining/mining.go](https://github.com/JingnanHe/abec-cleancode/blob/main/abec/mining/mining.go#L198) deleted this field
+			```go
+			type BlockTemplate struct {
+				// Block is a block that is ready to be solved by miners.  Thus, it is
+				// completely valid with the exception of satisfying the proof-of-work
+				// requirement.
+				Block    *wire.MsgBlock
+				BlockAbe *wire.MsgBlockAbe
+				...
+			}
+			```
+			which is used in [rpcserver.go](https://github.com/JingnanHe/abec-cleancode/blob/main/abec/rpcserver.go#L2064) change to BlockAbe?
+			```go
+				func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bool, useOwnAddr bool, miningAddr []byte) error {
+					...
+					template.Block.Header.MerkleRoot = *merkles[len(merkles)-1]
+				}
+			```
+		- [peer/log.go](https://github.com/JingnanHe/abec-cleancode/blob/main/abec/peer/log.go#L159) `func messageSummary(msg wire.Message)` has Abe case, so delete it?
+			```go
+			// messageSummary returns a human-readable string which summarizes a message.
+			// Not all messages have or need a summary.  This is used for debug logging.
+			func messageSummary(msg wire.Message) string {
+				switch msg := msg.(type) {
+					case *wire.MsgBlock:
+						header := &msg.Header
+						return fmt.Sprintf("hash %s, ver %d, %d tx, %s", msg.BlockHash(),
+						header.Version, len(msg.Transactions), header.Timestamp)
+
+					case *wire.MsgBlockAbe:
+						header := &msg.Header
+						return fmt.Sprintf("hash %s, ver %d, %d tx, %s", msg.BlockHash(),
+						header.Version, len(msg.Transactions), header.Timestamp)
+
+					...
+				}
+				...
+			}
+			```
+		- [rpcclient/chain.go](https://github.com/JingnanHe/abec-cleancode/blob/main/abec/rpcclient/chain.go#L138) `func (r FutureGetBlockResult) Receive() (*wire.MsgBlock, error)` 
+			```go
+			func (r FutureGetBlockResult) Receive() (*wire.MsgBlock, error) {
+				...
+				// Deserialize the block and return it.
+				var msgBlock wire.MsgBlock
+				...
+			}
+			```
+			here is another [Receive](https://github.com/JingnanHe/abec-cleancode/blob/main/abec/rpcclient/chain.go#L199) for Abe
+			```go
+			func (r FutureGetBlockAbeResult) Receive() (*wire.MsgBlockAbe, error) {
+				res, err := r.client.waitForGetBlockAbeRes(r.Response, r.hash, false, false)
+				if err != nil {
+					return nil, err
+				}
+				...
+			}
+			```
+
+# Others
+1. [rpcserverhelp.go](https://github.com/JingnanHe/abec-cleancode/blob/main/abec/rpcserverhelp.go#L690)
+   ```go
+	var rpcResultTypes = map[string][]interface{}{
+		...
+		"getblock":              {(*string)(nil), (*abejson.GetBlockAbeVerboseResult)(nil)},
+		"getblockabe":           {(*string)(nil), (*abejson.GetBlockAbeVerboseResult)(nil)}, //TODO(abe):after testing, this command will be replace by getblock
+	
+		...
+	}
+   ```
+	
+	

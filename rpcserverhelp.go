@@ -677,17 +677,17 @@ var helpDescsEnUS = map[string]string{
 // This information is used to generate the help.  Each result type must be a
 // pointer to the type (or nil to indicate no return value).
 var rpcResultTypes = map[string][]interface{}{
-	"addnode":               nil,
-	"createrawtransaction":  {(*string)(nil)},
-	"debuglevel":            {(*string)(nil), (*string)(nil)},
-	"decoderawtransaction":  {(*abejson.TxRawDecodeResult)(nil)},
-	"decodescript":          {(*abejson.DecodeScriptResult)(nil)},
-	"estimatefee":           {(*float64)(nil)},
-	"generate":              {(*[]string)(nil)},
-	"getaddednodeinfo":      {(*[]string)(nil), (*[]abejson.GetAddedNodeInfoResult)(nil)},
-	"getbestblock":          {(*abejson.GetBestBlockResult)(nil)},
-	"getbestblockhash":      {(*string)(nil)},
-	"getblock":              {(*string)(nil), (*abejson.GetBlockAbeVerboseResult)(nil)},
+	"addnode":              nil,
+	"createrawtransaction": {(*string)(nil)},
+	"debuglevel":           {(*string)(nil), (*string)(nil)},
+	"decoderawtransaction": {(*abejson.TxRawDecodeResult)(nil)},
+	"decodescript":         {(*abejson.DecodeScriptResult)(nil)},
+	"estimatefee":          {(*float64)(nil)},
+	"generate":             {(*[]string)(nil)},
+	"getaddednodeinfo":     {(*[]string)(nil), (*[]abejson.GetAddedNodeInfoResult)(nil)},
+	"getbestblock":         {(*abejson.GetBestBlockResult)(nil)},
+	"getbestblockhash":     {(*string)(nil)},
+	//"getblock":              {(*string)(nil), (*abejson.GetBlockAbeVerboseResult)(nil)},
 	"getblockabe":           {(*string)(nil), (*abejson.GetBlockAbeVerboseResult)(nil)}, //TODO(abe):after testing, this command will be replace by getblock
 	"getblockcount":         {(*int64)(nil)},
 	"getblockhash":          {(*string)(nil)},

@@ -173,11 +173,11 @@ func dbFetchBlockHashByID(dbTx database.Tx, id uint32) (*chainhash.Hash, error) 
 // described about for a transaction index entry.  The target byte slice must
 // be at least large enough to handle the number of bytes defined by the
 // txEntrySize constant or it will panic.
-func putTxIndexEntry(target []byte, blockID uint32, txLoc wire.TxLoc) {
+/*func putTxIndexEntry(target []byte, blockID uint32, txLoc wire.TxLoc) {
 	byteOrder.PutUint32(target, blockID)
 	byteOrder.PutUint32(target[4:], uint32(txLoc.TxStart))
 	byteOrder.PutUint32(target[8:], uint32(txLoc.TxLen))
-}
+}*/
 func putTxAbeIndexEntry(target []byte, blockID uint32, txLoc wire.TxAbeLoc) {
 	byteOrder.PutUint32(target, blockID)
 	byteOrder.PutUint32(target[4:], uint32(txLoc.TxStart))

@@ -193,10 +193,10 @@ func messageSummary(msg wire.Message) string {
 		return fmt.Sprintf("hash %s, %d inputs, %d outputs",
 			msg.TxHash(), len(msg.TxIns), len(msg.TxOuts))
 
-	case *wire.MsgBlock:
-		header := &msg.Header
-		return fmt.Sprintf("hash %s, ver %d, %d tx, %s", msg.BlockHash(),
-			header.Version, len(msg.Transactions), header.Timestamp)
+	/*case *wire.MsgBlock:
+	header := &msg.Header
+	return fmt.Sprintf("hash %s, ver %d, %d tx, %s", msg.BlockHash(),
+		header.Version, len(msg.Transactions), header.Timestamp)*/
 
 	case *wire.MsgBlockAbe:
 		header := &msg.Header

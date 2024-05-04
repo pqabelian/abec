@@ -175,8 +175,8 @@ func NewMsgBlockPrunedFromMsgBlockAbe(block *MsgBlockAbe) (*MsgPrunedBlock, erro
 	res := &MsgPrunedBlock{
 		Header:            block.Header,
 		CoinbaseTx:        block.Transactions[0],
-		TransactionHashes: make([]chainhash.Hash, 0, defaultTransactionAlloc),
-		WitnessHashs:      make([]chainhash.Hash, 0, defaultTransactionAlloc),
+		TransactionHashes: make([]chainhash.Hash, 0, defaultTransactionAllocAbe),
+		WitnessHashs:      make([]chainhash.Hash, 0, defaultTransactionAllocAbe),
 	}
 	hashes, err := block.TxHashes()
 	if err != nil {

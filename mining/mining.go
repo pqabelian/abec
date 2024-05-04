@@ -199,7 +199,7 @@ type BlockTemplate struct {
 	// Block is a block that is ready to be solved by miners.  Thus, it is
 	// completely valid with the exception of satisfying the proof-of-work
 	// requirement.
-	Block    *wire.MsgBlock
+	//Block    *wire.MsgBlock
 	BlockAbe *wire.MsgBlockAbe
 
 	// Fees contains the amount of fees each transaction in the generated
