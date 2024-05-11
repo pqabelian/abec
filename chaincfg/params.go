@@ -329,7 +329,7 @@ var MainNetParams = Params{
 	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
 	// ToDo(MLP):
 	BlockHeightMLPAUT:       300000,
-	BlockHeightMLPAUTCOMMIT: 320000,
+	BlockHeightMLPAUTCOMMIT: 340000,
 }
 
 // RegressionNetParams defines the network parameters for the regression test
@@ -406,7 +406,7 @@ var RegressionNetParams = Params{
 	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
 	// ToDo(MLP):
 	BlockHeightMLPAUT:       300000,
-	BlockHeightMLPAUTCOMMIT: 320000,
+	BlockHeightMLPAUTCOMMIT: 340000,
 }
 
 // TestNet3Params defines the network parameters for the test network
@@ -490,7 +490,7 @@ var TestNet3Params = Params{
 	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
 	// ToDo(MLP):
 	BlockHeightMLPAUT:       300000,
-	BlockHeightMLPAUTCOMMIT: 320000,
+	BlockHeightMLPAUTCOMMIT: 340000,
 }
 
 // SimNetParams defines the network parameters for the simulation test
