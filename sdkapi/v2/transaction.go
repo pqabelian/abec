@@ -14,6 +14,8 @@ import (
 	"io"
 )
 
+var TxVersion = wire.TxVersion
+
 // type OutPoint wire.OutPointAbe
 //
 //	As OutPointAbe use (TxHash, Index), here we use the more reasonable (TxId, Index)

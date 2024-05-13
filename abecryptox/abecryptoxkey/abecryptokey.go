@@ -31,6 +31,8 @@ const (
 // for the case of privacyLevel == abecryptoxparam.PrivacyLevelPSEUDONYM, cryptoSnsk and cryptoVsk will be nil.
 // reviewed on 2032.12.07
 // todo: remove this function, since it is replaced by CryptoAddressKeyGenByRandSeed
+//
+// Deprecated: For almost all use cases, use [CryptoAddressKeyGenByRandSeeds]
 func CryptoAddressKeyGen(randSeed []byte, cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel) (retCryptoAddress []byte, retCryptoSpsk []byte, retCryptoSnsk []byte, retCryptoVsk []byte, err error) {
 	switch cryptoScheme {
 	case abecryptoxparam.CryptoSchemePQRingCT:
@@ -49,18 +51,6 @@ func CryptoAddressKeyGen(randSeed []byte, cryptoScheme abecryptoxparam.CryptoSch
 		return nil, nil, nil, nil, errors.New("CryptoAddressKeyGen: unsupported crypto-scheme")
 	}
 	//return nil, nil, nil, nil, nil
-}
-
-func CryptoAddressKeySeedGen(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel) (
-	coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte,
-	coinDetectorRootKey []byte, err error) {
-	switch cryptoScheme {
-	case abecryptoxparam.CryptoSchemePQRingCTX:
-		return pqringctxCryptoAddressKeySeedGen(abecryptoxparam.PQRingCTXPP, cryptoScheme, privacyLevel)
-
-	default:
-		return nil, nil, nil, nil, fmt.Errorf("CryptoAddressSeedKeyGen: unsupported crypto-scheme")
-	}
 }
 
 // CryptoAddressKeyGenByRootSeeds generates a (cryptoAddress, cryptoKeys) for the input (Root Seeds, CoinDetectorRootKey).

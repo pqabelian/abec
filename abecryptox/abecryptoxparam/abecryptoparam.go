@@ -216,4 +216,16 @@ func GetCryptoSchemeParamSeedBytesLen(cryptoScheme CryptoScheme) (int, error) {
 	return 0, nil
 }
 
+func GetParamKeyGenPublicRandBytesLen(cryptoScheme CryptoScheme) (int, error) {
+	switch cryptoScheme {
+	case CryptoSchemePQRingCTX:
+		return pqringctxGetParamKeyGenPublicRandBytesLen(PQRingCTXPP), nil
+
+	default:
+		return 0, fmt.Errorf("GetCryptoSchemeParamKeyGenPublicRandBytesLen: unsupported crypto-scheme")
+	}
+
+	return 0, nil
+}
+
 // API for Sizes	end

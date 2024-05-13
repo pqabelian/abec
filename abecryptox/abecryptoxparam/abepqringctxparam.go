@@ -9,6 +9,9 @@ import (
 func pqringctxGetCryptoSchemeParamSeedBytesLen(pp *pqringctxapi.PublicParameter) int {
 	return pqringctxapi.GetParamSeedBytesLen(pp)
 }
+func pqringctxGetParamKeyGenPublicRandBytesLen(pp *pqringctxapi.PublicParameter) int {
+	return pqringctxapi.GetParamKeyGenPublicRandBytesLen(pp)
+}
 
 //	API for Sizes	end
 

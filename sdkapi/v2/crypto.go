@@ -10,7 +10,38 @@ import (
 )
 
 type CryptoScheme = abecryptoxparam.CryptoScheme
+
+const (
+	CryptoSchemePQRingCT  = abecryptoxparam.CryptoSchemePQRingCT
+	CryptoSchemePQRingCTX = abecryptoxparam.CryptoSchemePQRingCTX
+)
+
+func CryptoSchemeSerializeSize() int {
+	return abecryptoxparam.CryptoSchemeSerializeSize()
+}
+func SerializeCryptoScheme(cryptoScheme CryptoScheme) []byte {
+	return abecryptoxparam.SerializeCryptoScheme(cryptoScheme)
+}
+func DeserializeCryptoScheme(serializedCryptoScheme []byte) (CryptoScheme, error) {
+	return abecryptoxparam.DeserializeCryptoScheme(serializedCryptoScheme)
+}
+
+func GetCryptoSchemeParamSeedBytesLen(cryptoScheme CryptoScheme) (int, error) {
+	return abecryptoxparam.GetCryptoSchemeParamSeedBytesLen(cryptoScheme)
+}
+
+func GetParamKeyGenPublicRandBytesLen(cryptoScheme CryptoScheme) (int, error) {
+	return abecryptoxparam.GetParamKeyGenPublicRandBytesLen(cryptoScheme)
+}
+
 type PrivacyLevel = abecryptoxkey.PrivacyLevel
+
+const (
+	PrivacyLevelRINGCTPre PrivacyLevel = abecryptoxkey.PrivacyLevelRINGCTPre //	hide the payer in ring, hide the amount by commitment, the default privacy-level in the initial version
+	PrivacyLevelRINGCT    PrivacyLevel = abecryptoxkey.PrivacyLevelRINGCT    //	hide the payer in ring, hide the amount by commitment, same as the initial version, but explicitly specified
+	PrivacyLevelPSEUDONYM PrivacyLevel = abecryptoxkey.PrivacyLevelPSEUDONYM //	pseudonym, i.e., hide the real identity
+	// PrivacyLevelRINGCTSA  PrivacyLevel = 3 //	(not supported at this moment) hide the payer in ring, hide the amount by commitment, hide the payee by SA
+)
 
 func GetCryptoSchemeByTxVersion(txVersion uint32) (CryptoScheme, error) {
 	return abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
@@ -71,7 +102,7 @@ func ExtractCoinValueFromSerializedTxOutByKeys(txVersion uint32, serializedTxOut
 	return value, nil
 }
 
-func ExtractCoinAddressFromCryptoAddress(cryptoAddress []byte) ([]byte, error) {
-	_, coinAddr, _, err := abecryptoxkey.CryptoAddressParse(cryptoAddress)
-	return coinAddr, err
+func ExtractCoinAddressFromCryptoAddress(cryptoAddress []byte) (PrivacyLevel, []byte, error) {
+	privacyLevel, coinAddr, _, err := abecryptoxkey.CryptoAddressParse(cryptoAddress)
+	return privacyLevel, coinAddr, err
 }
