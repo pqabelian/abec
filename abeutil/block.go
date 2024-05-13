@@ -2,7 +2,6 @@ package abeutil
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 
@@ -369,9 +368,7 @@ func (b *Block) TxLoc() ([]wire.TxLoc, error) {
 func (b *BlockAbe) TxLoc() ([]wire.TxAbeLoc, error) {
 	var offset, witOffset int
 
-	if b.msgBlock.Header.Version > int32(wire.BlockVersionEthashPow) {
-		return nil, errors.New("unsupported block version")
-	} else if b.msgBlock.Header.Version == int32(wire.BlockVersionEthashPow) {
+	if b.msgBlock.Header.Version >= int32(wire.BlockVersionEthashPow) {
 		offset, witOffset = 120+wire.VarIntSerializeSize(uint64(len(b.msgBlock.Transactions))), 8
 	} else {
 		offset, witOffset = 80+wire.VarIntSerializeSize(uint64(len(b.msgBlock.Transactions))), 8

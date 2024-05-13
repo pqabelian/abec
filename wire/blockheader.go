@@ -2,7 +2,6 @@ package wire
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"time"
 
@@ -74,10 +73,7 @@ func (h *BlockHeader) BlockHash() chainhash.Hash {
 	// todo: (EthashPoW) BlockHash() is called by many places, such as validate, it is necessary to have an if-else here,
 	// to avoid modifying everywhere to call BlockHashETHash().
 	//	Here it is necessary to use version rather than height, since the blocks before the update do not have a meaningful height.
-	if h.Version > int32(BlockVersionEthashPow) {
-		log.Warnf("Unknown version %#08x with height %d than highest known version %#08x", h.Version, h.Height, BlockVersionEthashPow)
-		return chainhash.InvalidHash
-	} else if h.Version == int32(BlockVersionEthashPow) {
+	if h.Version >= int32(BlockVersionEthashPow) {
 		return h.BlockHashEthash()
 	}
 
@@ -236,11 +232,7 @@ func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
 func writeBlockHeader(w io.Writer, pver uint32, bh *BlockHeader) error {
 	sec := uint32(bh.Timestamp.Unix())
 
-	if bh.Version > int32(BlockVersionEthashPow) {
-		str := fmt.Sprintf("Unknown version %#08x with height %d than highest known version %#08x", bh.Version, bh.Height, BlockVersionEthashPow)
-		log.Warnf(str)
-		return fmt.Errorf("unsupported block version: %v", str)
-	} else if bh.Version == int32(BlockVersionEthashPow) {
+	if bh.Version >= int32(BlockVersionEthashPow) {
 		return writeElements(w, bh.Version, &bh.PrevBlock, &bh.MerkleRoot,
 			sec, bh.Bits, bh.Height, bh.NonceExt, bh.MixDigest)
 		//	The codes here should be the same as that in writeBlockHeaderEthash().
