@@ -136,6 +136,13 @@ type BlockChain struct {
 	maxRetargetTimespan int64 // target timespan * adjustment factor
 	blocksPerRetarget   int32 // target timespan / target time per block
 
+	// Added by Alice, 2024.05.11, for DSA
+	// todo(DSA): review
+	// todo: find reference
+	minRetargetTimespanDSA int64 // target timespan DSA / adjustment factor
+	maxRetargetTimespanDSA int64 // target timespan DSA * adjustment factor
+	blocksPerRetargetDSA   int32 // target timespan DSA / target time per block DSA
+
 	// chainLock protects concurrent access to the vast majority of the
 	// fields in this struct below this point.
 	chainLock sync.RWMutex
@@ -2563,6 +2570,12 @@ func New(config *Config) (*BlockChain, error) {
 	params := config.ChainParams
 	targetTimespan := int64(params.TargetTimespan / time.Second)
 	targetTimePerBlock := int64(params.TargetTimePerBlock / time.Second)
+
+	// Added by Alice, 2024.05.11, for DSA
+	// todo(DSA): review
+	targetTimespanDSA := int64(params.TargetTimespanDSA / time.Second)
+	targetTimePerBlockDSA := int64(params.TargetTimePerBlockDSA / time.Second)
+
 	adjustmentFactor := params.RetargetAdjustmentFactor
 	b := BlockChain{
 		nodeType:            config.NodeType,
@@ -2578,15 +2591,20 @@ func New(config *Config) (*BlockChain, error) {
 		minRetargetTimespan: targetTimespan / adjustmentFactor,
 		maxRetargetTimespan: targetTimespan * adjustmentFactor,
 		blocksPerRetarget:   int32(targetTimespan / targetTimePerBlock),
-		index:               newBlockIndex(config.DB, params),
-		hashCache:           config.HashCache,
-		bestChain:           newChainView(nil),
-		orphansBTCD:         make(map[chainhash.Hash]*orphanBlock),
-		orphansAbe:          make(map[chainhash.Hash]*orphanBlockAbe),
-		prevOrphans:         make(map[chainhash.Hash][]*orphanBlock),
-		prevOrphansAbe:      make(map[chainhash.Hash][]*orphanBlockAbe),
-		warningCaches:       newThresholdCaches(vbNumBits),
-		deploymentCaches:    newThresholdCaches(chaincfg.DefinedDeployments),
+		// Added by Alice, 2024.05.11, for DSA
+		// todo(DSA): review
+		minRetargetTimespanDSA: targetTimespanDSA / adjustmentFactor,
+		maxRetargetTimespanDSA: targetTimespanDSA * adjustmentFactor,
+		blocksPerRetargetDSA:   int32(targetTimespanDSA / targetTimePerBlockDSA),
+		index:                  newBlockIndex(config.DB, params),
+		hashCache:              config.HashCache,
+		bestChain:              newChainView(nil),
+		orphansBTCD:            make(map[chainhash.Hash]*orphanBlock),
+		orphansAbe:             make(map[chainhash.Hash]*orphanBlockAbe),
+		prevOrphans:            make(map[chainhash.Hash][]*orphanBlock),
+		prevOrphansAbe:         make(map[chainhash.Hash][]*orphanBlockAbe),
+		warningCaches:          newThresholdCaches(vbNumBits),
+		deploymentCaches:       newThresholdCaches(chaincfg.DefinedDeployments),
 	}
 
 	// Initialize the chain state from the passed database.  When the db

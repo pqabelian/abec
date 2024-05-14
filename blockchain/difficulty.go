@@ -1,10 +1,47 @@
 package blockchain
 
 import (
+	"fmt"
 	"github.com/abesuite/abec/chainhash"
 	"math/big"
 	"time"
 )
+
+// dsaSmoothFactors defines the smooth factor for DSA by hardcode,
+// say that, it supports only this smooth factor array, i.e., the difficulty of coming slot will be affected/computed
+// from the immediate 20 slots (of blocks), where the number of blocks in each slot is decided by TargetTimespanDSA and TargetTimePerBlockDSA.
+// Added by Alice, 2024.05.11, for DSA
+// todo(DSA): review
+//var dsaSmoothFactors = [20]float64{
+//	0.0025, 0.0075,
+//	0.0125, 0.0175,
+//	0.0225, 0.0275,
+//	0.0325, 0.0375,
+//	0.0425, 0.0475,
+//	0.0525, 0.0575,
+//	0.0625, 0.0675,
+//	0.0725, 0.0775,
+//	0.0825, 0.0875,
+//	0.0925, 0.0975,
+//}
+
+// dsaSmoothFactorsInt gives the smooth factors in integer.
+// The final result will be divided by 10000.
+var dsaSmoothFactorsInt = [20]int64{
+	25, 75,
+	125, 175,
+	225, 275,
+	325, 375,
+	425, 475,
+	525, 575,
+	625, 675,
+	725, 775,
+	825, 875,
+	925, 975,
+}
+
+// bigTenThousand will be used to compute smooth factor from dsaSmoothFactorsInt.
+var bigTenThousand = big.NewInt(10000)
 
 var (
 	// bigOne is 1 represented as a big.Int.  It is defined here to avoid
@@ -150,6 +187,16 @@ func CalcWork(bits uint32) *big.Int {
 	return new(big.Int).Div(oneLsh256, denominator)
 }
 
+func calcTargetFormExpectedWorkSum(expectedWorkSum *big.Int) *big.Int {
+	if expectedWorkSum == nil || expectedWorkSum.Sign() <= 0 {
+		return big.NewInt(1)
+	}
+
+	// (1 << 256) / (expectedWorkSum)
+	// This is assuming that Hash-with-256-output is used to
+	return new(big.Int).Div(oneLsh256, expectedWorkSum)
+}
+
 // calcEasiestDifficulty calculates the easiest possible difficulty that a block
 // can have given starting difficulty bits and a duration.  It is mainly used to
 // verify that claimed proof of work by a block is sane as compared to a
@@ -211,6 +258,30 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) uint32 {
 	return lastBits
 }
 
+// findPrevTestNetDifficultyDSA returns the difficulty of the previous block which
+// did not have the special testnet minimum difficulty rule applied.
+// This function MUST be called with the chain state lock held (for writes).
+// Added by Alice, 2024.05.11, for DSA
+// todo(DSA): review
+func (b *BlockChain) findPrevTestNetDifficultyDSA(startNode *blockNode) uint32 {
+	// Search backwards through the chain for the last block without
+	// the special rule applied.
+	iterNode := startNode
+	for iterNode != nil && iterNode.height%b.blocksPerRetargetDSA != 0 &&
+		iterNode.bits == b.chainParams.PowLimitBits {
+
+		iterNode = iterNode.parent
+	}
+
+	// Return the found difficulty or the minimum difficulty if no
+	// appropriate block was found.
+	lastBits := b.chainParams.PowLimitBits
+	if iterNode != nil {
+		lastBits = iterNode.bits
+	}
+	return lastBits
+}
+
 // calcNextRequiredDifficulty calculates the required difficulty for the block
 // after the passed previous block node based on the difficulty retarget rules.
 // This function differs from the exported CalcNextRequiredDifficulty in that
@@ -220,6 +291,157 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 	// Genesis block.
 	if lastNode == nil {
 		return b.chainParams.PowLimitBits, nil
+	}
+
+	// Added by Alice, 2024.05.11, for DSA
+	// todo(DSA): review
+	if lastNode.height+1 >= b.chainParams.BlockHeightDSA {
+		//	DSA takes effect from BlockHeightMLPAUT
+
+		// Return the previous block's difficulty requirements if this block
+		// is not at a difficulty retarget interval.
+		if (lastNode.height+1)%b.blocksPerRetargetDSA != 0 {
+			// For networks that support it, allow special reduction of the
+			// required difficulty once too much time has elapsed without
+			// mining a block.
+			if b.chainParams.ReduceMinDifficulty {
+				// Return minimum difficulty when more than the desired
+				// amount of time has elapsed without mining a block.
+				reductionTime := int64(b.chainParams.MinDiffReductionTime /
+					time.Second)
+				allowMinTime := lastNode.timestamp + reductionTime
+				if newBlockTime.Unix() > allowMinTime {
+					return b.chainParams.PowLimitBits, nil
+				}
+
+				// The block was mined within the desired timeframe, so
+				// return the difficulty for the last block which did
+				// not have the special minimum difficulty rule applied.
+				return b.findPrevTestNetDifficultyDSA(lastNode), nil
+			}
+
+			// For the main network (or any unrecognized networks), simply
+			// return the previous block's difficulty requirements.
+			return lastNode.bits, nil
+		}
+
+		// the classic difficulty adjustment mechanism:
+		// currentDifficulty * (adjustedTimespan / targetTimespan),
+		// where adjustedTimespan (normally) is the time spent to generate last blocksPerRetarget blocks, say actualTimespan.
+		// and targetTimespan is the target time that the system expects to generate the coming/next blocksPerRetarget blocks.
+		// The behind principles: the system assumes the computation power, say HashRate in the coming epoch will be the same as the last epoch,
+		// then, using such a HashRate and the (expected) targetTimespan, the system sets the difficulty for the coming epoch.
+		// The HashRate of the last epoch is:  (2^{256} / oldTarget) * blocksPerRetarget / actualTimespan,
+		// The HashRate of the coming epoch is:  (2^{256} / newTarget) * blocksPerRetarget / targetTimespan.
+		// The HashRate of the last epoch is:  epochWorkSum_old / actualTimespan,
+		// The HashRate of the coming epoch is:  epochWorkSum_new / targetTimespan.
+		// Note that epochWorkSum_old = blocksPerRetarget * blockWorkSum_old, and blockWorkSum_old = (1 << 256) / (target_old + 1)
+		//       and epochWorkSum_new = blocksPerRetarget * blockWorkSum_new, and blockWorkSum_new = (1 << 256) / (target_new + 1)
+		// Thus, we have (target_old + 1) * actualTimespan = (target_new+1) * targetTimespan，
+		// and then target_new + 1 = (target_old + 1 ) * (actualTimespan / targetTimespan), which means approximately
+		// target_new = target_old * (actualTimespan / targetTimespan)
+
+		// For Difficulty Smooth Adjustment:
+		// The system assumes the HashRate in the coming slot will be the (weighted) average of the HashRate of the previous 20 slots.
+		// alpha_0 HR_0 + ... + alpha_19 HR_19 = (1 << 256) / (target_new + 1) * blocksPerRetargetDSA / targetTimespanDSA, where
+		// HR_i = slotWorkSum_i / actualTimespan_i
+		// Then, target_new = (1 << 256) / (avgHR * targetTimespanPerBlockDSA).
+
+		// Difficulty Smooth Adjustment
+		log.Infof("Difficulty retarget at block height %d", lastNode.height+1)
+
+		avgHR := big.NewInt(0)
+		latestHR := big.NewInt(1)
+		latestTimeSpan := int64(1)
+
+		slotWorkSum := big.NewInt(0)
+		slotTimeSpan := big.NewInt(1)
+		hashRate := big.NewInt(1)
+
+		factorInt := big.NewInt(1)
+		avgItem := big.NewInt(1)
+
+		slotEndNode := lastNode
+		for i := len(dsaSmoothFactorsInt) - 1; i >= 0; i-- {
+			if slotEndNode == nil {
+				return 0, AssertError(fmt.Sprintf("%d-th slotEndNode is nil", i))
+			}
+
+			slotStartNode := slotEndNode.RelativeAncestor(b.blocksPerRetargetDSA - 1)
+			if slotStartNode == nil {
+				return 0, AssertError(fmt.Sprintf("unable to obtain %d-th slotStartNode (at heigt %d)", i, slotEndNode.height-b.blocksPerRetargetDSA+1))
+			}
+
+			if slotEndNode.workSum.Cmp(slotStartNode.workSum) <= 0 {
+				errStr := fmt.Sprintf("slotEndNode (at heigt %d, hash %s) has workSum %d, while slotStartNode (at heigt %d, hash %s) has workSum %d",
+					slotEndNode.height, slotEndNode.hash, slotEndNode.workSum, slotStartNode.height, slotStartNode.hash, slotStartNode.workSum)
+				return 0, AssertError(errStr)
+			}
+
+			if slotEndNode.timestamp <= slotStartNode.timestamp {
+				errStr := fmt.Sprintf("slotEndNode (at heigt %d, hash %s) has timestamp %d, while slotStartNode (at heigt %d, hash %s) has timestamp %d",
+					slotEndNode.height, slotEndNode.hash, slotEndNode.timestamp, slotStartNode.height, slotStartNode.hash, slotStartNode.timestamp)
+				return 0, AssertError(errStr)
+			}
+
+			slotWorkSum = slotWorkSum.Sub(slotEndNode.workSum, slotStartNode.workSum)
+			slotTimeSpan.SetInt64(slotEndNode.timestamp - slotStartNode.timestamp) // in seconds
+			hashRate = hashRate.Div(slotWorkSum, slotTimeSpan)
+
+			// logging for each slot
+			log.Infof("Slot %d : difficulty %08x (%064x), timespan %064x, workSum %d, hashRate %d",
+				i, slotEndNode.bits, CompactToBig(slotEndNode.bits), time.Duration(slotTimeSpan.Int64())*time.Second, slotWorkSum, hashRate)
+
+			if i == len(dsaSmoothFactorsInt)-1 {
+				latestHR = hashRate
+				latestTimeSpan = slotTimeSpan.Int64()
+			}
+
+			factorInt.SetInt64(dsaSmoothFactorsInt[i])
+			avgItem = avgItem.Mul(hashRate, factorInt) // Note that this will not cause overflow
+			avgHR = avgHR.Add(avgHR, avgItem)
+
+			slotEndNode = slotStartNode.parent
+		}
+
+		avgHR = avgHR.Div(avgHR, bigTenThousand)
+
+		retargetAdjustmentFactor := big.NewInt(b.chainParams.RetargetAdjustmentFactor)
+		maxAllowedHR := new(big.Int).Mul(latestHR, retargetAdjustmentFactor)
+		minAllowedHR := new(big.Int).Div(latestHR, retargetAdjustmentFactor)
+		targetHR := avgHR
+		if avgHR.Cmp(maxAllowedHR) == 1 {
+			targetHR = maxAllowedHR
+		} else if avgHR.Cmp(minAllowedHR) == -1 {
+			targetHR = minAllowedHR
+		}
+
+		targetTimePerBlock := int64(b.chainParams.TargetTimePerBlockDSA / time.Second)
+		targetWorkSumPerBlock := new(big.Int).Mul(targetHR, big.NewInt(targetTimePerBlock))
+		newTarget := calcTargetFormExpectedWorkSum(targetWorkSumPerBlock)
+
+		// Limit new value to the proof of work limit.
+		if newTarget.Cmp(b.chainParams.PowLimit) > 0 {
+			newTarget.Set(b.chainParams.PowLimit)
+		}
+
+		// Log new target difficulty and return it.  The new target logging is
+		// intentionally converting the bits back to a number instead of using
+		// newTarget since conversion to the compact representation loses
+		// precision.
+		newTargetBits := BigToCompact(newTarget)
+
+		log.Infof("Summary for Difficulty retarget at block height %d", lastNode.height+1)
+		log.Infof("Old target %08x (%064x)", lastNode.bits, CompactToBig(lastNode.bits))
+		log.Infof("New target %08x (%064x)", newTargetBits, CompactToBig(newTargetBits))
+		log.Infof("Latest timespan %v, Latest Hash Rate %064x, Average Hash Rate %064x, Target Hash Rate %064x, Target timespan %v",
+			time.Duration(latestTimeSpan)*time.Second,
+			latestHR,
+			avgHR,
+			targetHR,
+			b.chainParams.TargetTimespanDSA)
+
+		return newTargetBits, nil
 	}
 
 	// Return the previous block's difficulty requirements if this block

@@ -657,7 +657,7 @@ func medianAdjustedTime(chainState *blockchain.BestState, timeSource blockchain.
 	// of the last several blocks.  Thus, choose the maximum between the
 	// current time and one second after the past median time.  The current
 	// timestamp is truncated to a second boundary before comparison since a
-	// block timestamp does not supported a precision greater than one
+	// block timestamp does not support a precision greater than one
 	// second.
 	newTimestamp := timeSource.AdjustedTime()
 	minTimestamp := MinimumMedianTime(chainState)
