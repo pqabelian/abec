@@ -8,26 +8,6 @@ import (
 	"github.com/cryptosuite/pqringctx/pqringctxapi"
 )
 
-func pqringctxCryptoAddressKeySeedGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
-	privacyLevel PrivacyLevel) (coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte,
-	coinDetectorRootKey []byte, err error) {
-	expectedSeedLen := pqringctx.GetParamSeedBytesLen(pp)
-
-	//	For PQRingCTX, the CryptoAddressKeySeed may need contain one or two seeds, one for address part and one for value part.
-	switch privacyLevel {
-	case PrivacyLevelRINGCT:
-		//coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed, coinDetectorRootKey
-		return abecryptoutils.RandomBytes(expectedSeedLen), abecryptoutils.RandomBytes(expectedSeedLen),
-			abecryptoutils.RandomBytes(expectedSeedLen), abecryptoutils.RandomBytes(expectedSeedLen), nil
-	case PrivacyLevelPSEUDONYM:
-		// coinSpendKeyRootSeed, 0..0, 0..0, coinDetectorRootKey
-		return abecryptoutils.RandomBytes(expectedSeedLen), nil, nil,
-			abecryptoutils.RandomBytes(expectedSeedLen), nil
-	default:
-		return nil, nil, nil, nil, fmt.Errorf("Unsupported privacy level")
-	}
-}
-
 // pqringctxCryptoAddressKeyGenByRootSeeds generates (CryptoAddress, CryptoKeys) for the input Root Seeds and the CoinDetectorRootKey.
 // This is a randomized algorithm, in particular,
 // (1) A Public Rand is chosen,

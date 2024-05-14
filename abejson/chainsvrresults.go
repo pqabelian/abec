@@ -795,6 +795,7 @@ type TxRawResultAbe struct {
 	Version       uint32     `json:"version"`
 	Vin           []TxIn     `json:"vin"`
 	Vout          []TxOutAbe `json:"vout"`
+	Memo          []byte     `json:"memo"`
 	Fee           float64    `json:"fee"`
 	Witness       string     `json:"witness"`
 	BlockHash     string     `json:"blockhash,omitempty"`
