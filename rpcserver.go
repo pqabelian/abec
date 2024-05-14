@@ -1024,7 +1024,7 @@ func createTxRawResultAbe(chainParams *chaincfg.Params, mtx *wire.MsgTxAbe,
 		Fullsize: int32(mtx.SerializeSizeFull()),
 		Vin:      createVinListAbe(mtx),
 		Vout:     createVoutListAbe(mtx, chainParams),
-		Memo:     mtx.TxMemo,
+		Memo:     hex.EncodeToString(mtx.TxMemo),
 		Fee:      abeutil.Amount(mtx.TxFee).ToABE(),
 		Version:  mtx.Version,
 	}
