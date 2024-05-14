@@ -765,6 +765,7 @@ type InfoChainResult struct {
 	Errors               string  `json:"errors"`
 	NodeType             string  `json:"nodetype"`
 	WitnessServiceHeight int32   `json:"witnessserviceheight"`
+	NetID                byte    `json:"netid"`
 }
 
 // TxRawResult models the data from the getrawtransaction command.

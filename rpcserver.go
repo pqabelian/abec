@@ -3002,6 +3002,7 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		RelayFee:             cfg.minRelayTxFee.ToABE(),
 		NodeType:             nodeType.String(),
 		WitnessServiceHeight: int32(witnessServiceHeight),
+		NetID:                s.cfg.ChainParams.AbelAddressNetId,
 	}
 
 	return ret, nil
