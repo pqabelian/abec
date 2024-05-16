@@ -389,8 +389,8 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 			hashRate = hashRate.Div(slotWorkSum, slotTimeSpan)
 
 			// logging for each slot
-			log.Infof("Slot %d : difficulty %08x (%064x), timespan %064x, workSum %d, hashRate %d",
-				i, slotEndNode.bits, CompactToBig(slotEndNode.bits), time.Duration(slotTimeSpan.Int64())*time.Second, slotWorkSum, hashRate)
+			log.Infof("Slot %d : start height: %d, end height %d, difficulty %08x (%064x), timespan %064x, workSum %d, hashRate %d",
+				i, slotStartNode.height, slotEndNode.height, slotEndNode.bits, CompactToBig(slotEndNode.bits), time.Duration(slotTimeSpan.Int64())*time.Second, slotWorkSum, hashRate)
 
 			if i == len(dsaSmoothFactorsInt)-1 {
 				latestHR = hashRate

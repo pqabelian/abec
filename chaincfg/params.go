@@ -346,7 +346,7 @@ var MainNetParams = Params{
 
 	// Added by Alice, 2024.05.11, for DSA
 	// todo(DSA): review
-	BlockHeightDSA: 300000,
+	BlockHeightDSA: 288000,
 
 	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
 	// ToDo(MLP):
@@ -429,7 +429,7 @@ var RegressionNetParams = Params{
 
 	// Added by Alice, 2024.05.11, for DSA
 	// todo(DSA): review
-	BlockHeightDSA: 300000,
+	BlockHeightDSA: 288000,
 
 	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
 	// ToDo(MLP):
@@ -519,7 +519,7 @@ var TestNet3Params = Params{
 
 	// Added by Alice, 2024.05.11, for DSA
 	// todo(DSA): review
-	BlockHeightDSA: 300000,
+	BlockHeightDSA: 288000,
 
 	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
 	// ToDo(MLP):
@@ -605,7 +605,7 @@ var SimNetParams = Params{
 
 	// Added by Alice, 2024.05.11, for DSA
 	// todo(DSA): review
-	BlockHeightDSA: 300000,
+	BlockHeightDSA: 288000,
 
 	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
 	// ToDo(MLP):
