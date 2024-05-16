@@ -219,21 +219,23 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 
 	switch ntfn.Method {
 	// OnBlockConnected
-	case abejson.BlockConnectedNtfnMethod:
-		// Ignore the notification if the client is not interested in
-		// it.
-		if c.ntfnHandlers.OnBlockConnected == nil {
-			return
-		}
+	/*
+		case abejson.BlockConnectedNtfnMethod:
+			// Ignore the notification if the client is not interested in
+			// it.
+			if c.ntfnHandlers.OnBlockConnected == nil {
+				return
+			}
 
-		blockHash, blockHeight, blockTime, err := parseChainNtfnParams(ntfn.Params)
-		if err != nil {
-			log.Warnf("Received invalid block connected "+
-				"notification: %v", err)
-			return
-		}
+			blockHash, blockHeight, blockTime, err := parseChainNtfnParams(ntfn.Params)
+			if err != nil {
+				log.Warnf("Received invalid block connected "+
+					"notification: %v", err)
+				return
+			}
 
-		c.ntfnHandlers.OnBlockConnected(blockHash, blockHeight, blockTime)
+			c.ntfnHandlers.OnBlockConnected(blockHash, blockHeight, blockTime)
+	*/
 	case abejson.BlockAbeConnectedNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
@@ -271,7 +273,8 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 	//		blockHeader, transactions)
 
 	// OnBlockDisconnected
-	case abejson.BlockDisconnectedNtfnMethod:
+	/*
+		case abejson.BlockDisconnectedNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnBlockDisconnected == nil {
@@ -286,6 +289,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		}
 
 		c.ntfnHandlers.OnBlockDisconnected(blockHash, blockHeight, blockTime)
+	*/
 	case abejson.BlockAbeDisconnectedNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
@@ -771,7 +775,7 @@ func parseTxAcceptedNtfnParams(params []json.RawMessage) (*chainhash.Hash,
 	}
 
 	// Bounds check amount.
-	amt, err := abeutil.NewAmount(famt)
+	amt, err := abeutil.NewAmountAbe(famt)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1111,7 +1115,7 @@ func (c *Client) notifyReceivedInternal(addresses []string) FutureNotifyReceived
 // NOTE: This is a btcd extension and requires a websocket connection.
 //
 // Deprecated: Use LoadTxFilterAsync instead.
-func (c *Client) NotifyReceivedAsync(addresses []abeutil.Address) FutureNotifyReceivedResult {
+/*func (c *Client) NotifyReceivedAsync(addresses []abeutil.Address) FutureNotifyReceivedResult {
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
 		return newFutureError(ErrWebsocketsRequired)
@@ -1130,7 +1134,7 @@ func (c *Client) NotifyReceivedAsync(addresses []abeutil.Address) FutureNotifyRe
 	}
 	cmd := abejson.NewNotifyReceivedCmd(addrs)
 	return c.sendCmd(cmd)
-}
+}*/
 
 // NotifyReceived registers the client to receive notifications every time a
 // new transaction which pays to one of the passed addresses is accepted to
@@ -1151,9 +1155,9 @@ func (c *Client) NotifyReceivedAsync(addresses []abeutil.Address) FutureNotifyRe
 // NOTE: This is a btcd extension and requires a websocket connection.
 //
 // Deprecated: Use LoadTxFilter instead.
-func (c *Client) NotifyReceived(addresses []abeutil.Address) error {
+/*func (c *Client) NotifyReceived(addresses []abeutil.Address) error {
 	return c.NotifyReceivedAsync(addresses).Receive()
-}
+}*/
 
 // FutureRescanResult is a future promise to deliver the result of a RescanAsync
 // or RescanEndHeightAsync RPC invocation (or an applicable error).
@@ -1183,7 +1187,7 @@ func (r FutureRescanResult) Receive() error {
 // NOTE: This is a btcd extension and requires a websocket connection.
 //
 // Deprecated: Use RescanBlocksAsync instead.
-func (c *Client) RescanAsync(startBlock *chainhash.Hash,
+/*func (c *Client) RescanAsync(startBlock *chainhash.Hash,
 	addresses []abeutil.Address,
 	outpoints []*wire.OutPoint) FutureRescanResult {
 
@@ -1218,7 +1222,7 @@ func (c *Client) RescanAsync(startBlock *chainhash.Hash,
 
 	cmd := abejson.NewRescanCmd(startBlockHashStr, addrs, ops, nil)
 	return c.sendCmd(cmd)
-}
+}*/
 func (c *Client) RescanAbeAsync(startBlock *chainhash.Hash) FutureRescanResult {
 
 	// Not supported in HTTP POST mode.
@@ -1290,7 +1294,7 @@ func (c *Client) RescanAbe(startBlock *chainhash.Hash) error {
 // NOTE: This is a btcd extension and requires a websocket connection.
 //
 // Deprecated: Use RescanBlocksAsync instead.
-func (c *Client) RescanEndBlockAsync(startBlock *chainhash.Hash,
+/*func (c *Client) RescanEndBlockAsync(startBlock *chainhash.Hash,
 	addresses []abeutil.Address, outpoints []*wire.OutPoint,
 	endBlock *chainhash.Hash) FutureRescanResult {
 
@@ -1329,7 +1333,7 @@ func (c *Client) RescanEndBlockAsync(startBlock *chainhash.Hash,
 	cmd := abejson.NewRescanCmd(startBlockHashStr, addrs, ops,
 		&endBlockHashStr)
 	return c.sendCmd(cmd)
-}
+}*/
 func (c *Client) RescanAbeEndBlockAsync(startBlock *chainhash.Hash,
 	endBlock *chainhash.Hash) FutureRescanResult {
 
@@ -1378,13 +1382,13 @@ func (c *Client) RescanAbeEndBlockAsync(startBlock *chainhash.Hash,
 // NOTE: This is a btcd extension and requires a websocket connection.
 //
 // Deprecated: Use RescanBlocks instead.
-func (c *Client) RescanEndHeight(startBlock *chainhash.Hash,
+/*func (c *Client) RescanEndHeight(startBlock *chainhash.Hash,
 	addresses []abeutil.Address, outpoints []*wire.OutPoint,
 	endBlock *chainhash.Hash) error {
 
 	return c.RescanEndBlockAsync(startBlock, addresses, outpoints,
 		endBlock).Receive()
-}
+}*/
 func (c *Client) RescanAbeEndHeight(startBlock *chainhash.Hash,
 	endBlock *chainhash.Hash) error {
 	return c.RescanAbeEndBlockAsync(startBlock, endBlock).Receive()
@@ -1415,7 +1419,7 @@ func (r FutureLoadTxFilterResult) Receive() error {
 //
 // NOTE: This is a btcd extension ported from github.com/decred/dcrrpcclient
 // and requires a websocket connection.
-func (c *Client) LoadTxFilterAsync(reload bool, addresses []abeutil.Address,
+/*func (c *Client) LoadTxFilterAsync(reload bool, addresses []abeutil.Address,
 	outPoints []wire.OutPoint) FutureLoadTxFilterResult {
 
 	addrStrs := make([]string, len(addresses))
@@ -1432,7 +1436,7 @@ func (c *Client) LoadTxFilterAsync(reload bool, addresses []abeutil.Address,
 
 	cmd := abejson.NewLoadTxFilterCmd(reload, addrStrs, outPointObjects)
 	return c.sendCmd(cmd)
-}
+}*/
 
 // LoadTxFilter loads, reloads, or adds data to a websocket client's transaction
 // filter.  The filter is consistently updated based on inspected transactions
@@ -1440,6 +1444,6 @@ func (c *Client) LoadTxFilterAsync(reload bool, addresses []abeutil.Address,
 //
 // NOTE: This is a btcd extension ported from github.com/decred/dcrrpcclient
 // and requires a websocket connection.
-func (c *Client) LoadTxFilter(reload bool, addresses []abeutil.Address, outPoints []wire.OutPoint) error {
+/*func (c *Client) LoadTxFilter(reload bool, addresses []abeutil.Address, outPoints []wire.OutPoint) error {
 	return c.LoadTxFilterAsync(reload, addresses, outPoints).Receive()
-}
+}*/

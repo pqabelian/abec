@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/abesuite/abec/abejson"
-	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 )
@@ -124,7 +123,7 @@ func (r FutureListAddressTransactionsResult) Receive() ([]abejson.ListTransactio
 // See ListAddressTransactions for the blocking version and more details.
 //
 // NOTE: This is a btcd extension.
-func (c *Client) ListAddressTransactionsAsync(addresses []abeutil.Address, account string) FutureListAddressTransactionsResult {
+/*func (c *Client) ListAddressTransactionsAsync(addresses []abeutil.Address, account string) FutureListAddressTransactionsResult {
 	// Convert addresses to strings.
 	addrs := make([]string, 0, len(addresses))
 	for _, addr := range addresses {
@@ -132,15 +131,15 @@ func (c *Client) ListAddressTransactionsAsync(addresses []abeutil.Address, accou
 	}
 	cmd := abejson.NewListAddressTransactionsCmd(addrs, &account)
 	return c.sendCmd(cmd)
-}
+}*/
 
 // ListAddressTransactions returns information about all transactions associated
 // with the provided addresses.
 //
 // NOTE: This is a btcwallet extension.
-func (c *Client) ListAddressTransactions(addresses []abeutil.Address, account string) ([]abejson.ListTransactionsResult, error) {
+/*func (c *Client) ListAddressTransactions(addresses []abeutil.Address, account string) ([]abejson.ListTransactionsResult, error) {
 	return c.ListAddressTransactionsAsync(addresses, account).Receive()
-}
+}*/
 
 // FutureGetBestBlockResult is a future promise to deliver the result of a
 // GetBestBlockAsync RPC invocation (or an applicable error).

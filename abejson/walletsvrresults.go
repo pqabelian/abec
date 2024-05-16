@@ -165,10 +165,10 @@ type BalanceDetailsResult struct {
 }
 
 // GetBalancesResult models the data returned from the getbalances command.
-type GetBalancesResult struct {
+/*type GetBalancesResult struct {
 	Mine      BalanceDetailsResult  `json:"mine"`
 	WatchOnly *BalanceDetailsResult `json:"watchonly"`
-}
+}*/
 
 type GetBalancesAbeResult struct {
 	Mine      BalanceDetailsResult  `json:"mine"`

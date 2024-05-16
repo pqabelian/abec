@@ -266,7 +266,7 @@ func dbFetchOrCreateVersion(dbTx database.Tx, key []byte, defaultVersion uint32)
 // the comments above, the additional contextual information will only be valid
 // when this spent txout is spending the last unspent output of the containing
 // transaction.
-type SpentTxOut struct {
+/*type SpentTxOut struct {
 	// Amount is the amount of the output.
 	Amount int64
 
@@ -278,7 +278,7 @@ type SpentTxOut struct {
 
 	// Denotes if the creating tx is a coinbase.
 	IsCoinBase bool
-}
+}*/
 
 type SpentTxOutAbe struct {
 	//	the serialNumber of spentTxo
@@ -414,7 +414,7 @@ func putSpentTxOut(target []byte, stxo *SpentTxOut) int {
 // decodeSpentTxOut decodes the passed serialized stxo entry, possibly followed
 // by other data, into the passed stxo struct.  It returns the number of bytes
 // read.
-func decodeSpentTxOut(serialized []byte, stxo *SpentTxOut) (int, error) {
+/*func decodeSpentTxOut(serialized []byte, stxo *SpentTxOut) (int, error) {
 	// Ensure there are bytes to decode.
 	if len(serialized) == 0 {
 		return 0, errDeserialize("no serialized bytes")
@@ -456,7 +456,7 @@ func decodeSpentTxOut(serialized []byte, stxo *SpentTxOut) (int, error) {
 	stxo.Amount = int64(amount)
 	stxo.PkScript = pkScript
 	return offset, nil
-}
+}*/
 
 // deserializeSpendJournalEntry decodes the passed serialized byte slice into a
 // slice of spent txouts according to the format described in detail above.
@@ -1925,9 +1925,9 @@ func dbStoreBlockNode(dbTx database.Tx, node *blockNode) error {
 	return blockIndexBucket.Put(key, value)
 }
 
-/*// dbStoreBlock stores the provided block in the database if it is not already
+// dbStoreBlock stores the provided block in the database if it is not already
 // there. The full block data is written to ffldb.
-func dbStoreBlock(dbTx database.Tx, block *abeutil.Block) error {
+/*func dbStoreBlock(dbTx database.Tx, block *abeutil.Block) error {
 	hasBlock, err := dbTx.HasBlock(block.Hash())
 	if err != nil {
 		return err

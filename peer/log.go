@@ -184,10 +184,10 @@ func messageSummary(msg wire.Message) string {
 	//case *wire.MsgMemPool:
 	//	// No summary.
 
-	case *wire.MsgTx:
-		return fmt.Sprintf("hash %s, %d inputs, %d outputs, lock %s",
-			msg.TxHash(), len(msg.TxIn), len(msg.TxOut),
-			formatLockTime(msg.LockTime))
+	/*case *wire.MsgTx:
+	return fmt.Sprintf("hash %s, %d inputs, %d outputs, lock %s",
+		msg.TxHash(), len(msg.TxIn), len(msg.TxOut),
+		formatLockTime(msg.LockTime))*/
 
 	case *wire.MsgTxAbe:
 		return fmt.Sprintf("hash %s, %d inputs, %d outputs",

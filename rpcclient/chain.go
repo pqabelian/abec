@@ -50,7 +50,7 @@ func (c *Client) GetBestBlockHash() (*chainhash.Hash, error) {
 // legacyGetBlockRequest constructs and sends a legacy getblock request which
 // contains two separate bools to denote verbosity, in contract to a single int
 // parameter.
-func (c *Client) legacyGetBlockRequest(hash string, verbose,
+/*func (c *Client) legacyGetBlockRequest(hash string, verbose,
 	verboseTx bool) ([]byte, error) {
 
 	hashJSON, err := json.Marshal(hash)
@@ -68,7 +68,7 @@ func (c *Client) legacyGetBlockRequest(hash string, verbose,
 	return c.RawRequest("getblock", []json.RawMessage{
 		hashJSON, verboseJSON, verboseTxJSON,
 	})
-}
+}*/
 func (c *Client) legacyGetBlockAbeRequest(hash string, verbose,
 	verboseTx bool) ([]byte, error) {
 
@@ -92,7 +92,7 @@ func (c *Client) legacyGetBlockAbeRequest(hash string, verbose,
 // waitForGetBlockRes waits for the response of a getblock request. If the
 // response indicates an invalid parameter was provided, a legacy style of the
 // request is resent and its response is returned instead.
-func (c *Client) waitForGetBlockRes(respChan chan *response, hash string,
+/*func (c *Client) waitForGetBlockRes(respChan chan *response, hash string,
 	verbose, verboseTx bool) ([]byte, error) {
 
 	res, err := receiveFuture(respChan)
@@ -107,7 +107,7 @@ func (c *Client) waitForGetBlockRes(respChan chan *response, hash string,
 
 	// Otherwise, we can return the response as is.
 	return res, err
-}
+}*/
 func (c *Client) waitForGetBlockAbeRes(respChan chan *response, hash string,
 	verbose, verboseTx bool) ([]byte, error) {
 
@@ -135,7 +135,7 @@ type FutureGetBlockResult struct {
 
 // Receive waits for the response promised by the future and returns the raw
 // block requested from the server given its hash.
-func (r FutureGetBlockResult) Receive() (*wire.MsgBlock, error) {
+/*func (r FutureGetBlockResult) Receive() (*wire.MsgBlock, error) {
 	res, err := r.client.waitForGetBlockRes(r.Response, r.hash, false, false)
 	if err != nil {
 		return nil, err
@@ -161,14 +161,14 @@ func (r FutureGetBlockResult) Receive() (*wire.MsgBlock, error) {
 		return nil, err
 	}
 	return &msgBlock, nil
-}
+}*/
 
 // GetBlockAsync returns an instance of a type that can be used to get the
 // result of the RPC at some future time by invoking the Receive function on the
 // returned instance.
 //
 // See GetBlock for the blocking version and more details.
-func (c *Client) GetBlockAsync(blockHash *chainhash.Hash) FutureGetBlockResult {
+/*func (c *Client) GetBlockAsync(blockHash *chainhash.Hash) FutureGetBlockResult {
 	hash := ""
 	if blockHash != nil {
 		hash = blockHash.String()
@@ -180,15 +180,15 @@ func (c *Client) GetBlockAsync(blockHash *chainhash.Hash) FutureGetBlockResult {
 		hash:     hash,
 		Response: c.sendCmd(cmd),
 	}
-}
+}*/
 
 // GetBlock returns a raw block from the server given its hash.
 //
 // See GetBlockVerbose to retrieve a data structure with information about the
 // block instead.
-func (c *Client) GetBlock(blockHash *chainhash.Hash) (*wire.MsgBlock, error) {
+/*func (c *Client) GetBlock(blockHash *chainhash.Hash) (*wire.MsgBlock, error) {
 	return c.GetBlockAsync(blockHash).Receive()
-}
+}*/
 
 type FutureGetBlockAbeResult struct {
 	client   *Client
@@ -248,11 +248,11 @@ func (c *Client) GetBlockAbe(blockHash *chainhash.Hash) (*wire.MsgBlockAbe, erro
 
 // FutureGetBlockVerboseResult is a future promise to deliver the result of a
 // GetBlockVerboseAsync RPC invocation (or an applicable error).
-type FutureGetBlockVerboseResult struct {
+/*type FutureGetBlockVerboseResult struct {
 	client   *Client
 	hash     string
 	Response chan *response
-}
+}*/
 type FutureGetBlockAbeVerboseResult struct {
 	client   *Client
 	hash     string
@@ -261,7 +261,7 @@ type FutureGetBlockAbeVerboseResult struct {
 
 // Receive waits for the response promised by the future and returns the data
 // structure from the server with information about the requested block.
-func (r FutureGetBlockVerboseResult) Receive() (*abejson.GetBlockVerboseResult, error) {
+/*func (r FutureGetBlockVerboseResult) Receive() (*abejson.GetBlockVerboseResult, error) {
 	res, err := r.client.waitForGetBlockRes(r.Response, r.hash, true, false)
 	if err != nil {
 		return nil, err
@@ -274,7 +274,7 @@ func (r FutureGetBlockVerboseResult) Receive() (*abejson.GetBlockVerboseResult, 
 		return nil, err
 	}
 	return &blockResult, nil
-}
+}*/
 func (r FutureGetBlockAbeVerboseResult) Receive() (*abejson.GetBlockAbeVerboseResult, error) {
 	res, err := r.client.waitForGetBlockAbeRes(r.Response, r.hash, true, false)
 	if err != nil {
@@ -295,7 +295,7 @@ func (r FutureGetBlockAbeVerboseResult) Receive() (*abejson.GetBlockAbeVerboseRe
 // the returned instance.
 //
 // See GetBlockVerbose for the blocking version and more details.
-func (c *Client) GetBlockVerboseAsync(blockHash *chainhash.Hash) FutureGetBlockVerboseResult {
+/*func (c *Client) GetBlockVerboseAsync(blockHash *chainhash.Hash) FutureGetBlockVerboseResult {
 	hash := ""
 	if blockHash != nil {
 		hash = blockHash.String()
@@ -308,7 +308,7 @@ func (c *Client) GetBlockVerboseAsync(blockHash *chainhash.Hash) FutureGetBlockV
 		hash:     hash,
 		Response: c.sendCmd(cmd),
 	}
-}
+}*/
 
 func (c *Client) GetBlockAbeVerboseAsync(blockHash *chainhash.Hash) FutureGetBlockAbeVerboseResult {
 	hash := ""
@@ -330,20 +330,20 @@ func (c *Client) GetBlockAbeVerboseAsync(blockHash *chainhash.Hash) FutureGetBlo
 //
 // See GetBlockVerboseTx to retrieve transaction data structures as well.
 // See GetBlock to retrieve a raw block instead.
-func (c *Client) GetBlockVerbose(blockHash *chainhash.Hash) (*abejson.GetBlockVerboseResult, error) {
+/*func (c *Client) GetBlockVerbose(blockHash *chainhash.Hash) (*abejson.GetBlockVerboseResult, error) {
 	return c.GetBlockVerboseAsync(blockHash).Receive()
-}
+}*/
 func (c *Client) GetBlockAbeVerbose(blockHash *chainhash.Hash) (*abejson.GetBlockAbeVerboseResult, error) {
 	return c.GetBlockAbeVerboseAsync(blockHash).Receive()
 }
 
 // FutureGetBlockVerboseTxResult is a future promise to deliver the result of a
 // GetBlockVerboseTxResult RPC invocation (or an applicable error).
-type FutureGetBlockVerboseTxResult struct {
+/*type FutureGetBlockVerboseTxResult struct {
 	client   *Client
 	hash     string
 	Response chan *response
-}
+}*/
 type FutureGetBlockAbeVerboseTxResult struct {
 	client   *Client
 	hash     string
@@ -352,7 +352,7 @@ type FutureGetBlockAbeVerboseTxResult struct {
 
 // Receive waits for the response promised by the future and returns a verbose
 // version of the block including detailed information about its transactions.
-func (r FutureGetBlockVerboseTxResult) Receive() (*abejson.GetBlockVerboseTxResult, error) {
+/*func (r FutureGetBlockVerboseTxResult) Receive() (*abejson.GetBlockVerboseTxResult, error) {
 	res, err := r.client.waitForGetBlockRes(r.Response, r.hash, true, true)
 	if err != nil {
 		return nil, err
@@ -365,7 +365,7 @@ func (r FutureGetBlockVerboseTxResult) Receive() (*abejson.GetBlockVerboseTxResu
 	}
 
 	return &blockResult, nil
-}
+}*/
 func (r FutureGetBlockAbeVerboseTxResult) Receive() (*abejson.GetBlockAbeVerboseTxResult, error) {
 	res, err := r.client.waitForGetBlockAbeRes(r.Response, r.hash, true, true)
 	if err != nil {
@@ -386,7 +386,7 @@ func (r FutureGetBlockAbeVerboseTxResult) Receive() (*abejson.GetBlockAbeVerbose
 // the returned instance.
 //
 // See GetBlockVerboseTx or the blocking version and more details.
-func (c *Client) GetBlockVerboseTxAsync(blockHash *chainhash.Hash) FutureGetBlockVerboseTxResult {
+/*func (c *Client) GetBlockVerboseTxAsync(blockHash *chainhash.Hash) FutureGetBlockVerboseTxResult {
 	hash := ""
 	if blockHash != nil {
 		hash = blockHash.String()
@@ -402,7 +402,7 @@ func (c *Client) GetBlockVerboseTxAsync(blockHash *chainhash.Hash) FutureGetBloc
 		hash:     hash,
 		Response: c.sendCmd(cmd),
 	}
-}
+}*/
 func (c *Client) GetBlockAbeVerboseTxAsync(blockHash *chainhash.Hash) FutureGetBlockAbeVerboseTxResult {
 	hash := ""
 	if blockHash != nil {
@@ -426,9 +426,9 @@ func (c *Client) GetBlockAbeVerboseTxAsync(blockHash *chainhash.Hash) FutureGetB
 //
 // See GetBlockVerbose if only transaction hashes are preferred.
 // See GetBlock to retrieve a raw block instead.
-func (c *Client) GetBlockVerboseTx(blockHash *chainhash.Hash) (*abejson.GetBlockVerboseTxResult, error) {
+/*func (c *Client) GetBlockVerboseTx(blockHash *chainhash.Hash) (*abejson.GetBlockVerboseTxResult, error) {
 	return c.GetBlockVerboseTxAsync(blockHash).Receive()
-}
+}*/
 func (c *Client) GetBlockAbeVerboseTx(blockHash *chainhash.Hash) (*abejson.GetBlockAbeVerboseTxResult, error) {
 	return c.GetBlockAbeVerboseTxAsync(blockHash).Receive()
 }

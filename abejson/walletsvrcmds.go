@@ -225,7 +225,7 @@ func NewExportRangeCmd(start uint64, end uint64) *ExportRangeCmd {
 }
 
 // GetBalancesCmd defines the getbalances JSON-RPC command.
-type GetBalancesCmd struct{}
+// type GetBalancesCmd struct{}
 type GenerateAddressCmd struct {
 	Num *int `jsonrpcdefault:"1"`
 }
@@ -244,9 +244,9 @@ func NewListFreeAddressesCmd() *ListFreeAddressesCmd {
 
 // NewGetBalancesCmd returns a new instance which can be used to issue a
 // getbalances JSON-RPC command.
-func NewGetBalancesCmd() *GetBalancesCmd {
+/*func NewGetBalancesCmd() *GetBalancesCmd {
 	return &GetBalancesCmd{}
-}
+}*/
 func NewGetBalancesAbeCmd(minconf *int) *GetBalancesAbeCmd {
 	return &GetBalancesAbeCmd{
 		Minconf: minconf,
@@ -512,11 +512,11 @@ func NewListTransactionsCmd(account *string, count, from *int, includeWatchOnly 
 }
 
 // ListUnspentCmd defines the listunspent JSON-RPC command.
-type ListUnspentCmd struct {
+/*type ListUnspentCmd struct {
 	MinConf   *int `jsonrpcdefault:"1"`
 	MaxConf   *int `jsonrpcdefault:"9999999"`
 	Addresses *[]string
-}
+}*/
 type ListAllUnspentAbeCmd struct {
 	Min *float64 `jsonrpcdefault:"0"`
 	Max *float64 `jsonrpcdefault:"0"`
@@ -644,13 +644,13 @@ func NewTxStatusCmd(hash string) *TxStatusCmd {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewListUnspentCmd(minConf, maxConf *int, addresses *[]string) *ListUnspentCmd {
+/*func NewListUnspentCmd(minConf, maxConf *int, addresses *[]string) *ListUnspentCmd {
 	return &ListUnspentCmd{
 		MinConf:   minConf,
 		MaxConf:   maxConf,
 		Addresses: addresses,
 	}
-}
+}*/
 
 // LockUnspentCmd defines the lockunspent JSON-RPC command.
 type LockUnspentCmd struct {
@@ -794,26 +794,26 @@ func NewSendToPayeesCmd(amounts map[string]float64, minconf *int, scaleToFeeSatP
 }
 
 // SendToAddressCmd defines the sendtoaddress JSON-RPC command.
-type SendToAddressCmd struct {
+/*type SendToAddressCmd struct {
 	Address   string
 	Amount    float64
 	Comment   *string
 	CommentTo *string
-}
+}*/
 
 // NewSendToAddressCmd returns a new instance which can be used to issue a
 // sendtoaddress JSON-RPC command.
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewSendToAddressCmd(address string, amount float64, comment, commentTo *string) *SendToAddressCmd {
+/*func NewSendToAddressCmd(address string, amount float64, comment, commentTo *string) *SendToAddressCmd {
 	return &SendToAddressCmd{
 		Address:   address,
 		Amount:    amount,
 		Comment:   comment,
 		CommentTo: commentTo,
 	}
-}
+}*/
 
 // SetAccountCmd defines the setaccount JSON-RPC command.
 type SetAccountCmd struct {

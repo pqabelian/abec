@@ -7,7 +7,6 @@ import (
 	"errors"
 
 	"github.com/abesuite/abec/abejson"
-	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 )
@@ -96,15 +95,15 @@ func (f FutureGenerateToAddressResult) Receive() ([]*chainhash.Hash, error) {
 // the returned instance.
 //
 // See GenerateToAddress for the blocking version and more details.
-func (c *Client) GenerateToAddressAsync(numBlocks int64, address abeutil.Address, maxTries *int64) FutureGenerateToAddressResult {
+/*func (c *Client) GenerateToAddressAsync(numBlocks int64, address abeutil.Address, maxTries *int64) FutureGenerateToAddressResult {
 	cmd := abejson.NewGenerateToAddressCmd(numBlocks, address.EncodeAddress(), maxTries)
 	return c.sendCmd(cmd)
-}
+}*/
 
 // GenerateToAddress generates numBlocks blocks to the given address and returns their hashes.
-func (c *Client) GenerateToAddress(numBlocks int64, address abeutil.Address, maxTries *int64) ([]*chainhash.Hash, error) {
+/*func (c *Client) GenerateToAddress(numBlocks int64, address abeutil.Address, maxTries *int64) ([]*chainhash.Hash, error) {
 	return c.GenerateToAddressAsync(numBlocks, address, maxTries).Receive()
-}
+}*/
 
 // FutureGetGenerateResult is a future promise to deliver the result of a
 // GetGenerateAsync RPC invocation (or an applicable error).

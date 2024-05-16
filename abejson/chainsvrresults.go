@@ -92,7 +92,7 @@ type GetBlockStatsResult struct {
 // whose tx field is an array of transaction hashes. When the verbose flag is set to 2,
 // getblock returns an object whose tx field is an array of raw transactions.
 // Use GetBlockVerboseTxResult to unmarshal data received from passing verbose=2 to getblock.
-type GetBlockVerboseResult struct {
+/*type GetBlockVerboseResult struct {
 	Hash          string `json:"hash"`
 	Confirmations int64  `json:"confirmations"`
 	//	StrippedSize  int32         `json:"strippedsize"`
@@ -111,7 +111,7 @@ type GetBlockVerboseResult struct {
 	Difficulty   float64          `json:"difficulty"`
 	PreviousHash string           `json:"previousblockhash"`
 	NextHash     string           `json:"nextblockhash,omitempty"`
-}
+}*/
 
 type GetBlockAbeVerboseResult struct {
 	Hash          string `json:"hash"`
@@ -143,7 +143,7 @@ type GetBlockAbeVerboseResult struct {
 // whose tx field is an array of transaction hashes. When the verbose flag is set to 2,
 // getblock returns an object whose tx field is an array of raw transactions.
 // Use GetBlockVerboseResult to unmarshal data received from passing verbose=1 to getblock.
-type GetBlockVerboseTxResult struct {
+/*type GetBlockVerboseTxResult struct {
 	Hash          string        `json:"hash"`
 	Confirmations int64         `json:"confirmations"`
 	StrippedSize  int32         `json:"strippedsize"`
@@ -160,7 +160,7 @@ type GetBlockVerboseTxResult struct {
 	Difficulty    float64       `json:"difficulty"`
 	PreviousHash  string        `json:"previousblockhash"`
 	NextHash      string        `json:"nextblockhash,omitempty"`
-}
+}*/
 
 // TODO(abe)
 type GetBlockAbeVerboseTxResult struct {
@@ -296,14 +296,14 @@ type GetBlockChainInfoResult struct {
 
 // GetBlockTemplateResultTx models the transactions field of the
 // getblocktemplate command.
-type GetBlockTemplateResultTx struct {
+/*type GetBlockTemplateResultTx struct {
 	Data    string  `json:"data"`
 	Hash    string  `json:"hash"`
 	Depends []int64 `json:"depends"`
 	Fee     int64   `json:"fee"`
 	SigOps  int64   `json:"sigops"`
 	Weight  int64   `json:"weight"`
-}
+}*/
 
 // GetBlockTemplateResultTxAbe models the transactions field of the
 // getblocktemplate command.
@@ -787,6 +787,7 @@ type TxRawResult struct {
 	Time          int64  `json:"time,omitempty"`
 	Blocktime     int64  `json:"blocktime,omitempty"`
 }
+
 type TxRawResultAbe struct {
 	Hex           string     `json:"hex"`
 	Txid          string     `json:"txid"`
@@ -826,13 +827,13 @@ type SearchRawTransactionsResult struct {
 // TxRawDecodeResult models the data from the decoderawtransaction command.
 //
 //	todo(ABE):
-type TxRawDecodeResult struct {
+/*type TxRawDecodeResult struct {
 	Txid     string `json:"txid"`
 	Version  int32  `json:"version"`
 	Locktime uint32 `json:"locktime"`
 	Vin      []Vin  `json:"vin"`
 	Vout     []Vout `json:"vout"`
-}
+}*/
 
 type TxRawDecodeResultAbe struct {
 	Txid    string     `json:"txid"`

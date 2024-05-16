@@ -181,12 +181,13 @@ func NewStopNotifySpentCmd(outPoints []OutPoint) *StopNotifySpentCmd {
 // RescanCmd defines the rescan JSON-RPC command.
 //
 // Deprecated: Use RescanBlocksCmd instead.
-type RescanCmd struct {
+/*type RescanCmd struct {
 	BeginBlock string
 	Addresses  []string
 	OutPoints  []OutPoint
 	EndBlock   *string
-}
+}*/
+
 type RescanAbeCmd struct {
 	BeginBlock string
 	EndBlock   *string
@@ -199,14 +200,14 @@ type RescanAbeCmd struct {
 // for optional parameters will use the default value.
 //
 // Deprecated: Use NewRescanBlocksCmd instead.
-func NewRescanCmd(beginBlock string, addresses []string, outPoints []OutPoint, endBlock *string) *RescanCmd {
+/*func NewRescanCmd(beginBlock string, addresses []string, outPoints []OutPoint, endBlock *string) *RescanCmd {
 	return &RescanCmd{
 		BeginBlock: beginBlock,
 		Addresses:  addresses,
 		OutPoints:  outPoints,
 		EndBlock:   endBlock,
 	}
-}
+}*/
 func NewRescanAbeCmd(beginBlock string, endBlock *string) *RescanAbeCmd {
 	return &RescanAbeCmd{
 		BeginBlock: beginBlock,
@@ -248,7 +249,7 @@ func init() {
 	MustRegisterCmd("stopnotifynewtransactions", (*StopNotifyNewTransactionsCmd)(nil), flags)
 	MustRegisterCmd("stopnotifyspent", (*StopNotifySpentCmd)(nil), flags)
 	MustRegisterCmd("stopnotifyreceived", (*StopNotifyReceivedCmd)(nil), flags)
-	MustRegisterCmd("rescan", (*RescanCmd)(nil), flags)
+	//MustRegisterCmd("rescan", (*RescanCmd)(nil), flags)
 	MustRegisterCmd("rescanabe", (*RescanAbeCmd)(nil), flags)
 	MustRegisterCmd("rescanblocks", (*RescanBlocksCmd)(nil), flags)
 }

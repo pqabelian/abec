@@ -76,11 +76,11 @@ type TransactionOutputAbe struct {
 // CreateRawTransactionCmd defines the createrawtransaction JSON-RPC command.
 //
 //	todo(ABE):
-type CreateRawTransactionCmd struct {
+/*type CreateRawTransactionCmd struct {
 	Inputs   []TransactionInput
 	Amounts  map[string]float64 `jsonrpcusage:"{\"address\":amount,...}"` // In BTC
 	LockTime *int64
-}
+}*/
 
 // TODO(abe): the type of txfee may need to change to a pointer point to float64
 type CreateRawTransactionCmdAbe struct {
@@ -95,7 +95,7 @@ type CreateRawTransactionCmdAbe struct {
 //
 // Amounts are in BTC. Passing in nil and the empty slice as inputs is equivalent,
 // both gets interpreted as the empty slice.
-func NewCreateRawTransactionCmd(inputs []TransactionInput, amounts map[string]float64,
+/*func NewCreateRawTransactionCmd(inputs []TransactionInput, amounts map[string]float64,
 	lockTime *int64) *CreateRawTransactionCmd {
 	// to make sure we're serializing this to the empty list and not null, we
 	// explicitly initialize the list
@@ -107,7 +107,7 @@ func NewCreateRawTransactionCmd(inputs []TransactionInput, amounts map[string]fl
 		Amounts:  amounts,
 		LockTime: lockTime,
 	}
-}
+}*/
 
 // FundRawTransactionOpts are the different options that can be passed to rawtransaction
 type FundRawTransactionOpts struct {
@@ -214,12 +214,12 @@ type GetBlockAbeCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewGetBlockCmd(hash string, verbosity *int) *GetBlockCmd {
+/*func NewGetBlockCmd(hash string, verbosity *int) *GetBlockCmd {
 	return &GetBlockCmd{
 		Hash:      hash,
 		Verbosity: verbosity,
 	}
-}
+}*/
 func NewGetBlockAbeCmd(hash string, verbosity *int) *GetBlockAbeCmd {
 	return &GetBlockAbeCmd{
 		Hash:      hash,
@@ -859,12 +859,12 @@ type SendRawTransactionAbeCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewSendRawTransactionCmd(hexTx string, allowHighFees *bool) *SendRawTransactionCmd {
+/*func NewSendRawTransactionCmd(hexTx string, allowHighFees *bool) *SendRawTransactionCmd {
 	return &SendRawTransactionCmd{
 		HexTx:         hexTx,
 		AllowHighFees: allowHighFees,
 	}
-}
+}*/
 func NewSendRawTransactionAbeCmd(hexTx string, allowHighFees *bool) *SendRawTransactionAbeCmd {
 	return &SendRawTransactionAbeCmd{
 		HexTx:         hexTx,

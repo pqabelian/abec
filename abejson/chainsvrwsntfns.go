@@ -8,7 +8,7 @@ const (
 	// notifications from the chain server that a block has been connected.
 	//
 	// Deprecated: Use FilteredBlockConnectedNtfnMethod instead.
-	BlockConnectedNtfnMethod    = "blockconnected"
+	//BlockConnectedNtfnMethod    = "blockconnected"
 	BlockAbeConnectedNtfnMethod = "blockabeconnected"
 
 	// BlockDisconnectedNtfnMethod is the legacy, deprecated method used for
@@ -16,7 +16,7 @@ const (
 	// disconnected.
 	//
 	// Deprecated: Use FilteredBlockDisconnectedNtfnMethod instead.
-	BlockDisconnectedNtfnMethod    = "blockdisconnected"
+	//BlockDisconnectedNtfnMethod    = "blockdisconnected"
 	BlockAbeDisconnectedNtfnMethod = "blockabedisconnected"
 
 	// FilteredBlockConnectedNtfnMethod is the new method used for
@@ -79,11 +79,11 @@ const (
 // BlockConnectedNtfn defines the blockconnected JSON-RPC notification.
 //
 // Deprecated: Use FilteredBlockConnectedNtfn instead.
-type BlockConnectedNtfn struct {
+/*type BlockConnectedNtfn struct {
 	Hash   string
 	Height int32
 	Time   int64
-}
+}*/
 type BlockAbeConnectedNtfn struct {
 	Hash   string
 	Height int32
@@ -94,13 +94,13 @@ type BlockAbeConnectedNtfn struct {
 // blockconnected JSON-RPC notification.
 //
 // Deprecated: Use NewFilteredBlockConnectedNtfn instead.
-func NewBlockConnectedNtfn(hash string, height int32, time int64) *BlockConnectedNtfn {
+/*func NewBlockConnectedNtfn(hash string, height int32, time int64) *BlockConnectedNtfn {
 	return &BlockConnectedNtfn{
 		Hash:   hash,
 		Height: height,
 		Time:   time,
 	}
-}
+}*/
 func NewBlockAbeConnectedNtfn(hash string, height int32, time int64) *BlockAbeConnectedNtfn {
 	return &BlockAbeConnectedNtfn{
 		Hash:   hash,
@@ -112,11 +112,11 @@ func NewBlockAbeConnectedNtfn(hash string, height int32, time int64) *BlockAbeCo
 // BlockDisconnectedNtfn defines the blockdisconnected JSON-RPC notification.
 //
 // Deprecated: Use FilteredBlockDisconnectedNtfn instead.
-type BlockDisconnectedNtfn struct {
+/*type BlockDisconnectedNtfn struct {
 	Hash   string
 	Height int32
 	Time   int64
-}
+}*/
 type BlockAbeDisconnectedNtfn struct {
 	Hash   string
 	Height int32
@@ -127,13 +127,13 @@ type BlockAbeDisconnectedNtfn struct {
 // blockdisconnected JSON-RPC notification.
 //
 // Deprecated: Use NewFilteredBlockDisconnectedNtfn instead.
-func NewBlockDisconnectedNtfn(hash string, height int32, time int64) *BlockDisconnectedNtfn {
+/*func NewBlockDisconnectedNtfn(hash string, height int32, time int64) *BlockDisconnectedNtfn {
 	return &BlockDisconnectedNtfn{
 		Hash:   hash,
 		Height: height,
 		Time:   time,
 	}
-}
+}*/
 func NewBlockAbeDisconnectedNtfn(hash string, height int32, time int64) *BlockAbeDisconnectedNtfn {
 	return &BlockAbeDisconnectedNtfn{
 		Hash:   hash,
@@ -319,9 +319,9 @@ func NewTxInvalidNtfn(txHash string, height int32) *TxInvalidNtfn {
 // TxAcceptedVerboseNtfn defines the txacceptedverbose JSON-RPC notification.
 //
 //	todo(ABE):
-type TxAcceptedVerboseNtfn struct {
+/*type TxAcceptedVerboseNtfn struct {
 	RawTx TxRawResult
-}
+}*/
 
 type TxAcceptedVerboseNtfnAbe struct {
 	RawTx TxRawResultAbe
@@ -360,9 +360,9 @@ func init() {
 	// notifications.
 	flags := UFWebsocketOnly | UFNotification
 
-	MustRegisterCmd(BlockConnectedNtfnMethod, (*BlockConnectedNtfn)(nil), flags)
+	//MustRegisterCmd(BlockConnectedNtfnMethod, (*BlockConnectedNtfn)(nil), flags)
 	MustRegisterCmd(BlockAbeConnectedNtfnMethod, (*BlockAbeConnectedNtfn)(nil), flags)
-	MustRegisterCmd(BlockDisconnectedNtfnMethod, (*BlockDisconnectedNtfn)(nil), flags)
+	//MustRegisterCmd(BlockDisconnectedNtfnMethod, (*BlockDisconnectedNtfn)(nil), flags)
 	MustRegisterCmd(BlockAbeDisconnectedNtfnMethod, (*BlockAbeDisconnectedNtfn)(nil), flags)
 	MustRegisterCmd(FilteredBlockConnectedNtfnMethod, (*FilteredBlockConnectedNtfn)(nil), flags)
 	MustRegisterCmd(FilteredBlockDisconnectedNtfnMethod, (*FilteredBlockDisconnectedNtfn)(nil), flags)
@@ -374,6 +374,6 @@ func init() {
 	MustRegisterCmd(TxAcceptedNtfnMethod, (*TxAcceptedNtfn)(nil), flags)
 	MustRegisterCmd(TxRollbackNtfnMethod, (*TxRollbackNtfn)(nil), flags)
 	MustRegisterCmd(TxInvalidNtfnMethod, (*TxInvalidNtfn)(nil), flags)
-	MustRegisterCmd(TxAcceptedVerboseNtfnMethod, (*TxAcceptedVerboseNtfn)(nil), flags)
-	MustRegisterCmd(RelevantTxAcceptedNtfnMethod, (*RelevantTxAcceptedNtfn)(nil), flags)
+	//MustRegisterCmd(TxAcceptedVerboseNtfnMethod, (*TxAcceptedVerboseNtfn)(nil), flags)
+	//MustRegisterCmd(RelevantTxAcceptedNtfnMethod, (*RelevantTxAcceptedNtfn)(nil), flags)
 }

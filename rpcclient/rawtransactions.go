@@ -123,7 +123,7 @@ type FutureGetRawTransactionVerboseResult chan *response
 
 // Receive waits for the response promised by the future and returns information
 // about a transaction given its hash.
-func (r FutureGetRawTransactionVerboseResult) Receive() (*abejson.TxRawResult, error) {
+/*func (r FutureGetRawTransactionVerboseResult) Receive() (*abejson.TxRawResult, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -137,7 +137,7 @@ func (r FutureGetRawTransactionVerboseResult) Receive() (*abejson.TxRawResult, e
 	}
 
 	return &rawTxResult, nil
-}
+}*/
 
 // GetRawTransactionVerboseAsync returns an instance of a type that can be used
 // to get the result of the RPC at some future time by invoking the Receive
@@ -158,9 +158,9 @@ func (c *Client) GetRawTransactionVerboseAsync(txHash *chainhash.Hash) FutureGet
 // its hash.
 //
 // See GetRawTransaction to obtain only the transaction already deserialized.
-func (c *Client) GetRawTransactionVerbose(txHash *chainhash.Hash) (*abejson.TxRawResult, error) {
+/*func (c *Client) GetRawTransactionVerbose(txHash *chainhash.Hash) (*abejson.TxRawResult, error) {
 	return c.GetRawTransactionVerboseAsync(txHash).Receive()
-}
+}*/
 
 // FutureDecodeRawTransactionResult is a future promise to deliver the result
 // of a DecodeRawTransactionAsync RPC invocation (or an applicable error).
@@ -286,7 +286,7 @@ func (r FutureCreateRawTransactionResult) Receive() (*wire.MsgTx, error) {
 // function on the returned instance.
 //
 // See CreateRawTransaction for the blocking version and more details.
-func (c *Client) CreateRawTransactionAsync(inputs []abejson.TransactionInput,
+/*func (c *Client) CreateRawTransactionAsync(inputs []abejson.TransactionInput,
 	amounts map[abeutil.Address]abeutil.Amount, lockTime *int64) FutureCreateRawTransactionResult {
 
 	convertedAmts := make(map[string]float64, len(amounts))
@@ -295,26 +295,26 @@ func (c *Client) CreateRawTransactionAsync(inputs []abejson.TransactionInput,
 	}
 	cmd := abejson.NewCreateRawTransactionCmd(inputs, convertedAmts, lockTime)
 	return c.sendCmd(cmd)
-}
+}*/
 
 // CreateRawTransaction returns a new transaction spending the provided inputs
 // and sending to the provided addresses. If the inputs are either nil or an
 // empty slice, it is interpreted as an empty slice.
-func (c *Client) CreateRawTransaction(inputs []abejson.TransactionInput,
+/*func (c *Client) CreateRawTransaction(inputs []abejson.TransactionInput,
 	amounts map[abeutil.Address]abeutil.Amount, lockTime *int64) (*wire.MsgTx, error) {
 
 	return c.CreateRawTransactionAsync(inputs, amounts, lockTime).Receive()
-}
+}*/
 
 // FutureSendRawTransactionResult is a future promise to deliver the result
 // of a SendRawTransactionAsync RPC invocation (or an applicable error).
-type FutureSendRawTransactionResult chan *response
+// type FutureSendRawTransactionResult chan *response
 type FutureSendRawTransactionAbeResult chan *response
 
 // Receive waits for the response promised by the future and returns the result
 // of submitting the encoded transaction to the server which then relays it to
 // the network.
-func (r FutureSendRawTransactionResult) Receive() (*chainhash.Hash, error) {
+/*func (r FutureSendRawTransactionResult) Receive() (*chainhash.Hash, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -328,7 +328,7 @@ func (r FutureSendRawTransactionResult) Receive() (*chainhash.Hash, error) {
 	}
 
 	return chainhash.NewHashFromStr(txHashStr)
-}
+}*/
 func (r FutureSendRawTransactionAbeResult) Receive() (*chainhash.Hash, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
@@ -350,7 +350,7 @@ func (r FutureSendRawTransactionAbeResult) Receive() (*chainhash.Hash, error) {
 // the returned instance.
 //
 // See SendRawTransaction for the blocking version and more details.
-func (c *Client) SendRawTransactionAsync(tx *wire.MsgTx, allowHighFees bool) FutureSendRawTransactionResult {
+/*func (c *Client) SendRawTransactionAsync(tx *wire.MsgTx, allowHighFees bool) FutureSendRawTransactionResult {
 	txHex := ""
 	if tx != nil {
 		// Serialize the transaction and convert to hex string.
@@ -387,7 +387,7 @@ func (c *Client) SendRawTransactionAsync(tx *wire.MsgTx, allowHighFees bool) Fut
 	}
 
 	return c.sendCmd(cmd)
-}
+}*/
 
 // TODO(abe): need to complete this function including the struct and Handler function in rpc server
 func (c *Client) SendRawTransactionAbeAsync(tx *wire.MsgTxAbe, allowHighFees bool) FutureSendRawTransactionAbeResult {
@@ -671,13 +671,13 @@ func (r FutureSearchRawTransactionsResult) Receive() ([]*wire.MsgTx, error) {
 // function on the returned instance.
 //
 // See SearchRawTransactions for the blocking version and more details.
-func (c *Client) SearchRawTransactionsAsync(address abeutil.Address, skip, count int, reverse bool, filterAddrs []string) FutureSearchRawTransactionsResult {
+/*func (c *Client) SearchRawTransactionsAsync(address abeutil.Address, skip, count int, reverse bool, filterAddrs []string) FutureSearchRawTransactionsResult {
 	addr := address.EncodeAddress()
 	verbose := abejson.Int(0)
 	cmd := abejson.NewSearchRawTransactionsCmd(addr, verbose, &skip, &count,
 		nil, &reverse, &filterAddrs)
 	return c.sendCmd(cmd)
-}
+}*/
 
 // SearchRawTransactions returns transactions that involve the passed address.
 //
@@ -686,9 +686,9 @@ func (c *Client) SearchRawTransactionsAsync(address abeutil.Address, skip, count
 //
 // See SearchRawTransactionsVerbose to retrieve a list of data structures with
 // information about the transactions instead of the transactions themselves.
-func (c *Client) SearchRawTransactions(address abeutil.Address, skip, count int, reverse bool, filterAddrs []string) ([]*wire.MsgTx, error) {
+/*func (c *Client) SearchRawTransactions(address abeutil.Address, skip, count int, reverse bool, filterAddrs []string) ([]*wire.MsgTx, error) {
 	return c.SearchRawTransactionsAsync(address, skip, count, reverse, filterAddrs).Receive()
-}
+}*/
 
 // FutureSearchRawTransactionsVerboseResult is a future promise to deliver the
 // result of the SearchRawTransactionsVerboseAsync RPC invocation (or an
@@ -718,7 +718,7 @@ func (r FutureSearchRawTransactionsVerboseResult) Receive() ([]*abejson.SearchRa
 // function on the returned instance.
 //
 // See SearchRawTransactionsVerbose for the blocking version and more details.
-func (c *Client) SearchRawTransactionsVerboseAsync(address abeutil.Address, skip,
+/*func (c *Client) SearchRawTransactionsVerboseAsync(address abeutil.Address, skip,
 	count int, includePrevOut, reverse bool, filterAddrs *[]string) FutureSearchRawTransactionsVerboseResult {
 
 	addr := address.EncodeAddress()
@@ -730,7 +730,7 @@ func (c *Client) SearchRawTransactionsVerboseAsync(address abeutil.Address, skip
 	cmd := abejson.NewSearchRawTransactionsCmd(addr, verbose, &skip, &count,
 		prevOut, &reverse, filterAddrs)
 	return c.sendCmd(cmd)
-}
+}*/
 
 // SearchRawTransactionsVerbose returns a list of data structures that describe
 // transactions which involve the passed address.
@@ -739,12 +739,12 @@ func (c *Client) SearchRawTransactionsVerboseAsync(address abeutil.Address, skip
 // specifically been enabled.
 //
 // See SearchRawTransactions to retrieve a list of raw transactions instead.
-func (c *Client) SearchRawTransactionsVerbose(address abeutil.Address, skip,
+/*func (c *Client) SearchRawTransactionsVerbose(address abeutil.Address, skip,
 	count int, includePrevOut, reverse bool, filterAddrs []string) ([]*abejson.SearchRawTransactionsResult, error) {
 
 	return c.SearchRawTransactionsVerboseAsync(address, skip, count,
 		includePrevOut, reverse, &filterAddrs).Receive()
-}
+}*/
 
 // FutureDecodeScriptResult is a future promise to deliver the result
 // of a DecodeScriptAsync RPC invocation (or an applicable error).

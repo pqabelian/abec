@@ -17,7 +17,7 @@ const (
 
 	// Size of a transaction entry.  It consists of 4 bytes block id + 4
 	// bytes offset + 4 bytes length.
-	txEntrySize = 4 + 4 + 4
+	//txEntrySize = 4 + 4 + 4
 
 	// Size of a transaction entry.  It consists of 4 bytes block id + 4
 	// bytes offset + 4 bytes length + 4 bytes witness offset + 4 bytes

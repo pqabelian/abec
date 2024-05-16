@@ -73,7 +73,7 @@ func round(f float64) Amount {
 // See GoDoc for example: http://godoc.org/github.com/btcsuite/btcutil#example-Amount
 //
 //	todo(ABE):
-func NewAmount(f float64) (Amount, error) {
+/*func NewAmount(f float64) (Amount, error) {
 	// The amount is only considered invalid if it cannot be represented
 	// as an integer type.  This may happen if f is NaN or +-Infinity.
 	switch {
@@ -86,7 +86,7 @@ func NewAmount(f float64) (Amount, error) {
 	}
 
 	return round(f * SatoshiPerBitcoin), nil
-}
+}*/
 
 func NewAmountAbe(f float64) (Amount, error) {
 	// The amount is only considered invalid if it cannot be represented

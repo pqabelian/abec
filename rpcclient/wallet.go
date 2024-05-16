@@ -2,11 +2,9 @@ package rpcclient
 
 import (
 	"encoding/json"
-	"strconv"
 
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 )
@@ -191,37 +189,37 @@ func (r FutureListUnspentResult) Receive() ([]abejson.ListUnspentResult, error) 
 // on the returned instance.
 //
 // See ListUnspent for the blocking version and more details.
-func (c *Client) ListUnspentAsync() FutureListUnspentResult {
+/*func (c *Client) ListUnspentAsync() FutureListUnspentResult {
 	cmd := abejson.NewListUnspentCmd(nil, nil, nil)
 	return c.sendCmd(cmd)
-}
+}*/
 
 // ListUnspentMinAsync returns an instance of a type that can be used to get
 // the result of the RPC at some future time by invoking the Receive function
 // on the returned instance.
 //
 // See ListUnspentMin for the blocking version and more details.
-func (c *Client) ListUnspentMinAsync(minConf int) FutureListUnspentResult {
+/*func (c *Client) ListUnspentMinAsync(minConf int) FutureListUnspentResult {
 	cmd := abejson.NewListUnspentCmd(&minConf, nil, nil)
 	return c.sendCmd(cmd)
-}
+}*/
 
 // ListUnspentMinMaxAsync returns an instance of a type that can be used to get
 // the result of the RPC at some future time by invoking the Receive function
 // on the returned instance.
 //
 // See ListUnspentMinMax for the blocking version and more details.
-func (c *Client) ListUnspentMinMaxAsync(minConf, maxConf int) FutureListUnspentResult {
+/*func (c *Client) ListUnspentMinMaxAsync(minConf, maxConf int) FutureListUnspentResult {
 	cmd := abejson.NewListUnspentCmd(&minConf, &maxConf, nil)
 	return c.sendCmd(cmd)
-}
+}*/
 
 // ListUnspentMinMaxAddressesAsync returns an instance of a type that can be
 // used to get the result of the RPC at some future time by invoking the Receive
 // function on the returned instance.
 //
 // See ListUnspentMinMaxAddresses for the blocking version and more details.
-func (c *Client) ListUnspentMinMaxAddressesAsync(minConf, maxConf int, addrs []abeutil.Address) FutureListUnspentResult {
+/*func (c *Client) ListUnspentMinMaxAddressesAsync(minConf, maxConf int, addrs []abeutil.Address) FutureListUnspentResult {
 	addrStrs := make([]string, 0, len(addrs))
 	for _, a := range addrs {
 		addrStrs = append(addrStrs, a.EncodeAddress())
@@ -229,35 +227,35 @@ func (c *Client) ListUnspentMinMaxAddressesAsync(minConf, maxConf int, addrs []a
 
 	cmd := abejson.NewListUnspentCmd(&minConf, &maxConf, &addrStrs)
 	return c.sendCmd(cmd)
-}
+}*/
 
 // ListUnspent returns all unspent transaction outputs known to a wallet, using
 // the default number of minimum and maximum number of confirmations as a
 // filter (1 and 999999, respectively).
-func (c *Client) ListUnspent() ([]abejson.ListUnspentResult, error) {
+/*func (c *Client) ListUnspent() ([]abejson.ListUnspentResult, error) {
 	return c.ListUnspentAsync().Receive()
-}
+}*/
 
 // ListUnspentMin returns all unspent transaction outputs known to a wallet,
 // using the specified number of minimum conformations and default number of
 // maximum confiramtions (999999) as a filter.
-func (c *Client) ListUnspentMin(minConf int) ([]abejson.ListUnspentResult, error) {
+/*func (c *Client) ListUnspentMin(minConf int) ([]abejson.ListUnspentResult, error) {
 	return c.ListUnspentMinAsync(minConf).Receive()
-}
+}*/
 
 // ListUnspentMinMax returns all unspent transaction outputs known to a wallet,
 // using the specified number of minimum and maximum number of confirmations as
 // a filter.
-func (c *Client) ListUnspentMinMax(minConf, maxConf int) ([]abejson.ListUnspentResult, error) {
+/*func (c *Client) ListUnspentMinMax(minConf, maxConf int) ([]abejson.ListUnspentResult, error) {
 	return c.ListUnspentMinMaxAsync(minConf, maxConf).Receive()
-}
+}*/
 
 // ListUnspentMinMaxAddresses returns all unspent transaction outputs that pay
 // to any of specified addresses in a wallet using the specified number of
 // minimum and maximum number of confirmations as a filter.
-func (c *Client) ListUnspentMinMaxAddresses(minConf, maxConf int, addrs []abeutil.Address) ([]abejson.ListUnspentResult, error) {
+/*func (c *Client) ListUnspentMinMaxAddresses(minConf, maxConf int, addrs []abeutil.Address) ([]abejson.ListUnspentResult, error) {
 	return c.ListUnspentMinMaxAddressesAsync(minConf, maxConf, addrs).Receive()
-}
+}*/
 
 // FutureListSinceBlockResult is a future promise to deliver the result of a
 // ListSinceBlockAsync or ListSinceBlockMinConfAsync RPC invocation (or an
@@ -541,11 +539,11 @@ func (r FutureSendToPayeeResult) Receive() (*chainhash.Hash, error) {
 // returned instance.
 //
 // See SendToAddress for the blocking version and more details.
-func (c *Client) SendToAddressAsync(address abeutil.Address, amount abeutil.Amount) FutureSendToAddressResult {
+/*func (c *Client) SendToAddressAsync(address abeutil.Address, amount abeutil.Amount) FutureSendToAddressResult {
 	addr := address.EncodeAddress()
 	cmd := abejson.NewSendToAddressCmd(addr, amount.ToABE(), nil, nil)
 	return c.sendCmd(cmd)
-}
+}*/
 func (c *Client) SendToPayeesAsync(payees []string, amount []abeutil.Amount, minconf *int, scaleToFeeSatPerKb *float64, feeSpecified *float64, utxoSpecified *string, comment *string) FutureSendToPayeeResult {
 	amounts := make(map[string]float64, len(payees))
 	for i := 0; i < len(payees); i++ {
@@ -590,7 +588,7 @@ func (c *Client) SendToAddressAbe(payees []string, amount []abeutil.Amount, scal
 // function on the returned instance.
 //
 // See SendToAddressComment for the blocking version and more details.
-func (c *Client) SendToAddressCommentAsync(address abeutil.Address,
+/*func (c *Client) SendToAddressCommentAsync(address abeutil.Address,
 	amount abeutil.Amount, comment,
 	commentTo string) FutureSendToAddressResult {
 
@@ -598,7 +596,7 @@ func (c *Client) SendToAddressCommentAsync(address abeutil.Address,
 	cmd := abejson.NewSendToAddressCmd(addr, amount.ToABE(), &comment,
 		&commentTo)
 	return c.sendCmd(cmd)
-}
+}*/
 
 // SendToAddressComment sends the passed amount to the given address and stores
 // the provided comment and comment to in the wallet.  The comment parameter is
@@ -612,10 +610,10 @@ func (c *Client) SendToAddressCommentAsync(address abeutil.Address,
 //
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
-func (c *Client) SendToAddressComment(address abeutil.Address, amount abeutil.Amount, comment, commentTo string) (*chainhash.Hash, error) {
+/*func (c *Client) SendToAddressComment(address abeutil.Address, amount abeutil.Amount, comment, commentTo string) (*chainhash.Hash, error) {
 	return c.SendToAddressCommentAsync(address, amount, comment,
 		commentTo).Receive()
-}
+}*/
 
 // FutureSendFromResult is a future promise to deliver the result of a
 // SendFromAsync, SendFromMinConfAsync, or SendFromCommentAsync RPC invocation
@@ -646,12 +644,12 @@ func (r FutureSendFromResult) Receive() (*chainhash.Hash, error) {
 // returned instance.
 //
 // See SendFrom for the blocking version and more details.
-func (c *Client) SendFromAsync(fromAccount string, toAddress abeutil.Address, amount abeutil.Amount) FutureSendFromResult {
+/*func (c *Client) SendFromAsync(fromAccount string, toAddress abeutil.Address, amount abeutil.Amount) FutureSendFromResult {
 	addr := toAddress.EncodeAddress()
 	cmd := abejson.NewSendFromCmd(fromAccount, addr, amount.ToABE(), nil,
 		nil, nil)
 	return c.sendCmd(cmd)
-}
+}*/
 
 // SendFrom sends the passed amount to the given address using the provided
 // account as a source of funds.  Only funds with the default number of minimum
@@ -661,21 +659,21 @@ func (c *Client) SendFromAsync(fromAccount string, toAddress abeutil.Address, am
 //
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
-func (c *Client) SendFrom(fromAccount string, toAddress abeutil.Address, amount abeutil.Amount) (*chainhash.Hash, error) {
+/*func (c *Client) SendFrom(fromAccount string, toAddress abeutil.Address, amount abeutil.Amount) (*chainhash.Hash, error) {
 	return c.SendFromAsync(fromAccount, toAddress, amount).Receive()
-}
+}*/
 
 // SendFromMinConfAsync returns an instance of a type that can be used to get
 // the result of the RPC at some future time by invoking the Receive function on
 // the returned instance.
 //
 // See SendFromMinConf for the blocking version and more details.
-func (c *Client) SendFromMinConfAsync(fromAccount string, toAddress abeutil.Address, amount abeutil.Amount, minConfirms int) FutureSendFromResult {
+/*func (c *Client) SendFromMinConfAsync(fromAccount string, toAddress abeutil.Address, amount abeutil.Amount, minConfirms int) FutureSendFromResult {
 	addr := toAddress.EncodeAddress()
 	cmd := abejson.NewSendFromCmd(fromAccount, addr, amount.ToABE(),
 		&minConfirms, nil, nil)
 	return c.sendCmd(cmd)
-}
+}*/
 
 // SendFromMinConf sends the passed amount to the given address using the
 // provided account as a source of funds.  Only funds with the passed number of
@@ -686,17 +684,17 @@ func (c *Client) SendFromMinConfAsync(fromAccount string, toAddress abeutil.Addr
 //
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
-func (c *Client) SendFromMinConf(fromAccount string, toAddress abeutil.Address, amount abeutil.Amount, minConfirms int) (*chainhash.Hash, error) {
+/*func (c *Client) SendFromMinConf(fromAccount string, toAddress abeutil.Address, amount abeutil.Amount, minConfirms int) (*chainhash.Hash, error) {
 	return c.SendFromMinConfAsync(fromAccount, toAddress, amount,
 		minConfirms).Receive()
-}
+}*/
 
 // SendFromCommentAsync returns an instance of a type that can be used to get
 // the result of the RPC at some future time by invoking the Receive function on
 // the returned instance.
 //
 // See SendFromComment for the blocking version and more details.
-func (c *Client) SendFromCommentAsync(fromAccount string,
+/*func (c *Client) SendFromCommentAsync(fromAccount string,
 	toAddress abeutil.Address, amount abeutil.Amount, minConfirms int,
 	comment, commentTo string) FutureSendFromResult {
 
@@ -704,7 +702,7 @@ func (c *Client) SendFromCommentAsync(fromAccount string,
 	cmd := abejson.NewSendFromCmd(fromAccount, addr, amount.ToABE(),
 		&minConfirms, &comment, &commentTo)
 	return c.sendCmd(cmd)
-}
+}*/
 
 // SendFromComment sends the passed amount to the given address using the
 // provided account as a source of funds and stores the provided comment and
@@ -717,13 +715,13 @@ func (c *Client) SendFromCommentAsync(fromAccount string,
 //
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
-func (c *Client) SendFromComment(fromAccount string, toAddress abeutil.Address,
+/*func (c *Client) SendFromComment(fromAccount string, toAddress abeutil.Address,
 	amount abeutil.Amount, minConfirms int,
 	comment, commentTo string) (*chainhash.Hash, error) {
 
 	return c.SendFromCommentAsync(fromAccount, toAddress, amount,
 		minConfirms, comment, commentTo).Receive()
-}
+}*/
 
 // FutureSendManyResult is a future promise to deliver the result of a
 // SendManyAsync, SendManyMinConfAsync, or SendManyCommentAsync RPC invocation
@@ -754,14 +752,14 @@ func (r FutureSendManyResult) Receive() (*chainhash.Hash, error) {
 // returned instance.
 //
 // See SendMany for the blocking version and more details.
-func (c *Client) SendManyAsync(fromAccount string, amounts map[abeutil.Address]abeutil.Amount) FutureSendManyResult {
+/*func (c *Client) SendManyAsync(fromAccount string, amounts map[abeutil.Address]abeutil.Amount) FutureSendManyResult {
 	convertedAmounts := make(map[string]float64, len(amounts))
 	for addr, amount := range amounts {
 		convertedAmounts[addr.EncodeAddress()] = amount.ToABE()
 	}
 	cmd := abejson.NewSendManyCmd(fromAccount, convertedAmounts, nil, nil)
 	return c.sendCmd(cmd)
-}
+}*/
 
 // SendMany sends multiple amounts to multiple addresses using the provided
 // account as a source of funds in a single transaction.  Only funds with the
@@ -771,16 +769,16 @@ func (c *Client) SendManyAsync(fromAccount string, amounts map[abeutil.Address]a
 //
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
-func (c *Client) SendMany(fromAccount string, amounts map[abeutil.Address]abeutil.Amount) (*chainhash.Hash, error) {
+/*func (c *Client) SendMany(fromAccount string, amounts map[abeutil.Address]abeutil.Amount) (*chainhash.Hash, error) {
 	return c.SendManyAsync(fromAccount, amounts).Receive()
-}
+}*/
 
 // SendManyMinConfAsync returns an instance of a type that can be used to get
 // the result of the RPC at some future time by invoking the Receive function on
 // the returned instance.
 //
 // See SendManyMinConf for the blocking version and more details.
-func (c *Client) SendManyMinConfAsync(fromAccount string,
+/*func (c *Client) SendManyMinConfAsync(fromAccount string,
 	amounts map[abeutil.Address]abeutil.Amount,
 	minConfirms int) FutureSendManyResult {
 
@@ -791,7 +789,7 @@ func (c *Client) SendManyMinConfAsync(fromAccount string,
 	cmd := abejson.NewSendManyCmd(fromAccount, convertedAmounts,
 		&minConfirms, nil)
 	return c.sendCmd(cmd)
-}
+}*/
 
 // SendManyMinConf sends multiple amounts to multiple addresses using the
 // provided account as a source of funds in a single transaction.  Only funds
@@ -802,19 +800,19 @@ func (c *Client) SendManyMinConfAsync(fromAccount string,
 //
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
-func (c *Client) SendManyMinConf(fromAccount string,
+/*func (c *Client) SendManyMinConf(fromAccount string,
 	amounts map[abeutil.Address]abeutil.Amount,
 	minConfirms int) (*chainhash.Hash, error) {
 
 	return c.SendManyMinConfAsync(fromAccount, amounts, minConfirms).Receive()
-}
+}*/
 
 // SendManyCommentAsync returns an instance of a type that can be used to get
 // the result of the RPC at some future time by invoking the Receive function on
 // the returned instance.
 //
 // See SendManyComment for the blocking version and more details.
-func (c *Client) SendManyCommentAsync(fromAccount string,
+/*func (c *Client) SendManyCommentAsync(fromAccount string,
 	amounts map[abeutil.Address]abeutil.Amount, minConfirms int,
 	comment string) FutureSendManyResult {
 
@@ -825,7 +823,7 @@ func (c *Client) SendManyCommentAsync(fromAccount string,
 	cmd := abejson.NewSendManyCmd(fromAccount, convertedAmounts,
 		&minConfirms, &comment)
 	return c.sendCmd(cmd)
-}
+}*/
 
 // SendManyComment sends multiple amounts to multiple addresses using the
 // provided account as a source of funds in a single transaction and stores the
@@ -837,13 +835,13 @@ func (c *Client) SendManyCommentAsync(fromAccount string,
 //
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
-func (c *Client) SendManyComment(fromAccount string,
+/*func (c *Client) SendManyComment(fromAccount string,
 	amounts map[abeutil.Address]abeutil.Amount, minConfirms int,
 	comment string) (*chainhash.Hash, error) {
 
 	return c.SendManyCommentAsync(fromAccount, amounts, minConfirms,
 		comment).Receive()
-}
+}*/
 
 // *************************
 // Address/Account Functions
@@ -857,7 +855,7 @@ type FutureAddPayeeResult chan *response
 // Receive waits for the response promised by the future and returns the
 // multisignature address that requires the specified number of signatures for
 // the provided addresses.
-func (r FutureAddMultisigAddressResult) Receive() (abeutil.Address, error) {
+/*func (r FutureAddMultisigAddressResult) Receive() (abeutil.Address, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -871,7 +869,7 @@ func (r FutureAddMultisigAddressResult) Receive() (abeutil.Address, error) {
 	}
 
 	return abeutil.DecodeAddress(addr, &chaincfg.MainNetParams)
-}
+}*/
 func (r FutureAddPayeeResult) Receive() error {
 	_, err := receiveFuture(r)
 	return err
@@ -882,7 +880,7 @@ func (r FutureAddPayeeResult) Receive() error {
 // the returned instance.
 //
 // See AddMultisigAddress for the blocking version and more details.
-func (c *Client) AddMultisigAddressAsync(requiredSigs int, addresses []abeutil.Address, account string) FutureAddMultisigAddressResult {
+/*func (c *Client) AddMultisigAddressAsync(requiredSigs int, addresses []abeutil.Address, account string) FutureAddMultisigAddressResult {
 	addrs := make([]string, 0, len(addresses))
 	for _, addr := range addresses {
 		addrs = append(addrs, addr.String())
@@ -890,7 +888,7 @@ func (c *Client) AddMultisigAddressAsync(requiredSigs int, addresses []abeutil.A
 
 	cmd := abejson.NewAddMultisigAddressCmd(requiredSigs, addrs, &account)
 	return c.sendCmd(cmd)
-}
+}*/
 func (c *Client) AddPayeeAsync(name string, masterPubKey string) FutureAddPayeeResult {
 	cmd := abejson.NewAddPayeeCmd(name, masterPubKey)
 	return c.sendCmd(cmd)
@@ -898,10 +896,10 @@ func (c *Client) AddPayeeAsync(name string, masterPubKey string) FutureAddPayeeR
 
 // AddMultisigAddress adds a multisignature address that requires the specified
 // number of signatures for the provided addresses to the wallet.
-func (c *Client) AddMultisigAddress(requiredSigs int, addresses []abeutil.Address, account string) (abeutil.Address, error) {
+/*func (c *Client) AddMultisigAddress(requiredSigs int, addresses []abeutil.Address, account string) (abeutil.Address, error) {
 	return c.AddMultisigAddressAsync(requiredSigs, addresses,
 		account).Receive()
-}
+}*/
 func (c *Client) AddPayee(name string, masterPubKey string) error {
 	return c.AddPayeeAsync(name, masterPubKey).Receive()
 }
@@ -933,7 +931,7 @@ func (r FutureCreateMultisigResult) Receive() (*abejson.CreateMultiSigResult, er
 // the returned instance.
 //
 // See CreateMultisig for the blocking version and more details.
-func (c *Client) CreateMultisigAsync(requiredSigs int, addresses []abeutil.Address) FutureCreateMultisigResult {
+/*func (c *Client) CreateMultisigAsync(requiredSigs int, addresses []abeutil.Address) FutureCreateMultisigResult {
 	addrs := make([]string, 0, len(addresses))
 	for _, addr := range addresses {
 		addrs = append(addrs, addr.String())
@@ -941,14 +939,14 @@ func (c *Client) CreateMultisigAsync(requiredSigs int, addresses []abeutil.Addre
 
 	cmd := abejson.NewCreateMultisigCmd(requiredSigs, addrs)
 	return c.sendCmd(cmd)
-}
+}*/
 
 // CreateMultisig creates a multisignature address that requires the specified
 // number of signatures for the provided addresses and returns the
 // multisignature address and script needed to redeem it.
-func (c *Client) CreateMultisig(requiredSigs int, addresses []abeutil.Address) (*abejson.CreateMultiSigResult, error) {
+/*func (c *Client) CreateMultisig(requiredSigs int, addresses []abeutil.Address) (*abejson.CreateMultiSigResult, error) {
 	return c.CreateMultisigAsync(requiredSigs, addresses).Receive()
-}
+}*/
 
 // FutureCreateNewAccountResult is a future promise to deliver the result of a
 // CreateNewAccountAsync RPC invocation (or an applicable error).
@@ -982,7 +980,7 @@ type FutureGetNewAddressResult chan *response
 
 // Receive waits for the response promised by the future and returns a new
 // address.
-func (r FutureGetNewAddressResult) Receive() (abeutil.Address, error) {
+/*func (r FutureGetNewAddressResult) Receive() (abeutil.Address, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -996,7 +994,7 @@ func (r FutureGetNewAddressResult) Receive() (abeutil.Address, error) {
 	}
 
 	return abeutil.DecodeAddress(addr, &chaincfg.MainNetParams)
-}
+}*/
 
 // GetNewAddressAsync returns an instance of a type that can be used to get the
 // result of the RPC at some future time by invoking the Receive function on the
@@ -1009,9 +1007,9 @@ func (c *Client) GetNewAddressAsync(account string) FutureGetNewAddressResult {
 }
 
 // GetNewAddress returns a new address.
-func (c *Client) GetNewAddress(account string) (abeutil.Address, error) {
+/*func (c *Client) GetNewAddress(account string) (abeutil.Address, error) {
 	return c.GetNewAddressAsync(account).Receive()
-}
+}*/
 
 // FutureGetRawChangeAddressResult is a future promise to deliver the result of
 // a GetRawChangeAddressAsync RPC invocation (or an applicable error).
@@ -1020,7 +1018,7 @@ type FutureGetRawChangeAddressResult chan *response
 // Receive waits for the response promised by the future and returns a new
 // address for receiving change that will be associated with the provided
 // account.  Note that this is only for raw transactions and NOT for normal use.
-func (r FutureGetRawChangeAddressResult) Receive() (abeutil.Address, error) {
+/*func (r FutureGetRawChangeAddressResult) Receive() (abeutil.Address, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -1034,7 +1032,7 @@ func (r FutureGetRawChangeAddressResult) Receive() (abeutil.Address, error) {
 	}
 
 	return abeutil.DecodeAddress(addr, &chaincfg.MainNetParams)
-}
+}*/
 
 // GetRawChangeAddressAsync returns an instance of a type that can be used to
 // get the result of the RPC at some future time by invoking the Receive
@@ -1049,9 +1047,9 @@ func (c *Client) GetRawChangeAddressAsync(account string) FutureGetRawChangeAddr
 // GetRawChangeAddress returns a new address for receiving change that will be
 // associated with the provided account.  Note that this is only for raw
 // transactions and NOT for normal use.
-func (c *Client) GetRawChangeAddress(account string) (abeutil.Address, error) {
+/*func (c *Client) GetRawChangeAddress(account string) (abeutil.Address, error) {
 	return c.GetRawChangeAddressAsync(account).Receive()
-}
+}*/
 
 // FutureAddWitnessAddressResult is a future promise to deliver the result of
 // a AddWitnessAddressAsync RPC invocation (or an applicable error).
@@ -1059,7 +1057,7 @@ type FutureAddWitnessAddressResult chan *response
 
 // Receive waits for the response promised by the future and returns the new
 // address.
-func (r FutureAddWitnessAddressResult) Receive() (abeutil.Address, error) {
+/*func (r FutureAddWitnessAddressResult) Receive() (abeutil.Address, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -1073,7 +1071,7 @@ func (r FutureAddWitnessAddressResult) Receive() (abeutil.Address, error) {
 	}
 
 	return abeutil.DecodeAddress(addr, &chaincfg.MainNetParams)
-}
+}*/
 
 // AddWitnessAddressAsync returns an instance of a type that can be used to get
 // the result of the RPC at some future time by invoking the Receive function on
@@ -1087,9 +1085,9 @@ func (c *Client) AddWitnessAddressAsync(address string) FutureAddWitnessAddressR
 
 // AddWitnessAddress adds a witness address for a script and returns the new
 // address (P2SH of the witness script).
-func (c *Client) AddWitnessAddress(address string) (abeutil.Address, error) {
+/*func (c *Client) AddWitnessAddress(address string) (abeutil.Address, error) {
 	return c.AddWitnessAddressAsync(address).Receive()
-}
+}*/
 
 // FutureGetAccountAddressResult is a future promise to deliver the result of a
 // GetAccountAddressAsync RPC invocation (or an applicable error).
@@ -1097,7 +1095,7 @@ type FutureGetAccountAddressResult chan *response
 
 // Receive waits for the response promised by the future and returns the current
 // Bitcoin address for receiving payments to the specified account.
-func (r FutureGetAccountAddressResult) Receive() (abeutil.Address, error) {
+/*func (r FutureGetAccountAddressResult) Receive() (abeutil.Address, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -1111,7 +1109,7 @@ func (r FutureGetAccountAddressResult) Receive() (abeutil.Address, error) {
 	}
 
 	return abeutil.DecodeAddress(addr, &chaincfg.MainNetParams)
-}
+}*/
 
 // GetAccountAddressAsync returns an instance of a type that can be used to get
 // the result of the RPC at some future time by invoking the Receive function on
@@ -1125,9 +1123,9 @@ func (c *Client) GetAccountAddressAsync(account string) FutureGetAccountAddressR
 
 // GetAccountAddress returns the current Bitcoin address for receiving payments
 // to the specified account.
-func (c *Client) GetAccountAddress(account string) (abeutil.Address, error) {
+/*func (c *Client) GetAccountAddress(account string) (abeutil.Address, error) {
 	return c.GetAccountAddressAsync(account).Receive()
-}
+}*/
 
 // FutureGetAccountResult is a future promise to deliver the result of a
 // GetAccountAsync RPC invocation (or an applicable error).
@@ -1156,7 +1154,7 @@ func (r FutureGetAccountResult) Receive() (string, error) {
 // returned instance.
 //
 // See GetAccount for the blocking version and more details.
-func (c *Client) GetAccountAsync(address abeutil.Address) FutureGetAccountResult {
+/*func (c *Client) GetAccountAsync(address abeutil.Address) FutureGetAccountResult {
 	addr := address.EncodeAddress()
 	cmd := abejson.NewGetAccountCmd(addr)
 	return c.sendCmd(cmd)
@@ -1165,7 +1163,7 @@ func (c *Client) GetAccountAsync(address abeutil.Address) FutureGetAccountResult
 // GetAccount returns the account associated with the passed address.
 func (c *Client) GetAccount(address abeutil.Address) (string, error) {
 	return c.GetAccountAsync(address).Receive()
-}
+}*/
 
 // FutureSetAccountResult is a future promise to deliver the result of a
 // SetAccountAsync RPC invocation (or an applicable error).
@@ -1183,7 +1181,7 @@ func (r FutureSetAccountResult) Receive() error {
 // returned instance.
 //
 // See SetAccount for the blocking version and more details.
-func (c *Client) SetAccountAsync(address abeutil.Address, account string) FutureSetAccountResult {
+/*func (c *Client) SetAccountAsync(address abeutil.Address, account string) FutureSetAccountResult {
 	addr := address.EncodeAddress()
 	cmd := abejson.NewSetAccountCmd(addr, account)
 	return c.sendCmd(cmd)
@@ -1192,7 +1190,7 @@ func (c *Client) SetAccountAsync(address abeutil.Address, account string) Future
 // SetAccount sets the account associated with the passed address.
 func (c *Client) SetAccount(address abeutil.Address, account string) error {
 	return c.SetAccountAsync(address, account).Receive()
-}
+}*/
 
 // FutureGetAddressesByAccountResult is a future promise to deliver the result
 // of a GetAddressesByAccountAsync RPC invocation (or an applicable error).
@@ -1200,7 +1198,7 @@ type FutureGetAddressesByAccountResult chan *response
 
 // Receive waits for the response promised by the future and returns the list of
 // addresses associated with the passed account.
-func (r FutureGetAddressesByAccountResult) Receive() ([]abeutil.Address, error) {
+/*func (r FutureGetAddressesByAccountResult) Receive() ([]abeutil.Address, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -1224,7 +1222,7 @@ func (r FutureGetAddressesByAccountResult) Receive() ([]abeutil.Address, error) 
 	}
 
 	return addrs, nil
-}
+}*/
 
 // GetAddressesByAccountAsync returns an instance of a type that can be used to
 // get the result of the RPC at some future time by invoking the Receive
@@ -1238,9 +1236,9 @@ func (c *Client) GetAddressesByAccountAsync(account string) FutureGetAddressesBy
 
 // GetAddressesByAccount returns the list of addresses associated with the
 // passed account.
-func (c *Client) GetAddressesByAccount(account string) ([]abeutil.Address, error) {
+/*func (c *Client) GetAddressesByAccount(account string) ([]abeutil.Address, error) {
 	return c.GetAddressesByAccountAsync(account).Receive()
-}
+}*/
 
 // FutureMoveResult is a future promise to deliver the result of a MoveAsync,
 // MoveMinConfAsync, or MoveCommentAsync RPC invocation (or an applicable
@@ -1386,7 +1384,7 @@ func (r FutureValidateAddressResult) Receive() (*abejson.ValidateAddressWalletRe
 // the returned instance.
 //
 // See ValidateAddress for the blocking version and more details.
-func (c *Client) ValidateAddressAsync(address abeutil.Address) FutureValidateAddressResult {
+/*func (c *Client) ValidateAddressAsync(address abeutil.Address) FutureValidateAddressResult {
 	addr := address.EncodeAddress()
 	cmd := abejson.NewValidateAddressCmd(addr)
 	return c.sendCmd(cmd)
@@ -1395,7 +1393,7 @@ func (c *Client) ValidateAddressAsync(address abeutil.Address) FutureValidateAdd
 // ValidateAddress returns information about the given bitcoin address.
 func (c *Client) ValidateAddress(address abeutil.Address) (*abejson.ValidateAddressWalletResult, error) {
 	return c.ValidateAddressAsync(address).Receive()
-}
+}*/
 
 // FutureKeyPoolRefillResult is a future promise to deliver the result of a
 // KeyPoolRefillAsync RPC invocation (or an applicable error).
@@ -1452,7 +1450,7 @@ type FutureListAccountsResult chan *response
 
 // Receive waits for the response promised by the future and returns returns a
 // map of account names and their associated balances.
-func (r FutureListAccountsResult) Receive() (map[string]abeutil.Amount, error) {
+/*func (r FutureListAccountsResult) Receive() (map[string]abeutil.Amount, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -1476,7 +1474,7 @@ func (r FutureListAccountsResult) Receive() (map[string]abeutil.Amount, error) {
 	}
 
 	return accountsMap, nil
-}
+}*/
 
 // ListAccountsAsync returns an instance of a type that can be used to get the
 // result of the RPC at some future time by invoking the Receive function on the
@@ -1492,9 +1490,9 @@ func (c *Client) ListAccountsAsync() FutureListAccountsResult {
 // using the default number of minimum confirmations.
 //
 // See ListAccountsMinConf to override the minimum number of confirmations.
-func (c *Client) ListAccounts() (map[string]abeutil.Amount, error) {
+/*func (c *Client) ListAccounts() (map[string]abeutil.Amount, error) {
 	return c.ListAccountsAsync().Receive()
-}
+}*/
 
 // ListAccountsMinConfAsync returns an instance of a type that can be used to
 // get the result of the RPC at some future time by invoking the Receive
@@ -1510,9 +1508,9 @@ func (c *Client) ListAccountsMinConfAsync(minConfirms int) FutureListAccountsRes
 // balances using the specified number of minimum confirmations.
 //
 // See ListAccounts to use the default minimum number of confirmations.
-func (c *Client) ListAccountsMinConf(minConfirms int) (map[string]abeutil.Amount, error) {
+/*func (c *Client) ListAccountsMinConf(minConfirms int) (map[string]abeutil.Amount, error) {
 	return c.ListAccountsMinConfAsync(minConfirms).Receive()
-}
+}*/
 
 // FutureGetBalanceResult is a future promise to deliver the result of a
 // GetBalanceAsync or GetBalanceMinConfAsync RPC invocation (or an applicable
@@ -1521,7 +1519,7 @@ type FutureGetBalanceResult chan *response
 
 // Receive waits for the response promised by the future and returns the
 // available balance from the server for the specified account.
-func (r FutureGetBalanceResult) Receive() (abeutil.Amount, error) {
+/*func (r FutureGetBalanceResult) Receive() (abeutil.Amount, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return 0, err
@@ -1540,7 +1538,7 @@ func (r FutureGetBalanceResult) Receive() (abeutil.Amount, error) {
 	}
 
 	return amount, nil
-}
+}*/
 
 // FutureGetBalanceParseResult is same as FutureGetBalanceResult except
 // that the result is expected to be a string which is then parsed into
@@ -1550,7 +1548,7 @@ type FutureGetBalanceParseResult chan *response
 
 // Receive waits for the response promised by the future and returns the
 // available balance from the server for the specified account.
-func (r FutureGetBalanceParseResult) Receive() (abeutil.Amount, error) {
+/*func (r FutureGetBalanceParseResult) Receive() (abeutil.Amount, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return 0, err
@@ -1573,7 +1571,7 @@ func (r FutureGetBalanceParseResult) Receive() (abeutil.Amount, error) {
 	}
 
 	return amount, nil
-}
+}*/
 
 // GetBalanceAsync returns an instance of a type that can be used to get the
 // result of the RPC at some future time by invoking the Receive function on the
@@ -1590,9 +1588,9 @@ func (c *Client) GetBalanceAsync(account string) FutureGetBalanceResult {
 // be "*" for all accounts.
 //
 // See GetBalanceMinConf to override the minimum number of confirmations.
-func (c *Client) GetBalance(account string) (abeutil.Amount, error) {
+/*func (c *Client) GetBalance(account string) (abeutil.Amount, error) {
 	return c.GetBalanceAsync(account).Receive()
-}
+}*/
 
 // GetBalanceMinConfAsync returns an instance of a type that can be used to get
 // the result of the RPC at some future time by invoking the Receive function on
@@ -1609,22 +1607,22 @@ func (c *Client) GetBalanceMinConfAsync(account string, minConfirms int) FutureG
 // account may be "*" for all accounts.
 //
 // See GetBalance to use the default minimum number of confirmations.
-func (c *Client) GetBalanceMinConf(account string, minConfirms int) (abeutil.Amount, error) {
+/*func (c *Client) GetBalanceMinConf(account string, minConfirms int) (abeutil.Amount, error) {
 	if c.config.EnableBCInfoHacks {
 		response := c.GetBalanceMinConfAsync(account, minConfirms)
 		return FutureGetBalanceParseResult(response).Receive()
 	}
 	return c.GetBalanceMinConfAsync(account, minConfirms).Receive()
-}
+}*/
 
 // FutureGetBalancesResult is a future promise to deliver the result of a
 // GetBalancesAsync RPC invocation (or an applicable error).
-type FutureGetBalancesResult chan *response
+// type FutureGetBalancesResult chan *response
 type FutureGetBalancesAbeResult chan *response
 
 // Receive waits for the response promised by the future and returns the
 // available balances from the server.
-func (r FutureGetBalancesResult) Receive() (*abejson.GetBalancesResult, error) {
+/*func (r FutureGetBalancesResult) Receive() (*abejson.GetBalancesResult, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -1638,7 +1636,7 @@ func (r FutureGetBalancesResult) Receive() (*abejson.GetBalancesResult, error) {
 	}
 
 	return &balances, nil
-}
+}*/
 func (r FutureGetBalancesAbeResult) Receive() (*abejson.GetBalancesAbeResult, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
@@ -1660,10 +1658,10 @@ func (r FutureGetBalancesAbeResult) Receive() (*abejson.GetBalancesAbeResult, er
 // returned instance.
 //
 // See GetBalances for the blocking version and more details.
-func (c *Client) GetBalancesAsync() FutureGetBalancesResult {
+/*func (c *Client) GetBalancesAsync() FutureGetBalancesResult {
 	cmd := abejson.NewGetBalancesCmd()
 	return c.sendCmd(cmd)
-}
+}*/
 func (c *Client) GetBalancesAbeAsync() FutureGetBalancesAbeResult {
 	cmd := abejson.NewGetBalancesAbeCmd(nil)
 	return c.sendCmd(cmd)
@@ -1691,7 +1689,7 @@ type FutureGetReceivedByAccountResult chan *response
 
 // Receive waits for the response promised by the future and returns the total
 // amount received with the specified account.
-func (r FutureGetReceivedByAccountResult) Receive() (abeutil.Amount, error) {
+/*func (r FutureGetReceivedByAccountResult) Receive() (abeutil.Amount, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return 0, err
@@ -1710,7 +1708,7 @@ func (r FutureGetReceivedByAccountResult) Receive() (abeutil.Amount, error) {
 	}
 
 	return amount, nil
-}
+}*/
 
 // GetReceivedByAccountAsync returns an instance of a type that can be used to
 // get the result of the RPC at some future time by invoking the Receive
@@ -1727,9 +1725,9 @@ func (c *Client) GetReceivedByAccountAsync(account string) FutureGetReceivedByAc
 //
 // See GetReceivedByAccountMinConf to override the minimum number of
 // confirmations.
-func (c *Client) GetReceivedByAccount(account string) (abeutil.Amount, error) {
+/*func (c *Client) GetReceivedByAccount(account string) (abeutil.Amount, error) {
 	return c.GetReceivedByAccountAsync(account).Receive()
-}
+}*/
 
 // GetReceivedByAccountMinConfAsync returns an instance of a type that can be
 // used to get the result of the RPC at some future time by invoking the Receive
@@ -1746,9 +1744,9 @@ func (c *Client) GetReceivedByAccountMinConfAsync(account string, minConfirms in
 // confirmations.
 //
 // See GetReceivedByAccount to use the default minimum number of confirmations.
-func (c *Client) GetReceivedByAccountMinConf(account string, minConfirms int) (abeutil.Amount, error) {
+/*func (c *Client) GetReceivedByAccountMinConf(account string, minConfirms int) (abeutil.Amount, error) {
 	return c.GetReceivedByAccountMinConfAsync(account, minConfirms).Receive()
-}
+}*/
 
 // FutureGetUnconfirmedBalanceResult is a future promise to deliver the result
 // of a GetUnconfirmedBalanceAsync RPC invocation (or an applicable error).
@@ -1756,7 +1754,7 @@ type FutureGetUnconfirmedBalanceResult chan *response
 
 // Receive waits for the response promised by the future and returns returns the
 // unconfirmed balance from the server for the specified account.
-func (r FutureGetUnconfirmedBalanceResult) Receive() (abeutil.Amount, error) {
+/*func (r FutureGetUnconfirmedBalanceResult) Receive() (abeutil.Amount, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return 0, err
@@ -1775,7 +1773,7 @@ func (r FutureGetUnconfirmedBalanceResult) Receive() (abeutil.Amount, error) {
 	}
 
 	return amount, nil
-}
+}*/
 
 // GetUnconfirmedBalanceAsync returns an instance of a type that can be used to
 // get the result of the RPC at some future time by invoking the Receive
@@ -1789,9 +1787,9 @@ func (c *Client) GetUnconfirmedBalanceAsync(account string) FutureGetUnconfirmed
 
 // GetUnconfirmedBalance returns the unconfirmed balance from the server for
 // the specified account.
-func (c *Client) GetUnconfirmedBalance(account string) (abeutil.Amount, error) {
+/*func (c *Client) GetUnconfirmedBalance(account string) (abeutil.Amount, error) {
 	return c.GetUnconfirmedBalanceAsync(account).Receive()
-}
+}*/
 
 // FutureGetReceivedByAddressResult is a future promise to deliver the result of
 // a GetReceivedByAddressAsync or GetReceivedByAddressMinConfAsync RPC
@@ -1800,7 +1798,7 @@ type FutureGetReceivedByAddressResult chan *response
 
 // Receive waits for the response promised by the future and returns the total
 // amount received by the specified address.
-func (r FutureGetReceivedByAddressResult) Receive() (abeutil.Amount, error) {
+/*func (r FutureGetReceivedByAddressResult) Receive() (abeutil.Amount, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return 0, err
@@ -1819,14 +1817,14 @@ func (r FutureGetReceivedByAddressResult) Receive() (abeutil.Amount, error) {
 	}
 
 	return amount, nil
-}
+}*/
 
 // GetReceivedByAddressAsync returns an instance of a type that can be used to
 // get the result of the RPC at some future time by invoking the Receive
 // function on the returned instance.
 //
 // See GetReceivedByAddress for the blocking version and more details.
-func (c *Client) GetReceivedByAddressAsync(address abeutil.Address) FutureGetReceivedByAddressResult {
+/*func (c *Client) GetReceivedByAddressAsync(address abeutil.Address) FutureGetReceivedByAddressResult {
 	addr := address.EncodeAddress()
 	cmd := abejson.NewGetReceivedByAddressCmd(addr, nil)
 	return c.sendCmd(cmd)
@@ -1840,14 +1838,14 @@ func (c *Client) GetReceivedByAddressAsync(address abeutil.Address) FutureGetRec
 // confirmations.
 func (c *Client) GetReceivedByAddress(address abeutil.Address) (abeutil.Amount, error) {
 	return c.GetReceivedByAddressAsync(address).Receive()
-}
+}*/
 
 // GetReceivedByAddressMinConfAsync returns an instance of a type that can be
 // used to get the result of the RPC at some future time by invoking the Receive
 // function on the returned instance.
 //
 // See GetReceivedByAddressMinConf for the blocking version and more details.
-func (c *Client) GetReceivedByAddressMinConfAsync(address abeutil.Address, minConfirms int) FutureGetReceivedByAddressResult {
+/*func (c *Client) GetReceivedByAddressMinConfAsync(address abeutil.Address, minConfirms int) FutureGetReceivedByAddressResult {
 	addr := address.EncodeAddress()
 	cmd := abejson.NewGetReceivedByAddressCmd(addr, &minConfirms)
 	return c.sendCmd(cmd)
@@ -1859,7 +1857,7 @@ func (c *Client) GetReceivedByAddressMinConfAsync(address abeutil.Address, minCo
 // See GetReceivedByAddress to use the default minimum number of confirmations.
 func (c *Client) GetReceivedByAddressMinConf(address abeutil.Address, minConfirms int) (abeutil.Amount, error) {
 	return c.GetReceivedByAddressMinConfAsync(address, minConfirms).Receive()
-}
+}*/
 
 // FutureListReceivedByAccountResult is a future promise to deliver the result
 // of a ListReceivedByAccountAsync, ListReceivedByAccountMinConfAsync, or
@@ -2145,7 +2143,7 @@ func (r FutureSignMessageResult) Receive() (string, error) {
 // returned instance.
 //
 // See SignMessage for the blocking version and more details.
-func (c *Client) SignMessageAsync(address abeutil.Address, message string) FutureSignMessageResult {
+/*func (c *Client) SignMessageAsync(address abeutil.Address, message string) FutureSignMessageResult {
 	addr := address.EncodeAddress()
 	cmd := abejson.NewSignMessageCmd(addr, message)
 	return c.sendCmd(cmd)
@@ -2157,7 +2155,7 @@ func (c *Client) SignMessageAsync(address abeutil.Address, message string) Futur
 // WalletPassphrase function for more details.
 func (c *Client) SignMessage(address abeutil.Address, message string) (string, error) {
 	return c.SignMessageAsync(address, message).Receive()
-}
+}*/
 
 // FutureVerifyMessageResult is a future promise to deliver the result of a
 // VerifyMessageAsync RPC invocation (or an applicable error).
@@ -2186,7 +2184,7 @@ func (r FutureVerifyMessageResult) Receive() (bool, error) {
 // returned instance.
 //
 // See VerifyMessage for the blocking version and more details.
-func (c *Client) VerifyMessageAsync(address abeutil.Address, signature, message string) FutureVerifyMessageResult {
+/*func (c *Client) VerifyMessageAsync(address abeutil.Address, signature, message string) FutureVerifyMessageResult {
 	addr := address.EncodeAddress()
 	cmd := abejson.NewVerifyMessageCmd(addr, signature, message)
 	return c.sendCmd(cmd)
@@ -2198,7 +2196,7 @@ func (c *Client) VerifyMessageAsync(address abeutil.Address, signature, message 
 // WalletPassphrase function for more details.
 func (c *Client) VerifyMessage(address abeutil.Address, signature, message string) (bool, error) {
 	return c.VerifyMessageAsync(address, signature, message).Receive()
-}
+}*/
 
 //	todo(ABE.MUST):
 //// *********************

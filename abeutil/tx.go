@@ -11,7 +11,7 @@ import (
 // TxIndexUnknown is the value returned for a transaction index that is unknown.
 // This is typically because the transaction has not been inserted into a block
 // yet.
-const TxIndexUnknown = -1
+// const TxIndexUnknown = -1
 const TxAbeIndexUnknown = -1
 
 // Tx defines a bitcoin transaction that provides easier and more efficient

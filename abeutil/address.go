@@ -151,7 +151,8 @@ type Address interface {
 	// passed bitcoin network.
 	IsForNet(*chaincfg.Params) bool
 }
-type AddressAbe interface {
+
+/*type AddressAbe interface {
 	// String returns the string encoding of the transaction output
 	// destination.
 	//
@@ -170,7 +171,7 @@ type AddressAbe interface {
 	// IsForNet returns whether or not the address is associated with the
 	// passed bitcoin network.
 	IsForNet(*chaincfg.Params) bool
-}
+}*/
 
 // DecodeAddress decodes the string encoding of an address and returns
 // the Address if addr is a valid encoding for a known address type.
