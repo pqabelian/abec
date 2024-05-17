@@ -1024,7 +1024,8 @@ func NewStandardCoinbaseTxIn(nextBlockHeight int32, txVersion uint32) (*TxInAbe,
 	previousOutPointRing.BlockHashs[0] = &hash0
 	//	todo: (EthashPoW) validity check of coinbaseTx will not check these remain hashes, to leave it free
 	for i := 1; i < int(numBlockForRing); i++ {
-		previousOutPointRing.BlockHashs[i] = &chainhash.ZeroHash
+		tmp := chainhash.ZeroHash // do not use point directly, the first 8 bytes of second block hash would be used to store the ExtraNonce for ETHPoW.
+		previousOutPointRing.BlockHashs[i] = &tmp
 	}
 
 	//	The 'empty' ring contains only 1 empty outpoint.
@@ -1076,8 +1077,13 @@ func CheckStandardCoinbaseTxIn(coinbaseTx *MsgTxAbe) error {
 	if len(txIn.PreviousOutPointRing.OutPoints) != 1 {
 		return fmt.Errorf("CheckStandardCoinbaseTxIn: the number of outpoints in TxIns[0].PreviousOutPointRing.OutPoints is not 1")
 	}
-	if bytes.Compare(txIn.PreviousOutPointRing.OutPoints[0].TxHash[:], chainhash.ZeroHash[:]) != 0 || txIn.PreviousOutPointRing.OutPoints[0].Index != 0 {
-		return fmt.Errorf("CheckStandardCoinbaseTxIn: TxIns[0].PreviousOutPointRing.OutPoints[0].TxHash or TxIns[0].PreviousOutPointRing.OutPoints[0].Index is not as expected")
+	if bytes.Compare(txIn.PreviousOutPointRing.OutPoints[0].TxHash[:], chainhash.ZeroHash[:]) != 0 {
+		return fmt.Errorf("CheckStandardCoinbaseTxIn: TxIns[0].PreviousOutPointRing.OutPoints[0].TxHash (%02x) is not as expected (%02x)",
+			txIn.PreviousOutPointRing.OutPoints[0].TxHash[:], chainhash.ZeroHash[:])
+	}
+	if txIn.PreviousOutPointRing.OutPoints[0].Index != 0 {
+		return fmt.Errorf("CheckStandardCoinbaseTxIn: TxIns[0].PreviousOutPointRing.OutPoints[0].Index (%d) is not as expected (%d)",
+			txIn.PreviousOutPointRing.OutPoints[0].Index, 0)
 	}
 
 	return nil
