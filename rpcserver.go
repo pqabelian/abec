@@ -3103,6 +3103,13 @@ func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	blocksPerRetarget := int32(s.cfg.ChainParams.TargetTimespan /
 		s.cfg.ChainParams.TargetTimePerBlock)
 
+	// Added by Alice, 2024.05.11, for DSA
+	// todo(DSA): review
+	if endHeight >= s.cfg.ChainParams.BlockHeightDSA {
+		blocksPerRetarget = int32(s.cfg.ChainParams.TargetTimespanDSA /
+			s.cfg.ChainParams.TargetTimePerBlockDSA)
+	}
+
 	// Calculate the starting block height based on the passed number of
 	// blocks.  When the passed value is negative, use the last block the
 	// difficulty changed as the starting height.  Also make sure the

@@ -41,6 +41,12 @@ const (
 	//	Thus, we set it to 0x20000000, while the previous (original) version is 0x10000000.
 	BlockVersionEthashPow = 0x20000000
 
+	// BlockVersionDSA is the block version which changed block to support DSA.
+	// The version is coded by the rule in versionbits.go
+	// Added by Alice, 2024.05.11, for DSA
+	// todo(DSA): review
+	BlockVersionDSA = 0x21000000
+
 	// BlockHeightEthashPoW
 	// BlockHeightEthashPoW denotes the block height from which Ethash-PoW mining is applied.
 	//	BlockHeightEthashPoW = 56000

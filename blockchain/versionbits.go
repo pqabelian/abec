@@ -27,6 +27,9 @@ const (
 	BlockVersionInitial = 0x10000000
 	//	wire.BlockVersionEthashPow = 0x20000000
 
+	// todo(DSA): review
+	//	wire.BlockVersionDSA = 0x21000000
+
 	//	todo: 202207 revise the version mechanism
 	//	In the future,
 	// vbTopBits defines the bits to set in the version to signal that the
@@ -216,10 +219,24 @@ func (b *BlockChain) calcNextBlockVersion(prevNode *blockNode) (int32, error) {
 	// Set the appropriate bits for each actively defined rule deployment
 	// that is either in the process of being voted on, or locked in for the
 	// activation at the next threshold window change.
-	if prevNode != nil && prevNode.height+1 >= b.chainParams.BlockHeightEthashPoW {
-		//	todo: this rule should be public known.
-		//	shall we directly defined wire.BlockVersionEthashPow as int32? to avoid type-transfer.
-		return int32(wire.BlockVersionEthashPow), nil
+	//if prevNode != nil && prevNode.height+1 >= b.chainParams.BlockHeightEthashPoW {
+	//	//	todo: this rule should be public known.
+	//	//	shall we directly defined wire.BlockVersionEthashPow as int32? to avoid type-transfer.
+	//	return int32(wire.BlockVersionEthashPow), nil
+	//}
+
+	if prevNode != nil {
+		//	if more versions are added, hard code here
+
+		// Added by Alice, 2024.05.11, for DSA
+		// todo(DSA): review
+		if prevNode.height+1 >= b.chainParams.BlockHeightDSA {
+			return int32(wire.BlockVersionDSA), nil
+		}
+
+		if prevNode.height+1 >= b.chainParams.BlockHeightEthashPoW {
+			return int32(wire.BlockVersionEthashPow), nil
+		}
 	}
 
 	return int32(BlockVersionInitial), nil

@@ -140,14 +140,22 @@ func (b *BlockChain) initBlockNode(node *blockNode, blockHeader *wire.BlockHeade
 				errStr := fmt.Sprintf("Block %v has height %d, while its parent has height %d", node.hash, blockHeader.Height, parent.height)
 				return ruleError(ErrMismatchedBlockHeightWithPrevNode, errStr)
 			}
+
+			// Added by Alice, 2024.05.11, for DSA
+			// todo(DSA): review
 			//	todo: when more versions appear, we need to refactor here.
-			if blockHeader.Version != int32(wire.BlockVersionEthashPow) {
-				if blockHeader.Version > int32(wire.BlockVersionEthashPow) {
-					log.Warnf("Unknown version %#08x with height %d than highest known version %#08x", blockHeader.Version, blockHeader.Height, wire.BlockVersionEthashPow)
+			if blockHeader.Height >= b.chainParams.BlockHeightDSA {
+				if blockHeader.Version != int32(wire.BlockVersionDSA) {
+					str := fmt.Sprintf("block has height %d, it should have version %08x for DSA, rather than version %08x", blockHeader.Height, int32(wire.BlockVersionDSA), blockHeader.Version)
+					return ruleError(ErrMismatchedBlockHeightAndVersion, str)
 				}
-				str := fmt.Sprintf("block has height %d, it should have version %d for EthashPoW, rather than the old version %d", blockHeader.Height, int32(wire.BlockVersionEthashPow), blockHeader.Version)
-				return ruleError(ErrMismatchedBlockHeightAndVersion, str)
+			} else {
+				if blockHeader.Version != int32(wire.BlockVersionEthashPow) {
+					str := fmt.Sprintf("block has height %d, it should have version %08x for EthashPoW, rather than the version %08x", blockHeader.Height, int32(wire.BlockVersionEthashPow), blockHeader.Version)
+					return ruleError(ErrMismatchedBlockHeightAndVersion, str)
+				}
 			}
+
 		}
 	}
 

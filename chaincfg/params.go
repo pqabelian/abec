@@ -150,6 +150,18 @@ type Params struct {
 	// block.
 	TargetTimePerBlock time.Duration
 
+	// TargetTimespanDSA is the desired amount of time that should elapse
+	// before the block difficulty requirement for DSA (Difficulty Smooth Adjustment) is examined to determine
+	// how it should be changed in order to maintain the desired block generation rate.
+	// Added by Alice, 2024.05.11, for DSA
+	// todo(DSA): review
+	TargetTimespanDSA time.Duration
+
+	// TargetTimePerBlockDSA is the desired amount of time to generate each block, in DSA.
+	// Added by Alice, 2024.05.11, for DSA
+	// todo(DSA): review
+	TargetTimePerBlockDSA time.Duration
+
 	// RetargetAdjustmentFactor is the adjustment factor used to limit
 	// the minimum and maximum amount of adjustment that can occur between
 	// difficulty retargets.
@@ -219,6 +231,11 @@ type Params struct {
 
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength int32
+
+	// BlockHeightDSA specifies the block height from which DSA is applied.
+	// Added by Alice, 2024.05.11, for DSA
+	// todo(DSA): review
+	BlockHeightDSA int32
 }
 
 // MainNetParams defines the network parameters for the main network.
@@ -250,6 +267,8 @@ var MainNetParams = Params{
 	SubsidyReductionInterval: 400_000,
 	TargetTimespan:           time.Second * 256 * 4000, // 14 days TODO(abe):this value may be need changed
 	TargetTimePerBlock:       time.Second * 256,        // 10 minutes TODO(abe): this value may be need changed, now temporary to be 3 min
+	TargetTimespanDSA:        time.Second * 256 * 200,  // For DSA, added by Alice. todo(DSA): review
+	TargetTimePerBlockDSA:    time.Second * 256,        // For DSA, added by Alice. todo(DSA): review
 	RetargetAdjustmentFactor: 4,                        // 25% less, 400% more
 	ReduceMinDifficulty:      false,                    // TODO(abe): this config may be used for adjust the difficult automatic?
 	MinDiffReductionTime:     0,
@@ -320,6 +339,10 @@ var MainNetParams = Params{
 
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength: 4000,
+
+	// Added by Alice, 2024.05.11, for DSA
+	// todo(DSA): review
+	BlockHeightDSA: 288000,
 }
 
 // RegressionNetParams defines the network parameters for the regression test
@@ -341,7 +364,9 @@ var RegressionNetParams = Params{
 	SubsidyReductionInterval: 400_000,
 	TargetTimespan:           time.Second * 256 * 4000,
 	TargetTimePerBlock:       time.Second * 256,
-	RetargetAdjustmentFactor: 4, // 25% less, 400% more
+	TargetTimespanDSA:        time.Second * 256 * 200, // For DSA, added by Alice. todo(DSA): review
+	TargetTimePerBlockDSA:    time.Second * 256,       // For DSA, added by Alice. todo(DSA): review
+	RetargetAdjustmentFactor: 4,                       // 25% less, 400% more
 	ReduceMinDifficulty:      true,
 	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
 	GenerateSupported:        true,
@@ -392,6 +417,10 @@ var RegressionNetParams = Params{
 	BlockHeightEthashPoW: 300,
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength: 200,
+
+	// Added by Alice, 2024.05.11, for DSA
+	// todo(DSA): review
+	BlockHeightDSA: 288000,
 }
 
 // TestNet3Params defines the network parameters for the test network
@@ -418,6 +447,8 @@ var TestNet3Params = Params{
 	SubsidyReductionInterval: 400_000,
 	TargetTimespan:           time.Second * 256 * 4000, // 14 days TODO(abe):this value may be need changed
 	TargetTimePerBlock:       time.Second * 256,        // 10 minutes TODO(abe): this value may be need changed, now temporary to be 3 min
+	TargetTimespanDSA:        time.Second * 256 * 200,  // For DSA, added by Alice. todo(DSA): review
+	TargetTimePerBlockDSA:    time.Second * 256,        // For DSA, added by Alice. todo(DSA): review
 	RetargetAdjustmentFactor: 4,                        // 25% less, 400% more
 	ReduceMinDifficulty:      true,                     // TODO(abe): this config may be used for adjust the difficult automatic?
 	MinDiffReductionTime:     time.Minute * 20,
@@ -471,6 +502,10 @@ var TestNet3Params = Params{
 	BlockHeightEthashPoW: 56000,
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength: 4000,
+
+	// Added by Alice, 2024.05.11, for DSA
+	// todo(DSA): review
+	BlockHeightDSA: 288000,
 }
 
 // SimNetParams defines the network parameters for the simulation test
@@ -495,7 +530,9 @@ var SimNetParams = Params{
 	SubsidyReductionInterval: 400_000,
 	TargetTimespan:           time.Second * 256 * 4000,
 	TargetTimePerBlock:       time.Second * 256,
-	RetargetAdjustmentFactor: 4, // 25% less, 400% more
+	TargetTimespanDSA:        time.Second * 256 * 200, // For DSA, added by Alice. todo(DSA): review
+	TargetTimePerBlockDSA:    time.Second * 256,       // For DSA, added by Alice. todo(DSA): review
+	RetargetAdjustmentFactor: 4,                       // 25% less, 400% more
 	ReduceMinDifficulty:      true,
 	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
 	GenerateSupported:        true,
@@ -546,6 +583,10 @@ var SimNetParams = Params{
 	BlockHeightEthashPoW: 300,
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength: 200,
+
+	// Added by Alice, 2024.05.11, for DSA
+	// todo(DSA): review
+	BlockHeightDSA: 288000,
 }
 
 var (
