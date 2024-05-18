@@ -26,8 +26,10 @@ const (
 	// All historical versions should be listed here.
 	BlockVersionInitial = 0x10000000
 	//	wire.BlockVersionEthashPow = 0x20000000
+
 	// todo(DSA): review
 	//	wire.BlockVersionDSA = 0x21000000
+
 	// ToDo(MLP):
 	//	wire.BlockVersionMLPAUT = 0x30000000
 

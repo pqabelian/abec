@@ -187,6 +187,8 @@ func CalcWork(bits uint32) *big.Int {
 	return new(big.Int).Div(oneLsh256, denominator)
 }
 
+// Added by Alice, 2024.05.11, for DSA
+// todo(DSA): review
 func calcTargetFormExpectedWorkSum(expectedWorkSum *big.Int) *big.Int {
 	if expectedWorkSum == nil || expectedWorkSum.Sign() <= 0 {
 		return big.NewInt(1)

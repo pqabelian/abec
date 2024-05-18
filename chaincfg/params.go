@@ -232,6 +232,7 @@ type Params struct {
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength int32
 
+	// BlockHeightDSA specifies the block height from which DSA is applied.
 	// Added by Alice, 2024.05.11, for DSA
 	// todo(DSA): review
 	BlockHeightDSA int32
