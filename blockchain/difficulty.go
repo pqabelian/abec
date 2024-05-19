@@ -380,14 +380,31 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 				return 0, AssertError(errStr)
 			}
 
+			timeStampWarn := false
 			if slotEndNode.timestamp <= slotStartNode.timestamp {
-				errStr := fmt.Sprintf("slotEndNode (at heigt %d, hash %s) has timestamp %d, while slotStartNode (at heigt %d, hash %s) has timestamp %d",
+				// This should not happen.
+				// In case attacker launch attacks on this point and to make the system as robust as possible, we use a default smallest time and warn.
+				timeStampWarn = true
+
+				warnStr := fmt.Sprintf("slotEndNode (at heigt %d, hash %s) has timestamp %d, while slotStartNode (at heigt %d, hash %s) has timestamp %d",
 					slotEndNode.height, slotEndNode.hash, slotEndNode.timestamp, slotStartNode.height, slotStartNode.hash, slotStartNode.timestamp)
-				return 0, AssertError(errStr)
+				log.Warn(warnStr)
+				log.Warn(warnStr)
+				log.Warn(warnStr)
+				// As this is actually a serious warning, it warns three times.
+			}
+
+			if timeStampWarn {
+				slotTimeSpan.SetInt64(b.minRetargetTimespan)
+				// Note that when warning happens, it means the network hash rate is much larger than the difficulty evaluates,
+				// for example, with the main net, at least 8 times of the expected (since, for main net 200 blocks were generated in 2 hours).
+				// The above time setting may underestimate the hash rate for this slot.
+				log.Infof("Timestamp warning happens. The slot time is set to minRetargetTimespan (%064x)", time.Duration(b.minRetargetTimespan)*time.Second)
+			} else {
+				slotTimeSpan.SetInt64(slotEndNode.timestamp - slotStartNode.timestamp) // in seconds
 			}
 
 			slotWorkSum = slotWorkSum.Sub(slotEndNode.workSum, slotStartNode.workSum)
-			slotTimeSpan.SetInt64(slotEndNode.timestamp - slotStartNode.timestamp) // in seconds
 			hashRate = hashRate.Div(slotWorkSum, slotTimeSpan)
 
 			// logging for each slot
