@@ -189,14 +189,15 @@ func CalcWork(bits uint32) *big.Int {
 
 // Added by Alice, 2024.05.11, for DSA
 // todo(DSA): review
-func calcTargetFormExpectedWorkSum(expectedWorkSum *big.Int) *big.Int {
-	if expectedWorkSum == nil || expectedWorkSum.Sign() <= 0 {
-		return big.NewInt(1)
+func calcTargetFromExpectedWorkSumPerBlock(expectedWorkSumPerBlock *big.Int) *big.Int {
+	denominator := big.NewInt(1)
+	if expectedWorkSumPerBlock != nil && expectedWorkSumPerBlock.Sign() > 0 {
+		denominator = expectedWorkSumPerBlock
 	}
 
 	// (1 << 256) / (expectedWorkSum)
-	// This is assuming that Hash-with-256-output is used to
-	return new(big.Int).Div(oneLsh256, expectedWorkSum)
+	// This is assuming that Hash-with-256-output is used for the PoW algorithm.
+	return new(big.Int).Div(oneLsh256, denominator)
 }
 
 // calcEasiestDifficulty calculates the easiest possible difficulty that a block
@@ -437,7 +438,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 
 		targetTimePerBlock := int64(b.chainParams.TargetTimePerBlockDSA / time.Second)
 		targetWorkSumPerBlock := new(big.Int).Mul(targetHR, big.NewInt(targetTimePerBlock))
-		newTarget := calcTargetFormExpectedWorkSum(targetWorkSumPerBlock)
+		newTarget := calcTargetFromExpectedWorkSumPerBlock(targetWorkSumPerBlock)
 
 		// Limit new value to the proof of work limit.
 		if newTarget.Cmp(b.chainParams.PowLimit) > 0 {
