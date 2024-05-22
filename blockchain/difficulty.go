@@ -400,7 +400,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 				// Note that when warning happens, it means the network hash rate is much larger than the difficulty evaluates,
 				// for example, with the main net, at least 8 times of the expected (since, for main net 200 blocks were generated in 2 hours).
 				// The above time setting may underestimate the hash rate for this slot.
-				log.Infof("Timestamp warning happens. The slot time is set to minRetargetTimespan (%064x)", time.Duration(b.minRetargetTimespan)*time.Second)
+				log.Infof("Timestamp warning happens. The slot time is set to minRetargetTimespan (%v)", time.Duration(b.minRetargetTimespanDSA)*time.Second)
 			} else {
 				slotTimeSpan.SetInt64(slotEndNode.timestamp - slotStartNode.timestamp) // in seconds
 			}
