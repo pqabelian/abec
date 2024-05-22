@@ -396,7 +396,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 			}
 
 			if timeStampWarn {
-				slotTimeSpan.SetInt64(b.minRetargetTimespan)
+				slotTimeSpan.SetInt64(b.minRetargetTimespanDSA)
 				// Note that when warning happens, it means the network hash rate is much larger than the difficulty evaluates,
 				// for example, with the main net, at least 8 times of the expected (since, for main net 200 blocks were generated in 2 hours).
 				// The above time setting may underestimate the hash rate for this slot.
