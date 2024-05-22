@@ -409,11 +409,13 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 			hashRate = hashRate.Div(slotWorkSum, slotTimeSpan)
 
 			// logging for each slot
-			log.Infof("Slot %d : start height: %d, end height %d, difficulty %08x (%064x), timespan %064x, workSum %d, hashRate %d",
+			log.Infof("Slot %d : start height: %d, end height %d, difficulty %08x (%064x), timespan %v, workSum %d, hashRate %d",
 				i, slotStartNode.height, slotEndNode.height, slotEndNode.bits, CompactToBig(slotEndNode.bits), time.Duration(slotTimeSpan.Int64())*time.Second, slotWorkSum, hashRate)
 
 			if i == len(dsaSmoothFactorsInt)-1 {
-				latestHR = hashRate
+				tmpBytes := make([]byte, len(hashRate.Bytes()))
+				copy(tmpBytes, hashRate.Bytes())
+				latestHR.SetBytes(hashRate.Bytes())
 				latestTimeSpan = slotTimeSpan.Int64()
 			}
 
@@ -442,6 +444,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 
 		// Limit new value to the proof of work limit.
 		if newTarget.Cmp(b.chainParams.PowLimit) > 0 {
+			log.Warnf("new target is set to the proof of work limit")
 			newTarget.Set(b.chainParams.PowLimit)
 		}
 
@@ -454,7 +457,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 		log.Infof("Summary for Difficulty retarget at block height %d", lastNode.height+1)
 		log.Infof("Old target %08x (%064x)", lastNode.bits, CompactToBig(lastNode.bits))
 		log.Infof("New target %08x (%064x)", newTargetBits, CompactToBig(newTargetBits))
-		log.Infof("Latest timespan %v, Latest Hash Rate %064x, Average Hash Rate %064x, Target Hash Rate %064x, Target timespan %v",
+		log.Infof("Latest timespan %v, Latest Hash Rate %064x, Average Hash Rate %v, Target Hash Rate %v, Target timespan %v",
 			time.Duration(latestTimeSpan)*time.Second,
 			latestHR,
 			avgHR,
