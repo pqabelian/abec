@@ -532,7 +532,7 @@ func CryptoAddressKeysVerify(cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk
 		if cryptoSchemeInSnsk != cryptoScheme {
 			return false, fmt.Errorf("CryptoAddressKeysVerify: unmacthed cryptoScheme in cryptoSnsk and cryptoAddress: %d vs %d", cryptoSchemeInSnsk, cryptoScheme)
 		}
-		privacyLevelInSnsk, coinSerialNumberSecretKey, err := CryptoSerialNumberSecretKeyParse(cryptoSnsk)
+		privacyLevelInSnsk, _, err := CryptoSerialNumberSecretKeyParse(cryptoSnsk)
 		if err != nil {
 			return false, fmt.Errorf("CryptoAddressKeysVerify: can not parse cryptoSnsk: %v", err)
 		}
@@ -555,9 +555,9 @@ func CryptoAddressKeysVerify(cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk
 			return false, fmt.Errorf("CryptoAddressKeysVerify: unmacthed privacyLevel in cryptoVsk and cryptoAddress: %d vs %d", privacyLevelInVsk, privacyLevel)
 		}
 
-		valid, hints := abecrypto.VerifyCryptoAddressSpsnsk(coinAddress, coinSpendSecretKey, coinSerialNumberSecretKey)
+		valid, hints := abecrypto.VerifyCryptoAddressSpsnsk(cryptoAddress, cryptoSpsk, cryptoSnsk)
 		if !valid {
-			return false, fmt.Errorf("%s", hints)
+			return false, fmt.Errorf("fail to verify crypto address and keys %s", hints)
 		}
 
 		return pqringctxCoinValueKeyVerify(abecryptoxparam.PQRingCTXPP, coinValuePublicKey, coinValueSecretKey)
@@ -577,7 +577,7 @@ func CryptoAddressKeysVerify(cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk
 		if cryptoSchemeInDetectorKey != cryptoScheme {
 			return false, fmt.Errorf("CryptoAddressKeysVerify: unmacthed cryptoScheme in cryptoDetectorKey and cryptoAddress: %d vs %d", cryptoSchemeInDetectorKey, cryptoScheme)
 		}
-		privacyLevelInDetectorKey, coinDetectorKey, err := CryptoDetectorKeyParse(cryptoSnsk)
+		privacyLevelInDetectorKey, coinDetectorKey, err := CryptoDetectorKeyParse(cryptoDetectorKey)
 		if err != nil {
 			return false, fmt.Errorf("CryptoAddressKeysVerify: can not parse cryptoDetectorKey: %v", err)
 		}

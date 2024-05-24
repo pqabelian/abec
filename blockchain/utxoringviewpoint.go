@@ -523,7 +523,7 @@ func (entry *UtxoRingEntry) Serialize(w io.Writer) error {
 		}
 	}
 	if len(entry.consumingBlockHashs) != len(entry.serialNumbers) {
-		return AssertError(fmt.Sprintf("The number of consumed serialNumbers does not mathc the number of corresponidng block hashes"))
+		return AssertError(fmt.Sprintf("The number of consumed serialNumbers does not match the number of corresponidng block hashes"))
 	}
 	for _, consumingBlockHash := range entry.consumingBlockHashs {
 		_, err = w.Write(consumingBlockHash[:])

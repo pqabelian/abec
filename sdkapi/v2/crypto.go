@@ -3,6 +3,7 @@ package v2
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
@@ -50,9 +51,44 @@ func GetCryptoSchemeByTxVersion(txVersion uint32) (CryptoScheme, error) {
 func CryptoAddressKeyGenByRootSeeds(cryptoScheme CryptoScheme, privacyLevel PrivacyLevel,
 	coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte,
 	coinDetectorRootKey []byte) (cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk []byte, cryptoVsk []byte, cryptoDetectorKey []byte, err error) {
-	return abecryptoxkey.CryptoAddressKeyGenByRootSeeds(cryptoScheme, privacyLevel,
-		coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed,
-		coinValueKeyRootSeed, coinDetectorRootKey)
+	switch cryptoScheme {
+	case CryptoSchemePQRingCTX:
+		return abecryptoxkey.CryptoAddressKeyGenByRootSeeds(cryptoScheme, privacyLevel,
+			coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed,
+			coinValueKeyRootSeed, coinDetectorRootKey)
+	default:
+		return nil, nil, nil, nil, nil, fmt.Errorf("unsupported crypto scheme %d", cryptoScheme)
+	}
+}
+
+func ExtractPublicRandFromCryptoAddress(cryptoAddress []byte) (publicRand []byte, err error) {
+	return abecryptoxkey.ExtractPublicRandFromCryptoAddress(cryptoAddress)
+}
+
+func CryptoAddressKeyReGenByRootSeedsFromPublicRand(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
+	coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte,
+	coinDetectorRootKey []byte, publicRand []byte) (cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk []byte,
+	cryptoVsk []byte, cryptoDetectorKey []byte, err error) {
+	return abecryptoxkey.CryptoAddressKeyReGenByRootSeedsFromPublicRand(cryptoScheme, privacyLevel,
+		coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed,
+		coinDetectorRootKey, publicRand)
+}
+
+func RandSeedsGenByRootSeedsFromPublicRand(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
+	coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte,
+	coinDetectorRootKey []byte, publicRand []byte) (coinSpendKeyRandSeed []byte, coinSerialNumberKeyRandSeed []byte, coinValueKeyRandSeed []byte,
+	coinDetectorKey []byte, err error) {
+	return abecryptoxkey.RandSeedsGenByRootSeedsFromPublicRand(cryptoScheme, privacyLevel,
+		coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed,
+		coinDetectorRootKey, publicRand)
+}
+
+func CryptoAddressKeyGenByRandSeeds(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
+	coinSpendKeyRandSeed []byte, coinSerialNumberKeyRandSeed []byte, coinValueKeyRandSeed []byte,
+	coinDetectorKey []byte, publicRand []byte) (cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk []byte, cryptoVsk []byte, cryptoDetectorKey []byte, err error) {
+	return abecryptoxkey.CryptoAddressKeyGenByRandSeeds(cryptoScheme, privacyLevel,
+		coinSpendKeyRandSeed, coinSerialNumberKeyRandSeed, coinValueKeyRandSeed,
+		coinDetectorKey, publicRand)
 }
 
 func CryptoAddressKeyVerify(cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk []byte, cryptoVsk []byte, cryptoDetectorKey []byte) (bool, error) {
@@ -65,11 +101,6 @@ func CheckCryptoAddress(cryptoAddress []byte) (valid bool, err error) {
 	return abecryptoxkey.CheckCryptoAddress(cryptoAddress)
 }
 
-/*
-*
-ToDo: At this moment (2023.03.03), serializedTxOut is actually txoScript (which user obtains by RPC API).
-In later version, we need to modify the RPC API to provide serializedTxOut.
-*/
 func ExtractCoinAddressFromSerializedTxOut(txVersion uint32, serializedTxOut []byte) ([]byte, error) {
 	abeTxo := &wire.TxOutAbe{}
 	err := wire.ReadTxOutAbe(bytes.NewReader(serializedTxOut), 0, txVersion, abeTxo)
@@ -79,19 +110,73 @@ func ExtractCoinAddressFromSerializedTxOut(txVersion uint32, serializedTxOut []b
 	return abecryptox.ExtractCoinAddressFromTxo(abeTxo)
 }
 
+func TxoCoinDetectByCoinDetectorRootKey(txVersion uint32, serializedTxOut []byte, coinDetectorRootKey []byte) (bool, error) {
+	abeTxo := &wire.TxOutAbe{}
+	err := wire.ReadTxOutAbe(bytes.NewReader(serializedTxOut), 0, txVersion, abeTxo)
+	if err != nil {
+		return false, err
+	}
+	return abecryptox.TxoCoinDetectByCoinDetectorRootKey(abeTxo, coinDetectorRootKey)
+}
+func TxoCoinReceiveByRootSeeds(txVersion uint32, serializedTxOut []byte, coinValueKeyRootSeed []byte, coinDetectorRootKey []byte) (bool, uint64, error) {
+	abeTxo := &wire.TxOutAbe{}
+	err := wire.ReadTxOutAbe(bytes.NewReader(serializedTxOut), 0, txVersion, abeTxo)
+	if err != nil {
+		return false, 0, err
+	}
+	return abecryptox.TxoCoinReceiveByRootSeeds(abeTxo, coinValueKeyRootSeed, coinDetectorRootKey)
+}
+func TxoCoinReceiveByKeys(txVersion uint32, serializedTxOut []byte, cryptoAddress []byte, cryptoValueSecretKey []byte) (bool, uint64, error) {
+	abeTxo := &wire.TxOutAbe{}
+	err := wire.ReadTxOutAbe(bytes.NewReader(serializedTxOut), 0, txVersion, abeTxo)
+	if err != nil {
+		return false, 0, err
+	}
+	return abecryptox.TxoCoinReceiveByKeys(abeTxo, cryptoAddress, cryptoValueSecretKey)
+}
+
+func GetTxoPrivacyLevel(txVersion uint32, serializedTxOut []byte) (PrivacyLevel, error) {
+	abeTxo := &wire.TxOutAbe{}
+	err := wire.ReadTxOutAbe(bytes.NewReader(serializedTxOut), 0, txVersion, abeTxo)
+	if err != nil {
+		return 0, err
+	}
+	return abecryptox.GetTxoPrivacyLevel(abeTxo)
+}
+
+func PrivacyLevelPseudonymTxoCoinParse(txVersion uint32, serializedTxOut []byte) (value uint64, err error) {
+	abeTxo := &wire.TxOutAbe{}
+	err = wire.ReadTxOutAbe(bytes.NewReader(serializedTxOut), 0, txVersion, abeTxo)
+	if err != nil {
+		return 0, err
+	}
+	privacyLevel, err := abecryptox.GetTxoPrivacyLevel(abeTxo)
+	if err != nil {
+		return 0, fmt.Errorf("fail to extract the privacy level from transaction output: %v", err)
+	}
+	if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
+		return 0, fmt.Errorf("can not extract from non-pseudonym output")
+	}
+	_, coinValue, err := abecryptox.PseudonymTxoCoinParse(abeTxo)
+	if err != nil {
+		return 0, fmt.Errorf("fail to parse transacoutput output as an pseudonym txo: %v", err)
+	}
+	return coinValue, nil
+}
+
 /*
 *
 ToDo: At this moment (2023.03.03), serializedTxOut is actually txoScript (which user obtains by RPC API).
 In later version, we need to modify the RPC API to provide serializedTxOut.
 */
-func ExtractCoinValueFromSerializedTxOutByKeys(txVersion uint32, serializedTxOut []byte, cryptoValueSecretKey []byte, coinDetectorKey []byte) (uint64, error) {
+func ExtractCoinValueFromSerializedTxOutByKeys(txVersion uint32, serializedTxOut []byte, cryptoAddress []byte, cryptoValueSecretKey []byte) (uint64, error) {
 	abeTxo := &wire.TxOutAbe{}
 	err := wire.ReadTxOutAbe(bytes.NewReader(serializedTxOut), 0, txVersion, abeTxo)
 	if err != nil {
 		return 0, err
 	}
 
-	bl, value, err := abecryptox.TxoCoinReceiveByKeys(abeTxo, cryptoValueSecretKey, coinDetectorKey)
+	bl, value, err := abecryptox.TxoCoinReceiveByKeys(abeTxo, cryptoAddress, cryptoValueSecretKey)
 	if err != nil {
 		return 0, err
 	}
