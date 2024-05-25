@@ -603,16 +603,16 @@ out:
 			//m.notifyForTx(watchedOutPoints, watchedAddrs, n.tx, nil)
 			//m.notifyRelevantTxAccepted(n.tx, clients)
 
-			case *notificationTxAcceptedByMempoolAbe:
-				if n.isNew && len(txNotifications) != 0 {
-					//m.notifyForNewTxAbe(txNotifications, n.tx)
-				}
+			/*case *notificationTxAcceptedByMempoolAbe:
+			if n.isNew && len(txNotifications) != 0 {
+				//m.notifyForNewTxAbe(txNotifications, n.tx)
+			}
 
-				//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
-				//m.notifyForTx(watchedOutPoints, watchedAddrs, n.tx, nil)
+			//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+			//m.notifyForTx(watchedOutPoints, watchedAddrs, n.tx, nil)
 
-				// TODO(ABE): ABE does not support filter.
-				//m.notifyRelevantTxAccepted(n.tx, clients)
+			// TODO(ABE): ABE does not support filter.
+			//m.notifyRelevantTxAccepted(n.tx, clients)*/
 
 			case *notificationRegisterBlocks:
 				wsc := (*wsClient)(n)

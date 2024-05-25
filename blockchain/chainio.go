@@ -1555,12 +1555,13 @@ func (b *BlockChain) createChainState() error {
 func (b *BlockChain) initChainState() error {
 	// Determine the state of the chain database. We may need to initialize
 	// everything from scratch or upgrade certain buckets.
-	var initialized, hasBlockIndex bool
+	//var hasBlockIndex bool
+	var initialized bool
 	var hasDeletedWitnessFileBucket bool
 	var workedHeightScope, readyHeightScope []BlockHeightScope
 	err := b.db.View(func(dbTx database.Tx) error {
 		initialized = dbTx.Metadata().Get(chainStateKeyName) != nil
-		hasBlockIndex = dbTx.Metadata().Bucket(blockIndexBucketName) != nil
+		//hasBlockIndex = dbTx.Metadata().Bucket(blockIndexBucketName) != nil
 		hasDeletedWitnessFileBucket = dbTx.Metadata().Bucket(deletedWitnessFileBucketName) != nil
 
 		if b.chainParams.Net != wire.MainNet {
@@ -1580,13 +1581,13 @@ func (b *BlockChain) initChainState() error {
 		return b.createChainState()
 	}
 
-	// todo: 202207 need refactor to remove
+	/*// todo: 202207 need refactor to remove
 	if !hasBlockIndex {
 		err := migrateBlockIndex(b.db)
 		if err != nil {
 			return nil
 		}
-	}
+	}*/
 
 	if !hasDeletedWitnessFileBucket {
 		// Create the bucket that houses the meta infos of deleted witness file,

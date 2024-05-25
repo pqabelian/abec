@@ -505,18 +505,16 @@ type BlkTmplGenerator struct {
 func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
 	txSource TxSource, chain *blockchain.BlockChain,
 	timeSource blockchain.MedianTimeSource,
-	sigCache *txscript.SigCache,
-	hashCache *txscript.HashCache,
 	witnessCache *txscript.WitnessCache) *BlkTmplGenerator {
 
 	return &BlkTmplGenerator{
-		policy:       policy,
-		chainParams:  params,
-		txSource:     txSource,
-		chain:        chain,
-		timeSource:   timeSource,
-		sigCache:     sigCache,
-		hashCache:    hashCache,
+		policy:      policy,
+		chainParams: params,
+		txSource:    txSource,
+		chain:       chain,
+		timeSource:  timeSource,
+		//sigCache:     sigCache,
+		//hashCache:    hashCache,
 		witnessCache: witnessCache,
 	}
 }

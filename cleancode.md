@@ -1765,5 +1765,98 @@
 	}
    ```
 	
-	
+23/05/2024
+1. [blockchain/chainio.go `func (b *BlockChain) initChainState()`](https://github.com/pqabelian/abec/blob/feature_cleancode/blockchain/chainio.go#L1583)
+   ```go
+	// initChainState attempts to load and initialize the chain state from the
+	// database.  When the db does not yet contain any chain state, both it and the
+	// chain state are initialized to the genesis block.
+	func (b *BlockChain) initChainState() error {
+		...
+		// todo: 202207 need refactor to remove
+		if !hasBlockIndex {
+			err := migrateBlockIndex(b.db)
+			if err != nil {
+				return nil
+			}
+		}
+		...
+	}
+   ```
+	`migrateBlockIndex` is in [blockchain/upgrade.go](https://github.com/pqabelian/abec/blob/feature_cleancode/blockchain/upgrade.go#L49)
+	```go
+	// migrateBlockIndex migrates all block entries from the v1 block index bucket
+	// to the v2 bucket. The v1 bucket stores all block entries keyed by block hash,
+	// whereas the v2 bucket stores the exact same values, but keyed instead by
+	// block height + hash.
+	//
+	//	todo: (EthashPoW) 202207 Need refactor to remove.
+	func migrateBlockIndex(db database.DB) error {
+		...
+	}
+	```
+2. [server.go](https://github.com/pqabelian/abec/blob/feature_cleancode/server.go#L202)
+   ```go
+	// server provides an Abelian server for handling communications to and from Abelian peers.
+	type server struct {
+		...
+		//	TODO:(Abelian) remove txScript, sigCache, and hashCache
+		sigCache             *txscript.SigCache
+		hashCache            *txscript.HashCache
+		witnessCache         *txscript.WitnessCache
+		...
+	}
+   ```
+3. [server.go `func initListeners`](https://github.com/pqabelian/abec/blob/feature_cleancode/server.go#L2933) random port?
+	```go
+	// initListeners initializes the configured net listeners and adds any bound
+	// addresses to the address manager. Returns the listeners and a NAT interface,
+	// which is non-nil if UPnP is in use.
+	func initListeners(amgr *netaddrmgr.NetAddrManager, listenAddrs []string, services wire.ServiceFlag) ([]net.Listener, NAT, error) {
+		...
+		for _, sip := range cfg.ExternalIPs {
+			eport := uint16(defaultPort)
+			host, portstr, err := net.SplitHostPort(sip)
+			if err != nil {
+				// no port, use default.
+				// todo: 20220427. if no port, then use a random port
+				host = sip
+			}
+			...
+		}
+		...
+	}
+
+	```
+
+4. [rpcwebsocket.go](https://github.com/pqabelian/abec/blob/feature_cleancode/rpcwebsocket.go#L606)
+   ```go
+	// notificationHandler reads notifications and control messages from the queue
+	// handler and processes one at a time.
+	//
+	//	TODO(ABE, MUST):
+	func (m *wsNotificationManager) notificationHandler() {
+		...
+		case *notificationTxAcceptedByMempoolAbe:
+				if n.isNew && len(txNotifications) != 0 {
+					//m.notifyForNewTxAbe(txNotifications, n.tx)
+				}
+
+				//	todo(ABE): ABE does not support watchedOutPoints or watchedAddrs.
+				//m.notifyForTx(watchedOutPoints, watchedAddrs, n.tx, nil)
+
+				// TODO(ABE): ABE does not support filter.
+				//m.notifyRelevantTxAccepted(n.tx, clients)
+		...
+	}
+   ```
+5. [rpcserver.go `func handleDecodeScript`](https://github.com/pqabelian/abec/blob/feature_cleancode/rpcserver.go#L1122)
+	```go
+	// handleDecodeScript handles decodescript commands.
+	//
+	//	todo(ABE): ABE does not use/support this?
+	func handleDecodeScript(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+		...
+	}
+	```
 	

@@ -131,22 +131,22 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"debuglevel":              handleDebugLevel,
 	//"decoderawtransaction":    handleDecodeRawTransaction,
 	"decoderawtransactionAbe": handleDecodeRawTransactionAbe,
-	"decodescript":            handleDecodeScript,
-	"estimatefee":             handleEstimateFee,
-	"generate":                handleGenerate,
-	"getaddednodeinfo":        handleGetAddedNodeInfo,
-	"getbestblock":            handleGetBestBlock,
-	"getbestblockhash":        handleGetBestBlockHash,
-	"getblock":                handleGetBlockAbe,
-	"getblockabe":             handleGetBlockAbe, //TODO(abe):after testing, this command will be replace by getblock
-	"getblockchaininfo":       handleGetBlockChainInfo,
-	"getblockcount":           handleGetBlockCount,
-	"getblockhash":            handleGetBlockHash,
-	"getblockheader":          handleGetBlockHeader,
-	"getblocktemplate":        handleGetBlockTemplate,
-	"getwork":                 handleGetWork,
-	"submitwork":              handleSubmitWork,
-	"submithashrate":          handleSubmitHashRate,
+	//"decodescript":            handleDecodeScript,
+	"estimatefee":       handleEstimateFee,
+	"generate":          handleGenerate,
+	"getaddednodeinfo":  handleGetAddedNodeInfo,
+	"getbestblock":      handleGetBestBlock,
+	"getbestblockhash":  handleGetBestBlockHash,
+	"getblock":          handleGetBlockAbe,
+	"getblockabe":       handleGetBlockAbe, //TODO(abe):after testing, this command will be replace by getblock
+	"getblockchaininfo": handleGetBlockChainInfo,
+	"getblockcount":     handleGetBlockCount,
+	"getblockhash":      handleGetBlockHash,
+	"getblockheader":    handleGetBlockHeader,
+	"getblocktemplate":  handleGetBlockTemplate,
+	"getwork":           handleGetWork,
+	"submitwork":        handleSubmitWork,
+	"submithashrate":    handleSubmitHashRate,
 	// TODO(ABE): ABE does not support filter.
 	//"getcfilter":            handleGetCFilter,
 	//"getcfilterheader":      handleGetCFilterHeader,
@@ -1122,7 +1122,7 @@ func handleDecodeRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-ch
 // handleDecodeScript handles decodescript commands.
 //
 //	todo(ABE): ABE does not use/support this?
-func handleDecodeScript(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+/*func handleDecodeScript(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.DecodeScriptCmd)
 
 	// Convert the hex script to bytes.
@@ -1167,7 +1167,7 @@ func handleDecodeScript(s *rpcServer, cmd interface{}, closeChan <-chan struct{}
 		reply.P2sh = p2sh.EncodeAddress()
 	}
 	return reply, nil
-}
+}*/
 
 // handleEstimateFee handles estimatefee commands.
 func handleEstimateFee(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {

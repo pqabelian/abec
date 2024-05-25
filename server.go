@@ -200,8 +200,8 @@ type server struct {
 	addrManager *netaddrmgr.NetAddrManager
 	connManager *connmgr.ConnManager
 	//	TODO:(Abelian) remove txScript, sigCache, and hashCache
-	sigCache             *txscript.SigCache
-	hashCache            *txscript.HashCache
+	//sigCache             *txscript.SigCache
+	//hashCache            *txscript.HashCache
 	witnessCache         *txscript.WitnessCache
 	rpcServer            *rpcServer
 	rpcServerGetWork     *rpcServer
@@ -2508,12 +2508,12 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		db:                   db,
 		timeSource:           blockchain.NewMedianTime(),
 		services:             services,
-		sigCache:             txscript.NewSigCache(cfg.SigCacheMaxSize),
-		hashCache:            txscript.NewHashCache(cfg.SigCacheMaxSize),
-		witnessCache:         txscript.NewWitnessCache(cfg.WitnessCacheMaxSize),
-		agentBlacklist:       agentBlacklist,
-		agentWhitelist:       agentWhitelist,
-		communicationCache:   sync.Map{},
+		//sigCache:             txscript.NewSigCache(cfg.SigCacheMaxSize),
+		//hashCache:          txscript.NewHashCache(cfg.SigCacheMaxSize),
+		witnessCache:       txscript.NewWitnessCache(cfg.WitnessCacheMaxSize),
+		agentBlacklist:     agentBlacklist,
+		agentWhitelist:     agentWhitelist,
+		communicationCache: sync.Map{},
 	}
 
 	// Create the transaction index if needed.
@@ -2559,10 +2559,10 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		Checkpoints:         checkpoints,
 		FakePowHeightScopes: cfg.addFakePowHeightScopes,
 		TimeSource:          s.timeSource,
-		SigCache:            s.sigCache,
-		WitnessCache:        s.witnessCache,
-		IndexManager:        indexManager,
-		HashCache:           s.hashCache,
+		//SigCache:            s.sigCache,
+		WitnessCache: s.witnessCache,
+		IndexManager: indexManager,
+		//HashCache:    s.hashCache,
 	})
 	if err != nil {
 		return nil, err
@@ -2639,13 +2639,13 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 			return s.chain.CalcSequenceLock(tx, view, true)
 		},*/
 		IsDeploymentActive: s.chain.IsDeploymentActive,
-		SigCache:           s.sigCache,
-		HashCache:          s.hashCache,
-		WitnessCache:       s.witnessCache,
-		FeeEstimator:       s.feeEstimator,
-		AllowDiskCacheTx:   cfg.AllowDiskCacheTx,
-		TxCacheRotator:     s.txCacheRotator,
-		CacheTxFileName:    filepath.Join(cfg.CacheTxDir, defaultCacheTxFilename),
+		//SigCache:           s.sigCache,
+		//HashCache:        s.hashCache,
+		WitnessCache:     s.witnessCache,
+		FeeEstimator:     s.feeEstimator,
+		AllowDiskCacheTx: cfg.AllowDiskCacheTx,
+		TxCacheRotator:   s.txCacheRotator,
+		CacheTxFileName:  filepath.Join(cfg.CacheTxDir, defaultCacheTxFilename),
 	}
 	s.txMemPool = mempool.New(&txC)
 	//	todo: (EthashPoW)
@@ -2702,7 +2702,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	}
 	blockTemplateGenerator := mining.NewBlkTmplGenerator(&policy,
 		s.chainParams, s.txMemPool, s.chain, s.timeSource,
-		s.sigCache, s.hashCache, s.witnessCache)
+		s.witnessCache)
 	s.cpuMiner = cpuminer.New(&cpuminer.Config{
 		ChainParams:            chainParams,
 		Ethash:                 s.ethash, // todo: (EthashPoW)
@@ -2930,7 +2930,6 @@ func initListeners(amgr *netaddrmgr.NetAddrManager, listenAddrs []string, servic
 			host, portstr, err := net.SplitHostPort(sip)
 			if err != nil {
 				// no port, use default.
-				// todo: 20220427. if no port, then use a random port
 				host = sip
 			} else {
 				port, err := strconv.ParseUint(portstr, 10, 16)

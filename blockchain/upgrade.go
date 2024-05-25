@@ -52,7 +52,7 @@ type blockChainContext struct {
 // block height + hash.
 //
 //	todo: (EthashPoW) 202207 Need refactor to remove.
-func migrateBlockIndex(db database.DB) error {
+/*func migrateBlockIndex(db database.DB) error {
 	// Hardcoded bucket names so updates to the global values do not affect
 	// old upgrades.
 	v1BucketName := []byte("ffldb-blockidx")
@@ -139,7 +139,7 @@ func migrateBlockIndex(db database.DB) error {
 
 	log.Infof("Block database migration complete")
 	return nil
-}
+}*/
 
 // readBlockTree reads the old block index bucket and constructs a mapping of
 // each block to its parent block and all child blocks. This mapping represents
