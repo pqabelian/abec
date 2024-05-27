@@ -342,7 +342,7 @@ var MainNetParams = Params{
 
 	// Added by Alice, 2024.05.11, for DSA
 	// todo(DSA): review
-	BlockHeightDSA: 288000,
+	BlockHeightDSA: 284000,
 }
 
 // RegressionNetParams defines the network parameters for the regression test
@@ -420,7 +420,7 @@ var RegressionNetParams = Params{
 
 	// Added by Alice, 2024.05.11, for DSA
 	// todo(DSA): review
-	BlockHeightDSA: 288000,
+	BlockHeightDSA: 284000,
 }
 
 // TestNet3Params defines the network parameters for the test network
@@ -505,7 +505,7 @@ var TestNet3Params = Params{
 
 	// Added by Alice, 2024.05.11, for DSA
 	// todo(DSA): review
-	BlockHeightDSA: 288000,
+	BlockHeightDSA: 284000,
 }
 
 // SimNetParams defines the network parameters for the simulation test
@@ -586,7 +586,7 @@ var SimNetParams = Params{
 
 	// Added by Alice, 2024.05.11, for DSA
 	// todo(DSA): review
-	BlockHeightDSA: 288000,
+	BlockHeightDSA: 284000,
 }
 
 var (
