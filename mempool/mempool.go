@@ -1863,8 +1863,8 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 
 	txD := mp.addTransactionAbe(utxoRingView, autView, tx, bestHeight, txFee, fromDiskCache)
 
-	log.Debugf("Accepted transaction %v (input %d, output %d, serialized size %d bytes, full size %d bytes) "+
-		"(pool size: %v)", txHash, len(tx.MsgTx().TxIns), len(tx.MsgTx().TxOuts),
+	log.Debugf("Accepted transaction %v (version %08x, input %d, output %d, serialized size %d bytes, full size %d bytes) "+
+		"(pool size: %v)", txHash, tx.MsgTx().Version, len(tx.MsgTx().TxIns), len(tx.MsgTx().TxOuts),
 		tx.MsgTx().SerializeSize(), tx.MsgTx().SerializeSizeFull(), len(mp.poolAbe))
 
 	return nil, txD, nil

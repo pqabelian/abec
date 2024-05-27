@@ -454,7 +454,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 		log.Infof("Summary for Difficulty retarget at block height %d", lastNode.height+1)
 		log.Infof("Old target %08x (%064x)", lastNode.bits, CompactToBig(lastNode.bits))
 		log.Infof("New target %08x (%064x)", newTargetBits, CompactToBig(newTargetBits))
-		log.Infof("Latest timespan %v, Latest Hash Rate %064x, Average Hash Rate %064x, Target Hash Rate %064x, Target timespan %v",
+		log.Infof("Latest timespan %v, Latest Hash Rate %v, Average Hash Rate %d, Target Hash Rate %d, Target timespan %v",
 			time.Duration(latestTimeSpan)*time.Second,
 			latestHR,
 			avgHR,
