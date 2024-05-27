@@ -415,7 +415,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 			if i == len(dsaSmoothFactorsInt)-1 {
 				tmpBytes := make([]byte, len(hashRate.Bytes()))
 				copy(tmpBytes, hashRate.Bytes())
-				latestHR.SetBytes(hashRate.Bytes())
+				latestHR.SetBytes(tmpBytes)
 				latestTimeSpan = slotTimeSpan.Int64()
 			}
 
