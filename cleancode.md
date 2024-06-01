@@ -1859,4 +1859,72 @@
 		...
 	}
 	```
-	
+30/05/2024
+1. [rpcserver.go `func chainErrToGBTErrString(err error)`](https://github.com/pqabelian/abec/blob/main/rpcserver.go#L2475) 
+   ```go
+	func chainErrToGBTErrString(err error) string {
+		...
+		//	todo(ABE): ABE does not use weight
+		case blockchain.ErrBlockWeightTooHigh:
+			return "bad-blk-weight"
+		...
+	}
+   ```
+   used in [rpcserver.go `handleGetBlockTemplateProposal`](https://github.com/pqabelian/abec/blob/main/rpcserver.go#L2572)
+ 2. [rpcserver.go `func handleGetBlockTemplate`](https://github.com/pqabelian/abec/blob/main/rpcserver.go#L2642)
+   ```go
+	// handleGetBlockTemplate implements the getblocktemplate command.
+	func handleGetBlockTemplate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+		...
+		switch mode {
+		case "template":
+			return handleGetBlockTemplateRequest(s, request, closeChan)
+		// todo (ABE): proposal is not supported yet, maybe deleted or implemented in the future
+		case "proposal":
+			return handleGetBlockTemplateProposal(s, request)
+		}
+	}
+   ```
+   handleGetBlockTemplateProposal is in [rpcserver.go](https://github.com/pqabelian/abec/blob/main/rpcserver.go#L2572)
+
+3. [params.go](https://github.com/pqabelian/abec/blob/main/params.go#L42)
+   ```go
+	// TODO: To build a test net or not?
+	// regressionNetParams contains parameters specific to the regression test
+	// network (wire.TestNet).  NOTE: The RPC port is intentionally different
+	// than the reference implementation - see the mainNetParams comment for
+	// details.
+	var regressionNetParams = params{
+		Params: &chaincfg.RegressionNetParams,
+		//rpcPort: "18334",
+		rpcPort:        "18667",
+		rpcPortGetWork: "18668",
+	}
+
+	// testNet3Params contains parameters specific to the test network (version 3)
+	// (wire.TestNet3).  NOTE: The RPC port is intentionally different than the
+	// reference implementation - see the mainNetParams comment for details.
+	var testNet3Params = params{
+		Params: &chaincfg.TestNet3Params,
+		//rpcPort: "18334",
+		rpcPort:        "18667",
+		rpcPortGetWork: "18668",
+	}
+
+	// simNetParams contains parameters specific to the simulation test network
+	// (wire.SimNet).
+	var simNetParams = params{
+		Params: &chaincfg.SimNetParams,
+		//rpcPort: "18556",
+		rpcPort:        "18889",
+		rpcPortGetWork: "18890",
+	}
+   ```
+4. [netaddrmgr/netaddrmanager.go](https://github.com/pqabelian/abec/blob/main/netaddrmgr/netaddrmanager.go#L29) btcd in comments
+   ```go
+	type NetAddrManager struct {
+		mtx               sync.Mutex
+		peersFile         string // store the peers to quicker build connection when the btcd restart
+		...
+	}
+   ```
