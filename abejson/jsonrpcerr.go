@@ -93,7 +93,7 @@ const (
 	ErrRPCIntegerEncodeError  RPCErrorCode = -206
 )
 
-// Errors that are specific to btcd.
+// Errors that are specific to abec.
 const (
 	ErrRPCNoWallet      RPCErrorCode = -1
 	ErrRPCUnimplemented RPCErrorCode = -1

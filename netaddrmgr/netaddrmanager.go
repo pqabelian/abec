@@ -26,7 +26,7 @@ import (
 // peers on the network.
 type NetAddrManager struct {
 	mtx               sync.Mutex
-	peersFile         string // store the peers to quicker build connection when the btcd restart
+	peersFile         string // store the peers to quicker build connection when the abec restart
 	lookupFunc        func(string) ([]net.IP, error)
 	rand              *rand.Rand
 	key               [32]byte

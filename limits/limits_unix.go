@@ -1,3 +1,4 @@
+//go:build !windows && !plan9
 // +build !windows,!plan9
 
 package limits
@@ -12,7 +13,7 @@ const (
 	fileLimitMin  = 1024
 )
 
-// SetLimits raises some process limits to values which allow btcd and
+// SetLimits raises some process limits to values which allow abec and
 // associated utilities to run.
 func SetLimits() error {
 	var rLimit syscall.Rlimit

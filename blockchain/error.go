@@ -37,7 +37,7 @@ const (
 
 	// ErrBlockWeightTooHigh indicates that the block's computed weight
 	// metric exceeds the maximum allowed value.
-	ErrBlockWeightTooHigh
+	//ErrBlockWeightTooHigh
 
 	// ErrBlockVersionTooOld indicates the block version is too old and is
 	// no longer accepted since the majority of the network has upgraded
@@ -236,10 +236,10 @@ const (
 
 // Map of ErrorCode values back to their constant names for pretty printing.
 var errorCodeStrings = map[ErrorCode]string{
-	ErrDuplicateBlock:                    "ErrDuplicateBlock",
-	ErrBlockTooBig:                       "ErrBlockTooBig",
-	ErrBlockVersionTooOld:                "ErrBlockVersionTooOld",
-	ErrBlockWeightTooHigh:                "ErrBlockWeightTooHigh",
+	ErrDuplicateBlock:     "ErrDuplicateBlock",
+	ErrBlockTooBig:        "ErrBlockTooBig",
+	ErrBlockVersionTooOld: "ErrBlockVersionTooOld",
+	//ErrBlockWeightTooHigh:                "ErrBlockWeightTooHigh",
 	ErrInvalidTime:                       "ErrInvalidTime",
 	ErrTimeTooOld:                        "ErrTimeTooOld",
 	ErrTimeTooNew:                        "ErrTimeTooNew",

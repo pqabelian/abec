@@ -2478,9 +2478,9 @@ func chainErrToGBTErrString(err error) string {
 		return "duplicate"
 	case blockchain.ErrBlockTooBig:
 		return "bad-blk-length"
-		//	todo(ABE): ABE does not use weight
-	case blockchain.ErrBlockWeightTooHigh:
-		return "bad-blk-weight"
+	/*	//	todo(ABE): ABE does not use weight
+		case blockchain.ErrBlockWeightTooHigh:
+			return "bad-blk-weight"*/
 	case blockchain.ErrBlockVersionTooOld:
 		return "bad-version"
 	case blockchain.ErrInvalidTime:
