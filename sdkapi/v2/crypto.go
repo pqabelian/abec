@@ -65,7 +65,7 @@ func ExtractPublicRandFromCryptoAddress(cryptoAddress []byte) (publicRand []byte
 	return abecryptoxkey.ExtractPublicRandFromCryptoAddress(cryptoAddress)
 }
 
-func CryptoAddressKeyReGenByRootSeedsFromPublicRand(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
+func CryptoAddressKeyReGenByRootSeedsFromPublicRand(cryptoScheme CryptoScheme, privacyLevel PrivacyLevel,
 	coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte,
 	coinDetectorRootKey []byte, publicRand []byte) (cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk []byte,
 	cryptoVsk []byte, cryptoDetectorKey []byte, err error) {
@@ -74,7 +74,7 @@ func CryptoAddressKeyReGenByRootSeedsFromPublicRand(cryptoScheme abecryptoxparam
 		coinDetectorRootKey, publicRand)
 }
 
-func RandSeedsGenByRootSeedsFromPublicRand(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
+func RandSeedsGenByRootSeedsFromPublicRand(cryptoScheme CryptoScheme, privacyLevel PrivacyLevel,
 	coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte,
 	coinDetectorRootKey []byte, publicRand []byte) (coinSpendKeyRandSeed []byte, coinSerialNumberKeyRandSeed []byte, coinValueKeyRandSeed []byte,
 	coinDetectorKey []byte, err error) {
@@ -83,7 +83,7 @@ func RandSeedsGenByRootSeedsFromPublicRand(cryptoScheme abecryptoxparam.CryptoSc
 		coinDetectorRootKey, publicRand)
 }
 
-func CryptoAddressKeyGenByRandSeeds(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
+func CryptoAddressKeyGenByRandSeeds(cryptoScheme CryptoScheme, privacyLevel PrivacyLevel,
 	coinSpendKeyRandSeed []byte, coinSerialNumberKeyRandSeed []byte, coinValueKeyRandSeed []byte,
 	coinDetectorKey []byte, publicRand []byte) (cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk []byte, cryptoVsk []byte, cryptoDetectorKey []byte, err error) {
 	return abecryptoxkey.CryptoAddressKeyGenByRandSeeds(cryptoScheme, privacyLevel,
