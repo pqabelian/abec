@@ -463,17 +463,7 @@ func TxoCoinReceiveByKeys(abeTxo *wire.TxOutAbe, cryptoAddress []byte, cryptoVal
 	if err != nil {
 		return false, 0, err
 	}
-
-	switch cryptoScheme {
-	case abecryptoxparam.CryptoSchemePQRingCT:
-		return abecrypto.TxoCoinReceive(abeTxo, cryptoAddress, cryptoValueSecretKey)
-
-	case abecryptoxparam.CryptoSchemePQRingCTX:
-		return pqringctxTxoCoinReceiveByKeys(abecryptoxparam.PQRingCTXPP, cryptoScheme, abeTxo, cryptoAddress, cryptoValueSecretKey)
-
-	default:
-		return false, 0, fmt.Errorf("TxoCoinReceiveByKeys: the cryptoScheme (%d) implied by abeTxo.Version is not supported", cryptoScheme)
-	}
+	return pqringctxTxoCoinReceiveByKeys(abecryptoxparam.PQRingCTXPP, cryptoScheme, abeTxo, cryptoAddress, cryptoValueSecretKey)
 }
 
 // PseudonymTxoCoinParse parses the input (Pseudonym-Privacy) TxoMLP to its (coinAddress, coinValue) pair, and
