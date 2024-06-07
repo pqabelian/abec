@@ -1928,3 +1928,177 @@
 		...
 	}
    ```
+
+06/06/2024
+1. [wire/message.go](https://github.com/pqabelian/abec/blob/main/wire/message.go#L84)
+   ```go
+	// Message is an interface that describes a bitcoin message.  A type that
+	// implements Message has complete control over the representation of its data
+	// and may therefore contain additional or fewer fields than those which
+	// are used directly in the protocol encoded message.
+	type Message interface {
+		BtcDecode(io.Reader, uint32, MessageEncoding) error
+		BtcEncode(io.Writer, uint32, MessageEncoding) error
+		Command() string
+		MaxPayloadLength(uint32) uint32
+	}
+   ```
+2. [rpcclient/notify.go](https://github.com/pqabelian/abec/blob/main/rpcclient/notify.go#L188)
+   ```go
+	type NotificationHandlers struct {
+		...
+		// OnBtcdConnected is invoked when a wallet connects or disconnects from
+		// btcd.
+		//
+		// This will only be available when client is connected to a wallet
+		// server such as btcwallet.
+		OnBtcdConnected func(connected bool)
+		...
+	}
+   ```
+   OnBtcdConnected is used in [rpcclient/notify.go](https://github.com/pqabelian/abec/blob/main/rpcclient/notify.go#L446)
+   ```go
+	func (c *Client) handleNotification(ntfn *rawNotification) {
+		...
+		// OnBtcdConnected
+	case abejson.BtcdConnectedNtfnMethod:
+		// Ignore the notification if the client is not interested in
+		// it.
+		if c.ntfnHandlers.OnBtcdConnected == nil {
+			return
+		}
+
+		connected, err := parseBtcdConnectedNtfnParams(ntfn.Params)
+		if err != nil {
+			log.Warnf("Received invalid abec connected "+
+				"notification: %v", err)
+			return
+		}
+
+		c.ntfnHandlers.OnBtcdConnected(connected)		
+		...
+   ```
+3. [abejson/walletsvrwsntfns.go](https://github.com/pqabelian/abec/blob/main/abejson/walletsvrwsntfns.go#L10)
+   ```go
+	const (
+		...
+		// BtcdConnectedNtfnMethod is the method used for notifications when
+		// a wallet server is connected to a chain server.
+		BtcdConnectedNtfnMethod = "btcdconnected"
+		...
+	)
+   ```
+   is used in [abejson/walletsvrwsntfns.go](https://github.com/pqabelian/abec/blob/main/abejson/walletsvrwsntfns.go#L85)
+   ```go
+	func init() {
+		MustRegisterCmd(BtcdConnectedNtfnMethod, (*BtcdConnectedNtfn)(nil), flags)
+		...
+	}
+   ```
+
+4. [abeutil/const.go](https://github.com/pqabelian/abec/blob/main/abeutil/const.go#L4) delete Satoshi...? MaxAbe?
+   ```go 
+	const (
+		// SatoshiPerBitcent is the number of satoshi in one bitcoin cent.
+		SatoshiPerBitcent = 1e6
+
+		// SatoshiPerBitcoin is the number of satoshi in one bitcoin (1 BTC).
+		SatoshiPerBitcoin = 1e8
+
+		// MaxSatoshi is the maximum transaction amount allowed in satoshi.
+		MaxSatoshi = 21e6 * SatoshiPerBitcoin
+	)
+
+	const (
+		// SatoshiPerBitcent is the number of satoshi in one bitcoin cent.
+		//	SatoshiPerBitcent = 1e6
+
+		//	todo: 20220327 Denote the value by uint64
+		// NeutrinoPerAbe is the number of Neutrino in one Abe (1 ABE).
+		NeutrinoPerAbe = uint64(10_000_000)
+
+		// MaxAbe is the maximum transaction amount allowed in Neutrino.
+		MaxAbe = 1<<51 - 1
+
+		// MaxNeutrino is the maximum transaction amount allowed in Neutrino.
+		MaxNeutrino = uint64(1<<51 - 1)
+	)
+   ```
+   SatoshiPerBitcoin is used in [mining/mining.go](https://github.com/pqabelian/abec/blob/main/mining/mining.go#L21) should be NeutrinoPerAbe?
+   ```go
+	const (
+		// MinHighPriority is the minimum priority value that allows a
+		// transaction to be considered high priority.
+		MinHighPriority = abeutil.SatoshiPerBitcoin * 144.0 / 250
+		...
+	)
+   ```
+
+   MaxSatoshi is used in [blockchain/validate.go](https://github.com/pqabelian/abec/blob/main/blockchain/validate.go#L399) should be MaxNeutrino?
+   ```go
+   func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
+		...
+		if msgTx.TxFee > abeutil.MaxNeutrino {
+			str := fmt.Sprintf("transaction fee of %v is higher than max allowed value of %v", msgTx.TxFee, abeutil.MaxSatoshi)
+			return ruleError(ErrBadTxFeeValue, str)
+		}
+		...
+	}
+   ```
+
+5. [mining/mining.go](https://github.com/pqabelian/abec/blob/main/mining/mining.go#L31)
+   ```go
+	const (
+		// CoinbaseFlags is added to the coinbase script of a generated block
+		// and is used to monitor BIP16 support as well as blocks that are
+		// generated via btcd.
+		CoinbaseFlags = "/P2SH/btcd/" // this is the coinbase message, can write by ourselves
+	)
+   ```
+6. [abejson/chainsvrwscmds.go](https://github.com/pqabelian/abec/blob/main/abejson/chainsvrwscmds.go#L111) delete filter?
+   ```go
+   // LoadTxFilterCmd defines the loadtxfilter request parameters to load or
+	// reload a transaction filter.
+	//
+	// NOTE: This is a btcd extension ported from github.com/decred/dcrd/dcrjson
+	// and requires a websocket connection.
+	type LoadTxFilterCmd struct {
+		Reload    bool
+		Addresses []string
+		OutPoints []OutPoint
+	}
+   ```
+   is used in [abejson/chainsvrwscmds.go](https://github.com/pqabelian/abec/blob/main/abejson/chainsvrwscmds.go#L122)
+   ```go
+	func NewLoadTxFilterCmd(reload bool, addresses []string, outPoints []OutPoint) *LoadTxFilterCmd {
+		return &LoadTxFilterCmd{
+			Reload:    reload,
+			Addresses: addresses,
+			OutPoints: outPoints,
+		}
+	}
+   ```
+   and [init()](https://github.com/pqabelian/abec/blob/main/abejson/chainsvrwscmds.go#L240)
+   ```go
+   func init() {
+		...
+		MustRegisterCmd("loadtxfilter", (*LoadTxFilterCmd)(nil), flags)
+		...
+	}
+   ```
+7. [server.go](https://github.com/pqabelian/abec/blob/main/server.go#L2837)
+   ```go
+	func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
+	db database.DB, chainParams *chaincfg.Params,
+	interrupt <-chan struct{}) (*server, error) {
+		...
+		s.rpcServer, err = newRPCServer(&rpcserverConfig{
+			...
+			// todo: 2023.05.11 At this moment, the ExternalMiner here is not used,
+			// since we use rpcServerGetWork to respond the requests of getwork.
+			ExternalMiner: s.externalMiner,
+			...
+		}
+		...
+	}
+   ```

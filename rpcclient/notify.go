@@ -184,7 +184,14 @@ type NotificationHandlers struct {
 	//
 	// This will only be available when client is connected to a wallet
 	// server such as btcwallet.
-	OnBtcdConnected func(connected bool)
+	//OnBtcdConnected func(connected bool)
+
+	// OnAbecConnected is invoked when a wallet connects or disconnects from
+	// abec.
+	//
+	// This will only be available when client is connected to a wallet
+	// server such as abewallet.
+	OnAbecConnected func(connected bool)
 
 	// OnAccountBalance is invoked with account balance updates.
 	//
@@ -445,22 +452,22 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 
 		c.ntfnHandlers.OnTxAcceptedVerbose(rawTx)
 
-	// OnBtcdConnected
-	case abejson.BtcdConnectedNtfnMethod:
+	// OnAbecConnected
+	case abejson.AbecConnectedNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
-		if c.ntfnHandlers.OnBtcdConnected == nil {
+		if c.ntfnHandlers.OnAbecConnected == nil {
 			return
 		}
 
-		connected, err := parseBtcdConnectedNtfnParams(ntfn.Params)
+		connected, err := parseAbecConnectedNtfnParams(ntfn.Params)
 		if err != nil {
 			log.Warnf("Received invalid abec connected "+
 				"notification: %v", err)
 			return
 		}
 
-		c.ntfnHandlers.OnBtcdConnected(connected)
+		c.ntfnHandlers.OnAbecConnected(connected)
 
 	// OnAccountBalance
 	case abejson.AccountBalanceNtfnMethod:
@@ -813,7 +820,21 @@ func parseTxAcceptedVerboseNtfnParams(params []json.RawMessage) (*abejson.TxRawR
 
 // parseBtcdConnectedNtfnParams parses out the connection status of btcd
 // and btcwallet from the parameters of a btcdconnected notification.
-func parseBtcdConnectedNtfnParams(params []json.RawMessage) (bool, error) {
+/*func parseBtcdConnectedNtfnParams(params []json.RawMessage) (bool, error) {
+	if len(params) != 1 {
+		return false, wrongNumParams(len(params))
+	}
+
+	// Unmarshal first parameter as a boolean.
+	var connected bool
+	err := json.Unmarshal(params[0], &connected)
+	if err != nil {
+		return false, err
+	}
+
+	return connected, nil
+}*/
+func parseAbecConnectedNtfnParams(params []json.RawMessage) (bool, error) {
 	if len(params) != 1 {
 		return false, wrongNumParams(len(params))
 	}

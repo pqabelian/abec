@@ -382,7 +382,7 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		return ruleError(ErrBadTxFeeValue, str)
 	}
 	if msgTx.TxFee > abeutil.MaxNeutrino {
-		str := fmt.Sprintf("transaction fee of %v is higher than max allowed value of %v", msgTx.TxFee, abeutil.MaxSatoshi)
+		str := fmt.Sprintf("transaction fee of %v is higher than max allowed value of %v", msgTx.TxFee, abeutil.MaxNeutrino)
 		return ruleError(ErrBadTxFeeValue, str)
 	}
 

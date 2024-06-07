@@ -2835,8 +2835,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 			Ethash:    s.ethash,
 			Generator: blockTemplateGenerator,
 			CPUMiner:  s.cpuMiner,
-			// todo: 2023.05.11 At this moment, the ExternalMiner here is not used,
-			// since we use rpcServerGetWork to respond the requests of getwork.
+
 			ExternalMiner: s.externalMiner,
 			TxIndex:       s.txIndex,
 			FeeEstimator:  s.feeEstimator,

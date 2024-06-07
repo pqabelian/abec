@@ -108,24 +108,24 @@ type OutPoint struct {
 //
 // NOTE: This is a btcd extension ported from github.com/decred/dcrd/dcrjson
 // and requires a websocket connection.
-type LoadTxFilterCmd struct {
+/*type LoadTxFilterCmd struct {
 	Reload    bool
 	Addresses []string
 	OutPoints []OutPoint
-}
+}*/
 
 // NewLoadTxFilterCmd returns a new instance which can be used to issue a
 // loadtxfilter JSON-RPC command.
 //
 // NOTE: This is a btcd extension ported from github.com/decred/dcrd/dcrjson
 // and requires a websocket connection.
-func NewLoadTxFilterCmd(reload bool, addresses []string, outPoints []OutPoint) *LoadTxFilterCmd {
+/*func NewLoadTxFilterCmd(reload bool, addresses []string, outPoints []OutPoint) *LoadTxFilterCmd {
 	return &LoadTxFilterCmd{
 		Reload:    reload,
 		Addresses: addresses,
 		OutPoints: outPoints,
 	}
-}
+}*/
 
 // NotifySpentCmd defines the notifyspent JSON-RPC command.
 //
@@ -238,7 +238,7 @@ func init() {
 	flags := UFWebsocketOnly
 
 	MustRegisterCmd("authenticate", (*AuthenticateCmd)(nil), flags)
-	MustRegisterCmd("loadtxfilter", (*LoadTxFilterCmd)(nil), flags)
+	//MustRegisterCmd("loadtxfilter", (*LoadTxFilterCmd)(nil), flags)
 	MustRegisterCmd("notifyblocks", (*NotifyBlocksCmd)(nil), flags)
 	MustRegisterCmd("notifynewtransactions", (*NotifyNewTransactionsCmd)(nil), flags)
 	MustRegisterCmd("notifytransaction", (*NotifyTransactionCmd)(nil), flags)
