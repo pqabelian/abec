@@ -36,6 +36,8 @@ type config struct {
 	RegressionTest bool   `long:"regtest" description:"Use the regression test network"`
 	SimNet         bool   `long:"simnet" description:"Use the simulation test network"`
 	TestNet3       bool   `long:"testnet" description:"Use the test network"`
+
+	Heights []int32 `long:"heights" description:""`
 }
 
 // validDbType returns whether or not dbType is a supported database type.

@@ -161,7 +161,6 @@ func (b *BlockChain) initBlockNode(node *blockNode, blockHeader *wire.BlockHeade
 					return ruleError(ErrMismatchedBlockHeightAndVersion, str)
 				}
 			}
-
 		}
 	}
 
