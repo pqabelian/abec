@@ -2102,3 +2102,222 @@
 		...
 	}
    ```
+
+14/06/2024
+1. [abejson/chainsvrresults.go](https://github.com/pqabelian/abec/blob/main/abejson/chainsvrresults.go#L530)
+   ```go
+	// GetTxOutResult models the data from the gettxout command.
+	//
+	//	todo(ABE): ABE does not support 'GetTxOutCmd', as it seems that this command is to get Txo from transactions in mempool and utxo of main chain.
+	type GetTxOutResult struct {
+		BestBlock     string             `json:"bestblock"`
+		Confirmations int64              `json:"confirmations"`
+		Value         float64            `json:"value"`
+		ScriptPubKey  ScriptPubKeyResult `json:"scriptPubKey"`
+		Coinbase      bool               `json:"coinbase"`
+	}
+   ```
+   is used in
+   [rpcclient/chain.go](https://github.com/pqabelian/abec/blob/main/rpcclient/chain.go#L1122)
+   ```go
+	// Receive waits for the response promised by the future and returns a
+	// transaction given its hash.
+	func (r FutureGetTxOutResult) Receive() (*abejson.GetTxOutResult, error) {
+		...
+		// Unmarshal result as an gettxout result object.
+		var txOutInfo *abejson.GetTxOutResult
+		err = json.Unmarshal(res, &txOutInfo)
+		if err != nil {
+			return nil, err
+		}
+		...
+	}
+   ```
+   in [rpcclient/chain.go](https://github.com/pqabelian/abec/blob/main/rpcclient/chain.go#L1148)
+   ```go
+	// GetTxOut returns the transaction output info if it's unspent and
+	// nil, otherwise.
+	func (c *Client) GetTxOut(txHash *chainhash.Hash, index uint32, mempool bool) (*abejson.GetTxOutResult, error) {
+		return c.GetTxOutAsync(txHash, index, mempool).Receive()
+	}
+   ```
+
+   in [rpcserverhelp.go](https://github.com/pqabelian/abec/blob/main/rpcserverhelp.go#L715)
+   ```go
+   var rpcResultTypes = map[string][]interface{}{
+		...
+		"gettxout":              {(*abejson.GetTxOutResult)(nil)},
+		...
+	}
+   ```
+
+2. [abejson/chainsvrcmds.go](https://github.com/pqabelian/abec/blob/main/abejson/chainsvrcmds.go#L686)
+   ```go
+	// GetTxOutCmd defines the gettxout JSON-RPC command.
+	//
+	//	todo(ABE): ABE does not support 'GetTxOutCmd', as it seems that this command is to get Txo from transactions in mempool and utxo of main chain.
+	type GetTxOutCmd struct {
+		Txid           string
+		Vout           uint32
+		IncludeMempool *bool `jsonrpcdefault:"true"`
+	}
+   ```
+
+   is used in [abejson/chainsvrcmds.go](https://github.com/pqabelian/abec/blob/main/abejson/chainsvrcmds.go#L702)
+   ```go
+	func NewGetTxOutCmd(txHash string, vout uint32, includeMempool *bool) *GetTxOutCmd {
+		return &GetTxOutCmd{
+			Txid:           txHash,
+			Vout:           vout,
+			IncludeMempool: includeMempool,
+		}
+	}
+   ```
+
+   in [abejson/chainsvrcmds.go](https://github.com/pqabelian/abec/blob/main/abejson/chainsvrcmds.go#L1068)
+   ```go
+   func init() {
+		...
+		MustRegisterCmd("gettxout", (*GetTxOutCmd)(nil), flags)
+		...
+   }
+   ```
+
+3. [blockchain/chain.go `BlockWeight`](https://github.com/pqabelian/abec/blob/main/blockchain/chain.go#L75)
+	```go
+	type BestState struct {
+		...
+		BlockSize uint64 // The size of the block.
+		//	todo(ABE): ABE does not ues weight.
+		BlockWeight uint64    // The weight of the block.
+		...
+	}
+	```
+
+	is used in [blockchain/chain.go `newBestState`](https://github.com/pqabelian/abec/blob/main/blockchain/chain.go#L90)
+	```go
+	// newBestState returns a new best stats instance for the given parameters.
+	func newBestState(node *blockNode, blockSize, blockWeight, numTxns, totalTxns uint64, medianTime time.Time) *BestState {
+		return &BestState{
+			...
+			BlockSize:   blockSize,
+			BlockWeight: blockWeight,
+			...
+		}
+	}
+	```
+
+	in [rpcserver.go](https://github.com/pqabelian/abec/blob/main/rpcserver.go#L3051)
+	```go
+	func handleGetMiningInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+		...
+		result := abejson.GetMiningInfoResult{
+			...
+			CurrentBlockSize:   best.BlockSize,
+			CurrentBlockWeight: best.BlockWeight,
+			...
+		}
+		...
+	}
+	```
+	`CurrentBlockWeight` is in [abejson/chainsvrresults.go](https://github.com/pqabelian/abec/blob/main/abejson/chainsvrresults.go#L732)
+	```go
+	// GetMiningInfoResult models the data from the getmininginfo command.
+	type GetMiningInfoResult struct {
+		Blocks             int64   `json:"blocks"`
+		CurrentBlockSize   uint64  `json:"currentblocksize"`
+		CurrentBlockWeight uint64  `json:"currentblockweight"`
+		CurrentBlockTx     uint64  `json:"currentblocktx"`
+		Difficulty         float64 `json:"difficulty"`
+		Errors             string  `json:"errors"`
+		Generate           bool    `json:"generate"`
+		GenProcLimit       int32   `json:"genproclimit"`
+		HashesPerSec       int64   `json:"hashespersec"`
+		NetworkHashPS      int64   `json:"networkhashps"`
+		PooledTx           uint64  `json:"pooledtx"`
+		TestNet            bool    `json:"testnet"`
+	}
+	```
+4. [mining/policy.go `BlockMinWeight` & `BlockMaxWeight`](https://github.com/pqabelian/abec/blob/main/mining/policy.go#L22)
+   ```go
+	type Policy struct {
+		// BlockMinWeight is the minimum block weight to be used when
+		// generating a block template.
+		BlockMinWeight uint32
+
+		//	todo(ABE): ABE does not use weight, while use size only.
+		// BlockMaxWeight is the maximum block weight to be used when
+		// generating a block template.
+		BlockMaxWeight uint32
+
+		// BlockMinWeight is the minimum block size to be used when generating
+		// a block template.
+		BlockMinSize uint32
+
+		// BlockMaxSize is the maximum block size to be used when generating a
+		// block template.
+		BlockMaxSize uint32
+
+		// BlockPrioritySize is the size in bytes for high-priority / low-fee
+		// transactions to be used when generating a block template.
+		BlockPrioritySize uint32
+
+		// TxMinFreeFee is the minimum fee in Satoshi/1000 bytes that is
+		// required for a transaction to be treated as free for mining purposes
+		// (block template generation).
+		TxMinFreeFee abeutil.Amount
+	}
+   ```
+
+   are used in [server.go](https://github.com/pqabelian/abec/blob/main/server.go#L2695)
+   ```go
+   func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
+	db database.DB, chainParams *chaincfg.Params,
+	interrupt <-chan struct{}) (*server, error) {
+		...
+		policy := mining.Policy{
+			BlockMinWeight:    cfg.BlockMinWeight,
+			BlockMaxWeight:    cfg.BlockMaxWeight,
+			BlockMinSize:      cfg.BlockMinSize,
+			BlockMaxSize:      cfg.BlockMaxSize,
+			BlockPrioritySize: cfg.BlockPrioritySize,
+			TxMinFreeFee:      cfg.minRelayTxFee,
+		}
+		...
+	}
+   ```
+   `cfg.BlockMinWeight` `cfg.BlockMaxWeight` [config.go](https://github.com/pqabelian/abec/blob/main/config.go#L118)
+   ```go
+	type config struct {
+		BlockMaxSize      uint32        `long:"blockmaxsize" description:"Maximum block size in bytes to be used when creating a block"`
+		BlockMinSize      uint32        `long:"blockminsize" description:"Mininum block size in bytes to be used when creating a block"`
+		BlockMaxWeight    uint32        `long:"blockmaxweight" description:"Maximum block weight to be used when creating a block"`
+		BlockMinWeight    uint32        `long:"blockminweight" description:"Mininum block weight to be used when creating a block"`
+	}
+   ```
+   they are used in loadConfig()
+
+5. [rpcserver.go `handleVersion`](https://github.com/pqabelian/abec/blob/main/rpcserver.go#L4661) comments "btcsuite" & "btcdjsonrpcapi"
+   ```go
+	// handleVersion implements the version command.
+	//
+	// NOTE: This is a btcsuite extension ported from github.com/decred/dcrd.
+	func handleVersion(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+		result := map[string]abejson.VersionResult{
+			"btcdjsonrpcapi": {
+				VersionString: jsonrpcSemverString,
+				Major:         jsonrpcSemverMajor,
+				Minor:         jsonrpcSemverMinor,
+				Patch:         jsonrpcSemverPatch,
+			},
+			"abec": {
+				VersionString: version(),
+				Major:         uint32(appMajor),
+				Minor:         uint32(appMinor),
+				Patch:         uint32(appPatch),
+				Prerelease:    appPreRelease,
+			},
+		}
+		return result, nil
+	}
+   ```

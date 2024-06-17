@@ -2061,7 +2061,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 			block := abeutil.NewBlockAbe(template.BlockAbe)
 			//merkles := blockchain.BuildMerkleTreeStore(block.Transactions(), false)
 			merkles := blockchain.BuildMerkleTreeStoreAbe(block.Transactions(), false)
-			template.Block.Header.MerkleRoot = *merkles[len(merkles)-1]
+			template.BlockAbe.Header.MerkleRoot = *merkles[len(merkles)-1]
 		}
 
 		// Set locals for convenience.
@@ -4653,7 +4653,7 @@ func handleVerifyChain(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 // NOTE: This is a btcsuite extension ported from github.com/decred/dcrd.
 func handleVersion(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	result := map[string]abejson.VersionResult{
-		"btcdjsonrpcapi": {
+		"abecjsonrpcapi": {
 			VersionString: jsonrpcSemverString,
 			Major:         jsonrpcSemverMajor,
 			Minor:         jsonrpcSemverMinor,

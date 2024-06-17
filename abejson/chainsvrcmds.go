@@ -683,11 +683,11 @@ func NewGetRawTransactionCmd(txHash string, verbose *bool) *GetRawTransactionCmd
 // GetTxOutCmd defines the gettxout JSON-RPC command.
 //
 //	todo(ABE): ABE does not support 'GetTxOutCmd', as it seems that this command is to get Txo from transactions in mempool and utxo of main chain.
-type GetTxOutCmd struct {
+/*type GetTxOutCmd struct {
 	Txid           string
 	Vout           uint32
 	IncludeMempool *bool `jsonrpcdefault:"true"`
-}
+}*/
 
 type GetUtxoRingCmd struct {
 	OutPointRing OutPointRing
@@ -698,13 +698,13 @@ type GetUtxoRingCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewGetTxOutCmd(txHash string, vout uint32, includeMempool *bool) *GetTxOutCmd {
+/*func NewGetTxOutCmd(txHash string, vout uint32, includeMempool *bool) *GetTxOutCmd {
 	return &GetTxOutCmd{
 		Txid:           txHash,
 		Vout:           vout,
 		IncludeMempool: includeMempool,
 	}
-}
+}*/
 
 // GetTxOutProofCmd defines the gettxoutproof JSON-RPC command.
 type GetTxOutProofCmd struct {
@@ -1065,7 +1065,7 @@ func init() {
 	MustRegisterCmd("getpeerinfo", (*GetPeerInfoCmd)(nil), flags)
 	MustRegisterCmd("getrawmempool", (*GetRawMempoolCmd)(nil), flags)
 	MustRegisterCmd("getrawtransaction", (*GetRawTransactionCmd)(nil), flags)
-	MustRegisterCmd("gettxout", (*GetTxOutCmd)(nil), flags)
+	//MustRegisterCmd("gettxout", (*GetTxOutCmd)(nil), flags)
 	MustRegisterCmd("gettxoutproof", (*GetTxOutProofCmd)(nil), flags)
 	MustRegisterCmd("gettxoutsetinfo", (*GetTxOutSetInfoCmd)(nil), flags)
 	MustRegisterCmd("help", (*HelpCmd)(nil), flags)

@@ -528,13 +528,13 @@ type ScriptPubKeyResult struct {
 // GetTxOutResult models the data from the gettxout command.
 //
 //	todo(ABE): ABE does not support 'GetTxOutCmd', as it seems that this command is to get Txo from transactions in mempool and utxo of main chain.
-type GetTxOutResult struct {
+/*type GetTxOutResult struct {
 	BestBlock     string             `json:"bestblock"`
 	Confirmations int64              `json:"confirmations"`
 	Value         float64            `json:"value"`
 	ScriptPubKey  ScriptPubKeyResult `json:"scriptPubKey"`
 	Coinbase      bool               `json:"coinbase"`
-}
+}*/
 
 type GetUtxoRingResult struct {
 	RingBlockHeight     int32 `json:"ringblockheight"`
@@ -895,7 +895,7 @@ func (f *FundRawTransactionResult) UnmarshalJSON(data []byte) error {
 		}
 	}
 
-	fee, err := abeutil.NewAmount(rawRes.Fee)
+	fee, err := abeutil.NewAmountAbe(rawRes.Fee)
 	if err != nil {
 		return err
 	}

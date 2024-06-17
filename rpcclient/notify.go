@@ -879,7 +879,7 @@ func parseAccountBalanceNtfnParams(params []json.RawMessage) (account string,
 	}
 
 	// Bounds check amount.
-	bal, err := abeutil.NewAmount(fbal)
+	bal, err := abeutil.NewAmountAbe(fbal)
 	if err != nil {
 		return "", 0, false, err
 	}
