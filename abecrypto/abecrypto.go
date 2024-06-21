@@ -391,8 +391,12 @@ func CoinbaseTxVerify(coinbaseTx *wire.MsgTxAbe) error {
 //	(6) TxWitness: set empty here and will be filled by underlying crypto schemes
 //	In summary, CreateTransferTxMsgTemplate() fills all fields except the serialNumber, TxOuts, and TxWitness.
 //	Note that these filled fields (except the Version) are independent of the underlying crypto scheme, and are specified by the issuer of a transaction.
+//
+// abecrypto.CreateTransferTxMsgTemplate will create transaction with version wire.TxVersion_Height_0 which maps to abecryptoparam.CryptoSchemePQRingCT
 func CreateTransferTxMsgTemplate(abeTxInputDescs []*AbeTxInputDesc, abeTxOutputDescs []*AbeTxOutputDesc, txFee uint64, txMemo []byte) (*wire.MsgTxAbe, error) {
 	//	Version
+	// For MLPAUT fork at specified height, the transaction version switch to new one ( wire.TxVersion_Height_MLPAUT_300000 ),
+	// here we fix the outdated version (wire.TxVersion_Height_0) used by abecrypto.CreateTransferTxMsgTemplate
 	txMsgTemplate := wire.NewMsgTxAbe(wire.TxVersion_Height_0)
 	//	Note that new Tx must use the latest/current TxVersion.
 
