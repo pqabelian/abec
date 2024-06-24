@@ -3,7 +3,7 @@ package wire
 import (
 	"bytes"
 	"fmt"
-	"github.com/abesuite/abec/abecrypto/abecryptoparam"
+	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"io"
 
 	"github.com/abesuite/abec/chainhash"
@@ -181,7 +181,7 @@ func (msg *MsgBlockAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding)
 	if enc == WitnessEncoding && existWitness[0] == 1 {
 		var tmp []byte
 		for _, tx := range msg.Transactions {
-			tmp, err = ReadVarBytes(r, pver, abecryptoparam.MaxAllowedTxWitnessSize, "tx.Witness")
+			tmp, err = ReadVarBytes(r, pver, abecryptoxparam.MaxAllowedTxWitnessSize, "tx.Witness")
 			if err != nil {
 				return err
 			}
