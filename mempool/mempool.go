@@ -1652,6 +1652,13 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	bestHeight := mp.cfg.BestHeight()
 	nextBlockHeight := bestHeight + 1
 
+	if nextBlockHeight >= mp.cfg.ChainParams.BlockHeightMLPAUTCOMMIT {
+		if tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_300000 {
+			str := fmt.Sprintf("since from block with height %d, transactions with version %d will not be mined any more", mp.cfg.ChainParams.BlockHeightMLPAUTCOMMIT, tx.MsgTx().Version)
+			return nil, nil, txRuleError(wire.RejectInvalid, str)
+		}
+	}
+
 	// Don't allow non-standard transactions if the network parameters
 	// forbid their acceptance.
 	// TODO(Abe 20240124) Now we should only support standard transaction

@@ -88,6 +88,8 @@ type TxSource interface {
 	// HaveTransaction returns whether or not the passed transaction hash
 	// exists in the source pool.
 	HaveTransaction(hash *chainhash.Hash) bool
+
+	RemoveTransactionAbe(Tx *abeutil.TxAbe)
 }
 
 // txPrioItemAbe houses a transaction along with extra information that allows the
@@ -860,6 +862,8 @@ mempoolLoop:
 		if nextBlockHeight >= g.chainParams.BlockHeightMLPAUTCOMMIT {
 			if tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_300000 {
 				log.Tracef("Skipping tx %s, since from block with height %d, transactions with version %d will not be mined any more", tx.Hash(), g.chainParams.BlockHeightMLPAUTCOMMIT, tx.MsgTx().Version)
+				// notify mempool remove outdated transaction immediately
+				g.txSource.RemoveTransactionAbe(tx)
 				continue
 			}
 		} else if nextBlockHeight >= g.chainParams.BlockHeightMLPAUT {
@@ -965,6 +969,7 @@ mempoolLoop:
 		// transaction size without witness
 		txSize := uint32(tx.MsgTx().SerializeSize())
 		blockPlusTxSize := blockSize + txSize
+		// TODO(MLPAUT) add block full size check here
 		if blockPlusTxSize < blockSize || blockPlusTxSize >= g.policy.BlockMaxSize {
 			log.Tracef("Skipping tx %s because it would exceed "+
 				"the max block size", tx.Hash())
