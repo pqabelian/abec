@@ -2182,6 +2182,9 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 					mempool.DefaultEstimateFeeMinRegisteredBlocks)
 			}
 		}
+		if sm.chainParams.BlockHeightMLPAUTCOMMIT <= block.Height() && block.Height() < sm.chainParams.BlockHeightMLPAUTCOMMIT+10 {
+			sm.txMemPool.ClearOutdatedTransaction()
+		}
 
 	// A block has been disconnected from the main block chain.
 	case blockchain.NTBlockDisconnected:

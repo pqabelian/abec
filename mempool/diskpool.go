@@ -51,7 +51,7 @@ func (mp *TxPool) txMonitor() {
 			var f *os.File
 			for i := 0; i < len(filenames) && len(mp.poolAbe) < MaxTransactionInMemoryNum; i++ {
 				name := filenames[i]
-				log.Infof("loading some transactions from %s", name)
+				log.Infof("loading transactions from %s", name)
 				f, err = os.OpenFile(name, os.O_RDONLY, 0644)
 				if err != nil {
 					continue
@@ -76,9 +76,10 @@ func (mp *TxPool) txMonitor() {
 						break
 					}
 					tx := abeutil.NewTxAbe(msgTx)
-					log.Infof("load transaction %s from file %s", msgTx.TxHash(), name)
+					log.Infof("loading transaction %s from file %s", msgTx.TxHash(), name)
 					_, err = mp.ProcessTransactionAbe(tx, false, false, 0, true)
 					if err != nil {
+						log.Debugf("fail to load transaction %s from file %s: %v", msgTx.TxHash(), name, err)
 						break
 					}
 				}

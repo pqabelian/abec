@@ -716,6 +716,10 @@ func (mp *TxPool) removeTransactionBTCD(tx *abeutil.Tx, removeRedeemers bool) {
 }
 
 // todo(ABE):
+// removeTransactionAbe is the internal function which implements the public
+// RemoveTransaction.  See the comment for RemoveTransaction for more details.
+//
+// This function MUST be called with the mempool lock held (for writes).
 func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 	txHash := tx.Hash()
 	/*	if removeRedeemers {
@@ -1653,6 +1657,9 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	nextBlockHeight := bestHeight + 1
 
 	if nextBlockHeight >= mp.cfg.ChainParams.BlockHeightMLPAUTCOMMIT {
+		if mp.cfg.ChainParams.BlockHeightMLPAUTCOMMIT <= nextBlockHeight && nextBlockHeight < mp.cfg.ChainParams.BlockHeightMLPAUTCOMMIT+10 {
+			mp.clearOutdatedTransaction()
+		}
 		if tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_300000 {
 			str := fmt.Sprintf("since from block with height %d, transactions with version %d will not be mined any more", mp.cfg.ChainParams.BlockHeightMLPAUTCOMMIT, tx.MsgTx().Version)
 			return nil, nil, txRuleError(wire.RejectInvalid, str)
@@ -2185,6 +2192,22 @@ func (mp *TxPool) RemoveExpiredAUTTransaction(height int32) {
 		mp.removeTransactionAbe(txAbe.Tx)
 	}
 	mp.mtx.Unlock()
+}
+
+func (mp *TxPool) ClearOutdatedTransaction() {
+	log.Debugf("Clean outdated transaction in mempool")
+	mp.mtx.Lock()
+	defer mp.mtx.Unlock()
+	mp.clearOutdatedTransaction()
+}
+
+func (mp *TxPool) clearOutdatedTransaction() {
+	for _, txDesc := range mp.poolAbe {
+		if txDesc.Tx.MsgTx().Version == wire.TxVersion_Height_0 {
+			mp.removeTransactionAbe(txDesc.Tx)
+			log.Infof("transaction %s has been removed from transaction pool", txDesc.Tx.Hash())
+		}
+	}
 }
 
 // New returns a new memory pool for validating and storing standalone
