@@ -300,12 +300,15 @@ func (view *AUTViewpoint) connectTransaction(tx *abeutil.TxAbe, blockHeight int3
 
 		log.Debugf(`Register AUT with identifier %s with following configuration: Symbol: %v,
 	UpdateThreshold: %v, IssueThreshold: %v, PlannedTotalAmount: %v,
-	ExpireHeight: %v, IssuerTokens: %v, 
+	ExpireHeight: %v, 
 	UnitName: %v, MinUnitName: %v, UnitScale: %v`, string(autTransaction.AutIdentifier), string(autTransaction.AutSymbol),
 			autTransaction.IssuerUpdateThreshold, autTransaction.IssueTokensThreshold, autTransaction.PlannedTotalAmount,
-			autTransaction.ExpireHeight, autTransaction.IssuerTokens,
+			autTransaction.ExpireHeight,
 			string(autTransaction.UnitName), string(autTransaction.MinUnitName), autTransaction.UnitScale)
-
+		log.Debugf("IssuerTokens: len = %d", len(autTransaction.IssuerTokens))
+		for i := 0; i < len(autTransaction.IssuerTokens); i++ {
+			log.Debugf("[%d] %s", i, hex.EncodeToString(autTransaction.IssuerTokens[i]))
+		}
 	case *aut.MintTx:
 		info := entry.Metadata()
 		var currentSauts = (SpentAUTTokens)(make([]SpentAUTToken, 0, len(autTransaction.TxIns)))
@@ -396,17 +399,31 @@ func (view *AUTViewpoint) connectTransaction(tx *abeutil.TxAbe, blockHeight int3
 		log.Debugf(`Re-register AUT with identifier %s with following configuration: Symbol: %s -> %s,
 UpdateThreshold: %v -> %v, IssueThreshold: %v -> %v,
 PlannedTotalAmount: %v -> %v, ExpireHeight: %v -> %v,
-IssuerTokens: %v -> %v, UnitScale: %v -> %v,
-RootCoin: enable %d, abolish %d`, string(autTransaction.AutIdentifier),
+UnitScale: %v -> %v`, string(autTransaction.AutIdentifier),
 			string(originInfo.AutSymbol), string(autTransaction.AutSymbol),
 			originInfo.UpdateThreshold, autTransaction.IssuerUpdateThreshold,
 			originInfo.IssueThreshold, autTransaction.IssueTokensThreshold,
 			originInfo.PlannedTotalAmount, autTransaction.PlannedTotalAmount,
 			originInfo.ExpireHeight, autTransaction.ExpireHeight,
-			originInfo.IssuerTokens, autTransaction.IssuerTokens,
 			originInfo.UnitScale, autTransaction.UnitScale,
-			len(autTransaction.TxOuts), len(originInfo.RootCoinSet),
 		)
+		log.Debugf("Previous IssuerTokens: len = %d", len(originInfo.IssuerTokens))
+		for i := 0; i < len(originInfo.IssuerTokens); i++ {
+			log.Debugf("[%d] %s", i, hex.EncodeToString(originInfo.IssuerTokens[i]))
+		}
+
+		log.Debugf("Current IssuerTokens: len = %d", len(autTransaction.IssuerTokens))
+		for i := 0; i < len(autTransaction.IssuerTokens); i++ {
+			log.Debugf("[%d] %s", i, hex.EncodeToString(autTransaction.IssuerTokens[i]))
+		}
+		log.Debugf("Abolished RootCoin: len = %d", len(originInfo.RootCoinSet))
+		for point := range originInfo.RootCoinSet {
+			log.Debugf("%s", point)
+		}
+		log.Debugf("Enabled RootCoin: len = %d", len(autTransaction.TxOuts))
+		for _, point := range autTransaction.TxOuts {
+			log.Debugf("%s", point)
+		}
 
 	case *aut.TransferTx:
 		// check the sanity of transfer transaction
@@ -491,7 +508,8 @@ RootCoin: enable %d, abolish %d`, string(autTransaction.AutIdentifier),
 					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index,
 					string(autTx.AUTIdentifier()))
 			}
-			if burnedValues+token.Amount() <= burnedValues || burnedValues+token.Amount() <= token.Amount() {
+			if burnedValues+token.Amount() <= burnedValues ||
+				(burnedValues != 0 && burnedValues+token.Amount() <= token.Amount()) {
 				return fmt.Errorf("an burn AUT transaction %s try to overflow"+
 					" for AUT identified by %s",
 					tx.Hash(), string(autTx.AUTIdentifier()))

@@ -1942,16 +1942,19 @@ func dbPutAUTView(dbTx database.Tx, view *AUTViewpoint, blockHeight int32, block
 	autRootCoinBucket := dbTx.Metadata().Bucket(autRootCoinBucketName)
 	for autNameKey, entry := range view.entries {
 		log.Debugf(`AUT identified by %s with following configuration would be stored at height %d (block hash %s):
-	Symbol: %s, IssuerTokens: %v, UpdateThreshold: %v, IssueThreshold: %v,
+	Symbol: %s, UpdateThreshold: %v, IssueThreshold: %v,
 	PlannedTotalAmount: %v, ExpireHeight: %v, UnitName: %v, MinUnitName: %v, UnitScale: %v,
 	Memo: %v, MintedAmount: %v, RootCoinSet: %v`,
 			string(entry.metadata.AutIdentifier), blockHeight, blockHash,
-			string(entry.metadata.AutSymbol), entry.metadata.IssuerTokens,
+			string(entry.metadata.AutSymbol),
 			entry.metadata.UpdateThreshold, entry.metadata.IssueThreshold,
 			entry.metadata.PlannedTotalAmount, entry.metadata.ExpireHeight,
 			entry.metadata.UnitName, entry.metadata.MinUnitName, entry.metadata.UnitScale,
 			entry.metadata.AutMemo, entry.metadata.MintedAmount, entry.metadata.RootCoinSet)
-
+		log.Debugf("IssuerTokens: len = %d", len(entry.metadata.IssuerTokens))
+		for i := 0; i < len(entry.metadata.IssuerTokens); i++ {
+			log.Debugf("[%d] %s", i, hex.EncodeToString(entry.metadata.IssuerTokens[i]))
+		}
 		// Serialize and store the utxo entry.
 		serializedAUTInfo, err := serializeAUTInfo(entry.metadata)
 		if err != nil {
