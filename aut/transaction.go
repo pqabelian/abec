@@ -117,6 +117,14 @@ type Transaction interface {
 //	return AUTHash(sha3.Sum512(b))
 //}
 
+// MetaInfo hosts metadata information for registered Abelian User Token
+// Different AUTs are uniquely distinguished and identified by identifiers
+// In details:
+// RegistrationTx would create a new one with unique AutIdentifier
+// MintTx would update fields MintedAmount and RootCoinSet
+// ReRegistrationTx would update fields other than AutIdentifier / RootCoinSet
+// TransferTx would update no fields
+// BurnTx would update no fields
 type MetaInfo struct {
 	AutIdentifier      []byte // unique identifier
 	AutSymbol          []byte
@@ -169,8 +177,12 @@ func (info *MetaInfo) Clone() *MetaInfo {
 	copy(cloned.UnitName, info.UnitName)
 	copy(cloned.MinUnitName, info.MinUnitName)
 
-	for outpoint, rootCoin := range info.RootCoinSet {
-		cloned.RootCoinSet[outpoint] = rootCoin
+	for outpoint := range info.RootCoinSet {
+		newOutpoint := OutPoint{}
+		copy(newOutpoint.TxHash[:], outpoint.TxHash[:])
+		newOutpoint.Index = outpoint.Index
+
+		cloned.RootCoinSet[newOutpoint] = struct{}{}
 	}
 
 	return cloned
