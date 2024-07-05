@@ -67,10 +67,10 @@ type TransactionType = uint8
 const (
 	Registration TransactionType = 0
 	// todo(Alice): ecah needs to specify the type.
-	Mint           = 1
-	ReRegistration = 2
-	Transfer       = 3
-	Burn           = 4
+	Mint           TransactionType = 1
+	ReRegistration TransactionType = 2
+	Transfer       TransactionType = 3
+	Burn           TransactionType = 4
 )
 
 const CommonPrefixLength = 9
