@@ -88,7 +88,7 @@ const MaxIssuerNum = 10
 // AUTSCRIPT 1 varSize ...
 
 // todo: using constant?
-var CommonPrefix = []byte("AUTSCRIPT")
+const CommonPrefix = "AUTSCRIPT"
 
 // todo(AUT): Ins --> TxIns(), Outs --> TxOuts (since Ins and Outs are too short to describe clearly).
 // todo(AUT): NumIns() ? shall be removed?
@@ -231,7 +231,7 @@ func (tx *RegistrationTx) Serialize() ([]byte, error) {
 	var b bytes.Buffer
 	var err error
 
-	_, err = b.Write(CommonPrefix)
+	_, err = b.Write([]byte(CommonPrefix))
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +320,7 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	if !bytes.Equal(commprefix, CommonPrefix) {
+	if !bytes.Equal(commprefix, []byte(CommonPrefix)) {
 		return ErrNonAutTx
 	}
 
@@ -486,7 +486,7 @@ func (tx *MintTx) Serialize() ([]byte, error) {
 	var b bytes.Buffer
 	var err error
 
-	_, err = b.Write(CommonPrefix)
+	_, err = b.Write([]byte(CommonPrefix))
 	if err != nil {
 		return nil, err
 	}
@@ -544,7 +544,7 @@ func (tx *MintTx) Deserialize(r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	if !bytes.Equal(commprefix, CommonPrefix) {
+	if !bytes.Equal(commprefix, []byte(CommonPrefix)) {
 		return ErrNonAutTx
 	}
 
@@ -667,7 +667,7 @@ func (tx *ReRegistrationTx) Serialize() ([]byte, error) {
 	var b bytes.Buffer
 	var err error
 
-	_, err = b.Write(CommonPrefix)
+	_, err = b.Write([]byte(CommonPrefix))
 	if err != nil {
 		return nil, err
 	}
@@ -749,7 +749,7 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	if !bytes.Equal(commprefix, CommonPrefix) {
+	if !bytes.Equal(commprefix, []byte(CommonPrefix)) {
 		return ErrNonAutTx
 	}
 
@@ -909,7 +909,7 @@ func (tx *TransferTx) Serialize() ([]byte, error) {
 	var b bytes.Buffer
 	var err error
 
-	_, err = b.Write(CommonPrefix)
+	_, err = b.Write([]byte(CommonPrefix))
 	if err != nil {
 		return nil, err
 	}
@@ -970,7 +970,7 @@ func (tx *TransferTx) Deserialize(r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	if !bytes.Equal(commprefix, CommonPrefix) {
+	if !bytes.Equal(commprefix, []byte(CommonPrefix)) {
 		return ErrNonAutTx
 	}
 
@@ -1079,7 +1079,7 @@ func (tx *BurnTx) Serialize() ([]byte, error) {
 	var b bytes.Buffer
 	var err error
 
-	_, err = b.Write(CommonPrefix)
+	_, err = b.Write([]byte(CommonPrefix))
 	if err != nil {
 		return nil, err
 	}
@@ -1115,7 +1115,7 @@ func (tx *BurnTx) Deserialize(r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	if !bytes.Equal(commprefix, CommonPrefix) {
+	if !bytes.Equal(commprefix, []byte(CommonPrefix)) {
 		return ErrNonAutTx
 	}
 
@@ -1191,7 +1191,7 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 	if len(tx.TxMemo) <= CommonPrefixLength {
 		return nil, nil
 	}
-	if !bytes.Equal(tx.TxMemo[:CommonPrefixLength], CommonPrefix) {
+	if !bytes.Equal(tx.TxMemo[:CommonPrefixLength], []byte(CommonPrefix)) {
 		return nil, nil
 	}
 
