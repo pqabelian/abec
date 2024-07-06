@@ -38,7 +38,7 @@ func pqringctxCoinbaseTxGen(pp *pqringctxapi.PublicParameter, abeTxOutputDescs [
 	}
 
 	// parse the pqringctx.CoinbaseTx to wire.TxAbe
-	cryptoTxos := cryptoCoinbaseTx.GetTxos()
+	cryptoTxos := pqringctxapi.GetCbTxTxos(cryptoCoinbaseTx)
 	coinbaseTxMsgTemplate.TxOuts = make([]*wire.TxOutAbe, len(cryptoTxos))
 	for i := 0; i < len(cryptoTxos); i++ {
 		serializedTxo, err := pqringctxapi.SerializeTxo(pp, cryptoTxos[i])
@@ -52,7 +52,8 @@ func pqringctxCoinbaseTxGen(pp *pqringctxapi.PublicParameter, abeTxOutputDescs [
 	}
 
 	// witness must be associated with Tx, so it does not need to contain cryptoScheme or TxVersion.
-	serializedCbTxWitness, err := pqringctxapi.SerializeTxWitnessCbTx(pp, cryptoCoinbaseTx.GetTxWitness())
+	cbTxWitness := pqringctxapi.GetCbTxTxWitness(cryptoCoinbaseTx)
+	serializedCbTxWitness, err := pqringctxapi.SerializeTxWitnessCbTx(pp, cbTxWitness)
 	if err != nil {
 		return nil, err
 	}
@@ -412,12 +413,12 @@ func pqringctxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme
 
 	//	Set the txInputs
 	//	only the serial number needs to be set
-	cryptoTxInputs := cryptoTransferTx.GetTxInputs()
+	cryptoTxInputs := pqringctxapi.GetTrTxTxInputs(cryptoTransferTx)
 	for i := 0; i < inputNum; i++ {
-		transferTxMsgTemplate.TxIns[i].SerialNumber = cryptoTxInputs[i].GetSerialNumber()
+		transferTxMsgTemplate.TxIns[i].SerialNumber = pqringctxapi.GetTxInputSerialNumber(cryptoTxInputs[i])
 	}
 
-	cryptoTxos := cryptoTransferTx.GetTxos()
+	cryptoTxos := pqringctxapi.GetTrTxTxos(cryptoTransferTx)
 	transferTxMsgTemplate.TxOuts = make([]*wire.TxOutAbe, len(cryptoTxos))
 	for i := 0; i < len(cryptoTxos); i++ {
 		serializedTxo, err := pqringctxapi.SerializeTxo(pp, cryptoTxos[i])
@@ -431,7 +432,8 @@ func pqringctxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme
 	}
 
 	// witness must be associated with Tx, so it does not need to contain cryptoScheme or TxVersion.
-	transferTxMsgTemplate.TxWitness, err = pqringctxapi.SerializeTxWitnessTrTx(pp, cryptoTransferTx.GetTxWitness())
+	trTxWitness := pqringctxapi.GetTrTxWitness(cryptoTransferTx)
+	transferTxMsgTemplate.TxWitness, err = pqringctxapi.SerializeTxWitnessTrTx(pp, trTxWitness)
 	if err != nil {
 		return nil, err
 	}
