@@ -78,11 +78,16 @@ const IdentifierLength = 64 // identifier
 const MaxSymbolLength = 64  // symbol
 
 // todo(Alice): MaxAutMemoLength, MaxTxMemoLength
-const MaxAUTMemoLength = 20
-const MaxAUTTxMemoLength = 20
+const MaxAUTMemoLength = 1024
+const MaxAUTTxMemoLength = 1024
 const MaxUnitLength = 20
 const MaxMinUnitLength = 20
-const MaxIssuerTokenLength = 198 // TODO
+
+// IssuerTokenLength would be length of coin address for pseudonym(4+1+193)
+const IssuerTokenLength = 198
+
+// MaxIssuerNum won't exceed number limit of pseudonym address in crypto scheme(current abecryptox)
+// also, it won't exceed 256 math.MaxUint8
 const MaxIssuerNum = 10
 
 // AUTSCRIPT 0 varSize ...
@@ -375,7 +380,7 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 	tx.IssuerTokens = make([][]byte, numIssuer)
 	existIssuerTokens := map[string]struct{}{}
 	for i := 0; i < len(tx.IssuerTokens); i++ {
-		tx.IssuerTokens[i], err = ReadVarBytes(r, 0, MaxIssuerTokenLength, "issuerToken")
+		tx.IssuerTokens[i], err = ReadVarBytes(r, 0, IssuerTokenLength, "issuerToken")
 		if err != nil {
 			return err
 		}
@@ -804,7 +809,7 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 	tx.IssuerTokens = make([][]byte, numIssuer)
 	existIssuerTokens := map[string]struct{}{}
 	for i := 0; i < len(tx.IssuerTokens); i++ {
-		tx.IssuerTokens[i], err = ReadVarBytes(r, 0, MaxIssuerTokenLength, "issuerToken")
+		tx.IssuerTokens[i], err = ReadVarBytes(r, 0, IssuerTokenLength, "issuerToken")
 		if err != nil {
 			return err
 		}
