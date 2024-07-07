@@ -1650,7 +1650,7 @@ func deserializeAUTInfo(serialized []byte) (*aut.MetaInfo, error) {
 
 	info.IssuerTokens = make([][]byte, issuerNum)
 	for i := uint64(0); i < issuerNum; i++ {
-		info.IssuerTokens[i], err = wire.ReadVarBytes(buff, 0, aut.MaxIssuerTokenLength, "issuerToken")
+		info.IssuerTokens[i], err = wire.ReadVarBytes(buff, 0, aut.IssuerTokenLength, "issuerToken")
 		if err != nil {
 			return nil, errors.New("error to write issuer token")
 		}
