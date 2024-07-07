@@ -549,12 +549,12 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		}
 
 		consumedAUTCoins := make(map[aut.OutPoint]struct{})
-		for _, in := range autTransaction.TxInputs() {
-			if _, inExists := consumedAUTCoins[in]; inExists {
+		for _, autpoint := range autTransaction.TxInputs() {
+			if _, pointExists := consumedAUTCoins[autpoint]; pointExists {
 				return ruleError(ErrDuplicateTxInputs, "transaction "+
 					"contains duplicate inputs")
 			}
-			consumedAUTCoins[in] = struct{}{}
+			consumedAUTCoins[autpoint] = struct{}{}
 		}
 
 		txOuts := tx.MsgTx().TxOuts
@@ -1663,13 +1663,14 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 		return fmt.Errorf("CheckTransactionInputsAUT: the input abeutil.TxAbe does not contain a valid AutTransaction")
 	}
 
-	autNameKey := hex.EncodeToString(autTx.AUTIdentifier())
-	autEntry, exist := autView.entries[autNameKey]
+	autIdentifierKey := hex.EncodeToString(autTx.AUTIdentifier())
 	if autTx.Type() == aut.Registration {
+		autEntry, exist := autView.entries[autIdentifierKey]
 		if exist && autEntry != nil && autEntry.metadata != nil {
-			return errors.New("an registration AUT transaction try to register AUT entry with an existing AUT name ")
+			return errors.New("an registration AUT transaction try to register AUT entry with an existing AUT identifier ")
 		}
 	} else {
+		autEntry, exist := autView.entries[autIdentifierKey]
 		if !exist || autEntry == nil || autEntry.metadata == nil {
 			return errors.New("an non-registration AUT transaction try to operate on non-existing AUT entry")
 		}
@@ -1708,7 +1709,7 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 		willConsumedRootCoins := map[aut.OutPoint]struct{}{}
 		for i := 0; i < len(autTransaction.TxIns); i++ {
 			// spend non-exist or double spending
-			if _, existOutpoint := autEntry.metadata.RootCoinSet[autTransaction.TxIns[i]]; !existOutpoint {
+			if _, existOutpoint := autView.entries[autIdentifierKey].metadata.RootCoinSet[autTransaction.TxIns[i]]; !existOutpoint {
 				return fmt.Errorf("transaction %s try to mint with unknown root coin <%s:%d>",
 					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index)
 			}
@@ -1735,13 +1736,13 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 			}
 		}
 		allIssuerTokens := map[string]struct{}{}
-		for i := 0; i < len(autEntry.metadata.IssuerTokens); i++ {
-			privacyLevel, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(autEntry.metadata.IssuerTokens[i])
+		for i := 0; i < len(autView.entries[autIdentifierKey].metadata.IssuerTokens); i++ {
+			privacyLevel, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(autView.entries[autIdentifierKey].metadata.IssuerTokens[i])
 			if err != nil {
-				return fmt.Errorf("fail to parse %d-th issuer token in aut %s(identifer %s)", i, string(autEntry.metadata.AutSymbol), string(autEntry.metadata.AutIdentifier))
+				return fmt.Errorf("fail to parse %d-th issuer token in aut %s(identifer %s)", i, string(autView.entries[autIdentifierKey].metadata.AutSymbol), string(autView.entries[autIdentifierKey].metadata.AutIdentifier))
 			}
 			if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
-				return fmt.Errorf("specified %d-th issuer token is invalid in aut %s(identifer %s)", i, string(autEntry.metadata.AutSymbol), string(autEntry.metadata.AutIdentifier))
+				return fmt.Errorf("specified %d-th issuer token is invalid in aut %s(identifer %s)", i, string(autView.entries[autIdentifierKey].metadata.AutSymbol), string(autView.entries[autIdentifierKey].metadata.AutIdentifier))
 			}
 			allIssuerTokens[hex.EncodeToString(coinAddress)] = struct{}{}
 		}
@@ -1752,9 +1753,9 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 			}
 		}
 		// check the input issuer token and issue token in info
-		if len(consumedIssueTokens) < int(autEntry.metadata.IssueThreshold) {
+		if len(consumedIssueTokens) < int(autView.entries[autIdentifierKey].metadata.IssueTokensThreshold) {
 			return fmt.Errorf("transaction %s try to mint with %d issue token but "+
-				"the AUT entry claim its issue threshold %d", tx.Hash(), len(consumedIssueTokens), autEntry.metadata.IssueThreshold)
+				"the AUT entry claim its issue threshold %d", tx.Hash(), len(consumedIssueTokens), autView.entries[autIdentifierKey].metadata.IssueTokensThreshold)
 		}
 
 		// value
@@ -1765,23 +1766,23 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 				wouldMintedAmount+autTransaction.TxoAUTValues[i] < autTransaction.TxoAUTValues[i] {
 				return fmt.Errorf("transaction %s try to mint coin to overflow", tx.Hash())
 			}
-			if wouldMintedAmount+autTransaction.TxoAUTValues[i] > autEntry.metadata.PlannedTotalAmount {
+			if wouldMintedAmount+autTransaction.TxoAUTValues[i] > autView.entries[autIdentifierKey].metadata.PlannedTotalAmount {
 				return fmt.Errorf("transaction %s try to mint coin exceed it claimed planned %d",
-					tx.Hash(), autEntry.metadata.PlannedTotalAmount)
+					tx.Hash(), autView.entries[autIdentifierKey].metadata.PlannedTotalAmount)
 			}
 			wouldMintedAmount += autTransaction.TxoAUTValues[i]
 		}
-		if autEntry.metadata.MintedAmount+wouldMintedAmount < autEntry.metadata.MintedAmount {
+		if autView.entries[autIdentifierKey].metadata.MintedAmount+wouldMintedAmount < autView.entries[autIdentifierKey].metadata.MintedAmount {
 			return fmt.Errorf("transaction %s try to mint coin exceed it claimed planned %d",
-				tx.Hash(), autEntry.metadata.PlannedTotalAmount)
+				tx.Hash(), autView.entries[autIdentifierKey].metadata.PlannedTotalAmount)
 		}
 
 	case *aut.ReRegistrationTx:
 		// check the sanity of re-registration transaction
 		// expire height
-		if autEntry.metadata.ExpireHeight < txHeight {
+		if autView.entries[autIdentifierKey].metadata.ExpireHeight < txHeight {
 			return fmt.Errorf("transaction %s try to re-register at height %d but "+
-				"the AUT entry claim its expire height %d when last registered", tx.Hash(), txHeight, autEntry.metadata.ExpireHeight)
+				"the AUT entry claim its expire height %d when last registered", tx.Hash(), txHeight, autView.entries[autIdentifierKey].metadata.ExpireHeight)
 		}
 		if autTransaction.ExpireHeight < txHeight {
 			return fmt.Errorf("transaction %s try to re-register an AUT "+
@@ -1794,7 +1795,7 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 		willConsumedRootCoins := map[aut.OutPoint]struct{}{}
 		for i := 0; i < len(autTransaction.TxIns); i++ {
 			// spend non-exist or double spending
-			if _, isAUTTx := autEntry.metadata.RootCoinSet[autTransaction.TxIns[i]]; !isAUTTx {
+			if _, isAUTTx := autView.entries[autIdentifierKey].metadata.RootCoinSet[autTransaction.TxIns[i]]; !isAUTTx {
 				return fmt.Errorf("transaction %s try to re-register with unknown root coin <%s:%d>",
 					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index)
 			}
@@ -1821,13 +1822,13 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 			}
 		}
 		allIssuerTokens := map[string]struct{}{}
-		for i := 0; i < len(autEntry.metadata.IssuerTokens); i++ {
-			privacyLevel, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(autEntry.metadata.IssuerTokens[i])
+		for i := 0; i < len(autView.entries[autIdentifierKey].metadata.IssuerTokens); i++ {
+			privacyLevel, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(autView.entries[autIdentifierKey].metadata.IssuerTokens[i])
 			if err != nil {
-				return fmt.Errorf("fail to parse %d-th issuer token in aut %s(identifer %s)", i, string(autEntry.metadata.AutSymbol), string(autEntry.metadata.AutIdentifier))
+				return fmt.Errorf("fail to parse %d-th issuer token in aut %s(identifer %s)", i, string(autView.entries[autIdentifierKey].metadata.AutSymbol), string(autView.entries[autIdentifierKey].metadata.AutIdentifier))
 			}
 			if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
-				return fmt.Errorf("specified %d-th issuer token is invalid in aut %s(identifer %s)", i, string(autEntry.metadata.AutSymbol), string(autEntry.metadata.AutIdentifier))
+				return fmt.Errorf("specified %d-th issuer token is invalid in aut %s(identifer %s)", i, string(autView.entries[autIdentifierKey].metadata.AutSymbol), string(autView.entries[autIdentifierKey].metadata.AutIdentifier))
 			}
 			allIssuerTokens[hex.EncodeToString(coinAddress)] = struct{}{}
 		}
@@ -1838,16 +1839,16 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 			}
 		}
 		// check the input issuer token and issue token in info
-		if len(consumedIssueTokens) < int(autEntry.metadata.IssueThreshold) {
+		if len(consumedIssueTokens) < int(autView.entries[autIdentifierKey].metadata.IssueTokensThreshold) {
 			return fmt.Errorf("transaction %s try to mint with %d issue token but "+
-				"the AUT entry claim its issue threshold %d", tx.Hash(), len(consumedIssueTokens), autEntry.metadata.IssueThreshold)
+				"the AUT entry claim its issue threshold %d", tx.Hash(), len(consumedIssueTokens), autView.entries[autIdentifierKey].metadata.IssueTokensThreshold)
 		}
 
 		// check updated AUT info
 		// planned amount
-		if autTransaction.PlannedTotalAmount < autEntry.metadata.MintedAmount {
+		if autTransaction.PlannedTotalAmount < autView.entries[autIdentifierKey].metadata.MintedAmount {
 			return fmt.Errorf("transaction %s try to re-register with planned total amount %d but "+
-				"the AUT entry has mint %d", tx.Hash(), autTransaction.PlannedTotalAmount, autEntry.metadata.MintedAmount)
+				"the AUT entry has mint %d", tx.Hash(), autTransaction.PlannedTotalAmount, autView.entries[autIdentifierKey].metadata.MintedAmount)
 		}
 
 	case *aut.TransferTx:
@@ -1856,7 +1857,7 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 		totalInputValue := uint64(0)
 		willConsumedTokens := map[aut.OutPoint]struct{}{}
 		for i := 0; i < len(autTransaction.TxIns); i++ {
-			token, ok := autEntry.coins[autTransaction.TxIns[i]]
+			token, ok := autView.entries[autIdentifierKey].coins[autTransaction.TxIns[i]]
 			if !ok {
 				return fmt.Errorf("transaction %s try to spend non-existing/spent/burn token"+
 					"<%s:%d>", tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index)
@@ -1881,10 +1882,10 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 				return fmt.Errorf("transaction %s try to spend coin with overflow value", tx.Hash())
 
 			}
-			if totalOutValue+autTransaction.TxoAUTValues[i] > autEntry.metadata.MintedAmount ||
-				totalOutValue+autTransaction.TxoAUTValues[i] > autEntry.metadata.PlannedTotalAmount {
+			if totalOutValue+autTransaction.TxoAUTValues[i] > autView.entries[autIdentifierKey].metadata.MintedAmount ||
+				totalOutValue+autTransaction.TxoAUTValues[i] > autView.entries[autIdentifierKey].metadata.PlannedTotalAmount {
 				return fmt.Errorf("transaction %s try to spend coin exceed it claimed minted %d/planned %d",
-					tx.Hash(), autEntry.metadata.MintedAmount, autEntry.metadata.PlannedTotalAmount)
+					tx.Hash(), autView.entries[autIdentifierKey].metadata.MintedAmount, autView.entries[autIdentifierKey].metadata.PlannedTotalAmount)
 			}
 			totalOutValue += autTransaction.TxoAUTValues[i]
 		}
@@ -1896,7 +1897,7 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 		willBurnedCoins := map[aut.OutPoint]struct{}{}
 		for i := 0; i < len(autTransaction.TxIns); i++ {
 			// spend non-exist or double spending
-			if _, isAUTTx := autEntry.coins[autTransaction.TxIns[i]]; !isAUTTx {
+			if _, isAUTTx := autView.entries[autIdentifierKey].coins[autTransaction.TxIns[i]]; !isAUTTx {
 				return fmt.Errorf("transaction %s try to burn with unknown coin <%s:%d>",
 					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index)
 			}

@@ -1440,11 +1440,11 @@ func serializeAUTInfo(info *aut.MetaInfo) ([]byte, error) {
 		return nil, err
 	}
 
-	err = buff.WriteByte(info.UpdateThreshold)
+	err = buff.WriteByte(info.IssuerUpdateThreshold)
 	if err != nil {
 		return nil, err
 	}
-	err = buff.WriteByte(info.IssueThreshold)
+	err = buff.WriteByte(info.IssueTokensThreshold)
 	if err != nil {
 		return nil, err
 	}
@@ -1624,11 +1624,11 @@ func deserializeAUTInfo(serialized []byte) (*aut.MetaInfo, error) {
 		return nil, err
 	}
 
-	info.UpdateThreshold, err = buff.ReadByte()
+	info.IssuerUpdateThreshold, err = buff.ReadByte()
 	if err != nil {
 		return nil, err
 	}
-	info.IssueThreshold, err = buff.ReadByte()
+	info.IssueTokensThreshold, err = buff.ReadByte()
 	if err != nil {
 		return nil, err
 	}
@@ -1942,15 +1942,15 @@ func dbPutAUTView(dbTx database.Tx, view *AUTViewpoint, blockHeight int32, block
 	autRootCoinBucket := dbTx.Metadata().Bucket(autRootCoinBucketName)
 	for autNameKey, entry := range view.entries {
 		log.Debugf(`AUT identified by %s with following configuration would be stored at height %d (block hash %s):
-	Symbol: %s, UpdateThreshold: %v, IssueThreshold: %v,
+	Symbol: %s, IssuerUpdateThreshold: %v, IssueTokensThreshold: %v,
 	PlannedTotalAmount: %v, ExpireHeight: %v, UnitName: %v, MinUnitName: %v, UnitScale: %v,
-	Memo: %v, MintedAmount: %v, RootCoinSet: %v`,
+	Memo: %v, MintedAmount: %v`,
 			string(entry.metadata.AutIdentifier), blockHeight, blockHash,
 			string(entry.metadata.AutSymbol),
-			entry.metadata.UpdateThreshold, entry.metadata.IssueThreshold,
+			entry.metadata.IssuerUpdateThreshold, entry.metadata.IssueTokensThreshold,
 			entry.metadata.PlannedTotalAmount, entry.metadata.ExpireHeight,
 			entry.metadata.UnitName, entry.metadata.MinUnitName, entry.metadata.UnitScale,
-			entry.metadata.AutMemo, entry.metadata.MintedAmount, entry.metadata.RootCoinSet)
+			entry.metadata.AutMemo, entry.metadata.MintedAmount)
 		log.Debugf("IssuerTokens: len = %d", len(entry.metadata.IssuerTokens))
 		for i := 0; i < len(entry.metadata.IssuerTokens); i++ {
 			log.Debugf("[%d] %s", i, hex.EncodeToString(entry.metadata.IssuerTokens[i]))
@@ -1970,12 +1970,15 @@ func dbPutAUTView(dbTx database.Tx, view *AUTViewpoint, blockHeight int32, block
 			return err
 		}
 
+		log.Debugf("RootCoinSet: len = %d", len(entry.metadata.RootCoinSet))
 		rootCoinSet := make([]*aut.OutPoint, 0, len(entry.metadata.RootCoinSet))
 		for rootCoin := range entry.metadata.RootCoinSet {
-			rootCoinSet = append(rootCoinSet, &aut.OutPoint{
+			autpoint := &aut.OutPoint{
 				TxHash: rootCoin.TxHash,
 				Index:  rootCoin.Index,
-			})
+			}
+			rootCoinSet = append(rootCoinSet, autpoint)
+			log.Debugf("\t%s", autpoint)
 		}
 		serializedRootCoinSet, err := serializeAUTRootCoinSet(rootCoinSet)
 		if err != nil {

@@ -79,6 +79,7 @@ const MaxSymbolLength = 64  // symbol
 
 // todo(Alice): MaxAutMemoLength, MaxTxMemoLength
 const MaxAUTMemoLength = 20
+const MaxAUTTxMemoLength = 20
 const MaxUnitLength = 20
 const MaxMinUnitLength = 20
 const MaxIssuerTokenLength = 198 // TODO
@@ -122,21 +123,22 @@ type Transaction interface {
 // In details:
 // RegistrationTx would create a new one with unique AutIdentifier
 // MintTx would update fields MintedAmount and RootCoinSet
-// ReRegistrationTx would update fields other than AutIdentifier / RootCoinSet
+// ReRegistrationTx would update fields other than AutIdentifier/ UnitName / MinUnitName /MintedAmount
 // TransferTx would update no fields
 // BurnTx would update no fields
 type MetaInfo struct {
 	AutIdentifier      []byte // unique identifier
 	AutSymbol          []byte
-	IssuerTokens       [][]byte //[] crypto address // todo(AUT): using SHA3-512, define a standalone hash in AUT. Hash(CoinAddress)?
-	UpdateThreshold    uint8
-	IssueThreshold     uint8
+	IssuerTokens       [][]byte //[] coin address // todo(AUT): using SHA3-512, define a standalone hash in AUT. Hash(CoinAddress)?
 	PlannedTotalAmount uint64
-	ExpireHeight       int32
 	UnitName           []byte
 	MinUnitName        []byte
 	UnitScale          uint64
 	AutMemo            []byte
+
+	IssueTokensThreshold  uint8
+	ExpireHeight          int32
+	IssuerUpdateThreshold uint8
 
 	MintedAmount uint64
 	// only records active root coin
@@ -151,19 +153,19 @@ func (info *MetaInfo) Clone() *MetaInfo {
 
 	// ToDo(Alice): by the same order as the definition?
 	cloned := &MetaInfo{
-		AutIdentifier:      make([]byte, len(info.AutIdentifier)),
-		AutSymbol:          make([]byte, len(info.AutSymbol)),
-		IssuerTokens:       make([][]byte, len(info.IssuerTokens)),
-		UpdateThreshold:    info.UpdateThreshold,
-		IssueThreshold:     info.IssueThreshold,
-		PlannedTotalAmount: info.PlannedTotalAmount,
-		ExpireHeight:       info.ExpireHeight,
-		UnitName:           make([]byte, len(info.UnitName)),
-		MinUnitName:        make([]byte, len(info.MinUnitName)),
-		UnitScale:          info.UnitScale,
-		AutMemo:            make([]byte, len(info.AutMemo)),
-		MintedAmount:       info.MintedAmount,
-		RootCoinSet:        make(map[OutPoint]struct{}, len(info.RootCoinSet)),
+		AutIdentifier:         make([]byte, len(info.AutIdentifier)),
+		AutSymbol:             make([]byte, len(info.AutSymbol)),
+		IssuerTokens:          make([][]byte, len(info.IssuerTokens)),
+		IssuerUpdateThreshold: info.IssuerUpdateThreshold,
+		IssueTokensThreshold:  info.IssueTokensThreshold,
+		PlannedTotalAmount:    info.PlannedTotalAmount,
+		ExpireHeight:          info.ExpireHeight,
+		UnitName:              make([]byte, len(info.UnitName)),
+		MinUnitName:           make([]byte, len(info.MinUnitName)),
+		UnitScale:             info.UnitScale,
+		AutMemo:               make([]byte, len(info.AutMemo)),
+		MintedAmount:          info.MintedAmount,
+		RootCoinSet:           make(map[OutPoint]struct{}, len(info.RootCoinSet)),
 	}
 	copy(cloned.AutIdentifier, info.AutIdentifier)
 	copy(cloned.AutSymbol, info.AutSymbol)
@@ -215,18 +217,21 @@ func (info *MetaInfo) Clone() *MetaInfo {
 // Why this is dupliating the Info?
 // todo(Alice): for the common fields, using the same order as the definition, the particular fields
 type RegistrationTx struct {
-	AutIdentifier         []byte   // identifier
-	AutSymbol             []byte   // symbol
-	IssuerTokens          [][]byte // todo(AUT): same as in Info
-	ExpireHeight          int32
+	AutIdentifier      []byte   // identifier
+	AutSymbol          []byte   // symbol
+	IssuerTokens       [][]byte // todo(AUT): same as in Info
+	PlannedTotalAmount uint64
+	UnitName           []byte
+	MinUnitName        []byte
+	UnitScale          uint64
+	AutMemo            []byte
+
 	IssueTokensThreshold  uint8
+	ExpireHeight          int32
 	IssuerUpdateThreshold uint8 // TODO confirm the range
-	OutAutRootCoinNum     uint8
-	AutMemo               []byte
-	PlannedTotalAmount    uint64
-	UnitName              []byte
-	MinUnitName           []byte
-	UnitScale             uint64
+
+	OutAutRootCoinNum uint8
+	Memo              []byte
 	// todo(Alice): besides AutMemo to initialize the AUT, should have TxMemo to memo this transaction.
 
 	TxIns  []OutPoint
@@ -243,7 +248,7 @@ func (tx *RegistrationTx) Serialize() ([]byte, error) {
 	var b bytes.Buffer
 	var err error
 
-	_, err = b.Write([]byte(CommonPrefix))
+	_, err = b.WriteString(CommonPrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -274,31 +279,6 @@ func (tx *RegistrationTx) Serialize() ([]byte, error) {
 		}
 	}
 
-	err = WriteVarInt(&b, 0, uint64(tx.ExpireHeight))
-	if err != nil {
-		return nil, err
-	}
-
-	err = b.WriteByte(tx.IssuerUpdateThreshold)
-	if err != nil {
-		return nil, err
-	}
-
-	err = b.WriteByte(tx.IssueTokensThreshold)
-	if err != nil {
-		return nil, err
-	}
-
-	err = b.WriteByte(tx.OutAutRootCoinNum)
-	if err != nil {
-		return nil, err
-	}
-
-	err = WriteVarBytes(&b, 0, tx.AutMemo)
-	if err != nil {
-		return nil, err
-	}
-
 	err = WriteVarInt(&b, 0, tx.PlannedTotalAmount)
 	if err != nil {
 		return nil, err
@@ -312,8 +292,33 @@ func (tx *RegistrationTx) Serialize() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	err = WriteVarInt(&b, 0, tx.UnitScale)
+	if err != nil {
+		return nil, err
+	}
+	err = WriteVarBytes(&b, 0, tx.AutMemo)
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.WriteByte(tx.IssueTokensThreshold)
+	if err != nil {
+		return nil, err
+	}
+	err = WriteVarInt(&b, 0, uint64(tx.ExpireHeight))
+	if err != nil {
+		return nil, err
+	}
+	err = b.WriteByte(tx.IssuerUpdateThreshold)
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.WriteByte(tx.OutAutRootCoinNum)
+	if err != nil {
+		return nil, err
+	}
+	err = WriteVarBytes(&b, 0, tx.Memo)
 	if err != nil {
 		return nil, err
 	}
@@ -328,7 +333,7 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 	var err error
 
 	commprefix := make([]byte, len(CommonPrefix))
-	_, err = r.Read(commprefix)
+	_, err = io.ReadFull(r, commprefix)
 	if err != nil {
 		return err
 	}
@@ -337,7 +342,7 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 	}
 
 	oneByte := make([]byte, 1)
-	_, err = r.Read(oneByte)
+	_, err = io.ReadFull(r, oneByte)
 	if err != nil {
 		return err
 	}
@@ -377,39 +382,7 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 		if _, ok := existIssuerTokens[hex.EncodeToString(tx.IssuerTokens[i])]; ok {
 			return ErrInValidAUTTx
 		}
-	}
-
-	var expireHeight uint64
-	expireHeight, err = ReadVarInt(r, 0)
-	if err != nil {
-		return err
-	}
-	if expireHeight > math.MaxInt32 {
-		return ErrInValidAUTTx
-	}
-	tx.ExpireHeight = int32(expireHeight)
-
-	_, err = r.Read(oneByte)
-	if err != nil {
-		return err
-	}
-	tx.IssuerUpdateThreshold = oneByte[0]
-
-	_, err = r.Read(oneByte)
-	if err != nil {
-		return err
-	}
-	tx.IssueTokensThreshold = oneByte[0]
-
-	_, err = r.Read(oneByte)
-	if err != nil {
-		return err
-	}
-	tx.OutAutRootCoinNum = oneByte[0]
-
-	tx.AutMemo, err = ReadVarBytes(r, 0, MaxAUTMemoLength, "memo")
-	if err != nil {
-		return err
+		existIssuerTokens[hex.EncodeToString(tx.IssuerTokens[i])] = struct{}{}
 	}
 
 	tx.PlannedTotalAmount, err = ReadVarInt(r, 0)
@@ -438,9 +411,43 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 		return err
 	}
 
+	tx.AutMemo, err = ReadVarBytes(r, 0, MaxAUTMemoLength, "autmemo")
+	if err != nil {
+		return err
+	}
+
+	_, err = io.ReadFull(r, oneByte)
+	if err != nil {
+		return err
+	}
+	tx.IssueTokensThreshold = oneByte[0]
+
+	var expireHeight uint64
+	expireHeight, err = ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	if expireHeight > math.MaxInt32 {
+		return ErrInValidAUTTx
+	}
+	tx.ExpireHeight = int32(expireHeight)
+
+	_, err = io.ReadFull(r, oneByte)
+	if err != nil {
+		return err
+	}
+	tx.IssuerUpdateThreshold = oneByte[0]
+
+	_, err = io.ReadFull(r, oneByte)
+	if err != nil {
+		return err
+	}
+	tx.OutAutRootCoinNum = oneByte[0]
+
 	if len(tx.AutIdentifier) != IdentifierLength ||
 		len(tx.AutSymbol) > MaxSymbolLength ||
 		len(tx.AutMemo) > MaxAUTMemoLength ||
+		len(tx.Memo) > MaxAUTTxMemoLength ||
 		len(tx.UnitName) > MaxUnitLength ||
 		len(tx.MinUnitName) > MaxMinUnitLength {
 		return errors.New("an AUT with invalid length of name")
@@ -454,9 +461,6 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 		return errors.New("an AUT with invalid scale")
 	}
 	return nil
-}
-func (tx *RegistrationTx) NumIns() int {
-	return len(tx.TxIns)
 }
 func (tx *RegistrationTx) TxInputs() []OutPoint {
 	return tx.TxIns
@@ -498,7 +502,7 @@ func (tx *MintTx) Serialize() ([]byte, error) {
 	var b bytes.Buffer
 	var err error
 
-	_, err = b.Write([]byte(CommonPrefix))
+	_, err = b.WriteString(CommonPrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -524,14 +528,14 @@ func (tx *MintTx) Serialize() ([]byte, error) {
 	}
 
 	// todo(Alice): add a simple santiy-check on the consistence bewteen OutAutCoinNum and len(TxoAUTValues)
+	if len(tx.TxoAUTValues) != int(tx.OutAutCoinNum) {
+		return nil, errors.New("mis-match number of output and declared")
+	}
 	err = WriteVarInt(&b, 0, uint64(len(tx.TxoAUTValues)))
 	if err != nil {
 		return nil, err
 	}
 
-	if err != nil {
-		return nil, err
-	}
 	for _, value := range tx.TxoAUTValues {
 		err = WriteVarInt(&b, 0, value)
 		if err != nil {
@@ -552,7 +556,7 @@ func (tx *MintTx) Deserialize(r io.Reader) error {
 	// todo(Alice): use bytes.NewReader()?
 
 	commprefix := make([]byte, len(CommonPrefix))
-	_, err = r.Read(commprefix)
+	_, err = io.ReadFull(r, commprefix)
 	if err != nil {
 		return err
 	}
@@ -561,7 +565,7 @@ func (tx *MintTx) Deserialize(r io.Reader) error {
 	}
 
 	oneByte := make([]byte, 1)
-	_, err = r.Read(oneByte)
+	_, err = io.ReadFull(r, oneByte)
 	if err != nil {
 		return err
 	}
@@ -577,19 +581,19 @@ func (tx *MintTx) Deserialize(r io.Reader) error {
 		return ErrInValidAUTTx
 	}
 
-	_, err = r.Read(oneByte)
+	_, err = io.ReadFull(r, oneByte)
 	if err != nil {
 		return err
 	}
 	tx.InAutRootCoinNum = oneByte[0]
 
-	_, err = r.Read(oneByte)
+	_, err = io.ReadFull(r, oneByte)
 	if err != nil {
 		return err
 	}
 	tx.OutAutCoinNum = oneByte[0]
 
-	_, err = r.Read(oneByte)
+	_, err = io.ReadFull(r, oneByte)
 	if err != nil {
 		return err
 	}
@@ -607,14 +611,14 @@ func (tx *MintTx) Deserialize(r io.Reader) error {
 		}
 	}
 
-	tx.Memo, err = ReadVarBytes(r, 0, MaxAUTMemoLength, "memo")
+	tx.Memo, err = ReadVarBytes(r, 0, MaxAUTTxMemoLength, "memo")
 	if err != nil {
 		return err
 	}
 
 	// todo(Alice): MaxAutTxMemo
 	if len(tx.AutIdentifier) != IdentifierLength ||
-		len(tx.Memo) > MaxAUTMemoLength {
+		len(tx.Memo) > MaxAUTTxMemoLength {
 		return errors.New("an AUT with invalid length of name")
 	}
 	return nil
@@ -623,10 +627,6 @@ func (tx *MintTx) AUTIdentifier() []byte {
 	return tx.AutIdentifier
 }
 
-// todo(Alice): remove this?
-func (tx *MintTx) NumIns() int {
-	return len(tx.TxIns)
-}
 func (tx *MintTx) TxInputs() []OutPoint {
 	return tx.TxIns
 }
@@ -653,17 +653,20 @@ var _ Transaction = &MintTx{}
 type ReRegistrationTx struct {
 	// todo(Alice): for the common fields with RegistrationTx, use the same order; then particular fields
 	// AutMemo, and AutTxMemo
-	AutIdentifier         []byte
-	AutSymbol             []byte // symbol
-	IssuerTokens          [][]byte
+	AutIdentifier      []byte
+	AutSymbol          []byte // symbol
+	IssuerTokens       [][]byte
+	PlannedTotalAmount uint64
+	UnitScale          uint64
+	AutMemo            []byte
+
+	IssueTokensThreshold  uint8
 	ExpireHeight          int32
 	IssuerUpdateThreshold uint8 // TODO confirm the range
-	IssueTokensThreshold  uint8
-	InAutRootCoinNum      uint8
-	OutAutRootCoinNum     uint8
-	Memo                  []byte
-	PlannedTotalAmount    uint64
-	UnitScale             uint64
+
+	InAutRootCoinNum  uint8
+	OutAutRootCoinNum uint8
+	Memo              []byte
 
 	TxIns  []OutPoint
 	TxOuts []OutPoint
@@ -679,7 +682,7 @@ func (tx *ReRegistrationTx) Serialize() ([]byte, error) {
 	var b bytes.Buffer
 	var err error
 
-	_, err = b.Write([]byte(CommonPrefix))
+	_, err = b.WriteString(CommonPrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -709,17 +712,30 @@ func (tx *ReRegistrationTx) Serialize() ([]byte, error) {
 		}
 	}
 
-	err = WriteVarInt(&b, 0, uint64(tx.ExpireHeight))
+	err = WriteVarInt(&b, 0, tx.PlannedTotalAmount)
 	if err != nil {
 		return nil, err
 	}
 
-	err = b.WriteByte(tx.IssuerUpdateThreshold)
+	err = WriteVarInt(&b, 0, tx.UnitScale)
+	if err != nil {
+		return nil, err
+	}
+
+	err = WriteVarBytes(&b, 0, tx.AutMemo)
 	if err != nil {
 		return nil, err
 	}
 
 	err = b.WriteByte(tx.IssueTokensThreshold)
+	if err != nil {
+		return nil, err
+	}
+	err = WriteVarInt(&b, 0, uint64(tx.ExpireHeight))
+	if err != nil {
+		return nil, err
+	}
+	err = b.WriteByte(tx.IssuerUpdateThreshold)
 	if err != nil {
 		return nil, err
 	}
@@ -739,16 +755,6 @@ func (tx *ReRegistrationTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	err = WriteVarInt(&b, 0, tx.PlannedTotalAmount)
-	if err != nil {
-		return nil, err
-	}
-
-	err = WriteVarInt(&b, 0, tx.UnitScale)
-	if err != nil {
-		return nil, err
-	}
-
 	return b.Bytes(), nil
 }
 func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
@@ -757,7 +763,7 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 	// todo(Alice): use bytes.NewReader()?
 
 	commprefix := make([]byte, len(CommonPrefix))
-	_, err = r.Read(commprefix)
+	_, err = io.ReadFull(r, commprefix)
 	if err != nil {
 		return err
 	}
@@ -766,7 +772,7 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 	}
 
 	oneByte := make([]byte, 1)
-	_, err = r.Read(oneByte)
+	_, err = io.ReadFull(r, oneByte)
 	if err != nil {
 		return err
 	}
@@ -806,45 +812,7 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 			return ErrInValidAUTTx
 		}
 		// todo(Alice): did not put into existIssuerTokens? as existIssuerTokens is used to detect repeated tokens
-	}
-
-	var expireHeight uint64
-	expireHeight, err = ReadVarInt(r, 0)
-	if err != nil {
-		return err
-	}
-	if tx.ExpireHeight > math.MaxInt32 {
-		return ErrInValidAUTTx
-	}
-	tx.ExpireHeight = int32(expireHeight)
-
-	_, err = r.Read(oneByte)
-	if err != nil {
-		return err
-	}
-	tx.IssuerUpdateThreshold = oneByte[0]
-
-	_, err = r.Read(oneByte)
-	if err != nil {
-		return err
-	}
-	tx.IssueTokensThreshold = oneByte[0]
-
-	_, err = r.Read(oneByte)
-	if err != nil {
-		return err
-	}
-	tx.InAutRootCoinNum = oneByte[0]
-
-	_, err = r.Read(oneByte)
-	if err != nil {
-		return err
-	}
-	tx.OutAutRootCoinNum = oneByte[0]
-
-	tx.Memo, err = ReadVarBytes(r, 0, MaxAUTMemoLength, "memo")
-	if err != nil {
-		return err
+		existIssuerTokens[hex.EncodeToString(tx.IssuerTokens[i])] = struct{}{}
 	}
 
 	tx.PlannedTotalAmount, err = ReadVarInt(r, 0)
@@ -857,7 +825,54 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 		return err
 	}
 
-	if len(tx.AutIdentifier) != IdentifierLength || len(tx.Memo) > MaxAUTMemoLength {
+	tx.AutMemo, err = ReadVarBytes(r, 0, MaxAUTMemoLength, "autmemo")
+	if err != nil {
+		return err
+	}
+
+	_, err = io.ReadFull(r, oneByte)
+	if err != nil {
+		return err
+	}
+	tx.IssueTokensThreshold = oneByte[0]
+
+	var expireHeight uint64
+	expireHeight, err = ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	if tx.ExpireHeight > math.MaxInt32 {
+		return ErrInValidAUTTx
+	}
+	tx.ExpireHeight = int32(expireHeight)
+
+	_, err = io.ReadFull(r, oneByte)
+	if err != nil {
+		return err
+	}
+	tx.IssuerUpdateThreshold = oneByte[0]
+
+	_, err = io.ReadFull(r, oneByte)
+	if err != nil {
+		return err
+	}
+	tx.InAutRootCoinNum = oneByte[0]
+
+	_, err = io.ReadFull(r, oneByte)
+	if err != nil {
+		return err
+	}
+	tx.OutAutRootCoinNum = oneByte[0]
+
+	tx.Memo, err = ReadVarBytes(r, 0, MaxAUTTxMemoLength, "memo")
+	if err != nil {
+		return err
+	}
+
+	if len(tx.AutIdentifier) != IdentifierLength ||
+		len(tx.AutSymbol) > MaxSymbolLength ||
+		len(tx.AutMemo) > MaxAUTMemoLength ||
+		len(tx.Memo) > MaxAUTTxMemoLength {
 		return errors.New("an AUT with invalid length of name")
 	}
 	// todo(Alice): AutMemo, AutTxMemo
@@ -878,10 +893,6 @@ func (tx *ReRegistrationTx) AUTIdentifier() []byte {
 	return tx.AutIdentifier
 }
 
-// todo(Alice): remove this?
-func (tx *ReRegistrationTx) NumIns() int {
-	return len(tx.TxIns)
-}
 func (tx *ReRegistrationTx) TxInputs() []OutPoint {
 	return tx.TxIns
 }
@@ -921,7 +932,7 @@ func (tx *TransferTx) Serialize() ([]byte, error) {
 	var b bytes.Buffer
 	var err error
 
-	_, err = b.Write([]byte(CommonPrefix))
+	_, err = b.WriteString(CommonPrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -955,9 +966,6 @@ func (tx *TransferTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	if err != nil {
-		return nil, err
-	}
 	for _, value := range tx.TxoAUTValues {
 		err = WriteVarInt(&b, 0, value)
 		if err != nil {
@@ -978,7 +986,7 @@ func (tx *TransferTx) Deserialize(r io.Reader) error {
 	// todo(Alice): use bytes.NewReader()? which supports ReadByte
 
 	commprefix := make([]byte, len(CommonPrefix))
-	_, err = r.Read(commprefix)
+	_, err = io.ReadFull(r, commprefix)
 	if err != nil {
 		return err
 	}
@@ -987,7 +995,7 @@ func (tx *TransferTx) Deserialize(r io.Reader) error {
 	}
 
 	oneByte := make([]byte, 1)
-	_, err = r.Read(oneByte)
+	_, err = io.ReadFull(r, oneByte)
 	if err != nil {
 		return err
 	}
@@ -1003,13 +1011,13 @@ func (tx *TransferTx) Deserialize(r io.Reader) error {
 		return ErrInValidAUTTx
 	}
 
-	_, err = r.Read(oneByte)
+	_, err = io.ReadFull(r, oneByte)
 	if err != nil {
 		return err
 	}
 	tx.InAutCoinNum = oneByte[0]
 
-	_, err = r.Read(oneByte)
+	_, err = io.ReadFull(r, oneByte)
 	if err != nil {
 		return err
 	}
@@ -1032,13 +1040,13 @@ func (tx *TransferTx) Deserialize(r io.Reader) error {
 		}
 	}
 
-	tx.Memo, err = ReadVarBytes(r, 0, MaxAUTMemoLength, "memo")
+	tx.Memo, err = ReadVarBytes(r, 0, MaxAUTTxMemoLength, "memo")
 	if err != nil {
 		return err
 	}
 
 	if len(tx.AutIdentifier) != IdentifierLength ||
-		len(tx.Memo) > MaxAUTMemoLength {
+		len(tx.Memo) > MaxAUTTxMemoLength {
 		return errors.New("an AUT with invalid length of name")
 	}
 	return nil
@@ -1091,7 +1099,7 @@ func (tx *BurnTx) Serialize() ([]byte, error) {
 	var b bytes.Buffer
 	var err error
 
-	_, err = b.Write([]byte(CommonPrefix))
+	_, err = b.WriteString(CommonPrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -1123,7 +1131,7 @@ func (tx *BurnTx) Deserialize(r io.Reader) error {
 	var err error
 	// todo(Alice): use bytes.NewReader()? which supports ReadByte
 	commprefix := make([]byte, len(CommonPrefix))
-	_, err = r.Read(commprefix)
+	_, err = io.ReadFull(r, commprefix)
 	if err != nil {
 		return err
 	}
@@ -1132,7 +1140,7 @@ func (tx *BurnTx) Deserialize(r io.Reader) error {
 	}
 
 	oneByte := make([]byte, 1)
-	_, err = r.Read(oneByte)
+	_, err = io.ReadFull(r, oneByte)
 	if err != nil {
 		return err
 	}
@@ -1148,19 +1156,19 @@ func (tx *BurnTx) Deserialize(r io.Reader) error {
 		return ErrInValidAUTTx
 	}
 
-	_, err = r.Read(oneByte)
+	_, err = io.ReadFull(r, oneByte)
 	if err != nil {
 		return err
 	}
 	tx.InAutCoinNum = oneByte[0]
 
-	tx.Memo, err = ReadVarBytes(r, 0, MaxAUTMemoLength, "memo")
+	tx.Memo, err = ReadVarBytes(r, 0, MaxAUTTxMemoLength, "memo")
 	if err != nil {
 		return err
 	}
 
 	if len(tx.AutIdentifier) != IdentifierLength ||
-		len(tx.Memo) > MaxAUTMemoLength {
+		len(tx.Memo) > MaxAUTTxMemoLength {
 		return errors.New("an AUT with invalid length of name")
 	}
 	return nil
@@ -1169,10 +1177,6 @@ func (tx *BurnTx) AUTIdentifier() []byte {
 	return tx.AutIdentifier
 }
 
-// todo(Alice): remove this?
-func (tx *BurnTx) NumIns() int {
-	return len(tx.TxIns)
-}
 func (tx *BurnTx) TxInputs() []OutPoint {
 	return tx.TxIns
 }
@@ -1200,7 +1204,7 @@ var ErrInValidAUTTx = errors.New("not a valid AUT transaction")
 
 func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 	// could not be an AUT transaction
-	if len(tx.TxMemo) <= CommonPrefixLength {
+	if len(tx.TxMemo) <= CommonPrefixLength+1 {
 		return nil, nil
 	}
 	if !bytes.Equal(tx.TxMemo[:CommonPrefixLength], []byte(CommonPrefix)) {
@@ -1243,35 +1247,7 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 		autTransaction.TxOuts = make([]OutPoint, 0, autTransaction.OutAutRootCoinNum)
 		txHash := tx.TxHash()
 
-		//	todo(Alice): should not have coinAddress at this layer, how to match the token and actual coin address
-		existCoinAddresses := map[string]struct{}{}
-		for i := 0; i < int(autTransaction.OutAutRootCoinNum); i++ {
-			txOut := tx.TxOuts[i]
-			coinAddress, err := CheckTxoSanity(txHash, i, txOut)
-			if err != nil {
-				return nil, err
-			}
-
-			if _, ok := existCoinAddresses[hex.EncodeToString(coinAddress)]; !ok {
-				existCoinAddresses[hex.EncodeToString(coinAddress)] = struct{}{}
-			}
-
-			autTransaction.TxOuts = append(autTransaction.TxOuts, OutPoint{
-				TxHash: txHash,
-				Index:  uint8(i),
-			})
-		}
-
-		// configuration conflict
-		if len(existCoinAddresses) < int(autTransaction.IssueTokensThreshold) ||
-			len(existCoinAddresses) < int(autTransaction.IssuerUpdateThreshold) {
-			return nil, fmt.Errorf("the num of exist tokens less than configurated threshold from transaction %s", txHash)
-		}
-
-		if len(existCoinAddresses) != len(autTransaction.IssuerTokens) {
-			return nil, fmt.Errorf("unmatched issuer tokens and outputs for aut root coin")
-		}
-		// compare claimed issueTokens
+		claimedCoinAddresses := map[string]struct{}{}
 		for i := 0; i < len(autTransaction.IssuerTokens); i++ {
 			privacyLevel, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(autTransaction.IssuerTokens[i])
 			if err != nil {
@@ -1281,14 +1257,52 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 				return nil, fmt.Errorf("specified %d-th issuer token is invalid for aut from transaction %s", i, txHash)
 			}
 			key := hex.EncodeToString(coinAddress)
-			if _, ok := existCoinAddresses[key]; !ok {
-				return nil, fmt.Errorf("the claimed issuer tokens claims duplicate issuer token or "+
-					"claims non-exist issuer tken in root coin from transaction %s", txHash)
+			if _, ok := claimedCoinAddresses[key]; !ok {
+				claimedCoinAddresses[key] = struct{}{}
 			}
-			delete(existCoinAddresses, key)
 		}
-		if len(existCoinAddresses) != 0 {
+		if len(claimedCoinAddresses) != len(autTransaction.IssuerTokens) {
+			return nil, fmt.Errorf("claimed repeated issue token")
+		}
+
+		//	todo(Alice): should not have coinAddress at this layer, how to match the token and actual coin address
+		tokenCoinAddresses := map[string]struct{}{}
+		for i := 0; i < int(autTransaction.OutAutRootCoinNum); i++ {
+			txOut := tx.TxOuts[i]
+			coinAddress, err := CheckTxoSanity(txHash, i, txOut)
+			if err != nil {
+				return nil, err
+			}
+
+			if _, ok := tokenCoinAddresses[hex.EncodeToString(coinAddress)]; !ok {
+				tokenCoinAddresses[hex.EncodeToString(coinAddress)] = struct{}{}
+			}
+
+			autTransaction.TxOuts = append(autTransaction.TxOuts, OutPoint{
+				TxHash: txHash,
+				Index:  uint8(i),
+			})
+		}
+
+		if len(tokenCoinAddresses) != len(autTransaction.IssuerTokens) {
 			return nil, fmt.Errorf("unmatched issuer tokens and outputs for aut root coin")
+		}
+
+		// configuration conflict
+		if len(tokenCoinAddresses) < int(autTransaction.IssueTokensThreshold) ||
+			len(tokenCoinAddresses) < int(autTransaction.IssuerUpdateThreshold) {
+			return nil, fmt.Errorf("the num of exist tokens less than configurated threshold from transaction %s", txHash)
+		}
+
+		// compare claimed issueTokens
+		for coinAddress := range tokenCoinAddresses {
+			if _, ok := claimedCoinAddresses[coinAddress]; !ok {
+				return nil, fmt.Errorf("use unclaimed issuer token")
+			}
+			delete(claimedCoinAddresses, coinAddress)
+		}
+		if len(claimedCoinAddresses) != 0 {
+			return nil, fmt.Errorf("claimed unused issuer token")
 		}
 
 		if autTransaction.UnitScale > autTransaction.PlannedTotalAmount {
@@ -1331,6 +1345,26 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 		}
 
 	case *ReRegistrationTx:
+		txHash := tx.TxHash()
+
+		claimedCoinAddresses := map[string]struct{}{}
+		for i := 0; i < len(autTransaction.IssuerTokens); i++ {
+			privacyLevel, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(autTransaction.IssuerTokens[i])
+			if err != nil {
+				return nil, fmt.Errorf("fail to parse %d-th issuer token for aut from transaction %s", i, txHash)
+			}
+			if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
+				return nil, fmt.Errorf("specified %d-th issuer token is invalid for aut from transaction %s", i, txHash)
+			}
+			key := hex.EncodeToString(coinAddress)
+			if _, ok := claimedCoinAddresses[key]; !ok {
+				claimedCoinAddresses[key] = struct{}{}
+			}
+		}
+		if len(claimedCoinAddresses) != len(autTransaction.IssuerTokens) {
+			return nil, fmt.Errorf("claimed repeated issuer token")
+		}
+
 		// invalid configurations can exit early
 		// TODO need to check the length of outpoint ring?
 		// TODO check the num of issue token?
@@ -1350,9 +1384,8 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 			return nil, ErrInValidAUTTx
 		}
 		autTransaction.TxOuts = make([]OutPoint, 0, autTransaction.OutAutRootCoinNum)
-		txHash := tx.TxHash()
 
-		existCoinAddresses := map[string]struct{}{}
+		tokenCoinAddresses := map[string]struct{}{}
 		for i := 0; i < int(autTransaction.OutAutRootCoinNum); i++ {
 			txOut := tx.TxOuts[i]
 			coinAddress, err := CheckTxoSanity(txHash, i, txOut)
@@ -1360,8 +1393,8 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 				return nil, err
 			}
 
-			if _, ok := existCoinAddresses[hex.EncodeToString(coinAddress)]; !ok {
-				existCoinAddresses[hex.EncodeToString(coinAddress)] = struct{}{}
+			if _, ok := tokenCoinAddresses[hex.EncodeToString(coinAddress)]; !ok {
+				tokenCoinAddresses[hex.EncodeToString(coinAddress)] = struct{}{}
 			}
 
 			autTransaction.TxOuts = append(autTransaction.TxOuts, OutPoint{
@@ -1371,33 +1404,29 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 		}
 
 		// configuration conflict
-		if len(existCoinAddresses) < int(autTransaction.IssueTokensThreshold) ||
-			len(existCoinAddresses) < int(autTransaction.IssuerUpdateThreshold) {
+		if len(tokenCoinAddresses) < int(autTransaction.IssueTokensThreshold) ||
+			len(tokenCoinAddresses) < int(autTransaction.IssuerUpdateThreshold) {
 			return nil, fmt.Errorf("the num of exist tokens less than configurated threshold from transaction %s", txHash)
 		}
 
-		if len(existCoinAddresses) != len(autTransaction.IssuerTokens) {
+		if len(tokenCoinAddresses) != len(autTransaction.IssuerTokens) {
 			return nil, fmt.Errorf("unmatched issuer tokens and outputs for aut root coin")
 		}
 		// compare claimed issueTokens
-		for i := 0; i < len(autTransaction.IssuerTokens); i++ {
-			privacyLevel, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(autTransaction.IssuerTokens[i])
-			if err != nil {
-				return nil, fmt.Errorf("fail to parse %d-th issuer token for aut from transaction %s", i, txHash)
+		for coinAddress := range tokenCoinAddresses {
+			if _, ok := claimedCoinAddresses[coinAddress]; !ok {
+				return nil, fmt.Errorf("use unclaimed issuer token")
 			}
-			if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
-				return nil, fmt.Errorf("specified %d-th issuer token is invalid for aut from transaction %s", i, txHash)
-			}
-			key := hex.EncodeToString(coinAddress)
-			if _, ok := existCoinAddresses[key]; !ok {
-				return nil, fmt.Errorf("the claimed issuer tokens claims duplicate issuer token or "+
-					"claims non-exist issuer tken in root coin from transaction %s", txHash)
-			}
-			delete(existCoinAddresses, key)
+			delete(claimedCoinAddresses, coinAddress)
 		}
-		if len(existCoinAddresses) != 0 {
-			return nil, fmt.Errorf("unmatched issuer tokens and outputs for aut root coin")
+		if len(claimedCoinAddresses) != 0 {
+			return nil, fmt.Errorf("claimed unused issuer token")
 		}
+
+		if autTransaction.UnitScale > autTransaction.PlannedTotalAmount {
+			return nil, errors.New("an AUT with invalid unit scale")
+		}
+
 	case *TransferTx:
 		// invalid configurations can exit early
 		// TODO need to check the length of outpoint ring?
@@ -1418,7 +1447,6 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 			return nil, ErrInValidAUTTx
 		}
 		autTransaction.TxOuts = make([]OutPoint, 0, autTransaction.OutAutCoinNum)
-
 		txHash := tx.TxHash()
 		for i := 0; i < int(autTransaction.OutAutCoinNum); i++ {
 			_, err = CheckTxoSanity(txHash, i, tx.TxOuts[i])

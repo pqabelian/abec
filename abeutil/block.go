@@ -368,7 +368,7 @@ func (b *BlockAbe) AUTTransactions() []aut.Transaction {
 			continue
 		}
 		if autTx == nil {
-			// TODO print log
+			log.Debugf("AUTTransactions: skip non-AUT transaction %s", txAbe.Hash())
 			continue
 		}
 		b.autTransactions = append(b.autTransactions, autTx)

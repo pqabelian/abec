@@ -898,11 +898,6 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint,
 		mp.cfg.AddrIndex.AddUnconfirmedTx(tx, utxoView)
 	}*/
 
-	// Record this tx for fee estimation if enabled.
-	if mp.cfg.FeeEstimator != nil {
-		mp.cfg.FeeEstimator.ObserveTransaction(txD)
-	}
-
 	autTx, err := tx.AUTTransaction()
 	if err != nil {
 		// This should not happen, since before addTransactionAbe, the transaction should have been checked
@@ -924,6 +919,11 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint,
 		default:
 			// nothing to do
 		}
+	}
+
+	// Record this tx for fee estimation if enabled.
+	if mp.cfg.FeeEstimator != nil {
+		mp.cfg.FeeEstimator.ObserveTransaction(txD)
 	}
 
 	return txD

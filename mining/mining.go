@@ -3,12 +3,9 @@ package mining
 import (
 	"container/heap"
 	"encoding/binary"
-	"encoding/hex"
-	"errors"
 	"fmt"
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
@@ -485,143 +482,9 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *bl
 		return err
 	}
 	if autTx != nil {
-		autIdentifierKey := hex.EncodeToString(autTx.AUTIdentifier())
-		entries := autView.Entries()
-		entry, exist := entries[autIdentifierKey]
-		if autTx.Type() == aut.Registration {
-			if exist && entry != nil && entry.Metadata() != nil {
-				return errors.New("an registration AUT transaction try to register AUT entry with an existing AUT name ")
-			}
-		} else {
-			if !exist || entry == nil || entry.Metadata() == nil {
-				return errors.New("an non-registration AUT transaction try to operate on non-existing AUT entry")
-			}
-		}
-		switch autTransaction := autTx.(type) {
-		case *aut.RegistrationTx:
-			rootCoinSet := map[aut.OutPoint]struct{}{}
-			for i := 0; i < len(autTransaction.TxOuts); i++ {
-				rootCoinSet[autTransaction.TxOuts[i]] = struct{}{}
-			}
-			// register the AUT entry
-			autView.SetEntry(autTransaction.AutIdentifier, blockchain.NewAUTEntry(
-				&aut.MetaInfo{
-					AutIdentifier:      autTransaction.AutIdentifier,
-					AutSymbol:          autTransaction.AutSymbol,
-					AutMemo:            autTransaction.AutMemo,
-					UpdateThreshold:    autTransaction.IssuerUpdateThreshold,
-					IssueThreshold:     autTransaction.IssueTokensThreshold,
-					PlannedTotalAmount: autTransaction.PlannedTotalAmount,
-					ExpireHeight:       autTransaction.ExpireHeight,
-					IssuerTokens:       autTransaction.IssuerTokens,
-					UnitName:           autTransaction.UnitName,
-					MinUnitName:        autTransaction.MinUnitName,
-					UnitScale:          autTransaction.UnitScale,
-					MintedAmount:       0,
-					RootCoinSet:        rootCoinSet,
-				},
-				nil,
-			))
-
-		case *aut.MintTx:
-			info := entry.Metadata()
-			for i := 0; i < len(autTransaction.TxIns); i++ {
-				if _, ok := info.RootCoinSet[autTransaction.TxIns[i]]; !ok {
-					return errors.New("an AUT transaction with non-existing/spent root coin")
-				}
-				delete(info.RootCoinSet, autTransaction.TxIns[i])
-			}
-			// value overflow? exceed?
-			wouldMintedAmount := info.MintedAmount
-			for i := 0; i < len(autTransaction.TxoAUTValues); i++ {
-				if wouldMintedAmount+autTransaction.TxoAUTValues[i] < wouldMintedAmount || // overflow
-					wouldMintedAmount+autTransaction.TxoAUTValues[i] < autTransaction.TxoAUTValues[i] || // overflow
-					wouldMintedAmount+autTransaction.TxoAUTValues[i] > info.PlannedTotalAmount {
-					return errors.New("an AUT mint transaction try to mint amount exceed planned")
-				}
-				wouldMintedAmount += autTransaction.TxoAUTValues[i]
-				entry.Add(autTransaction.TxOuts[i], blockchain.NewAUTCoin(autTransaction.AutIdentifier, autTransaction.TxoAUTValues[i], -1, false))
-			}
-			info.MintedAmount = wouldMintedAmount
-
-		case *aut.ReRegistrationTx:
-			// input exist? double spent?
-			info := entry.Metadata()
-			for i := 0; i < len(autTransaction.TxIns); i++ {
-				if _, ok := info.RootCoinSet[autTransaction.TxIns[i]]; !ok {
-					return errors.New("an AUT transaction with non-existing/spent root coin")
-				}
-				delete(info.RootCoinSet, autTransaction.TxIns[i])
-			}
-
-			// update aut info
-			info.AutSymbol = autTransaction.AutSymbol
-			info.AutMemo = autTransaction.Memo
-			info.UpdateThreshold = autTransaction.IssuerUpdateThreshold
-			info.IssueThreshold = autTransaction.IssueTokensThreshold
-			info.PlannedTotalAmount = autTransaction.PlannedTotalAmount
-			info.ExpireHeight = autTransaction.ExpireHeight
-			info.IssuerTokens = autTransaction.IssuerTokens
-			info.UnitScale = autTransaction.UnitScale
-			// remove previous root coins
-			info.RootCoinSet = make(map[aut.OutPoint]struct{}, len(autTransaction.TxOuts))
-			for i := 0; i < len(autTransaction.TxOuts); i++ {
-				info.RootCoinSet[autTransaction.TxOuts[i]] = struct{}{}
-			}
-
-		case *aut.TransferTx:
-			// check the sanity of transfer transaction
-			// balance between inputs and outputs
-			info := entry.Metadata()
-			totalInputValue := uint64(0)
-			for i := 0; i < len(autTransaction.TxIns); i++ {
-				token := entry.LookupCoin(autTransaction.TxIns[i])
-				if token == nil {
-					return errors.New("an AUT transfer transaction try to spend non-existing/spent/burn token")
-				}
-				if token.IsSpent() {
-					return errors.New("an AUT transfer transaction try to spend non-existing/spent/burn token")
-				}
-				token.Spend()
-			}
-			totalOutValue := uint64(0)
-			for i := 0; i < len(autTransaction.TxoAUTValues); i++ {
-				if totalOutValue+autTransaction.TxoAUTValues[i] < totalOutValue || // overflow
-					totalOutValue+autTransaction.TxoAUTValues[i] < autTransaction.TxoAUTValues[i] || // overflow
-					totalOutValue+autTransaction.TxoAUTValues[i] > info.MintedAmount ||
-					totalOutValue+autTransaction.TxoAUTValues[i] > info.PlannedTotalAmount {
-					return errors.New("an AUT transfer transaction try to overflow amount")
-				}
-				entry.Add(autTransaction.TxOuts[i], blockchain.NewAUTCoin(autTransaction.AutIdentifier, autTransaction.TxoAUTValues[i], 0, false))
-			}
-			if totalInputValue != totalOutValue {
-				return errors.New("an AUT transfer transaction try to break-balance amount")
-			}
-
-		case *aut.BurnTx:
-			info := entry.Metadata()
-			burnedValues := uint64(0)
-			for i := 0; i < len(autTransaction.TxIns); i++ {
-				token := entry.LookupCoin(autTransaction.TxIns[i])
-				if token == nil {
-					return errors.New("an AUT transfer transaction try to spend non-existing/spent/burn token")
-				}
-				if token.IsSpent() {
-					return errors.New("an AUT transfer transaction try to spend non-existing/spent/burn token")
-				}
-				if burnedValues+token.Amount() <= burnedValues {
-					return errors.New("an AUT transfer transaction try to spend overflow token")
-				}
-				token.Spend()
-				burnedValues += token.Amount()
-			}
-			if info.MintedAmount-burnedValues > info.MintedAmount { // overflow
-				return errors.New("an AUT transfer transaction try to overflow token")
-			}
-			info.MintedAmount -= burnedValues
-
-		default:
-			return errors.New("unreachable")
+		err = autView.SpendTransaction(autTx)
+		if err != nil {
+			return err
 		}
 	}
 
