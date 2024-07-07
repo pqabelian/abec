@@ -183,7 +183,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.
 	// 4. no duplicated transaction
 	// 5. merkle tree root
 	// 6. transaction sanity (input,output,fee,serialized size, ring+sn, aut)
-	err = checkBlockSanityAbe(block, ethashObj, b.chainParams.PowLimit, b.timeSource, flags)
+	err = checkBlockSanityAbe(block, ethashObj, b.chainParams, b.timeSource, flags)
 	if err != nil {
 		return false, false, err
 	}

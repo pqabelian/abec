@@ -26,13 +26,29 @@ type Policy struct {
 	// generating a block template.
 	BlockMaxWeight uint32
 
-	// BlockMinWeight is the minimum block size to be used when generating
+	// BlockMinSize is the minimum block size to be used when generating
 	// a block template.
 	BlockMinSize uint32
 
 	// BlockMaxSize is the maximum block size to be used when generating a
 	// block template.
 	BlockMaxSize uint32
+
+	// BlockMinSize is the minimum block size to be used when generating
+	// a block template.
+	BlockSizeMinMLPAUT uint32
+
+	// BlockMaxSize is the maximum block size to be used when generating a
+	// block template.
+	BlockSizeMaxMLPAUT uint32
+
+	// BlockMinFullSize is the minimum block full size to be used when generating
+	// a block template.
+	BlockFullSizeMinMLPAUT uint32
+
+	// BlockMaxFullSize is the maximum block full size to be used when generating a
+	// block template.
+	BlockFullSizeMaxMLPAUT uint32
 
 	// BlockPrioritySize is the size in bytes for high-priority / low-fee
 	// transactions to be used when generating a block template.

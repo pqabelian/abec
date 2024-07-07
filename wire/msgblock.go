@@ -28,7 +28,12 @@ const MaxBlockPayload = 4000000
 // MaxBlockPayloadAbe is the maximum bytes a block message can be in bytes.
 // todo: The max block payload in abe is 8MB. However, it seems that there is bug in transaction
 // serialization currently. Hence, the MaxBlockPayload is temporarily  set as 800MB.
-const MaxBlockPayloadAbe = 800000000
+//
+// changed at fork for MLPAUT,use 256MB as max block message payload
+// and corresponding, the max message size is adjusted to 320MB for redundancy
+// the strategy is to use the default configuration first, if the network
+// is not congested, gradually increase the default configuration until limited MaxBlockPayloadAbe
+const MaxBlockPayloadAbe = 256 * 1024 * 1024
 
 // maxTxPerBlock is the maximum number of transactions that could
 // possibly fit into a block.

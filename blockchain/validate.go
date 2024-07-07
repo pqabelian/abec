@@ -420,9 +420,16 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 
 	// A transaction must not exceed the maximum allowed block payload when serialized.
 	serializedTxSize := tx.MsgTx().SerializeSize()
-	if serializedTxSize > MaxBlockBaseSize { // TODO(MLP)  replace with maxStandardTxSizeFull?
+	if serializedTxSize > MaxBlockBaseSizeMLPAUT {
 		str := fmt.Sprintf("serialized transaction is too big - got "+
-			"%d, max %d", serializedTxSize, MaxBlockBaseSize)
+			"%d, max %d", serializedTxSize, MaxBlockBaseSizeMLPAUT)
+		return ruleError(ErrTxTooBig, str)
+	}
+
+	serializedTxFullSize := tx.MsgTx().SerializeSizeFull()
+	if serializedTxFullSize > MaxBlockFullSizeMLPAUT {
+		str := fmt.Sprintf("serialized full transaction is too big - got "+
+			"%d, max %d", serializedTxSize, MaxBlockFullSizeMLPAUT)
 		return ruleError(ErrTxTooBig, str)
 	}
 
@@ -868,17 +875,19 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 //  1. Check sanity of block header (checkBlockHeaderSanity)
 //  2. There is at least one transaction in the block
 //  3. The block size (without witness) is smaller than MaxBlockBaseSize
-//  4. The first transaction is coinbase and there is only one coinbase in the block
-//  5. No duplicate transactions (same tx hash)
-//  6. The merkle root is correctly computed with the given transactions
-//  7. Preliminary check on each transaction (CheckTransactionSanityAbe)
+//  4. The block full size (with witness) is smaller than MaxBlockFullSize
+//  5. The first transaction is coinbase and there is only one coinbase in the block
+//  6. No duplicate transactions (same tx hash)
+//  7. The merkle root is correctly computed with the given transactions
+//  8. Preliminary check on each transaction (CheckTransactionSanityAbe)
 //
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkBlockHeaderSanity.
 //
 // todo: (EthashPoW)
 // reviewed on 2024.01.03 by Alice
-func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
+func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainParams *chaincfg.Params, timeSource MedianTimeSource, flags BehaviorFlags) error {
+	powLimit := chainParams.PowLimit
 	msgBlock := block.MsgBlock()
 	header := &msgBlock.Header
 	//	todo: (EthashPoW)
@@ -906,11 +915,31 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, powLimi
 
 	// A block must not exceed the maximum allowed block payload when
 	// serialized.
-	serializedSize := msgBlock.SerializeSizeStripped()
-	if serializedSize > MaxBlockBaseSize {
-		str := fmt.Sprintf("serialized block is too big - got %d, "+
-			"max %d", serializedSize, MaxBlockBaseSize)
-		return ruleError(ErrBlockTooBig, str)
+	if block.Height() >= chainParams.BlockHeightMLPAUT {
+		// A block must not exceed the maximum allowed block payload when
+		// serialized.
+		serializedSize := msgBlock.SerializeSizeStripped()
+		if serializedSize > MaxBlockBaseSizeMLPAUT {
+			str := fmt.Sprintf("serialized block content is too big - got %d, "+
+				"max %d", serializedSize, MaxBlockBaseSizeMLPAUT)
+			return ruleError(ErrBlockTooBig, str)
+		}
+
+		// TODO(MLPAUT) add block full size check here
+		serializedFullSize := msgBlock.SerializeSize()
+		if serializedFullSize > MaxBlockFullSizeMLPAUT {
+			str := fmt.Sprintf("serialized block is too big - got %d, "+
+				"max %d", serializedSize, MaxBlockFullSizeMLPAUT)
+			return ruleError(ErrBlockTooBig, str)
+		}
+
+	} else {
+		serializedSize := msgBlock.SerializeSizeStripped()
+		if serializedSize > MaxBlockBaseSize {
+			str := fmt.Sprintf("serialized block is too big - got %d, "+
+				"max %d", serializedSize, MaxBlockBaseSize)
+			return ruleError(ErrBlockTooBig, str)
+		}
 	}
 
 	// The first transaction in a block must be a coinbase.
@@ -995,8 +1024,8 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, powLimi
 }
 
 // todo: (EthashPoW) 202207
-func CheckBlockSanity(block *abeutil.BlockAbe, ethash *ethash.Ethash, powLimit *big.Int, timeSource MedianTimeSource) error {
-	return checkBlockSanityAbe(block, ethash, powLimit, timeSource, BFNone)
+func CheckBlockSanity(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainParams *chaincfg.Params, timeSource MedianTimeSource) error {
+	return checkBlockSanityAbe(block, ethash, chainParams, timeSource, BFNone)
 }
 
 // ExtractCoinbaseHeight attempts to extract the height of the block from the
@@ -1261,6 +1290,9 @@ func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blo
 	}
 
 	// todo: if there are more forks, we need hard code the version check here.
+	// 1. after commit height, disallow transaction less than older version
+	// 2. during fork to commit, coinbase transaction must be new version
+	// 3. before fork, coinbase/transfer transaction must be older version
 	if blockHeight >= b.chainParams.BlockHeightMLPAUTCOMMIT {
 		//	the block should not contain transactions with earlier version
 		for i, tx := range block.Transactions() {
@@ -2273,7 +2305,7 @@ func (b *BlockChain) CheckConnectBlockTemplateAbe(block *abeutil.BlockAbe) error
 
 	//	todo: (EthashPoW)
 	//	for flags = BFNoPoWCheck, PoW will not be checked, we set ethash = nil
-	err := checkBlockSanityAbe(block, nil, b.chainParams.PowLimit, b.timeSource, flags)
+	err := checkBlockSanityAbe(block, nil, b.chainParams, b.timeSource, flags)
 	if err != nil {
 		return err
 	}

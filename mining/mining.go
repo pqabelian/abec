@@ -815,6 +815,7 @@ mempoolLoop:
 	//	todo(ABE): ABE does not use weight, while use size only.
 	// blockWeight := (blockHeaderOverhead * blockchain.WitnessScaleFactor) + uint32(blockchain.GetTransactionWeightAbe(coinbaseTx))
 	blockSize := uint32((blockHeaderOverhead) + coinbaseTx.MsgTx().SerializeSize())
+	blockFullSize := uint32((blockHeaderOverhead) + coinbaseTx.MsgTx().SerializeSize())
 	totalFee := uint64(0)
 
 	// Choose which transactions make it into the block.
@@ -828,25 +829,53 @@ mempoolLoop:
 		// transaction size without witness
 		txSize := uint32(tx.MsgTx().SerializeSize())
 		blockPlusTxSize := blockSize + txSize
+		txFullSize := uint32(tx.MsgTx().SerializeSizeFull())
+		blockPlusTxFullSize := blockFullSize + txFullSize
 		// TODO(MLPAUT) add block full size check here
-		if blockPlusTxSize < blockSize || blockPlusTxSize >= g.policy.BlockMaxSize {
-			log.Tracef("Skipping tx %s because it would exceed "+
-				"the max block size", tx.Hash())
-			continue
+		if nextBlockHeight >= g.chainParams.BlockHeightMLPAUT {
+			if blockPlusTxSize < blockSize || blockPlusTxSize >= g.policy.BlockSizeMaxMLPAUT {
+				log.Debugf("Skipping tx %s because it would exceed "+
+					"the max block size %d", tx.Hash(), g.policy.BlockSizeMaxMLPAUT)
+				continue
+			}
+			// TODO(MLPAUT) add block full size check here
+			if blockPlusTxFullSize < blockFullSize || blockPlusTxFullSize >= g.policy.BlockFullSizeMaxMLPAUT {
+				log.Debugf("Skipping tx %s because it would exceed "+
+					"the max block full size %d", tx.Hash(), g.policy.BlockSizeMaxMLPAUT)
+				continue
+			}
+		} else { // nextBlockHeight < g.chainParams.BlockHeightMLPAUT
+			if blockPlusTxSize < blockSize || blockPlusTxSize >= g.policy.BlockMaxSize {
+				log.Debugf("Skipping tx %s because it would exceed "+
+					"the max block size %d", tx.Hash(), g.policy.BlockMaxSize)
+				continue
+			}
 		}
 
 		// Skip free transactions once the block is larger than the
 		// minimum block size.
-		if sortedByFee &&
-			prioItem.feePerKB < uint64(g.policy.TxMinFreeFee) &&
-			blockPlusTxSize >= g.policy.BlockMinSize {
-
-			log.Tracef("Skipping tx %s with feePerKB %d "+
-				"< TxMinFreeFee %d and block size %d >= "+
-				"minBlockSize %d", tx.Hash(), prioItem.feePerKB,
-				g.policy.TxMinFreeFee, blockPlusTxSize,
-				g.policy.BlockMinSize)
-			continue
+		if sortedByFee && prioItem.feePerKB < uint64(g.policy.TxMinFreeFee) {
+			if nextBlockHeight >= g.chainParams.BlockHeightMLPAUT {
+				if blockPlusTxSize >= g.policy.BlockSizeMinMLPAUT &&
+					blockPlusTxFullSize >= g.policy.BlockFullSizeMinMLPAUT {
+					log.Debugf("Skipping tx %s with feePerKB %d< TxMinFreeFee %d "+
+						"and block size %d >= minBlockSize %d "+
+						"and block full size %d >= minBlockFullSize %d",
+						tx.Hash(), prioItem.feePerKB, g.policy.TxMinFreeFee,
+						blockPlusTxSize, g.policy.BlockSizeMinMLPAUT,
+						blockPlusTxFullSize, g.policy.BlockFullSizeMinMLPAUT)
+					continue
+				}
+			} else { // nextBlockHeight < g.chainParams.BlockHeightMLPAUT
+				if blockPlusTxSize >= g.policy.BlockMinSize {
+					log.Debugf("Skipping tx %s with feePerKB %d "+
+						"< TxMinFreeFee %d and block size %d >= "+
+						"minBlockSize %d", tx.Hash(), prioItem.feePerKB,
+						g.policy.TxMinFreeFee, blockPlusTxSize,
+						g.policy.BlockMinSize)
+					continue
+				}
+			}
 		}
 
 		// Prioritize by fee per kilobyte once the block is larger than
@@ -856,7 +885,7 @@ mempoolLoop:
 		if !sortedByFee &&
 			(blockPlusTxSize >= g.policy.BlockPrioritySize || prioItem.priority <= MinHighPriority) {
 
-			log.Tracef("Switching to sort by fees per "+
+			log.Debugf("Switching to sort by fees per "+
 				"kilobyte blockSize %d >= BlockPrioritySize "+
 				"%d || priority %.2f <= minHighPriority %.2f",
 				blockPlusTxSize, g.policy.BlockPrioritySize,
@@ -882,7 +911,7 @@ mempoolLoop:
 		//	todo(ABE): check double spending
 		err := blockchain.CheckTransactionInputsAbe(tx, nextBlockHeight, blockUtxoRings, g.chainParams)
 		if err != nil {
-			log.Tracef("Skipping tx %s due to error in "+
+			log.Debugf("Skipping tx %s due to error in "+
 				"CheckTransactionInputs: %v", tx.Hash(), err)
 			continue
 		}
@@ -893,14 +922,14 @@ mempoolLoop:
 		*/
 		err = blockchain.ValidateTransactionScriptsAbe(tx, blockUtxoRings, g.witnessCache)
 		if err != nil {
-			log.Tracef("Skipping tx %s due to error in "+
+			log.Debugf("Skipping tx %s due to error in "+
 				"ValidateTransactionScripts: %v", tx.Hash(), err)
 			continue
 		}
 
 		autTx, err := tx.AUTTransaction()
 		if err != nil {
-			log.Tracef("Skipping tx %s due to error in "+
+			log.Debugf("Skipping tx %s due to error in "+
 				"AUTTransaction: %v", tx.Hash(), err)
 			continue
 		}
@@ -919,7 +948,7 @@ mempoolLoop:
 		// aren't double spending.
 		err = spendTransactionAbe(blockUtxoRings, blockAUTView, tx)
 		if err != nil {
-			log.Tracef("Skipping tx %s due to error in "+
+			log.Debugf("Skipping tx %s due to error in "+
 				"spendTransactionAbe: %v", tx.Hash(), err)
 			continue
 		}
@@ -929,11 +958,12 @@ mempoolLoop:
 		// template.
 		blockTxns = append(blockTxns, tx)
 		blockSize += txSize
+		blockFullSize += txFullSize
 		totalFee += prioItem.fee
 		txFees = append(txFees, prioItem.fee)
 
-		log.Tracef("Adding tx %s (priority %.2f, feePerKB %.2f)",
-			prioItem.tx.Hash(), prioItem.priority, prioItem.feePerKB)
+		log.Debugf("Adding tx %s (priority %.2f, feePerKB %d, size %d, full size %d)",
+			prioItem.tx.Hash(), prioItem.priority, prioItem.feePerKB, txSize, txFullSize)
 	}
 
 	// Now that the actual transactions have been selected, update the
@@ -1013,7 +1043,9 @@ mempoolLoop:
 	}
 
 	log.Debugf("Created new block template (version %08x,%d transactions, %d in "+
-		"fees, %d size, target difficulty "+"%064x)", msgBlock.Header.Version, len(msgBlock.Transactions), totalFee, blockSize, blockchain.CompactToBig(msgBlock.Header.Bits))
+		"fees, %d size, %d full size, target difficulty "+"%064x)",
+		msgBlock.Header.Version, len(msgBlock.Transactions), totalFee,
+		blockSize, blockFullSize, blockchain.CompactToBig(msgBlock.Header.Bits))
 
 	return &BlockTemplate{
 		BlockAbe:        &msgBlock,

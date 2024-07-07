@@ -2694,12 +2694,16 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	// NOTE: The CPU miner relies on the mempool, so the mempool has to be
 	// created before calling the function to create the CPU miner.
 	policy := mining.Policy{
-		BlockMinWeight:    cfg.BlockMinWeight,
-		BlockMaxWeight:    cfg.BlockMaxWeight,
-		BlockMinSize:      cfg.BlockMinSize,
-		BlockMaxSize:      cfg.BlockMaxSize,
-		BlockPrioritySize: cfg.BlockPrioritySize,
-		TxMinFreeFee:      cfg.minRelayTxFee,
+		BlockMinWeight:         cfg.BlockMinWeight,
+		BlockMaxWeight:         cfg.BlockMaxWeight,
+		BlockMinSize:           cfg.BlockMinSize,
+		BlockMaxSize:           cfg.BlockMaxSize,
+		BlockSizeMinMLPAUT:     cfg.BlockSizeMinMLPAUT,
+		BlockSizeMaxMLPAUT:     cfg.BlockSizeMaxMLPAUT,
+		BlockFullSizeMinMLPAUT: cfg.BlockFullSizeMinMLPAUT,
+		BlockFullSizeMaxMLPAUT: cfg.BlockFullSizeMaxMLPAUT,
+		BlockPrioritySize:      cfg.BlockPrioritySize,
+		TxMinFreeFee:           cfg.minRelayTxFee,
 	}
 	blockTemplateGenerator := mining.NewBlkTmplGenerator(&policy,
 		s.chainParams, s.txMemPool, s.chain, s.timeSource,
@@ -2708,7 +2712,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		// Check address, disallow higher address with crypto scheme
 		for i := 0; i < len(cfg.miningAddrs); i++ {
 			if cfg.miningAddrs[i].CryptoScheme() != abecryptoxparam.CryptoSchemePQRingCT {
-				return nil, fmt.Errorf("address with crypto scheme address is disallow until height %d", s.chainParams.BlockHeightMLPAUT)
+				return nil, fmt.Errorf("address with crypto scheme other than %d address is disallow until height %d", abecryptoxparam.CryptoSchemePQRingCT, s.chainParams.BlockHeightMLPAUT)
 			}
 		}
 	}

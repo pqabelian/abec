@@ -991,6 +991,7 @@ func NewMsgTxAbe(version uint32) *MsgTxAbe {
 
 // NewStandardCoinbaseTxIn creates a new TxInAbe for coinbaseTx.
 // reviewed on 2024.01.01
+// TODO: move to package blockchain, so called standard should be defined by blockchain
 func NewStandardCoinbaseTxIn(nextBlockHeight int32, txVersion uint32) (*TxInAbe, error) {
 	txIn := &TxInAbe{}
 
@@ -1048,6 +1049,7 @@ func NewStandardCoinbaseTxIn(nextBlockHeight int32, txVersion uint32) (*TxInAbe,
 // 4. the txos in ring would be only one, and it must be zeroHash:zeroIndex
 //
 // reviewed on 2024.01.05
+// TODO: move to package blockchain
 func CheckStandardCoinbaseTxIn(coinbaseTx *MsgTxAbe) error {
 	isCb, err := coinbaseTx.IsCoinBase()
 	if err != nil {
