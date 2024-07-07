@@ -41,10 +41,26 @@ func pqringctxGetTxInputMaxNum(pp *pqringctxapi.PublicParameter) int {
 	return pqringctxapi.GetTxInputMaxNum(pp)
 }
 
+func pqringctxGetTxInputMaxNumForRing(pp *pqringctxapi.PublicParameter) int {
+	return pqringctxapi.GetTxInputMaxNumForRing(pp)
+}
+
+func pqringctxGetTxInputMaxNumForSingle(pp *pqringctxapi.PublicParameter) int {
+	return pqringctxapi.GetTxInputMaxNumForSingle(pp)
+}
+
 // pqringctxGetTxOutputMaxNum returns the allowed maximum number of TxOutputs.
 // reviewed on 2024.01.03
 func pqringctxGetTxOutputMaxNum(pp *pqringctxapi.PublicParameter) int {
 	return pqringctxapi.GetTxOutputMaxNum(pp)
+}
+
+func pqringctxGetTxOutputMaxNumForRing(pp *pqringctxapi.PublicParameter) int {
+	return pqringctxapi.GetTxOutputMaxNumForRing(pp)
+}
+
+func pqringctxGetTxOutputMaxNumForSingle(pp *pqringctxapi.PublicParameter) int {
+	return pqringctxapi.GetTxOutputMaxNumForSingle(pp)
 }
 
 //	Transaction-related Params	end
