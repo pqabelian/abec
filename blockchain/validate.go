@@ -1758,7 +1758,14 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 				return fmt.Errorf("transaction %s try to mint at height %d but "+
 					"the consumed UTXO at Ring %s not exist", tx.Hash(), txHeight, tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash())
 			}
-			coinAddress, err := aut.CheckTxoSanity(autTransaction.TxIns[i].TxHash, i, utxoRing.txOuts[i])
+			if len(utxoRing.txOuts) != 1 {
+				return fmt.Errorf("transaction %s try to mint at height %d but "+
+					"the consumed UTXO at Ring %s has ring size %d, expected %d",
+					tx.Hash(), txHeight, tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash(),
+					len(utxoRing.txOuts), 1,
+				)
+			}
+			coinAddress, err := aut.CheckTxoSanity(autTransaction.TxIns[i].TxHash, i, utxoRing.txOuts[0])
 			if err != nil {
 				return fmt.Errorf("transaction %s try to mint at height %d but "+
 					"the consumed UTXO at Ring %s is not a valid output", tx.Hash(), txHeight, tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash())
@@ -1844,7 +1851,14 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 				return fmt.Errorf("transaction %s try to re-register at height %d but "+
 					"the consumed UTXO at Ring %s not exist", tx.Hash(), txHeight, tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash())
 			}
-			coinAddress, err := aut.CheckTxoSanity(autTransaction.TxIns[i].TxHash, i, utxoRing.txOuts[i])
+			if len(utxoRing.txOuts) != 1 {
+				return fmt.Errorf("transaction %s try to mint at height %d but "+
+					"the consumed UTXO at Ring %s has ring size %d, expected %d",
+					tx.Hash(), txHeight, tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash(),
+					len(utxoRing.txOuts), 1,
+				)
+			}
+			coinAddress, err := aut.CheckTxoSanity(autTransaction.TxIns[i].TxHash, i, utxoRing.txOuts[0])
 			if err != nil {
 				return fmt.Errorf("transaction %s try to re-register at height %d but "+
 					"the consumed UTXO at Ring %s is not a valid output", tx.Hash(), txHeight, tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash())
@@ -1872,7 +1886,7 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 		}
 		// check the input issuer token and issue token in info
 		if len(consumedIssueTokens) < int(autView.entries[autIdentifierKey].metadata.IssueTokensThreshold) {
-			return fmt.Errorf("transaction %s try to mint with %d issue token but "+
+			return fmt.Errorf("transaction %s try to re-register with %d issue token but "+
 				"the AUT entry claim its issue threshold %d", tx.Hash(), len(consumedIssueTokens), autView.entries[autIdentifierKey].metadata.IssueTokensThreshold)
 		}
 
