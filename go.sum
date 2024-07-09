@@ -9,12 +9,10 @@ github.com/cryptosuite/kyber-go v0.0.2-alpha h1:JHvNqZho24qJq7c4JnyKGtyQuF03VOeE
 github.com/cryptosuite/kyber-go v0.0.2-alpha/go.mod h1:1G0Jh7bXJGSUCTrC6ZB9lFpmCF+VFQehDqIwm9dJU3s=
 github.com/cryptosuite/liboqs-go v0.9.5-alpha h1:mmCyD1gZRnm6sD214ylg0h17I37BmY8wDDbcvpW4fDc=
 github.com/cryptosuite/liboqs-go v0.9.5-alpha/go.mod h1:LzuvuQAJHbED51lHoYr91rBbKRdv2MewGcVCwjE1JCk=
-github.com/cryptosuite/pqringct v0.11.12-alpha h1:ZJ8dLTTpF5tDUs09WgX2JqkI3+4eTFduyxv9hmYr53U=
-github.com/cryptosuite/pqringct v0.11.12-alpha/go.mod h1:LVtvih9kNVHzAX60qzOqO6TAIjurfNKYWICRDUegjkg=
-github.com/cryptosuite/pqringctx v0.11.13 h1:4tRUUc4GzmElMzfJ4IRsXcMlm5/X+eufVfHcTEXqHNU=
-github.com/cryptosuite/pqringctx v0.11.13/go.mod h1:6MXcMlhH5nHipQN9lQQi665KJd+4bPCrhLQK5xGifZo=
-github.com/cryptosuite/pqringctx v0.11.14-0.20240611123750-bcbcca7f6762 h1:Hdldl8nQT9CYjz+b4jIoLIMo5XmT6kxvlLfS9TbEcUk=
-github.com/cryptosuite/pqringctx v0.11.14-0.20240611123750-bcbcca7f6762/go.mod h1:w0l9e1ckzV5V5FefK+eZziU3Mgf5Jbml/cRBKDKeUNk=
+github.com/cryptosuite/pqringct v0.13.0 h1:Jt619Ic8s8uEVPXjkDkKrg7Lj5Ft3Ta/eZBIZrL2hbc=
+github.com/cryptosuite/pqringct v0.13.0/go.mod h1:LVtvih9kNVHzAX60qzOqO6TAIjurfNKYWICRDUegjkg=
+github.com/cryptosuite/pqringctx v0.13.0 h1:Ju9AbLUHNHhZVB83El1BC1QEFmNYh5uIwY/qfi+q6f0=
+github.com/cryptosuite/pqringctx v0.13.0/go.mod h1:w0l9e1ckzV5V5FefK+eZziU3Mgf5Jbml/cRBKDKeUNk=
 github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1 h1:vN3Cibtye7f3YuPvrJWG4Kp/jrb/XfxS5oIwl8XZBQY=
 github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1/go.mod h1:mJeCa86eOqj3kCJO+O4245Wnq5U07P9K9RfJplI8bQ4=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
