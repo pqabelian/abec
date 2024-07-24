@@ -5,7 +5,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/abesuite/abec/chainhash"
+	"github.com/pqabelian/abec/chainhash"
 )
 
 // MaxBlockHeaderPayload is the maximum number of bytes a block header can be.

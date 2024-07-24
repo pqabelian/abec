@@ -3,11 +3,11 @@ package indexers
 import (
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/blockchain"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/database"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/blockchain"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/database"
+	"github.com/pqabelian/abec/wire"
 )
 
 const (
@@ -267,7 +267,7 @@ func dbAddTxIndexEntries(dbTx database.Tx, block *abeutil.Block, blockID uint32)
 	return nil
 }
 
-//	Abe to do
+// Abe to do
 func dbAddTxIndexEntriesAbe(dbTx database.Tx, block *abeutil.BlockAbe, blockID uint32) error {
 	// The offset and length of the transactions within the serialized
 	// block.
@@ -323,7 +323,7 @@ func dbRemoveTxIndexEntries(dbTx database.Tx, block *abeutil.Block) error {
 	return nil
 }
 
-//	ToDo(ABE):
+// ToDo(ABE):
 func dbRemoveTxIndexEntriesAbe(dbTx database.Tx, block *abeutil.BlockAbe) error {
 	for _, tx := range block.Transactions() {
 		err := dbRemoveTxIndexEntry(dbTx, tx.Hash())
@@ -464,7 +464,7 @@ func (idx *TxIndex) ConnectBlock(dbTx database.Tx, block *abeutil.Block,
 	return nil
 }
 
-//	todo(ABE.MUST)
+// todo(ABE.MUST)
 func (idx *TxIndex) ConnectBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe,
 	stxos []*blockchain.SpentTxOutAbe) error {
 
@@ -507,7 +507,7 @@ func (idx *TxIndex) DisconnectBlock(dbTx database.Tx, block *abeutil.Block,
 	return nil
 }
 
-//	ToDo(ABE.MUST):
+// ToDo(ABE.MUST):
 func (idx *TxIndex) DisconnectBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe,
 	stxos []*blockchain.SpentTxOutAbe) error {
 

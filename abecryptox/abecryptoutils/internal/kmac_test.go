@@ -2,7 +2,7 @@ package internal
 
 import (
 	"encoding/hex"
-	"github.com/abesuite/abec/abecrypto"
+	"github.com/pqabelian/abec/abecrypto"
 	"golang.org/x/crypto/sha3"
 	"reflect"
 	"testing"

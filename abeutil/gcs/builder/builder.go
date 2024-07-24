@@ -3,10 +3,10 @@ package builder
 import (
 	"crypto/rand"
 	"fmt"
-	"github.com/abesuite/abec/abeutil/gcs"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/txscript"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abeutil/gcs"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/txscript"
+	"github.com/pqabelian/abec/wire"
 	"math"
 )
 

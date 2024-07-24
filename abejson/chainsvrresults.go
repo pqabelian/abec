@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/wire"
 )
 
 // GetBlockHeaderVerboseResult models the data from the getblockheader command when

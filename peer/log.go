@@ -2,10 +2,10 @@ package peer
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/abelog"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/txscript"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abelog"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/txscript"
+	"github.com/pqabelian/abec/wire"
 	"strings"
 	"time"
 )

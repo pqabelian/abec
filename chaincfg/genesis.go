@@ -3,8 +3,8 @@ package chaincfg
 import (
 	"time"
 
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 // genesisCoinbaseTx is the coinbase transaction for the genesis blocks for

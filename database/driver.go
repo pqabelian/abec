@@ -3,7 +3,7 @@ package database
 import (
 	"fmt"
 
-	"github.com/abesuite/abec/abelog"
+	"github.com/pqabelian/abec/abelog"
 )
 
 // Driver defines a structure for backend drivers to use when they registered

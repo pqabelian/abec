@@ -2,7 +2,7 @@ package blockchain
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/chainhash"
+	"github.com/pqabelian/abec/chainhash"
 )
 
 // ThresholdState define the various threshold states used when voting on

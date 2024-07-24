@@ -1,8 +1,8 @@
 package txscript
 
 import (
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 // TypeFlags is a bitmask defining which type of item should engine verify.

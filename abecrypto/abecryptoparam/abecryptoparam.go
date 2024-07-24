@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/cryptosuite/pqringct"
+	"github.com/pqabelian/pqringct"
 )
 
 // For 0x12345678

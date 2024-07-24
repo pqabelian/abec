@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/wire"
 )
 
 // activeNetParams is a pointer to the parameters specific to the

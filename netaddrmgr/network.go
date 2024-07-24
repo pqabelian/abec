@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/wire"
 )
 
 var (

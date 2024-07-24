@@ -3,10 +3,10 @@ package abecryptoxkey
 import (
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abecrypto"
-	"github.com/abesuite/abec/abecrypto/abecryptoparam"
-	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
-	"github.com/cryptosuite/pqringctx/pqringctxapi"
+	"github.com/pqabelian/abec/abecrypto"
+	"github.com/pqabelian/abec/abecrypto/abecryptoparam"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
+	"github.com/pqabelian/pqringctx/pqringctxapi"
 )
 
 // PrivacyLevel defines the type to denote PrivacyLevel.

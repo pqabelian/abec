@@ -1,8 +1,8 @@
 package txscript
 
 import (
-	"github.com/abesuite/abec/btcec"
-	"github.com/abesuite/abec/chainhash"
+	"github.com/pqabelian/abec/btcec"
+	"github.com/pqabelian/abec/chainhash"
 	"sync"
 )
 

@@ -1,8 +1,8 @@
 package blockchain
 
 import (
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/wire"
 	"math"
 )
 

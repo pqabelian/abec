@@ -2,11 +2,11 @@ package abeutil
 
 import (
 	"bytes"
-	"github.com/abesuite/abec/aut"
+	"github.com/pqabelian/abec/aut"
 	"io"
 
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 // TxIndexUnknown is the value returned for a transaction index that is unknown.

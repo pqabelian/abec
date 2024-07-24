@@ -9,11 +9,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/abeutil/base58"
-	"github.com/abesuite/abec/btcec"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/chainhash"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/abeutil/base58"
+	"github.com/pqabelian/abec/btcec"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/chainhash"
 	"math/big"
 )
 

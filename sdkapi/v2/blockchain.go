@@ -1,6 +1,6 @@
 package v2
 
-import "github.com/abesuite/abec/wire"
+import "github.com/pqabelian/abec/wire"
 
 func GetTxoRingSizeByBlockHeight(height int32) uint8 {
 	return wire.GetTxoRingSizeByBlockHeight(height)

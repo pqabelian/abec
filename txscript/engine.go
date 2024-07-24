@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
-	"github.com/abesuite/abec/btcec"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/btcec"
+	"github.com/pqabelian/abec/wire"
 	"math/big"
 )
 

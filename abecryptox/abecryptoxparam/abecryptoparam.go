@@ -3,8 +3,8 @@ package abecryptoxparam
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/abesuite/abec/abecrypto/abecryptoparam"
-	"github.com/cryptosuite/pqringctx/pqringctxapi"
+	"github.com/pqabelian/abec/abecrypto/abecryptoparam"
+	"github.com/pqabelian/pqringctx/pqringctxapi"
 )
 
 // This package will be called/imported by wire and blokchain paackage, at the same position of abecryptox package.

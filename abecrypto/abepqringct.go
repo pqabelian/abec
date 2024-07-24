@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abecrypto/abecryptoparam"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
-	"github.com/cryptosuite/pqringct"
+	"github.com/pqabelian/abec/abecrypto/abecryptoparam"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
+	"github.com/pqabelian/pqringct"
 )
 
 // // abecrypto -> abepqringct -> pqringct

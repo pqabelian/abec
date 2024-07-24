@@ -3,11 +3,11 @@ package abeutil
 import (
 	"bytes"
 	"fmt"
-	"github.com/abesuite/abec/aut"
+	"github.com/pqabelian/abec/aut"
 	"io"
 
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 // OutOfRangeError describes an error due to accessing an element that is out

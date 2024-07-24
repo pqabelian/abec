@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 // These variables are the chain proof-of-work limit parameters for each default

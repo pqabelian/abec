@@ -1,8 +1,8 @@
 package syncmgr
 
 import (
-	"github.com/abesuite/abec/abelog"
-	"github.com/abesuite/abec/abeutil"
+	"github.com/pqabelian/abec/abelog"
+	"github.com/pqabelian/abec/abeutil"
 	"sync"
 	"time"
 )
@@ -22,8 +22,9 @@ type blockProgressLogger struct {
 
 // newBlockProgressLogger returns a new block progress logger.
 // The progress message is templated as follows:
-//  {progressAction} {numProcessed} {blocks|block} in the last {timePeriod}
-//  ({numTxs}, height {lastBlockHeight}, {lastBlockTimeStamp})
+//
+//	{progressAction} {numProcessed} {blocks|block} in the last {timePeriod}
+//	({numTxs}, height {lastBlockHeight}, {lastBlockTimeStamp})
 func newBlockProgressLogger(progressMessage string, logger abelog.Logger) *blockProgressLogger {
 	return &blockProgressLogger{
 		lastBlockLogTime: time.Now(),

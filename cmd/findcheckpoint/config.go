@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/database"
-	"github.com/abesuite/abec/wire"
 	"github.com/jessevdk/go-flags"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/database"
+	"github.com/pqabelian/abec/wire"
 	"os"
 	"path/filepath"
 )

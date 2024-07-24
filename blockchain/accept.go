@@ -2,8 +2,8 @@ package blockchain
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/database"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/database"
 )
 
 // maybeAcceptBlockAbe potentially accepts a block into the block chain and, if

@@ -3,12 +3,12 @@ package abecryptox
 import (
 	"bytes"
 	"fmt"
-	"github.com/abesuite/abec/abecryptox/abecryptoutils"
-	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
-	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
-	"github.com/cryptosuite/pqringctx/pqringctxapi"
+	"github.com/pqabelian/abec/abecryptox/abecryptoutils"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxkey"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
+	"github.com/pqabelian/pqringctx/pqringctxapi"
 )
 
 // // abecryptox -> abepqringctx -> pqringctx

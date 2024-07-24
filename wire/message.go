@@ -3,7 +3,7 @@ package wire
 import (
 	"bytes"
 	"fmt"
-	"github.com/abesuite/abec/chainhash"
+	"github.com/pqabelian/abec/chainhash"
 	"io"
 	"unicode/utf8"
 )

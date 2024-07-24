@@ -1,7 +1,7 @@
 package abecryptoxparam
 
 import (
-	"github.com/cryptosuite/pqringctx/pqringctxapi"
+	"github.com/pqabelian/pqringctx/pqringctxapi"
 )
 
 // API for Sizes	begin

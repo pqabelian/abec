@@ -2,7 +2,7 @@ package abecryptoparam
 
 import (
 	"fmt"
-	"github.com/cryptosuite/pqringct"
+	"github.com/pqabelian/pqringct"
 )
 
 // This file is added when refactoring due to the implementation of pqringctx.

@@ -1,8 +1,8 @@
 package blockchain
 
 import (
-	"github.com/abesuite/abec/btcec"
-	"github.com/abesuite/abec/txscript"
+	"github.com/pqabelian/abec/btcec"
+	"github.com/pqabelian/abec/txscript"
 )
 
 // -----------------------------------------------------------------------------

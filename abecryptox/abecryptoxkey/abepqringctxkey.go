@@ -2,10 +2,10 @@ package abecryptoxkey
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/abecryptox/abecryptoutils"
-	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
-	"github.com/cryptosuite/pqringctx"
-	"github.com/cryptosuite/pqringctx/pqringctxapi"
+	"github.com/pqabelian/abec/abecryptox/abecryptoutils"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
+	"github.com/pqabelian/pqringctx"
+	"github.com/pqabelian/pqringctx/pqringctxapi"
 )
 
 // pqringctxCryptoAddressKeyGenByRootSeeds generates (CryptoAddress, CryptoKeys) for the input Root Seeds and the CoinDetectorRootKey.

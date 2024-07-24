@@ -2,7 +2,7 @@ package wire
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/chainhash"
+	"github.com/pqabelian/abec/chainhash"
 	"io"
 )
 

@@ -8,10 +8,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/abesuite/abec/btcec"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/wire"
-	"github.com/abesuite/abec/abeutil"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/btcec"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/wire"
 )
 
 // RawTxInWitnessSignature returns the serialized ECDA signature for the input

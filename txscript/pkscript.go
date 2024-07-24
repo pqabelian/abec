@@ -4,10 +4,10 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/btcec"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/btcec"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/wire"
 	"golang.org/x/crypto/ripemd160"
 )
 

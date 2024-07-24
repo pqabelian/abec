@@ -3,10 +3,10 @@ package wire
 import (
 	"bytes"
 	"fmt"
-	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
 	"io"
 
-	"github.com/abesuite/abec/chainhash"
+	"github.com/pqabelian/abec/chainhash"
 )
 
 // defaultTransactionAlloc is the default size used for the backing array

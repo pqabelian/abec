@@ -7,14 +7,14 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/database"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/database"
+	"github.com/pqabelian/abec/wire"
 	"os"
 	"path/filepath"
 
-	_ "github.com/abesuite/abec/database/ffldb"
+	_ "github.com/pqabelian/abec/database/ffldb"
 )
 
 var (

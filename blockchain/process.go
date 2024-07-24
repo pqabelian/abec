@@ -2,10 +2,10 @@ package blockchain
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/consensus/ethash"
-	"github.com/abesuite/abec/database"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/consensus/ethash"
+	"github.com/pqabelian/abec/database"
 	"time"
 )
 

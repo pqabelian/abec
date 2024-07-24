@@ -4,10 +4,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/aut"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/database"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/aut"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/database"
 )
 
 // autFlags is a bitmask defining additional information and state for a
