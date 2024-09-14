@@ -485,26 +485,33 @@ func BuildTransferTxRequestDescFromTxoRings(
 
 	txoRings := make([]*wire.TxoRing, inputNum)
 	for i := 0; i < len(serializedTxoRings); i++ {
+		outPointIdToSpend := outPointsToSpend[i].outPointId
+
 		txoRings[i] = &wire.TxoRing{}
 		err = txoRings[i].Deserialize(bytes.NewReader(serializedTxoRings[i]))
 		if err != nil {
 			return nil, err
 		}
+
+		// here sanity check for the ring
+		seenTxInOutpointsInRing := make(map[wire.OutPointId]struct{}, len(txoRings[i].OutPointRing.OutPoints))
+		for _, outPoint := range txoRings[i].OutPointRing.OutPoints {
+			outPointID := outPoint.OutPointId()
+			if _, ok := seenTxInOutpointsInRing[outPointID]; ok {
+				return nil, errors.New("BuildTransferTxRequestDescFromTxoRings: there are repeated OutPoint (TxId, Index) in the rings")
+			}
+			seenTxInOutpointsInRing[outPointID] = struct{}{}
+		}
+
 		ringId := txoRings[i].RingId()
 		matched := false
 		for opIndex, outPoint := range txoRings[i].OutPointRing.OutPoints {
 			opId := outPoint.OutPointId()
-			txRequestInputDesc, ok := seenTxInOutpoints[opId]
-			if !ok {
+			if !bytes.Equal(outPointIdToSpend[:], opId[:]) {
 				continue
 			}
-			matched = true
-			//	the outPoint is one of the outPointsToSpend
-			if txRequestInputDesc.ringId != nil {
-				// It has been set previously
-				return nil, errors.New("BuildTransferTxRequestDesc: there are repeated OutPoint (TxId, Index) in the rings")
-			}
 
+			matched = true
 			seenTxInOutpoints[opId].ringId = &wire.RingId{}
 			copy(seenTxInOutpoints[opId].ringId[:], ringId[:])
 			seenTxInOutpoints[opId].txoRing = txoRings[i]
@@ -1293,6 +1300,165 @@ func GenerateCoinSerialNumberByKeys(
 		}
 
 		blockIdx += int(blockNumPerRingGroup)
+	}
+
+	//	check whether all outPoint has found the corresponding TxoRing
+	for i := 0; i < coinNum; i++ {
+		if txoRingMembers[i].ringId == nil {
+			return nil, fmt.Errorf("GenerateCoinSerialNumber: at least one of the input OutPoing such as OutPoint[%d] = (%s,%d) can not find the corresponding TxoRing",
+				i,
+				chainhash.Hash(*outPoints[i].TxId).String(),
+				outPoints[i].Index,
+			)
+		}
+	}
+
+	serialNumbers = make([][]byte, coinNum)
+	for i := 0; i < coinNum; i++ {
+		txOut := txoRingMembers[i].txoRing.TxOuts[txoRingMembers[i].idx]
+		serialNumbers[i], err = abecryptox.TxoCoinSerialNumberGenByKey(txOut,
+			chainhash.Hash(*txoRingMembers[i].ringId),
+			txoRingMembers[i].idx, cryptoSnsks[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return serialNumbers, nil
+}
+
+func GenerateCoinSerialNumberByRootSeedsWithRing(
+	outPoints []*OutPoint,
+	serializedRing []byte,
+	coinSerialNumberKeyRootSeed []byte) (serialNumbers [][]byte, err error) {
+
+	coinNum := len(outPoints)
+	if coinNum == 0 {
+		return nil, errors.New("GenerateCoinSerialNumber: input outPoints is empty")
+	}
+
+	txoRingMembers := make([]*TxoRingMember, coinNum)
+
+	outPointToTxoRingMemberMap := make(map[wire.OutPointId]*TxoRingMember, coinNum)
+	for i := 0; i < coinNum; i++ {
+		txoRingMembers[i] = &TxoRingMember{ringId: nil}
+		// this nil will be used to check whether the corresponding TxoRing
+
+		opId := outPoints[i].OutPointId()
+		if _, ok := outPointToTxoRingMemberMap[opId]; ok {
+			return nil, errors.New("GenerateCoinSerialNumber: outPoints contains repeated OutPoint")
+		} else {
+			outPointToTxoRingMemberMap[opId] = txoRingMembers[i]
+			//	later txoRingMembers[i] will be fetched from the map, then be set and put back
+		}
+	}
+
+	txoRing := &wire.TxoRing{}
+	err = txoRing.Deserialize(bytes.NewReader(serializedRing))
+	if err != nil {
+		return nil, errors.New("GenerateCoinSerialNumber: fail to parser serialized ring")
+	}
+
+	ringId := txoRing.RingId()
+	for opIndex, outPoint := range txoRing.OutPointRing.OutPoints {
+		opId := outPoint.OutPointId()
+		if txoRingMember, ok := outPointToTxoRingMemberMap[opId]; ok {
+			//	the outPoint is one of the outPointsToSpend
+			if txoRingMember.ringId != nil {
+				// It has been set previously
+				return nil, fmt.Errorf("GenerateCoinSerialNumber: there are repeated OutPoint (%s, %d) in the rings",
+					txoRingMember.txoRing.OutPointRing.OutPoints[txoRingMember.idx].TxHash,
+					txoRingMember.txoRing.OutPointRing.OutPoints[txoRingMember.idx].Index,
+				)
+			}
+
+			outPointToTxoRingMemberMap[opId].ringId = &wire.RingId{}
+			copy(outPointToTxoRingMemberMap[opId].ringId[:], ringId[:])
+			outPointToTxoRingMemberMap[opId].txoRing = txoRing
+			outPointToTxoRingMemberMap[opId].idx = uint8(opIndex) //	The Ring Rule will make sure opIndex is in the scope of uint8
+		}
+	}
+
+	//	check whether all outPoint has found the corresponding TxoRing
+	for i := 0; i < coinNum; i++ {
+		if txoRingMembers[i].ringId == nil {
+			return nil, fmt.Errorf("GenerateCoinSerialNumber: at least one of the input OutPoing such as OutPoint[%d] = (%s,%d) can not find the corresponding TxoRing",
+				i,
+				chainhash.Hash(*outPoints[i].TxId).String(),
+				outPoints[i].Index,
+			)
+		}
+	}
+
+	serialNumbers = make([][]byte, coinNum)
+	for i := 0; i < coinNum; i++ {
+		txOut := txoRingMembers[i].txoRing.TxOuts[txoRingMembers[i].idx]
+		serialNumbers[i], err = abecryptox.TxoCoinSerialNumberGenByRootSeed(txOut,
+			*txoRingMembers[i].ringId,
+			txoRingMembers[i].idx,
+			coinSerialNumberKeyRootSeed,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return serialNumbers, nil
+}
+
+func GenerateCoinSerialNumberByKeysWithRing(
+	outPoints []*OutPoint,
+	serializedRing []byte,
+	cryptoSnsks [][]byte) (serialNumbers [][]byte, err error) {
+
+	coinNum := len(outPoints)
+	if coinNum == 0 {
+		return nil, errors.New("GenerateCoinSerialNumber: input outPoints is empty")
+	}
+
+	if coinNum != len(cryptoSnsks) {
+		return nil, errors.New("GenerateCoinSerialNumber: the number of input keys does not match the number of outPoints")
+	}
+
+	txoRingMembers := make([]*TxoRingMember, coinNum)
+	outPointToTxoRingMemberMap := make(map[wire.OutPointId]*TxoRingMember, coinNum)
+	for i := 0; i < coinNum; i++ {
+		txoRingMembers[i] = &TxoRingMember{ringId: nil}
+		// this nil will be used to check whether the corresponding TxoRing
+
+		opId := outPoints[i].OutPointId()
+		if _, ok := outPointToTxoRingMemberMap[opId]; ok {
+			return nil, errors.New("GenerateCoinSerialNumber: outPoints contains repeated OutPoint")
+		} else {
+			outPointToTxoRingMemberMap[opId] = txoRingMembers[i]
+			//	later txoRingMembers[i] will be fetched from the map, then be set and put back
+		}
+	}
+
+	txoRing := &wire.TxoRing{}
+	err = txoRing.Deserialize(bytes.NewReader(serializedRing))
+	if err != nil {
+		return nil, errors.New("GenerateCoinSerialNumber: fail to parser serialized ring")
+	}
+
+	ringId := txoRing.RingId()
+	for opIndex, outPoint := range txoRing.OutPointRing.OutPoints {
+		opId := outPoint.OutPointId()
+		if txoRingMember, ok := outPointToTxoRingMemberMap[opId]; ok {
+			//	the outPoint is one of the outPointsToSpend
+			if txoRingMember.ringId != nil {
+				// It has been set previously
+				return nil, fmt.Errorf("GenerateCoinSerialNumber: there are repeated OutPoint (%s, %d) in the rings",
+					txoRingMember.txoRing.OutPointRing.OutPoints[txoRingMember.idx].TxHash,
+					txoRingMember.txoRing.OutPointRing.OutPoints[txoRingMember.idx].Index,
+				)
+			}
+
+			outPointToTxoRingMemberMap[opId].ringId = &wire.RingId{}
+			copy(outPointToTxoRingMemberMap[opId].ringId[:], ringId[:])
+			outPointToTxoRingMemberMap[opId].txoRing = txoRing
+			outPointToTxoRingMemberMap[opId].idx = uint8(opIndex) //	The Ring Rule will make sure opIndex is in the scope of uint8
+		}
 	}
 
 	//	check whether all outPoint has found the corresponding TxoRing
