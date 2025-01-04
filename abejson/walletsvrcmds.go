@@ -612,6 +612,30 @@ func NewListAUTCoinsCmd(autIdentifier *string, rootCoinOnly *bool) *ListAUTCoins
 	}
 }
 
+type GetAUTBalanceCmd struct {
+	AUTIdentifier string
+	Address       string
+}
+
+func NewGetAUTBalanceCmd(autIdentifier string, address string) *GetAUTBalanceCmd {
+	return &GetAUTBalanceCmd{
+		AUTIdentifier: autIdentifier,
+		Address:       address,
+	}
+}
+
+type BurnAUTBalanceCmd struct {
+	AUTIdentifier string
+	Address       string
+}
+
+func NewBurnAUTBalanceCmd(autIdentifier string, address string) *BurnAUTBalanceCmd {
+	return &BurnAUTBalanceCmd{
+		AUTIdentifier: autIdentifier,
+		Address:       address,
+	}
+}
+
 type ListConfirmedTxsCmd struct {
 	Verbose *int `jsonrpcdefault:"0"`
 }
@@ -1158,6 +1182,9 @@ func init() {
 	MustRegisterCmd("transferaut", (*TransferAUTTransactionCmd)(nil), flags)
 	MustRegisterCmd("reregisteraut", (*ReRegisterAUTTransactionCmd)(nil), flags)
 	MustRegisterCmd("burnaut", (*BurnAUTTransactionCmd)(nil), flags)
+	MustRegisterCmd("getautbalance", (*GetAUTBalanceCmd)(nil), flags)
+	MustRegisterCmd("burnautbalance", (*BurnAUTBalanceCmd)(nil), flags)
+
 	MustRegisterCmd("generateaddressabe", (*GenerateAddressCmd)(nil), flags)
 	MustRegisterCmd("listfreeaddresses", (*ListFreeAddressesCmd)(nil), flags)
 	MustRegisterCmd("addressmaxsequencenumber", (*AddressMaxSequenceNumberCmd)(nil), flags)
