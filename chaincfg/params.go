@@ -140,6 +140,13 @@ type Params struct {
 	// is reduced.
 	SubsidyReductionInterval int32
 
+	// SubsidyReductionInterval2 is the interval of blocks before the subsidy is reduced,
+	// for the new Token Release Schedule in AIP0012.
+	// Abelian applies AIP0012 from the start height of Era 2, say a new Token Release Schedule that
+	// provides longer eras with new tokens produced,
+	// while keeping the total supply unchanged, say same as that of the original Token Release Schedule.
+	SubsidyReductionInterval2 int32
+
 	// TargetTimespan is the desired amount of time that should elapse
 	// before the block difficulty requirement is examined to determine how
 	// it should be changed in order to maintain the desired block
@@ -243,6 +250,12 @@ type Params struct {
 	// BlockHeightMLPAUTCOMMIT specifies the block height
 	// from which new transactions with version before TxVersion_Height_MLPAUT_300000 will not be accepted anymore.
 	BlockHeightMLPAUTCOMMIT int32
+
+	// BlockHeightEra2Start specifies the start height of Era 2.
+	// From BlockHeightEra2Start, Abelian applies AIP0012, say a new Token Release Schedule that
+	// provides longer eras with new tokens produced,
+	// while keeping the total supply unchanged, say same as that of the original Token Release Schedule.
+	BlockHeightEra2Start int32
 }
 
 // MainNetParams defines the network parameters for the main network.
@@ -272,6 +285,9 @@ var MainNetParams = Params{
 	//CoinbaseMaturity:         100,
 	CoinbaseMaturity:         200,
 	SubsidyReductionInterval: 400_000,
+
+	SubsidyReductionInterval2: 800_000,
+
 	TargetTimespan:           time.Second * 256 * 4000, // 14 days TODO(abe):this value may be need changed
 	TargetTimePerBlock:       time.Second * 256,        // 10 minutes TODO(abe): this value may be need changed, now temporary to be 3 min
 	TargetTimespanDSA:        time.Second * 256 * 200,  // For DSA, added by Alice. todo(DSA): review
@@ -357,6 +373,12 @@ var MainNetParams = Params{
 	// ToDo(MLP):
 	BlockHeightMLPAUT:       300000,
 	BlockHeightMLPAUTCOMMIT: 340000,
+
+	// BlockHeightEra2Start specifies the start height of Era 2.
+	// From BlockHeightEra2Start, Abelian applies AIP0012.
+	// Based on the well-accepted rule that each era starts at height XY0000 rather than XY0001 (note that the genesis block has height 0),
+	// BlockHeightEra2Start must set to be SubsidyReductionInterval.
+	BlockHeightEra2Start: 400000,
 }
 
 // RegressionNetParams defines the network parameters for the regression test
@@ -376,6 +398,9 @@ var RegressionNetParams = Params{
 	PowLimitBits:             0x207fffff,
 	CoinbaseMaturity:         200,
 	SubsidyReductionInterval: 400_000,
+
+	SubsidyReductionInterval2: 800_000,
+
 	TargetTimespan:           time.Second * 256 * 4000,
 	TargetTimePerBlock:       time.Second * 256,
 	TargetTimespanDSA:        time.Second * 256 * 200, // For DSA, added by Alice. todo(DSA): review
@@ -440,6 +465,12 @@ var RegressionNetParams = Params{
 	// ToDo(MLP):
 	BlockHeightMLPAUT:       300000,
 	BlockHeightMLPAUTCOMMIT: 340000,
+
+	// BlockHeightEra2Start specifies the start height of Era 2.
+	// From BlockHeightEra2Start, Abelian applies AIP0012.
+	// Based on the well-accepted rule that each era starts at height XY0000 rather than XY0001 (note that the genesis block has height 0),
+	// BlockHeightEra2Start must set to be SubsidyReductionInterval.
+	BlockHeightEra2Start: 400000,
 }
 
 // TestNet3Params defines the network parameters for the test network
@@ -450,7 +481,7 @@ var TestNet3Params = Params{
 	Net:  wire.TestNet3,
 	//DefaultPort: "18333",
 	DefaultPort: "18666",
-	DNSSeeds:    []DNSSeed{
+	DNSSeeds: []DNSSeed{
 		//{"testnet-seed.bitcoin.jonasschnelli.ch", true},
 		//{"testnet-seed.bitcoin.schildbach.de", false},
 		//{"seed.tbtc.petertodd.org", true},
@@ -464,6 +495,9 @@ var TestNet3Params = Params{
 	PowLimitBits:             0x207fffff,
 	CoinbaseMaturity:         200,
 	SubsidyReductionInterval: 400_000,
+
+	SubsidyReductionInterval2: 800_000,
+
 	TargetTimespan:           time.Second * 256 * 4000, // 14 days TODO(abe):this value may be need changed
 	TargetTimePerBlock:       time.Second * 256,        // 10 minutes TODO(abe): this value may be need changed, now temporary to be 3 min
 	TargetTimespanDSA:        time.Second * 256 * 200,  // For DSA, added by Alice. todo(DSA): review
@@ -530,6 +564,12 @@ var TestNet3Params = Params{
 	// ToDo(MLP):
 	BlockHeightMLPAUT:       300000,
 	BlockHeightMLPAUTCOMMIT: 340000,
+
+	// BlockHeightEra2Start specifies the start height of Era 2.
+	// From BlockHeightEra2Start, Abelian applies AIP0012.
+	// Based on the well-accepted rule that each era starts at height XY0000 rather than XY0001 (note that the genesis block has height 0),
+	// BlockHeightEra2Start must set to be SubsidyReductionInterval.
+	BlockHeightEra2Start: 400000,
 }
 
 // SimNetParams defines the network parameters for the simulation test
@@ -552,6 +592,9 @@ var SimNetParams = Params{
 	PowLimitBits:             0x207fffff,
 	CoinbaseMaturity:         200,
 	SubsidyReductionInterval: 400_000,
+
+	SubsidyReductionInterval2: 800_000,
+
 	TargetTimespan:           time.Second * 256 * 4000,
 	TargetTimePerBlock:       time.Second * 256,
 	TargetTimespanDSA:        time.Second * 256 * 200, // For DSA, added by Alice. todo(DSA): review
@@ -616,6 +659,12 @@ var SimNetParams = Params{
 	// ToDo(MLP):
 	BlockHeightMLPAUT:       1000,
 	BlockHeightMLPAUTCOMMIT: 2000,
+
+	// BlockHeightEra2Start specifies the start height of Era 2.
+	// From BlockHeightEra2Start, Abelian applies AIP0012.
+	// Based on the well-accepted rule that each era starts at height XY0000 rather than XY0001 (note that the genesis block has height 0),
+	// BlockHeightEra2Start must set to be SubsidyReductionInterval.
+	BlockHeightEra2Start: 400000,
 }
 
 var (
