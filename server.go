@@ -2815,7 +2815,9 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	for _, addr := range permanentPeers {
 		netAddr, err := addrStringToNetAddr(addr)
 		if err != nil {
-			return nil, err
+			srvrLog.Warnf("warning critical: can not parse %s to network address: %v",
+				addr, err)
+			continue
 		}
 
 		go s.connManager.Connect(&connmgr.ConnReq{
