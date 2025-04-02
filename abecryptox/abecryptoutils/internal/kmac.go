@@ -129,13 +129,25 @@ func (k *kmac) Clone() sha3.ShakeHash {
 //
 // specified in 2.3.3 of [1].
 //
-// copied from golang.org/x/crypto/sha3/shake.go
+// copied from golang.org/x/crypto/sha3/shake.go and modified.
+// note that the difference is that
+// origin:   padlen := w - (len(buf) % w), the result would be (0,w],
+// modified: padlen := (len(buf)+w-1)/w*w - len(buf), the result would be [0,w-1), or simply padlen := (w - (len(buf) % w) ) % w
+//
+// As specified in 2.3.3 of [1]
+// while (len(z)/8) mod w ≠ 0:
+//
+//	z = z || 00000000
+//
+// would result [0,w-1) zero padding
+// Therefore, the original implementation of the input of a specific length, i.e.
+// when the result after left-encoding happens to be an integer (w) multiple, it will lead to incorrect padding.
 func bytepad(input []byte, w int) []byte {
 	// leftEncode always returns max 9 bytes
 	buf := make([]byte, 0, 9+len(input)+w)
 	buf = append(buf, leftEncode(uint64(w))...)
 	buf = append(buf, input...)
-	padlen := w - (len(buf) % w)
+	padlen := (len(buf)+w-1)/w*w - len(buf)
 	return append(buf, make([]byte, padlen)...)
 }
 

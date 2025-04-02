@@ -161,7 +161,7 @@ func (instAddr *InstanceAddress) Deserialize(serializedInstAddr []byte) error {
 		fallthrough
 	case abecryptoxkey.PrivacyLevelPSEUDONYM:
 		instAddr.netID = netId
-		instAddr.cryptoScheme = abecryptoxparam.CryptoSchemePQRingCT
+		instAddr.cryptoScheme = abecryptoxparam.CryptoSchemePQRingCTX
 
 		instAddr.cryptoAddress = make([]byte, len(serializedInstAddr)-1)
 		copy(instAddr.cryptoAddress, serializedInstAddr[1:])

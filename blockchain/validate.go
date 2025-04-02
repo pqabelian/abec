@@ -45,6 +45,12 @@ const (
 	//baseSubsidy = 512 * abeutil.NeutrinoPerAbe       //TODO(osy):this value should be 400 to uniform
 	//baseSubsidy = 400 * abeutil.NeutrinoPerAbe      //TODO(abe): for testing 1,2,5,10, we adjust the subsidy from 400 to 512
 	baseSubsidy = 256 * abeutil.NeutrinoPerAbe
+
+	// Abelian applies AIP0012 from the start height of Era 2, say a new Token Release Schedule that
+	// provides longer eras with new tokens produced,
+	// while keeping the total supply unchanged, say same as that of the original Token Release Schedule.
+	// baseSubsidy2 specifies the base subsidy for the new Token Release Schedule.
+	baseSubsidy2 = 64 * abeutil.NeutrinoPerAbe
 )
 
 var (
@@ -252,17 +258,42 @@ func isBIP0030Node(node *blockNode) bool {
 //
 // At the target block generation rate for the main network, this is
 // approximately every 4 years.
+// AIP0012 takes effect from the start height of Era 2.
 func CalcBlockSubsidy(height int32, chainParams *chaincfg.Params) uint64 {
-	if chainParams.SubsidyReductionInterval == 0 {
-		return baseSubsidy
-	}
+	if height < chainParams.BlockHeightEra2Start {
+		// Use the original Token Release Schedule for Era 1.
+		// The codes here could be simple, say directly return baseSubsidy.
+		// We keep the original codes for keeping the old rules.
 
-	// Equivalent to: baseSubsidy / 2^(height/subsidyHalvingInterval)
-	era := uint(height / chainParams.SubsidyReductionInterval)
-	if era < 10 {
-		return baseSubsidy >> uint(height/chainParams.SubsidyReductionInterval)
+		if chainParams.SubsidyReductionInterval == 0 {
+			return baseSubsidy
+		}
+
+		// Equivalent to: baseSubsidy / 2^(height/subsidyHalvingInterval)
+		era := uint(height / chainParams.SubsidyReductionInterval)
+		if era < 10 {
+			return baseSubsidy >> uint(height/chainParams.SubsidyReductionInterval)
+		} else {
+			return 0
+		}
 	} else {
-		return 0
+		// The new Token Release Schedule in AIP0012
+
+		if chainParams.SubsidyReductionInterval2 == 0 {
+			//	just a error-tolerant case
+			return baseSubsidy2
+		}
+
+		// start from Era2 with baseSubsidy2
+		// there are total 9 Eras with new tokens produced, where
+		// (1) the first era has era2-value = 0 and subsidy = baseSubsidy2 = 64 ABEL,
+		// (2) the last era has era2-value = 8 and subsidy = baseSubsidy2/2^8 = 1/2^2 ABEL.
+		era2 := uint((height - chainParams.BlockHeightEra2Start) / chainParams.SubsidyReductionInterval2)
+		if era2 < 9 {
+			return baseSubsidy2 >> era2
+		} else {
+			return 0
+		}
 	}
 }
 
