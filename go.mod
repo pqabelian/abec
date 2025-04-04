@@ -3,6 +3,7 @@ module github.com/pqabelian/abec
 go 1.18
 
 require (
+	github.com/abesuite/abec v0.0.0-00010101000000-000000000000
 	github.com/abesuite/go-socks v0.0.0-20170105172521-4720035b7bfd
 	github.com/abesuite/go-spew v1.1.1
 	github.com/aead/siphash v1.0.1
