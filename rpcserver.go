@@ -891,21 +891,23 @@ func createVinListAbe(mtx *wire.MsgTxAbe) []abejson.TxIn {
 
 		blockHashNum := len(txIn.PreviousOutPointRing.BlockHashs)
 		blockHashs := make([]string, blockHashNum)
-		for i := 0; i < blockHashNum; i++ {
-			blockHashs[i] = txIn.PreviousOutPointRing.BlockHashs[i].String()
+		for j := 0; j < blockHashNum; j++ {
+			blockHashs[j] = txIn.PreviousOutPointRing.BlockHashs[j].String()
 		}
 
 		ringSize := len(txIn.PreviousOutPointRing.OutPoints)
 		outPoints := make([]abejson.OutPointAbe, ringSize)
-		for i := 0; i < ringSize; i++ {
-			outPoint := &outPoints[i]
-			outPoint.Txid = txIn.PreviousOutPointRing.OutPoints[i].TxHash.String()
-			outPoint.Index = txIn.PreviousOutPointRing.OutPoints[i].Index
+		for j := 0; j < ringSize; j++ {
+			outPoint := &outPoints[j]
+			outPoint.Txid = txIn.PreviousOutPointRing.OutPoints[j].TxHash.String()
+			outPoint.Index = txIn.PreviousOutPointRing.OutPoints[j].Index
 		}
 
 		vinEntry.PreviousOutPointRing = &abejson.OutPointRing{
+			Version:    txIn.PreviousOutPointRing.Version,
 			BlockHashs: blockHashs,
-			OutPoints:  outPoints}
+			OutPoints:  outPoints,
+		}
 	}
 
 	return vinList
