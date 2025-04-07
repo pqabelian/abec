@@ -296,6 +296,16 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 		return b.chainParams.PowLimitBits, nil
 	}
 
+	// bypass adjust difficulty when hit configured Fake PoW scope
+	if b.fakePoWHeightScopes != nil {
+		for _, scope := range b.fakePoWHeightScopes {
+			nextHeight := lastNode.height + 1
+			if scope.StartHeight <= nextHeight && nextHeight < scope.EndHeight {
+				return lastNode.bits, nil
+			}
+		}
+	}
+
 	// Added by Alice, 2024.05.11, for DSA
 	// todo(DSA): review
 	if lastNode.height+1 >= b.chainParams.BlockHeightDSA {
