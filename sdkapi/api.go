@@ -1,6 +1,6 @@
 package sdkapi
 
-import "github.com/abesuite/abec/wire"
+import "github.com/pqabelian/abec/wire"
 
 type MsgBlock wire.MsgBlockAbe
 

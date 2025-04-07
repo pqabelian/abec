@@ -1,7 +1,7 @@
 package wire
 
 import (
-	"github.com/abesuite/abec/abelog"
+	"github.com/pqabelian/abec/abelog"
 	"strings"
 )
 

@@ -3,13 +3,13 @@ package cpuminer
 import (
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/blockchain"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/consensus/ethash"
-	"github.com/abesuite/abec/mining"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/blockchain"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/consensus/ethash"
+	"github.com/pqabelian/abec/mining"
+	"github.com/pqabelian/abec/wire"
 	"math/rand"
 	"runtime"
 	"sync"
@@ -209,7 +209,12 @@ func (m *CPUMiner) submitBlock(block *abeutil.BlockAbe) bool {
 	// nodes.  This will in turn relay it to the network like normal.
 	behavior := blockchain.BFNone
 	if m.cfg.ChainParams.Net != wire.MainNet && len(m.cfg.FakePowHeightScope) != 0 {
-		blockHeight := wire.ExtractCoinbaseHeight(block.MsgBlock().Transactions[0])
+		blockHeight, err := wire.ExtractCoinbaseHeight(block.MsgBlock().Transactions[0])
+		if err != nil {
+			log.Errorf("error happens when ExtractCoinbaseHeight(block.MsgBlock().Transactions[0]) : %v", err)
+			return false
+		}
+
 		for _, scope := range m.cfg.FakePowHeightScope {
 			if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
 				behavior |= blockchain.BFNoPoWCheck
@@ -241,8 +246,10 @@ func (m *CPUMiner) submitBlock(block *abeutil.BlockAbe) bool {
 
 	//	in pqringct-Abelian, the TxFee field of CoinbaseTx is used to store the invalue
 	inValue := block.MsgBlock().Transactions[0].TxFee
-	log.Infof("Block submitted via CPU miner accepted (hash %v, seal hash %v, "+"height %d, "+
-		"amount %v)", block.Hash(), ethash.SealHash(&block.MsgBlock().Header), block.Height(), abeutil.Amount(inValue))
+	log.Infof("Block submitted via CPU miner accepted (version %08x, hash %v, seal hash %v, "+"height %d, "+
+		"amount %v, stripped size %d bytes, full size %d bytes)",
+		block.MsgBlock().Header.Version, block.Hash(), ethash.SealHash(&block.MsgBlock().Header), block.Height(), abeutil.Amount(inValue),
+		block.MsgBlock().SerializeSizeStripped(), block.MsgBlock().SerializeSize())
 	return true
 }
 
@@ -267,7 +274,11 @@ func (m *CPUMiner) submitBlockEthash(block *abeutil.BlockAbe) bool {
 	// nodes.  This will in turn relay it to the network like normal.
 	behavior := blockchain.BFNone
 	if m.cfg.ChainParams.Net != wire.MainNet && len(m.cfg.FakePowHeightScope) != 0 {
-		blockHeight := wire.ExtractCoinbaseHeight(block.MsgBlock().Transactions[0])
+		blockHeight, err := wire.ExtractCoinbaseHeight(block.MsgBlock().Transactions[0])
+		if err != nil {
+			log.Errorf("error happens when ExtractCoinbaseHeight(block.MsgBlock().Transactions[0]) : %v", err)
+			return false
+		}
 		for _, scope := range m.cfg.FakePowHeightScope {
 			if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
 				behavior |= blockchain.BFNoPoWCheck
@@ -299,8 +310,10 @@ func (m *CPUMiner) submitBlockEthash(block *abeutil.BlockAbe) bool {
 
 	//	in pqringct-Abelian, the TxFee field of CoinbaseTx is used to store the invalue
 	inValue := block.MsgBlock().Transactions[0].TxFee
-	log.Infof("Block submitted via CPU miner accepted (hash %v, "+"seal Hash %v, "+"height %d, "+
-		"amount %v)", block.Hash(), ethash.SealHash(&block.MsgBlock().Header), block.Height(), abeutil.Amount(inValue))
+	log.Infof("Block submitted via CPU miner accepted (version %08x, hash %v, seal hash %v, height %d, "+
+		"amount %v, stripped size %d bytes, full size %d bytes)",
+		block.MsgBlock().Header.Version, block.Hash(), ethash.SealHash(&block.MsgBlock().Header), block.Height(), abeutil.Amount(inValue),
+		block.MsgBlock().SerializeSizeStripped(), block.MsgBlock().SerializeSize())
 	return true
 }
 

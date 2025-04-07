@@ -2,10 +2,11 @@ package abeutil
 
 import (
 	"bytes"
+	"github.com/pqabelian/abec/aut"
 	"io"
 
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 // TxIndexUnknown is the value returned for a transaction index that is unknown.
@@ -34,6 +35,10 @@ type TxAbe struct {
 	//	txHasTxoDetails *bool // if the transaction has txo details
 	txHasWitness *bool // If the transaction has witness data
 	txIndex      int   // Position within a block or TxIndexUnknown
+
+	autTxDone bool
+	autTx     aut.Transaction
+	errAUTTx  error
 }
 
 // MsgTx returns the underlying wire.MsgTx for the transaction.
@@ -45,6 +50,23 @@ func (t *Tx) MsgTx() *wire.MsgTx {
 func (tx *TxAbe) MsgTx() *wire.MsgTxAbe {
 	// Return the cached transaction.
 	return tx.msgTx
+}
+
+// AUTTransaction try to deserialize the memo in transaction to AUT transaction,
+// when success, set the fields autTx to the AUT transaction, and isAUTTx to true
+// when failed:
+// - if the origin transaction can not be an AUT transaction, set the fields autTx to nil, and isAUTTx to false
+// - if the origin transaction can be an AUT transaction but conflict with sanity, set the fields autTx to nil, and isAUTTx to true
+// refactored by Alice, on 2024.02.29, to return err if there is
+func (tx *TxAbe) AUTTransaction() (aut.Transaction, error) {
+	if tx.autTxDone {
+		return tx.autTx, tx.errAUTTx
+	}
+	tx.autTxDone = true
+
+	tx.autTx, tx.errAUTTx = aut.ExtractAutTransaction(tx.MsgTx())
+
+	return tx.autTx, tx.errAUTTx
 }
 
 func (tx *TxAbe) InvType() wire.InvType {

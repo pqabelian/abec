@@ -4,10 +4,14 @@ import (
 	"errors"
 )
 
-// These vesion-consts are used to maintain the history TxVersion.
+// These version-constants are used to maintain the history TxVersion.
 const (
-	TxVersion_Height_0 uint32 = iota + 1 // the TxVersion since height 0, corresponding to CryptoSchemePQRingCT
+	TxVersion_Unknown uint32 = 0 // the TxVersion since height 0, corresponding to CryptoSchemePQRingCT
+
+	TxVersion_Height_0 uint32 = 1 // the TxVersion since height 0, corresponding to CryptoSchemePQRingCT
 	//CryptoSchemePQRingCTV2
+	// ToDo(MLP): how about not use iota?
+	TxVersion_Height_MLPAUT_300000 uint32 = 2
 )
 
 const (
@@ -32,14 +36,27 @@ const (
 	//	But on the other side, TxVersion updates do not only work for crypto-scheme update, and it works for all possible updates.
 	//	That's why we need to maintain the mapping of (CryptoScheme, TxVersion).
 
+	// ToDo(MLP):
 	//	TxVersion = 1
-	TxVersion = TxVersion_Height_0
+	// TxVersion = TxVersion_Height_0
+	TxVersion = TxVersion_Height_MLPAUT_300000
 
 	//	todo: (EthashPow) BlockVersionEthashPow
 	// BlockVersionEthashPow is the block version which changed block to use EthashPoW
 	//	This causes hard-fork.
 	//	Thus, we set it to 0x20000000, while the previous (original) version is 0x10000000.
 	BlockVersionEthashPow = 0x20000000
+
+	// BlockVersionDSA is the block version which changed block to support DSA.
+	// The version is coded by the rule in versionbits.go
+	// Added by Alice, 2024.05.11, for DSA
+	// todo(DSA): review
+	BlockVersionDSA = 0x21000000
+
+	// BlockVersionMLPAUT is the block version which changed block to support MLP and AUT.
+	// The version is coded by the rule in versionbits.go
+	// ToDo(MLP):
+	BlockVersionMLPAUT = 0x30000000
 
 	// BlockHeightEthashPoW
 	// BlockHeightEthashPoW denotes the block height from which Ethash-PoW mining is applied.
@@ -67,7 +84,9 @@ const (
 // The mapping between TxVersion and BlockNumPerRingGroup is hardcode here.
 func GetBlockNumPerRingGroupByRingVersion(version uint32) (uint8, error) {
 	switch version {
-	case 1:
+	case TxVersion_Height_0:
+		return BlockNumPerRingGroup, nil
+	case TxVersion_Height_MLPAUT_300000:
 		return BlockNumPerRingGroup, nil
 
 	default:
@@ -87,7 +106,9 @@ func GetBlockNumPerRingGroupByBlockHeight(height int32) uint8 {
 // The mapping between TxVersion and TxoRingSize is hardcode here.
 func GetTxoRingSizeByRingVersion(version uint32) (uint8, error) {
 	switch version {
-	case 1:
+	case TxVersion_Height_0:
+		return TxoRingSize, nil
+	case TxVersion_Height_MLPAUT_300000:
 		return TxoRingSize, nil
 
 	default:

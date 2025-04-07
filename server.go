@@ -7,25 +7,26 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/blockchain"
-	"github.com/abesuite/abec/blockchain/indexers"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/connmgr"
-	"github.com/abesuite/abec/consensus/ethash"
-	"github.com/abesuite/abec/database"
-	"github.com/abesuite/abec/mempool"
-	"github.com/abesuite/abec/mempool/rotator"
-	"github.com/abesuite/abec/mining"
-	"github.com/abesuite/abec/mining/cpuminer"
-	"github.com/abesuite/abec/mining/externalminer"
-	"github.com/abesuite/abec/netaddrmgr"
-	"github.com/abesuite/abec/peer"
-	"github.com/abesuite/abec/syncmgr"
-	"github.com/abesuite/abec/txscript"
-	"github.com/abesuite/abec/wire"
-	"github.com/abesuite/abec/witnessmgr"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/blockchain"
+	"github.com/pqabelian/abec/blockchain/indexers"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/connmgr"
+	"github.com/pqabelian/abec/consensus/ethash"
+	"github.com/pqabelian/abec/database"
+	"github.com/pqabelian/abec/mempool"
+	"github.com/pqabelian/abec/mempool/rotator"
+	"github.com/pqabelian/abec/mining"
+	"github.com/pqabelian/abec/mining/cpuminer"
+	"github.com/pqabelian/abec/mining/externalminer"
+	"github.com/pqabelian/abec/netaddrmgr"
+	"github.com/pqabelian/abec/peer"
+	"github.com/pqabelian/abec/syncmgr"
+	"github.com/pqabelian/abec/txscript"
+	"github.com/pqabelian/abec/wire"
+	"github.com/pqabelian/abec/witnessmgr"
 	"github.com/shirou/gopsutil/v3/process"
 	"math"
 	"net"
@@ -2625,13 +2626,14 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 			MaxOrphanTxSize:      defaultMaxOrphanTxSize,
 			MaxSigOpCostPerTx:    blockchain.MaxBlockSigOpsCost / 4,
 			MinRelayTxFee:        cfg.minRelayTxFee,
-			MaxTxVersion:         2,
+			MaxTxVersion:         int32(wire.TxVersion),
 			RejectReplacement:    cfg.RejectReplacement,
 		},
 		ChainParams: chainParams,
 		//	todo(ABE):
 		FetchUtxoView:     s.chain.FetchUtxoView,
 		FetchUtxoRingView: s.chain.FetchUtxoRingView,
+		FetchAUTView:      s.chain.FetchAUTView,
 		BestHeight:        func() int32 { return s.chain.BestSnapshot().Height },
 		MedianTimePast:    func() time.Time { return s.chain.BestSnapshot().MedianTime },
 		CalcSequenceLock: func(tx *abeutil.Tx, view *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error) {
@@ -2692,16 +2694,29 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	// NOTE: The CPU miner relies on the mempool, so the mempool has to be
 	// created before calling the function to create the CPU miner.
 	policy := mining.Policy{
-		BlockMinWeight:    cfg.BlockMinWeight,
-		BlockMaxWeight:    cfg.BlockMaxWeight,
-		BlockMinSize:      cfg.BlockMinSize,
-		BlockMaxSize:      cfg.BlockMaxSize,
-		BlockPrioritySize: cfg.BlockPrioritySize,
-		TxMinFreeFee:      cfg.minRelayTxFee,
+		BlockMinWeight:         cfg.BlockMinWeight,
+		BlockMaxWeight:         cfg.BlockMaxWeight,
+		BlockMinSize:           cfg.BlockMinSize,
+		BlockMaxSize:           cfg.BlockMaxSize,
+		BlockSizeMinMLPAUT:     cfg.BlockSizeMinMLPAUT,
+		BlockSizeMaxMLPAUT:     cfg.BlockSizeMaxMLPAUT,
+		BlockFullSizeMinMLPAUT: cfg.BlockFullSizeMinMLPAUT,
+		BlockFullSizeMaxMLPAUT: cfg.BlockFullSizeMaxMLPAUT,
+		BlockPrioritySize:      cfg.BlockPrioritySize,
+		TxMinFreeFee:           cfg.minRelayTxFee,
 	}
 	blockTemplateGenerator := mining.NewBlkTmplGenerator(&policy,
 		s.chainParams, s.txMemPool, s.chain, s.timeSource,
 		s.sigCache, s.hashCache, s.witnessCache)
+	if s.chain.BestSnapshot().Height+1 < s.chainParams.BlockHeightMLPAUT {
+		// Check address, disallow higher address with crypto scheme
+		for i := 0; i < len(cfg.miningAddrs); i++ {
+			if cfg.miningAddrs[i].CryptoScheme() != abecryptoxparam.CryptoSchemePQRingCT {
+				return nil, fmt.Errorf("address with crypto scheme other than %d address is disallow until height %d", abecryptoxparam.CryptoSchemePQRingCT, s.chainParams.BlockHeightMLPAUT)
+			}
+		}
+	}
+
 	s.cpuMiner = cpuminer.New(&cpuminer.Config{
 		ChainParams:            chainParams,
 		Ethash:                 s.ethash, // todo: (EthashPoW)
@@ -2800,7 +2815,9 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	for _, addr := range permanentPeers {
 		netAddr, err := addrStringToNetAddr(addr)
 		if err != nil {
-			return nil, err
+			srvrLog.Warnf("warning critical: can not parse %s to network address: %v",
+				addr, err)
+			continue
 		}
 
 		go s.connManager.Connect(&connmgr.ConnReq{

@@ -6,12 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abejson"
-	"github.com/abesuite/abec/abeutil"
+	"github.com/pqabelian/abec/abejson"
+	"github.com/pqabelian/abec/abeutil"
 	"time"
 
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 var (

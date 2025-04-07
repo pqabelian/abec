@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/database"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/database"
 	"time"
 )
 

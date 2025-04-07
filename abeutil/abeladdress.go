@@ -4,8 +4,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abecrypto/abecryptoparam"
-	"github.com/abesuite/abec/chaincfg"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
+	"github.com/pqabelian/abec/chaincfg"
 )
 
 // AbelAddress is the address facing to the users.
@@ -35,6 +35,8 @@ type AbelAddress interface {
 	//	CryptoAddress() returns the cryptoAddress
 	CryptoAddress() []byte
 
+	CryptoScheme() abecryptoxparam.CryptoScheme
+
 	// IsForNet returns whether or not the address is associated with the passed Abelian network.
 	// Each abec net (such as mainnet, testnet) has a chaincfg.Params instance object,
 	// where particular parameters (such as genesis block, block-reward etc.) are set.
@@ -63,22 +65,31 @@ func DecodeAbelAddress(addrStr string) (AbelAddress, error) {
 
 	//	the bytes [1]~[4] must match the generation of cryptoAddress, namely in pqringctCryptoAddressGen()
 
-	cryptoScheme, err := abecryptoparam.Deserialize(addrBytes[1:5])
+	cryptoScheme, err := abecryptoxparam.DeserializeCryptoScheme(addrBytes[1:5])
 	if err != nil {
 		errStr := fmt.Sprintf("abel-address %v has a wrong length", addrStr)
 		return nil, errors.New(errStr)
 	}
 
 	switch cryptoScheme {
-	case abecryptoparam.CryptoSchemePQRingCT:
+	case abecryptoxparam.CryptoSchemePQRingCT:
 		instAddr := &InstanceAddress{}
 		err := instAddr.Decode(addrStr)
 		if err != nil {
 			return nil, err
 		}
+		instAddr.cryptoScheme = cryptoScheme
 
 		return instAddr, nil
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+		instAddr := &InstanceAddress{}
+		err := instAddr.Decode(addrStr)
+		if err != nil {
+			return nil, err
+		}
+		instAddr.cryptoScheme = cryptoScheme
 
+		return instAddr, nil
 	default:
 		return nil, errors.New("Unsupported cryptoScheme of AbelAddress")
 	}

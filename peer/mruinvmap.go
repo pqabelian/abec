@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"container/list"
 	"fmt"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/wire"
 	"sync"
 )
 

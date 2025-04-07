@@ -2,15 +2,15 @@ package syncmgr
 
 import (
 	"container/list"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/blockchain"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/consensus/ethash"
-	"github.com/abesuite/abec/database"
-	"github.com/abesuite/abec/mempool"
-	peerpkg "github.com/abesuite/abec/peer"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/blockchain"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/consensus/ethash"
+	"github.com/pqabelian/abec/database"
+	"github.com/pqabelian/abec/mempool"
+	peerpkg "github.com/pqabelian/abec/peer"
+	"github.com/pqabelian/abec/wire"
 	"math/rand"
 	"net"
 	"sync"
@@ -644,6 +644,7 @@ func (sm *SyncManager) updateSyncPeer(dcSyncPeer bool) {
 }
 
 // handleTxMsgAbe handles transaction messages from all peers.
+// todo_DONE(MLP): reviewed on 2024.01.09
 func (sm *SyncManager) handleTxMsgAbe(tmsg *txMsgAbe) {
 	peer := tmsg.peer
 	state, exists := sm.peerStates[peer]
@@ -675,6 +676,7 @@ func (sm *SyncManager) handleTxMsgAbe(tmsg *txMsgAbe) {
 
 	// Process the transaction to include validation, insertion in the
 	// memory pool, orphan handling, etc.
+	// todo_DONE(MLP): reviewed on 2024.01.09
 	acceptedTx, err := sm.txMemPool.ProcessTransactionAbe(tmsg.tx,
 		true, true, mempool.Tag(peer.ID()), false)
 
@@ -957,6 +959,7 @@ func (sm *SyncManager) current() bool {
 //	todo(ABE):
 //
 // handleBlockMsgAbe handles block messages from all peers.
+// todo_DONE(MLP): reviewed on 2024.01.05
 func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 	peer := bmsg.peer
 	state, exists := sm.peerStates[peer]
@@ -1009,7 +1012,13 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 	if sm.chainParams.Net != wire.MainNet {
 		fakePoWHeightScopes := sm.chain.FakePoWHeightScopes()
 		if len(fakePoWHeightScopes) != 0 {
-			blockHeight := wire.ExtractCoinbaseHeight(bmsg.block.MsgBlock().Transactions[0])
+			blockHeight, err := wire.ExtractCoinbaseHeight(bmsg.block.MsgBlock().Transactions[0])
+			if err != nil {
+				log.Infof("Rejected block %v from %s: error happens wire.ExtractCoinbaseHeight(bmsg.block.MsgBlock().Transactions[0]): %v", blockHash, peer, err)
+				peer.Disconnect()
+				return
+			}
+
 			for _, scope := range fakePoWHeightScopes {
 				if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
 					behaviorFlags |= blockchain.BFNoPoWCheck
@@ -1044,6 +1053,7 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
 	//	todo (EthashPoW): 202207
+	// todo_DONE(MLP): reviewed on 2024.01.05
 	_, isOrphan, err := sm.chain.ProcessBlockAbe(bmsg.block, sm.ethash, behaviorFlags)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
@@ -1090,7 +1100,12 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 		// high enough (ver 2+).
 		// todo (ABE): does abec have height stored in coinbase?
 		header := &bmsg.block.MsgBlock().Header
-		if blockchain.ShouldHaveSerializedBlockHeight(header) {
+
+		if blockchain.ShouldHaveHeightInBlockHeader(header) {
+			heightUpdate = header.Height
+			blkHashUpdate = blockHash
+		} else {
+			// extract from coinbase Tx.
 			coinbaseTx := bmsg.block.Transactions()[0]
 			cbHeight, err := blockchain.ExtractCoinbaseHeightAbe(coinbaseTx)
 			if err != nil {
@@ -1199,6 +1214,7 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 }
 
 // handlePrunedBlockMsgAbe handles prunedblock messages from all peers.
+// todo_DONE(MLP): review on 2024.01.09
 func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	defer func() {
 		if bmsg.reply != nil {
@@ -1249,6 +1265,26 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 					isCheckpointBlock = true
 				} else {
 					sm.headerList.Remove(firstNodeEl)
+				}
+			}
+		}
+	}
+
+	// for fake pow mode
+	if sm.chainParams.Net != wire.MainNet {
+		fakePoWHeightScopes := sm.chain.FakePoWHeightScopes()
+		if len(fakePoWHeightScopes) != 0 {
+			blockHeight, err := wire.ExtractCoinbaseHeight(bmsg.block.MsgPrunedBlock().CoinbaseTx)
+			if err != nil {
+				log.Infof("Rejected block %v from %s: error happens wire.ExtractCoinbaseHeight(bmsg.block.MsgBlock().Transactions[0]): %v", blockHash, peer, err)
+				peer.Disconnect()
+				return
+			}
+
+			for _, scope := range fakePoWHeightScopes {
+				if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
+					behaviorFlags |= blockchain.BFNoPoWCheck
+					break
 				}
 			}
 		}
@@ -2131,6 +2167,7 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 			//todo(ABE): for ABE, sm does not need to sm.peerNotifier.AnnounceNewTransactions(acceptedTx),
 			// as tx is propagated with blocks, and may be announced when verify the block.
 		}
+		sm.txMemPool.RemoveExpiredAUTTransaction(block.Height())
 
 		// Register block with the fee estimator, if it exists.
 		if sm.feeEstimator != nil {
@@ -2144,6 +2181,9 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 					mempool.DefaultEstimateFeeMaxRollback,
 					mempool.DefaultEstimateFeeMinRegisteredBlocks)
 			}
+		}
+		if sm.chainParams.BlockHeightMLPAUTCOMMIT <= block.Height() && block.Height() < sm.chainParams.BlockHeightMLPAUTCOMMIT+10 {
+			sm.txMemPool.ClearOutdatedTransaction()
 		}
 
 	// A block has been disconnected from the main block chain.

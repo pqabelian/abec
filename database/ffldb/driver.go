@@ -2,9 +2,9 @@ package ffldb
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/abelog"
-	"github.com/abesuite/abec/database"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abelog"
+	"github.com/pqabelian/abec/database"
+	"github.com/pqabelian/abec/wire"
 )
 
 var log = abelog.Disabled

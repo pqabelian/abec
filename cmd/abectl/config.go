@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/abejson"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/chaincfg"
 	"github.com/jessevdk/go-flags"
+	"github.com/pqabelian/abec/abejson"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/chaincfg"
 	"io/ioutil"
 	"net"
 	"os"

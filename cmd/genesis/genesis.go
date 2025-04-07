@@ -3,12 +3,12 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/abesuite/abec/abecrypto"
-	"github.com/abesuite/abec/abecrypto/abecryptoparam"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/blockchain"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abecrypto"
+	"github.com/pqabelian/abec/abecrypto/abecryptoparam"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/blockchain"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 	"log"
 	"os"
 	"time"
@@ -66,14 +66,15 @@ func gensis() {
 	for i := 0; i < len(txOutDescs); i++ {
 		txOutDescs[i] = abecrypto.NewAbeTxOutDesc(retSerializedCryptoAddress, 205_799_813_685_247)
 	}
-	nullSerialNumer, _ := abecryptoparam.GetNullSerialNumber(wire.TxVersion)
+	txVersion := wire.TxVersion
+	nullSerialNumer, _ := abecryptoparam.GetNullSerialNumber(txVersion)
 	cbTxTemplate := &wire.MsgTxAbe{
-		Version: wire.TxVersion,
+		Version: txVersion,
 		TxIns: []*wire.TxInAbe{
 			{
 				SerialNumber: nullSerialNumer,
 				PreviousOutPointRing: wire.OutPointRing{
-					Version: wire.TxVersion,
+					Version: txVersion,
 					BlockHashs: []*chainhash.Hash{
 						&chainhash.ZeroHash,
 						&chainhash.ZeroHash,

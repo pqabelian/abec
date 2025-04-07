@@ -6,9 +6,9 @@ package blockchain
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/txscript"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/txscript"
+	"github.com/pqabelian/abec/wire"
 )
 
 const (
@@ -25,6 +25,9 @@ const (
 	// which can be allocated to non-witness data.
 	//	MaxBlockBaseSize = 1000000
 	MaxBlockBaseSize = 8000000 // 8M
+
+	MaxBlockBaseSizeMLPAUT = 8 * 1024 * 1024 // 8M
+	MaxBlockFullSizeMLPAUT = wire.MaxBlockPayloadAbe
 
 	// MaxBlockSigOpsCost is the maximum number of signature operations
 	// allowed for a block. It is calculated via a weighted algorithm which
@@ -59,7 +62,7 @@ func GetBlockWeight(blk *abeutil.Block) int64 {
 	return int64((baseSize * (WitnessScaleFactor - 1)) + totalSize)
 }
 
-//	Abe to do
+// Abe to do
 func GetBlockWeightAbe(blk *abeutil.BlockAbe) int64 {
 	msgBlock := blk.MsgBlock()
 
@@ -85,9 +88,9 @@ func GetTransactionWeight(tx *abeutil.Tx) int64 {
 	return int64((baseSize * (WitnessScaleFactor - 1)) + totalSize)
 }
 
-//	todo(ABE): the caller mya convert the result to int32, why not return 'int32' directly?
-//	in ABE, we directly use the size, rather than the witness, since the witness size is roughly proportional to the basic size.
-//	If we also use weight, we need to set the factor according to more details.
+// todo(ABE): the caller mya convert the result to int32, why not return 'int32' directly?
+// in ABE, we directly use the size, rather than the witness, since the witness size is roughly proportional to the basic size.
+// If we also use weight, we need to set the factor according to more details.
 func GetTransactionWeightAbe(tx *abeutil.TxAbe) int64 {
 	msgTx := tx.MsgTx()
 

@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abecrypto"
-	"github.com/abesuite/abec/abecrypto/abecryptoparam"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/blockchain"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abecrypto"
+	"github.com/pqabelian/abec/abecrypto/abecryptoparam"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/blockchain"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 	"io"
 )
 
@@ -493,7 +493,11 @@ func GetAndSetHeight(block *abeutil.BlockAbe) error {
 		if len(block.MsgBlock().Transactions) == 0 {
 			return errors.New("invalid block which do not include any transaction")
 		}
-		height = wire.ExtractCoinbaseHeight(block.MsgBlock().Transactions[0])
+		var err error
+		height, err = wire.ExtractCoinbaseHeight(block.MsgBlock().Transactions[0])
+		if err != nil {
+			return err
+		}
 	}
 	block.SetHeight(height)
 	return nil
@@ -660,6 +664,8 @@ func BuildTransferTxRequestDescFromBlocks(
 	return serializedTxRequestDesc, nil
 }
 
+//	todo(MLP): todo
+//
 // CreateTransferTx would use the result called by BuildTransferTxRequestDescFromBlocks or BuildTransferTxRequestDescFromTxoRings as the unsigned transaction
 // and the cryptoKeys should be matched in order for the input in unsigned transaction
 func CreateTransferTx(serializedTransferTxRequestDesc []byte, cryptoKeys []*CryptoKey) (serializedTxFull []byte, txId *TxId, err error) {

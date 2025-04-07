@@ -2,8 +2,8 @@ package blockchain
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/database"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/database"
 )
 
 // maybeAcceptBlockAbe potentially accepts a block into the block chain and, if
@@ -23,6 +23,8 @@ import (
 //  5. Add the new block into block index
 //  6. Connect new block to the chain, including reorganization and switch main chain if needed (connectBestChainAbe)
 //  7. Send NTBlockAccepted notification
+//
+// todo_DOME(MLP): reviewed on 2024.01.05
 func (b *BlockChain) maybeAcceptBlockAbe(block *abeutil.BlockAbe, flags BehaviorFlags) (bool, error) {
 	// The height of this block is one more than the referenced previous
 	// block.
@@ -39,8 +41,9 @@ func (b *BlockChain) maybeAcceptBlockAbe(block *abeutil.BlockAbe, flags Behavior
 	blockHeight := prevNode.height + 1
 	block.SetHeight(blockHeight)
 
-	// The block must pass all of the validation rules which depend on the
-	// position of the block within the block chain.
+	// The block must pass all the validation rules which depend on the
+	// position of the block within the blockchain.
+	// reviewed on 2024.01.03, by Alice for MLP
 	err := b.checkBlockContextAbe(block, prevNode, flags)
 	if err != nil {
 		return false, err
@@ -83,6 +86,7 @@ func (b *BlockChain) maybeAcceptBlockAbe(block *abeutil.BlockAbe, flags Behavior
 	// Connect the passed block to the chain while respecting proper chain
 	// selection according to the chain with the most proof of work.  This
 	// also handles validation of the transaction scripts.
+	// todo_DONE(MLP): reviewed on 2024.01.03
 	isMainChain, err := b.connectBestChainAbe(newNode, block, flags)
 	if err != nil {
 		return false, err
@@ -91,9 +95,11 @@ func (b *BlockChain) maybeAcceptBlockAbe(block *abeutil.BlockAbe, flags Behavior
 	// Notify the caller that the new block was accepted into the block
 	// chain.  The caller would typically want to react by relaying the
 	// inventory to other peers.
-	b.chainLock.Unlock()
-	b.sendNotification(NTBlockAccepted, block)
-	b.chainLock.Lock()
+	func() {
+		b.chainLock.Unlock()
+		defer b.chainLock.Lock()
+		b.sendNotification(NTBlockAccepted, block)
+	}()
 
 	return isMainChain, nil
 }

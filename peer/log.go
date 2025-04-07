@@ -2,10 +2,10 @@ package peer
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/abelog"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/txscript"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abelog"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/txscript"
+	"github.com/pqabelian/abec/wire"
 	"strings"
 	"time"
 )
@@ -194,12 +194,12 @@ func messageSummary(msg wire.Message) string {
 
 	case *wire.MsgBlock:
 		header := &msg.Header
-		return fmt.Sprintf("hash %s, ver %d, %d tx, %s", msg.BlockHash(),
+		return fmt.Sprintf("hash %s, ver %08x, %d tx, %s", msg.BlockHash(),
 			header.Version, len(msg.Transactions), header.Timestamp)
 
 	case *wire.MsgBlockAbe:
 		header := &msg.Header
-		return fmt.Sprintf("hash %s, ver %d, %d tx, %s", msg.BlockHash(),
+		return fmt.Sprintf("hash %s, ver %08x, %d tx, %s", msg.BlockHash(),
 			header.Version, len(msg.Transactions), header.Timestamp)
 
 	case *wire.MsgInv:

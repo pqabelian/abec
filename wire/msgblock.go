@@ -3,10 +3,10 @@ package wire
 import (
 	"bytes"
 	"fmt"
-	"github.com/abesuite/abec/abecrypto/abecryptoparam"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
 	"io"
 
-	"github.com/abesuite/abec/chainhash"
+	"github.com/pqabelian/abec/chainhash"
 )
 
 // defaultTransactionAlloc is the default size used for the backing array
@@ -28,7 +28,12 @@ const MaxBlockPayload = 4000000
 // MaxBlockPayloadAbe is the maximum bytes a block message can be in bytes.
 // todo: The max block payload in abe is 8MB. However, it seems that there is bug in transaction
 // serialization currently. Hence, the MaxBlockPayload is temporarily  set as 800MB.
-const MaxBlockPayloadAbe = 800000000
+//
+// changed at fork for MLPAUT,use 256MB as max block message payload
+// and corresponding, the max message size is adjusted to 320MB for redundancy
+// the strategy is to use the default configuration first, if the network
+// is not congested, gradually increase the default configuration until limited MaxBlockPayloadAbe
+const MaxBlockPayloadAbe = 256 * 1024 * 1024
 
 // maxTxPerBlock is the maximum number of transactions that could
 // possibly fit into a block.
@@ -181,7 +186,7 @@ func (msg *MsgBlockAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding)
 	if enc == WitnessEncoding && existWitness[0] == 1 {
 		var tmp []byte
 		for _, tx := range msg.Transactions {
-			tmp, err = ReadVarBytes(r, pver, abecryptoparam.MaxAllowedTxWitnessSize, "tx.Witness")
+			tmp, err = ReadVarBytes(r, pver, abecryptoxparam.MaxAllowedTxWitnessSize, "tx.Witness")
 			if err != nil {
 				return err
 			}
@@ -543,7 +548,8 @@ func (msg *MsgBlock) SerializeSize() int {
 	// todo: (EthashPow)
 	// n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
 	n := blockHeaderLen
-	if msg.Header.Version == int32(BlockVersionEthashPow) {
+	// todo(MLP):
+	if msg.Header.Version >= int32(BlockVersionEthashPow) {
 		n = blockHeaderLenEthash
 	}
 	n += VarIntSerializeSize(uint64(len(msg.Transactions)))
@@ -563,7 +569,8 @@ func (msg *MsgBlock) SerializeSizeStripped() int {
 	//	todo: (EthashPoW)
 	//n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
 	n := blockHeaderLen
-	if msg.Header.Version == int32(BlockVersionEthashPow) {
+	// todo(MLP):
+	if msg.Header.Version >= int32(BlockVersionEthashPow) {
 		n = blockHeaderLenEthash
 	}
 	n += VarIntSerializeSize(uint64(len(msg.Transactions)))
@@ -580,7 +587,8 @@ func (msg *MsgBlockAbe) SerializeSizeStripped() int {
 	// todo: (EthashPoW)
 	//n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
 	n := blockHeaderLen
-	if msg.Header.Version == int32(BlockVersionEthashPow) {
+	// todo(MLP):
+	if msg.Header.Version >= int32(BlockVersionEthashPow) {
 		n = blockHeaderLenEthash
 	}
 	n += VarIntSerializeSize(uint64(len(msg.Transactions)))
@@ -628,7 +636,8 @@ func (msg *MsgBlockAbe) SerializeSize() int {
 	// todo: (EthashPoW)
 	// n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
 	n := blockHeaderLen
-	if msg.Header.Version == int32(BlockVersionEthashPow) {
+	// todo(MLP):
+	if msg.Header.Version >= int32(BlockVersionEthashPow) {
 		n = blockHeaderLenEthash
 	}
 	n += VarIntSerializeSize(uint64(len(msg.Transactions)))

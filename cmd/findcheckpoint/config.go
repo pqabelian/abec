@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/database"
-	"github.com/abesuite/abec/wire"
 	"github.com/jessevdk/go-flags"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/database"
+	"github.com/pqabelian/abec/wire"
 	"os"
 	"path/filepath"
 )
@@ -36,6 +36,8 @@ type config struct {
 	RegressionTest bool   `long:"regtest" description:"Use the regression test network"`
 	SimNet         bool   `long:"simnet" description:"Use the simulation test network"`
 	TestNet3       bool   `long:"testnet" description:"Use the test network"`
+
+	Heights []int32 `long:"heights" description:""`
 }
 
 // validDbType returns whether or not dbType is a supported database type.

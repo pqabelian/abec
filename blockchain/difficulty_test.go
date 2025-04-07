@@ -3,7 +3,7 @@ package blockchain
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/abesuite/abec/chainhash"
+	"github.com/pqabelian/abec/chainhash"
 	"math/big"
 	"testing"
 )

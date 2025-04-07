@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/abesuite/abec/abejson"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abejson"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 // FutureGetBestBlockHashResult is a future promise to deliver the result of a
@@ -734,7 +734,7 @@ func (r FutureGetBlockHeaderResult) Receive() (*wire.BlockHeader, error) {
 	var bh wire.BlockHeader
 	err = bh.Deserialize(bytes.NewReader(serializedBH))
 	if err != nil {
-		return nil, err
+		return &bh, err
 	}
 
 	return &bh, err

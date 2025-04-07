@@ -5,10 +5,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abecrypto"
-	"github.com/abesuite/abec/abecrypto/abecryptoparam"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/chainhash"
+	"github.com/pqabelian/abec/abecrypto"
+	"github.com/pqabelian/abec/abecrypto/abecryptoparam"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxkey"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/chainhash"
 )
 
 /*
@@ -115,7 +117,7 @@ func ParseMasterAddressPQringctFromSerialzedBytes(serialized []byte) (*MasterAdd
 type InstanceAddress struct {
 	netID         byte
 	cryptoAddress []byte
-	cryptoScheme  abecryptoparam.CryptoScheme // This value is encoded in cryptoAddress. It is defined for cache.
+	cryptoScheme  abecryptoxparam.CryptoScheme // This value is encoded in cryptoAddress. It is defined for cache.
 }
 
 func (instAddr *InstanceAddress) SerializeSize() uint32 {
@@ -139,21 +141,34 @@ func (instAddr *InstanceAddress) Deserialize(serializedInstAddr []byte) error {
 
 	netId := serializedInstAddr[0]
 
-	//	the bytes [1]~[4] must match the generation of cryptoAddress, namely in pqringctCryptoAddressGen()
-	cryptoScheme, err := abecryptoparam.Deserialize(serializedInstAddr[1:5])
-	if err != nil || cryptoScheme != abecryptoparam.CryptoSchemePQRingCT {
-		return errors.New("A non-PQRingCT1.0 abelAddress is deserialized as an instanceAddress")
+	privacyLevel, _, _, err := abecryptoxkey.CryptoAddressParse(serializedInstAddr[1:])
+	if err != nil {
+		return errors.New("A non-PQRingCT abelAddress is deserialized as an instanceAddress")
 	}
+	switch privacyLevel {
+	case abecryptoxkey.PrivacyLevelRINGCTPre:
+		if uint32(len(serializedInstAddr)) != abecrypto.GetCryptoAddressSerializeSize(abecryptoparam.CryptoSchemePQRingCT)+1 {
+			return errors.New("the length of serializedInstAddr does not match the design")
+		}
 
-	if uint32(len(serializedInstAddr)) != abecrypto.GetCryptoAddressSerializeSize(instAddr.cryptoScheme)+1 {
-		return errors.New("the length of serializedInstAddr does not match the design")
+		instAddr.netID = netId
+		instAddr.cryptoScheme = abecryptoxparam.CryptoSchemePQRingCT
+
+		instAddr.cryptoAddress = make([]byte, len(serializedInstAddr)-1)
+		copy(instAddr.cryptoAddress, serializedInstAddr[1:])
+		return nil
+	case abecryptoxkey.PrivacyLevelRINGCT:
+		fallthrough
+	case abecryptoxkey.PrivacyLevelPSEUDONYM:
+		instAddr.netID = netId
+		instAddr.cryptoScheme = abecryptoxparam.CryptoSchemePQRingCTX
+
+		instAddr.cryptoAddress = make([]byte, len(serializedInstAddr)-1)
+		copy(instAddr.cryptoAddress, serializedInstAddr[1:])
+		return nil
+	default:
+		return errors.New("A non-PQRingCT abelAddress is deserialized as an instanceAddress")
 	}
-
-	instAddr.netID = netId
-	instAddr.cryptoScheme = abecryptoparam.CryptoScheme(cryptoScheme)
-
-	instAddr.cryptoAddress = make([]byte, len(serializedInstAddr)-1)
-	copy(instAddr.cryptoAddress, serializedInstAddr[1:])
 
 	return nil
 }
@@ -200,6 +215,9 @@ func (instAddr *InstanceAddress) String() string {
 
 func (instAddr *InstanceAddress) CryptoAddress() []byte {
 	return instAddr.cryptoAddress
+}
+func (instAddr *InstanceAddress) CryptoScheme() abecryptoxparam.CryptoScheme {
+	return instAddr.cryptoScheme
 }
 
 func (instAddr *InstanceAddress) IsForNet(netParam *chaincfg.Params) bool {

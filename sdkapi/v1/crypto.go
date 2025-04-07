@@ -3,9 +3,9 @@ package v1
 import (
 	"bytes"
 	"errors"
-	"github.com/abesuite/abec/abecrypto"
-	"github.com/abesuite/abec/abecrypto/abecryptoparam"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abecrypto"
+	"github.com/pqabelian/abec/abecrypto/abecryptoparam"
+	"github.com/pqabelian/abec/wire"
 )
 
 type CryptoScheme abecryptoparam.CryptoScheme

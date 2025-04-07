@@ -3,10 +3,11 @@ package abeutil
 import (
 	"bytes"
 	"fmt"
+	"github.com/pqabelian/abec/aut"
 	"io"
 
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 // OutOfRangeError describes an error due to accessing an element that is out
@@ -46,6 +47,9 @@ type BlockAbe struct {
 	blockHeight              int32             // Height in the main block chain
 	transactions             []*TxAbe          // Transactions
 	txnsGenerated            bool              // ALL wrapped transactions generated
+
+	autTransactions  []aut.Transaction
+	autTxnsGenerated bool
 }
 
 // Abe to do
@@ -328,6 +332,52 @@ func (b *BlockAbe) Transactions() []*TxAbe {
 	return b.transactions
 }
 
+// AUTTransactions returns the AutTransaction hosted by the transaction in the block.
+// If they have been parsed, just return, otherwise, parse and return.
+// refactored by Alice on 2024.03.01
+func (b *BlockAbe) AUTTransactions() []aut.Transaction {
+	// Return transactions if they have ALL already been generated.  This
+	// flag is necessary because the wrapped transactions are lazily
+	// generated in a sparse fashion.
+	if b.autTxnsGenerated {
+		return b.autTransactions
+	}
+
+	// Generate slice to hold all of the wrapped transactions if needed.
+	if len(b.autTransactions) == 0 {
+		b.autTransactions = make([]aut.Transaction, 0, len(b.msgBlock.Transactions))
+	}
+
+	// Generate and cache the wrapped autTransactions for all that haven't
+	// already been done.
+	for i, txAbe := range b.Transactions() {
+		isCb, err := txAbe.IsCoinBase()
+		if err != nil {
+			//	this should not happen
+			log.Warnf("AUTTransactions: error happens when calling IsCoinBase() on the %d-th transaction of the block: %v", i, err)
+			continue
+		}
+		if isCb {
+			continue
+		}
+
+		autTx, err := txAbe.AUTTransaction()
+		if err != nil {
+			//	this should not happen
+			log.Warnf("AUTTransactions: error happens when getting AutTransaction from the %d-th transaction (%s) of the block: %v", i, txAbe.Hash(), err)
+			continue
+		}
+		if autTx == nil {
+			log.Debugf("AUTTransactions: skip non-AUT transaction %s", txAbe.Hash())
+			continue
+		}
+		b.autTransactions = append(b.autTransactions, autTx)
+	}
+
+	b.autTxnsGenerated = true
+	return b.autTransactions
+}
+
 // TxHash returns the hash for the requested transaction number in the Block.
 // The supplied index is 0 based.  That is to say, the first transaction in the
 // block is txNum 0.  This is equivalent to calling TxHash on the underlying
@@ -367,7 +417,8 @@ func (b *Block) TxLoc() ([]wire.TxLoc, error) {
 
 func (b *BlockAbe) TxLoc() ([]wire.TxAbeLoc, error) {
 	var offset, witOffset int
-	if b.msgBlock.Header.Version == int32(wire.BlockVersionEthashPow) {
+	// todo(MLP):
+	if b.msgBlock.Header.Version >= int32(wire.BlockVersionEthashPow) {
 		offset, witOffset = 120+wire.VarIntSerializeSize(uint64(len(b.msgBlock.Transactions))), 8
 	} else {
 		offset, witOffset = 80+wire.VarIntSerializeSize(uint64(len(b.msgBlock.Transactions))), 8

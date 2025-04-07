@@ -2,7 +2,7 @@ package blockchain
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/chainhash"
+	"github.com/pqabelian/abec/chainhash"
 )
 
 // ThresholdState define the various threshold states used when voting on
@@ -260,9 +260,9 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 // This function is safe for concurrent access.
 func (b *BlockChain) ThresholdState(deploymentID uint32) (ThresholdState, error) {
 	b.chainLock.Lock()
-	state, err := b.deploymentState(b.bestChain.Tip(), deploymentID)
-	b.chainLock.Unlock()
+	defer b.chainLock.Unlock()
 
+	state, err := b.deploymentState(b.bestChain.Tip(), deploymentID)
 	return state, err
 }
 
@@ -272,8 +272,9 @@ func (b *BlockChain) ThresholdState(deploymentID uint32) (ThresholdState, error)
 // This function is safe for concurrent access.
 func (b *BlockChain) IsDeploymentActive(deploymentID uint32) (bool, error) {
 	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+
 	state, err := b.deploymentState(b.bestChain.Tip(), deploymentID)
-	b.chainLock.Unlock()
 	if err != nil {
 		return false, err
 	}

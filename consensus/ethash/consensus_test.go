@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/abesuite/abec/chainhash"
+	"github.com/pqabelian/abec/chainhash"
 	"golang.org/x/crypto/sha3"
 	"math/big"
 	"testing"

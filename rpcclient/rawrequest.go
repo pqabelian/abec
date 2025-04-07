@@ -3,7 +3,7 @@ package rpcclient
 import (
 	"encoding/json"
 	"errors"
-	"github.com/abesuite/abec/abejson"
+	"github.com/pqabelian/abec/abejson"
 )
 
 // FutureRawResult is a future promise to deliver the result of a RawRequest RPC

@@ -2,7 +2,7 @@ package rpcclient
 
 import (
 	"encoding/json"
-	"github.com/abesuite/abec/abejson"
+	"github.com/pqabelian/abec/abejson"
 )
 
 // AddNodeCommand enumerates the available commands that the AddNode function

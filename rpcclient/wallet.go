@@ -2,11 +2,11 @@ package rpcclient
 
 import (
 	"encoding/json"
-	"github.com/abesuite/abec/abejson"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abejson"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 	"strconv"
 )
 
@@ -484,6 +484,8 @@ func (c *Client) SetTxFee(fee abeutil.Amount) error {
 // SendToAddressAsync RPC invocation (or an applicable error).
 type FutureSendToAddressResult chan *response
 type FutureSendToAddressAbeResult chan *response
+type FutureRegisterAUTTransactionResult chan *response
+type FutureNonRegisterAUTTransactionResult chan *response
 
 type FutureSendToPayeeResult chan *response
 
@@ -505,6 +507,36 @@ func (r FutureSendToAddressResult) Receive() (*chainhash.Hash, error) {
 	return chainhash.NewHashFromStr(txHash)
 }
 func (r FutureSendToAddressAbeResult) Receive() (*chainhash.Hash, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a string.
+	var txHash string
+	err = json.Unmarshal(res, &txHash)
+	if err != nil {
+		return nil, err
+	}
+
+	return chainhash.NewHashFromStr(txHash)
+}
+func (r FutureRegisterAUTTransactionResult) Receive() (*chainhash.Hash, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a string.
+	var txHash string
+	err = json.Unmarshal(res, &txHash)
+	if err != nil {
+		return nil, err
+	}
+
+	return chainhash.NewHashFromStr(txHash)
+}
+func (r FutureNonRegisterAUTTransactionResult) Receive() (*chainhash.Hash, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err

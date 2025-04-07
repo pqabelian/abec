@@ -7,8 +7,8 @@ package main
 import (
 	"encoding/hex"
 	"errors"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/database"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/database"
 	"strconv"
 	"time"
 )

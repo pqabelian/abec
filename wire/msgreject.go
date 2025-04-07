@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/abesuite/abec/chainhash"
+	"github.com/pqabelian/abec/chainhash"
 )
 
 // RejectCode represents a numeric value by which a remote peer indicates
@@ -21,6 +21,7 @@ const (
 	RejectDust            RejectCode = 0x41
 	RejectInsufficientFee RejectCode = 0x42
 	RejectCheckpoint      RejectCode = 0x43
+	RejectAutBadForm      RejectCode = 0x51
 )
 
 // Map of reject codes back strings for pretty printing.
@@ -33,6 +34,7 @@ var rejectCodeStrings = map[RejectCode]string{
 	RejectDust:            "REJECT_DUST",
 	RejectInsufficientFee: "REJECT_INSUFFICIENTFEE",
 	RejectCheckpoint:      "REJECT_CHECKPOINT",
+	RejectAutBadForm:      "REJECT_AUTBADFORM",
 }
 
 // String returns the RejectCode in human-readable form.

@@ -1,6 +1,7 @@
 // This file is ignored during the regular build due to the following build tag.
 // It is called by go generate and used to automatically generate pre-computed
 // tables used to accelerate operations.
+//go:build ignore
 // +build ignore
 
 package main
@@ -13,7 +14,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/abesuite/abec/btcec"
+	"github.com/pqabelian/abec/btcec"
 )
 
 func main() {
@@ -57,6 +58,3 @@ func main() {
 	fmt.Printf("a2: %x\n", a2)
 	fmt.Printf("b2: %x\n", b2)
 }
-
-
-

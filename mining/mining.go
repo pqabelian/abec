@@ -4,14 +4,13 @@ import (
 	"container/heap"
 	"encoding/binary"
 	"fmt"
-	"github.com/abesuite/abec/abecrypto"
-	"github.com/abesuite/abec/abecrypto/abecryptoparam"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/blockchain"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/txscript"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abecryptox"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/blockchain"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/txscript"
+	"github.com/pqabelian/abec/wire"
 	"time"
 )
 
@@ -250,6 +249,40 @@ func mergeUtxoView(viewA *blockchain.UtxoViewpoint, viewB *blockchain.UtxoViewpo
 	}
 }
 
+func mergeUtxoRingView(viewA *blockchain.UtxoRingViewpoint, viewB *blockchain.UtxoRingViewpoint) {
+	viewAEntries := viewA.Entries()
+	for outpoint, entryB := range viewB.Entries() {
+		viewAEntries[outpoint] = entryB
+	}
+
+	viewA.SetEntries(viewAEntries)
+}
+
+func mergeAUTView(viewA *blockchain.AUTViewpoint, viewB *blockchain.AUTViewpoint) {
+	if viewB == nil {
+		return
+	}
+
+	viewAEntries := viewA.Entries()
+	if viewAEntries == nil {
+		viewAEntries = make(map[string]*blockchain.AUTEntry)
+	}
+	for autNameKeys, entry := range viewB.Entries() {
+		existAUTInfo := viewAEntries[autNameKeys]
+		if existAUTInfo == nil {
+			viewAEntries[autNameKeys] = entry
+			continue
+		}
+		// do not change AUT info
+		// but add all coin to viewA
+		for outpiont, coin := range entry.AUTCoins() {
+			existAUTInfo.Add(outpiont, coin)
+		}
+		viewAEntries[autNameKeys] = existAUTInfo
+	}
+	viewA.SetEntries(viewAEntries)
+}
+
 // standardCoinbaseScript returns a standard script suitable for use as the
 // signature script of the coinbase transaction of a new block.  In particular,
 // it starts with the block height that is required by version 2 blocks and adds
@@ -286,7 +319,7 @@ func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockH
 		}
 	}
 
-	tx := wire.NewMsgTx(int32(wire.TxVersion))
+	tx := wire.NewMsgTx(int32(wire.TxVersion_Height_0))
 	tx.AddTxIn(&wire.TxIn{
 		// Coinbase transactions have no inputs, so previous outpoint is
 		// zero hash and max index.
@@ -371,10 +404,13 @@ func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockH
 /*
 todo: create a coinbaseTx template, where the TxOuts, the TxFee, and TxWitness are set to be 'fake' ones, and TxMemo is set to null
 */
-func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, txOutNum int) (*wire.MsgTxAbe, error) {
-	//	When a new msgTx is created for a new transaction, it should use the current Txversion
+// ToDo(MLP):
+// reviewed on 2024.01.01, by Alice
+func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, txVersion uint32, cryptoAddressPayTo []byte) (*wire.MsgTxAbe, error) {
+	//	When a new msgTx is created for a new transaction, it should use the current TxVersion
 	// msgTx := wire.NewMsgTxAbe(wire.TxVersion)
-	msgTx := wire.NewMsgTxAbe(wire.TxVersion)
+	// More reasonable, the txVersion should be decided by the caller.
+	msgTx := wire.NewMsgTxAbe(txVersion)
 
 	//	one TxIn
 	//	For coinbase transaction, as there is no real consumed coin, the TxIn is set by particular policy,
@@ -384,7 +420,9 @@ func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, txOutNum int) (*wire.
 		return nil, err
 	}
 	msgTx.AddTxIn(coinbaseTxIn)
-	txoSizeApprxo, err := abecryptoparam.GetTxoSerializeSizeApprox(msgTx.Version)
+
+	// oneTxOut
+	txoScriptSizeApprox, err := abecryptox.GetTxoSerializeSizeApprox(msgTx.Version, cryptoAddressPayTo)
 	if err != nil {
 		return nil, err
 	}
@@ -392,21 +430,20 @@ func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, txOutNum int) (*wire.
 		//	Txo inherits the version from the Tx
 		Version: msgTx.Version,
 		//	TxoSerialize here is used to occupy the space
-		TxoScript: make([]byte, txoSizeApprxo),
+		TxoScript: make([]byte, txoScriptSizeApprox),
 	}
-
-	//	one or multiple TxoOuts
-	//	Set the TxOuts and the later TxWitness to occupy block size
-	for i := 0; i < txOutNum; i++ {
-		msgTx.AddTxOut(tempTxOut)
-	}
+	msgTx.AddTxOut(tempTxOut)
 
 	//msgTx.TxFee = abecryptoparam.GetMaxCoinValue(msgTx.Version)
 	msgTx.TxFee = 0 // txFee will be serialized with 8bytes.
 	//	todo: 202207. This txMemo value is unnecessary. We could remove it.
 	msgTx.TxMemo = []byte{byte(msgTx.Version >> 24), byte(msgTx.Version >> 16), byte(msgTx.Version >> 8), byte(msgTx.Version)}
 	//	TxWitnessSerializeSize here is used to occupy space.
-	txWitnessSizeApprox, err := abecryptoparam.GetCbTxWitnessSerializeSizeApprox(msgTx.Version, txOutNum)
+
+	//	For the default/reference implementation of coinbaseTx, there is only one output Txo.
+	cryptoAddressListPayTo := make([][]byte, 1)
+	cryptoAddressListPayTo[0] = cryptoAddressPayTo
+	txWitnessSizeApprox, err := abecryptox.GetCbTxWitnessSerializeSizeApprox(msgTx.Version, cryptoAddressListPayTo)
 	if err != nil {
 		return nil, err
 	}
@@ -430,14 +467,27 @@ func spendTransaction(utxoView *blockchain.UtxoViewpoint, tx *abeutil.Tx, height
 	return nil
 }
 
-//	todo(ABE): the block is unknown yet, use hainhash.ZeroHash as the block hash consuming the serialNumber
-func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, tx *abeutil.TxAbe) error {
+// todo(ABE): the block is unknown yet, use hainhash.ZeroHash as the block hash consuming the serialNumber
+// Move this function to blockchain package
+func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *blockchain.AUTViewpoint, tx *abeutil.TxAbe) error {
 	for _, txIn := range tx.MsgTx().TxIns {
 		entry := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())
 		if entry != nil {
 			entry.Spend(txIn.SerialNumber, &chainhash.ZeroHash)
 		}
 	}
+	// AUT
+	autTx, err := tx.AUTTransaction()
+	if err != nil {
+		return err
+	}
+	if autTx != nil {
+		err = autView.SpendTransaction(autTx)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -470,7 +520,7 @@ func medianAdjustedTime(chainState *blockchain.BestState, timeSource blockchain.
 	// of the last several blocks.  Thus, choose the maximum between the
 	// current time and one second after the past median time.  The current
 	// timestamp is truncated to a second boundary before comparison since a
-	// block timestamp does not supported a precision greater than one
+	// block timestamp does not support a precision greater than one
 	// second.
 	newTimestamp := timeSource.AdjustedTime()
 	minTimestamp := MinimumMedianTime(chainState)
@@ -560,27 +610,29 @@ func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
 //
 // Given the above, a block generated by this function is of the following form:
 //
-//   -----------------------------------  --  --
-//  |      Coinbase Transaction         |   |   |
-//  |-----------------------------------|   |   |
-//  |                                   |   |   | ----- policy.BlockPrioritySize
-//  |   High-priority Transactions      |   |   |
-//  |                                   |   |   |
-//  |-----------------------------------|   | --
-//  |                                   |   |
-//  |                                   |   |
-//  |                                   |   |--- policy.BlockMaxSize
-//  |  Transactions prioritized by fee  |   |
-//  |  until <= policy.TxMinFreeFee     |   |
-//  |                                   |   |
-//  |                                   |   |
-//  |                                   |   |
-//  |-----------------------------------|   |
-//  |  Low-fee/Non high-priority (free) |   |
-//  |  transactions (while block size   |   |
-//  |  <= policy.BlockMinSize)          |   |
-//   -----------------------------------  --
-func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress []byte) (*BlockTemplate, error) {
+//	 -----------------------------------  --  --
+//	|      Coinbase Transaction         |   |   |
+//	|-----------------------------------|   |   |
+//	|                                   |   |   | ----- policy.BlockPrioritySize
+//	|   High-priority Transactions      |   |   |
+//	|                                   |   |   |
+//	|-----------------------------------|   | --
+//	|                                   |   |
+//	|                                   |   |
+//	|                                   |   |--- policy.BlockMaxSize
+//	|  Transactions prioritized by fee  |   |
+//	|  until <= policy.TxMinFreeFee     |   |
+//	|                                   |   |
+//	|                                   |   |
+//	|                                   |   |
+//	|-----------------------------------|   |
+//	|  Low-fee/Non high-priority (free) |   |
+//	|  transactions (while block size   |   |
+//	|  <= policy.BlockMinSize)          |   |
+//	 -----------------------------------  --
+//
+// reviewed on 2024.01.01, by Alice
+func (g *BlkTmplGenerator) NewBlockTemplate(cryptoAddressPayTo []byte) (*BlockTemplate, error) {
 	// Extend the most recently known best block.
 	best := g.chain.BestSnapshot()
 	nextBlockHeight := best.Height + 1
@@ -594,13 +646,22 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress []byte) (*BlockTemplate
 	// same value to the same public key address would otherwise be an
 	// identical transaction for block version 1).
 	//extraNonce := uint64(0)
-
-	coinbaseTxMsg, err := createCoinbaseTxAbeMsgTemplate(nextBlockHeight, 1)
+	// ToDo(MLP): If there are more versions, we need to added here.
+	txVersion := wire.TxVersion
+	if nextBlockHeight < g.chainParams.BlockHeightMLPAUT {
+		txVersion = wire.TxVersion_Height_0
+	} else {
+		txVersion = wire.TxVersion_Height_MLPAUT_300000
+	}
+	// At this moment, we do not need to support output for coinbaseTx,
+	// since it will require the mechanism on separating the total output value to the multiple output Txos.
+	coinbaseTxMsg, err := createCoinbaseTxAbeMsgTemplate(nextBlockHeight, txVersion, cryptoAddressPayTo)
 	if err != nil {
 		return nil, err
 	}
 	subsidy := blockchain.CalcBlockSubsidy(nextBlockHeight, g.chainParams)
 
+	// TODO review from here 20240125
 	// Get the current source transactions and create a priority queue to
 	// hold the transactions which are ready for inclusion into a block
 	// along with some priority related and fee metadata.  Reserve the same
@@ -619,6 +680,7 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress []byte) (*BlockTemplate
 	coinbaseTx := abeutil.NewTxAbe(coinbaseTxMsg)
 	blockTxns = append(blockTxns, coinbaseTx)
 	blockUtxoRings := blockchain.NewUtxoRingViewpoint()
+	blockAUTView := blockchain.NewAUTViewpoint()
 
 	// Create slices to hold the fees and number of signature operations
 	// for each of the selected transactions and add an entry for the
@@ -653,7 +715,26 @@ mempoolLoop:
 			continue
 		}
 
-		// Fetch all of the utxoRings referenced by the this transaction.
+		// mainnet [0    -    55999] [56000     -    279999] [280000   -    321999]
+		// testnet [0    -    55999] [56000     -    279999] [280000   -    321999]
+		// simnet  [0    -    299  ] [300       -    999   ] [1000     -    1999  ]
+		//             1                    1/2                  2
+		// ToDo(MLP):
+		if nextBlockHeight >= g.chainParams.BlockHeightMLPAUTCOMMIT {
+			if tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_300000 {
+				log.Tracef("Skipping tx %s, since from block with height %d, transactions with version %d will not be mined any more", tx.Hash(), g.chainParams.BlockHeightMLPAUTCOMMIT, tx.MsgTx().Version)
+				continue
+			}
+		} else if nextBlockHeight >= g.chainParams.BlockHeightMLPAUT {
+			// nothing to do
+		} else { // height lower than the fork for MLPAUT
+			if tx.MsgTx().Version >= wire.TxVersion_Height_MLPAUT_300000 {
+				log.Tracef("Skipping tx %s, transactions with version %d would not be mined until height %d", tx.Hash(), tx.MsgTx().Version, g.chainParams.BlockHeightMLPAUT)
+				continue
+			}
+		}
+
+		// Fetch all of the utxoRings referenced by this transaction.
 		utxoRings, err := g.chain.FetchUtxoRingView(tx)
 		if err != nil {
 			log.Warnf("Unable to fetch utxoRing view for tx %s: %v",
@@ -661,6 +742,16 @@ mempoolLoop:
 			continue
 		}
 
+		// TODO replace with this one?
+		err = blockchain.CheckTransactionInputsAbe(tx, nextBlockHeight, utxoRings, g.chainParams)
+		if err != nil {
+			log.Tracef("Skipping tx %s because it "+
+				"references unspent output %s "+
+				"which is not available",
+				tx.Hash(), err)
+			continue mempoolLoop
+		}
+		// ToDo(MLP):todo
 		// If utxoRing of one of the transaction inputs does not exist,
 		// skip this transaction.
 		for _, txIn := range tx.MsgTx().TxIns {
@@ -671,6 +762,23 @@ mempoolLoop:
 					"which is not available",
 					tx.Hash(), txIn.String())
 				continue mempoolLoop
+			}
+		}
+
+		autView, err := g.chain.FetchAUTView(tx)
+		if err != nil {
+			log.Warnf("Unable to fetch aut view for tx %s: %v",
+				tx.Hash(), err)
+			continue
+		}
+
+		if autView != nil {
+			err = blockchain.CheckTransactionInputsAUT(tx, nextBlockHeight, utxoRings, autView, g.chainParams)
+			if err != nil {
+				log.Debugf("Skipping tx %s because it "+
+					"contains an invalid AUT transaction: %v",
+					tx.Hash(), err)
+				continue
 			}
 		}
 
@@ -693,10 +801,10 @@ mempoolLoop:
 		// code below to avoid a second lookup.
 		//	todo(ABE): how to prevent double spending
 		//mergeUtxoView(blockUtxos, utxos)
-		//	if blockUtxoRings.Entries() has the same utxoRing, just replace, as the utxoRing in utxoRings is queried from the latest database
-		for ringHash, utxoRing := range utxoRings.Entries() {
-			blockUtxoRings.Entries()[ringHash] = utxoRing
-		}
+		// if blockUtxoRings.Entries() has the same utxoRing,
+		// just replace, as the utxoRing in utxoRings is queried from the latest database
+		mergeUtxoRingView(blockUtxoRings, utxoRings)
+		mergeAUTView(blockAUTView, autView)
 	}
 
 	log.Tracef("Priority queue len %d", priorityQueue.Len())
@@ -707,6 +815,7 @@ mempoolLoop:
 	//	todo(ABE): ABE does not use weight, while use size only.
 	// blockWeight := (blockHeaderOverhead * blockchain.WitnessScaleFactor) + uint32(blockchain.GetTransactionWeightAbe(coinbaseTx))
 	blockSize := uint32((blockHeaderOverhead) + coinbaseTx.MsgTx().SerializeSize())
+	blockFullSize := uint32((blockHeaderOverhead) + coinbaseTx.MsgTx().SerializeSize())
 	totalFee := uint64(0)
 
 	// Choose which transactions make it into the block.
@@ -717,26 +826,56 @@ mempoolLoop:
 		tx := prioItem.tx
 
 		// Enforce maximum block weight.  Also check for overflow.
+		// transaction size without witness
 		txSize := uint32(tx.MsgTx().SerializeSize())
 		blockPlusTxSize := blockSize + txSize
-		if blockPlusTxSize < blockSize || blockPlusTxSize >= g.policy.BlockMaxSize {
-			log.Tracef("Skipping tx %s because it would exceed "+
-				"the max block size", tx.Hash())
-			continue
+		txFullSize := uint32(tx.MsgTx().SerializeSizeFull())
+		blockPlusTxFullSize := blockFullSize + txFullSize
+		// TODO(MLPAUT) add block full size check here
+		if nextBlockHeight >= g.chainParams.BlockHeightMLPAUT {
+			if blockPlusTxSize < blockSize || blockPlusTxSize >= g.policy.BlockSizeMaxMLPAUT {
+				log.Debugf("Skipping tx %s because it would exceed "+
+					"the max block size %d", tx.Hash(), g.policy.BlockSizeMaxMLPAUT)
+				continue
+			}
+			// TODO(MLPAUT) add block full size check here
+			if blockPlusTxFullSize < blockFullSize || blockPlusTxFullSize >= g.policy.BlockFullSizeMaxMLPAUT {
+				log.Debugf("Skipping tx %s because it would exceed "+
+					"the max block full size %d", tx.Hash(), g.policy.BlockSizeMaxMLPAUT)
+				continue
+			}
+		} else { // nextBlockHeight < g.chainParams.BlockHeightMLPAUT
+			if blockPlusTxSize < blockSize || blockPlusTxSize >= g.policy.BlockMaxSize {
+				log.Debugf("Skipping tx %s because it would exceed "+
+					"the max block size %d", tx.Hash(), g.policy.BlockMaxSize)
+				continue
+			}
 		}
 
 		// Skip free transactions once the block is larger than the
 		// minimum block size.
-		if sortedByFee &&
-			prioItem.feePerKB < uint64(g.policy.TxMinFreeFee) &&
-			blockPlusTxSize >= g.policy.BlockMinSize {
-
-			log.Tracef("Skipping tx %s with feePerKB %d "+
-				"< TxMinFreeFee %d and block size %d >= "+
-				"minBlockSize %d", tx.Hash(), prioItem.feePerKB,
-				g.policy.TxMinFreeFee, blockPlusTxSize,
-				g.policy.BlockMinSize)
-			continue
+		if sortedByFee && prioItem.feePerKB < uint64(g.policy.TxMinFreeFee) {
+			if nextBlockHeight >= g.chainParams.BlockHeightMLPAUT {
+				if blockPlusTxSize >= g.policy.BlockSizeMinMLPAUT &&
+					blockPlusTxFullSize >= g.policy.BlockFullSizeMinMLPAUT {
+					log.Debugf("Skipping tx %s with feePerKB %d< TxMinFreeFee %d "+
+						"and block size %d >= minBlockSize %d "+
+						"and block full size %d >= minBlockFullSize %d",
+						tx.Hash(), prioItem.feePerKB, g.policy.TxMinFreeFee,
+						blockPlusTxSize, g.policy.BlockSizeMinMLPAUT,
+						blockPlusTxFullSize, g.policy.BlockFullSizeMinMLPAUT)
+					continue
+				}
+			} else { // nextBlockHeight < g.chainParams.BlockHeightMLPAUT
+				if blockPlusTxSize >= g.policy.BlockMinSize {
+					log.Debugf("Skipping tx %s with feePerKB %d "+
+						"< TxMinFreeFee %d and block size %d >= "+
+						"minBlockSize %d", tx.Hash(), prioItem.feePerKB,
+						g.policy.TxMinFreeFee, blockPlusTxSize,
+						g.policy.BlockMinSize)
+					continue
+				}
+			}
 		}
 
 		// Prioritize by fee per kilobyte once the block is larger than
@@ -746,7 +885,7 @@ mempoolLoop:
 		if !sortedByFee &&
 			(blockPlusTxSize >= g.policy.BlockPrioritySize || prioItem.priority <= MinHighPriority) {
 
-			log.Tracef("Switching to sort by fees per "+
+			log.Debugf("Switching to sort by fees per "+
 				"kilobyte blockSize %d >= BlockPrioritySize "+
 				"%d || priority %.2f <= minHighPriority %.2f",
 				blockPlusTxSize, g.policy.BlockPrioritySize,
@@ -772,7 +911,7 @@ mempoolLoop:
 		//	todo(ABE): check double spending
 		err := blockchain.CheckTransactionInputsAbe(tx, nextBlockHeight, blockUtxoRings, g.chainParams)
 		if err != nil {
-			log.Tracef("Skipping tx %s due to error in "+
+			log.Debugf("Skipping tx %s due to error in "+
 				"CheckTransactionInputs: %v", tx.Hash(), err)
 			continue
 		}
@@ -783,27 +922,48 @@ mempoolLoop:
 		*/
 		err = blockchain.ValidateTransactionScriptsAbe(tx, blockUtxoRings, g.witnessCache)
 		if err != nil {
-			log.Tracef("Skipping tx %s due to error in "+
+			log.Debugf("Skipping tx %s due to error in "+
 				"ValidateTransactionScripts: %v", tx.Hash(), err)
 			continue
+		}
+
+		autTx, err := tx.AUTTransaction()
+		if err != nil {
+			log.Debugf("Skipping tx %s due to error in "+
+				"AUTTransaction: %v", tx.Hash(), err)
+			continue
+		}
+		if autTx != nil {
+			err = blockchain.CheckTransactionInputsAUT(tx, nextBlockHeight, blockUtxoRings, blockAUTView, g.chainParams)
+			if err != nil {
+				log.Debugf("Skipping tx %s due to error in "+
+					"CheckTransactionInputsAUT: %v", tx.Hash(), err)
+				continue
+			}
 		}
 
 		// Spend the transaction inputs in the block utxoRing view and add
 		// an entry for it to ensure any transactions which reference
 		// this one have it available as an input and can ensure they
 		// aren't double spending.
-		spendTransactionAbe(blockUtxoRings, tx)
+		err = spendTransactionAbe(blockUtxoRings, blockAUTView, tx)
+		if err != nil {
+			log.Debugf("Skipping tx %s due to error in "+
+				"spendTransactionAbe: %v", tx.Hash(), err)
+			continue
+		}
 
 		// Add the transaction to the block, increment counters, and
 		// save the fees and signature operation counts to the block
 		// template.
 		blockTxns = append(blockTxns, tx)
 		blockSize += txSize
+		blockFullSize += txFullSize
 		totalFee += prioItem.fee
 		txFees = append(txFees, prioItem.fee)
 
-		log.Tracef("Adding tx %s (priority %.2f, feePerKB %.2f)",
-			prioItem.tx.Hash(), prioItem.priority, prioItem.feePerKB)
+		log.Debugf("Adding tx %s (priority %.2f, feePerKB %d, size %d, full size %d)",
+			prioItem.tx.Hash(), prioItem.priority, prioItem.feePerKB, txSize, txFullSize)
 	}
 
 	// Now that the actual transactions have been selected, update the
@@ -816,10 +976,12 @@ mempoolLoop:
 
 	coinbaseTxMsg.TxFee = subsidy + totalFee
 	// txFees[0] = -totalFee
-	txOutDescs := make([]*abecrypto.AbeTxOutputDesc, 1)
-	txOutDescs[0] = abecrypto.NewAbeTxOutDesc(payToAddress, coinbaseTxMsg.TxFee)
+	// For the default/reference implementation, here we set the coinbaseTx to have only one output Txo.
+	abeTxOutDescs := make([]*abecryptox.AbeTxOutputDesc, 1)
+	abeTxOutDescs[0] = abecryptox.NewAbeTxOutDesc(cryptoAddressPayTo, coinbaseTxMsg.TxFee)
 
-	coinbaseTxMsg, err = abecrypto.CoinbaseTxGen(txOutDescs, coinbaseTxMsg)
+	// ToDo(MLP):todo
+	coinbaseTxMsg, err = abecryptox.CoinbaseTxGen(abeTxOutDescs, coinbaseTxMsg)
 	if err != nil {
 		return nil, err
 	}
@@ -880,14 +1042,16 @@ mempoolLoop:
 		return nil, err
 	}
 
-	log.Debugf("Created new block template (%d transactions, %d in "+
-		"fees, %d size, target difficulty "+"%064x)", len(msgBlock.Transactions), totalFee, blockSize, blockchain.CompactToBig(msgBlock.Header.Bits))
+	log.Debugf("Created new block template (version %08x,%d transactions, %d in "+
+		"fees, %d size, %d full size, target difficulty "+"%064x)",
+		msgBlock.Header.Version, len(msgBlock.Transactions), totalFee,
+		blockSize, blockFullSize, blockchain.CompactToBig(msgBlock.Header.Bits))
 
 	return &BlockTemplate{
 		BlockAbe:        &msgBlock,
 		Fees:            txFees,
 		Height:          nextBlockHeight,
-		ValidPayAddress: payToAddress != nil,
+		ValidPayAddress: cryptoAddressPayTo != nil,
 		SiblingHashes:   siblingHashes, // todo: (EthashPow)
 	}, nil
 }
@@ -1002,6 +1166,7 @@ func (g *BlkTmplGenerator) UpdateExtraNonceAbe(msgBlock *wire.MsgBlockAbe, extra
 }
 
 // todo: (EthashPoW) Confirm and Optimization
+//
 //	UpdateExtraNonceAbeEthash() updates extraNonce in the coinbaseTx of blockTemplate,
 //	which is designed to be the first 8 bytes of coinbaseTx.PreviousOutPointRing.BlockHashs[1].
 //	As a result, the siblinghashes and merkleroot are also updated accordingly.

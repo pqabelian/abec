@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 // These variables are the chain proof-of-work limit parameters for each default
@@ -140,6 +140,13 @@ type Params struct {
 	// is reduced.
 	SubsidyReductionInterval int32
 
+	// SubsidyReductionInterval2 is the interval of blocks before the subsidy is reduced,
+	// for the new Token Release Schedule in AIP0012.
+	// Abelian applies AIP0012 from the start height of Era 2, say a new Token Release Schedule that
+	// provides longer eras with new tokens produced,
+	// while keeping the total supply unchanged, say same as that of the original Token Release Schedule.
+	SubsidyReductionInterval2 int32
+
 	// TargetTimespan is the desired amount of time that should elapse
 	// before the block difficulty requirement is examined to determine how
 	// it should be changed in order to maintain the desired block
@@ -149,6 +156,18 @@ type Params struct {
 	// TargetTimePerBlock is the desired amount of time to generate each
 	// block.
 	TargetTimePerBlock time.Duration
+
+	// TargetTimespanDSA is the desired amount of time that should elapse
+	// before the block difficulty requirement for DSA (Difficulty Smooth Adjustment) is examined to determine
+	// how it should be changed in order to maintain the desired block generation rate.
+	// Added by Alice, 2024.05.11, for DSA
+	// todo(DSA): review
+	TargetTimespanDSA time.Duration
+
+	// TargetTimePerBlockDSA is the desired amount of time to generate each block, in DSA.
+	// Added by Alice, 2024.05.11, for DSA
+	// todo(DSA): review
+	TargetTimePerBlockDSA time.Duration
 
 	// RetargetAdjustmentFactor is the adjustment factor used to limit
 	// the minimum and maximum amount of adjustment that can occur between
@@ -219,6 +238,24 @@ type Params struct {
 
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength int32
+
+	// BlockHeightDSA specifies the block height from which DSA is applied.
+	// Added by Alice, 2024.05.11, for DSA
+	// todo(DSA): review
+	BlockHeightDSA int32
+
+	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
+	// ToDo(MLP):
+	BlockHeightMLPAUT int32
+	// BlockHeightMLPAUTCOMMIT specifies the block height
+	// from which new transactions with version before TxVersion_Height_MLPAUT_300000 will not be accepted anymore.
+	BlockHeightMLPAUTCOMMIT int32
+
+	// BlockHeightEra2Start specifies the start height of Era 2.
+	// From BlockHeightEra2Start, Abelian applies AIP0012, say a new Token Release Schedule that
+	// provides longer eras with new tokens produced,
+	// while keeping the total supply unchanged, say same as that of the original Token Release Schedule.
+	BlockHeightEra2Start int32
 }
 
 // MainNetParams defines the network parameters for the main network.
@@ -248,8 +285,13 @@ var MainNetParams = Params{
 	//CoinbaseMaturity:         100,
 	CoinbaseMaturity:         200,
 	SubsidyReductionInterval: 400_000,
+
+	SubsidyReductionInterval2: 800_000,
+
 	TargetTimespan:           time.Second * 256 * 4000, // 14 days TODO(abe):this value may be need changed
 	TargetTimePerBlock:       time.Second * 256,        // 10 minutes TODO(abe): this value may be need changed, now temporary to be 3 min
+	TargetTimespanDSA:        time.Second * 256 * 200,  // For DSA, added by Alice. todo(DSA): review
+	TargetTimePerBlockDSA:    time.Second * 256,        // For DSA, added by Alice. todo(DSA): review
 	RetargetAdjustmentFactor: 4,                        // 25% less, 400% more
 	ReduceMinDifficulty:      false,                    // TODO(abe): this config may be used for adjust the difficult automatic?
 	MinDiffReductionTime:     0,
@@ -271,6 +313,13 @@ var MainNetParams = Params{
 		{196000, newHashFromStr("b504a4b4fb7e2141f493885d40e5742db7eab8359b6dfc9569dc5be58c020da4")},
 		{200000, newHashFromStr("48804fd65122a6a5df5edb02f4351b8fe58e992245c0675588af690b267a103a")},
 		{212000, newHashFromStr("4612a35933bc8161d781a4ce351295f9264b73ede03397b4da02ed9c8d03bdb4")},
+		{252000, newHashFromStr("5be4b068a2eceaed3d6e041659614a0c43b8b37308595616326f5e5ddcae24b7")},
+		{268000, newHashFromStr("2b350b79076f27985837d45e422598e640f8ebaa6243874c271703cdd6997407")},
+		{284000, newHashFromStr("9d9494bb20e81e1e153aef2468d6c58aab62ff6e9130832af80bcc1d0fa39a52")},
+		{288000, newHashFromStr("c8d4ab8cf05dc577cfc49224ee13e49b003b264b1eac0b8315da8c3dc6a6742b")},
+		{300000, newHashFromStr("4e6adcc8583a5cd0b541adcceba8ef2032b9debc211820b5d3e735e144336913")},
+		{340000, newHashFromStr("562da4e0adac79c98344ce28bf236a383f58712d4b4a68cffb78126e47caeb3c")},
+		{360000, newHashFromStr("00d39b5d84f43b088728b7b947ffe7d138ddbcb4a67fbc3f746cfeb3172d7a3b")},
 	},
 	// Consensus rule change deployments.
 	//
@@ -318,6 +367,21 @@ var MainNetParams = Params{
 
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength: 4000,
+
+	// Added by Alice, 2024.05.11, for DSA
+	// todo(DSA): review
+	BlockHeightDSA: 284000,
+
+	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
+	// ToDo(MLP):
+	BlockHeightMLPAUT:       300000,
+	BlockHeightMLPAUTCOMMIT: 340000,
+
+	// BlockHeightEra2Start specifies the start height of Era 2.
+	// From BlockHeightEra2Start, Abelian applies AIP0012.
+	// Based on the well-accepted rule that each era starts at height XY0000 rather than XY0001 (note that the genesis block has height 0),
+	// BlockHeightEra2Start must set to be SubsidyReductionInterval.
+	BlockHeightEra2Start: 400000,
 }
 
 // RegressionNetParams defines the network parameters for the regression test
@@ -337,9 +401,14 @@ var RegressionNetParams = Params{
 	PowLimitBits:             0x207fffff,
 	CoinbaseMaturity:         200,
 	SubsidyReductionInterval: 400_000,
+
+	SubsidyReductionInterval2: 800_000,
+
 	TargetTimespan:           time.Second * 256 * 4000,
 	TargetTimePerBlock:       time.Second * 256,
-	RetargetAdjustmentFactor: 4, // 25% less, 400% more
+	TargetTimespanDSA:        time.Second * 256 * 200, // For DSA, added by Alice. todo(DSA): review
+	TargetTimePerBlockDSA:    time.Second * 256,       // For DSA, added by Alice. todo(DSA): review
+	RetargetAdjustmentFactor: 4,                       // 25% less, 400% more
 	ReduceMinDifficulty:      true,
 	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
 	GenerateSupported:        true,
@@ -390,6 +459,21 @@ var RegressionNetParams = Params{
 	BlockHeightEthashPoW: 300,
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength: 200,
+
+	// Added by Alice, 2024.05.11, for DSA
+	// todo(DSA): review
+	BlockHeightDSA: 284000,
+
+	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
+	// ToDo(MLP):
+	BlockHeightMLPAUT:       300000,
+	BlockHeightMLPAUTCOMMIT: 340000,
+
+	// BlockHeightEra2Start specifies the start height of Era 2.
+	// From BlockHeightEra2Start, Abelian applies AIP0012.
+	// Based on the well-accepted rule that each era starts at height XY0000 rather than XY0001 (note that the genesis block has height 0),
+	// BlockHeightEra2Start must set to be SubsidyReductionInterval.
+	BlockHeightEra2Start: 400000,
 }
 
 // TestNet3Params defines the network parameters for the test network
@@ -400,7 +484,7 @@ var TestNet3Params = Params{
 	Net:  wire.TestNet3,
 	//DefaultPort: "18333",
 	DefaultPort: "18666",
-	DNSSeeds:    []DNSSeed{
+	DNSSeeds: []DNSSeed{
 		//{"testnet-seed.bitcoin.jonasschnelli.ch", true},
 		//{"testnet-seed.bitcoin.schildbach.de", false},
 		//{"seed.tbtc.petertodd.org", true},
@@ -414,8 +498,13 @@ var TestNet3Params = Params{
 	PowLimitBits:             0x207fffff,
 	CoinbaseMaturity:         200,
 	SubsidyReductionInterval: 400_000,
+
+	SubsidyReductionInterval2: 800_000,
+
 	TargetTimespan:           time.Second * 256 * 4000, // 14 days TODO(abe):this value may be need changed
 	TargetTimePerBlock:       time.Second * 256,        // 10 minutes TODO(abe): this value may be need changed, now temporary to be 3 min
+	TargetTimespanDSA:        time.Second * 256 * 200,  // For DSA, added by Alice. todo(DSA): review
+	TargetTimePerBlockDSA:    time.Second * 256,        // For DSA, added by Alice. todo(DSA): review
 	RetargetAdjustmentFactor: 4,                        // 25% less, 400% more
 	ReduceMinDifficulty:      true,                     // TODO(abe): this config may be used for adjust the difficult automatic?
 	MinDiffReductionTime:     time.Minute * 20,
@@ -469,6 +558,21 @@ var TestNet3Params = Params{
 	BlockHeightEthashPoW: 56000,
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength: 4000,
+
+	// Added by Alice, 2024.05.11, for DSA
+	// todo(DSA): review
+	BlockHeightDSA: 284000,
+
+	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
+	// ToDo(MLP):
+	BlockHeightMLPAUT:       300000,
+	BlockHeightMLPAUTCOMMIT: 340000,
+
+	// BlockHeightEra2Start specifies the start height of Era 2.
+	// From BlockHeightEra2Start, Abelian applies AIP0012.
+	// Based on the well-accepted rule that each era starts at height XY0000 rather than XY0001 (note that the genesis block has height 0),
+	// BlockHeightEra2Start must set to be SubsidyReductionInterval.
+	BlockHeightEra2Start: 400000,
 }
 
 // SimNetParams defines the network parameters for the simulation test
@@ -491,9 +595,14 @@ var SimNetParams = Params{
 	PowLimitBits:             0x207fffff,
 	CoinbaseMaturity:         200,
 	SubsidyReductionInterval: 400_000,
+
+	SubsidyReductionInterval2: 800_000,
+
 	TargetTimespan:           time.Second * 256 * 4000,
 	TargetTimePerBlock:       time.Second * 256,
-	RetargetAdjustmentFactor: 4, // 25% less, 400% more
+	TargetTimespanDSA:        time.Second * 256 * 200, // For DSA, added by Alice. todo(DSA): review
+	TargetTimePerBlockDSA:    time.Second * 256,       // For DSA, added by Alice. todo(DSA): review
+	RetargetAdjustmentFactor: 4,                       // 25% less, 400% more
 	ReduceMinDifficulty:      true,
 	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
 	GenerateSupported:        true,
@@ -544,6 +653,21 @@ var SimNetParams = Params{
 	BlockHeightEthashPoW: 300,
 	// EthashEpochLength specifies the epoch length of EthashPoW.
 	EthashEpochLength: 200,
+
+	// Added by Alice, 2024.05.11, for DSA
+	// todo(DSA): review
+	BlockHeightDSA: 284000,
+
+	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
+	// ToDo(MLP):
+	BlockHeightMLPAUT:       1000,
+	BlockHeightMLPAUTCOMMIT: 2000,
+
+	// BlockHeightEra2Start specifies the start height of Era 2.
+	// From BlockHeightEra2Start, Abelian applies AIP0012.
+	// Based on the well-accepted rule that each era starts at height XY0000 rather than XY0001 (note that the genesis block has height 0),
+	// BlockHeightEra2Start must set to be SubsidyReductionInterval.
+	BlockHeightEra2Start: 400000,
 }
 
 var (

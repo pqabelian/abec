@@ -6,25 +6,26 @@ package main
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/consensus/ethash"
-	"github.com/abesuite/abec/mining/externalminer"
-	"github.com/abesuite/abec/witnessmgr"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/consensus/ethash"
+	"github.com/pqabelian/abec/mining/externalminer"
+	"github.com/pqabelian/abec/witnessmgr"
 	"os"
 	"path/filepath"
 
-	"github.com/abesuite/abec/abelog"
-	"github.com/abesuite/abec/blockchain"
-	"github.com/abesuite/abec/blockchain/indexers"
-	"github.com/abesuite/abec/connmgr"
-	"github.com/abesuite/abec/database"
-	"github.com/abesuite/abec/mempool"
-	"github.com/abesuite/abec/mining"
-	"github.com/abesuite/abec/mining/cpuminer"
-	"github.com/abesuite/abec/netaddrmgr"
-	"github.com/abesuite/abec/peer"
-	"github.com/abesuite/abec/syncmgr"
-	"github.com/abesuite/abec/txscript"
 	"github.com/jrick/logrotate/rotator"
+	"github.com/pqabelian/abec/abelog"
+	"github.com/pqabelian/abec/blockchain"
+	"github.com/pqabelian/abec/blockchain/indexers"
+	"github.com/pqabelian/abec/connmgr"
+	"github.com/pqabelian/abec/database"
+	"github.com/pqabelian/abec/mempool"
+	"github.com/pqabelian/abec/mining"
+	"github.com/pqabelian/abec/mining/cpuminer"
+	"github.com/pqabelian/abec/netaddrmgr"
+	"github.com/pqabelian/abec/peer"
+	"github.com/pqabelian/abec/syncmgr"
+	"github.com/pqabelian/abec/txscript"
 )
 
 // logWriter implements an io.Writer that outputs to both standard output and
@@ -72,6 +73,7 @@ var (
 	txmpLog = backendLog.Logger("TXMP")
 	ethhLog = backendLog.Logger("ETHH")
 	wmgrLog = backendLog.Logger("WMGR")
+	utilLog = backendLog.Logger("UTIL")
 )
 
 // Initialize package-global logger variables.
@@ -90,6 +92,7 @@ func init() {
 	mempool.UseLogger(txmpLog)
 	ethash.UseLogger(ethhLog)
 	witnessmgr.UseLogger(wmgrLog)
+	abeutil.UseLogger(utilLog)
 }
 
 // subsystemLoggers maps each subsystem identifier to its associated logger.
@@ -111,6 +114,7 @@ var subsystemLoggers = map[string]abelog.Logger{
 	"TXMP": txmpLog,
 	"ETHH": ethhLog,
 	"WMGR": wmgrLog,
+	"UTIL": utilLog,
 }
 
 // initLogRotator initializes the logging rotater to write logs to logFile and

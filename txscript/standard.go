@@ -2,9 +2,9 @@ package txscript
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/wire"
 )
 
 const (
@@ -464,7 +464,7 @@ func PayToAddrScript(addr abeutil.Address) ([]byte, error) {
 	return nil, scriptError(ErrUnsupportedAddress, str)
 }
 
-//	todo(ABE): use the txoGen replace this function
+// todo(ABE): use the txoGen replace this function
 func PayToAddressScriptAbe(maddr abeutil.MasterAddress) ([]byte, error) {
 	// Create the script to pay to the provided payment address if one was
 	// specified.  Otherwise create a script that allows the coinbase to be
@@ -486,44 +486,6 @@ func PayToAddressScriptAbe(maddr abeutil.MasterAddress) ([]byte, error) {
 	}
 
 	return addressScript, nil
-}
-
-// TODO(abe): abstract the derivedaddress not the derivedAddressSalrs
-func ExtractAddressFromScriptAbe(script []byte) (res *abeutil.DerivedAddressSalrs, err error) {
-	// Create the script to pay to the provided payment address if one was
-	// specified.  Otherwise create a script that allows the coinbase to be
-	// redeemable by anyone.
-	if res == nil {
-		res = new(abeutil.DerivedAddressSalrs)
-	}
-	err = res.Deserialize(script[1:])
-	if err != nil {
-		return nil, err
-	}
-	return
-}
-
-//	todo(ABE): with this function, it may allow more ways to generate the AddressScript
-func BuildAddressScript(daddr abeutil.DerivedAddress) ([]byte, error) {
-	const nilAddrErrStr = "unable to generate payment AddressScript for nil address"
-
-	switch daddr := daddr.(type) {
-
-	case *abeutil.DerivedAddressSalrs:
-		if daddr == nil {
-			return nil, scriptError(ErrUnsupportedAddress, nilAddrErrStr)
-		}
-		//	todo(ABE): At different phase of the system, for example, by protocol version, we may form different AddressScript.
-		//	At this moment, we use (serialized) DerivedAddress
-		addressScript := make([]byte, 1+daddr.SerializeSize())
-		addressScript[0] = uint8(abeutil.AddressScriptDerivedAddress)
-		copy(addressScript[1:], daddr.Serialize())
-		return addressScript, nil
-	}
-
-	str := fmt.Sprintf("unable to generate payment AddressScript for unsupported "+
-		"address type %T", daddr)
-	return nil, scriptError(ErrUnsupportedAddress, str)
 }
 
 // NullDataScript creates a provably-prunable script containing OP_RETURN

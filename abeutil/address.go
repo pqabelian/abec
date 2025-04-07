@@ -6,12 +6,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abecrypto/abecryptoparam"
-	"github.com/abesuite/abec/abeutil/base58"
-	"github.com/abesuite/abec/abeutil/bech32"
-	"github.com/abesuite/abec/btcec"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/chainhash"
+	"github.com/pqabelian/abec/abecrypto/abecryptoparam"
+	"github.com/pqabelian/abec/abeutil/base58"
+	"github.com/pqabelian/abec/abeutil/bech32"
+	"github.com/pqabelian/abec/btcec"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/chainhash"
 	"golang.org/x/crypto/ripemd160"
 	"strconv"
 	"strings"
@@ -275,7 +275,7 @@ func DecodeMasterAddressAbe(addrstr string) (MasterAddress, error) {
 		return nil, errors.New("decoded address is of unknown format: bytesize <= 2 + chainhash.HashSize")
 	}
 
-	cryptoScheme, err := abecryptoparam.Deserialize(addrBytes[1:5])
+	cryptoScheme, err := abecryptoparam.DeserializeCryptoScheme(addrBytes[1:5])
 	if err != nil {
 		return nil, errors.New("decoded address is of unknown format: bytesize <= 2 + chainhash.HashSize")
 	}

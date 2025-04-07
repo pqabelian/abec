@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/abesuite/abec/chainhash"
+	"github.com/pqabelian/abec/chainhash"
 )
 
 type MsgPrunedBlock struct {
@@ -37,7 +37,8 @@ func (msg *MsgPrunedBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncodi
 		return err
 	}
 	// TODO: There are something problem becasuse the transaction version would be updated in the future
-	msg.CoinbaseTx = NewMsgTxAbe(TxVersion)
+	// Use TxVersion_Unknown temporary, this would be immediately set after Deserialize
+	msg.CoinbaseTx = NewMsgTxAbe(TxVersion_Unknown)
 	err = msg.CoinbaseTx.BtcDecode(r, pver, enc)
 	if err != nil {
 		return err
@@ -133,7 +134,8 @@ func (msg *MsgPrunedBlock) SerializeSize() int {
 	// todo: (EthashPow)
 	// n := blockHeaderLen + msg.CoinbaseTx.SerializeSizeFull() + VarIntSerializeSize(uint64(len(msg.TransactionHashes))) + len(msg.TransactionHashes)*32 + len(msg.WitnessHashs)*32
 	n := blockHeaderLen
-	if msg.Header.Version == int32(BlockVersionEthashPow) {
+	// todo(MLP):
+	if msg.Header.Version >= int32(BlockVersionEthashPow) {
 		n = blockHeaderLenEthash
 	}
 	n += msg.CoinbaseTx.SerializeSizeFull() + VarIntSerializeSize(uint64(len(msg.TransactionHashes))) + len(msg.TransactionHashes)*32 + len(msg.WitnessHashs)*32

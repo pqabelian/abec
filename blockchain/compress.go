@@ -1,8 +1,8 @@
 package blockchain
 
 import (
-	"github.com/abesuite/abec/btcec"
-	"github.com/abesuite/abec/txscript"
+	"github.com/pqabelian/abec/btcec"
+	"github.com/pqabelian/abec/txscript"
 )
 
 // -----------------------------------------------------------------------------
@@ -543,6 +543,9 @@ func compressedTxOutSize(amount uint64, pkScript []byte) int {
 	return serializeSizeVLQ(compressTxOutAmount(amount)) +
 		compressedScriptSize(pkScript)
 }
+func compressedAUTSize(amount uint64) int {
+	return serializeSizeVLQ(compressTxOutAmount(amount))
+}
 
 // putCompressedTxOut compresses the passed amount and script according to their
 // domain specific compression algorithms and encodes them directly into the
@@ -553,6 +556,10 @@ func putCompressedTxOut(target []byte, amount uint64, pkScript []byte) int {
 	offset := putVLQ(target, compressTxOutAmount(amount))
 	offset += putCompressedScript(target[offset:], pkScript)
 	return offset
+}
+
+func putCompressedAUT(target []byte, amount uint64) int {
+	return putVLQ(target, compressTxOutAmount(amount))
 }
 
 // decodeCompressedTxOut decodes the passed compressed txout, possibly followed
@@ -579,4 +586,18 @@ func decodeCompressedTxOut(serialized []byte) (uint64, []byte, int, error) {
 	amount := decompressTxOutAmount(compressedAmount)
 	script := decompressScript(serialized[bytesRead : bytesRead+scriptSize])
 	return amount, script, bytesRead + scriptSize, nil
+}
+
+func decodeCompressedAUT(serialized []byte) (uint64, int, error) {
+	// Deserialize the compressed amount and ensure there are bytes
+	// remaining for the compressed script.
+	compressedAmount, bytesRead := deserializeVLQ(serialized)
+	if bytesRead >= len(serialized) {
+		return 0, bytesRead, errDeserialize("unexpected end of " +
+			"data after compressed amount")
+	}
+
+	// Decompress and return the amount and script.
+	amount := decompressTxOutAmount(compressedAmount)
+	return amount, bytesRead, nil
 }

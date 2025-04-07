@@ -3,16 +3,18 @@ package mempool
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
-	"github.com/abesuite/abec/abejson"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/blockchain"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/mempool/rotator"
-	"github.com/abesuite/abec/mining"
-	"github.com/abesuite/abec/txscript"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abejson"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/aut"
+	"github.com/pqabelian/abec/blockchain"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/mempool/rotator"
+	"github.com/pqabelian/abec/mining"
+	"github.com/pqabelian/abec/txscript"
+	"github.com/pqabelian/abec/wire"
 	"math"
 	"os"
 	"sync"
@@ -72,6 +74,7 @@ type Config struct {
 	FetchUtxoView func(*abeutil.Tx) (*blockchain.UtxoViewpoint, error)
 
 	FetchUtxoRingView func(*abeutil.TxAbe) (*blockchain.UtxoRingViewpoint, error)
+	FetchAUTView      func(*abeutil.TxAbe) (*blockchain.AUTViewpoint, error)
 
 	// BestHeight defines the function to use to access the block height of
 	// the current best chain.
@@ -219,6 +222,9 @@ type TxPool struct {
 	orphansAbe       map[chainhash.Hash]*orphanTxAbe
 	outpointsAbe     map[chainhash.Hash]map[string]*abeutil.TxAbe                    //TODO(abe):why use two layers map                 //	corresponding to btc's outpoints, using hash rather then TxIn as the key for map
 	orphansByPrevAbe map[chainhash.Hash]map[string]map[chainhash.Hash]*abeutil.TxAbe // corresponding to btc's orphansByPrev //TODO type transfer??? []byte -> string
+
+	expiredHeightAUT  map[int32]map[chainhash.Hash]*TxDescAbe
+	registeredAUTName map[string]chainhash.Hash
 
 	txMonitorMu  sync.Mutex
 	txMonitoring bool
@@ -588,18 +594,10 @@ func (mp *TxPool) removeOrphanDoubleSpendsAbe(tx *abeutil.TxAbe) {
 	}
 }
 
-// isTransactionInPool returns whether or not the passed transaction already
-// exists in the main pool.
+// isTransactionInMemPool returns whether the passed transaction already
+// exists in the memory pool or not.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *TxPool) isTransactionInPoolBTCD(hash *chainhash.Hash) bool {
-	if _, exists := mp.pool[*hash]; exists {
-		return true
-	}
-
-	return false
-}
-
 func (mp *TxPool) isTransactionInMemPool(hash *chainhash.Hash) bool {
 	if _, exists := mp.poolAbe[*hash]; exists {
 		return true
@@ -608,6 +606,10 @@ func (mp *TxPool) isTransactionInMemPool(hash *chainhash.Hash) bool {
 	return false
 }
 
+// isTransactionInDiskPool returns whether the passed transaction already
+// exists in the disk pool or not.
+//
+// This function MUST be called with the mempool lock held (for reads).
 func (mp *TxPool) isTransactionInDiskPool(hash *chainhash.Hash) bool {
 	if _, exists := mp.diskPool[*hash]; exists {
 		return true
@@ -616,18 +618,18 @@ func (mp *TxPool) isTransactionInDiskPool(hash *chainhash.Hash) bool {
 	return false
 }
 
-// IsTransactionInPool returns whether or not the passed transaction already
+// isTransactionInPool returns whether or not the passed transaction already
 // exists in the main pool.
 //
 // This function is safe for concurrent access.
-func (mp *TxPool) IsTransactionInPool(hash *chainhash.Hash) bool {
+func (mp *TxPool) isTransactionInPool(hash *chainhash.Hash) bool {
 	// Protect concurrent access.
 	mp.mtx.RLock()
-	inPool := mp.isTransactionInMemPool(hash)
-	inCache := mp.isTransactionInDiskPool(hash)
+	inMem := mp.isTransactionInMemPool(hash)
+	inDisk := mp.isTransactionInDiskPool(hash)
 	mp.mtx.RUnlock()
 
-	return inPool || inCache
+	return inMem || inDisk
 }
 
 // isOrphanInPool returns whether or not the passed transaction already exists
@@ -714,6 +716,10 @@ func (mp *TxPool) removeTransactionBTCD(tx *abeutil.Tx, removeRedeemers bool) {
 }
 
 // todo(ABE):
+// removeTransactionAbe is the internal function which implements the public
+// RemoveTransaction.  See the comment for RemoveTransaction for more details.
+//
+// This function MUST be called with the mempool lock held (for writes).
 func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 	txHash := tx.Hash()
 	/*	if removeRedeemers {
@@ -748,6 +754,18 @@ func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 		}
 		os.Remove(name)
 		atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
+	}
+
+	autTx, err := tx.AUTTransaction()
+	if err != nil {
+		// This should not happen, since mempool should accept tx which has error on extracting AutTransaction.
+		log.Warnf("removeTransactionAbe: error happens when extracting AutTransaction from Tx %s: %v", tx.Hash(), err)
+		return
+	}
+	if autTx != nil {
+		if autTx.Type() == aut.Registration {
+			delete(mp.registeredAUTName, hex.EncodeToString(autTx.AUTIdentifier()))
+		}
 	}
 }
 
@@ -807,7 +825,9 @@ func (mp *TxPool) RemoveDoubleSpendsAbe(tx *abeutil.TxAbe) {
 // helper for maybeAcceptTransactionAbe.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, tx *abeutil.TxAbe, height int32, fee uint64, fromDiskCache bool) *TxDescAbe {
+func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint,
+	autView *blockchain.AUTViewpoint, tx *abeutil.TxAbe,
+	height int32, fee uint64, fromDiskCache bool) *TxDescAbe {
 	// Add the transaction to the pool and mark the referenced outpoints
 	// as spent by the pool.
 	txD := &TxDescAbe{
@@ -878,6 +898,29 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 		mp.cfg.AddrIndex.AddUnconfirmedTx(tx, utxoView)
 	}*/
 
+	autTx, err := tx.AUTTransaction()
+	if err != nil {
+		// This should not happen, since before addTransactionAbe, the transaction should have been checked
+		log.Warnf("addTransactionAbe: fail to add Tx %s to mempool, since error happens when extracting AutTransaction: %v", tx.Hash(), err)
+	}
+	if autTx != nil {
+		switch autTransaction := autTx.(type) {
+		case *aut.RegistrationTx:
+			if mp.expiredHeightAUT[autTransaction.ExpireHeight] == nil {
+				mp.expiredHeightAUT[autTransaction.ExpireHeight] = map[chainhash.Hash]*TxDescAbe{}
+			}
+			mp.expiredHeightAUT[autTransaction.ExpireHeight][*txD.Tx.Hash()] = txD
+			mp.registeredAUTName[hex.EncodeToString(autTransaction.AUTIdentifier())] = *tx.Hash()
+		case *aut.ReRegistrationTx:
+			if mp.expiredHeightAUT[autTransaction.ExpireHeight] == nil {
+				mp.expiredHeightAUT[autTransaction.ExpireHeight] = map[chainhash.Hash]*TxDescAbe{}
+			}
+			mp.expiredHeightAUT[autTransaction.ExpireHeight][*txD.Tx.Hash()] = txD
+		default:
+			// nothing to do
+		}
+	}
+
 	// Record this tx for fee estimation if enabled.
 	if mp.cfg.FeeEstimator != nil {
 		mp.cfg.FeeEstimator.ObserveTransaction(txD)
@@ -939,90 +982,6 @@ func (mp *TxPool) checkPoolDoubleSpendAbe(tx *abeutil.TxAbe) error {
 	}
 
 	return nil
-}
-func (mp *TxPool) txMonitor() {
-	if mp.txMonitoring {
-		return
-	}
-	mp.txMonitorMu.Lock()
-	if mp.txMonitoring {
-		mp.txMonitorMu.Unlock()
-		return
-	}
-	mp.txMonitoring = true
-	mp.txMonitorMu.Unlock()
-	log.Infof("start monitor transaction number in mempool")
-	defer func() {
-		mp.txMonitorMu.Lock()
-		mp.txMonitoring = false
-		mp.txMonitorMu.Unlock()
-		log.Infof("stop monitor transaction number in mempool")
-	}()
-	// considerate a block would about 256s, and trigger early a little
-	duration := 3 * time.Minute
-	timer := time.NewTicker(duration)
-	for {
-		select {
-		case <-timer.C:
-			log.Infof("transaction in mempool:%d, cached in disk:%d", len(mp.poolAbe), len(mp.diskPool))
-			if len(mp.poolAbe) >= MaxTransactionInMemoryNum {
-				continue
-			}
-			log.Infof("loading transactions from disk...")
-			filenames, err := mp.cfg.TxCacheRotator.RotatedRolled()
-			if err != nil {
-				log.Errorf("Unable to load cached transaction: %v", err)
-				return
-			}
-			if len(filenames) == 0 {
-				log.Infof("No cached transaction can be loaded.")
-				return
-			}
-
-			var f *os.File
-			for i := 0; i < len(filenames) && len(mp.poolAbe) < MaxTransactionInMemoryNum; i++ {
-				name := filenames[i]
-				log.Infof("loading some transactions from %s", name)
-				f, err = os.OpenFile(name, os.O_RDONLY, 0644)
-				if err != nil {
-					continue
-				}
-				size := make([]byte, 8)
-				for {
-					// [transaction_size] [transaction_content]
-					_, err = f.Read(size)
-					if err != nil {
-						break
-					}
-					contentSize := binary.LittleEndian.Uint64(size)
-					content := make([]byte, contentSize)
-					_, err = f.Read(content)
-					if err != nil {
-						break
-					}
-					buffer := bytes.NewBuffer(content)
-					msgTx := &wire.MsgTxAbe{}
-					err = msgTx.DeserializeFull(buffer)
-					if err != nil {
-						break
-					}
-					tx := abeutil.NewTxAbe(msgTx)
-					log.Infof("load transaction %s from file %s", msgTx.TxHash(), name)
-					_, err = mp.ProcessTransactionAbe(tx, false, false, 0, true)
-					if err != nil {
-						break
-					}
-				}
-				f.Close()
-				log.Infof("finish loading transactions from file %s, remove it...", name)
-				os.Remove(name)
-				f = nil
-			}
-
-			timer.Reset(duration)
-		default:
-		}
-	}
 }
 
 // signalsReplacement determines if a transaction is signaling that it can be
@@ -1373,6 +1332,16 @@ func (mp *TxPool) fetchInputUtxoRingsAbe(tx *abeutil.TxAbe) (*blockchain.UtxoRin
 	return utxoRingView, nil
 }
 
+// fetch relevant info withAUT transaction
+func (mp *TxPool) fetchInputAUT(tx *abeutil.TxAbe) (*blockchain.AUTViewpoint, error) {
+	autView, err := mp.cfg.FetchAUTView(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	return autView, nil
+}
+
 // FetchTransaction returns the requested transaction from the transaction pool.
 // This only fetches from the main transaction pool and does not include
 // orphans.
@@ -1639,7 +1608,10 @@ func (mp *TxPool) validateReplacement(tx *abeutil.Tx,
 //  8. Check transaction input standard (if do not accept non-standard tx)
 //  9. Ensure the fee is not too low (or have enough priority accept free fee tx, or rate limit)
 //  10. Check the witness of the transaction (ValidateTransactionScriptsAbe)
-//  11. Add transaction into mempool
+//  11. Check the AUT feature of the transaction if the memo meet the condition
+//  12. Add transaction into mempool
+//
+// todo_DONE(MLP): reviewed on 2024.01.09
 func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit, rejectDupOrphans bool, fromDiskCache bool) ([]*wire.OutPointRing, *TxDescAbe, error) {
 
 	txHash := tx.Hash()
@@ -1648,8 +1620,9 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	// applies to orphan transactions as well when the reject duplicate
 	// orphans flag is set.  This check is intended to be a quick check to
 	// weed out duplicates.
-	if mp.isTransactionInMemPool(txHash) || (rejectDupOrphans &&
-		mp.isOrphanInPoolAbe(txHash)) || (!fromDiskCache && mp.isTransactionInDiskPool(txHash)) {
+	if mp.isTransactionInMemPool(txHash) ||
+		(rejectDupOrphans && mp.isOrphanInPoolAbe(txHash)) ||
+		(!fromDiskCache && mp.isTransactionInDiskPool(txHash)) {
 
 		str := fmt.Sprintf("already have transaction %v", txHash)
 		return nil, nil, txRuleError(wire.RejectDuplicate, str)
@@ -1683,8 +1656,20 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	bestHeight := mp.cfg.BestHeight()
 	nextBlockHeight := bestHeight + 1
 
+	if nextBlockHeight >= mp.cfg.ChainParams.BlockHeightMLPAUTCOMMIT {
+		if mp.cfg.ChainParams.BlockHeightMLPAUTCOMMIT <= nextBlockHeight && nextBlockHeight < mp.cfg.ChainParams.BlockHeightMLPAUTCOMMIT+10 {
+			mp.clearOutdatedTransaction()
+		}
+		if tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_300000 {
+			str := fmt.Sprintf("since from block with height %d, transactions with version %d will not be mined any more", mp.cfg.ChainParams.BlockHeightMLPAUTCOMMIT, tx.MsgTx().Version)
+			return nil, nil, txRuleError(wire.RejectInvalid, str)
+		}
+	}
+
 	// Don't allow non-standard transactions if the network parameters
 	// forbid their acceptance.
+	// TODO(Abe 20240124) Now we should only support standard transaction
+	//     before defining the standard transaction clearly
 	if !mp.cfg.Policy.AcceptNonStd {
 		err = checkTransactionStandardAbe(tx, mp.cfg.Policy.MaxTxVersion)
 		if err != nil {
@@ -1715,7 +1700,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 		return nil, nil, err
 	}
 
-	// Fetch all of the utxoRings referenced by the inputs
+	// Fetch all the utxoRings referenced by the inputs
 	// to this transaction.  This function also attempts to fetch the
 	// transaction itself to be used for detecting a duplicate transaction
 	// without needing to do a separate lookup.
@@ -1804,6 +1789,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	// memory pool from blocks that have been disconnected during a reorg
 	// are exempted.
 	if isNew && !mp.cfg.Policy.DisableRelayPriority && txFee < minFee {
+		// priority = sum of all txo confirmation / serialize size
 		currentPriority := mining.CalcPriorityAbe(tx.MsgTx(), utxoRingView,
 			nextBlockHeight)
 		if currentPriority <= mining.MinHighPriority {
@@ -1853,10 +1839,47 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 		return nil, nil, err
 	}
 
-	txD := mp.addTransactionAbe(utxoRingView, tx, bestHeight, txFee, fromDiskCache)
+	autView, err := mp.fetchInputAUT(tx)
+	if err != nil {
+		if cerr, ok := err.(blockchain.RuleError); ok {
+			return nil, nil, chainRuleError(cerr)
+		}
+		return nil, nil, err
+	}
 
-	log.Debugf("Accepted transaction %v (pool size: %v)", txHash,
-		len(mp.poolAbe))
+	autTx, err := tx.AUTTransaction()
+	if err != nil {
+		str := fmt.Sprintf("transaction %v has invalid AUT info", txHash)
+		return nil, nil, txRuleError(wire.RejectAutBadForm, str)
+	}
+	if autTx != nil {
+		// check whether the mempool has the AUT transaction would register an AUT with the same name
+		if autTx.Type() == aut.Registration {
+			if registerAUTTxHash, exist := mp.registeredAUTName[hex.EncodeToString(autTx.AUTIdentifier())]; exist {
+				str := fmt.Sprintf("transaction %v has register the same name AUT earlier than transaction %v", registerAUTTxHash, txHash)
+				return nil, nil, txRuleError(wire.RejectInvalid, str)
+			}
+		}
+		// TODO AUT Check with blockchain, including:
+		// - check the issue tokens threshold
+		// - constraint output which can be used as an AUTCoin
+		// - whether the specified AUT exists
+		// - check existence of input
+		// - check balance for output and input
+		err = blockchain.CheckTransactionInputsAUT(tx, nextBlockHeight, utxoRingView, autView, mp.cfg.ChainParams)
+		if err != nil {
+			if cerr, ok := err.(blockchain.RuleError); ok {
+				return nil, nil, chainRuleError(cerr)
+			}
+			return nil, nil, err
+		}
+	}
+
+	txD := mp.addTransactionAbe(utxoRingView, autView, tx, bestHeight, txFee, fromDiskCache)
+
+	log.Debugf("Accepted transaction %v (version %08x, input %d, output %d, memo size %d bytes, serialized size %d bytes, full size %d bytes) "+
+		"(pool size: %v)", txHash, tx.MsgTx().Version, len(tx.MsgTx().TxIns), len(tx.MsgTx().TxOuts), len(tx.MsgTx().TxMemo),
+		tx.MsgTx().SerializeSize(), tx.MsgTx().SerializeSizeFull(), len(mp.poolAbe))
 
 	return nil, txD, nil
 }
@@ -1884,9 +1907,9 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 func (mp *TxPool) MaybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit bool) ([]*wire.OutPointRing, *TxDescAbe, error) {
 	// Protect concurrent access.
 	mp.mtx.Lock()
-	missingParents, txD, err := mp.maybeAcceptTransactionAbe(tx, isNew, rateLimit, true, false)
-	mp.mtx.Unlock()
+	defer mp.mtx.Unlock()
 
+	missingParents, txD, err := mp.maybeAcceptTransactionAbe(tx, isNew, rateLimit, true, false)
 	return missingParents, txD, err
 }
 
@@ -1935,6 +1958,7 @@ func (mp *TxPool) ProcessOrphansAbe(acceptedTx *abeutil.TxAbe) {
 // the passed one being accepted.
 //
 // This function is safe for concurrent access.
+// todo_DONE(MLP): reviewed on 2024.01.09
 func (mp *TxPool) ProcessTransactionAbe(tx *abeutil.TxAbe, allowOrphan, rateLimit bool, tag Tag, fromDiskCache bool) (*TxDescAbe, error) {
 	log.Tracef("Processing transaction %v", tx.Hash())
 
@@ -1943,6 +1967,7 @@ func (mp *TxPool) ProcessTransactionAbe(tx *abeutil.TxAbe, allowOrphan, rateLimi
 	defer mp.mtx.Unlock()
 
 	// Potentially accept the transaction to the memory pool.
+	// todo_DONE(MLP): reviewed on 2024.01.09
 	missingParents, txD, err := mp.maybeAcceptTransactionAbe(tx, true, rateLimit,
 		true, fromDiskCache)
 	if err != nil {
@@ -1955,9 +1980,9 @@ func (mp *TxPool) ProcessTransactionAbe(tx *abeutil.TxAbe, allowOrphan, rateLimi
 	//	only when a new block is accepted, some orphans may go into mempool.
 	if len(missingParents) == 0 {
 
-		//	As ABE does not allow transaction to depends on the transactions which are not included in block,
+		//	As ABE does not allow transaction to depend on the transactions which are not included in block,
 		//	the orphans may go into mempool only when new blocks are appended to chain.
-		//	Here only removed the orphans thta are conflict with the acceptedTx.
+		//	Here only removed the orphans that are conflict with the acceptedTx.
 		mp.removeOrphanDoubleSpendsAbe(tx)
 
 		acceptedTx := txD
@@ -2160,6 +2185,31 @@ func (mp *TxPool) RemoveTransactionAbeByRingHash(hash chainhash.Hash) {
 	mp.mtx.Unlock()
 }
 
+func (mp *TxPool) RemoveExpiredAUTTransaction(height int32) {
+	mp.mtx.Lock()
+	removeTransactions := mp.expiredHeightAUT[height]
+	for _, txAbe := range removeTransactions {
+		mp.removeTransactionAbe(txAbe.Tx)
+	}
+	mp.mtx.Unlock()
+}
+
+func (mp *TxPool) ClearOutdatedTransaction() {
+	log.Debugf("Clean outdated transaction in mempool")
+	mp.mtx.Lock()
+	defer mp.mtx.Unlock()
+	mp.clearOutdatedTransaction()
+}
+
+func (mp *TxPool) clearOutdatedTransaction() {
+	for _, txDesc := range mp.poolAbe {
+		if txDesc.Tx.MsgTx().Version == wire.TxVersion_Height_0 {
+			mp.removeTransactionAbe(txDesc.Tx)
+			log.Infof("transaction %s has been removed from transaction pool", txDesc.Tx.Hash())
+		}
+	}
+}
+
 // New returns a new memory pool for validating and storing standalone
 // transactions until they are mined into a block.
 func New(cfg *Config) *TxPool {
@@ -2176,5 +2226,8 @@ func New(cfg *Config) *TxPool {
 		orphansAbe:       make(map[chainhash.Hash]*orphanTxAbe),
 		outpointsAbe:     make(map[chainhash.Hash]map[string]*abeutil.TxAbe),
 		orphansByPrevAbe: make(map[chainhash.Hash]map[string]map[chainhash.Hash]*abeutil.TxAbe),
+
+		expiredHeightAUT:  make(map[int32]map[chainhash.Hash]*TxDescAbe),
+		registeredAUTName: make(map[string]chainhash.Hash),
 	}
 }

@@ -3,7 +3,7 @@ package wire
 import (
 	"bytes"
 	"fmt"
-	"github.com/abesuite/abec/chainhash"
+	"github.com/pqabelian/abec/chainhash"
 	"io"
 	"unicode/utf8"
 )
@@ -19,7 +19,10 @@ const CommandSize = 12
 
 // MaxMessagePayload is the maximum bytes a message can be regardless of other
 // individual limits imposed by messages themselves.
-const MaxMessagePayload = (1024 * 1024 * 256) // 256MB
+//
+// changed at fork for MLPAUT,use 256MB as max block message payload
+// and corresponding, the max message size is adjusted to 320MB for redundancy
+const MaxMessagePayload = 320 * 1024 * 1024 // 256MB
 
 // Commands used in bitcoin message headers which describe the type of message.
 const (

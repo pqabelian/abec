@@ -3,8 +3,8 @@ package externalminer
 import (
 	"encoding/binary"
 	"encoding/hex"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/mining"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/mining"
 	"math/big"
 	"strings"
 	"time"

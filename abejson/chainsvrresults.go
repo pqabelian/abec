@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/wire"
 )
 
 // GetBlockHeaderVerboseResult models the data from the getblockheader command when
@@ -765,6 +765,7 @@ type InfoChainResult struct {
 	Errors               string  `json:"errors"`
 	NodeType             string  `json:"nodetype"`
 	WitnessServiceHeight int32   `json:"witnessserviceheight"`
+	NetID                byte    `json:"netid"`
 }
 
 // TxRawResult models the data from the getrawtransaction command.
@@ -795,6 +796,7 @@ type TxRawResultAbe struct {
 	Version       uint32     `json:"version"`
 	Vin           []TxIn     `json:"vin"`
 	Vout          []TxOutAbe `json:"vout"`
+	Memo          string     `json:"memo"`
 	Fee           float64    `json:"fee"`
 	Witness       string     `json:"witness"`
 	BlockHash     string     `json:"blockhash,omitempty"`

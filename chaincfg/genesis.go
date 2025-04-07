@@ -3,14 +3,14 @@ package chaincfg
 import (
 	"time"
 
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 // genesisCoinbaseTx is the coinbase transaction for the genesis blocks for
 // the main network, regression test network, and test network (version 3).
 var genesisCoinbaseTx = wire.MsgTxAbe{
-	Version: wire.TxVersion,
+	Version: wire.TxVersion_Height_0,
 	TxIns: []*wire.TxInAbe{
 		{
 			SerialNumber: []byte{
@@ -24,7 +24,7 @@ var genesisCoinbaseTx = wire.MsgTxAbe{
 				0, 0, 0, 0, 0, 0, 0, 0,
 			},
 			PreviousOutPointRing: wire.OutPointRing{
-				Version: wire.TxVersion,
+				Version: wire.TxVersion_Height_0,
 				BlockHashs: []*chainhash.Hash{
 					&chainhash.ZeroHash,
 					&chainhash.ZeroHash,
@@ -41,7 +41,7 @@ var genesisCoinbaseTx = wire.MsgTxAbe{
 	},
 	TxOuts: []*wire.TxOutAbe{ //len(TxOuts) >=1
 		{
-			Version: wire.TxVersion,
+			Version: wire.TxVersion_Height_0,
 			TxoScript: []byte{
 				0xB2, 0xA3, 0x77, 0xCD, 0x68, 0x7D, 0x7D, 0x17, 0x87, 0xBB, 0xE2, 0x0D, 0x02, 0x78, 0x74, 0xB9,
 				0xC8, 0x1D, 0xB0, 0xDF, 0x12, 0x7C, 0x45, 0x8B, 0x10, 0x14, 0x85, 0xBF, 0x2F, 0x32, 0xC2, 0x91,

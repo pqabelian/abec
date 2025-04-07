@@ -1,7 +1,7 @@
 package netaddrmgr
 
 import (
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/wire"
 	"time"
 )
 

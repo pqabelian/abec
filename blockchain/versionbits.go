@@ -1,8 +1,8 @@
 package blockchain
 
 import (
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/wire"
 	"math"
 )
 
@@ -27,11 +27,18 @@ const (
 	BlockVersionInitial = 0x10000000
 	//	wire.BlockVersionEthashPow = 0x20000000
 
+	// todo(DSA): review
+	//	wire.BlockVersionDSA = 0x21000000
+
+	// ToDo(MLP):
+	//	wire.BlockVersionMLPAUT = 0x30000000
+
 	//	todo: 202207 revise the version mechanism
 	//	In the future,
 	// vbTopBits defines the bits to set in the version to signal that the
 	// version bits scheme is being used.
 	vbTopBits = 0x10000000 //	 todo: modify according to the AIP mechanism.
+	// ToDo(MLP): whether we need to modify those related to this part.
 
 	// vbTopMask is the bitmask to use to determine whether or not the
 	// version bits scheme is in use.
@@ -216,10 +223,29 @@ func (b *BlockChain) calcNextBlockVersion(prevNode *blockNode) (int32, error) {
 	// Set the appropriate bits for each actively defined rule deployment
 	// that is either in the process of being voted on, or locked in for the
 	// activation at the next threshold window change.
-	if prevNode != nil && prevNode.height+1 >= b.chainParams.BlockHeightEthashPoW {
-		//	todo: this rule should be public known.
-		//	shall we directly defined wire.BlockVersionEthashPow as int32? to avoid type-transfer.
-		return int32(wire.BlockVersionEthashPow), nil
+
+	// ToDo(MLP):
+
+	//if prevNode != nil && prevNode.height+1 >= b.chainParams.BlockHeightEthashPoW {
+	//	//	todo: this rule should be public known.
+	//	//	shall we directly defined wire.BlockVersionEthashPow as int32? to avoid type-transfer.
+	//	return int32(wire.BlockVersionEthashPow), nil
+	//}
+
+	if prevNode != nil {
+		if prevNode.height+1 >= b.chainParams.BlockHeightMLPAUT {
+			return int32(wire.BlockVersionMLPAUT), nil
+		}
+
+		// Added by Alice, 2024.05.11, for DSA
+		// todo(DSA): review
+		if prevNode.height+1 >= b.chainParams.BlockHeightDSA {
+			return int32(wire.BlockVersionDSA), nil
+		}
+
+		if prevNode.height+1 >= b.chainParams.BlockHeightEthashPoW {
+			return int32(wire.BlockVersionEthashPow), nil
+		}
 	}
 
 	return int32(BlockVersionInitial), nil
@@ -248,8 +274,9 @@ func (b *BlockChain) calcNextBlockVersion(prevNode *blockNode) (int32, error) {
 // This function is safe for concurrent access.
 func (b *BlockChain) CalcNextBlockVersion() (int32, error) {
 	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+
 	version, err := b.calcNextBlockVersion(b.bestChain.Tip())
-	b.chainLock.Unlock()
 	return version, err
 }
 

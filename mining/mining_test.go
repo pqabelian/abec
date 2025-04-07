@@ -4,18 +4,22 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/abesuite/abec/abecrypto"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/blockchain"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abecrypto"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/blockchain"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 	"testing"
 	"time"
 )
 
 func TestBlkTmplGenerator_UpdateExtraNonceAbe(t *testing.T) {
+	payToAddress, err := hex.DecodeString(payToAddressStr)
+	if err != nil {
+		fmt.Println(err)
+	}
 
-	cbTx, _ := createCoinbaseTxAbeMsgTemplate(49999, 1)
+	cbTx, _ := createCoinbaseTxAbeMsgTemplate(49999, 1, payToAddress)
 
 	binary.BigEndian.PutUint64(cbTx.TxIns[0].PreviousOutPointRing.BlockHashs[1][0:8], 15)
 
@@ -34,7 +38,7 @@ func TestBlkTmplGenerator_NewBlockTemplate_UpdateExtraNonceAbe(t *testing.T) {
 		fmt.Println(err)
 	}
 
-	coinbaseTxMsg, err := createCoinbaseTxAbeMsgTemplate(nextBlockHeight, 1)
+	coinbaseTxMsg, err := createCoinbaseTxAbeMsgTemplate(nextBlockHeight, 1, payToAddress)
 	if err != nil {
 		fmt.Println(err)
 	}

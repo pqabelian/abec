@@ -10,8 +10,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/consensus/ethash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/consensus/ethash"
+	"github.com/pqabelian/abec/wire"
 	"io"
 	"net"
 	"os"
@@ -22,17 +22,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/blockchain"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/connmgr"
-	"github.com/abesuite/abec/database"
-	_ "github.com/abesuite/abec/database/ffldb"
-	"github.com/abesuite/abec/mempool"
-	"github.com/abesuite/abec/peer"
 	"github.com/abesuite/go-socks/socks"
 	flags "github.com/jessevdk/go-flags"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/blockchain"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/connmgr"
+	"github.com/pqabelian/abec/database"
+	_ "github.com/pqabelian/abec/database/ffldb"
+	"github.com/pqabelian/abec/mempool"
+	"github.com/pqabelian/abec/peer"
 )
 
 const (
@@ -60,6 +60,20 @@ const (
 	blockMaxSizeMax             = blockchain.MaxBlockBaseSize - 1000
 	blockMaxWeightMin           = 4000
 	blockMaxWeightMax           = blockchain.MaxBlockWeight - 4000
+
+	// defaultBlockSizeMinMLPAUT / defaultBlockSizeMaxMLPAUT is used as default configuration
+	//  if the network is not congested, gradually increase this to 8M
+	defaultBlockSizeMinMLPAUT = 0
+	defaultBlockSizeMaxMLPAUT = 1 * 1024 * 1024 // 1M
+	// defaultBlockFullSizeMinMLPAUT / defaultBlockFullSizeMaxMLPAUT is used as default configuration
+	//  if the network is not congested, gradually increase it to MaxBlockPayloadAbe
+	defaultBlockFullSizeMinMLPAUT = 0
+	defaultBlockFullSizeMaxMLPAUT = 64 * 1024 * 1024 // 64M
+	blockSizeMaxMLPAUTMin         = 1000
+	blockSizeMaxMLPAUTMax         = blockchain.MaxBlockBaseSizeMLPAUT - 1000
+	blockFullSizeMaxMLPAUTMin     = 1000
+	blockFullSizeMaxMLPAUTMax     = blockchain.MaxBlockFullSizeMLPAUT - 1000
+
 	// todo(abe):
 	defaultGenerate         = false
 	defaultExternalGenerate = false
@@ -107,26 +121,30 @@ func minUint32(a, b uint32) uint32 {
 //
 // See loadConfig for details on the configuration load process.
 type config struct {
-	AddCheckpoints    []string      `long:"addcheckpoint" description:"Add a custom checkpoint.  Format: '<height>:<hash>'"`
-	AddPeers          []string      `short:"a" long:"addpeer" description:"Add a peer to connect with at startup"`
-	AgentBlacklist    []string      `long:"agentblacklist" description:"A comma separated list of user-agent substrings which will cause abec to reject any peers whose user-agent contains any of the blacklisted substrings."`
-	AgentWhitelist    []string      `long:"agentwhitelist" description:"A comma separated list of user-agent substrings which will cause abec to require all peers' user-agents to contain one of the whitelisted substrings. The blacklist is applied before the blacklist, and an empty whitelist will allow all agents that do not fail the blacklist."`
-	BanDuration       time.Duration `long:"banduration" description:"How long to ban misbehaving peers.  Valid time units are {s, m, h}.  Minimum 1 second"`
-	BanThreshold      uint32        `long:"banthreshold" description:"Maximum allowed ban score before disconnecting and banning misbehaving peers."`
-	BlockMaxSize      uint32        `long:"blockmaxsize" description:"Maximum block size in bytes to be used when creating a block"`
-	BlockMinSize      uint32        `long:"blockminsize" description:"Mininum block size in bytes to be used when creating a block"`
-	BlockMaxWeight    uint32        `long:"blockmaxweight" description:"Maximum block weight to be used when creating a block"`
-	BlockMinWeight    uint32        `long:"blockminweight" description:"Mininum block weight to be used when creating a block"`
-	BlockPrioritySize uint32        `long:"blockprioritysize" description:"Size in bytes for high-priority/low-fee transactions when creating a block"`
-	BlocksOnly        bool          `long:"blocksonly" description:"Do not accept transactions from remote peers."`
-	ConfigFile        string        `short:"C" long:"configfile" description:"Path to configuration file"`
-	ConnectPeers      []string      `long:"connect" description:"Connect only to the specified peers at startup"`
-	CPUProfile        string        `long:"cpuprofile" description:"Write CPU profile to the specified file"`
-	DataDir           string        `short:"b" long:"datadir" description:"Directory to store data"`
-	DbType            string        `long:"dbtype" description:"Database backend to use for the Block Chain"`
-	DebugLevel        string        `short:"d" long:"debuglevel" description:"Logging level for all subsystems {trace, debug, info, warn, error, critical} -- You may also specify <subsystem>=<level>,<subsystem2>=<level>,... to set the log level for individual subsystems -- Use show to list available subsystems"`
-	DropTxIndex       bool          `long:"droptxindex" description:"Deletes the hash-based transaction index from the database on start up and then exits."`
-	ExternalIPs       []string      `long:"externalip" description:"Add an ip to the list of local addresses we claim to listen on to peers"`
+	AddCheckpoints         []string      `long:"addcheckpoint" description:"Add a custom checkpoint.  Format: '<height>:<hash>'"`
+	AddPeers               []string      `short:"a" long:"addpeer" description:"Add a peer to connect with at startup"`
+	AgentBlacklist         []string      `long:"agentblacklist" description:"A comma separated list of user-agent substrings which will cause abec to reject any peers whose user-agent contains any of the blacklisted substrings."`
+	AgentWhitelist         []string      `long:"agentwhitelist" description:"A comma separated list of user-agent substrings which will cause abec to require all peers' user-agents to contain one of the whitelisted substrings. The blacklist is applied before the blacklist, and an empty whitelist will allow all agents that do not fail the blacklist."`
+	BanDuration            time.Duration `long:"banduration" description:"How long to ban misbehaving peers.  Valid time units are {s, m, h}.  Minimum 1 second"`
+	BanThreshold           uint32        `long:"banthreshold" description:"Maximum allowed ban score before disconnecting and banning misbehaving peers."`
+	BlockMaxSize           uint32        `long:"blockmaxsize" description:"Maximum block size in bytes to be used when creating a block"`
+	BlockMinSize           uint32        `long:"blockminsize" description:"Mininum block size in bytes to be used when creating a block"`
+	BlockSizeMaxMLPAUT     uint32        `long:"blocksizemaxmlpaut" description:"Maximum block size in bytes to be used when creating a block after mlpaut"`
+	BlockSizeMinMLPAUT     uint32        `long:"blocksizeminmlpaut" description:"Mininum block size in bytes to be used when creating a block after mlpaut"`
+	BlockFullSizeMaxMLPAUT uint32        `long:"blockfullsizemaxmlpaut" description:"Maximum block full size in bytes to be used when creating a block"`
+	BlockFullSizeMinMLPAUT uint32        `long:"blockfullsizeminmlpaut" description:"Mininum block full size in bytes to be used when creating a block"`
+	BlockMaxWeight         uint32        `long:"blockmaxweight" description:"Maximum block weight to be used when creating a block"`
+	BlockMinWeight         uint32        `long:"blockminweight" description:"Mininum block weight to be used when creating a block"`
+	BlockPrioritySize      uint32        `long:"blockprioritysize" description:"Size in bytes for high-priority/low-fee transactions when creating a block"`
+	BlocksOnly             bool          `long:"blocksonly" description:"Do not accept transactions from remote peers."`
+	ConfigFile             string        `short:"C" long:"configfile" description:"Path to configuration file"`
+	ConnectPeers           []string      `long:"connect" description:"Connect only to the specified peers at startup"`
+	CPUProfile             string        `long:"cpuprofile" description:"Write CPU profile to the specified file"`
+	DataDir                string        `short:"b" long:"datadir" description:"Directory to store data"`
+	DbType                 string        `long:"dbtype" description:"Database backend to use for the Block Chain"`
+	DebugLevel             string        `short:"d" long:"debuglevel" description:"Logging level for all subsystems {trace, debug, info, warn, error, critical} -- You may also specify <subsystem>=<level>,<subsystem2>=<level>,... to set the log level for individual subsystems -- Use show to list available subsystems"`
+	DropTxIndex            bool          `long:"droptxindex" description:"Deletes the hash-based transaction index from the database on start up and then exits."`
+	ExternalIPs            []string      `long:"externalip" description:"Add an ip to the list of local addresses we claim to listen on to peers"`
 	//	todo: (EthashPoW)
 	EthashConfig           ethash.Config
 	EthashVerifyByFullDAG  bool          `long:"ethashverifybyfulldag" description:"For a mining node, use full DAG to verify EthashPow"`
@@ -489,39 +507,43 @@ func newConfigParser(cfg *config, so *serviceOptions, options flags.Options) *fl
 func loadConfig() (*config, []string, error) {
 	// Default config.
 	cfg := config{
-		ConfigFile:           defaultConfigFile,
-		DebugLevel:           defaultLogLevel,
-		MaxPeers:             defaultMaxPeers,
-		BanDuration:          defaultBanDuration,
-		BanThreshold:         defaultBanThreshold,
-		RPCMaxClients:        defaultMaxRPCClients,
-		RPCMaxWebsockets:     defaultMaxRPCWebsockets,
-		RPCMaxConcurrentReqs: defaultMaxRPCConcurrentReqs,
-		DataDir:              defaultDataDir,
-		LogDir:               defaultLogDir,
-		DbType:               defaultDbType,
-		RPCKey:               defaultRPCKeyFile,
-		RPCCert:              defaultRPCCertFile,
-		MinRelayTxFee:        mempool.DefaultMinRelayTxFee,
-		FreeTxRelayLimit:     defaultFreeTxRelayLimit,
-		TrickleInterval:      defaultTrickleInterval,
-		BlockMinSize:         defaultBlockMinSize,
-		BlockMaxSize:         defaultBlockMaxSize,
-		BlockMinWeight:       defaultBlockMinWeight,
-		BlockMaxWeight:       defaultBlockMaxWeight,
-		BlockPrioritySize:    mempool.DefaultBlockPrioritySize,
-		MaxOrphanTxs:         defaultMaxOrphanTransactions,
-		SigCacheMaxSize:      defaultSigCacheMaxSize,
-		WitnessCacheMaxSize:  defaultWitnessCacheMaxSize,
-		Generate:             defaultGenerate,
-		ExternalGenerate:     defaultExternalGenerate,
-		HashRateWatermark:    defaultHashRateWatermark,
-		EthashConfig:         ethash.DefaultCfg,
-		TxIndex:              defaultTxIndex,
-		NodeType:             defaultNodeType,
-		maxReservedWitness:   defaultMaxReservedWitness,
-		AllowDiskCacheTx:     defaultAllowDiskCacheTx,
-		CacheTxDir:           defaultCacheTxDir,
+		ConfigFile:             defaultConfigFile,
+		DebugLevel:             defaultLogLevel,
+		MaxPeers:               defaultMaxPeers,
+		BanDuration:            defaultBanDuration,
+		BanThreshold:           defaultBanThreshold,
+		RPCMaxClients:          defaultMaxRPCClients,
+		RPCMaxWebsockets:       defaultMaxRPCWebsockets,
+		RPCMaxConcurrentReqs:   defaultMaxRPCConcurrentReqs,
+		DataDir:                defaultDataDir,
+		LogDir:                 defaultLogDir,
+		DbType:                 defaultDbType,
+		RPCKey:                 defaultRPCKeyFile,
+		RPCCert:                defaultRPCCertFile,
+		MinRelayTxFee:          mempool.DefaultMinRelayTxFee,
+		FreeTxRelayLimit:       defaultFreeTxRelayLimit,
+		TrickleInterval:        defaultTrickleInterval,
+		BlockMinSize:           defaultBlockMinSize,
+		BlockMaxSize:           defaultBlockMaxSize,
+		BlockSizeMinMLPAUT:     defaultBlockSizeMinMLPAUT,
+		BlockSizeMaxMLPAUT:     defaultBlockSizeMaxMLPAUT,
+		BlockFullSizeMinMLPAUT: defaultBlockFullSizeMinMLPAUT,
+		BlockFullSizeMaxMLPAUT: defaultBlockFullSizeMaxMLPAUT,
+		BlockMinWeight:         defaultBlockMinWeight,
+		BlockMaxWeight:         defaultBlockMaxWeight,
+		BlockPrioritySize:      mempool.DefaultBlockPrioritySize,
+		MaxOrphanTxs:           defaultMaxOrphanTransactions,
+		SigCacheMaxSize:        defaultSigCacheMaxSize,
+		WitnessCacheMaxSize:    defaultWitnessCacheMaxSize,
+		Generate:               defaultGenerate,
+		ExternalGenerate:       defaultExternalGenerate,
+		HashRateWatermark:      defaultHashRateWatermark,
+		EthashConfig:           ethash.DefaultCfg,
+		TxIndex:                defaultTxIndex,
+		NodeType:               defaultNodeType,
+		maxReservedWitness:     defaultMaxReservedWitness,
+		AllowDiskCacheTx:       defaultAllowDiskCacheTx,
+		CacheTxDir:             defaultCacheTxDir,
 	}
 	// Service options which are only added on Windows.
 	// TODO(osy): this set is ingoned, we should detect it!
@@ -916,6 +938,31 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
+	// Limit the max block full size to a sane value.
+	if cfg.BlockSizeMaxMLPAUT < blockSizeMaxMLPAUTMin || cfg.BlockSizeMaxMLPAUT >
+		blockSizeMaxMLPAUTMax {
+
+		str := "%s: The blocksizemaxmlpaut option must be in between %d " +
+			"and %d -- parsed [%d]"
+		err := fmt.Errorf(str, funcName, blockSizeMaxMLPAUTMin,
+			blockSizeMaxMLPAUTMax, cfg.BlockFullSizeMaxMLPAUT)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
+	// Limit the max block full size to a sane value.
+	if cfg.BlockFullSizeMaxMLPAUT < blockFullSizeMaxMLPAUTMin || cfg.BlockFullSizeMaxMLPAUT >
+		blockFullSizeMaxMLPAUTMax {
+
+		str := "%s: The blockfullsizemaxmlpaut option must be in between %d " +
+			"and %d -- parsed [%d]"
+		err := fmt.Errorf(str, funcName, blockFullSizeMaxMLPAUTMin,
+			blockFullSizeMaxMLPAUTMax, cfg.BlockFullSizeMaxMLPAUT)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
+
 	// Limit the max block weight to a sane value.
 	if cfg.BlockMaxWeight < blockMaxWeightMin ||
 		cfg.BlockMaxWeight > blockMaxWeightMax {
@@ -943,6 +990,9 @@ func loadConfig() (*config, []string, error) {
 	cfg.BlockPrioritySize = minUint32(cfg.BlockPrioritySize, cfg.BlockMaxSize)
 	cfg.BlockMinSize = minUint32(cfg.BlockMinSize, cfg.BlockMaxSize)
 	cfg.BlockMinWeight = minUint32(cfg.BlockMinWeight, cfg.BlockMaxWeight)
+
+	cfg.BlockSizeMinMLPAUT = minUint32(cfg.BlockSizeMinMLPAUT, cfg.BlockSizeMaxMLPAUT)
+	cfg.BlockFullSizeMinMLPAUT = minUint32(cfg.BlockFullSizeMinMLPAUT, cfg.BlockFullSizeMaxMLPAUT)
 
 	switch {
 	// If the max block size isn't set, but the max weight is, then we'll

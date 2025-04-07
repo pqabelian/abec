@@ -6,7 +6,7 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/abesuite/abec/chainhash"
+	"github.com/pqabelian/abec/chainhash"
 )
 
 const (

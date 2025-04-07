@@ -1,9 +1,9 @@
 package mining
 
 import (
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/blockchain"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/blockchain"
+	"github.com/pqabelian/abec/wire"
 )
 
 const (
@@ -26,13 +26,29 @@ type Policy struct {
 	// generating a block template.
 	BlockMaxWeight uint32
 
-	// BlockMinWeight is the minimum block size to be used when generating
+	// BlockMinSize is the minimum block size to be used when generating
 	// a block template.
 	BlockMinSize uint32
 
 	// BlockMaxSize is the maximum block size to be used when generating a
 	// block template.
 	BlockMaxSize uint32
+
+	// BlockMinSize is the minimum block size to be used when generating
+	// a block template.
+	BlockSizeMinMLPAUT uint32
+
+	// BlockMaxSize is the maximum block size to be used when generating a
+	// block template.
+	BlockSizeMaxMLPAUT uint32
+
+	// BlockMinFullSize is the minimum block full size to be used when generating
+	// a block template.
+	BlockFullSizeMinMLPAUT uint32
+
+	// BlockMaxFullSize is the maximum block full size to be used when generating a
+	// block template.
+	BlockFullSizeMaxMLPAUT uint32
 
 	// BlockPrioritySize is the size in bytes for high-priority / low-fee
 	// transactions to be used when generating a block template.
@@ -160,6 +176,7 @@ func CalcPriority(tx *wire.MsgTx, utxoView *blockchain.UtxoViewpoint, nextBlockH
 // CalcPriorityAbe returns a transaction priority given a transaction and the sum
 // of each of its input values multiplied by their age (# of confirmations).
 // abe todo
+// sum of all txo confirmation / serialize size
 func CalcPriorityAbe(tx *wire.MsgTxAbe, utxoRingView *blockchain.UtxoRingViewpoint, nextBlockHeight int32) float64 {
 
 	inputValueAge := calcInputValueAgeAbe(tx, utxoRingView, nextBlockHeight)

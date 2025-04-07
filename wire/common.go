@@ -8,7 +8,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/abesuite/abec/chainhash"
+	"github.com/pqabelian/abec/chainhash"
 )
 
 const (

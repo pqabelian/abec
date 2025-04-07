@@ -7,10 +7,10 @@ package blockchain
 */
 import (
 	"fmt"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/database"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/database"
+	"github.com/pqabelian/abec/wire"
 	"math/big"
 	"sort"
 	"sync"
@@ -136,14 +136,30 @@ func (b *BlockChain) initBlockNode(node *blockNode, blockHeader *wire.BlockHeade
 		node.workSum = node.workSum.Add(parent.workSum, node.workSum)
 		// todo: (EthashPow) 202207
 		if node.height >= b.chainParams.BlockHeightEthashPoW {
+			//	Since BlockHeightEthashPoW, blockHeader contains Height.
 			if blockHeader.Height != node.height {
 				errStr := fmt.Sprintf("Block %v has height %d, while its parent has height %d", node.hash, blockHeader.Height, parent.height)
 				return ruleError(ErrMismatchedBlockHeightWithPrevNode, errStr)
 			}
+
+			// Added by Alice, 2024.05.11, for DSA
+			// todo(DSA): review
 			//	todo: when more versions appear, we need to refactor here.
-			if blockHeader.Version != int32(wire.BlockVersionEthashPow) {
-				str := fmt.Sprintf("block has height %d, it should have version %d for EthashPoW, rather than the old version %d", blockHeader.Height, int32(wire.BlockVersionEthashPow), blockHeader.Version)
-				return ruleError(ErrMismatchedBlockHeightAndVersion, str)
+			if blockHeader.Height >= b.chainParams.BlockHeightMLPAUT {
+				if blockHeader.Version != int32(wire.BlockVersionMLPAUT) {
+					str := fmt.Sprintf("block has height %d, it should have version %08x for MLPAUT, rather than version %08x", blockHeader.Height, int32(wire.BlockVersionMLPAUT), blockHeader.Version)
+					return ruleError(ErrMismatchedBlockHeightAndVersion, str)
+				}
+			} else if blockHeader.Height >= b.chainParams.BlockHeightDSA {
+				if blockHeader.Version != int32(wire.BlockVersionDSA) {
+					str := fmt.Sprintf("block has height %d, it should have version %08x for DSA, rather than version %08x", blockHeader.Height, int32(wire.BlockVersionDSA), blockHeader.Version)
+					return ruleError(ErrMismatchedBlockHeightAndVersion, str)
+				}
+			} else {
+				if blockHeader.Version != int32(wire.BlockVersionEthashPow) {
+					str := fmt.Sprintf("block has height %d, it should have version %08x for EthashPoW, rather than the version %08x", blockHeader.Height, int32(wire.BlockVersionEthashPow), blockHeader.Version)
+					return ruleError(ErrMismatchedBlockHeightAndVersion, str)
+				}
 			}
 		}
 	}
