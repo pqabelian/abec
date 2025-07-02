@@ -320,6 +320,7 @@ var MainNetParams = Params{
 		{300000, newHashFromStr("4e6adcc8583a5cd0b541adcceba8ef2032b9debc211820b5d3e735e144336913")},
 		{340000, newHashFromStr("562da4e0adac79c98344ce28bf236a383f58712d4b4a68cffb78126e47caeb3c")},
 		{360000, newHashFromStr("00d39b5d84f43b088728b7b947ffe7d138ddbcb4a67fbc3f746cfeb3172d7a3b")},
+		{400000, newHashFromStr("73a434b741b357e37587b1b0a39c0ef65832d403bfd4d91eb11d9d805c568022")},
 	},
 	// Consensus rule change deployments.
 	//
@@ -484,7 +485,7 @@ var TestNet3Params = Params{
 	Net:  wire.TestNet3,
 	//DefaultPort: "18333",
 	DefaultPort: "18666",
-	DNSSeeds: []DNSSeed{
+	DNSSeeds:    []DNSSeed{
 		//{"testnet-seed.bitcoin.jonasschnelli.ch", true},
 		//{"testnet-seed.bitcoin.schildbach.de", false},
 		//{"seed.tbtc.petertodd.org", true},
