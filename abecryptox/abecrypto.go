@@ -289,6 +289,11 @@ func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail
 
 // GetTxoPrivacyLevel returns the PrivacyLevel of the input wire.TxOutAbe,
 // which is determined by its version and its coinAddress.
+// At present, there are only 3 Privacy Levels for Txo, say PrivacyLevelRINGCTPre, PrivacyLevelRINGCT, and PrivacyLevelPSEUDONYM,
+// depending on the Txo's CoinAddressType,
+// although there is an additional PrivacyLevel definition, say PrivacyLevelPSEUDONYMCT.
+// In the future, if PrivacyLevelPSEUDONYMCT Txo is supported, Txo's data besides CoinAddressType will be further used to
+// determine its PrivacyLevel.
 // reviewed on 2024.01.04
 func GetTxoPrivacyLevel(abeTxo *wire.TxOutAbe) (abecryptoxkey.PrivacyLevel, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)

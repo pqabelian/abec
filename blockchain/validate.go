@@ -1811,7 +1811,7 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 			if err != nil {
 				return fmt.Errorf("fail to parse %d-th issuer token in aut %s(identifer %s)", i, string(autView.entries[autIdentifierKey].metadata.AutSymbol), string(autView.entries[autIdentifierKey].metadata.AutIdentifier))
 			}
-			if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
+			if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM && privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
 				return fmt.Errorf("specified %d-th issuer token is invalid in aut %s(identifer %s)", i, string(autView.entries[autIdentifierKey].metadata.AutSymbol), string(autView.entries[autIdentifierKey].metadata.AutIdentifier))
 			}
 			allIssuerTokens[hex.EncodeToString(coinAddress)] = struct{}{}
@@ -1904,7 +1904,7 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 			if err != nil {
 				return fmt.Errorf("fail to parse %d-th issuer token in aut %s(identifer %s)", i, string(autView.entries[autIdentifierKey].metadata.AutSymbol), string(autView.entries[autIdentifierKey].metadata.AutIdentifier))
 			}
-			if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
+			if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM && privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
 				return fmt.Errorf("specified %d-th issuer token is invalid in aut %s(identifer %s)", i, string(autView.entries[autIdentifierKey].metadata.AutSymbol), string(autView.entries[autIdentifierKey].metadata.AutIdentifier))
 			}
 			allIssuerTokens[hex.EncodeToString(coinAddress)] = struct{}{}

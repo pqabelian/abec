@@ -160,6 +160,8 @@ func (instAddr *InstanceAddress) Deserialize(serializedInstAddr []byte) error {
 	case abecryptoxkey.PrivacyLevelRINGCT:
 		fallthrough
 	case abecryptoxkey.PrivacyLevelPSEUDONYM:
+		fallthrough
+	case abecryptoxkey.PrivacyLevelPSEUDONYMCT:
 		instAddr.netID = netId
 		instAddr.cryptoScheme = abecryptoxparam.CryptoSchemePQRingCTX
 
