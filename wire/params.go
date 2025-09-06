@@ -12,6 +12,9 @@ const (
 	//CryptoSchemePQRingCTV2
 	// ToDo(MLP): how about not use iota?
 	TxVersion_Height_MLPAUT_300000 uint32 = 2
+
+	TxVersion_Height_450000_Aconcagua uint32 = 3 // the TxVersion since height 50 0000, corresponding to the Aconcagua upgrade/fork
+
 )
 
 const (
@@ -39,7 +42,8 @@ const (
 	// ToDo(MLP):
 	//	TxVersion = 1
 	// TxVersion = TxVersion_Height_0
-	TxVersion = TxVersion_Height_MLPAUT_300000
+	// TxVersion = TxVersion_Height_MLPAUT_300000
+	TxVersion = TxVersion_Height_450000_Aconcagua
 
 	//	todo: (EthashPow) BlockVersionEthashPow
 	// BlockVersionEthashPow is the block version which changed block to use EthashPoW
@@ -58,9 +62,14 @@ const (
 	// ToDo(MLP):
 	BlockVersionMLPAUT = 0x30000000
 
-	// BlockHeightEthashPoW
-	// BlockHeightEthashPoW denotes the block height from which Ethash-PoW mining is applied.
-	//	BlockHeightEthashPoW = 56000
+	// BlockVersionAconcagua is the block version which includes the following upgrades:
+	// 	- hybridPoW consensus.
+	//	- CT-AUT.
+	//
+	// The version is coded by the rule in versionbits.go.
+	//
+	// We set the version to be 0x40000000.
+	BlockVersionAconcagua = 0x40000000
 )
 
 /*
@@ -89,6 +98,9 @@ func GetBlockNumPerRingGroupByRingVersion(version uint32) (uint8, error) {
 	case TxVersion_Height_MLPAUT_300000:
 		return BlockNumPerRingGroup, nil
 
+	case TxVersion_Height_450000_Aconcagua:
+		return BlockNumPerRingGroup, nil
+
 	default:
 		return 0, errors.New("GetBlockNumPerRingGroupByRingVersion: Unsupported ringVersion")
 	}
@@ -109,6 +121,8 @@ func GetTxoRingSizeByRingVersion(version uint32) (uint8, error) {
 	case TxVersion_Height_0:
 		return TxoRingSize, nil
 	case TxVersion_Height_MLPAUT_300000:
+		return TxoRingSize, nil
+	case TxVersion_Height_450000_Aconcagua:
 		return TxoRingSize, nil
 
 	default:
