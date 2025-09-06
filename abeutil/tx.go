@@ -33,8 +33,8 @@ type TxAbe struct {
 	txWitnessHash *chainhash.Hash // Cached transaction witness hash
 	//	txPersistentHash	*chainhash.Hash // Cached transaction witness hash
 	//	txHasTxoDetails *bool // if the transaction has txo details
-	txHasWitness *bool // If the transaction has witness data
-	txIndex      int   // Position within a block or TxIndexUnknown
+	txHasTxWitness *bool // If the transaction has witness data
+	txIndex        int   // Position within a block or TxIndexUnknown
 
 	autTxDone bool
 	autTx     aut.Transaction
@@ -167,7 +167,7 @@ func (t *Tx) HasWitness() bool {
 
 func (tx *TxAbe) HasTxWitness() bool {
 	hasWitness := tx.msgTx.HasWitness()
-	tx.txHasWitness = &hasWitness
+	tx.txHasTxWitness = &hasWitness
 	return hasWitness
 }
 
