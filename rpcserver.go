@@ -2648,6 +2648,7 @@ func chainErrToGBTErrString(err error) string {
 // deals with block proposals.
 //
 // See https://en.bitcoin.it/wiki/BIP_0023 for more details.
+// todo: this function has potential issue due to msgBlock.Deserialize(). Fortunately, it is not used at present.
 func handleGetBlockTemplateProposal(s *rpcServer, request *abejson.TemplateRequest) (interface{}, error) {
 	hexData := request.Data
 	if hexData == "" {

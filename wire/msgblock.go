@@ -186,11 +186,20 @@ func (msg *MsgBlockAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding)
 	if enc == WitnessEncoding && existWitness[0] == 1 {
 		var tmp []byte
 		for _, tx := range msg.Transactions {
-			tmp, err = ReadVarBytes(r, pver, abecryptoxparam.MaxAllowedTxWitnessSize, "tx.Witness")
+			tmp, err = ReadVarBytes(r, pver, abecryptoxparam.MaxAllowedTxWitnessSize, "tx.TxWitness")
 			if err != nil {
 				return err
 			}
 			tx.TxWitness = tmp
+
+			if tx.Version >= TxVersion_Height_450000_Aconcagua {
+				tmp, err = ReadVarBytes(r, pver, abecryptoxparam.MaxAllowedAutWitnessSize, "tx.AutWitness")
+				if err != nil {
+					return err
+				}
+				tx.AutWitness = tmp
+			}
+
 		}
 	}
 	return nil
@@ -477,6 +486,14 @@ func (msg *MsgBlockAbe) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding)
 			if err != nil {
 				return err
 			}
+
+			if tx.Version >= TxVersion_Height_450000_Aconcagua {
+				err = WriteVarBytes(w, pver, tx.AutWitness)
+				if err != nil {
+					return err
+				}
+			}
+
 		}
 	} else {
 		_, err = w.Write([]byte{0})

@@ -121,6 +121,8 @@ func (b *Block) Bytes() ([]byte, error) {
 	return serializedBlock, nil
 }
 
+// Bytes
+// todo: this function has some potential issue. Fortunately, it is not used at present.
 func (b *BlockAbe) Bytes() ([]byte, error) {
 	// Return the cached serialized bytes if it has already been generated.
 	if len(b.serializedBlock) != 0 {
