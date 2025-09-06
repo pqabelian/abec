@@ -571,6 +571,13 @@ func (msg *MsgTxAbe) HasWitness() bool {
 	return true
 }
 
+func (msg *MsgTxAbe) HasAutWitness() bool {
+	if len(msg.AutWitness) == 0 {
+		return false
+	}
+	return true
+}
+
 // TxId return TxHash().
 func (msg *MsgTxAbe) TxId() TxId {
 	return TxId(msg.TxHash())
