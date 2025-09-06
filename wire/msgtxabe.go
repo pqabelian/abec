@@ -615,12 +615,100 @@ func (msg *MsgTxAbe) TxWitnessHash() *chainhash.Hash {
 // See Deserialize for decoding transactions stored to disk, such as in a
 // database, as opposed to decoding transactions from the wire.
 func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
-	txConType := TxContentTypeBase
-	if enc == WitnessEncoding {
-		txConType = TxContentTypeFull
+	version, err := binarySerializer.Uint32(r, littleEndian)
+	if err != nil {
+		return err
+	}
+	msg.Version = version
+
+	//	TxIns
+	txInNum, err := ReadVarInt(r, pver)
+	if err != nil {
+		return err
+	}
+	txInputMaxNum, err := abecryptoxparam.GetTxInputMaxNum(msg.Version)
+	if err != nil {
+		return err
+	}
+	if txInNum > uint64(txInputMaxNum) {
+		str := fmt.Sprintf("The numner of inputs exceeds the allowd max number [txInNum %d, max %d]", txInNum,
+			txInputMaxNum)
+		return messageError("MsgTx.BtcDecode", str)
+	}
+	msg.TxIns = make([]*TxInAbe, txInNum)
+	for i := uint64(0); i < txInNum; i++ {
+		txIn := TxInAbe{}
+		err = readTxInAbe(r, pver, msg.Version, &txIn)
+		if err != nil {
+			return err
+		}
+		msg.TxIns[i] = &txIn
 	}
 
-	return msg.ReadMsgTx(r, pver, txConType)
+	// TxOuts
+	txoNum, err := ReadVarInt(r, pver)
+	if err != nil {
+		return err
+	}
+	txOutputMaxNum, err := abecryptoxparam.GetTxOutputMaxNum(msg.Version)
+	if err != nil {
+		return err
+	}
+	if txoNum > uint64(txOutputMaxNum) {
+		str := fmt.Sprintf("The numner of inputs exceeds the allowd max number [txoNum %d, max %d]", txoNum,
+			txOutputMaxNum)
+		return messageError("MsgTx.BtcDecode", str)
+	}
+	msg.TxOuts = make([]*TxOutAbe, txoNum)
+	for i := uint64(0); i < txoNum; i++ {
+		txOut := TxOutAbe{}
+		err = ReadTxOutAbe(r, pver, msg.Version, &txOut)
+		if err != nil {
+			return err
+		}
+		msg.TxOuts[i] = &txOut
+	}
+
+	//	TxFee
+	txFee, err := ReadVarInt(r, pver)
+	if err != nil {
+		return err
+	}
+	msg.TxFee = txFee
+
+	/*	txFee, err := binarySerializer.Uint64(r, littleEndian)
+		if err != nil {
+			return err
+		}
+		msg.TxFee = txFee*/
+
+	//	TxMemo
+	//	For better performance, we use constant to specify the maxallowed size, rather than calling a function.
+	// txMemo, err := ReadVarBytes(r, pver, uint32(abepqringctparam.GetTxMemoMaxLen(msg.Version)), "TxMemo")
+	txMemo, err := ReadVarBytes(r, pver, abecryptoxparam.MaxAllowedTxMemoSize, "TxMemo")
+	if err != nil {
+		return err
+	}
+	msg.TxMemo = txMemo
+
+	//	witness details
+	/*	txWitness := TxWitnessAbe{}
+		err = readTxWitnessAbe(r, pver, msg.Version, &txWitness)
+		if err != nil {
+			return err
+		}
+		msg.TxWitness = &txWitness*/
+
+	if enc == WitnessEncoding {
+		//	TxWitness
+		//	For better performance, we use constant to specify the maxallowed size, rather than calling a function.
+		// txWitness, err := ReadVarBytes(r, pver, uint32(abepqringctparam.GetTxWitnessMaxLen(msg.Version)), "TxWitness")
+		txWitness, err := ReadVarBytes(r, pver, abecryptoxparam.MaxAllowedTxWitnessSize, "TxWitness")
+		if err != nil {
+			msg.TxWitness = nil
+		}
+		msg.TxWitness = txWitness
+	}
 
 	return nil
 }
@@ -630,13 +718,58 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 // See Serialize for encoding transactions to be stored to disk, such as in a
 // database, as opposed to encoding transactions for the wire.
 func (msg *MsgTxAbe) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
-
-	txConType := TxContentTypeBase
-	if enc == WitnessEncoding {
-		txConType = TxContentTypeFull
+	//	Version
+	err := binarySerializer.PutUint32(w, littleEndian, msg.Version)
+	if err != nil {
+		return err
 	}
 
-	return msg.WriteMsgTx(w, pver, txConType)
+	//	TxIns
+	err = WriteVarInt(w, 0, uint64(len(msg.TxIns)))
+	if err != nil {
+		return err
+	}
+	for _, txIn := range msg.TxIns {
+		err = writeTxInAbe(w, pver, msg.Version, txIn)
+		if err != nil {
+			return err
+		}
+	}
+
+	// TxOuts
+	err = WriteVarInt(w, 0, uint64(len(msg.TxOuts)))
+	for _, txOut := range msg.TxOuts {
+		err = WriteTxOutAbe(w, pver, msg.Version, txOut)
+		if err != nil {
+			return err
+		}
+	}
+
+	//	TxFee
+	err = WriteVarInt(w, 0, msg.TxFee)
+	if err != nil {
+		return err
+	}
+
+	/*	err = binarySerializer.PutUint64(w, littleEndian, msg.TxFee)
+		if err != nil {
+			return err
+		}*/
+
+	//	TxMemo
+	err = WriteVarBytes(w, 0, msg.TxMemo)
+	if err != nil {
+		return err
+	}
+
+	if enc == WitnessEncoding && msg.HasWitness() {
+		err = WriteVarBytes(w, 0, msg.TxWitness)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Command returns the protocol command string for the message.  This is part
