@@ -572,7 +572,7 @@ func (sp *serverPeer) OnNeedSetResult(p *peer.Peer, msg *wire.MsgNeedSetResult, 
 
 	// check witness in response
 	for i := 0; i < len(msg.Txs); i++ {
-		if !msg.Txs[i].HasWitness() {
+		if !msg.Txs[i].HasTxWitness() {
 			peerLog.Warnf("Got needset %v from %s, but some transaction in response does not has witness -- "+
 				"disconnecting", msg.BlockHash, p.Addr())
 			p.Disconnect()

@@ -71,7 +71,7 @@ func (tx *TxAbe) AUTTransaction() (aut.Transaction, error) {
 }
 
 func (tx *TxAbe) InvType() wire.InvType {
-	if tx.msgTx != nil && tx.msgTx.HasWitness() {
+	if tx.msgTx != nil && tx.msgTx.HasTxWitness() {
 		return wire.InvTypeWitnessTx
 	}
 	return wire.InvTypeTx
@@ -167,7 +167,7 @@ func (t *Tx) HasWitness() bool {
 }
 
 func (tx *TxAbe) HasTxWitness() bool {
-	hasWitness := tx.msgTx.HasWitness()
+	hasWitness := tx.msgTx.HasTxWitness()
 	tx.txHasTxWitness = &hasWitness
 	return hasWitness
 }

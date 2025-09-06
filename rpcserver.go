@@ -1040,7 +1040,7 @@ func createTxRawResultAbe(chainParams *chaincfg.Params, mtx *wire.MsgTxAbe,
 		Version:  mtx.Version,
 	}
 
-	if mtx.HasWitness() {
+	if mtx.HasTxWitness() {
 		txReply.Witness = hex.EncodeToString(mtx.TxWitness)
 	}
 
@@ -1120,7 +1120,7 @@ func handleDecodeRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-ch
 		Fee:     abeutil.Amount(mtx.TxFee).ToABE(),
 	}
 
-	if mtx.HasWitness() {
+	if mtx.HasTxWitness() {
 		txReply.Witness = hex.EncodeToString(mtx.TxWitness)
 	}
 

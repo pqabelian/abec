@@ -562,9 +562,9 @@ func (msg *MsgTxAbe) AddTxOut(txOut *TxOutAbe) {
 	msg.TxOuts = append(msg.TxOuts, txOut)
 }
 
-// HasWitness returns false if none of the inputs within the transaction
+// HasTxWitness returns false if none of the inputs within the transaction
 // contain witness data, true false otherwise.
-func (msg *MsgTxAbe) HasWitness() bool {
+func (msg *MsgTxAbe) HasTxWitness() bool {
 	if msg.TxWitness == nil || len(msg.TxWitness) == 0 {
 		return false
 	}
