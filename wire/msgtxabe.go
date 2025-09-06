@@ -544,6 +544,9 @@ type MsgTxAbe struct {
 
 	//TxWitness *TxWitnessAbe // Each Tx has one witness, consisting all necessary information, for example, signatures for inputs, range proofs for outputs, balance between inputs and outputs
 	TxWitness []byte
+
+	// AutWitness
+	AutWitness []byte
 }
 
 // AddTxIn adds a transaction input to the message.
@@ -708,6 +711,14 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 			msg.TxWitness = nil
 		}
 		msg.TxWitness = txWitness
+
+		if msg.Version >= TxVersion_Height_450000_Aconcagua {
+			autWitness, err := ReadVarBytes(r, pver, abecryptoxparam.MaxAllowedAutWitnessSize, "AutWitness")
+			if err != nil {
+				msg.AutWitness = nil
+			}
+			msg.AutWitness = autWitness
+		}
 	}
 
 	return nil
@@ -766,6 +777,13 @@ func (msg *MsgTxAbe) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) er
 		err = WriteVarBytes(w, 0, msg.TxWitness)
 		if err != nil {
 			return err
+		}
+
+		if msg.Version >= TxVersion_Height_450000_Aconcagua {
+			err = WriteVarBytes(w, 0, msg.AutWitness)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
