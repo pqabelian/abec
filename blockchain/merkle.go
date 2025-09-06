@@ -209,7 +209,7 @@ func BuildMerkleTreeStoreAbe(transactions []*abeutil.TxAbe, witness bool) []*cha
 		// chainhash.DoubleHashH(tx Hash || witness Hash)
 		// todo (ethminming): there is a bug, since for extraNonce update, the tx.txHash has been cached, it is inconsist with the update coinbaseTx.
 		copy(tmp[:chainhash.HashSize], tx.Hash()[:])
-		copy(tmp[chainhash.HashSize:], tx.WitnessHash()[:])
+		copy(tmp[chainhash.HashSize:], tx.TxWitnessHash()[:])
 		tHash := chainhash.DoubleHashH(tmp)
 		merkles[i] = &tHash
 	}
@@ -271,7 +271,7 @@ func BuildMerkleTreeStoreAbeEthash(transactions []*abeutil.TxAbe) (merkleRoot *c
 		// chainhash.DoubleHashH(tx Hash || txWitness Hash)
 		//	todo: (EthashPoW) For transaction layer, for compatibility, we keep tx.Hash() and tx.WitnessHash() by chainhash.DoubleHashH.
 		copy(tmp[:chainhash.HashSize], tx.Hash()[:])
-		copy(tmp[chainhash.HashSize:], tx.WitnessHash()[:])
+		copy(tmp[chainhash.HashSize:], tx.TxWitnessHash()[:])
 
 		//	todo: (EthashPoW) for building merkle tree, using ChainHash
 		tHash := chainhash.ChainHash(tmp)
