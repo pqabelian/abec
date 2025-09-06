@@ -542,6 +542,9 @@ type MsgTxAbe struct {
 	//	At most 1024 bytes
 	TxMemo []byte
 
+	// We clarify the concept of "Witness of Tx" here that it includes TxWitness and AutWitness
+	// Hash(AutWitness) are contained in TxMemo, so that TxWitness actually sealed TxBaseContent and AutWitness.
+
 	//TxWitness *TxWitnessAbe // Each Tx has one witness, consisting all necessary information, for example, signatures for inputs, range proofs for outputs, balance between inputs and outputs
 	TxWitness []byte
 
