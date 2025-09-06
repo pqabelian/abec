@@ -1826,7 +1826,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 
 	// Verify witness and reject the transaction if
 	// any don't verify.
-	if !tx.HasWitness() {
+	if !tx.HasTxWitness() {
 		str := fmt.Sprintf("transaction %v has been rejected "+
 			"due to no witness", txHash)
 		return nil, nil, txRuleError(wire.RejectInvalid, str)

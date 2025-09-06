@@ -1060,7 +1060,7 @@ func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<-
 			}
 			return err
 		}
-		if encoding == wire.WitnessEncoding && !tx.HasWitness() {
+		if encoding == wire.WitnessEncoding && !tx.HasTxWitness() {
 			peerLog.Warnf("Transaction %v fetch successful but it do not has witness: %v", hash, err)
 
 			if doneChan != nil {

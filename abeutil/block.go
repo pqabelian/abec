@@ -321,7 +321,7 @@ func (b *BlockAbe) Transactions() []*TxAbe {
 		if tx == nil {
 			newTx := NewTxAbe(b.msgBlock.Transactions[i])
 			newTx.SetIndex(i)
-			if !newTx.HasWitness() {
+			if !newTx.HasTxWitness() {
 				newTx.txWitnessHash = b.msgBlock.WitnessHashs[i]
 			}
 			b.transactions[i] = newTx

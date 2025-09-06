@@ -165,7 +165,7 @@ func (t *Tx) HasWitness() bool {
 	return hasWitness
 }
 
-func (tx *TxAbe) HasWitness() bool {
+func (tx *TxAbe) HasTxWitness() bool {
 	hasWitness := tx.msgTx.HasWitness()
 	tx.txHasWitness = &hasWitness
 	return hasWitness

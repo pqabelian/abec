@@ -1263,7 +1263,7 @@ func (tx *transaction) StoreBlockAbe(block *abeutil.BlockAbe) error {
 	txs := block.Transactions()
 	// Check if the block has witness. No witness is allowed when node is a fully pruned node.
 	witnessExist := false
-	if txs[0].HasWitness() {
+	if txs[0].HasTxWitness() {
 		witnessExist = true
 	}
 

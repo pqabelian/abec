@@ -204,7 +204,7 @@ func checkBlockScriptsAbe(block *abeutil.BlockAbe, utxoRingView *UtxoRingViewpoi
 
 	for i := 0; i < numTx; i++ {
 
-		if !allTxs[i].HasWitness() {
+		if !allTxs[i].HasTxWitness() {
 			str := fmt.Sprintf("transaction %s verify failed due to no witness", allTxs[i].Hash())
 			return ruleError(ErrWitnessMissing, str)
 		}
