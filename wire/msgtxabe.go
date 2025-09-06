@@ -762,7 +762,7 @@ func (msg *MsgTxAbe) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) er
 		return err
 	}
 
-	if enc == WitnessEncoding && msg.HasWitness() {
+	if enc == WitnessEncoding {
 		err = WriteVarBytes(w, 0, msg.TxWitness)
 		if err != nil {
 			return err
