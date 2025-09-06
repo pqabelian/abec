@@ -78,7 +78,7 @@ func (outPoint *OutPointAbe) OutPointId() OutPointId {
 }
 
 // String returns the OutPoint in the human-readable form "hash:index".
-func (op *OutPointAbe) String() string {
+func (op OutPointAbe) String() string {
 	// Allocate enough for hash string, colon, and 10 digits.  Although
 	// at the time of writing, the number of digits can be no greater than
 	// the length of the decimal representation of maxTxOutPerMessage, the
