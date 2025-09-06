@@ -1186,7 +1186,7 @@ func (g *BlkTmplGenerator) UpdateExtraNonceAbeEthash(blockTemplate *BlockTemplat
 	tmp := make([]byte, chainhash.HashSize*2)
 	// chainhash.DoubleHashH(tx Hash || witness Hash)
 	copy(tmp[:chainhash.HashSize], coinbaseTx.Hash()[:])
-	copy(tmp[chainhash.HashSize:], coinbaseTx.WitnessHash()[:])
+	copy(tmp[chainhash.HashSize:], coinbaseTx.TxWitnessHash()[:])
 
 	newCbTxHash := chainhash.ChainHash(tmp)
 

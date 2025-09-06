@@ -122,10 +122,10 @@ func (tx *TxAbe) TxId() wire.TxId {
 	return txId
 }
 
-// WitnessHash returns the hash the transaction witness.
+// TxWitnessHash returns the hash the TxWitness.
 // This is equivalent to calling TxWitnessHash on the underlying wire.MsgTx, however it
 // caches the result so subsequent calls are more efficient.
-func (tx *TxAbe) WitnessHash() *chainhash.Hash {
+func (tx *TxAbe) TxWitnessHash() *chainhash.Hash {
 	// Return the cached hash if it has already been generated.
 	if tx.txWitnessHash != nil {
 		return tx.txWitnessHash
