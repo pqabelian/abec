@@ -417,24 +417,33 @@ func (b *Block) TxLoc() ([]wire.TxLoc, error) {
 	return txLocs, err
 }
 
+// TxLoc
+// todo: modify according to the store of block in database
+// TxLoc is built from BlockAbe --> serialized to TxAbeIndexEntry --> put into Bucket-txIndexKey (key = txHash, value=(blockId, TxLoc))
+// --> Fetched into BlockRegion --> used by FetchBlockRegion and FetchWitnessRegion --> put into TxWitness
 func (b *BlockAbe) TxLoc() ([]wire.TxAbeLoc, error) {
 	var offset, witOffset int
-	// todo(MLP):
+
 	if b.msgBlock.Header.Version >= int32(wire.BlockVersionEthashPow) {
-		offset, witOffset = 120+wire.VarIntSerializeSize(uint64(len(b.msgBlock.Transactions))), 8
+		offset = 120
 	} else {
-		offset, witOffset = 80+wire.VarIntSerializeSize(uint64(len(b.msgBlock.Transactions))), 8
+		offset = 80
 	}
+	offset = offset + wire.VarIntSerializeSize(uint64(len(b.msgBlock.Transactions)))
+
+	witOffset = 4 // witness number
+
 	txs := b.Transactions()
 	res := make([]wire.TxAbeLoc, len(txs))
+
 	for i := 0; i < len(txs); i++ {
 		res[i].TxStart = offset
-		txLen := txs[i].MsgTx().SerializeSize()
-		res[i].TxLen, offset = txLen, offset+txLen
+		res[i].TxLen = txs[i].MsgTx().SerializeSize()
+		offset = offset + res[i].TxLen
 
-		res[i].WitnessStart = witOffset
-		witLen := chainhash.HashSize + len(txs[i].MsgTx().TxWitness)
-		res[i].WitnessLen, witOffset = witLen, witOffset+witLen+4
+		res[i].WitnessStart = witOffset + 4 // 4 bytes for size of rawWitness = (TxHash + txs[i].MsgTx().TxWitness)
+		res[i].WitnessLen = chainhash.HashSize + len(txs[i].MsgTx().TxWitness)
+		witOffset = witOffset + 4 + res[i].WitnessLen
 	}
 	return res, nil
 }
