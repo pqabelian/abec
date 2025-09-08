@@ -2890,10 +2890,16 @@ func dbFetchBlockByNodeAbe(dbTx database.Tx, node *blockNode) (*abeutil.BlockAbe
 	}
 
 	// Witness
-	if witnesses != nil {
+	if len(witnesses) != 0 && len(witnesses) == len(block.Transactions()) {
 		txs := block.Transactions()
 		for i := 0; i < len(txs); i++ {
-			txs[i].MsgTx().TxWitness = witnesses[i][chainhash.HashSize:]
+			// txs[i].MsgTx().TxWitness = witnesses[i][chainhash.HashSize:]
+			txWitness, autWitness, err := abeutil.DecodeTxWitnesses(txs[i].MsgTx().Version, witnesses[i][chainhash.HashSize:])
+			if err != nil {
+				return nil, err
+			}
+			txs[i].MsgTx().TxWitness = txWitness
+			txs[i].MsgTx().AutWitness = autWitness
 		}
 	}
 	block.SetHeight(node.height)

@@ -1230,10 +1230,16 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 			return err
 		}
 
-		if len(witnesses) != 0 {
+		if len(witnesses) != 0 && len(witnesses) == len(msgBlock.Transactions) {
 			txs := msgBlock.Transactions
 			for i := 0; i < len(txs); i++ {
-				txs[i].TxWitness = witnesses[i][chainhash.HashSize:]
+				// txs[i].TxWitness = witnesses[i][chainhash.HashSize:]
+				txWitness, autWitness, err := abeutil.DecodeTxWitnesses(txs[i].Version, witnesses[i][chainhash.HashSize:])
+				if err != nil {
+					return err
+				}
+				txs[i].TxWitness = txWitness
+				txs[i].AutWitness = autWitness
 			}
 		}
 
@@ -1322,10 +1328,16 @@ func (s *server) pushPrunedBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneCh
 		return err
 	}
 
-	if witnessBytes != nil {
+	if len(witnessBytes) != 0 && len(witnessBytes) == len(msgBlock.Transactions) {
 		txs := msgBlock.Transactions
 		for i := 0; i < len(txs); i++ {
-			txs[i].TxWitness = witnessBytes[i][chainhash.HashSize:]
+			//txs[i].TxWitness = witnessBytes[i][chainhash.HashSize:]
+			txWitness, autWitness, err := abeutil.DecodeTxWitnesses(txs[i].Version, witnessBytes[i][chainhash.HashSize:])
+			if err != nil {
+				return err
+			}
+			txs[i].TxWitness = txWitness
+			txs[i].AutWitness = autWitness
 		}
 	}
 

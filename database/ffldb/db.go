@@ -1273,7 +1273,8 @@ func (tx *transaction) StoreBlockAbe(block *abeutil.BlockAbe) error {
 		var witness []byte
 		for i := 0; i < len(txs); i++ {
 			txHash := txs[i].Hash()
-			witness = txs[i].MsgTx().TxWitness
+			// witness = txs[i].MsgTx().TxWitness
+			witness = abeutil.EncodeTxWitnesses(txs[i].MsgTx().Version, txs[i].MsgTx().TxWitness, txs[i].MsgTx().AutWitness)
 			witnesses[i] = make([]byte, chainhash.HashSize+len(witness))
 			copy(witnesses[i][:chainhash.HashSize], txHash[:])
 			copy(witnesses[i][chainhash.HashSize:], witness[:])
@@ -1472,6 +1473,7 @@ func (tx *transaction) FetchBlock(hash *chainhash.Hash) ([]byte, error) {
 	return blockBytes, nil
 }
 
+// FetchBlockAbe
 func (tx *transaction) FetchBlockAbe(hash *chainhash.Hash) ([]byte, [][]byte, error) {
 	// Ensure transaction state is valid.
 	if err := tx.checkClosed(); err != nil {
@@ -1515,6 +1517,8 @@ func (tx *transaction) FetchBlockAbe(hash *chainhash.Hash) ([]byte, [][]byte, er
 		return blockBytes, nil, nil
 	}
 
+	// witnesses is the array of rawWitness
+	// each rawWitness is [TxHash || witness], where witness is the result of EncodeTxWitnesses()
 	return blockBytes, witnesses, nil
 }
 
@@ -1699,6 +1703,8 @@ func (tx *transaction) fetchPendingWitnessRegion(region *database.BlockRegion) (
 	}
 
 	// Ensure the region is within the bounds of the block.
+	// todo: this is using BlockRegion's information to locate the corresponding loc.
+	// todo: seems have some problem, not exactly, seem to be bug. need to discuss and fix
 	witnesses := tx.pendingBlockAbeData[idx].bytesWitness
 	endWitnessOffset := region.WitnessOffset + region.WitnessLen
 	loc, sum := 0, uint32(0)
@@ -1787,6 +1793,7 @@ func (tx *transaction) FetchBlockRegion(region *database.BlockRegion) ([]byte, e
 	return regionBytes, nil
 }
 
+// FetchWitnessRegion fetches witness according to the input BlockRegion.
 func (tx *transaction) FetchWitnessRegion(region *database.BlockRegion) ([]byte, error) {
 	// Ensure transaction state is valid.
 	if err := tx.checkClosed(); err != nil {
@@ -1813,6 +1820,7 @@ func (tx *transaction) FetchWitnessRegion(region *database.BlockRegion) ([]byte,
 	location := deserializeWitnessLoc(witnessRow)
 
 	// Ensure the region is within the bounds of the block.
+	// todo: seems not exactly, need to discuss and fix
 	endOffset := region.WitnessOffset + region.WitnessLen
 	if endOffset < region.WitnessOffset || endOffset > location.witnessLen {
 		str := fmt.Sprintf("block witness %s region offset %d, length %d "+

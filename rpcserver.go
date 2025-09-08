@@ -777,7 +777,13 @@ func handleCreateRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-ch
 	mtx.TxFee = fee
 
 	//	TxWitness
-	mtx.TxWitness = c.Witness
+	// mtx.TxWitness = c.Witness
+	txWitness, autWitness, err := abeutil.DecodeTxWitnesses(mtx.Version, c.Witness)
+	if err != nil {
+		return nil, err
+	}
+	mtx.TxWitness = txWitness
+	mtx.AutWitness = autWitness
 
 	// Return the serialized and hex-encoded transaction.  Note that this
 	// is intentionally not directly returning because the first return
@@ -1019,6 +1025,8 @@ func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 }
 
 // todo(ABE.MUST)
+// todo (CTAUT):  investigate whether the caller of this function uses txReply.Witness to recover the TxWitness and AutWitness,
+// it should call abeutil.DecodeTxWitnesses().
 func createTxRawResultAbe(chainParams *chaincfg.Params, mtx *wire.MsgTxAbe,
 	txHash string, blkHeader *wire.BlockHeader, blkHash string,
 	blkHeight int32, chainHeight int32) (*abejson.TxRawResultAbe, error) {
@@ -1041,7 +1049,9 @@ func createTxRawResultAbe(chainParams *chaincfg.Params, mtx *wire.MsgTxAbe,
 	}
 
 	if mtx.HasTxWitness() {
-		txReply.Witness = hex.EncodeToString(mtx.TxWitness)
+		// txReply.Witness = hex.EncodeToString(mtx.TxWitness)
+		encodedWitness := abeutil.EncodeTxWitnesses(mtx.Version, mtx.TxWitness, mtx.AutWitness)
+		txReply.Witness = hex.EncodeToString(encodedWitness)
 	}
 
 	if blkHeader != nil {
@@ -1090,6 +1100,8 @@ func handleDecodeRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 	return txReply, nil
 }
 
+// todo (CTAUT):  investigate whether the caller of this function uses txReply.Witness to recover the TxWitness and AutWitness,
+// it should call abeutil.DecodeTxWitnesses().
 func handleDecodeRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.DecodeRawTransactionCmdAbe)
 
@@ -1121,7 +1133,9 @@ func handleDecodeRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-ch
 	}
 
 	if mtx.HasTxWitness() {
-		txReply.Witness = hex.EncodeToString(mtx.TxWitness)
+		//txReply.Witness = hex.EncodeToString(mtx.TxWitness)
+		encodedWitness := abeutil.EncodeTxWitnesses(mtx.Version, mtx.TxWitness, mtx.AutWitness)
+		txReply.Witness = hex.EncodeToString(encodedWitness)
 	}
 
 	return txReply, nil
@@ -1516,6 +1530,7 @@ func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	}
 	// If verbosity is 0, return the serialized block as a hex encoded string.
 	if c.Verbosity != nil && *c.Verbosity == 0 {
+		// todo: seem to have a bug, should contain witness.
 		return hex.EncodeToString(blkBytes), nil
 	}
 
@@ -1529,10 +1544,17 @@ func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	}
 
 	// Witness
-	if witnesses != nil {
+	if len(witnesses) != 0 && len(witnesses) == len(blk.Transactions()) {
 		txs := blk.Transactions()
 		for i := 0; i < len(txs); i++ {
-			txs[i].MsgTx().TxWitness = witnesses[i][chainhash.HashSize:]
+			//txs[i].MsgTx().TxWitness = witnesses[i][chainhash.HashSize:]
+			txWitness, autWitness, err := abeutil.DecodeTxWitnesses(txs[i].MsgTx().Version, witnesses[i][chainhash.HashSize:])
+			if err != nil {
+				context := "Failed to deserialize block"
+				return nil, internalRPCError(err.Error(), context)
+			}
+			txs[i].MsgTx().TxWitness = txWitness
+			txs[i].MsgTx().AutWitness = autWitness
 		}
 	}
 
@@ -3318,6 +3340,10 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 }
 
 // handleGetRawTransaction implements the getrawtransaction command.
+// if the caller of this function use verbose = true call this function and uses the returned bytes,
+// then it also need to call abeutil.DecodeTxWitnesses() to obtain TxWitness and AutWitness.
+// todo (CTAUT): investigate the callers of this function, check whether they use !verbose and decode witness.
+// If necessary, call abeutil.DecodeTxWitnesses().
 func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.GetRawTransactionCmd)
 
@@ -3389,6 +3415,7 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 		// avoid deserializing it only to reserialize it again later.
 		if !verbose {
 			return hex.EncodeToString(res), nil
+			// todo: if the caller of this function use res, then it also need to call abeutil.DecodeTxWitnesses()
 		}
 
 		// Grab the block height.
@@ -3407,7 +3434,14 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 			return nil, internalRPCError(err.Error(), context)
 		}
 		if len(witness) != 0 {
-			msgTx.TxWitness = witness[chainhash.HashSize:]
+			// msgTx.TxWitness = witness[chainhash.HashSize:]
+			txWitness, autWitness, err := abeutil.DecodeTxWitnesses(msgTx.Version, witness[chainhash.HashSize:])
+			if err != nil {
+				context := "Failed to deserialize transaction"
+				return nil, internalRPCError(err.Error(), context)
+			}
+			msgTx.TxWitness = txWitness
+			msgTx.AutWitness = autWitness
 		}
 		mtx = &msgTx
 	} else {
