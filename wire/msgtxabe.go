@@ -718,14 +718,14 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 		// txWitness, err := ReadVarBytes(r, pver, uint32(abepqringctparam.GetTxWitnessMaxLen(msg.Version)), "TxWitness")
 		txWitness, err := ReadVarBytes(r, pver, abecryptoxparam.MaxAllowedTxWitnessSize, "TxWitness")
 		if err != nil {
-			msg.TxWitness = nil
+			return err
 		}
 		msg.TxWitness = txWitness
 
 		if msg.Version >= TxVersion_Height_450000_Aconcagua {
 			autWitness, err := ReadVarBytes(r, pver, abecryptoxparam.MaxAllowedAutWitnessSize, "AutWitness")
 			if err != nil {
-				msg.AutWitness = nil
+				return err
 			}
 			msg.AutWitness = autWitness
 		}
@@ -847,6 +847,10 @@ func (msg *MsgTxAbe) SerializeSizeFull() int {
 	n := msg.SerializeSize()
 
 	n = n + VarIntSerializeSize(uint64(len(msg.TxWitness))) + len(msg.TxWitness)
+
+	if msg.Version >= TxVersion_Height_450000_Aconcagua {
+		n = n + VarIntSerializeSize(uint64(len(msg.AutWitness))) + len(msg.AutWitness)
+	}
 
 	return n
 }
