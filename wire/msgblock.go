@@ -361,7 +361,7 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 	return txLocs, nil
 }
 
-// DeserializeTxLoc Would be delete
+// DeserializeTxLoc Would be deleted
 func (msg *MsgBlockAbe) DeserializeTxLoc(r *bytes.Buffer) ([]TxAbeLoc, error) {
 	fullLen := r.Len()
 
