@@ -17,7 +17,7 @@ import (
 // this function will fill the TxOuts and TxWitness fields.
 // reviewed on 2023.12.07
 // reviewed on 2023.12.21
-func pqringctxCoinbaseTxGen(pp *pqringctxapi.PublicParameter, abeTxOutputDescs []*AbeTxOutputDesc, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
+func pqringctxCtxCoinbaseTxGen(pp *pqringctxapi.PublicParameter, abeTxOutputDescs []*AbeTxOutputDesc, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 
 	//	parse AbeTxOutputDesc to pqringctx.TxOutputDesc
 	txOutputDescs := make([]*pqringctxapi.TxOutputDescMLP, len(abeTxOutputDescs))
@@ -69,7 +69,7 @@ func pqringctxCoinbaseTxGen(pp *pqringctxapi.PublicParameter, abeTxOutputDescs [
 // reviewed on 2023.12.21
 // refactored on 2024.01.08, using err == nil or not to denote valid or invalid
 // todo: review
-func pqringctxCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, coinbaseTx *wire.MsgTxAbe) error {
+func pqringctxCtxCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, coinbaseTx *wire.MsgTxAbe) error {
 	if coinbaseTx == nil {
 		return fmt.Errorf("pqringctxCoinbaseTxVerify: the input coinbaseTx is nil")
 	}
@@ -116,7 +116,7 @@ func pqringctxCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, coinbaseTx *wir
 
 // pqringctxTransferTxGenByRootSeeds translates []*AbeTxInputDescByRootSeeds into []*AbeTxInputDescByKeys, then call pqringctxTransferTxGenByKeys.
 // reviewed on 2023.12.31
-func pqringctxTransferTxGenByRootSeeds(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
+func pqringctxCtxTransferTxGenByRootSeeds(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
 	abeTxInputDescsByRootSeeds []*AbeTxInputDescByRootSeeds, abeTxOutputDescs []*AbeTxOutputDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 	// just redundant double check
 	cryptoSchemeFromTxVersion, err := abecryptoxparam.GetCryptoSchemeByTxVersion(transferTxMsgTemplate.Version)
@@ -164,7 +164,7 @@ func pqringctxTransferTxGenByRootSeeds(pp *pqringctxapi.PublicParameter, cryptoS
 
 // pqringctxTransferTxGenByRandSeeds translates []*AbeTxInputDescByRandSeeds into []*AbeTxInputDescByKeys, then call pqringctxTransferTxGenByKeys.
 // reviewed on 2023.12.31
-func pqringctxTransferTxGenByRandSeeds(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxInputDescsByRandSeeds []*AbeTxInputDescByRandSeeds, abeTxOutputDescs []*AbeTxOutputDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
+func pqringctxCtxTransferTxGenByRandSeeds(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxInputDescsByRandSeeds []*AbeTxInputDescByRandSeeds, abeTxOutputDescs []*AbeTxOutputDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 	// just redundant double check
 	cryptoSchemeFromTxVersion, err := abecryptoxparam.GetCryptoSchemeByTxVersion(transferTxMsgTemplate.Version)
 	if err != nil {
@@ -221,7 +221,7 @@ func pqringctxTransferTxGenByRandSeeds(pp *pqringctxapi.PublicParameter, cryptoS
 // reviewed on 2023.12.21
 // todo: to review
 // todo: review CryptoValueSecretKeyParse
-func pqringctxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxInputDescs []*AbeTxInputDescByKeys, abeTxOutputDescs []*AbeTxOutputDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
+func pqringctxCtxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxInputDescs []*AbeTxInputDescByKeys, abeTxOutputDescs []*AbeTxOutputDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 	// just redundant double check
 	cryptoSchemeFromTxVersion, err := abecryptoxparam.GetCryptoSchemeByTxVersion(transferTxMsgTemplate.Version)
 	if err != nil {
@@ -443,7 +443,7 @@ func pqringctxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme
 
 // pqringctxTransferTxVerify verifies wire.MsgTxAbe.
 // todo: review
-func pqringctxTransferTxVerify(pp *pqringctxapi.PublicParameter, transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail) error {
+func pqringctxCtxTransferTxVerify(pp *pqringctxapi.PublicParameter, transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail) error {
 	if transferTx == nil {
 		return fmt.Errorf("pqringctxTransferTxVerify: the input transferTx is empty")
 	}
@@ -551,7 +551,7 @@ func pqringctxTransferTxVerify(pp *pqringctxapi.PublicParameter, transferTx *wir
 // This must keep the same as that in pqringct.ledgerTxoIdGen.
 // reviewed on 2023.12.08
 // reviewed on 2023.12.21
-func pqringctxLedgerTxoIdGen(ringId wire.RingId, index uint8) []byte {
+func pqringctxCtxLedgerTxoIdGen(ringId wire.RingId, index uint8) []byte {
 	w := bytes.NewBuffer(make([]byte, 0, chainhash.HashSize+1))
 	var err error
 	// ringId
@@ -573,7 +573,7 @@ func pqringctxLedgerTxoIdGen(ringId wire.RingId, index uint8) []byte {
 
 // pqringctxGetTxoPrivacyLevel returns the PrivacyLevel of the input wire.TxOutAbe.
 // reviewed on 2024.01.04
-func pqringctxGetTxoPrivacyLevel(pp *pqringctxapi.PublicParameter, abeTxo *wire.TxOutAbe) (abecryptoxkey.PrivacyLevel, error) {
+func pqringctxGetCtxTxoPrivacyLevel(pp *pqringctxapi.PublicParameter, abeTxo *wire.TxOutAbe) (abecryptoxkey.PrivacyLevel, error) {
 	cryptoTxoMLP, err := pqringctxapi.DeserializeTxo(pp, abeTxo.TxoScript)
 	if err != nil {
 		return 0, err
@@ -585,7 +585,7 @@ func pqringctxGetTxoPrivacyLevel(pp *pqringctxapi.PublicParameter, abeTxo *wire.
 // pqringctxGetTxoSerializeSize returns the TxoSerializeSize for the input coinAddress.
 // reviewed on 2023.12.07
 // refactored on 2024.01.24 by Alice: pqringctx-Layer takes as input cryptoAddress and parses it to coinAddress.
-func pqringctxGetTxoSerializeSize(pp *pqringctxapi.PublicParameter, cryptoAddressPayTo []byte) (int, error) {
+func pqringctxGetCtxTxoSerializeSize(pp *pqringctxapi.PublicParameter, cryptoAddressPayTo []byte) (int, error) {
 	//	Note that the cryptoAddressPayTo may not be generated by pqringctx,
 	//	we call ParseCryptoAddress() to cover all cases.
 	_, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(cryptoAddressPayTo)
@@ -598,7 +598,7 @@ func pqringctxGetTxoSerializeSize(pp *pqringctxapi.PublicParameter, cryptoAddres
 
 // pqringctxExtractPublicRandFromTxo returns the PublicRand in the CoinAddress of the input wire.TxOutAbe.
 // reviewed on 2023.12.31
-func pqringctxExtractPublicRandFromTxo(pp *pqringctxapi.PublicParameter, abeTxo *wire.TxOutAbe) ([]byte, error) {
+func pqringctxCtxExtractPublicRandFromTxo(pp *pqringctxapi.PublicParameter, abeTxo *wire.TxOutAbe) ([]byte, error) {
 	coinAddress, err := pqringctxapi.ExtractCoinAddressFromSerializedTxo(pp, abeTxo.TxoScript)
 	if err != nil {
 		return nil, err
@@ -608,13 +608,13 @@ func pqringctxExtractPublicRandFromTxo(pp *pqringctxapi.PublicParameter, abeTxo 
 
 // pqringctxExtractCoinAddressFromTxo returns the CoinAddress of the input wire.TxOutAbe.
 // reviewed on 2023.12.31
-func pqringctxExtractCoinAddressFromTxo(pp *pqringctxapi.PublicParameter, abeTxo *wire.TxOutAbe) ([]byte, error) {
+func pqringctxCtxExtractCoinAddressFromTxo(pp *pqringctxapi.PublicParameter, abeTxo *wire.TxOutAbe) ([]byte, error) {
 	return pqringctxapi.ExtractCoinAddressFromSerializedTxo(pp, abeTxo.TxoScript)
 }
 
 // pqringctxTxoCoinDetectByCoinDetectorRootKey use the input coinDetectorRootKey to check whether the input wire.TxOutAbe's coinAddress belongs to the owner of coinDetectorRootKey.
 // todo: review
-func pqringctxTxoCoinDetectByCoinDetectorRootKey(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe, coinDetectorRootKey []byte) (bool, error) {
+func pqringctxCtxTxoCoinDetectByCoinDetectorRootKey(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe, coinDetectorRootKey []byte) (bool, error) {
 	if abeTxo == nil {
 		return false, fmt.Errorf("pqringctxTxoCoinDetectByCoinDetectorRootKey: the input abeTxo is nil")
 	}
@@ -640,7 +640,7 @@ func pqringctxTxoCoinDetectByCoinDetectorRootKey(pp *pqringctxapi.PublicParamete
 
 // pqringctxTxoCoinDetectByCryptoDetectorKey use the input cryptoDetectorKey to check whether the input wire.TxOutAbe's coinAddress belongs to the owner of cryptoDetectorKey.
 // todo: review
-func pqringctxTxoCoinDetectByCryptoDetectorKey(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe, cryptoDetectorKey []byte) (bool, error) {
+func pqringctxCtxTxoCoinDetectByCryptoDetectorKey(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe, cryptoDetectorKey []byte) (bool, error) {
 	if abeTxo == nil {
 		return false, fmt.Errorf("pqringctxTxoCoinDetectByCryptoDetectorKey: the input abeTxo is nil")
 	}
@@ -662,7 +662,7 @@ func pqringctxTxoCoinDetectByCryptoDetectorKey(pp *pqringctxapi.PublicParameter,
 // it extracts the value of abeTxo using the input coinValueKeyRootSeed.
 // Note that it is the responsibility of the caller or user to make sure the coinValueKeyRootSeed is for the input abeTxo.
 // todo: review
-func pqringctxTxoCoinReceiveByRootSeeds(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe,
+func pqringctxCtxTxoCoinReceiveByRootSeeds(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe,
 	coinValueKeyRootSeed []byte, coinDetectorRootKey []byte) (valid bool, value uint64, err error) {
 
 	cryptoSchemeInTxo, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
@@ -735,7 +735,7 @@ func pqringctxTxoCoinReceiveByRootSeeds(pp *pqringctxapi.PublicParameter, crypto
 // it extracts the value of abeTxo using the input coinValueKeyRandSeed.
 // Note that it is the responsibility of the caller or user to make sure the coinValueKeyRandSeed is for the input abeTxo.
 // todo: review
-func pqringctxTxoCoinReceiveByRandSeeds(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe,
+func pqringctxCtxTxoCoinReceiveByRandSeeds(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe,
 	coinValueKeyRandSeed []byte, coinDetectorKey []byte) (valid bool, value uint64, err error) {
 	cryptoSchemeInTxo, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
 	if err != nil {
@@ -785,7 +785,7 @@ func pqringctxTxoCoinReceiveByRandSeeds(pp *pqringctxapi.PublicParameter, crypto
 // pqringctxTxoCoinReceiveByKeys checks whether the input abeTxo *wire.TxOutAbe belongs to the owner of the input cryptoAddress, and if true,
 // it extracts the value of abeTxo using the input cryptoValueSecretKey (if it indeed corresponds to the cryptoAddress).
 // todo: review
-func pqringctxTxoCoinReceiveByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe,
+func pqringctxCtxTxoCoinReceiveByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe,
 	cryptoAddress []byte, cryptoValueSecretKey []byte) (valid bool, value uint64, err error) {
 	cryptoSchemeInTxo, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
 	if err != nil {
@@ -829,7 +829,7 @@ func pqringctxTxoCoinReceiveByKeys(pp *pqringctxapi.PublicParameter, cryptoSchem
 // pqringctxPseudonymTxoCoinParse parses the input (Pseudonym-Privacy) TxoMLP to its (coinAddress, coinValue) pair, and
 // return an err if it is not a Pseudonym-Privacy Txo.
 // todo: review
-func pqringctxPseudonymTxoCoinParse(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe) (
+func pqringctxCtxoPseudonymTxoCoinParse(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe) (
 	coinAddress []byte, value uint64, err error) {
 
 	cryptoSchemeInTxo, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
@@ -854,7 +854,7 @@ func pqringctxPseudonymTxoCoinParse(pp *pqringctxapi.PublicParameter, cryptoSche
 // pqringctxTxoCoinSerialNumberGenByRootSeed generates serialNumber for the input LgrTxoMLP, using the input coinSerialNumberKeyRootSeed.
 // NOTE: the input coinSerialNumberKeyRootSeed could be nil, for example, when the input TxOutAbe is on a Pseudonym-Privacy address.
 // todo: review
-func pqringctxTxoCoinSerialNumberGenByRootSeed(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
+func pqringctxCtxTxoCoinSerialNumberGenByRootSeed(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
 	abeTxo *wire.TxOutAbe, ringId wire.RingId, txoIndexInRing uint8, coinSerialNumberKeyRootSeed []byte) ([]byte, error) {
 	// ringId + index -> ID
 	//	// (txo, txolid) + serialNumberSecretKey -> sn [pqringctx]
@@ -929,7 +929,7 @@ func pqringctxTxoCoinSerialNumberGenByRootSeed(pp *pqringctxapi.PublicParameter,
 // pqringctxTxoCoinSerialNumberGenByRandSeed generates serialNumber for the input LgrTxoMLP, using the input coinSerialNumberKeyRandSeed.
 // NOTE: the input coinSerialNumberKeyRandSeed could be nil, for example, when the input TxOutAbe is on a Pseudonym-Privacy address.
 // todo: review
-func pqringctxTxoCoinSerialNumberGenByRandSeed(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
+func pqringctxCtxTxoCoinSerialNumberGenByRandSeed(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
 	abeTxo *wire.TxOutAbe, ringId wire.RingId, txoIndexInRing uint8, coinSerialNumberKeyRandSeed []byte) ([]byte, error) {
 	// ringId + index -> ID
 	//	// (txo, txolid) + serialNumberSecretKey -> sn [pqringctx]
@@ -987,7 +987,7 @@ func pqringctxTxoCoinSerialNumberGenByRandSeed(pp *pqringctxapi.PublicParameter,
 // pqringctxTxoCoinSerialNumberGenByKey generates serialNumber for the input LgrTxoMLP, using the input coinSerialNumberSecretKey.
 // NOTE: the input cryptoSerialNumberSecretKey could be nil, for example, when the input TxOutAbe is on a Pseudonym-Privacy address.
 // todo: review
-func pqringctxTxoCoinSerialNumberGenByKey(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
+func pqringctxCtxTxoCoinSerialNumberGenByKey(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
 	abeTxo *wire.TxOutAbe, ringId wire.RingId, txoIndexInRing uint8, cryptoSerialNumberSecretKey []byte) ([]byte, error) {
 	// ringId + index -> ID
 	//	// (txo, txolid) + serialNumberSecretKey -> sn [pqringctx]
@@ -1095,7 +1095,7 @@ func pqringctxTxoCoinSerialNumberGenByKey(pp *pqringctxapi.PublicParameter, cryp
 // pqringctxGetTxWitnessCbTxSerializeSizeByDesc returns the TxWitnessCbTxSerializeSize for a CbTx,
 // which takes the input cryptoAddressListPayTo[] as the cryptoAddressList for the output Txos.
 // todo: review
-func pqringctxGetTxWitnessCbTxSerializeSizeByDesc(pp *pqringctxapi.PublicParameter, cryptoAddressListPayTo [][]byte) (int, error) {
+func pqringctxGetCtxTxWitnessCbTxSerializeSizeByDesc(pp *pqringctxapi.PublicParameter, cryptoAddressListPayTo [][]byte) (int, error) {
 	if len(cryptoAddressListPayTo) == 0 {
 		return 0, fmt.Errorf("pqringctxGetTxWitnessCbTxSerializeSizeByDesc: the input cryptoAddressListPayTo is empty")
 	}
@@ -1114,7 +1114,7 @@ func pqringctxGetTxWitnessCbTxSerializeSizeByDesc(pp *pqringctxapi.PublicParamet
 	return pqringctxapi.GetTxWitnessCbTxSerializeSizeByDesc(pp, coinAddressListPayTo)
 }
 
-func pqringctxGetTxWitnessTrTxSerializeSizeByDesc(pp *pqringctxapi.PublicParameter, inForRing uint8, inForSingleDistinct uint8,
+func pqringctxGetCtxTxWitnessTrTxSerializeSizeByDesc(pp *pqringctxapi.PublicParameter, inForRing uint8, inForSingleDistinct uint8,
 	outForRing uint8, inRingSizes []uint8, vPublic int64) (int, error) {
 	return pqringctxapi.GetTxWitnessTrTxSerializeSizeByDesc(pp, inForRing, inForSingleDistinct, outForRing, inRingSizes, vPublic)
 }
