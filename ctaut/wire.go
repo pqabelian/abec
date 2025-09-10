@@ -1,19 +1,20 @@
 package ctaut
 
-type CTAutTxo struct {
+type AutTxo struct {
 	Version   uint32
 	TxoScript []byte
 }
-type CTAutCoinbaseTx struct {
+
+type AutCoinbaseTx struct {
 	Version   uint32
 	Vin       uint64
-	TxOuts    []*CTAutTxo
+	TxOuts    []*AutTxo
 	TxWitness []byte
 }
 
-type CTAutTransferTx struct {
+type AutTransferTx struct {
 	Version   uint32
-	TxIns     []*CTAutTxo
-	TxOuts    []*CTAutTxo
+	TxIns     []*AutTxo
+	TxOuts    []*AutTxo
 	TxWitness []byte
 }
