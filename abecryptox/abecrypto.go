@@ -320,6 +320,7 @@ func GetTxoPrivacyLevel(abeTxo *wire.TxOutAbe) (abecryptoxkey.PrivacyLevel, erro
 // That's why txVersion is required as the input for this function.
 // reviewed on 2023.12.07
 // reviewed on 2024.01.01
+// todo: have a function with the same name, to fix
 func GetTxoSerializeSizeApprox(txVersion uint32, cryptoAddressPayTo []byte) (int, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
 	if err != nil {
