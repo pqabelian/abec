@@ -127,14 +127,14 @@ func GetAutTxoType(autTxo *ctaut.AutTxo) (AutTxoType, error) {
 // That's why txVersion is required as the input for this function.
 // reviewed on 2023.12.07
 // reviewed on 2024.01.01
-func GetAutTxoSerializeSize(txVersion uint32, autTxoType AutTxoType) (int, error) {
+func GetAutTxoScriptSize(txVersion uint32, autTxoType AutTxoType) (int, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
 	if err != nil {
 		return 0, err
 	}
 	switch cryptoScheme {
 	case abecryptoxparam.CryptoSchemePQRingCTX:
-		return pqringctxGetAutTxoSerializeSize(abecryptoxparam.PQRingCTXPP, autTxoType)
+		return pqringctxGetAutTxoScriptSize(abecryptoxparam.PQRingCTXPP, autTxoType)
 	default:
 		return 0, fmt.Errorf("GetTxoSerializeSizeApprox: Unsupported txVersion")
 	}

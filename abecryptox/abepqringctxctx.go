@@ -301,8 +301,7 @@ func pqringctxGetAutTxoType(pp *pqringctxapi.PublicParameter, autTxo *ctaut.AutT
 }
 
 // pqringctxGetAutTxoSerializeSize returns the TxoSerializeSize for the input coinAddress.
-// todo: version, rename?
-func pqringctxGetAutTxoSerializeSize(pp *pqringctxapi.PublicParameter, ctxTxoType pqringctxapi.CtxTxoType) (int, error) {
+func pqringctxGetAutTxoScriptSize(pp *pqringctxapi.PublicParameter, ctxTxoType pqringctxapi.CtxTxoType) (int, error) {
 	return pqringctxapi.GetCtxTxoSerializeSize(pp, ctxTxoType)
 }
 
