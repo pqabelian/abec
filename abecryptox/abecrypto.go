@@ -468,6 +468,7 @@ func TxoCoinReceiveByKeys(abeTxo *wire.TxOutAbe, cryptoAddress []byte, cryptoVal
 	if err != nil {
 		return false, 0, err
 	}
+	// todo: add crypto-scheme branches
 	return pqringctxTxoCoinReceiveByKeys(abecryptoxparam.PQRingCTXPP, cryptoScheme, abeTxo, cryptoAddress, cryptoValueSecretKey)
 }
 
