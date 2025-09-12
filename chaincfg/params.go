@@ -256,6 +256,12 @@ type Params struct {
 	// provides longer eras with new tokens produced,
 	// while keeping the total supply unchanged, say same as that of the original Token Release Schedule.
 	BlockHeightEra2Start int32
+
+	// BlockHeightAconcagua specifies the block height from which Aconcagua fork starts.
+	BlockHeightAconcagua int32
+	// BlockHeightAconcaguaCommit specifies the block height
+	// from which new transactions with version before TxVersion_Height_500000_Aconcagua will not be accepted anymore.
+	BlockHeightAconcaguaCommit int32
 }
 
 // MainNetParams defines the network parameters for the main network.
@@ -383,6 +389,12 @@ var MainNetParams = Params{
 	// Based on the well-accepted rule that each era starts at height XY0000 rather than XY0001 (note that the genesis block has height 0),
 	// BlockHeightEra2Start must set to be SubsidyReductionInterval.
 	BlockHeightEra2Start: 400000,
+
+	// BlockHeightAconcagua specifies the block height from which Aconcagua fork starts.
+	BlockHeightAconcagua: 450_000,
+	// BlockHeightAconcaguaCommit specifies the block height
+	// from which new transactions with version before TxVersion_Height_450000_Aconcagua will not be accepted anymore.
+	BlockHeightAconcaguaCommit: 480_000,
 }
 
 // RegressionNetParams defines the network parameters for the regression test
@@ -475,6 +487,12 @@ var RegressionNetParams = Params{
 	// Based on the well-accepted rule that each era starts at height XY0000 rather than XY0001 (note that the genesis block has height 0),
 	// BlockHeightEra2Start must set to be SubsidyReductionInterval.
 	BlockHeightEra2Start: 400000,
+
+	// BlockHeightAconcagua specifies the block height from which Aconcagua fork starts.
+	BlockHeightAconcagua: 450_000,
+	// BlockHeightAconcaguaCommit specifies the block height
+	// from which new transactions with version before TxVersion_Height_450000_Aconcagua will not be accepted anymore.
+	BlockHeightAconcaguaCommit: 480_000,
 }
 
 // TestNet3Params defines the network parameters for the test network
@@ -574,6 +592,12 @@ var TestNet3Params = Params{
 	// Based on the well-accepted rule that each era starts at height XY0000 rather than XY0001 (note that the genesis block has height 0),
 	// BlockHeightEra2Start must set to be SubsidyReductionInterval.
 	BlockHeightEra2Start: 400000,
+
+	// BlockHeightAconcagua specifies the block height from which Aconcagua fork starts.
+	BlockHeightAconcagua: 450_000,
+	// BlockHeightAconcaguaCommit specifies the block height
+	// from which new transactions with version before TxVersion_Height_450000_Aconcagua will not be accepted anymore.
+	BlockHeightAconcaguaCommit: 480_000,
 }
 
 // SimNetParams defines the network parameters for the simulation test
@@ -669,6 +693,12 @@ var SimNetParams = Params{
 	// Based on the well-accepted rule that each era starts at height XY0000 rather than XY0001 (note that the genesis block has height 0),
 	// BlockHeightEra2Start must set to be SubsidyReductionInterval.
 	BlockHeightEra2Start: 400000,
+
+	// BlockHeightAconcagua specifies the block height from which Aconcagua fork starts.
+	BlockHeightAconcagua: 450_000,
+	// BlockHeightAconcaguaCommit specifies the block height
+	// from which new transactions with version before TxVersion_Height_450000_Aconcagua will not be accepted anymore.
+	BlockHeightAconcaguaCommit: 480_000,
 }
 
 var (

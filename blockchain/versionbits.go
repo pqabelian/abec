@@ -233,6 +233,10 @@ func (b *BlockChain) calcNextBlockVersion(prevNode *blockNode) (int32, error) {
 	//}
 
 	if prevNode != nil {
+		if prevNode.height+1 >= b.chainParams.BlockHeightAconcagua {
+			return int32(wire.BlockVersionAconcagua), nil
+		}
+		
 		if prevNode.height+1 >= b.chainParams.BlockHeightMLPAUT {
 			return int32(wire.BlockVersionMLPAUT), nil
 		}

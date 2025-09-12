@@ -72,6 +72,8 @@ func GetCryptoSchemeByTxVersion(txVersion uint32) (CryptoScheme, error) {
 		return CryptoSchemePQRingCT, nil
 	case 2: // wire.TxVersion_Height_MLPAUT_300000
 		return CryptoSchemePQRingCTX, nil
+	case 3: // wire.TxVersion_Height_450000_ACONCAGUA
+		return CryptoSchemePQRingCTX, nil
 	default:
 		return 0, fmt.Errorf("GetCryptoSchemeByTxVersion: Unsupported TxVersion")
 	}
@@ -104,6 +106,9 @@ func GetTxInputMaxNum(txVersion uint32) (int, error) {
 	case 2: // wire.TxVersion_Height_MLPAUT_300000:
 		return pqringctxGetTxInputMaxNum(PQRingCTXPP), nil
 
+	case 3: // wire.TxVersion_Height_450000_Aconcagua:
+		return pqringctxGetTxInputMaxNum(PQRingCTXPP), nil
+
 	default:
 		return 0, fmt.Errorf("GetTxInputMaxNum: the input txVersion (%d) is not supported", txVersion)
 	}
@@ -119,6 +124,9 @@ func GetTxInputMaxNumForRing(txVersion uint32) (int, error) {
 	case 2: // wire.TxVersion_Height_MLPAUT_300000:
 		return pqringctxGetTxInputMaxNumForRing(PQRingCTXPP), nil
 
+	case 3: // wire.TxVersion_Height_450000_Aconcagua:
+		return pqringctxGetTxInputMaxNumForRing(PQRingCTXPP), nil
+
 	default:
 		return 0, fmt.Errorf("GetTxInputMaxNumForRing: the input txVersion (%d) is not supported", txVersion)
 	}
@@ -128,6 +136,9 @@ func GetTxInputMaxNumForSingle(txVersion uint32) (int, error) {
 	// todo: for each version, there is a corresponding CryptoScheme.
 	// Here we call the function of corresponding crypto-scheme
 	case 2: // wire.TxVersion_Height_MLPAUT_300000:
+		return pqringctxGetTxInputMaxNumForSingle(PQRingCTXPP), nil
+
+	case 3: // wire.TxVersion_Height_450000_Aconcagua:
 		return pqringctxGetTxInputMaxNumForSingle(PQRingCTXPP), nil
 
 	default:
@@ -148,6 +159,9 @@ func GetTxOutputMaxNum(txVersion uint32) (int, error) {
 	case 2: //wire.TxVersion_Height_MLPAUT_300000:
 		return pqringctxGetTxOutputMaxNum(PQRingCTXPP), nil
 
+	case 3: //wire.TxVersion_Height_450000_Aconcagua:
+		return pqringctxGetTxOutputMaxNum(PQRingCTXPP), nil
+
 	default:
 		return 0, fmt.Errorf("GetTxOutputMaxNum: the input txVersion (%d) is not supported", txVersion)
 	}
@@ -162,6 +176,9 @@ func GetTxOutputMaxNumForRing(txVersion uint32) (int, error) {
 	case 2: // wire.TxVersion_Height_MLPAUT_300000:
 		return pqringctxGetTxOutputMaxNumForRing(PQRingCTXPP), nil
 
+	case 3: // wire.TxVersion_Height_450000_Aconcagua:
+		return pqringctxGetTxOutputMaxNumForRing(PQRingCTXPP), nil
+
 	default:
 		return 0, fmt.Errorf("GetTxOutputMaxNumForRing: the input txVersion (%d) is not supported", txVersion)
 	}
@@ -171,6 +188,9 @@ func GetTxOutputMaxNumForSingle(txVersion uint32) (int, error) {
 	// todo: for each version, there is a corresponding CryptoScheme.
 	// Here we call the function of corresponding crypto-scheme
 	case 2: // wire.TxVersion_Height_MLPAUT_300000:
+		return pqringctxGetTxOutputMaxNumForSingle(PQRingCTXPP), nil
+
+	case 3: // wire.TxVersion_Height_450000_Aconcagua:
 		return pqringctxGetTxOutputMaxNumForSingle(PQRingCTXPP), nil
 
 	default:

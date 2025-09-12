@@ -654,11 +654,14 @@ func (g *BlkTmplGenerator) NewBlockTemplate(cryptoAddressPayTo []byte) (*BlockTe
 	//extraNonce := uint64(0)
 	// ToDo(MLP): If there are more versions, we need to added here.
 	txVersion := wire.TxVersion
-	if nextBlockHeight < g.chainParams.BlockHeightMLPAUT {
-		txVersion = wire.TxVersion_Height_0
-	} else {
+	if nextBlockHeight >= g.chainParams.BlockHeightAconcagua {
+		txVersion = wire.TxVersion_Height_450000_Aconcagua
+	} else if nextBlockHeight >= g.chainParams.BlockHeightMLPAUT {
 		txVersion = wire.TxVersion_Height_MLPAUT_300000
+	} else {
+		txVersion = wire.TxVersion_Height_0
 	}
+
 	// At this moment, we do not need to support output for coinbaseTx,
 	// since it will require the mechanism on separating the total output value to the multiple output Txos.
 	coinbaseTxMsg, err := createCoinbaseTxAbeMsgTemplate(nextBlockHeight, txVersion, cryptoAddressPayTo)
@@ -726,6 +729,23 @@ mempoolLoop:
 		// simnet  [0    -    299  ] [300       -    999   ] [1000     -    1999  ]
 		//             1                    1/2                  2
 		// ToDo(MLP):
+		if nextBlockHeight >= g.chainParams.BlockHeightAconcaguaCommit {
+			if tx.MsgTx().Version < wire.TxVersion_Height_450000_Aconcagua {
+				log.Tracef("Skipping tx %s, since from block with height %d, "+
+					"transactions with version %d will not be mined any more",
+					tx.Hash(), g.chainParams.BlockHeightAconcaguaCommit, tx.MsgTx().Version)
+				continue
+			}
+		} else if nextBlockHeight >= g.chainParams.BlockHeightAconcagua {
+			// nothing to do
+		} else { //nextBlockHeight < g.chainParams.BlockHeightAconcagua
+			if tx.MsgTx().Version >= wire.TxVersion_Height_450000_Aconcagua {
+				log.Tracef("Skipping tx %s, transactions with version %d would not be mined until height %d",
+					tx.Hash(), tx.MsgTx().Version, g.chainParams.BlockHeightAconcagua)
+				continue
+			}
+		}
+
 		if nextBlockHeight >= g.chainParams.BlockHeightMLPAUTCOMMIT {
 			if tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_300000 {
 				log.Tracef("Skipping tx %s, since from block with height %d, transactions with version %d will not be mined any more", tx.Hash(), g.chainParams.BlockHeightMLPAUTCOMMIT, tx.MsgTx().Version)

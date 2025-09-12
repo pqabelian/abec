@@ -1225,7 +1225,14 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 		//	todo: when more versions appear, we need to refactor here.
 		// Added by Alice, 2024.05.11, for DSA
 		// todo(DSA): review
-		if header.Height >= b.chainParams.BlockHeightMLPAUT {
+		if header.Height >= b.chainParams.BlockHeightAconcagua {
+			if header.Version != int32(wire.BlockVersionAconcagua) {
+				str := fmt.Sprintf("block has height %d, it should have version %08x for Aconcagua, "+
+					"rather than the version %08x",
+					header.Height, int32(wire.BlockVersionAconcagua), header.Version)
+				return ruleError(ErrMismatchedBlockHeightAndVersion, str)
+			}
+		} else if header.Height >= b.chainParams.BlockHeightMLPAUT {
 			if header.Version != int32(wire.BlockVersionMLPAUT) {
 				str := fmt.Sprintf("block has height %d, it should have version %08x for MLPAUT, rather than the version %08x", header.Height, int32(wire.BlockVersionMLPAUT), header.Version)
 				return ruleError(ErrMismatchedBlockHeightAndVersion, str)
@@ -1324,6 +1331,28 @@ func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blo
 	// 1. after commit height, disallow transaction less than older version
 	// 2. during fork to commit, coinbase transaction must be new version
 	// 3. before fork, coinbase/transfer transaction must be older version
+	if blockHeight >= b.chainParams.BlockHeightAconcaguaCommit {
+		//	the block should not contain transactions with earlier version
+		for i, tx := range block.Transactions() {
+			if tx.MsgTx().Version < wire.TxVersion_Height_450000_Aconcagua {
+				return fmt.Errorf("checkBlockContextAbe: the block has height %d, "+
+					"but its %d -th transaction has version %d", block.Height(), i, tx.MsgTx().Version)
+			}
+		}
+	} else if blockHeight >= b.chainParams.BlockHeightAconcagua {
+		if coinbaseTx.MsgTx().Version < wire.TxVersion_Height_450000_Aconcagua {
+			return fmt.Errorf("checkBlockContextAbe: the block has height %d, but its first transaction (coinbase Tx) has version %d", block.Height(), coinbaseTx.MsgTx().Version)
+		}
+	} else {
+		// blockHeight < b.chainParams.BlockHeightAconcagua
+		for i, tx := range block.Transactions() {
+			if tx.MsgTx().Version >= wire.TxVersion_Height_450000_Aconcagua {
+				return fmt.Errorf("checkBlockContextAbe: the block has height %d, "+
+					"but its %d -th transaction has version %d", block.Height(), i, tx.MsgTx().Version)
+			}
+		}
+	}
+
 	if blockHeight >= b.chainParams.BlockHeightMLPAUTCOMMIT {
 		//	the block should not contain transactions with earlier version
 		for i, tx := range block.Transactions() {
