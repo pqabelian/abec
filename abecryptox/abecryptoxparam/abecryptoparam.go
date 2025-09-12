@@ -219,9 +219,14 @@ func GetNullSerialNumber(txVersion uint32) ([]byte, error) {
 	}
 }
 
-// GetTxoSerializeSizeApprox
-// todo: review
-func GetTxoSerializeSizeApprox(txVersion uint32, coinAddressPayTo []byte) (int, error) {
+// GetTxoSerializeSizeApprox returns the approximate serialize size for a Txo,
+// which is in a transaction with the version being the input TxVersion and for the cryptoAddressPayTo.
+// Note that the transactions are generated and verified by the underlying crypto-scheme,
+// the approximate serialize size for Txo actually depends on the underlying crypto-scheme.
+// That's why txVersion is required as the input for this function.
+// reviewed on 2023.12.07
+// reviewed on 2024.01.01
+func GetTxoSerializeSizeApprox(txVersion uint32, cryptoAddressPayTo []byte) (int, error) {
 	cryptoScheme, err := GetCryptoSchemeByTxVersion(txVersion)
 	if err != nil {
 		return 0, err
@@ -232,7 +237,7 @@ func GetTxoSerializeSizeApprox(txVersion uint32, coinAddressPayTo []byte) (int, 
 		return abecryptoparam.GetTxoSerializeSizeApprox(txVersion)
 
 	case CryptoSchemePQRingCTX:
-		return pqringctxGetTxoSerializeSize(PQRingCTXPP, coinAddressPayTo)
+		return pqringctxGetTxoSerializeSize(PQRingCTXPP, cryptoAddressPayTo)
 
 	default:
 		return 0, fmt.Errorf("GetTxoSerializeSizeApprox: the cryptoScheme (%d) corresponding to the input txVersion (%d) is not supported", cryptoScheme, txVersion)

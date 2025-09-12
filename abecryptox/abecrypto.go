@@ -313,29 +313,6 @@ func GetTxoPrivacyLevel(abeTxo *wire.TxOutAbe) (abecryptoxkey.PrivacyLevel, erro
 	return 0, nil
 }
 
-// GetTxoSerializeSizeApprox returns the approximate serialize size for a Txo,
-// which is in a transaction with the version being the input TxVersion and for the cryptoAddressPayTo.
-// Note that the transactions are generated and verified by the underlying crypto-scheme,
-// the approximate serialize size for Txo actually depends on the underlying crypto-scheme.
-// That's why txVersion is required as the input for this function.
-// reviewed on 2023.12.07
-// reviewed on 2024.01.01
-// todo: have a function with the same name, to fix
-func GetTxoSerializeSizeApprox(txVersion uint32, cryptoAddressPayTo []byte) (int, error) {
-	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
-	if err != nil {
-		return 0, err
-	}
-	switch cryptoScheme {
-	case abecryptoxparam.CryptoSchemePQRingCT:
-		return abecryptoparam.GetTxoSerializeSizeApprox(txVersion)
-	case abecryptoxparam.CryptoSchemePQRingCTX:
-		return pqringctxGetTxoSerializeSize(abecryptoxparam.PQRingCTXPP, cryptoAddressPayTo)
-	default:
-		return 0, fmt.Errorf("GetTxoSerializeSizeApprox: Unsupported txVersion")
-	}
-}
-
 // ExtractPublicRandFromTxo returns the PublicRand in the CoinAddress of the input wire.TxOutAbe.
 // reviewed on 2023.12.31
 // reviewed on 2024.01.24
@@ -585,6 +562,7 @@ func TxoCoinSerialNumberGenByKey(abeTxo *wire.TxOutAbe, ringId wire.RingId, txoI
 // reviewed on 2023.12.07
 // reviewed on 2024.01.01, by Alice
 // refactored on 2024.01.24, by Alice, pqringctx-Layer takes cryptoAddress as input.
+// todo: move to abecryptoparam.go
 func GetCbTxWitnessSerializeSizeApprox(txVersion uint32, cryptoAddressListPayTo [][]byte) (int, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
 	if err != nil {
@@ -607,7 +585,7 @@ func GetCbTxWitnessSerializeSizeApprox(txVersion uint32, cryptoAddressListPayTo 
 // Note that the transactions are generated and versified by the underlying crypto-scheme,
 // the approximate serialize size for TransferTxWitness actually depends on the underlying crypto-scheme.
 // That's why txVersion is required as the input for this function.
-// todo: review
+// todo: move to abecryptoparam.go
 func GetTrTxWitnessSerializeSizeApprox(txVersion uint32,
 	inForRing uint8, inForSingleDistinct uint8, inRingSizes []uint8,
 	outForRing uint8, vPublic int64) (int, error) {
