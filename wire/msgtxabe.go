@@ -897,11 +897,11 @@ func PrecomputeTrTxConSizeMLP(txVersion uint32, inputRingVersions []uint32,
 	// 	serialized varInt size for output number
 	n = n + 1 // 1 byte for the output Txo Number
 	for i := 0; i < len(coinAddressListPayTo); i++ {
-		txoScriptLen, err := abecryptoxparam.GetTxoSerializeSizeApprox(txVersion, coinAddressListPayTo[i]) // depending on the crypto-scheme, and the TxVersion
+		txoScriptLen, err := abecryptoxparam.GetTxoScriptSizeApprox(txVersion, coinAddressListPayTo[i]) // depending on the crypto-scheme, and the TxVersion
 		if err != nil {
 			return 0, err
 		}
-		n = n + uint32(4+VarIntSerializeSize(uint64(txoScriptLen))) + uint32(txoScriptLen)
+		n = n + 4 + uint32(VarIntSerializeSize(uint64(txoScriptLen))) + uint32(txoScriptLen)
 	}
 
 	/*	for _, txOut := range msg.TxOuts {
@@ -942,12 +942,12 @@ func PrecomputeTrTxConSize(txVersion uint32, inputRingVersions []uint32, inputRi
 	}*/
 
 	// 	serialized varint size for output number
-	n = n + 1                                                                // 1 byte for the output Txo Number
-	txoScriptLen, err := abecryptoparam.GetTxoSerializeSizeApprox(txVersion) // depending on the crypto-scheme, and the TxVersion
+	n = n + 1                                                             // 1 byte for the output Txo Number
+	txoScriptLen, err := abecryptoparam.GetTxoScriptSizeApprox(txVersion) // depending on the crypto-scheme, and the TxVersion
 	if err != nil {
 		return 0, err
 	}
-	n = n + uint32(outputTxoNum)*(uint32(4+VarIntSerializeSize(uint64(txoScriptLen)))+uint32(txoScriptLen))
+	n = n + uint32(outputTxoNum)*(4+uint32(VarIntSerializeSize(uint64(txoScriptLen)))+uint32(txoScriptLen))
 	/*	for _, txOut := range msg.TxOuts {
 		n = n + txOut.SerializeSize()
 	}*/

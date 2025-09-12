@@ -148,14 +148,14 @@ func GetNullSerialNumber(txVersion uint32) ([]byte, error) {
 	}
 }
 
-// GetTxoSerializeSizeApprox returns the approximate serialize size for Txo, which is decided by the TxVersion.
+// GetTxoScriptSizeApprox returns the approximate serialize size for Txo, which is decided by the TxVersion.
 // Note that the transactions are generated and versified by the underlying crypto-scheme,
 // the approximate serialize size for Txo actually depends on the underlying crypto-scheme.
 // That's why txVersion is required as the input for this function.
-func GetTxoSerializeSizeApprox(txVersion uint32) (int, error) {
+func GetTxoScriptSizeApprox(txVersion uint32) (int, error) {
 	switch txVersion {
 	case 1:
-		return pqringct.GetTxoSerializeSizeApprox(PQRingCTPP), nil
+		return pqringct.GetTxoScriptSize(PQRingCTPP), nil
 	default:
 		return 0, errors.New("GetTxoSerializeSizeApprox: Unsupported txVersion")
 	}
