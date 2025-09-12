@@ -12,6 +12,9 @@ type AutCoinbaseTx struct {
 	TxWitness []byte
 }
 
+// AutTransferTx is only used to generate/verify TxOuts and balance proof.
+//
+// As a result, TxIns directly and only contain AutTxo.
 type AutTransferTx struct {
 	Version   uint32
 	TxIns     []*AutTxo
