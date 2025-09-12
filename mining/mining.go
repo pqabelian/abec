@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/abesuite/abec/abecryptox"
+	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
@@ -423,7 +424,11 @@ func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, txVersion uint32, cry
 	msgTx.AddTxIn(coinbaseTxIn)
 
 	// oneTxOut
-	txoScriptSizeApprox, err := abecryptoxparam.GetTxoSerializeSizeApprox(msgTx.Version, cryptoAddressPayTo)
+	_, coinAddressPayTo, _, err := abecryptoxkey.CryptoAddressParse(cryptoAddressPayTo)
+	if err != nil {
+		return nil, err
+	}
+	txoScriptSizeApprox, err := abecryptoxparam.GetTxoScriptSizeApprox(msgTx.Version, coinAddressPayTo)
 	if err != nil {
 		return nil, err
 	}
