@@ -252,8 +252,19 @@ func pqringctxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme
 			if txInRingVersion == wire.TxVersion_Height_0 &&
 				transferTxMsgTemplate.Version == wire.TxVersion_Height_MLPAUT_300000 {
 				// allowed case:
-				// we allow to use a transaction with Version == wire.TxVersion_Height_MLPAUT_300000
+				// we allow to use a transaction with Version == wire.TxVersion_Height_300000_MLPAUT
 				// to spend coins with Version == wire.TxVersion_Height_0.
+			} else if txInRingVersion == wire.TxVersion_Height_0 &&
+				transferTxMsgTemplate.Version == wire.TxVersion_Height_450000_Aconcagua {
+				// allowed case:
+				// we allow to use a transaction with Version == wire.TxVersion_Height_500000_Aconcagua
+				// to spend coins with Version == wire.TxVersion_Height_0.
+
+			} else if txInRingVersion == wire.TxVersion_Height_MLPAUT_300000 &&
+				transferTxMsgTemplate.Version == wire.TxVersion_Height_450000_Aconcagua {
+				// allowed case:
+				// we allow to use a transaction with Version == wire.TxVersion_Height_500000_Aconcagua
+				// to spend coins with Version == wire.TxVersion_Height_300000_MLPAUT.
 			} else {
 				return nil, fmt.Errorf("pqringctxTransferTxGen: the transferTxMsgTemplate is attempting to spend coins created by transactions with differnet versions, but the case is out of the allowed ones")
 			}
@@ -468,6 +479,12 @@ func pqringctxTransferTxVerify(pp *pqringctxapi.PublicParameter, transferTx *wir
 		if transferTx.TxIns[i].PreviousOutPointRing.Version != transferTx.Version {
 			if transferTx.TxIns[i].PreviousOutPointRing.Version == wire.TxVersion_Height_0 &&
 				transferTx.Version == wire.TxVersion_Height_MLPAUT_300000 {
+				//	allowed
+			} else if transferTx.TxIns[i].PreviousOutPointRing.Version == wire.TxVersion_Height_0 &&
+				transferTx.Version == wire.TxVersion_Height_450000_Aconcagua {
+				//	allowed
+			} else if transferTx.TxIns[i].PreviousOutPointRing.Version == wire.TxVersion_Height_MLPAUT_300000 &&
+				transferTx.Version == wire.TxVersion_Height_450000_Aconcagua {
 				//	allowed
 			} else {
 				//	not in the allowed cases

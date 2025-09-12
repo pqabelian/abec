@@ -531,6 +531,10 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 			// todo: when there are more cases of TxVersion, we may need hardcode more cases here.
 			if txIn.PreviousOutPointRing.Version == wire.TxVersion_Height_0 && msgTx.Version == wire.TxVersion_Height_MLPAUT_300000 {
 				//	allowed case, nothing to do
+			} else if txIn.PreviousOutPointRing.Version == wire.TxVersion_Height_0 && msgTx.Version == wire.TxVersion_Height_450000_Aconcagua {
+				//	allowed case, nothing to do
+			} else if txIn.PreviousOutPointRing.Version == wire.TxVersion_Height_MLPAUT_300000 && msgTx.Version == wire.TxVersion_Height_450000_Aconcagua {
+				//	allowed case, nothing to do
 			} else {
 				str := fmt.Sprintf("transaction's %d -th input refers to an OutPointRing with ring version "+
 					"%d, which is different from msgTx.Version %d, and this is not in the expected cases", i, txIn.PreviousOutPointRing.Version, msgTx.Version)
