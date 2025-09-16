@@ -192,6 +192,14 @@ func (view *CTAUTViewpoint) SetBestHash(hash *chainhash.Hash) {
 	view.bestHash = *hash
 }
 
+func (view *CTAUTViewpoint) Instances() map[string]*CTAUTInstance {
+	return view.instances
+}
+
+func (view *CTAUTViewpoint) SetInstances(instances map[string]*CTAUTInstance) {
+	view.instances = instances
+}
+
 // LookupAutCoin returns information about a given transaction output according to
 // the current state of the view.  It will return nil if the passed output does
 // not exist in the view or is otherwise not available such as when it has been
@@ -238,7 +246,8 @@ func (view *CTAUTViewpoint) addCTAUTCoin(identifier []byte, outpoint ctaut.OutPo
 	instance.coins[outpoint] = NewCTAUTCoin(identifier, script, blockHeight)
 }
 
-func (view *CTAUTViewpoint) connectRegistrationTransaction(autTransaction *ctaut.RegistrationTx, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
+func (view *CTAUTViewpoint) connectRegistrationTransaction(autTransaction *ctaut.RegistrationTx, txHash chainhash.Hash,
+	blockHeight int32, sctauts *[]SpentCTAUT) error {
 	identifierKey := CTAUTIdentifierKey(autTransaction.AUTIdentifier())
 	instance, exist := view.instances[identifierKey]
 	// TODO(CTAUT) assert rule need match the initialization
