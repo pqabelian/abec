@@ -63,7 +63,7 @@ func ctautOutpointKey(outpoint ctaut.OutPoint) *[]byte {
 func recycleCTAUTOutpointKey(key *[]byte) {
 	ctautOutpointKeyPool.Put(key)
 }
-func serializeCTAUTInstanceSize(info *ctaut.Instance) int {
+func serializeCTAUTInstanceSize(info *ctaut.Metadata) int {
 	if info == nil {
 		return 0
 	}
@@ -100,9 +100,9 @@ func serializeCTAUTInstanceSize(info *ctaut.Instance) int {
 
 	return n
 }
-func serializeCTAUTInstance(info *ctaut.Instance) ([]byte, error) {
+func serializeCTAUTMetadata(info *ctaut.Metadata) ([]byte, error) {
 	if info == nil {
-		return nil, errors.New("nil pointer to aut.Instance for serialize")
+		return nil, errors.New("nil pointer to aut.Metadata for serialize")
 	}
 	// Calculate the size needed to serialize AUT info.
 	size := serializeCTAUTInstanceSize(info)
@@ -185,10 +185,10 @@ func serializeCTAUTInstance(info *ctaut.Instance) ([]byte, error) {
 
 	return buff.Bytes(), nil
 }
-func deserializeCTAUTInstance(serialized []byte) (*ctaut.Instance, error) {
+func deserializeCTAUTMetadata(serialized []byte) (*ctaut.Metadata, error) {
 	// Serialize the header code followed by the compressed unspent
 	// transaction output.
-	info := &ctaut.Instance{}
+	info := &ctaut.Metadata{}
 	var err error
 	buff := bytes.NewReader(serialized)
 	info.CTAutIdentifier, err = wire.ReadVarBytes(buff, 0, aut.IdentifierLength, "identifier")
@@ -290,8 +290,8 @@ type SpentCTAUT interface {
 	Type() SpentCTAUTType
 }
 type UpdatedCTAUTInfo struct {
-	Before *ctaut.Instance
-	After  *ctaut.Instance
+	Before *ctaut.Metadata
+	After  *ctaut.Metadata
 
 	// Height is the height of the the block containing the creating tx.
 	Height int32
@@ -338,7 +338,7 @@ func spentCTAUTSerializeSize(stxo SpentCTAUT) (int, error) {
 
 		// +1 to represent nil for before
 		size += 1
-		serializedBefore, err := serializeCTAUTInstance(updated.Before)
+		serializedBefore, err := serializeCTAUTMetadata(updated.Before)
 		if err != nil {
 			return 0, err
 		}
@@ -349,7 +349,7 @@ func spentCTAUTSerializeSize(stxo SpentCTAUT) (int, error) {
 
 		// +1 to represent nil for after
 		size += 1
-		sizeAfter, err := serializeCTAUTInstance(updated.After)
+		sizeAfter, err := serializeCTAUTMetadata(updated.After)
 		if err != nil {
 			return 0, err
 		}
@@ -390,7 +390,7 @@ func putSpentCTAUT(target []byte, stxo SpentCTAUT) (int, error) {
 		offset += putVLQ(target[offset:], headerCode)
 
 		// +1 to represent nil
-		serializedBefore, err := serializeCTAUTInstance(updated.Before)
+		serializedBefore, err := serializeCTAUTMetadata(updated.Before)
 		if err != nil {
 			return 0, err
 		}
@@ -407,7 +407,7 @@ func putSpentCTAUT(target []byte, stxo SpentCTAUT) (int, error) {
 			offset += len(serializedBefore)
 		}
 
-		serializedAfter, err := serializeCTAUTInstance(updated.After)
+		serializedAfter, err := serializeCTAUTMetadata(updated.After)
 		if err != nil {
 			return 0, err
 		}
@@ -484,7 +484,7 @@ func decodeSpentCTAUT(serialized []byte) (SpentCTAUT, int, error) {
 			offset += 1
 		} else {
 			offset += 1
-			res.Before = &ctaut.Instance{}
+			res.Before = &ctaut.Metadata{}
 			sizeOfInfo, bytesRead := deserializeVLQ(serialized[offset:])
 			offset += bytesRead
 			if offset >= len(serialized) {
@@ -492,7 +492,7 @@ func decodeSpentCTAUT(serialized []byte) (SpentCTAUT, int, error) {
 					"after reserved")
 			}
 
-			res.Before, err = deserializeCTAUTInstance(serialized[offset : offset+int(sizeOfInfo)])
+			res.Before, err = deserializeCTAUTMetadata(serialized[offset : offset+int(sizeOfInfo)])
 			if err != nil {
 				return nil, offset, errDeserialize("unexpected end of data " +
 					"after reserved")
@@ -504,14 +504,14 @@ func decodeSpentCTAUT(serialized []byte) (SpentCTAUT, int, error) {
 			offset += 1
 		} else {
 			offset += 1
-			res.After = &ctaut.Instance{}
+			res.After = &ctaut.Metadata{}
 			sizeOfInfo, bytesRead := deserializeVLQ(serialized[offset:])
 			offset += bytesRead
 			if offset >= len(serialized) {
 				return nil, offset, errDeserialize("unexpected end of data " +
 					"after reserved")
 			}
-			res.After, err = deserializeCTAUTInstance(serialized[offset : offset+int(sizeOfInfo)])
+			res.After, err = deserializeCTAUTMetadata(serialized[offset : offset+int(sizeOfInfo)])
 			if err != nil {
 				return nil, offset, errDeserialize("unexpected end of data " +
 					"after reserved")
@@ -730,7 +730,7 @@ func dbFetchCTAUTCoin(dbTx database.Tx, outpoint ctaut.OutPoint) (*CTAUTCoin, er
 	return coin, nil
 }
 
-func dbFetchCTAUTInstance(dbTx database.Tx, key []byte) (*ctaut.Instance, error) {
+func dbFetchCTAUTMetadata(dbTx database.Tx, key []byte) (*ctaut.Metadata, error) {
 	// Fetch the unspent transaction output information for the passed
 	// transaction output.  Return now when there is no entry.
 	autInfoBucket := dbTx.Metadata().Bucket(ctautInstanceBucketName)
@@ -740,7 +740,7 @@ func dbFetchCTAUTInstance(dbTx database.Tx, key []byte) (*ctaut.Instance, error)
 	}
 
 	// Deserialize the utxo entry and return it.
-	instance, err := deserializeCTAUTInstance(serializedAUTInfo)
+	metadata, err := deserializeCTAUTMetadata(serializedAUTInfo)
 	if err != nil {
 		// Ensure any deserialization errors are returned as database
 		// corruption errors.
@@ -748,14 +748,14 @@ func dbFetchCTAUTInstance(dbTx database.Tx, key []byte) (*ctaut.Instance, error)
 			return nil, database.Error{
 				ErrorCode: database.ErrCorruption,
 				Description: fmt.Sprintf("corrupt information "+
-					"for AUT instance %v: %v", key, err),
+					"for AUT metadata %v: %v", key, err),
 			}
 		}
 
 		return nil, err
 	}
 
-	return instance, nil
+	return metadata, nil
 }
 func dbRemoveCTAUTInstance(dbTx database.Tx, instanceToDel map[string]struct{}, blockHeight int32, blockHash chainhash.Hash) error {
 	ctautInstanceBucket := dbTx.Metadata().Bucket(ctautInstanceBucketName)
@@ -786,7 +786,7 @@ func dbPutCTAUTView(dbTx database.Tx, view *CTAUTViewpoint, blockHeight int32, b
 		identifier := instance.metadata.CTAutIdentifier
 
 		// Serialize and store the utxo entry.
-		serializedCTAUTInfo, err := serializeCTAUTInstance(instance.metadata)
+		serializedCTAUTInfo, err := serializeCTAUTMetadata(instance.metadata)
 		if err != nil {
 			return err
 		}

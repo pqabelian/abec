@@ -1,34 +1,39 @@
-Here is the information about CT-AUT (Confidential Transaction for Abelian User Token).
+Here is the information about CT-AUT (Confidential Transaction for Abelian User Token) protocol.
 
 ### Overview
-Embedding the ct-aut script in memo field within an Abelian transfer transaction, and the ct-aut script would be 
+By embedding the ct-aut script in memo field within an Abelian transfer transaction, and the ct-aut script would be 
 interpreted with the following formats:
 
-1. Registration script, it would declare a new CT-AUT, as the result, an CT-AUT instance would be initialized with its 
+1. Registration script, it would declare a new CT-AUT instance, as the result, an CT-AUT instance would be initialized with its 
 metadata, including the following fields:
    - identifier, used as a unique identifier for the instance
-     - a byte array with fixed length
+     - a byte array with fixed length (64)
      - CAN'T be changed anymore
    - symbol, used as a symbol visible to the user
-     - a byte array with max length
+     - a byte array with max length (64)
      - [#TODO] CAN'T be changed anymore
    - token unit, including 
-     - common units, a byte array with max length, [#TODO] CAN'T be changed anymore
-     - minimum units, a byte array with max length, [#TODO] CAN'T be changed anymore
-     - the conversion ratio between common units and minimum units, [#TODO] CAN'T be changed anymore
-   - total planned issuance, counting in minimum units
+     - common units, a byte array with max length (20)
+       - [#TODO] CAN'T be changed anymore
+     - minimum units, a byte array with max length (20)
+       - [#TODO] CAN'T be changed anymore
+     - the conversion ratio between common units and minimum units 
+       - an integer range in (0, $2^{51}$ -1) [#TODO inclusive or not for upper limit?]
+       - [#TODO] CAN'T be changed anymore
+   - total planned issuance amount, counting in minimum units
      - an integer range in (0, $2^{51}$ -1) [#TODO inclusive or not for upper limit?]
      - could be changed with subsequent re-registration scripts
-   - AUT memo, used as a note
-       - a byte array with max length
+   - AUT memo, used as a note for instance
+       - a byte array with max length (1024)
    - issuers, used to auth for subsequent operations on instances (mint/re-register)
-     - an array of public key
-     - length N
+     - an array with length N of pseudonymous address (193-byte)
+     - N MUST less than or equal to 10
    - issuance threshold, 
      - an integer, less than or equal to N
    - re-registration threshold
      - an integer, less than or equal to N
    - expiry block height
+     - 32-bit signed integer
      - all root coins will expire after this height
      - next re-registration MUST occur before this height   
    - number of root coins, the root coins would be one-time access token for subsequent operations on instances
