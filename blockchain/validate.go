@@ -2026,6 +2026,9 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 }
 func PopulateCTAUTInputs(autTransaction ctaut.Transaction, tx *abeutil.TxAbe, height int32,
 	hostView *UtxoRingViewpoint) error {
+	if autTransaction == nil {
+		return nil
+	}
 	txHash := tx.Hash()
 
 	hostedTxIns := tx.MsgTx().TxIns
