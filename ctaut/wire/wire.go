@@ -1,4 +1,4 @@
-package ctaut
+package wire
 
 type AutTxo struct {
 	Version   uint32

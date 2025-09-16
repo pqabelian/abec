@@ -6,6 +6,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
+	"math/big"
+	"time"
+
+	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/abeutil"
@@ -13,11 +18,10 @@ import (
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/consensus/ethash"
+	"github.com/abesuite/abec/ctaut"
+	ctautwire "github.com/abesuite/abec/ctaut/wire"
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
-	"math"
-	"math/big"
-	"time"
 )
 
 const (
@@ -2025,6 +2029,460 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 
 	return nil
 }
+func PopulateCTAUTInputs(autTransaction ctaut.Transaction, tx *abeutil.TxAbe, height int32,
+	hostView *UtxoRingViewpoint) error {
+	txHash := tx.Hash()
+	hostedTxIns := tx.MsgTx().TxIns
+	startIndex := 0
+
+	numInCoins := autTransaction.NumTxInputs()
+
+	for ; startIndex < len(hostedTxIns); startIndex++ {
+		// sanity-check
+		ringHash := hostedTxIns[startIndex].PreviousOutPointRing.Hash()
+		utxoRing := hostView.LookupEntry(ringHash)
+		if utxoRing == nil {
+			return fmt.Errorf("transaction %s try to mint at height %d but "+
+				"the consumed UTXO at Ring %s not exist", txHash, height, ringHash)
+		}
+		if len(utxoRing.txOuts) == 0 {
+			return fmt.Errorf("transaction %s try to mint at height %d but "+
+				"the consumed UTXO at Ring %s has ring size %d, expected %d",
+				txHash, height, ringHash, len(utxoRing.txOuts), 1)
+		}
+		privacyLevel, err := abecryptox.GetTxoPrivacyLevel(utxoRing.txOuts[0])
+		if err != nil {
+			return err
+		}
+		if privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre ||
+			privacyLevel == abecryptoxkey.PrivacyLevelRINGCT {
+			continue
+		}
+
+		if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+			return fmt.Errorf("expect privacy level %d but got %d",
+				abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
+		}
+		break
+	}
+	if startIndex+numInCoins > len(hostedTxIns) {
+		return fmt.Errorf("claim %d (root) coins but only remain %d outputs",
+			numInCoins, len(hostedTxIns)-startIndex)
+	}
+
+	autTxIns := make([]*ctaut.CTAUTToken, numInCoins)
+	for i := 0; i < len(autTxIns); i++ {
+		hostIndex := startIndex + i
+
+		// sanity-check
+		ringHash := hostedTxIns[startIndex].PreviousOutPointRing.Hash()
+		utxoRing := hostView.LookupEntry(ringHash)
+		if utxoRing == nil {
+			return fmt.Errorf("transaction %s try to mint at height %d but "+
+				"the consumed UTXO at Ring %s not exist", txHash, height, ringHash)
+		}
+		if len(utxoRing.txOuts) == 0 || len(utxoRing.outPointRing.OutPoints) == 0 {
+			return fmt.Errorf("transaction %s try to mint at height %d but "+
+				"the consumed UTXO at Ring %s has ring size %d, expected %d",
+				txHash, height, ringHash, len(utxoRing.txOuts), 1)
+		}
+		privacyLevel, err := abecryptox.GetTxoPrivacyLevel(utxoRing.txOuts[0])
+		if err != nil {
+			return err
+		}
+		if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+			return fmt.Errorf("expect privacy level %d but got %d",
+				abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
+		}
+
+		outpoint := ctaut.OutPoint{
+			TxHash: utxoRing.outPointRing.OutPoints[0].TxHash,
+			Index:  utxoRing.outPointRing.OutPoints[0].Index,
+		}
+
+		coinAddress, err := ctaut.CheckTxoSanity(outpoint.TxHash, int(outpoint.Index), utxoRing.txOuts[hostIndex])
+		if err != nil {
+			return fmt.Errorf("transaction %s try to mint at height %d but "+
+				"the consumed UTXO at Ring %s is not a valid output",
+				txHash, height, hostedTxIns[i].PreviousOutPointRing.Hash())
+		}
+
+		autTxIns[i] = &ctaut.CTAUTToken{
+			OutPoint:    outpoint,
+			ValueScript: nil,         // will be populated later before verfication
+			CoinAddress: coinAddress, // required by root coin while optional for coin
+		}
+	}
+	return autTransaction.SetTxInputs(autTxIns)
+}
+func checkCTAUTRegistrationTransactionInputs(autTransaction *ctaut.RegistrationTx, tx *abeutil.TxAbe, txHeight int32,
+	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
+	identifierKey := CTAUTIdentifierKey(autTransaction.AUTIdentifier())
+
+	instance, exist := ctautView.instances[identifierKey]
+	if exist && instance != nil && instance.metadata != nil {
+		return errors.New("an registration transaction try to register AUT instance with an existing AUT identifier ")
+	}
+
+	if autTransaction.ExpireHeight <= txHeight {
+		return fmt.Errorf("transaction %s try to register an AUT "+
+			"instance with expire height %d , but current block height %d, it will expire soon", tx.Hash(),
+			autTransaction.ExpireHeight, txHeight)
+	}
+
+	return nil
+}
+func checkCTAUTMintTransactionInputs(autTransaction *ctaut.MintTx, tx *abeutil.TxAbe, txHeight int32,
+	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
+	identifierKey := CTAUTIdentifierKey(autTransaction.AUTIdentifier())
+
+	instance, exist := ctautView.instances[identifierKey]
+	if !exist || instance == nil || instance.metadata == nil {
+		return errors.New("an non-registration AUT transaction try to operate on non-existing AUT entry")
+	}
+
+	allIssuerTokens := map[string]struct{}{}
+	for i := 0; i < len(instance.metadata.IssuerTokens); i++ {
+		// TODO(CTAUT) got the issue token in some way, here it only get the coin address but not value public key anyway
+		coinAddress := instance.metadata.IssuerTokens[i]
+		allIssuerTokens[hex.EncodeToString(coinAddress)] = struct{}{}
+	}
+
+	// duplicated input or double spending?
+	consumedIssueTokens := map[string]struct{}{}
+	willConsumedRootCoins := map[ctaut.OutPoint]struct{}{}
+	for i := 0; i < len(autTransaction.TxIns); i++ {
+		outpoint := autTransaction.TxIns[i].OutPoint
+		if _, existOutpoint := instance.metadata.RootCoinSet[outpoint]; !existOutpoint {
+			return fmt.Errorf("transaction %s try to mint with unknown root coin <%s:%d>",
+				tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index)
+		}
+
+		// check whether duplicate though it won't appear with the checking with hosted Abelian transaction
+		if _, ok := willConsumedRootCoins[outpoint]; ok {
+			return fmt.Errorf("transaction %s try to mint with repeated root coin <%s:%d>",
+				tx.Hash(), outpoint.TxHash, outpoint.Index)
+		}
+		willConsumedRootCoins[outpoint] = struct{}{}
+
+		if len(autTransaction.TxIns[i].CoinAddress) == 0 {
+			return fmt.Errorf("transaction %s try to mint with root coin <%s:%d>, but it has no coin address",
+				tx.Hash(), outpoint.TxHash, outpoint.Index)
+		}
+		coinAddressKey := hex.EncodeToString(autTransaction.TxIns[i].CoinAddress)
+		if _, ok := consumedIssueTokens[coinAddressKey]; !ok {
+			consumedIssueTokens[coinAddressKey] = struct{}{}
+		}
+
+		autTransaction.TxIns[i] = &ctaut.CTAUTToken{
+			OutPoint:    outpoint,
+			ValueScript: nil, // nil for root coin
+		}
+	}
+
+	for issuerToken := range consumedIssueTokens {
+		if _, ok := allIssuerTokens[issuerToken]; !ok {
+			return fmt.Errorf("transaction %s try to mint at height %d with "+
+				"issue token but it do not exist in its registration", tx.Hash(), txHeight)
+		}
+	}
+	// check the threshold
+	if len(consumedIssueTokens) < int(instance.metadata.IssueTokensThreshold) {
+		return fmt.Errorf("transaction %s try to mint with %d issue token but "+
+			"the AUT entry claim its issue threshold %d",
+			tx.Hash(), len(consumedIssueTokens), instance.metadata.IssueTokensThreshold)
+	}
+
+	// TODO(CTAUT) check the witness
+	cbTx := &ctautwire.AutCoinbaseTx{
+		Version:   tx.MsgTx().Version,
+		Vin:       autTransaction.Vin,
+		TxOuts:    make([]*ctautwire.AutTxo, 0, len(autTransaction.TxOuts)),
+		TxWitness: tx.MsgTx().AutWitness,
+	}
+	for i := 0; i < len(autTransaction.TxOuts); i++ {
+		cbTx.TxOuts = append(cbTx.TxOuts, &ctautwire.AutTxo{
+			Version:   tx.MsgTx().Version,
+			TxoScript: autTransaction.TxOuts[i].ValueScript,
+		})
+	}
+	err := abecryptox.AutCoinbaseTxVerify(cbTx)
+	if err != nil {
+		return fmt.Errorf("transaction %s try to mint but the witness verfied fail with %s", tx.Hash(), err)
+	}
+
+	if instance.metadata.MintedAmount+autTransaction.Vin < instance.metadata.MintedAmount {
+		return fmt.Errorf("transaction %s try to mint coin exceed it claimed planned %d",
+			tx.Hash(), instance.metadata.PlannedTotalAmount)
+	}
+
+	return nil
+}
+
+func checkCTAUTReRegistrationTransactionInputs(autTransaction *ctaut.ReRegistrationTx, tx *abeutil.TxAbe, txHeight int32,
+	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
+	identifierKey := CTAUTIdentifierKey(autTransaction.AUTIdentifier())
+
+	instance, exist := ctautView.instances[identifierKey]
+	if !exist || instance == nil || instance.metadata == nil {
+		return errors.New("an non-registration AUT transaction try to operate on non-existing AUT entry")
+	}
+
+	// sanity check
+	if instance.metadata.ExpireHeight < txHeight {
+		return fmt.Errorf("transaction %s try to re-register at height %d but "+
+			"the AUT entry claim its expire height %d when last registered", tx.Hash(), txHeight, instance.metadata.ExpireHeight)
+	}
+
+	allIssuerTokens := map[string]struct{}{}
+	for i := 0; i < len(instance.metadata.IssuerTokens); i++ {
+		// TODO(CTAUT) got the issue token in some way, here it only get the coin address but not value public key anyway
+		coinAddress := instance.metadata.IssuerTokens[i]
+		allIssuerTokens[hex.EncodeToString(coinAddress)] = struct{}{}
+	}
+
+	// duplicated input or double spending?
+	consumedIssueTokens := map[string]struct{}{}
+	willConsumedRootCoins := map[ctaut.OutPoint]struct{}{}
+	autTransaction.TxIns = make([]*ctaut.CTAUTToken, autTransaction.InAutRootCoinNum)
+	for i := 0; i < len(autTransaction.TxIns); i++ {
+		outpoint := autTransaction.TxIns[i].OutPoint
+
+		if _, existOutpoint := instance.metadata.RootCoinSet[outpoint]; !existOutpoint {
+			return fmt.Errorf("transaction %s try to mint with unknown root coin <%s:%d>",
+				tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index)
+		}
+
+		// check whether duplicate though it won't appear with the checking with hosted Abelian transaction
+		if _, ok := willConsumedRootCoins[outpoint]; ok {
+			return fmt.Errorf("transaction %s try to mint with repeated root coin <%s:%d>",
+				tx.Hash(), outpoint.TxHash, outpoint.Index)
+		}
+		willConsumedRootCoins[outpoint] = struct{}{}
+
+		coinAddressKey := hex.EncodeToString(autTransaction.TxIns[i].CoinAddress)
+		if _, ok := consumedIssueTokens[coinAddressKey]; !ok {
+			consumedIssueTokens[coinAddressKey] = struct{}{}
+		}
+
+		autTransaction.TxIns[i] = &ctaut.CTAUTToken{
+			OutPoint:    outpoint,
+			ValueScript: nil, // nil for root coin
+		}
+	}
+
+	for issuerToken := range consumedIssueTokens {
+		if _, ok := allIssuerTokens[issuerToken]; !ok {
+			return fmt.Errorf("transaction %s try to mint at height %d with "+
+				"issue token but it do not exist in its registration", tx.Hash(), txHeight)
+		}
+	}
+	// check the threshold
+	if len(consumedIssueTokens) < int(instance.metadata.IssuerUpdateThreshold) {
+		return fmt.Errorf("transaction %s try to re-register with %d issuer token but "+
+			"the AUT entry claim its update threshold %d", tx.Hash(), len(consumedIssueTokens),
+			instance.metadata.IssuerUpdateThreshold)
+	}
+
+	// check updated AUT info
+	// planned amount
+	if autTransaction.PlannedTotalAmount < instance.metadata.MintedAmount {
+		return fmt.Errorf("transaction %s try to update the planned total amount to %d but "+
+			"the AUT entry has mint %d", tx.Hash(), autTransaction.PlannedTotalAmount,
+			instance.metadata.MintedAmount)
+	}
+
+	if autTransaction.ExpireHeight <= txHeight {
+		return fmt.Errorf("transaction %s try to re-register an AUT "+
+			"entry with expire height %d (current height %d)", tx.Hash(),
+			autTransaction.ExpireHeight, txHeight)
+	}
+
+	return nil
+}
+
+func checkCTAUTTransferTransactionInputs(autTransaction *ctaut.TransferTx, tx *abeutil.TxAbe, txHeight int32,
+	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
+	identifier := autTransaction.AUTIdentifier()
+	identifierKey := CTAUTIdentifierKey(identifier)
+
+	instance, exist := ctautView.instances[identifierKey]
+	if !exist || instance == nil || instance.metadata == nil {
+		return errors.New("an non-registration AUT transaction try to operate on non-existing AUT entry")
+	}
+
+	// duplicated input or double spending?
+	willConsumedTokens := map[ctaut.OutPoint]struct{}{}
+	for i := 0; i < len(autTransaction.TxIns); i++ {
+		outpoint := autTransaction.TxIns[i].OutPoint
+		coin := ctautView.LookupCTAUTCoin(identifier, outpoint)
+		if coin == nil {
+			return fmt.Errorf("transaction %s at %d try to tranfer tokens with invalid CTAUT coin",
+				tx.Hash(), txHeight)
+		}
+
+		autTransaction.TxIns[i] = &ctaut.CTAUTToken{
+			OutPoint:    outpoint,
+			ValueScript: coin.script, // non-nil for coin
+		}
+	}
+
+	trTx := &ctautwire.AutTransferTx{
+		Version:   tx.MsgTx().Version,
+		TxIns:     make([]*ctautwire.AutTxo, 0, len(autTransaction.TxIns)),
+		TxOuts:    make([]*ctautwire.AutTxo, 0, len(autTransaction.TxOuts)),
+		TxWitness: tx.MsgTx().AutWitness,
+	}
+
+	// sanity check
+	for i := 0; i < len(autTransaction.TxIns); i++ {
+		outpoint := autTransaction.TxIns[i].OutPoint
+		// ensure no duplicate
+		if _, ok := willConsumedTokens[outpoint]; ok {
+			return fmt.Errorf("transaction %s try to double spend the token <%s:%d>",
+				tx.Hash(), outpoint.TxHash, outpoint.Index)
+		}
+		willConsumedTokens[outpoint] = struct{}{}
+
+		// collect information
+		trTx.TxIns = append(trTx.TxIns, &ctautwire.AutTxo{
+			Version:   tx.MsgTx().Version,
+			TxoScript: autTransaction.TxIns[i].ValueScript,
+		})
+	}
+
+	// TODO(CTAUT): check witness for CTAUT
+	for i := 0; i < len(autTransaction.TxOuts); i++ {
+		trTx.TxOuts = append(trTx.TxOuts, &ctautwire.AutTxo{
+			Version:   tx.MsgTx().Version,
+			TxoScript: autTransaction.TxOuts[i].ValueScript,
+		})
+	}
+	err := abecryptox.AutTransferTxVerify(trTx)
+	if err != nil {
+		return fmt.Errorf(`transaction %s try to transfer tokens for CTAUT instance %s 
+but the witness verfied fail with %s`, tx.Hash(), identifierKey, err)
+	}
+	return nil
+}
+
+func checkCTAUTBurnTransactionInputs(autTransaction *ctaut.BurnTx, tx *abeutil.TxAbe, txHeight int32,
+	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
+	identifier := autTransaction.AUTIdentifier()
+	identifierKey := CTAUTIdentifierKey(identifier)
+
+	instance, exist := ctautView.instances[identifierKey]
+	if !exist || instance == nil || instance.metadata == nil {
+		return errors.New("an non-registration AUT transaction try to operate on non-existing AUT entry")
+	}
+
+	// duplicated input or double spending?
+	willConsumedTokens := map[ctaut.OutPoint]struct{}{}
+	autTransaction.TxIns = make([]*ctaut.CTAUTToken, autTransaction.InAutCoinNum)
+	for i := 0; i < len(autTransaction.TxIns); i++ {
+		outpoint := autTransaction.TxIns[i].OutPoint
+		coin := ctautView.LookupCTAUTCoin(identifier, outpoint)
+		if coin == nil {
+			return fmt.Errorf("transaction %s at %d try to burn tokens with invalid CTAUT coin",
+				tx.Hash(), txHeight)
+		}
+
+		autTransaction.TxIns[i] = &ctaut.CTAUTToken{
+			OutPoint:    outpoint,
+			ValueScript: coin.script, // non-nil for coin
+		}
+	}
+
+	trTx := &ctautwire.AutTransferTx{
+		Version:   tx.MsgTx().Version,
+		TxIns:     make([]*ctautwire.AutTxo, 0, len(autTransaction.TxIns)),
+		TxOuts:    make([]*ctautwire.AutTxo, 0, len(autTransaction.TxOuts)),
+		TxWitness: tx.MsgTx().AutWitness,
+	}
+
+	// sanity check
+	for i := 0; i < len(autTransaction.TxIns); i++ {
+		outpoint := autTransaction.TxIns[i].OutPoint
+		// ensure no duplicate
+		if _, ok := willConsumedTokens[outpoint]; ok {
+			return fmt.Errorf("transaction %s try to double spend the token <%s:%d>",
+				tx.Hash(), outpoint.TxHash, outpoint.Index)
+		}
+		willConsumedTokens[outpoint] = struct{}{}
+
+		// collect information
+		trTx.TxIns = append(trTx.TxIns, &ctautwire.AutTxo{
+			Version:   tx.MsgTx().Version,
+			TxoScript: autTransaction.TxIns[i].ValueScript,
+		})
+	}
+
+	// TODO(CTAUT): check witness for CTAUT
+	for i := 0; i < len(autTransaction.TxOuts); i++ {
+		trTx.TxOuts = append(trTx.TxOuts, &ctautwire.AutTxo{
+			Version:   tx.MsgTx().Version,
+			TxoScript: autTransaction.TxOuts[i].ValueScript,
+		})
+	}
+	err := abecryptox.AutTransferTxVerify(trTx)
+	if err != nil {
+		return fmt.Errorf(`transaction %s try to transfer tokens for CTAUT instance %s 
+but the witness verfied fail with %s`, tx.Hash(), identifierKey, err)
+	}
+	return nil
+}
+
+func CheckCTAUTTransactionInputs(tx *abeutil.TxAbe, txHeight int32, ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
+	if tx == nil {
+		return fmt.Errorf("CheckTransactionInputsAUT: a nil transaction")
+	}
+	ctautTx, err := tx.CTAUTTransaction()
+	if err != nil {
+		return fmt.Errorf("CheckTransactionInputsAUT: error happens when extract AutTRansaction from the input abeutil.TxAbe: %v", err)
+	}
+	if ctautTx == nil {
+		// As this function is for AUT, so it should be called on a Tx without hosting AutTransaction.
+		return fmt.Errorf("CheckTransactionInputsAUT: the input abeutil.TxAbe does not contain a valid AutTransaction")
+	}
+
+	switch autTransaction := ctautTx.(type) {
+	case *ctaut.RegistrationTx:
+		err = checkCTAUTRegistrationTransactionInputs(autTransaction, tx, txHeight, ctautView, chainParams)
+		if err != nil {
+			return err
+		}
+
+	case *ctaut.MintTx:
+		err = checkCTAUTMintTransactionInputs(autTransaction, tx, txHeight, ctautView, chainParams)
+		if err != nil {
+			return err
+		}
+
+	case *ctaut.ReRegistrationTx:
+		err = checkCTAUTReRegistrationTransactionInputs(autTransaction, tx, txHeight, ctautView, chainParams)
+		if err != nil {
+			return err
+		}
+
+	case *ctaut.TransferTx:
+		err = checkCTAUTTransferTransactionInputs(autTransaction, tx, txHeight, ctautView, chainParams)
+		if err != nil {
+			return err
+		}
+
+	case *ctaut.BurnTx:
+		// This branch is exactly the same checking as the previous one, except for all the differences in handling outputs
+		err = checkCTAUTBurnTransactionInputs(autTransaction, tx, txHeight, ctautView, chainParams)
+		if err != nil {
+			return err
+		}
+
+	default:
+		return errors.New("unsupported AUT transaction type")
+	}
+
+	return nil
+}
 
 // checkConnectBlockAbe performs several checks to confirm connecting the passed
 // block to the chain represented by the passed view does not violate any rules.
@@ -2060,7 +2518,8 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 // todo_DONE(MLP): reviewed on 2024.01.04
 func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 	view *UtxoRingViewpoint, stxos *[]*SpentTxOutAbe,
-	autView *AUTViewpoint, sauts *[]SpentAUT) error {
+	autView *AUTViewpoint, sauts *[]SpentAUT,
+	ctautView *CTAUTViewpoint, sctauts *[]SpentCTAUT) error {
 	// If the side chain blocks end up in the database, a call to
 	// CheckBlockSanity should be done here in case a previous version
 	// allowed a block that is no longer valid.  However, since the
@@ -2121,6 +2580,11 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	}
 
 	err = autView.fetchInputAUTUtxos(b.db, block)
+	if err != nil {
+		return err
+	}
+
+	err = ctautView.fetchInputCTAUTUtxos(b.db, block, view)
 	if err != nil {
 		return err
 	}
@@ -2400,11 +2864,14 @@ func (b *BlockChain) CheckConnectBlockTemplateAbe(block *abeutil.BlockAbe) error
 
 	autView := NewAUTViewpoint()
 	autView.SetBestHash(&tip.hash)
+
+	ctautView := NewCTAUTViewpoint()
+	ctautView.SetBestHash(&tip.hash)
 	//	todo: (EthashPoW)
 	newNode, err := b.newBlockNode(&header, tip)
 	if err != nil {
 		return err
 	}
 
-	return b.checkConnectBlockAbe(newNode, block, view, nil, autView, nil)
+	return b.checkConnectBlockAbe(newNode, block, view, nil, autView, nil, ctautView, nil)
 }

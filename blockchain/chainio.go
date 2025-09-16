@@ -6,12 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/aut"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/database"
-	"github.com/abesuite/abec/wire"
 	"io"
 	"math"
 	"math/big"
@@ -21,6 +15,13 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
+	"github.com/abesuite/abec/abeutil"
+	"github.com/abesuite/abec/aut"
+	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/database"
+	"github.com/abesuite/abec/wire"
 )
 
 const (
@@ -2488,6 +2489,11 @@ func (b *BlockChain) createChainState() error {
 			return err
 		}
 
+		err = createBucketForCTAUT(meta)
+		if err != nil {
+			return err
+		}
+
 		// Save the genesis block to the block index database.
 		err = dbStoreBlockNode(dbTx, node)
 		if err != nil {
@@ -2522,12 +2528,14 @@ func (b *BlockChain) initChainState() error {
 	var initialized, hasBlockIndex bool
 	var hasDeletedWitnessFileBucket bool
 	var hasAUTRelevantBucket bool
+	var hasCTAUTRelevantBucket bool
 	var workedHeightScope, readyHeightScope []BlockHeightScope
 	err := b.db.View(func(dbTx database.Tx) error {
 		initialized = dbTx.Metadata().Get(chainStateKeyName) != nil
 		hasBlockIndex = dbTx.Metadata().Bucket(blockIndexBucketName) != nil
 		hasDeletedWitnessFileBucket = dbTx.Metadata().Bucket(deletedWitnessFileBucketName) != nil
 		hasAUTRelevantBucket = dbTx.Metadata().Bucket(autInfoBucketName) != nil
+		hasCTAUTRelevantBucket = dbTx.Metadata().Bucket(ctautInstanceBucketName) != nil
 
 		if b.chainParams.Net != wire.MainNet {
 			workedHeightScope = dbFetchWorkedFakePowBlockScope(dbTx)
@@ -2590,6 +2598,21 @@ func (b *BlockChain) initChainState() error {
 			}
 
 			_, err = meta.CreateBucket(autSpendJournalBucketName)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+	if !hasCTAUTRelevantBucket {
+		log.Infof("Creating bucket for aut information...")
+		err = b.db.Update(func(dbTx database.Tx) error {
+			meta := dbTx.Metadata()
+			err = createBucketForCTAUT(meta)
 			if err != nil {
 				return err
 			}

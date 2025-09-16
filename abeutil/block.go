@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/abesuite/abec/aut"
 	"io"
+
+	"github.com/abesuite/abec/aut"
+	"github.com/abesuite/abec/ctaut"
 
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
@@ -51,6 +53,9 @@ type BlockAbe struct {
 
 	autTransactions  []aut.Transaction
 	autTxnsGenerated bool
+
+	ctautTransactions  []ctaut.Transaction
+	ctautTxnsGenerated bool
 }
 
 // Abe to do
@@ -379,6 +384,48 @@ func (b *BlockAbe) AUTTransactions() []aut.Transaction {
 
 	b.autTxnsGenerated = true
 	return b.autTransactions
+}
+func (b *BlockAbe) CTAUTTransactions() []ctaut.Transaction {
+	// Return transactions if they have ALL already been generated.  This
+	// flag is necessary because the wrapped transactions are lazily
+	// generated in a sparse fashion.
+	if b.ctautTxnsGenerated {
+		return b.ctautTransactions
+	}
+
+	// Generate slice to hold all of the wrapped transactions if needed.
+	if len(b.ctautTransactions) == 0 {
+		b.ctautTransactions = make([]ctaut.Transaction, 0, len(b.msgBlock.Transactions))
+	}
+
+	// Generate and cache the wrapped autTransactions for all that haven't
+	// already been done.
+	for i, txAbe := range b.Transactions() {
+		isCb, err := txAbe.IsCoinBase()
+		if err != nil {
+			//	this should not happen
+			log.Warnf("AUTTransactions: error happens when calling IsCoinBase() on the %d-th transaction of the block: %v", i, err)
+			continue
+		}
+		if isCb {
+			continue
+		}
+
+		autTx, err := txAbe.CTAUTTransaction()
+		if err != nil {
+			//	this should not happen
+			log.Warnf("AUTTransactions: error happens when getting AutTransaction from the %d-th transaction (%s) of the block: %v", i, txAbe.Hash(), err)
+			continue
+		}
+		if autTx == nil {
+			log.Debugf("AUTTransactions: skip non-AUT transaction %s", txAbe.Hash())
+			continue
+		}
+		b.ctautTransactions = append(b.ctautTransactions, autTx)
+	}
+
+	b.ctautTxnsGenerated = true
+	return b.ctautTransactions
 }
 
 // TxHash returns the hash for the requested transaction number in the Block.

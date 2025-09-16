@@ -2,8 +2,9 @@ package abecryptox
 
 import (
 	"fmt"
+
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
-	"github.com/abesuite/abec/ctaut"
+	"github.com/abesuite/abec/ctaut/wire"
 )
 
 // APIs for Transactions	begin
@@ -11,7 +12,7 @@ import (
 // CoinbaseTxGen takes as input the transaction material and outputs a *wire.MsgTxAbe
 // reviewed on 2023.12.07
 // reviewed on 2023.12.21
-func AutCoinbaseTxGen(txVersion uint32, vin uint64, autTxOutputDescs []*AutTxOutputDesc) (*ctaut.AutCoinbaseTx, error) {
+func AutCoinbaseTxGen(txVersion uint32, vin uint64, autTxOutputDescs []*AutTxOutputDesc) (*wire.AutCoinbaseTx, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
 	if err != nil {
 		return nil, err
@@ -31,7 +32,7 @@ func AutCoinbaseTxGen(txVersion uint32, vin uint64, autTxOutputDescs []*AutTxOut
 }
 
 // CoinbaseTxVerify verifies whether the input coinbaseTx *wire.MsgTxAbe is valid.
-func AutCoinbaseTxVerify(autCoinbaseTx *ctaut.AutCoinbaseTx) error {
+func AutCoinbaseTxVerify(autCoinbaseTx *wire.AutCoinbaseTx) error {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(autCoinbaseTx.Version)
 	if err != nil {
 		return err
@@ -49,7 +50,7 @@ func AutCoinbaseTxVerify(autCoinbaseTx *ctaut.AutCoinbaseTx) error {
 
 // TransferTxGenByKeys generates a new MsgTxAbe by filling the TxIns[].serialNumber, TxOuts[], and the TxWitness of the input transferTxMsgTemplate.
 // reviewed on 2023.12.21
-func AutTransferTxGen(txVersion uint32, autTxInputDescs []*AutTxInputDesc, autTxOutputDescs []*AutTxOutputDesc) (*ctaut.AutTransferTx, error) {
+func AutTransferTxGen(txVersion uint32, autTxInputDescs []*AutTxInputDesc, autTxOutputDescs []*AutTxOutputDesc) (*wire.AutTransferTx, error) {
 
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
 	if err != nil {
@@ -73,7 +74,7 @@ func AutTransferTxGen(txVersion uint32, autTxInputDescs []*AutTxInputDesc, autTx
 
 // TransferTxVerify verifies the input transferTx.
 // todo: review
-func AutTransferTxVerify(autTransferTx *ctaut.AutTransferTx) error {
+func AutTransferTxVerify(autTransferTx *wire.AutTransferTx) error {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(autTransferTx.Version)
 	if err != nil {
 		return err
@@ -104,7 +105,7 @@ func AutTransferTxVerify(autTransferTx *ctaut.AutTransferTx) error {
 // In the future, if PrivacyLevelPSEUDONYMCT Txo is supported, Txo's data besides CoinAddressType will be further used to
 // determine its PrivacyLevel.
 // reviewed on 2024.01.04
-func GetAutTxoType(autTxo *ctaut.AutTxo) (AutTxoType, error) {
+func GetAutTxoType(autTxo *wire.AutTxo) (AutTxoType, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(autTxo.Version)
 	if err != nil {
 		return 0, err
@@ -142,7 +143,7 @@ func GetAutTxoScriptSize(txVersion uint32, autTxoType AutTxoType) (int, error) {
 
 // TxoCoinReceiveByKeys
 // todo: review
-func ExtractAutTxoValue(autTxo *ctaut.AutTxo, coinaValuePublicKey []byte, cryptoValueSecretKey []byte) (uint64, error) {
+func ExtractAutTxoValue(autTxo *wire.AutTxo, coinaValuePublicKey []byte, cryptoValueSecretKey []byte) (uint64, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(autTxo.Version)
 	if err != nil {
 		return 0, err

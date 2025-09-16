@@ -7,6 +7,18 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
+	"net"
+	"os"
+	"path/filepath"
+	"runtime"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
@@ -28,17 +40,6 @@ import (
 	"github.com/abesuite/abec/wire"
 	"github.com/abesuite/abec/witnessmgr"
 	"github.com/shirou/gopsutil/v3/process"
-	"math"
-	"net"
-	"os"
-	"path/filepath"
-	"runtime"
-	"sort"
-	"strconv"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 const (
@@ -2646,6 +2647,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		FetchUtxoView:     s.chain.FetchUtxoView,
 		FetchUtxoRingView: s.chain.FetchUtxoRingView,
 		FetchAUTView:      s.chain.FetchAUTView,
+		FetchCTAUTView:    s.chain.FetchCTAUTView,
 		BestHeight:        func() int32 { return s.chain.BestSnapshot().Height },
 		MedianTimePast:    func() time.Time { return s.chain.BestSnapshot().MedianTime },
 		CalcSequenceLock: func(tx *abeutil.Tx, view *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error) {

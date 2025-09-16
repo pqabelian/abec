@@ -2,8 +2,10 @@ package abeutil
 
 import (
 	"bytes"
-	"github.com/abesuite/abec/aut"
 	"io"
+
+	"github.com/abesuite/abec/aut"
+	"github.com/abesuite/abec/ctaut"
 
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
@@ -40,6 +42,10 @@ type TxAbe struct {
 	autTxDone bool
 	autTx     aut.Transaction
 	errAUTTx  error
+
+	ctAutTxDone bool
+	ctAutTx     ctaut.Transaction
+	errCTAUTTx  error
 }
 
 // MsgTx returns the underlying wire.MsgTx for the transaction.
@@ -68,6 +74,16 @@ func (tx *TxAbe) AUTTransaction() (aut.Transaction, error) {
 	tx.autTx, tx.errAUTTx = aut.ExtractAutTransaction(tx.MsgTx())
 
 	return tx.autTx, tx.errAUTTx
+}
+func (tx *TxAbe) CTAUTTransaction() (ctaut.Transaction, error) {
+	if tx.autTxDone {
+		return tx.ctAutTx, tx.errCTAUTTx
+	}
+	tx.ctAutTxDone = true
+
+	tx.ctAutTx, tx.errCTAUTTx = ctaut.ExtractCTAutTransaction(tx.MsgTx())
+
+	return tx.ctAutTx, tx.errCTAUTTx
 }
 
 func (tx *TxAbe) InvType() wire.InvType {

@@ -2,8 +2,9 @@ package abecryptox
 
 import (
 	"fmt"
+
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
-	"github.com/abesuite/abec/ctaut"
+	"github.com/abesuite/abec/ctaut/wire"
 	"github.com/cryptosuite/pqringctx/pqringctxapi"
 )
 
@@ -19,7 +20,7 @@ const (
 
 // The caller needs to fill the Version, TxIns, TxFee, TxMemo fields for coinbaseTxMsgTemplate,
 // this function will fill the TxOuts and TxWitness fields.
-func pqringctxAutCoinbaseTxGen(pp *pqringctxapi.PublicParameter, txVersion uint32, vin uint64, autTxOutputDescs []*AutTxOutputDesc) (*ctaut.AutCoinbaseTx, error) {
+func pqringctxAutCoinbaseTxGen(pp *pqringctxapi.PublicParameter, txVersion uint32, vin uint64, autTxOutputDescs []*AutTxOutputDesc) (*wire.AutCoinbaseTx, error) {
 
 	//	parse AbeTxOutputDesc to pqringctx.TxOutputDesc
 	ctxTxOutputDesc := make([]*pqringctxapi.CtxTxOutputDesc, len(autTxOutputDescs))
@@ -36,13 +37,13 @@ func pqringctxAutCoinbaseTxGen(pp *pqringctxapi.PublicParameter, txVersion uint3
 
 	// parse the pqringctx.CoinbaseTx to wire.TxAbe
 	ctxTxos := pqringctxapi.GetCtxCoinbaseTxTxos(ctxCoinbaseTx)
-	autTxos := make([]*ctaut.AutTxo, len(ctxTxos))
+	autTxos := make([]*wire.AutTxo, len(ctxTxos))
 	for i := 0; i < len(ctxTxos); i++ {
 		serializedCtxTxo, err := pqringctxapi.SerializeCtxTxo(pp, ctxTxos[i])
 		if err != nil {
 			return nil, err
 		}
-		autTxos[i] = &ctaut.AutTxo{
+		autTxos[i] = &wire.AutTxo{
 			Version:   txVersion,
 			TxoScript: serializedCtxTxo,
 		}
@@ -56,7 +57,7 @@ func pqringctxAutCoinbaseTxGen(pp *pqringctxapi.PublicParameter, txVersion uint3
 	}
 	autTxWitness := serializedCtxCbTxWitness
 
-	autCoinbaseTx := &ctaut.AutCoinbaseTx{
+	autCoinbaseTx := &wire.AutCoinbaseTx{
 		Version:   txVersion,
 		Vin:       vin,
 		TxOuts:    autTxos,
@@ -69,7 +70,7 @@ func pqringctxAutCoinbaseTxGen(pp *pqringctxapi.PublicParameter, txVersion uint3
 // pqringctxCoinbaseTxVerify verify the input coinbaseTx *wire.MsgTxAbe.
 // The caller needs to guarantee the well-form of the input coinbaseTx *wire.MsgTxAbe, such as the TxIns.
 // This function only checks the balance proof, by calling the crypto-scheme.
-func pqringctxAutCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, autCoinbaseTx *ctaut.AutCoinbaseTx) error {
+func pqringctxAutCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, autCoinbaseTx *wire.AutCoinbaseTx) error {
 	if autCoinbaseTx == nil {
 		return fmt.Errorf("pqringctxCoinbaseTxVerify: the input coinbaseTx is nil")
 	}
@@ -125,7 +126,7 @@ func pqringctxAutCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, autCoinbaseT
 // todo: to review
 // todo: review CryptoValueSecretKeyParse
 func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
-	txVersion uint32, autTxInputDescs []*AutTxInputDesc, autTxOutputDescs []*AutTxOutputDesc) (*ctaut.AutTransferTx, error) {
+	txVersion uint32, autTxInputDescs []*AutTxInputDesc, autTxOutputDescs []*AutTxOutputDesc) (*wire.AutTransferTx, error) {
 	// just redundant double check
 	cryptoSchemeFromTxVersion, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
 	if err != nil {
@@ -187,20 +188,20 @@ func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 
 	//	Set the txInputs
 	//	As the underlying crypto-scheme will not change this part, it can be set directly using the autTxInputDescs
-	autTxIns := make([]*ctaut.AutTxo, inputNum)
+	autTxIns := make([]*wire.AutTxo, inputNum)
 	for i := 0; i < inputNum; i++ {
 		autTxIns[i] = autTxInputDescs[i].autTxo
 	}
 
 	// Set the TxOuts
 	ctxTxos := pqringctxapi.GetCtxTransferTxTxos(ctxTransferTx)
-	autTxos := make([]*ctaut.AutTxo, len(ctxTxos))
+	autTxos := make([]*wire.AutTxo, len(ctxTxos))
 	for j := 0; j < len(ctxTxos); j++ {
 		serializedCtxTxo, err := pqringctxapi.SerializeCtxTxo(pp, ctxTxos[j])
 		if err != nil {
 			return nil, err
 		}
-		autTxos[j] = &ctaut.AutTxo{
+		autTxos[j] = &wire.AutTxo{
 			Version:   txVersion,
 			TxoScript: serializedCtxTxo,
 		}
@@ -213,7 +214,7 @@ func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 		return nil, err
 	}
 
-	autTransferTx := &ctaut.AutTransferTx{
+	autTransferTx := &wire.AutTransferTx{
 		Version:   txVersion,
 		TxIns:     autTxIns,
 		TxOuts:    autTxos,
@@ -224,7 +225,7 @@ func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 }
 
 // pqringctxTransferTxVerify verifies wire.MsgTxAbe.
-func pqringctxAutTransferTxVerify(pp *pqringctxapi.PublicParameter, autTransferTx *ctaut.AutTransferTx) error {
+func pqringctxAutTransferTxVerify(pp *pqringctxapi.PublicParameter, autTransferTx *wire.AutTransferTx) error {
 	if autTransferTx == nil {
 		return fmt.Errorf("pqringctxTransferTxVerify: the input transferTx is empty")
 	}
@@ -291,7 +292,7 @@ func pqringctxAutTransferTxVerify(pp *pqringctxapi.PublicParameter, autTransferT
 
 // pqringctxGetTxoPrivacyLevel returns the PrivacyLevel of the input wire.TxOutAbe.
 // reviewed on 2024.01.04
-func pqringctxGetAutTxoType(pp *pqringctxapi.PublicParameter, autTxo *ctaut.AutTxo) (AutTxoType, error) {
+func pqringctxGetAutTxoType(pp *pqringctxapi.PublicParameter, autTxo *wire.AutTxo) (AutTxoType, error) {
 	ctxTxo, err := pqringctxapi.DeserializeCtxTxo(pp, autTxo.TxoScript)
 	if err != nil {
 		return pqringctxapi.CtxTxoTypeHidden, err
@@ -308,7 +309,7 @@ func pqringctxGetAutTxoScriptSize(pp *pqringctxapi.PublicParameter, ctxTxoType p
 // pqringctxTxoCoinReceiveByKeys checks whether the input abeTxo *wire.TxOutAbe belongs to the owner of the input cryptoAddress, and if true,
 // it extracts the value of abeTxo using the input cryptoValueSecretKey (if it indeed corresponds to the cryptoAddress).
 func pqringctxExtractValueFromAutTxo(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
-	autTxo *ctaut.AutTxo, coinValuePublicKey []byte, coinValueSecretKey []byte) (value uint64, err error) {
+	autTxo *wire.AutTxo, coinValuePublicKey []byte, coinValueSecretKey []byte) (value uint64, err error) {
 	cryptoSchemeInTxo, err := abecryptoxparam.GetCryptoSchemeByTxVersion(autTxo.Version)
 	if err != nil {
 		return 0, err

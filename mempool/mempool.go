@@ -5,21 +5,23 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"math"
+	"os"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/ctaut"
 	"github.com/abesuite/abec/mempool/rotator"
 	"github.com/abesuite/abec/mining"
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
-	"math"
-	"os"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 const (
@@ -75,6 +77,7 @@ type Config struct {
 
 	FetchUtxoRingView func(*abeutil.TxAbe) (*blockchain.UtxoRingViewpoint, error)
 	FetchAUTView      func(*abeutil.TxAbe) (*blockchain.AUTViewpoint, error)
+	FetchCTAUTView    func(ctAutTx ctaut.Transaction) (*blockchain.CTAUTViewpoint, error)
 
 	// BestHeight defines the function to use to access the block height of
 	// the current best chain.
@@ -826,7 +829,8 @@ func (mp *TxPool) RemoveDoubleSpendsAbe(tx *abeutil.TxAbe) {
 //
 // This function MUST be called with the mempool lock held (for writes).
 func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint,
-	autView *blockchain.AUTViewpoint, tx *abeutil.TxAbe,
+	ctautView *blockchain.CTAUTViewpoint,
+	tx *abeutil.TxAbe,
 	height int32, fee uint64, fromDiskCache bool) *TxDescAbe {
 	// Add the transaction to the pool and mark the referenced outpoints
 	// as spent by the pool.
@@ -1341,6 +1345,14 @@ func (mp *TxPool) fetchInputAUT(tx *abeutil.TxAbe) (*blockchain.AUTViewpoint, er
 
 	return autView, nil
 }
+func (mp *TxPool) fetchInputCTAUT(ctAutTx ctaut.Transaction) (*blockchain.CTAUTViewpoint, error) {
+	ctAutView, err := mp.cfg.FetchCTAUTView(ctAutTx)
+	if err != nil {
+		return nil, err
+	}
+
+	return ctAutView, nil
+}
 
 // FetchTransaction returns the requested transaction from the transaction pool.
 // This only fetches from the main transaction pool and does not include
@@ -1843,40 +1855,50 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	}
 	err = blockchain.ValidateTransactionScriptsAbe(tx, utxoRingView, mp.cfg.WitnessCache)
 	if err != nil {
-		if cerr, ok := err.(blockchain.RuleError); ok {
-			return nil, nil, chainRuleError(cerr)
-		}
-		return nil, nil, err
-	}
-
-	autView, err := mp.fetchInputAUT(tx)
-	if err != nil {
-		if cerr, ok := err.(blockchain.RuleError); ok {
-			return nil, nil, chainRuleError(cerr)
-		}
-		return nil, nil, err
-	}
-
-	autTx, err := tx.AUTTransaction()
-	if err != nil {
-		str := fmt.Sprintf("transaction %v has invalid AUT info", txHash)
+		str := fmt.Sprintf("transaction %v has invalid CTAUT script", txHash)
 		return nil, nil, txRuleError(wire.RejectAutBadForm, str)
 	}
-	if autTx != nil {
+
+	// == CT-AUT checking rule ==
+	var ctAutView *blockchain.CTAUTViewpoint
+
+	ctAutTx, err := tx.CTAUTTransaction()
+	if err != nil {
+		if cerr, ok := err.(blockchain.RuleError); ok {
+			return nil, nil, chainRuleError(cerr)
+		}
+		return nil, nil, err
+	}
+
+	if ctAutTx != nil {
+		// fill out the input here
+		err = blockchain.PopulateCTAUTInputs(ctAutTx, tx, nextBlockHeight, utxoRingView)
+		if err != nil {
+			return nil, nil, fmt.Errorf("fail to populate consumed outpoints for CT-AUT transaction")
+		}
+
+		ctAutView, err = mp.fetchInputCTAUT(ctAutTx)
+		if err != nil {
+			if cerr, ok := err.(blockchain.RuleError); ok {
+				return nil, nil, chainRuleError(cerr)
+			}
+			return nil, nil, err
+		}
 		// check whether the mempool has the AUT transaction would register an AUT with the same name
-		if autTx.Type() == aut.Registration {
-			if registerAUTTxHash, exist := mp.registeredAUTName[hex.EncodeToString(autTx.AUTIdentifier())]; exist {
-				str := fmt.Sprintf("transaction %v has register the same name AUT earlier than transaction %v", registerAUTTxHash, txHash)
+		if ctAutTx.Type() == ctaut.Registration {
+			if registerAUTTxHash, exist := mp.registeredAUTName[hex.EncodeToString(ctAutTx.AUTIdentifier())]; exist {
+				str := fmt.Sprintf("transaction %v has register the same name AUT earlier than transaction %v",
+					registerAUTTxHash, txHash)
 				return nil, nil, txRuleError(wire.RejectInvalid, str)
 			}
 		}
 		// TODO AUT Check with blockchain, including:
-		// - check the issue tokens threshold
+		// - check threshold
 		// - constraint output which can be used as an AUTCoin
 		// - whether the specified AUT exists
 		// - check existence of input
 		// - check balance for output and input
-		err = blockchain.CheckTransactionInputsAUT(tx, nextBlockHeight, utxoRingView, autView, mp.cfg.ChainParams)
+		err = blockchain.CheckCTAUTTransactionInputs(tx, nextBlockHeight, ctAutView, mp.cfg.ChainParams)
 		if err != nil {
 			if cerr, ok := err.(blockchain.RuleError); ok {
 				return nil, nil, chainRuleError(cerr)
@@ -1885,7 +1907,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 		}
 	}
 
-	txD := mp.addTransactionAbe(utxoRingView, autView, tx, bestHeight, txFee, fromDiskCache)
+	txD := mp.addTransactionAbe(utxoRingView, ctAutView, tx, bestHeight, txFee, fromDiskCache)
 
 	log.Debugf("Accepted transaction %v (version %08x, input %d, output %d, memo size %d bytes, serialized size %d bytes, full size %d bytes) "+
 		"(pool size: %v)", txHash, tx.MsgTx().Version, len(tx.MsgTx().TxIns), len(tx.MsgTx().TxOuts), len(tx.MsgTx().TxMemo),
