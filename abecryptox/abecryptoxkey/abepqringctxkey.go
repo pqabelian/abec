@@ -381,7 +381,7 @@ func pqringctxCryptoAddressKeyGenByRandSeeds(pp *pqringctxapi.PublicParameter,
 		return cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, cryptoDetectorKey, nil
 
 	} else if privacyLevel == PrivacyLevelPSEUDONYM {
-		coinAddress, coinSpSk, err := pqringctxapi.CoinAddressKeyForPKHSingleGen(pp, coinSpendKeyRandSeed, coinDetectorKey, publicRand)
+		coinAddress, coinSpSk, err := pqringctxapi.CoinAddressKeyForPKHSingleGen(pp, coinSpendKeyRandSeed, coinDetectorKey, publicRand, pqringctxapi.CoinAddressTypePublicKeyHashForSingle)
 		if err != nil {
 			return nil, nil, nil, nil, nil, err
 		}
@@ -409,7 +409,7 @@ func pqringctxCryptoAddressKeyGenByRandSeeds(pp *pqringctxapi.PublicParameter,
 			return nil, nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressKeyGenByRandSeeds: invalid length of coinValueKeyRandSeed (%d)", len(coinValueKeyRandSeed))
 		}
 
-		coinAddress, coinSpSk, err := pqringctxapi.CoinAddressKeyForPKHSingleGen(pp, coinSpendKeyRandSeed, coinDetectorKey, publicRand)
+		coinAddress, coinSpSk, err := pqringctxapi.CoinAddressKeyForPKHSingleGen(pp, coinSpendKeyRandSeed, coinDetectorKey, publicRand, pqringctxapi.CoinAddressTypePublicKeyHashForSingleCT)
 		if err != nil {
 			return nil, nil, nil, nil, nil, err
 		}
@@ -447,9 +447,18 @@ func pqringctxCoinAddressKeyForPKRingVerify(pp *pqringctxapi.PublicParameter, co
 	coinSpendSecretKey []byte, coinSerialNumberSecretKey []byte, coinDetectorKey []byte) (bool, error) {
 	return pqringctxapi.CoinAddressKeyForPKRingVerify(pp, coinAddress, coinSpendSecretKey, coinSerialNumberSecretKey, coinDetectorKey)
 }
-func pqringctxCoinAddressKeyForPKHSingleVerify(pp *pqringctxapi.PublicParameter, coinAddress []byte,
+func pqringctxCoinAddressKeyForPKHSingleVerify(pp *pqringctxapi.PublicParameter, privacyLevel PrivacyLevel, coinAddress []byte,
 	coinSpendSecretKey []byte, coinDetectorKey []byte) (bool, error) {
-	return pqringctxapi.CoinAddressKeyForPKHSingleVerify(pp, coinAddress, coinSpendSecretKey, coinDetectorKey)
+	if privacyLevel == PrivacyLevelPSEUDONYM {
+		return pqringctxapi.CoinAddressKeyForPKHSingleVerify(pp, coinAddress, coinSpendSecretKey, coinDetectorKey, pqringctxapi.CoinAddressTypePublicKeyHashForSingle)
+
+	} else if privacyLevel == PrivacyLevelPSEUDONYMCT {
+		return pqringctxapi.CoinAddressKeyForPKHSingleVerify(pp, coinAddress, coinSpendSecretKey, coinDetectorKey, pqringctxapi.CoinAddressTypePublicKeyHashForSingleCT)
+
+	} else {
+		return false, fmt.Errorf("pqringctxCoinAddressKeyForPKHSingleVerify: the input privacyLevel (%d) is not PrivacyLevelPSEUDONYM or PrivacyLevelPSEUDONYMCT", privacyLevel)
+	}
+
 }
 func pqringctxCoinValueKeyVerify(pp *pqringctxapi.PublicParameter,
 	coinValuePublicKey []byte, coinValueSecretKey []byte) (bool, error) {
@@ -469,6 +478,8 @@ func pqringctxGetPrivacyLevelFromCoinAddressType(coinAddressType pqringctxapi.Co
 		return PrivacyLevelRINGCT, nil
 	case pqringctxapi.CoinAddressTypePublicKeyHashForSingle:
 		return PrivacyLevelPSEUDONYM, nil
+	case pqringctxapi.CoinAddressTypePublicKeyHashForSingleCT:
+		return PrivacyLevelPSEUDONYMCT, nil
 	default:
 		return 0, fmt.Errorf("pqringctxGetPrivacyLevelFromCoinAddressType: the input CoinAddressType is not supported")
 	}
@@ -765,7 +776,7 @@ func pqringctxGetCoinAddressSize(pp *pqringctxapi.PublicParameter, privacyLevel 
 	case PrivacyLevelPSEUDONYM:
 		return pqringctxapi.GetCoinAddressSize(pp, pqringctx.CoinAddressTypePublicKeyHashForSingle)
 	case PrivacyLevelPSEUDONYMCT:
-		return pqringctxapi.GetCoinAddressSize(pp, pqringctx.CoinAddressTypePublicKeyHashForSingle)
+		return pqringctxapi.GetCoinAddressSize(pp, pqringctx.CoinAddressTypePublicKeyHashForSingleCT)
 	default:
 		return 0, fmt.Errorf("pqringctxGetCoinAddressSize: the input PrivacyLevel is not supported")
 	}
@@ -780,7 +791,7 @@ func pqringctxGetCoinValuePublicKeySize(pp *pqringctxapi.PublicParameter, privac
 	case PrivacyLevelPSEUDONYMCT:
 		return pqringctxapi.GetCoinValuePublicKeySize(pp), nil
 	default:
-		return 0, fmt.Errorf("pqringctxGetCoinValuePublicKeySize: the input PrivacyLevel is not supported")
+		return 0, fmt.Errorf("pqringctxGetCoinValuePublicKeySize: the input PrivacyLevel (%d) is not supported", privacyLevel)
 	}
 }
 
