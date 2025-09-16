@@ -200,7 +200,7 @@ func CheckTxoSanity(txHash chainhash.Hash, outputIndex int, txOut *wire.TxOutAbe
 	return coinAddress, nil
 }
 
-func populateCTAUTInputs(autTransaction Transaction, msgTx *wire.MsgTxAbe) error {
+func populateCTAUTOutputs(autTransaction Transaction, msgTx *wire.MsgTxAbe) error {
 	startIdx := 0
 	for ; startIdx < len(msgTx.TxOuts); startIdx++ {
 		txOut := msgTx.TxOuts[startIdx]
@@ -241,6 +241,7 @@ func populateCTAUTInputs(autTransaction Transaction, msgTx *wire.MsgTxAbe) error
 				TxHash: txHash,
 				Index:  uint8(index),
 			},
+			Version:     txOut.Version,
 			ValueScript: nil, // nil for root coin, fill out for coin later
 			CoinAddress: coinAddress,
 		}

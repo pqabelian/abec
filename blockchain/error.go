@@ -233,9 +233,9 @@ const (
 	// ErrWitnessMissing indicates that the witness of the block is missing.
 	ErrWitnessMissing
 
-	ErrTxVersionForAUT
+	ErrTxVersionForCTAUT
 
-	ErrAUTBadForm
+	ErrCTAUTBadForm
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
@@ -286,7 +286,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrInvalidAncestorBlock:              "ErrInvalidAncestorBlock",
 	ErrPrevBlockNotBest:                  "ErrPrevBlockNotBest",
 	ErrWitnessMissing:                    "ErrWitnessMissing",
-	ErrAUTBadForm:                        "ErrAUTBadForm",
+	ErrCTAUTBadForm:                      "ErrCTAUTBadForm",
 }
 
 // String returns the ErrorCode as a human-readable name.

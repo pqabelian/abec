@@ -44,6 +44,7 @@ func (o OutPoint) String() string {
 
 type CTAUTToken struct {
 	OutPoint
+	Version     uint32
 	ValueScript []byte // optional from root coin
 	CoinAddress []byte
 }
@@ -94,7 +95,7 @@ type Transaction interface {
 
 //const HashSize = 64
 
-// Instance hosts metadata information for registered Abelian User Token
+// Metadata hosts metadata information for registered Abelian User Token
 // Different AUTs are uniquely distinguished and identified by identifiers
 // In details:
 // RegistrationTx would create a new one with unique CTAutIdentifier
@@ -102,7 +103,7 @@ type Transaction interface {
 // ReRegistrationTx would update fields other than CTAutIdentifier/ UnitName / MinUnitName /MintedAmount
 // TransferTx would update no fields
 // BurnTx would update no fields
-type Instance struct {
+type Metadata struct {
 	CTAutIdentifier []byte // unique identifier
 	CTAutSymbol     []byte // symbol for public view
 	UnitName        []byte // can not chang anymore
@@ -123,13 +124,13 @@ type Instance struct {
 }
 
 // Clone returns a shallow copy of the utxo entry.
-func (info *Instance) Clone() *Instance {
+func (info *Metadata) Clone() *Metadata {
 	if info == nil {
 		return nil
 	}
 
 	// ToDo(Alice): by the same order as the definition?
-	cloned := &Instance{
+	cloned := &Metadata{
 		CTAutIdentifier: make([]byte, len(info.CTAutIdentifier)),
 		CTAutSymbol:     make([]byte, len(info.CTAutSymbol)),
 		UnitName:        make([]byte, len(info.UnitName)),
@@ -1005,7 +1006,7 @@ func ExtractCTAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 	// we don't know whether the CTAUT instance is exist or not, it should be checked by blockchain
 	// for input part, we can't determine which ones are input for CTAUT for the time being.
 	// for output part
-	err = populateCTAUTInputs(autTx, tx)
+	err = populateCTAUTOutputs(autTx, tx)
 	if err != nil {
 		return nil, err
 	}

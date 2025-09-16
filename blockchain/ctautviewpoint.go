@@ -47,11 +47,11 @@ const (
 // script, and how much it pays.
 // todo: AutEntry?
 type CTAUTInstance struct {
-	metadata *ctaut.Instance
+	metadata *ctaut.Metadata
 	coins    map[ctaut.OutPoint]*CTAUTCoin
 }
 
-func NewCTAUTInstance(metadata *ctaut.Instance, coins map[ctaut.OutPoint]*CTAUTCoin) *CTAUTInstance {
+func NewCTAUTInstance(metadata *ctaut.Metadata, coins map[ctaut.OutPoint]*CTAUTCoin) *CTAUTInstance {
 	a := 2
 	switch a {
 	case 1, 2:
@@ -67,7 +67,7 @@ func (instance *CTAUTInstance) Add(outpiont ctaut.OutPoint, coin *CTAUTCoin) {
 	instance.coins[outpiont] = coin
 }
 
-func (instance *CTAUTInstance) Metadata() *ctaut.Instance {
+func (instance *CTAUTInstance) Metadata() *ctaut.Metadata {
 	return instance.metadata
 }
 func (instance *CTAUTInstance) AUTCoins() map[ctaut.OutPoint]*CTAUTCoin {
@@ -209,7 +209,7 @@ func (view *CTAUTViewpoint) LookupCTAUTCoin(identifier []byte, outpoint ctaut.Ou
 }
 
 // todo: function name LookupAutDesc
-func (view *CTAUTViewpoint) LookupCTAUTMetaInfo(identifier []byte) *ctaut.Instance {
+func (view *CTAUTViewpoint) LookupCTAUTMetaInfo(identifier []byte) *ctaut.Metadata {
 	if view.instances == nil {
 		return nil
 	}
@@ -253,7 +253,7 @@ func (view *CTAUTViewpoint) connectRegistrationTransaction(autTransaction *ctaut
 	}
 	// register the AUT entry
 	instance = NewCTAUTInstance(
-		&ctaut.Instance{
+		&ctaut.Metadata{
 			CTAutIdentifier:       autTransaction.CTAutIdentifier,
 			CTAutSymbol:           autTransaction.CTAutSymbol,
 			UnitName:              autTransaction.UnitName,
@@ -918,7 +918,7 @@ func (view *CTAUTViewpoint) fetchCTAUTMain(db database.DB, outpoints map[ctaut.O
 		// firstly, fetch the meta information for specified identifier
 		if _, ok := view.instances[autIdentifierKey]; !ok {
 			// fetch aut info with root coin
-			metadata, err := dbFetchCTAUTInstance(dbTx, identifier)
+			metadata, err := dbFetchCTAUTMetadata(dbTx, identifier)
 			if err != nil {
 				return err
 			}
@@ -938,6 +938,7 @@ func (view *CTAUTViewpoint) fetchCTAUTMain(db database.DB, outpoints map[ctaut.O
 			if view.instances[autIdentifierKey].coins[outpoint] != nil {
 				continue
 			}
+
 			coin, err := dbFetchCTAUTCoin(dbTx, outpoint)
 			if err != nil {
 				return err
@@ -947,7 +948,6 @@ func (view *CTAUTViewpoint) fetchCTAUTMain(db database.DB, outpoints map[ctaut.O
 				return fmt.Errorf("invalid fetch for point (%s, %d) for CTAUT instance %s",
 					outpoint.TxHash, outpoint.Index, autIdentifierKey)
 			}
-
 			view.instances[autIdentifierKey].coins[outpoint] = coin
 		}
 
@@ -1133,20 +1133,24 @@ func (b *BlockChain) FetchCTAUTView(ctAutTx ctaut.Transaction) (*CTAUTViewpoint,
 	// Create a set of needed outputs based on those referenced by the
 	// inputs of the passed transaction and the outputs of the transaction
 	// itself.
+	view := NewCTAUTViewpoint()
+
 	if ctAutTx == nil {
-		return nil, nil
+		return view, nil
 	}
 
-	view := NewCTAUTViewpoint()
 	neededSet := make(map[ctaut.OutPoint]struct{})
 
 	switch autTransaction := ctAutTx.(type) {
 	case *ctaut.RegistrationTx:
 		// nothing
+		// all root coin would be fetched with instance
 	case *ctaut.MintTx:
 		// nothing
+		// all root coin would be fetched with instance
 	case *ctaut.ReRegistrationTx:
 		// nothing
+		// all root coin would be fetched with instance
 	case *ctaut.TransferTx:
 		for i := 0; i < len(autTransaction.TxIns); i++ {
 			neededSet[autTransaction.TxIns[i].OutPoint] = struct{}{}

@@ -1856,7 +1856,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	err = blockchain.ValidateTransactionScriptsAbe(tx, utxoRingView, mp.cfg.WitnessCache)
 	if err != nil {
 		str := fmt.Sprintf("transaction %v has invalid CTAUT script", txHash)
-		return nil, nil, txRuleError(wire.RejectAutBadForm, str)
+		return nil, nil, txRuleError(wire.RejectCTAutBadForm, str)
 	}
 
 	// == CT-AUT checking rule ==
@@ -1884,10 +1884,10 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 			}
 			return nil, nil, err
 		}
-		// check whether the mempool has the AUT transaction would register an AUT with the same name
+		// Ensure that no multiply transactions try register instances of the same identifier
 		if ctAutTx.Type() == ctaut.Registration {
 			if registerAUTTxHash, exist := mp.registeredAUTName[hex.EncodeToString(ctAutTx.AUTIdentifier())]; exist {
-				str := fmt.Sprintf("transaction %v has register the same name AUT earlier than transaction %v",
+				str := fmt.Sprintf("transaction %v has register CTAUT instance earlier than transaction %v",
 					registerAUTTxHash, txHash)
 				return nil, nil, txRuleError(wire.RejectInvalid, str)
 			}
@@ -1898,7 +1898,8 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 		// - whether the specified AUT exists
 		// - check existence of input
 		// - check balance for output and input
-		err = blockchain.CheckCTAUTTransactionInputs(tx, nextBlockHeight, ctAutView, mp.cfg.ChainParams)
+		err = blockchain.CheckCTAUTTransactionInputs(ctAutTx, tx, nextBlockHeight,
+			ctAutView, mp.cfg.ChainParams)
 		if err != nil {
 			if cerr, ok := err.(blockchain.RuleError); ok {
 				return nil, nil, chainRuleError(cerr)
@@ -2235,7 +2236,7 @@ func (mp *TxPool) ClearOutdatedTransaction() {
 
 func (mp *TxPool) clearOutdatedTransaction() {
 	for _, txDesc := range mp.poolAbe {
-		if txDesc.Tx.MsgTx().Version == wire.TxVersion_Height_0 {
+		if txDesc.Tx.MsgTx().Version <= wire.TxVersion_Height_MLPAUT_300000 {
 			mp.removeTransactionAbe(txDesc.Tx)
 			log.Infof("transaction %s has been removed from transaction pool", txDesc.Tx.Hash())
 		}
