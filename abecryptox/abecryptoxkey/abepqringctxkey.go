@@ -807,6 +807,10 @@ func coinDetectorKeyGenByCoinDetectorRootKeyFromPublicRand(pp *pqringctxapi.Publ
 	//// choose PublicRand
 	//publicRand := abecryptoutils.RandomBytes(pp.GetParamKeyGenPublicRandBytesLen())
 
+	if len(coinDetectorRootKey) != abecryptoutils.PRFKeyBytesLen {
+		return nil, fmt.Errorf("coinDetectorKeyGenByCoinDetectorRootKeyFromPublicRand: invalid length of coinDetectorRootKey (%d)", len(coinDetectorRootKey))
+	}
+
 	if len(publicRand) != pqringctxapi.GetParamKeyGenPublicRandBytesLen(pp) {
 		return nil, fmt.Errorf("pqringctxCoinDetectorKeyGenByCoinDetectorRootKeyFromPublicRand: the input publicRand has an invalid length (%d)", len(publicRand))
 	}
