@@ -303,7 +303,7 @@ func pqringctxGetAutTxoType(pp *pqringctxapi.PublicParameter, autTxo *wire.AutTx
 
 // pqringctxGetAutTxoSerializeSize returns the TxoSerializeSize for the input coinAddress.
 func pqringctxGetAutTxoScriptSize(pp *pqringctxapi.PublicParameter, ctxTxoType pqringctxapi.CtxTxoType) (int, error) {
-	return pqringctxapi.GetCtxTxoSerializeSize(pp, ctxTxoType)
+	return pqringctxapi.GetCtxTxoSerializeSizeByCtxTxoType(pp, ctxTxoType)
 }
 
 // pqringctxTxoCoinReceiveByKeys checks whether the input abeTxo *wire.TxOutAbe belongs to the owner of the input cryptoAddress, and if true,
