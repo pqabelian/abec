@@ -562,6 +562,8 @@ func CryptoAddressKeysVerify(cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk
 			return false, fmt.Errorf("fail to verify crypto address and keys %s", hints)
 		}
 
+		// todo: seems to be bug, should call function in abecrypto.go.
+		// As valueKey algorithms in abecrypto and abecryptox are the same, it does not matter here to call pqringctxCoinValueKeyVerify().
 		return pqringctxCoinValueKeyVerify(abecryptoxparam.PQRingCTXPP, coinValuePublicKey, coinValueSecretKey)
 
 	case abecryptoxparam.CryptoSchemePQRingCTX:
@@ -588,7 +590,7 @@ func CryptoAddressKeysVerify(cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk
 		}
 
 		if privacyLevel == PrivacyLevelPSEUDONYM {
-			return pqringctxCoinAddressKeyForPKHSingleVerify(abecryptoxparam.PQRingCTXPP, coinAddress, coinSpendSecretKey, coinDetectorKey)
+			return pqringctxCoinAddressKeyForPKHSingleVerify(abecryptoxparam.PQRingCTXPP, privacyLevel, coinAddress, coinSpendSecretKey, coinDetectorKey)
 		}
 
 		//	PrivacyLevelPSEUDONYMCT or PrivacyLevelRINGCT
@@ -613,7 +615,7 @@ func CryptoAddressKeysVerify(cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk
 		}
 
 		if privacyLevel == PrivacyLevelPSEUDONYMCT {
-			return pqringctxCoinAddressKeyForPKHSingleVerify(abecryptoxparam.PQRingCTXPP, coinAddress, coinSpendSecretKey, coinDetectorKey)
+			return pqringctxCoinAddressKeyForPKHSingleVerify(abecryptoxparam.PQRingCTXPP, privacyLevel, coinAddress, coinSpendSecretKey, coinDetectorKey)
 		}
 
 		// PrivacyLevelRINGCT
