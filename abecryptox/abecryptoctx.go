@@ -9,9 +9,7 @@ import (
 
 // APIs for Transactions	begin
 
-// CoinbaseTxGen takes as input the transaction material and outputs a *wire.MsgTxAbe
-// reviewed on 2023.12.07
-// reviewed on 2023.12.21
+// AutCoinbaseTxGen takes as input the transaction material and outputs a *wire.AutCoinbaseTx.
 func AutCoinbaseTxGen(txVersion uint32, vin uint64, autTxOutputDescs []*AutTxOutputDesc) (*wire.AutCoinbaseTx, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
 	if err != nil {
@@ -20,18 +18,19 @@ func AutCoinbaseTxGen(txVersion uint32, vin uint64, autTxOutputDescs []*AutTxOut
 
 	switch cryptoScheme {
 	case abecryptoxparam.CryptoSchemePQRingCTX:
-		cbTx, err := pqringctxAutCoinbaseTxGen(abecryptoxparam.PQRingCTXPP, txVersion, vin, autTxOutputDescs)
+		cbTx, err := pqringctxAutCoinbaseTxGen(abecryptoxparam.PQRingCTXPP, cryptoScheme, txVersion, vin, autTxOutputDescs)
 		if err != nil {
 			return nil, err
 		}
 		return cbTx, nil
+
 	default:
-		return nil, fmt.Errorf("CoinbaseTxGen: Unsupported crypto scheme")
+		return nil, fmt.Errorf("AutCoinbaseTxGen: Unsupported crypto scheme")
 	}
 
 }
 
-// CoinbaseTxVerify verifies whether the input coinbaseTx *wire.MsgTxAbe is valid.
+// AutCoinbaseTxVerify verifies whether the input autCoinbaseTx *wire.AutCoinbaseTx is valid.
 func AutCoinbaseTxVerify(autCoinbaseTx *wire.AutCoinbaseTx) error {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(autCoinbaseTx.Version)
 	if err != nil {
@@ -44,12 +43,11 @@ func AutCoinbaseTxVerify(autCoinbaseTx *wire.AutCoinbaseTx) error {
 		return pqringctxAutCoinbaseTxVerify(abecryptoxparam.PQRingCTXPP, autCoinbaseTx)
 
 	default:
-		return fmt.Errorf("CoinbaseTxVerify: crypto-scheme (%d) is not supported", cryptoScheme)
+		return fmt.Errorf("AutCoinbaseTxVerify: crypto-scheme (%d) is not supported", cryptoScheme)
 	}
 }
 
-// TransferTxGenByKeys generates a new MsgTxAbe by filling the TxIns[].serialNumber, TxOuts[], and the TxWitness of the input transferTxMsgTemplate.
-// reviewed on 2023.12.21
+// AutTransferTxGen takes as input the transaction material and outputs a *wire.AutTransferTx.
 func AutTransferTxGen(txVersion uint32, autTxInputDescs []*AutTxInputDesc, autTxOutputDescs []*AutTxOutputDesc) (*wire.AutTransferTx, error) {
 
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
@@ -66,8 +64,9 @@ func AutTransferTxGen(txVersion uint32, autTxInputDescs []*AutTxInputDesc, autTx
 			return nil, err
 		}
 		return trTx, nil
+
 	default:
-		return nil, fmt.Errorf("TransferTxGenByKeys: Unsupported crypto scheme")
+		return nil, fmt.Errorf("AutTransferTxGen: Unsupported crypto scheme")
 	}
 
 }
@@ -97,14 +96,7 @@ func AutTransferTxVerify(autTransferTx *wire.AutTransferTx) error {
 
 //	APIs for Txos	begin
 
-// GetTxoPrivacyLevel returns the PrivacyLevel of the input wire.TxOutAbe,
-// which is determined by its version and its coinAddress.
-// At present, there are only 3 Privacy Levels for Txo, say PrivacyLevelRINGCTPre, PrivacyLevelRINGCT, and PrivacyLevelPSEUDONYM,
-// depending on the Txo's CoinAddressType,
-// although there is an additional PrivacyLevel definition, say PrivacyLevelPSEUDONYMCT.
-// In the future, if PrivacyLevelPSEUDONYMCT Txo is supported, Txo's data besides CoinAddressType will be further used to
-// determine its PrivacyLevel.
-// reviewed on 2024.01.04
+// GetAutTxoType returns the AutTxoType of the input *wire.AutTxo.
 func GetAutTxoType(autTxo *wire.AutTxo) (AutTxoType, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(autTxo.Version)
 	if err != nil {
@@ -116,18 +108,15 @@ func GetAutTxoType(autTxo *wire.AutTxo) (AutTxoType, error) {
 	case abecryptoxparam.CryptoSchemePQRingCTX:
 		return pqringctxGetAutTxoType(abecryptoxparam.PQRingCTXPP, autTxo)
 	default:
-		return 0, fmt.Errorf("GetTxoPrivacyLevel: the crypto scheme mapped from abeTxo.Version is not supported")
+		return 0, fmt.Errorf("GetAutTxoType: the crypto scheme mapped from autTxo.Version is not supported")
 	}
 	return 0, nil
 }
 
-// GetTxoSerializeSizeApprox returns the approximate serialize size for a Txo,
-// which is in a transaction with the version being the input TxVersion and for the cryptoAddressPayTo.
+// GetAutTxoScriptSize returns the TxoScript size of AutTxo with the input AutTxoType.
 // Note that the transactions are generated and verified by the underlying crypto-scheme,
-// the approximate serialize size for Txo actually depends on the underlying crypto-scheme.
+// the TxoScript size for AutTxo actually depends on the underlying crypto-scheme.
 // That's why txVersion is required as the input for this function.
-// reviewed on 2023.12.07
-// reviewed on 2024.01.01
 func GetAutTxoScriptSize(txVersion uint32, autTxoType AutTxoType) (int, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
 	if err != nil {
@@ -137,12 +126,11 @@ func GetAutTxoScriptSize(txVersion uint32, autTxoType AutTxoType) (int, error) {
 	case abecryptoxparam.CryptoSchemePQRingCTX:
 		return pqringctxGetAutTxoScriptSize(abecryptoxparam.PQRingCTXPP, autTxoType)
 	default:
-		return 0, fmt.Errorf("GetTxoSerializeSizeApprox: Unsupported txVersion")
+		return 0, fmt.Errorf("GetAutTxoScriptSize: Unsupported txVersion")
 	}
 }
 
-// TxoCoinReceiveByKeys
-// todo: review
+// ExtractAutTxoValue extracts the value of the input AutTxo.
 func ExtractAutTxoValue(autTxo *wire.AutTxo, coinaValuePublicKey []byte, cryptoValueSecretKey []byte) (uint64, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(autTxo.Version)
 	if err != nil {
@@ -163,14 +151,9 @@ func ExtractAutTxoValue(autTxo *wire.AutTxo, coinaValuePublicKey []byte, cryptoV
 
 //	APIs for TxWitness	begin
 
-// GetCbTxWitnessSerializeSizeApprox returns the approximate serialize size for CoinbaseTxWitness, which is decided by the TxVersion and the number of out Txo.
-// Note that the transactions are generated and versified by the underlying crypto-scheme,
-// the approximate serialize size for CoinbaseTxWitness actually depends on the underlying crypto-scheme.
-// That's why txVersion is required as the input for this function.
-// reviewed on 2023.12.07
-// reviewed on 2024.01.01, by Alice
-// refactored on 2024.01.24, by Alice, pqringctx-Layer takes cryptoAddress as input.
-func GetAutCoinbaseTxWitnessSerializeSize(txVersion uint32, outNumForHidden uint8) (int, error) {
+// GetAutCoinbaseTxWitnessSizeByDesc returns the size of AutCoinbaseTxWitness,
+// which depends on the TxVersion and the number of AutTxoHidden on the output side.
+func GetAutCoinbaseTxWitnessSizeByDesc(txVersion uint32, outNumForHidden uint8) (int, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
 	if err != nil {
 		return 0, err
@@ -178,19 +161,16 @@ func GetAutCoinbaseTxWitnessSerializeSize(txVersion uint32, outNumForHidden uint
 	switch cryptoScheme {
 
 	case abecryptoxparam.CryptoSchemePQRingCTX:
-		return pqringctxGetAutCoinbaseTxWitnessSerializeSizeByDesc(abecryptoxparam.PQRingCTXPP, outNumForHidden)
+		return pqringctxGetAutCoinbaseTxWitnessSizeByDesc(abecryptoxparam.PQRingCTXPP, outNumForHidden)
 	default:
-		return 0, fmt.Errorf("GetCbTxWitnessSerializeSizeApprox: Unsupported txVersion")
+		return 0, fmt.Errorf("GetAutCoinbaseTxWitnessSizeByDesc: Unsupported txVersion")
 	}
 }
 
-// GetTrTxWitnessSerializeSizeApprox returns the approximate serialize size for TransferTxWitness,
-// which is decided by the TxVersion and description of the input and output.
-// Note that the transactions are generated and versified by the underlying crypto-scheme,
-// the approximate serialize size for TransferTxWitness actually depends on the underlying crypto-scheme.
-// That's why txVersion is required as the input for this function.
-// todo: vPublic = (sum of public value for out) - (sum of public value for in)
-func GetAutTransferTxWitnessSerializeSize(txVersion uint32,
+// GetAutTransferTxWitnessSizeByDesc returns the size of AutTransferTxWitness,
+// which depends on the TxVersion and description information (inNumForHidden uint8, outNumForHidden uint8, vPublic int64),
+// where vPublic = (sum of public value for out) - (sum of public value for in).
+func GetAutTransferTxWitnessSizeByDesc(txVersion uint32,
 	inNumForHidden uint8, outNumForHidden uint8, vPublic int64) (int, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
 	if err != nil {
@@ -200,10 +180,10 @@ func GetAutTransferTxWitnessSerializeSize(txVersion uint32,
 	switch cryptoScheme {
 
 	case abecryptoxparam.CryptoSchemePQRingCTX:
-		return pqringctxGetAutTransferTxWitnessSerializeSizeByDesc(abecryptoxparam.PQRingCTXPP, inNumForHidden, outNumForHidden, vPublic)
+		return pqringctxGetAutTransferTxWitnessSizeByDesc(abecryptoxparam.PQRingCTXPP, inNumForHidden, outNumForHidden, vPublic)
 
 	default:
-		return 0, fmt.Errorf("GetTrTxWitnessSerializeSizeApprox: the input txVersion (%d) is not supported", txVersion)
+		return 0, fmt.Errorf("GetAutTransferTxWitnessSizeByDesc: the input txVersion (%d) is not supported", txVersion)
 	}
 }
 

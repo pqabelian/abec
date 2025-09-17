@@ -8,7 +8,8 @@ import (
 	"github.com/cryptosuite/pqringctx/pqringctxapi"
 )
 
-// CtxTxoType is defined for the types of CtxTxo.
+// AutTxoType is defined for the types of AutTxo, which is actually pqringctxapi.CtxTxoType,
+// since it will also be passed to underlying crypto-scheme.
 type AutTxoType = pqringctxapi.CtxTxoType
 
 const (
@@ -18,24 +19,32 @@ const (
 
 // // abecryptox -> abepqringctx -> pqringctx
 
-// The caller needs to fill the Version, TxIns, TxFee, TxMemo fields for coinbaseTxMsgTemplate,
-// this function will fill the TxOuts and TxWitness fields.
-func pqringctxAutCoinbaseTxGen(pp *pqringctxapi.PublicParameter, txVersion uint32, vin uint64, autTxOutputDescs []*AutTxOutputDesc) (*wire.AutCoinbaseTx, error) {
+// pqringctxAutCoinbaseTxGen generates a new AutCoinbaseTx,
+// for the input (txVersion uint32, vin uint64, autTxOutputDescs []*AutTxOutputDesc).
+func pqringctxAutCoinbaseTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
+	txVersion uint32, vin uint64, autTxOutputDescs []*AutTxOutputDesc) (*wire.AutCoinbaseTx, error) {
+	// just redundant double check
+	cryptoSchemeFromTxVersion, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
+	if err != nil {
+		return nil, err
+	}
+	if cryptoSchemeFromTxVersion != cryptoScheme {
+		return nil, fmt.Errorf("pqringctxAutCoinbaseTxGen: the input cryptoScheme is different from that implied by txVersion")
+	}
 
-	//	parse AbeTxOutputDesc to pqringctx.TxOutputDesc
+	//	parse AutTxOutputDesc to pqringctx.CtxTxOutputDesc
 	ctxTxOutputDesc := make([]*pqringctxapi.CtxTxOutputDesc, len(autTxOutputDescs))
 	for j := 0; j < len(autTxOutputDescs); j++ {
 		ctxTxOutputDesc[j] = pqringctxapi.NewCtxTxOutputDesc(autTxOutputDescs[j].AutTxoType(), autTxOutputDescs[j].coinValuePublicKey, autTxOutputDescs[j].value)
 	}
 
-	// call the pqringctx.CoinbaseTxGen
-	//	vin is set in coinbaseTxMsgTemplate.TxFee
+	// call the pqringctx.CtxCoinbaseTxGen
 	ctxCoinbaseTx, err := pqringctxapi.CtxCoinbaseTxGen(pp, vin, ctxTxOutputDesc)
 	if err != nil {
 		return nil, err
 	}
 
-	// parse the pqringctx.CoinbaseTx to wire.TxAbe
+	// parse the pqringctx.CtxCoinbaseTxGen to wire.AutCoinbaseTx
 	ctxTxos := pqringctxapi.GetCtxCoinbaseTxTxos(ctxCoinbaseTx)
 	autTxos := make([]*wire.AutTxo, len(ctxTxos))
 	for i := 0; i < len(ctxTxos); i++ {
@@ -51,11 +60,10 @@ func pqringctxAutCoinbaseTxGen(pp *pqringctxapi.PublicParameter, txVersion uint3
 
 	// witness must be associated with Tx, so it does not need to contain cryptoScheme or TxVersion.
 	ctxCbTxWitness := pqringctxapi.GetCtxCoinbaseTxTxWitness(ctxCoinbaseTx)
-	serializedCtxCbTxWitness, err := pqringctxapi.SerializeCtxTxWitnessCbTx(pp, ctxCbTxWitness)
+	autTxWitness, err := pqringctxapi.SerializeCtxTxWitnessCbTx(pp, ctxCbTxWitness)
 	if err != nil {
 		return nil, err
 	}
-	autTxWitness := serializedCtxCbTxWitness
 
 	autCoinbaseTx := &wire.AutCoinbaseTx{
 		Version:   txVersion,
@@ -67,15 +75,15 @@ func pqringctxAutCoinbaseTxGen(pp *pqringctxapi.PublicParameter, txVersion uint3
 	return autCoinbaseTx, nil
 }
 
-// pqringctxCoinbaseTxVerify verify the input coinbaseTx *wire.MsgTxAbe.
-// The caller needs to guarantee the well-form of the input coinbaseTx *wire.MsgTxAbe, such as the TxIns.
+// pqringctxAutCoinbaseTxVerify verify the input autCoinbaseTx *wire.AutCoinbaseTx.
+// The caller needs to guarantee the well-form of the input autCoinbaseTx *wire.AutCoinbaseTx, such as the TxOuts.
 // This function only checks the balance proof, by calling the crypto-scheme.
 func pqringctxAutCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, autCoinbaseTx *wire.AutCoinbaseTx) error {
 	if autCoinbaseTx == nil {
-		return fmt.Errorf("pqringctxCoinbaseTxVerify: the input coinbaseTx is nil")
+		return fmt.Errorf("pqringctxAutCoinbaseTxVerify: the input autCoinbaseTx is nil")
 	}
 	if len(autCoinbaseTx.TxOuts) <= 0 {
-		return fmt.Errorf("pqringctxCoinbaseTxVerify: coinbaseTx.TxOuts is nil/empty")
+		return fmt.Errorf("pqringctxAutCoinbaseTxVerify: autCoinbaseTx.TxOuts is nil/empty")
 	}
 
 	var err error
@@ -85,7 +93,7 @@ func pqringctxAutCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, autCoinbaseT
 	ctxTxos := make([]pqringctxapi.CtxTxo, len(autCoinbaseTx.TxOuts))
 	for j := 0; j < len(autCoinbaseTx.TxOuts); j++ {
 		if autCoinbaseTx.TxOuts[j].Version != autCoinbaseTx.Version {
-			return fmt.Errorf("pqringctxCoinbaseTxVerify: coinbaseTx.TxOuts[%d].Version (%d) != coinbaseTx.Version (%d)",
+			return fmt.Errorf("pqringctxAutCoinbaseTxVerify: autCoinbaseTx.TxOuts[%d].Version (%d) != autCoinbaseTx.Version (%d)",
 				j, autCoinbaseTx.TxOuts[j].Version, autCoinbaseTx.Version)
 		}
 
@@ -106,50 +114,40 @@ func pqringctxAutCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, autCoinbaseT
 	if err != nil {
 		return err
 	}
-	//if bl == false {
-	//	return false, nil
-	//}
 
 	return nil
 }
 
-// pqringctxTransferTxGenByKeys generates a MsgTxAbe,
-// by filling TxIns[].serialNumber，Txos, and TxWitness of the input transferTxMsgTemplate.
-// The caller needs to fill the Version, TxIns[].PreviousOutPointRing, TxFee, TxMemo fields of transferTxMsgTemplate.
-// This function will fill the TxIns[].serialNumber，Txos, and TxWitness of the input transferTxMsgTemplate, and return it as the result.
+// pqringctxAutTransferTxGen generates a new AutTransferTx,
+// for the input (txVersion uint32, autTxInputDescs []*AutTxInputDesc, autTxOutputDescs []*AutTxOutputDesc).
 // The parameter cryptoScheme here is obtained by the caller from TxVersion, which causes this function is called.
 // Now it is redundant at this moment and works for ony double-check.
-// In the future, when the version of input ring is different from the ring of TxVersion/TxoVersion,
-// the two corresponding cryptoSchemes will be extracted here and further decides the TxGen algorithms.
-// Refer to wire.param for the details.
-// reviewed on 2023.12.21
-// todo: to review
-// todo: review CryptoValueSecretKeyParse
 func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
 	txVersion uint32, autTxInputDescs []*AutTxInputDesc, autTxOutputDescs []*AutTxOutputDesc) (*wire.AutTransferTx, error) {
+
 	// just redundant double check
 	cryptoSchemeFromTxVersion, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
 	if err != nil {
 		return nil, err
 	}
 	if cryptoSchemeFromTxVersion != cryptoScheme {
-		return nil, fmt.Errorf("pqringctxTransferTxGen: the input cryptoScheme is different from that implied by transferTxMsgTemplate.Version")
+		return nil, fmt.Errorf("pqringctxAutTransferTxGen: the input cryptoScheme is different from that implied by transferTxMsgTemplate.Version")
 	}
 
 	inputNum := len(autTxInputDescs)
 	outputNum := len(autTxOutputDescs)
 
 	if inputNum == 0 || outputNum == 0 {
-		return nil, fmt.Errorf("pqringctxTransferTxGen: neither the input abeTxInputDescs or abeTxOutputDescs could be empty")
+		return nil, fmt.Errorf("pqringctxAutTransferTxGen: neither the input autTxInputDescs or autTxOutputDescs could be empty")
 	}
 
-	// cryptoTxInputDescs
+	// xtTxInputDescs
 	ctxTxInputDescs := make([]*pqringctxapi.CtxTxInputDesc, inputNum)
 	for i := 0; i < inputNum; i++ {
 		if autTxInputDescs[i].autTxo.Version != txVersion {
-			//	the transferTxMsgTemplate is attempting to spend the coins generated by Txs with different versions.
+			//	The caller is attempting to spend the AutTxos generated by Txs with different versions.
 			//	Here we need to hard code to accept only the expected cases.
-			return nil, fmt.Errorf("pqringctxTransferTxGen: the transferTxMsgTemplate is attempting to spend coins created by transactions with differnet versions, but the case is out of the allowed ones")
+			return nil, fmt.Errorf("pqringctxAutTransferTxGen: attempting to spend AuTtxos created by transactions with differnet versions, but the case is out of the allowed ones")
 		}
 
 		// ctxTxo
@@ -161,22 +159,29 @@ func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 		//	coinValuePublicKey, coinValueSecretKey
 		if ctxTxo.CtxTxoType() == pqringctxapi.CtxTxoTypeHidden {
 			if len(autTxInputDescs[i].coinValuePublicKey) == 0 {
-				// only when the privacyLevelInAddress is PrivacyLevelPSEUDONYM, the extracted coinValuePublicKey from the cryptoAddress could be nil.
-				return nil, fmt.Errorf("pqringctxTransferTxGen: the abeTxInputDescs[%d].[%d]-th Txo's privacy-level is not PrivacyLevelPSEUDONYM, but the coinValuePublicKey is nil", i)
+				// only fore CtxTxoTypePublic, the coinValuePublicKey could be nil.
+				return nil, fmt.Errorf("pqringctxAutTransferTxGen: the autTxInputDescs[%d].autTxo is CtxTxoTypeHidden, but the coinValuePublicKey is nil", i)
 			}
 
 			if len(autTxInputDescs[i].coinValueSecretKey) == 0 {
-				// only when the privacyLevelInAddress is PrivacyLevelPSEUDONYM, the extracted coinValuePublicKey from the cryptoAddress could be nil.
-				return nil, fmt.Errorf("pqringctxTransferTxGen: the abeTxInputDescs[%d].[%d]-th Txo's privacy-level is not PrivacyLevelPSEUDONYM, but the coinValuePublicKey is nil", i)
+				// only fore CtxTxoTypePublic, the coinValueSecretKey could be nil.
+				return nil, fmt.Errorf("pqringctxAutTransferTxGen: the autTxInputDescs[%d].autTxo is CtxTxoTypeHidden, but the coinValueSecretKey is nil", i)
 			}
 		}
 
 		ctxTxInputDescs[i] = pqringctxapi.NewCtxTxInputDesc(ctxTxo, autTxInputDescs[i].coinValuePublicKey, autTxInputDescs[i].coinValueSecretKey, autTxInputDescs[i].value)
 	}
 
-	//	cryptoTxOutputDescs
+	//	ctxTxOutputDescs
 	ctxTxOutputDescs := make([]*pqringctxapi.CtxTxOutputDesc, outputNum)
 	for j := 0; j < outputNum; j++ {
+		if autTxOutputDescs[j].autTxoType == AutTxoTypeHidden {
+			if len(autTxOutputDescs[j].coinValuePublicKey) == 0 {
+				// only fore AutTxoTypeHidden, the coinValuePublicKey could be nil.
+				return nil, fmt.Errorf("pqringctxAutTransferTxGen: the autTxOutputDescs[%d].autTxoType is AutTxoTypeHidden, but the coinValuePublicKey is nil", j)
+			}
+		}
+
 		ctxTxOutputDescs[j] = pqringctxapi.NewCtxTxOutputDesc(autTxOutputDescs[j].autTxoType, autTxOutputDescs[j].coinValuePublicKey, autTxOutputDescs[j].value)
 	}
 
@@ -224,19 +229,21 @@ func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 	return autTransferTx, nil
 }
 
-// pqringctxTransferTxVerify verifies wire.MsgTxAbe.
+// pqringctxAutTransferTxVerify verify the input autTransferTx *wire.AutTransferTx.
+// The caller needs to guarantee the well-form of the input autTransferTx *wire.AutTransferTx, such as the TxOuts.
+// This function only checks the balance proof, by calling the crypto-scheme.
 func pqringctxAutTransferTxVerify(pp *pqringctxapi.PublicParameter, autTransferTx *wire.AutTransferTx) error {
 	if autTransferTx == nil {
-		return fmt.Errorf("pqringctxTransferTxVerify: the input transferTx is empty")
+		return fmt.Errorf("pqringctxAutTransferTxVerify: the input transferTx is empty")
 	}
 
 	inputNum := len(autTransferTx.TxIns)
 	outputNum := len(autTransferTx.TxOuts)
 	if inputNum <= 0 {
-		return fmt.Errorf("pqringctxTransferTxVerify: the inputNum is 0")
+		return fmt.Errorf("pqringctxAutTransferTxVerify: the inputNum is 0")
 	}
 	if outputNum <= 0 {
-		return fmt.Errorf("pqringctxTransferTxVerify: the outputNum is 0")
+		return fmt.Errorf("pqringctxAutTransferTxVerify: the outputNum is 0")
 	}
 
 	var err error
@@ -245,9 +252,10 @@ func pqringctxAutTransferTxVerify(pp *pqringctxapi.PublicParameter, autTransferT
 	for i := 0; i < inputNum; i++ {
 		if autTransferTx.TxIns[i].Version != autTransferTx.Version {
 			//	not in the allowed cases
-			return fmt.Errorf("pqringctxTransferTxVerify: transferTx.TxIns[%d].PreviousOutPointRing.Version (%d) is out of design", i, autTransferTx.Version)
+			return fmt.Errorf("pqringctxAutTransferTxVerify: (autTransferTx.TxIns[%d].Version (%d), autTransferTx.Version (%d)) is not allowed",
+				i, autTransferTx.TxIns[i].Version, autTransferTx.Version)
 		}
-		ctxTxInputs[i], err = pqringctxapi.DeserializeCtxTxo(pp, autTransferTx.TxIns[i].TxoScript) //	Note that pqringctx can deserialize the TxoScript generated by pqringct.
+		ctxTxInputs[i], err = pqringctxapi.DeserializeCtxTxo(pp, autTransferTx.TxIns[i].TxoScript)
 		if err != nil {
 			return err
 		}
@@ -290,8 +298,7 @@ func pqringctxAutTransferTxVerify(pp *pqringctxapi.PublicParameter, autTransferT
 
 //	APIs for Txos	begin
 
-// pqringctxGetTxoPrivacyLevel returns the PrivacyLevel of the input wire.TxOutAbe.
-// reviewed on 2024.01.04
+// pqringctxGetAutTxoType returns the AutTxoType of the input *wire.AutTxo.
 func pqringctxGetAutTxoType(pp *pqringctxapi.PublicParameter, autTxo *wire.AutTxo) (AutTxoType, error) {
 	ctxTxo, err := pqringctxapi.DeserializeCtxTxo(pp, autTxo.TxoScript)
 	if err != nil {
@@ -301,13 +308,14 @@ func pqringctxGetAutTxoType(pp *pqringctxapi.PublicParameter, autTxo *wire.AutTx
 	return ctxTxo.CtxTxoType(), nil
 }
 
-// pqringctxGetAutTxoSerializeSize returns the TxoSerializeSize for the input coinAddress.
-func pqringctxGetAutTxoScriptSize(pp *pqringctxapi.PublicParameter, ctxTxoType pqringctxapi.CtxTxoType) (int, error) {
-	return pqringctxapi.GetCtxTxoSerializeSizeByCtxTxoType(pp, ctxTxoType)
+// pqringctxGetAutTxoScriptSize returns the TxoScript size for the input CtxTxoType.
+func pqringctxGetAutTxoScriptSize(pp *pqringctxapi.PublicParameter, autTxoType AutTxoType) (int, error) {
+	// Note that AutTxoType is defined to be CtxTxoType.
+	return pqringctxapi.GetCtxTxoSerializeSizeByCtxTxoType(pp, autTxoType)
 }
 
-// pqringctxTxoCoinReceiveByKeys checks whether the input abeTxo *wire.TxOutAbe belongs to the owner of the input cryptoAddress, and if true,
-// it extracts the value of abeTxo using the input cryptoValueSecretKey (if it indeed corresponds to the cryptoAddress).
+// pqringctxExtractValueFromAutTxo extracts the value of the input AutTxo,
+// using the input (coinValuePublicKey, coinValueSecretKey).
 func pqringctxExtractValueFromAutTxo(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
 	autTxo *wire.AutTxo, coinValuePublicKey []byte, coinValueSecretKey []byte) (value uint64, err error) {
 	cryptoSchemeInTxo, err := abecryptoxparam.GetCryptoSchemeByTxVersion(autTxo.Version)
@@ -316,11 +324,12 @@ func pqringctxExtractValueFromAutTxo(pp *pqringctxapi.PublicParameter, cryptoSch
 	}
 
 	if cryptoSchemeInTxo != cryptoScheme {
-		return 0, fmt.Errorf("pqringctxTxoCoinReceiveByKeys: unmatched cryptoScheme for the input Txo")
+		return 0, fmt.Errorf("pqringctxExtractValueFromAutTxo: unmatched cryptoScheme for the input AutTxo")
 	}
 
-	//	NOTE: As the abepqringctx-layer obtained TxoMLP (associated in crypto-TransferTx/CoinbaseTx) and serialized it to abeTxo.TxoScript,
-	//	here abepqringctx-layer calls crypto-scheme using TxoMLP.
+	// NOTE: As the abepqringctx-layer obtained CtxTxo (associated in CtxTransferTx/CtxCoinbaseTx)
+	// and serialized it to AutTxo.TxoScript,
+	// here abepqringctx-layer calls crypto-scheme using CtxTxo.
 	ctxTxo, err := pqringctxapi.DeserializeCtxTxo(pp, autTxo.TxoScript)
 	if err != nil {
 		return 0, err
@@ -333,15 +342,16 @@ func pqringctxExtractValueFromAutTxo(pp *pqringctxapi.PublicParameter, cryptoSch
 
 // APIs for TxWitnesses	begin
 
-// pqringctxGetAutCoinbaseTxWitnessSerializeSizeByDesc returns the TxWitnessCbTxSerializeSize for a CbTx,
-// which takes the input cryptoAddressListPayTo[] as the cryptoAddressList for the output Txos.
-// todo: review
-func pqringctxGetAutCoinbaseTxWitnessSerializeSizeByDesc(pp *pqringctxapi.PublicParameter, outNumForHidden uint8) (int, error) {
+// pqringctxGetAutCoinbaseTxWitnessSizeByDesc returns the AutCoinbaseTxWitnessSize,
+// which depends on the number of AutTxoHidden.
+func pqringctxGetAutCoinbaseTxWitnessSizeByDesc(pp *pqringctxapi.PublicParameter, outNumForHidden uint8) (int, error) {
 	return pqringctxapi.GetCtxTxWitnessCbTxSerializeSizeByDesc(pp, outNumForHidden)
 }
 
-// todo: vPublic = (sum of public value for out) - (sum of public value for in)
-func pqringctxGetAutTransferTxWitnessSerializeSizeByDesc(pp *pqringctxapi.PublicParameter, inNumForHidden uint8, outNumForHidden uint8, vPublic int64) (int, error) {
+// pqringctxGetAutTransferTxWitnessSizeByDesc returns the size of AutTransferTxWitness,
+// which depends on the description information (inNumForHidden uint8, outNumForHidden uint8, vPublic int64),
+// where vPublic = (sum of public value for out) - (sum of public value for in).
+func pqringctxGetAutTransferTxWitnessSizeByDesc(pp *pqringctxapi.PublicParameter, inNumForHidden uint8, outNumForHidden uint8, vPublic int64) (int, error) {
 	return pqringctxapi.GetCtxTxWitnessTrTxSerializeSizeByDesc(pp, inNumForHidden, outNumForHidden, vPublic)
 }
 
