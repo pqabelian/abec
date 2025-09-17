@@ -1667,23 +1667,20 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	// one more than the current height.
 	bestHeight := mp.cfg.BestHeight()
 	nextBlockHeight := bestHeight + 1
+	mp.clearOutdatedTransaction(nextBlockHeight)
 
 	if nextBlockHeight >= mp.cfg.ChainParams.BlockHeightAconcaguaCommit {
-		if mp.cfg.ChainParams.BlockHeightAconcaguaCommit <= nextBlockHeight && nextBlockHeight < mp.cfg.ChainParams.BlockHeightAconcaguaCommit+10 {
-			mp.clearOutdatedTransaction()
-		}
 		if tx.MsgTx().Version < wire.TxVersion_Height_450000_Aconcagua {
-			str := fmt.Sprintf("since from block with height %d, transactions with version %d will not be mined any more", mp.cfg.ChainParams.BlockHeightAconcaguaCommit, tx.MsgTx().Version)
+			str := fmt.Sprintf("since from block with height %d, transactions with version %d will not be mined any more",
+				mp.cfg.ChainParams.BlockHeightAconcaguaCommit, tx.MsgTx().Version)
 			return nil, nil, txRuleError(wire.RejectInvalid, str)
 		}
 	}
 
 	if nextBlockHeight >= mp.cfg.ChainParams.BlockHeightMLPAUTCOMMIT {
-		if mp.cfg.ChainParams.BlockHeightMLPAUTCOMMIT <= nextBlockHeight && nextBlockHeight < mp.cfg.ChainParams.BlockHeightMLPAUTCOMMIT+10 {
-			mp.clearOutdatedTransaction()
-		}
 		if tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_300000 {
-			str := fmt.Sprintf("since from block with height %d, transactions with version %d will not be mined any more", mp.cfg.ChainParams.BlockHeightMLPAUTCOMMIT, tx.MsgTx().Version)
+			str := fmt.Sprintf("since from block with height %d, transactions with version %d will not be mined any more",
+				mp.cfg.ChainParams.BlockHeightMLPAUTCOMMIT, tx.MsgTx().Version)
 			return nil, nil, txRuleError(wire.RejectInvalid, str)
 		}
 	}
@@ -2001,8 +1998,7 @@ func (mp *TxPool) ProcessTransactionAbe(tx *abeutil.TxAbe, allowOrphan, rateLimi
 
 	// Potentially accept the transaction to the memory pool.
 	// todo_DONE(MLP): reviewed on 2024.01.09
-	missingParents, txD, err := mp.maybeAcceptTransactionAbe(tx, true, rateLimit,
-		true, fromDiskCache)
+	missingParents, txD, err := mp.maybeAcceptTransactionAbe(tx, true, rateLimit, true, fromDiskCache)
 	if err != nil {
 		return nil, err
 	}
@@ -2227,20 +2223,46 @@ func (mp *TxPool) RemoveExpiredAUTTransaction(height int32) {
 	mp.mtx.Unlock()
 }
 
-func (mp *TxPool) ClearOutdatedTransaction() {
+func (mp *TxPool) ClearOutdatedTransaction(nextHeight int32) {
 	log.Debugf("Clean outdated transaction in mempool")
 	mp.mtx.Lock()
 	defer mp.mtx.Unlock()
-	mp.clearOutdatedTransaction()
+	mp.clearOutdatedTransaction(nextHeight)
 }
 
-func (mp *TxPool) clearOutdatedTransaction() {
-	for _, txDesc := range mp.poolAbe {
-		if txDesc.Tx.MsgTx().Version <= wire.TxVersion_Height_MLPAUT_300000 {
-			mp.removeTransactionAbe(txDesc.Tx)
-			log.Infof("transaction %s has been removed from transaction pool", txDesc.Tx.Hash())
+func (mp *TxPool) clearOutdatedTransaction(nextHeight int32) {
+	switch {
+	case nextHeight < mp.cfg.ChainParams.BlockHeightEthashPoW:
+		// TxVersion_Height_0
+	case mp.cfg.ChainParams.BlockHeightEthashPoW <= nextHeight && nextHeight < mp.cfg.ChainParams.BlockHeightDSA:
+		// TxVersion_Height_0
+	case mp.cfg.ChainParams.BlockHeightDSA <= nextHeight && nextHeight < mp.cfg.ChainParams.BlockHeightMLPAUT:
+		// TxVersion_Height_0
+	case mp.cfg.ChainParams.BlockHeightMLPAUT <= nextHeight && nextHeight < mp.cfg.ChainParams.BlockHeightMLPAUTCOMMIT:
+		// TxVersion_Height_0 / TxVersion_Height_MLPAUT_300000
+	case mp.cfg.ChainParams.BlockHeightMLPAUTCOMMIT <= nextHeight && nextHeight < mp.cfg.ChainParams.BlockHeightMLPAUTCOMMIT+10:
+		// TxVersion_Height_MLPAUT_300000
+		for _, txDesc := range mp.poolAbe {
+			if txDesc.Tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_300000 {
+				mp.removeTransactionAbe(txDesc.Tx)
+				log.Infof("transaction %s has been removed from transaction pool", txDesc.Tx.Hash())
+			}
 		}
+	case mp.cfg.ChainParams.BlockHeightAconcagua <= nextHeight && nextHeight < mp.cfg.ChainParams.BlockHeightAconcaguaCommit:
+		// TxVersion_Height_MLPAUT_300000 / TxVersion_Height_450000_Aconcagua
+
+	case mp.cfg.ChainParams.BlockHeightAconcaguaCommit <= nextHeight && nextHeight < mp.cfg.ChainParams.BlockHeightAconcaguaCommit+10:
+		// TxVersion_Height_450000_Aconcagua
+		for _, txDesc := range mp.poolAbe {
+			if txDesc.Tx.MsgTx().Version < wire.TxVersion_Height_450000_Aconcagua {
+				mp.removeTransactionAbe(txDesc.Tx)
+				log.Infof("transaction %s has been removed from transaction pool", txDesc.Tx.Hash())
+			}
+		}
+	default:
+		// nothing
 	}
+
 }
 
 // New returns a new memory pool for validating and storing standalone

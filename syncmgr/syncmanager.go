@@ -2,6 +2,12 @@ package syncmgr
 
 import (
 	"container/list"
+	"math/rand"
+	"net"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chaincfg"
@@ -11,11 +17,6 @@ import (
 	"github.com/abesuite/abec/mempool"
 	peerpkg "github.com/abesuite/abec/peer"
 	"github.com/abesuite/abec/wire"
-	"math/rand"
-	"net"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 const (
@@ -2182,9 +2183,7 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 					mempool.DefaultEstimateFeeMinRegisteredBlocks)
 			}
 		}
-		if sm.chainParams.BlockHeightMLPAUTCOMMIT <= block.Height() && block.Height() < sm.chainParams.BlockHeightMLPAUTCOMMIT+10 {
-			sm.txMemPool.ClearOutdatedTransaction()
-		}
+		sm.txMemPool.ClearOutdatedTransaction(block.Height() + 1)
 
 	// A block has been disconnected from the main block chain.
 	case blockchain.NTBlockDisconnected:
