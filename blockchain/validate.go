@@ -574,12 +574,14 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		if _, ringExists := consumedOutPoints[ringHash]; !ringExists {
 			consumedOutPoints[ringHash] = make(map[string]struct{})
 		}
-		if _, snExists := consumedOutPoints[ringHash][string(txIn.SerialNumber)]; snExists {
+
+		snStr := hex.EncodeToString(txIn.SerialNumber)
+		if _, snExists := consumedOutPoints[ringHash][snStr]; snExists {
 			return ruleError(ErrDuplicateTxInputs, "transaction "+
 				"contains duplicate inputs")
 		}
 
-		consumedOutPoints[ringHash][string(txIn.SerialNumber)] = struct{}{}
+		consumedOutPoints[ringHash][snStr] = struct{}{}
 	}
 
 	// todo(CTAUT): to review
