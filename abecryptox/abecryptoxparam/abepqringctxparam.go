@@ -29,9 +29,10 @@ func pqringctxGetNullSerialNumber(pp *pqringctxapi.PublicParameter) []byte {
 	return pqringctxapi.GetNullSerialNumber(pp)
 }
 
-// pqringctxGetTxoScriptSize returns the TxoSerializeSize for the input cryptoAddress.
+// pqringctxGetTxoScriptSize returns the TxoSerializeSize for the input coinAddressPayTo.
 // reviewed on 2023.12.07
-// refactored on 2024.01.24 by Alice: pqringctx-Layer takes as input cryptoAddress and parses it to coinAddress.
+// We have a design that pqringctx-Layer takes as input cryptoAddress and parses it to coinAddress,
+// however, this function may cause cyclic imports. As a result, we have to use coinAddress here as input.
 func pqringctxGetTxoScriptSize(pp *pqringctxapi.PublicParameter, coinAddressPayTo []byte) (int, error) {
 	return pqringctxapi.GetTxoSerializeSize(pp, coinAddressPayTo)
 }
