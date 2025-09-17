@@ -2,7 +2,6 @@ package ctaut
 
 import (
 	"bytes"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -43,8 +42,8 @@ func (o OutPoint) String() string {
 }
 
 type CTAUTToken struct {
+	Version uint32
 	OutPoint
-	Version     uint32
 	ValueScript []byte // optional from root coin
 	CoinAddress []byte
 }
@@ -87,6 +86,7 @@ type Transaction interface {
 
 	NumTxInputs() int
 	SetTxInputs(autTxIns []*CTAUTToken) error
+	TxInputs() []*CTAUTToken
 
 	NumTxOutputs() int
 	setTxOutputs(autTxouts []*CTAUTToken) error
@@ -382,6 +382,10 @@ func (tx *RegistrationTx) NumTxOutputs() int {
 	return int(tx.OutAutRootCoinNum)
 }
 
+func (tx *RegistrationTx) TxInputs() []*CTAUTToken {
+	return tx.TxIns
+}
+
 func (tx *RegistrationTx) setTxOutputs(autTxouts []*CTAUTToken) error {
 	if len(autTxouts) != int(tx.OutAutRootCoinNum) {
 		return errors.New("invalid set inputs")
@@ -507,6 +511,9 @@ func (tx *MintTx) SetTxInputs(autTxIns []*CTAUTToken) error {
 	}
 	tx.TxIns = autTxIns
 	return nil
+}
+func (tx *MintTx) TxInputs() []*CTAUTToken {
+	return tx.TxIns
 }
 
 func (tx *MintTx) NumTxOutputs() int {
@@ -690,7 +697,9 @@ func (tx *ReRegistrationTx) SetTxInputs(autTxIns []*CTAUTToken) error {
 	tx.TxIns = autTxIns
 	return nil
 }
-
+func (tx *ReRegistrationTx) TxInputs() []*CTAUTToken {
+	return tx.TxIns
+}
 func (tx *ReRegistrationTx) NumTxOutputs() int {
 	return int(tx.OutAutRootCoinNum)
 }
@@ -815,6 +824,9 @@ func (tx *TransferTx) SetTxInputs(autTxIns []*CTAUTToken) error {
 	}
 	tx.TxIns = autTxIns
 	return nil
+}
+func (tx *TransferTx) TxInputs() []*CTAUTToken {
+	return tx.TxIns
 }
 
 func (tx *TransferTx) NumTxOutputs() int {
@@ -943,7 +955,9 @@ func (tx *BurnTx) SetTxInputs(autTxIns []*CTAUTToken) error {
 	tx.TxIns = autTxIns
 	return nil
 }
-
+func (tx *BurnTx) TxInputs() []*CTAUTToken {
+	return tx.TxIns
+}
 func (tx *BurnTx) NumTxOutputs() int {
 	return int(tx.OutAutCoinNum)
 }
@@ -962,17 +976,17 @@ var ErrNonAutTx = errors.New("not a AUT transaction")
 var ErrInValidAUTTx = errors.New("not a valid AUT transaction")
 var ErrInValidIndex = errors.New("not a valid index")
 
-// ExtractCTAutTransaction try to deserialize AUT transaction from transaction memo
-// if success, do some sanity for AUT transaction:
-// - check amount of output of origin transaction for AUT
-// - check configuration of AUT transaction
-// todo(AUT): using []byte rather than MsgTxAbe as input?
-// In aut package, add ExtractCTAutTransaction function
-// for each valid TrTx, ExtractAutTRansaction is called
-// if returned (autTx,  nil)
-// further proceeding
-// logic should be aut package, but database operation should be in blockchain.
-
+// ExtractCTAutTransaction try to deserialize CTAUT script from transaction memo
+// if success, it would :
+// - populate CTAUT transaction outputs
+//   - for root coin, version / outpoint / coin address
+//   - for non-root coin, version / outpoint / coin address / value script
+//
+// - do sanity-check for AUT transaction, including
+//   - no repeat issuer tokens for registration/re-registration
+//   - check configuration
+//
+// Note that the input part needs to be filled with the help of blockchain.
 func ExtractCTAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 	// could not be an AUT transaction
 	if len(tx.TxMemo) <= CommonPrefixLength+1 {
@@ -1020,40 +1034,8 @@ func ExtractCTAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 		// for inputs, there is no rules
 
 		// for outputs, the claimed issuer tokens must match the outputs exactly
-		claimedIssuerTokens := map[string]struct{}{}
-		for i := 0; i < len(autTransaction.IssuerTokens); i++ {
-			coinAddress := autTransaction.IssuerTokens[i]
-			key := hex.EncodeToString(coinAddress)
-			// ensure no duplicates one
-			if _, ok := claimedIssuerTokens[key]; ok {
-				return nil, fmt.Errorf("claimed repeated issue token")
-			}
-			claimedIssuerTokens[key] = struct{}{}
-		}
-		if len(claimedIssuerTokens) != len(autTransaction.IssuerTokens) {
-			return nil, fmt.Errorf("claimed repeated issue token")
-		}
-
-		//	todo(Alice): should not have coinAddress at this layer, how to match the token and actual coin address
-		tokenCoinAddresses := map[string]struct{}{}
-		for i := 0; i < len(autTransaction.TxOuts); i++ {
-			key := hex.EncodeToString(autTransaction.TxOuts[i].CoinAddress)
-			if _, ok := tokenCoinAddresses[key]; !ok {
-				tokenCoinAddresses[key] = struct{}{}
-			}
-		}
-		// compare with claimed issueTokens
-		if len(tokenCoinAddresses) != len(claimedIssuerTokens) {
-			return nil, fmt.Errorf("claimed mismatched issue token")
-		}
-		for coinAddress := range tokenCoinAddresses {
-			if _, ok := claimedIssuerTokens[coinAddress]; !ok {
-				return nil, fmt.Errorf("use unclaimed issuer token")
-			}
-			delete(claimedIssuerTokens, coinAddress)
-		}
-		if len(claimedIssuerTokens) != 0 {
-			return nil, fmt.Errorf("claim unused issuer token")
+		if err = matchIssuerTokens(autTransaction.IssuerTokens, autTransaction.TxOuts); err != nil {
+			return nil, err
 		}
 
 	case *MintTx:
@@ -1074,40 +1056,8 @@ func ExtractCTAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 		// It has to be delayed until the chain data can be seen before checking.
 
 		// for outputs, the claimed issuer tokens must match the outputs exactly
-		claimedIssuerTokens := map[string]struct{}{}
-		for i := 0; i < len(autTransaction.IssuerTokens); i++ {
-			coinAddress := autTransaction.IssuerTokens[i]
-			key := hex.EncodeToString(coinAddress)
-			// ensure no duplicates one
-			if _, ok := claimedIssuerTokens[key]; ok {
-				return nil, fmt.Errorf("claimed repeated issue token")
-			}
-			claimedIssuerTokens[key] = struct{}{}
-		}
-		if len(claimedIssuerTokens) != len(autTransaction.IssuerTokens) {
-			return nil, fmt.Errorf("claimed repeated issue token")
-		}
-
-		//	todo(Alice): should not have coinAddress at this layer, how to match the token and actual coin address
-		tokenCoinAddresses := map[string]struct{}{}
-		for i := 0; i < len(autTransaction.TxOuts); i++ {
-			key := hex.EncodeToString(autTransaction.TxOuts[i].CoinAddress)
-			if _, ok := tokenCoinAddresses[key]; !ok {
-				tokenCoinAddresses[key] = struct{}{}
-			}
-		}
-		// compare with claimed issueTokens
-		if len(tokenCoinAddresses) != len(claimedIssuerTokens) {
-			return nil, fmt.Errorf("claimed mismatched issue token")
-		}
-		for coinAddress := range tokenCoinAddresses {
-			if _, ok := claimedIssuerTokens[coinAddress]; !ok {
-				return nil, fmt.Errorf("use unclaimed issuer token")
-			}
-			delete(claimedIssuerTokens, coinAddress)
-		}
-		if len(claimedIssuerTokens) != 0 {
-			return nil, fmt.Errorf("claim unused issuer token")
+		if err = matchIssuerTokens(autTransaction.IssuerTokens, autTransaction.TxOuts); err != nil {
+			return nil, err
 		}
 
 	case *TransferTx:
