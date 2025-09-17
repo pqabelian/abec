@@ -135,13 +135,7 @@ func (b *BlockChain) initBlockNode(node *blockNode, blockHeader *wire.BlockHeade
 		node.height = parent.height + 1
 		node.workSum = node.workSum.Add(parent.workSum, node.workSum)
 		// todo: (EthashPow) 202207
-		if node.height >= b.chainParams.BlockHeightAconcagua {
-			if blockHeader.Version != int32(wire.BlockVersionAconcagua) {
-				str := fmt.Sprintf("block has height %d, it should have version %08x for Aconcagua upgrade, rather than version %08x",
-					blockHeader.Height, int32(wire.BlockVersionAconcagua), blockHeader.Version)
-				return ruleError(ErrMismatchedBlockHeightAndVersion, str)
-			}
-		} else if node.height >= b.chainParams.BlockHeightEthashPoW {
+		if node.height >= b.chainParams.BlockHeightEthashPoW {
 			//	Since BlockHeightEthashPoW, blockHeader contains Height.
 			if blockHeader.Height != node.height {
 				errStr := fmt.Sprintf("Block %v has height %d, while its parent has height %d", node.hash, blockHeader.Height, parent.height)
@@ -151,7 +145,13 @@ func (b *BlockChain) initBlockNode(node *blockNode, blockHeader *wire.BlockHeade
 			// Added by Alice, 2024.05.11, for DSA
 			// todo(DSA): review
 			//	todo: when more versions appear, we need to refactor here.
-			if blockHeader.Height >= b.chainParams.BlockHeightMLPAUT {
+			if blockHeader.Height >= b.chainParams.BlockHeightAconcagua {
+				if blockHeader.Version != int32(wire.BlockVersionAconcagua) {
+					str := fmt.Sprintf("block has height %d, it should have version %08x for Aconcagua upgrade, rather than version %08x",
+						blockHeader.Height, int32(wire.BlockVersionAconcagua), blockHeader.Version)
+					return ruleError(ErrMismatchedBlockHeightAndVersion, str)
+				}
+			} else if blockHeader.Height >= b.chainParams.BlockHeightMLPAUT {
 				if blockHeader.Version != int32(wire.BlockVersionMLPAUT) {
 					str := fmt.Sprintf("block has height %d, it should have version %08x for MLPAUT, rather than version %08x", blockHeader.Height, int32(wire.BlockVersionMLPAUT), blockHeader.Version)
 					return ruleError(ErrMismatchedBlockHeightAndVersion, str)
@@ -166,6 +166,11 @@ func (b *BlockChain) initBlockNode(node *blockNode, blockHeader *wire.BlockHeade
 					str := fmt.Sprintf("block has height %d, it should have version %08x for EthashPoW, rather than the version %08x", blockHeader.Height, int32(wire.BlockVersionEthashPow), blockHeader.Version)
 					return ruleError(ErrMismatchedBlockHeightAndVersion, str)
 				}
+			}
+		} else {
+			if blockHeader.Version != int32(BlockVersionInitial) {
+				str := fmt.Sprintf("block has height %d, it should have version %08x, rather than the version %08x", blockHeader.Height, int32(BlockVersionInitial), blockHeader.Version)
+				return ruleError(ErrMismatchedBlockHeightAndVersion, str)
 			}
 		}
 	}
