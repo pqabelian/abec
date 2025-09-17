@@ -2634,8 +2634,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	for _, tx := range transactions[1:] {
 		// todo_DONE(MLP): reviewed on 2024.01.04
 		// Did not check/prevent the case that two transactions in a block spend the same coin. It will be handled later.
-		err = CheckTransactionInputsAbe(tx, node.height, view,
-			b.chainParams)
+		err = CheckTransactionInputsAbe(tx, node.height, view, b.chainParams)
 		if err != nil {
 			return err
 		}

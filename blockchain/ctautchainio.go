@@ -803,7 +803,7 @@ func dbPutCTAUTView(dbTx database.Tx, view *CTAUTViewpoint, blockHeight int32, b
 			// Remove the utxo entry if it is spent.
 			if coin.IsSpent() {
 				key := ctautOutpointKey(outpoint)
-				err := ctautCoinBucket.Delete(*key)
+				err = ctautCoinBucket.Delete(*key) // if rollback, would restore by spend journal
 				recycleOutpointKey(key)
 				if err != nil {
 					return err

@@ -284,9 +284,10 @@ func (view *CTAUTViewpoint) connectRegistrationTransaction(autTransaction *ctaut
 	if sctauts != nil {
 		// Populate the stxo details using the utxo entry.
 		var stxo = &UpdatedCTAUTInfo{
-			Before: nil,
-			After:  instance.metadata,
-			Height: blockHeight,
+			Before:           nil,
+			After:            instance.metadata,
+			Height:           blockHeight,
+			IsReRegistration: false,
 		}
 		*sctauts = append(*sctauts, stxo)
 	}
@@ -617,11 +618,26 @@ func (view *CTAUTViewpoint) disconnectRegistrationTransaction(db database.DB, au
 
 	unregisteredCTAUT := map[string]struct{}{}
 
+	// ensure the instance does exist
 	instance, exist := view.instances[identifierKey]
 	if !exist || instance == nil || instance.metadata == nil {
 		return nil, fmt.Errorf("fail to find the registered AUT instance identified by %s",
 			identifierKey)
 	}
+
+	// for updated information
+	updatedAUTInfo, ok := sctaut.(*UpdatedCTAUTInfo)
+	if !ok {
+		return nil, fmt.Errorf("invalid updated information")
+	}
+	// assert
+	if updatedAUTInfo.IsReRegistration {
+		return nil, fmt.Errorf("invalid updated information: not for registration")
+	}
+	if updatedAUTInfo.Height != blockHeight {
+		return nil, fmt.Errorf("invalid updated information: mismatch block height")
+	}
+
 	unregisteredCTAUT[identifierKey] = struct{}{}
 
 	return unregisteredCTAUT, nil
@@ -643,6 +659,7 @@ func (view *CTAUTViewpoint) disconnectMintTransaction(db database.DB, autTransac
 		return nil, err
 	}
 
+	// ensure the instance does exist
 	instance, exist := view.instances[identifierKey]
 	if !exist || instance == nil || instance.metadata == nil {
 		return nil, fmt.Errorf("fail to find the registered AUT instance identified by %s",
@@ -680,6 +697,7 @@ func (view *CTAUTViewpoint) disconnectReRegistrationTransaction(db database.DB, 
 		return nil, err
 	}
 
+	// ensure the instance does exist
 	instance, exist := view.instances[identifierKey]
 	if !exist || instance == nil || instance.metadata == nil {
 		return nil, fmt.Errorf("fail to find the registered AUT instance identified by %s",
@@ -690,7 +708,15 @@ func (view *CTAUTViewpoint) disconnectReRegistrationTransaction(db database.DB, 
 	if !ok {
 		return nil, fmt.Errorf("invalid updated information")
 	}
+	// assert
+	if !updatedAUTInfo.IsReRegistration {
+		return nil, fmt.Errorf("invalid updated information")
+	}
+	if updatedAUTInfo.Height != blockHeight {
+		return nil, fmt.Errorf("invalid updated information")
+	}
 
+	// rollback with spend journal directly
 	instance.metadata = updatedAUTInfo.Before.Clone()
 	return nil, nil
 }
@@ -700,12 +726,9 @@ func (view *CTAUTViewpoint) disconnectTransferTransaction(db database.DB, autTra
 	identifier := autTransaction.AUTIdentifier()
 	identifierKey := CTAUTIdentifierKey(identifier)
 
-	// fetch outpoint from database if not exist with instance in batch
+	// fetch generate outpoint from database if not exist with instance in batch
 	outpoints := map[ctaut.OutPoint]struct{}{}
 	for _, coin := range autTransaction.TxOutputs() {
-		outpoints[coin.OutPoint] = struct{}{}
-	}
-	for _, coin := range autTransaction.TxInputs() {
 		outpoints[coin.OutPoint] = struct{}{}
 	}
 	err := view.fetchCTAUTMain(db, outpoints, identifier)
@@ -714,7 +737,6 @@ func (view *CTAUTViewpoint) disconnectTransferTransaction(db database.DB, autTra
 	}
 
 	instance, exist := view.instances[identifierKey]
-	// TODO(CTAUT) assert rule need match the initialization
 	if !exist || instance == nil || instance.metadata == nil {
 		return nil, fmt.Errorf("fail to find the registered AUT instance identified by %s",
 			identifierKey)
@@ -727,11 +749,11 @@ func (view *CTAUTViewpoint) disconnectTransferTransaction(db database.DB, autTra
 		instance.coins[coin.OutPoint].Spend()
 	}
 
-	txIns := autTransaction.TxInputs()
 	consumedAutTokens, ok := sctaut.(*SpentCTAUTTokens)
 	if !ok {
 		return nil, fmt.Errorf("invalid updated information")
 	}
+	txIns := autTransaction.TxInputs()
 	// assert
 	if len(txIns) != len(*consumedAutTokens) {
 		return nil, fmt.Errorf("mismatched spend journal")
@@ -759,9 +781,6 @@ func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, autTransac
 	for _, coin := range autTransaction.TxOutputs() {
 		outpoints[coin.OutPoint] = struct{}{}
 	}
-	for _, coin := range autTransaction.TxInputs() {
-		outpoints[coin.OutPoint] = struct{}{}
-	}
 	err := view.fetchCTAUTMain(db, outpoints, identifier)
 	if err != nil {
 		return nil, err
@@ -786,11 +805,11 @@ func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, autTransac
 		return nil, fmt.Errorf("should not exist coin %s for AUT instance %s", txOuts[0].OutPoint, identifierKey)
 	}
 
-	txIns := autTransaction.TxInputs()
 	consumedAutTokens, ok := sctaut.(*SpentCTAUTTokens)
 	if !ok {
 		return nil, fmt.Errorf("invalid updated information")
 	}
+	txIns := autTransaction.TxInputs()
 	// assert
 	if len(txIns) != len(*consumedAutTokens) {
 		return nil, fmt.Errorf("mismatched spend journal")
@@ -824,10 +843,10 @@ func (view *CTAUTViewpoint) disconnectTransactions(db database.DB, block *abeuti
 			"spent transaction out information")
 	}
 
+	blockHeight := block.Height()
 	// Loop backwards through all autTransactions so everything is unspent in
 	// reverse order.  This is necessary since autTransactions later in a block
 	// can spend from previous ones.
-	stxoIdx := len(sauts) - 1
 	ctAUTTxs := block.CTAUTTransactions()
 	unregisteredCTAUTs := map[string]struct{}{}
 	for txIdx := len(ctAUTTxs) - 1; txIdx >= 0; txIdx-- {
@@ -835,38 +854,38 @@ func (view *CTAUTViewpoint) disconnectTransactions(db database.DB, block *abeuti
 
 		switch autTransaction := ctAUTTx.(type) {
 		case *ctaut.RegistrationTx:
-			registeredAUTs, err := view.disconnectRegistrationTransaction(db, autTransaction, block.Height(), sauts[stxoIdx])
+			unregisteredInstances, err := view.disconnectRegistrationTransaction(db, autTransaction, blockHeight, sauts[txIdx])
 			if err != nil {
 				return nil, AssertError(fmt.Sprintf("disconnectTransactions called with bad "+
 					"spent transaction out information: %s", err))
 			}
-			for identifier := range registeredAUTs {
+			for identifier := range unregisteredInstances {
 				unregisteredCTAUTs[identifier] = struct{}{}
 			}
 
 		case *ctaut.MintTx:
-			_, err := view.disconnectMintTransaction(db, autTransaction, block.Height(), sauts[stxoIdx])
+			_, err := view.disconnectMintTransaction(db, autTransaction, blockHeight, sauts[txIdx])
 			if err != nil {
 				return nil, AssertError(fmt.Sprintf("disconnectTransactions called with bad "+
 					"spent transaction out information: %s", err))
 			}
 
 		case *ctaut.ReRegistrationTx:
-			_, err := view.disconnectReRegistrationTransaction(db, autTransaction, block.Height(), sauts[stxoIdx])
+			_, err := view.disconnectReRegistrationTransaction(db, autTransaction, blockHeight, sauts[txIdx])
 			if err != nil {
 				return nil, AssertError(fmt.Sprintf("disconnectTransactions called with bad "+
 					"spent transaction out information: %s", err))
 			}
 
 		case *ctaut.TransferTx:
-			_, err := view.disconnectTransferTransaction(db, autTransaction, block.Height(), sauts[stxoIdx])
+			_, err := view.disconnectTransferTransaction(db, autTransaction, blockHeight, sauts[txIdx])
 			if err != nil {
 				return nil, AssertError(fmt.Sprintf("disconnectTransactions called with bad "+
 					"spent transaction out information: %s", err))
 			}
 
 		case *ctaut.BurnTx:
-			_, err := view.disconnectBurnTransaction(db, autTransaction, block.Height(), sauts[stxoIdx])
+			_, err := view.disconnectBurnTransaction(db, autTransaction, blockHeight, sauts[txIdx])
 			if err != nil {
 				return nil, AssertError(fmt.Sprintf("disconnectTransactions called with bad "+
 					"spent transaction out information: %s", err))
@@ -874,8 +893,6 @@ func (view *CTAUTViewpoint) disconnectTransactions(db database.DB, block *abeuti
 		default:
 			return nil, AssertError("disconnectTransactions called with unknown AUT transaction type")
 		}
-
-		stxoIdx -= 1
 	}
 
 	// Update the best hash for view to the previous block since all of the
