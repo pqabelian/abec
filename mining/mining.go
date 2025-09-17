@@ -482,6 +482,7 @@ func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, txVersion uint32, cry
 		return nil, err
 	}
 	msgTx.TxWitness = make([]byte, txWitnessSizeApprox)
+	msgTx.AutWitness = nil // coinbaseTx should not carry AutTx.
 
 	return msgTx, nil
 }
