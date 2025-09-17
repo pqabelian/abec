@@ -1235,6 +1235,10 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 			txs := msgBlock.Transactions
 			for i := 0; i < len(txs); i++ {
 				// txs[i].TxWitness = witnesses[i][chainhash.HashSize:]
+				if len(witnesses[i]) < chainhash.HashSize {
+					return fmt.Errorf("witnesses[%d] has length %d (<%d)", i, len(witnesses[i]), chainhash.HashSize)
+				}
+
 				txWitness, autWitness, err := abeutil.DecodeTxWitnesses(txs[i].Version, witnesses[i][chainhash.HashSize:])
 				if err != nil {
 					return err
@@ -1333,6 +1337,10 @@ func (s *server) pushPrunedBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneCh
 		txs := msgBlock.Transactions
 		for i := 0; i < len(txs); i++ {
 			//txs[i].TxWitness = witnessBytes[i][chainhash.HashSize:]
+			if len(witnessBytes[i]) < chainhash.HashSize {
+				return fmt.Errorf("witnessBytes[%d] has length %d (<%d)", i, len(witnessBytes[i]), chainhash.HashSize)
+			}
+
 			txWitness, autWitness, err := abeutil.DecodeTxWitnesses(txs[i].Version, witnessBytes[i][chainhash.HashSize:])
 			if err != nil {
 				return err

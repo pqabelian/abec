@@ -1548,6 +1548,10 @@ func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 		txs := blk.Transactions()
 		for i := 0; i < len(txs); i++ {
 			//txs[i].MsgTx().TxWitness = witnesses[i][chainhash.HashSize:]
+			if len(witnesses[i]) < chainhash.HashSize {
+				return nil, fmt.Errorf("witnesses[%d] has length %d (<%d)", i, len(witnesses[i]), chainhash.HashSize)
+			}
+
 			txWitness, autWitness, err := abeutil.DecodeTxWitnesses(txs[i].MsgTx().Version, witnesses[i][chainhash.HashSize:])
 			if err != nil {
 				context := "Failed to deserialize block"
@@ -3435,6 +3439,10 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 		}
 		if len(witness) != 0 {
 			// msgTx.TxWitness = witness[chainhash.HashSize:]
+			if len(witness) < chainhash.HashSize {
+				return nil, fmt.Errorf("witness has length %d (<%d)", len(witness), chainhash.HashSize)
+			}
+
 			txWitness, autWitness, err := abeutil.DecodeTxWitnesses(msgTx.Version, witness[chainhash.HashSize:])
 			if err != nil {
 				context := "Failed to deserialize transaction"
