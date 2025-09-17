@@ -584,7 +584,7 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		consumedOutPoints[ringHash][snStr] = struct{}{}
 	}
 
-	// todo(MLPAUT): to review
+	// todo(CTAUT): to review
 	ctautTransaction, err := tx.CTAUTTransaction()
 	if err != nil {
 		str := fmt.Sprintf("error hapeens when extracting AutTransaction from Tx %s: %v", tx.Hash(), err)
@@ -1333,6 +1333,7 @@ func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blo
 	}
 
 	// todo: if there are more forks, we need hard code the version check here.
+	// todo: change to switch-case
 	// 1. after commit height, disallow transaction less than older version
 	// 2. during fork to commit, coinbase transaction must be new version
 	// 3. before fork, coinbase/transfer transaction must be older version
@@ -2284,7 +2285,7 @@ func checkCTAUTReRegistrationTransactionInputs(autTransaction *ctaut.ReRegistrat
 
 	// check updated AUT info
 	// planned amount
-	if autTransaction.PlannedTotalAmount < instance.metadata.MintedAmount {
+	if instance.metadata.MintedAmount > autTransaction.PlannedTotalAmount {
 		return fmt.Errorf("transaction %s try to update the planned total amount to %d but "+
 			"the AUT entry has mint %d", tx.Hash(), autTransaction.PlannedTotalAmount,
 			instance.metadata.MintedAmount)
@@ -2505,7 +2506,6 @@ func CheckCTAUTTransactionInputs(ctautTx ctaut.Transaction, tx *abeutil.TxAbe, t
 // todo_DONE(MLP): reviewed on 2024.01.04
 func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 	view *UtxoRingViewpoint, stxos *[]*SpentTxOutAbe,
-	autView *AUTViewpoint, sauts *[]SpentAUT,
 	ctautView *CTAUTViewpoint, sctauts *[]SpentCTAUT) error {
 	// If the side chain blocks end up in the database, a call to
 	// CheckBlockSanity should be done here in case a previous version
@@ -2566,11 +2566,8 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 		return err
 	}
 
-	err = autView.fetchInputAUTUtxos(b.db, block)
-	if err != nil {
-		return err
-	}
-
+	// 1. populate ctaut input transactions
+	// 2. fetch ctaut input from blockchain
 	err = ctautView.fetchInputCTAUTUtxos(b.db, block, view)
 	if err != nil {
 		return err
@@ -2643,13 +2640,14 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 			return err
 		}
 
-		autTx, err := tx.AUTTransaction()
+		ctautTx, err := tx.CTAUTTransaction()
 		if err != nil {
 			return err
 		}
-		if autTx != nil {
-			err = CheckTransactionInputsAUT(tx, node.height, view, autView,
-				b.chainParams)
+		if ctautTx != nil {
+			// 1. check the no repeat input
+			// 2. check witness
+			err = CheckCTAUTTransactionInputs(ctautTx, tx, node.height, ctautView, b.chainParams)
 			if err != nil {
 				return err
 			}
@@ -2675,7 +2673,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 			return err
 		}
 
-		err = autView.connectTransaction(tx, node.height, sauts)
+		err = ctautView.connectTransaction(tx, node.height, sctauts)
 		if err != nil {
 			return err
 		}
@@ -2796,7 +2794,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// Update the best hash for view to include this block since all of its
 	// transactions have been connected.
 	view.SetBestHash(&node.hash)
-	autView.SetBestHash(&node.hash)
+	ctautView.SetBestHash(&node.hash)
 
 	return nil
 }
@@ -2849,9 +2847,6 @@ func (b *BlockChain) CheckConnectBlockTemplateAbe(block *abeutil.BlockAbe) error
 	view := NewUtxoRingViewpoint()
 	view.SetBestHash(&tip.hash)
 
-	autView := NewAUTViewpoint()
-	autView.SetBestHash(&tip.hash)
-
 	ctautView := NewCTAUTViewpoint()
 	ctautView.SetBestHash(&tip.hash)
 	//	todo: (EthashPoW)
@@ -2860,5 +2855,5 @@ func (b *BlockChain) CheckConnectBlockTemplateAbe(block *abeutil.BlockAbe) error
 		return err
 	}
 
-	return b.checkConnectBlockAbe(newNode, block, view, nil, autView, nil, ctautView, nil)
+	return b.checkConnectBlockAbe(newNode, block, view, nil, ctautView, nil)
 }

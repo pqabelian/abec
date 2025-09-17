@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/abesuite/abec/abecryptox"
-	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/ctaut"
@@ -329,7 +327,6 @@ func (view *CTAUTViewpoint) connectMintTransaction(autTransaction *ctaut.MintTx,
 		}
 		delete(info.RootCoinSet, txIns[i].OutPoint)
 
-		// TODO(CTAUT): It seems that CTAUT  do need to use saut to record
 		if sctauts != nil {
 			var stxo = SpentCTAUTToken{
 				Script: nil,
@@ -345,9 +342,8 @@ func (view *CTAUTViewpoint) connectMintTransaction(autTransaction *ctaut.MintTx,
 		*sctauts = append(*sctauts, &sctaut)
 	}
 
-	// Rules
-	// 1. check balance proof, has done when extracting script from the transaction
-	// 2. check minted is exceed
+	// Double check
+	// 1. check whether minted amount is exceed planned
 	wouldMintedAmount := autTransaction.Vin
 	if info.MintedAmount+wouldMintedAmount < info.MintedAmount {
 		return fmt.Errorf("an mint AUT transaction %s try to mint AUT exceed planned amount %d for AUT identified by %s",
@@ -383,11 +379,12 @@ func (view *CTAUTViewpoint) connectReRegistrationTransaction(autTransaction *cta
 		delete(metadata.RootCoinSet, txIns[i].OutPoint)
 	}
 
-	metadata.CTAutSymbol = autTransaction.CTAutSymbol
-	metadata.UnitScale = autTransaction.UnitScale
+	// TODO(CTAUT) allow change?
+	//metadata.CTAutSymbol = autTransaction.CTAutSymbol
+	//metadata.UnitScale = autTransaction.UnitScale
 
 	metadata.AutMemo = autTransaction.AutMemo
-	// assert
+	// assert here?
 	if metadata.MintedAmount > autTransaction.PlannedTotalAmount {
 		return errors.New("re-registration transaction try to make planned amount less than minted amount")
 	}
@@ -976,114 +973,33 @@ func (view *CTAUTViewpoint) fetchInputCTAUTUtxos(db database.DB, block *abeutil.
 		// which has no inputs) collecting them into sets of what is needed and
 		// what is already known (in-flight).
 		neededSet := make(map[ctaut.OutPoint]struct{}) // it is not in the same block
-		autTx, err := tx.CTAUTTransaction()
+		ctAutTx, err := tx.CTAUTTransaction()
 		if err != nil {
 			//	if a tx.AUTTransaction() returns error, such a transaction should not be accepted by mempool or a block.
 			return err
 		}
-		if autTx != nil {
-			numInCoins := autTx.NumTxInputs()
-
-			txHash := tx.Hash()
-			hostedTxIns := tx.MsgTx().TxIns
-			startIndex := 0
-
-			for ; startIndex < len(hostedTxIns); startIndex++ {
-				// sanity-check
-				ringHash := hostedTxIns[startIndex].PreviousOutPointRing.Hash()
-				utxoRing := hostView.LookupEntry(ringHash)
-				if utxoRing == nil {
-					return fmt.Errorf("transaction %s try to mint at height %d but "+
-						"the consumed UTXO at Ring %s not exist", txHash, blockHeight, ringHash)
-				}
-				if len(utxoRing.txOuts) == 0 {
-					return fmt.Errorf("transaction %s try to mint at height %d but "+
-						"the consumed UTXO at Ring %s has ring size %d, expected %d",
-						txHash, blockHeight, ringHash, len(utxoRing.txOuts), 1)
-				}
-				privacyLevel, err := abecryptox.GetTxoPrivacyLevel(utxoRing.txOuts[0])
-				if err != nil {
-					return err
-				}
-				if privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre ||
-					privacyLevel == abecryptoxkey.PrivacyLevelRINGCT {
-					continue
-				}
-
-				if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
-					return fmt.Errorf("expect privacy level %d but got %d",
-						abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
-				}
-				break
-			}
-			if startIndex+numInCoins > len(hostedTxIns) {
-				return fmt.Errorf("claim %d (root) coins but only remain %d outputs",
-					numInCoins, len(hostedTxIns)-startIndex)
-			}
-
-			autTxIns := make([]*ctaut.CTAUTToken, numInCoins)
-			for i := 0; i < len(autTxIns); i++ {
-				hostIndex := startIndex + i
-
-				// sanity-check
-				ringHash := hostedTxIns[startIndex].PreviousOutPointRing.Hash()
-				utxoRing := hostView.LookupEntry(ringHash)
-				if utxoRing == nil {
-					return fmt.Errorf("transaction %s try to mint at height %d but "+
-						"the consumed UTXO at Ring %s not exist", txHash, blockHeight, ringHash)
-				}
-				if len(utxoRing.txOuts) == 0 || len(utxoRing.outPointRing.OutPoints) == 0 {
-					return fmt.Errorf("transaction %s try to mint at height %d but "+
-						"the consumed UTXO at Ring %s has ring size %d, expected %d",
-						txHash, blockHeight, ringHash, len(utxoRing.txOuts), 1)
-				}
-				privacyLevel, err := abecryptox.GetTxoPrivacyLevel(utxoRing.txOuts[0])
-				if err != nil {
-					return err
-				}
-				if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
-					return fmt.Errorf("expect privacy level %d but got %d",
-						abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
-				}
-
-				outpoint := ctaut.OutPoint{
-					TxHash: utxoRing.outPointRing.OutPoints[0].TxHash,
-					Index:  utxoRing.outPointRing.OutPoints[0].Index,
-				}
-
-				coinAddress, err := ctaut.CheckTxoSanity(outpoint.TxHash, int(outpoint.Index), utxoRing.txOuts[hostIndex])
-				if err != nil {
-					return fmt.Errorf("transaction %s try to mint at height %d but "+
-						"the consumed UTXO at Ring %s is not a valid output",
-						txHash, blockHeight, hostedTxIns[i].PreviousOutPointRing.Hash())
-				}
-
-				// TODO(CTAUT)
-				autTxIns[i] = &ctaut.CTAUTToken{
-					OutPoint:    outpoint,
-					ValueScript: nil, // nil for root coin
-					CoinAddress: coinAddress,
-				}
-			}
-			err = autTx.SetTxInputs(autTxIns)
+		if ctAutTx != nil {
+			// fill out the input here
+			err = PopulateCTAUTInputs(ctAutTx, tx, blockHeight, hostView)
 			if err != nil {
-				return fmt.Errorf("fail to set aut tx inputs %s", err)
+				return fmt.Errorf("fail to populate consumed outpoints for CT-AUT transaction")
 			}
 
-			for _, txIn := range autTxIns {
-				autCoin := view.LookupCTAUTCoin(autTx.AUTIdentifier(), txIn.OutPoint)
+			identifier := ctAutTx.AUTIdentifier()
+			for _, txIn := range ctAutTx.TxInputs() {
+				autCoin := view.LookupCTAUTCoin(identifier, txIn.OutPoint)
 				if autCoin == nil {
 					neededSet[txIn.OutPoint] = struct{}{}
 				}
 			}
-			err = view.fetchCTAUTMain(db, neededSet, autTx.AUTIdentifier())
+			// Request the input utxos from the database.
+			err = view.fetchCTAUTMain(db, neededSet, identifier)
 			if err != nil {
 				return err
 			}
 		}
 	}
 
-	// Request the input utxos from the database.
 	return nil
 }
 

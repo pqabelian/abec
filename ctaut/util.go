@@ -237,15 +237,54 @@ func populateCTAUTOutputs(autTransaction Transaction, msgTx *wire.MsgTxAbe) erro
 		}
 
 		autTxOuts[i] = &CTAUTToken{
+			Version: txOut.Version,
 			OutPoint: OutPoint{
 				TxHash: txHash,
 				Index:  uint8(index),
 			},
-			Version:     txOut.Version,
 			ValueScript: nil, // nil for root coin, fill out for coin later
 			CoinAddress: coinAddress,
 		}
 	}
 
 	return autTransaction.setTxOutputs(autTxOuts)
+}
+
+func matchIssuerTokens(issuerTokens [][]byte, outputs []*CTAUTToken) error {
+	claimedIssuerTokens := map[string]struct{}{}
+	for i := 0; i < len(issuerTokens); i++ {
+		coinAddress := issuerTokens[i]
+		key := hex.EncodeToString(coinAddress)
+		// ensure no duplicates one
+		if _, ok := claimedIssuerTokens[key]; ok {
+			return fmt.Errorf("claimed repeated issue token")
+		}
+		claimedIssuerTokens[key] = struct{}{}
+	}
+	if len(claimedIssuerTokens) != len(issuerTokens) {
+		return fmt.Errorf("claimed repeated issue token")
+	}
+
+	//	todo(Alice): should not have coinAddress at this layer, how to match the token and actual coin address
+	tokenCoinAddresses := map[string]struct{}{}
+	for i := 0; i < len(outputs); i++ {
+		key := hex.EncodeToString(outputs[i].CoinAddress)
+		if _, ok := tokenCoinAddresses[key]; !ok {
+			tokenCoinAddresses[key] = struct{}{}
+		}
+	}
+	// compare with claimed issueTokens
+	if len(tokenCoinAddresses) != len(claimedIssuerTokens) {
+		return fmt.Errorf("claimed mismatched issue token")
+	}
+	for coinAddress := range tokenCoinAddresses {
+		if _, ok := claimedIssuerTokens[coinAddress]; !ok {
+			return fmt.Errorf("use unclaimed issuer token")
+		}
+		delete(claimedIssuerTokens, coinAddress)
+	}
+	if len(claimedIssuerTokens) != 0 {
+		return fmt.Errorf("claim unused issuer token")
+	}
+	return nil
 }
