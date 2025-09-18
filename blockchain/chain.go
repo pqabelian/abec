@@ -1497,7 +1497,8 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			viewToDelAll.SetBestHash(&n.hash)
 			//	todo_DONE(MLP): reviewed on 2024.01.05
 			// err = viewToDelAll.newUtxoRingEntries(b.db, n, block)
-			err = viewToDelAll.newUtxoRingEntriesMLP(b.db, n, block)
+			// err = viewToDelAll.newUtxoRingEntriesMLP(b.db, n, block)
+			err = viewToDelAll.newUTxoRingEntriesAconcagua(b.db, n, block)
 			if err != nil {
 				return err
 			}
@@ -1648,7 +1649,8 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		if n.height%blockNumPerRingGroup == blockNumPerRingGroup-1 {
 			//	todo(MLPAUT):
 			//err = view.newUtxoRingEntries(b.db, n, block)
-			err = view.newUtxoRingEntriesMLP(b.db, n, block)
+			// err = view.newUtxoRingEntriesMLP(b.db, n, block)
+			err = view.newUTxoRingEntriesAconcagua(b.db, n, block)
 			if err != nil {
 				return err
 			}
@@ -1709,7 +1711,8 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		if n.height%blockNumPerRingGroup == blockNumPerRingGroup-1 {
 			//	todo(MLPAUT):
 			// err = viewToDel.newUtxoRingEntries(b.db, n, block)
-			err = viewToDel.newUtxoRingEntriesMLP(b.db, n, block)
+			// err = viewToDel.newUtxoRingEntriesMLP(b.db, n, block)
+			err = viewToDel.newUTxoRingEntriesAconcagua(b.db, n, block)
 			if err != nil {
 				return err
 			}
@@ -1811,7 +1814,8 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		if n.height%blockNumPerRingGroup == blockNumPerRingGroup-1 {
 			//	todo_DONE(MLP): reviewed on 2024.01.05
 			// err = view.newUtxoRingEntries(b.db, n, block)
-			err = view.newUtxoRingEntriesMLP(b.db, n, block)
+			// err = view.newUtxoRingEntriesMLP(b.db, n, block)
+			err = view.newUTxoRingEntriesAconcagua(b.db, n, block)
 			if err != nil {
 				return err
 			}
@@ -1949,7 +1953,8 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 		if node.height%blockNumPerRingGroup == blockNumPerRingGroup-1 {
 			//	todo_DONE(MLP): reviewed on 2024.01.04
 			// err := view.newUtxoRingEntries(b.db, node, block)
-			err := view.newUtxoRingEntriesMLP(b.db, node, block)
+			// err := view.newUtxoRingEntriesMLP(b.db, node, block)
+			err := view.newUTxoRingEntriesAconcagua(b.db, node, block)
 			if err != nil {
 				return false, err
 			}

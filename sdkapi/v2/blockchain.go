@@ -209,7 +209,8 @@ func BuildTxoRingsFromRingBlocks(serializedBlocksForRingGroup [][]byte) ([]*TxoR
 		return nil, err
 	}
 
-	wireTxoRings, err := blockchain.BuildTxoRingsMLP(len(blocks), ringSize, blocks)
+	// wireTxoRings, err := blockchain.BuildTxoRingsMLP(len(blocks), ringSize, blocks)
+	wireTxoRings, err := blockchain.BuildTxoRingsAconcagua(len(blocks), ringSize, blocks)
 	if err != nil {
 		return nil, err
 	}

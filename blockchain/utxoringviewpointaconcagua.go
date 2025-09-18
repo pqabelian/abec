@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
-	"github.com/abesuite/abec/abeutil/blockutil"
+	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/wire"
@@ -14,8 +14,8 @@ import (
 // which serves as the last block for the block-group.
 //
 // This function backward compatible with the function newUTxoRingEntriesMLP,
-// so that the call on newUTxoRingEntriesMLP can be replaced by call on this fucntion.
-func (view *UTxoRingViewpoint) newUTxoRingEntriesAconcagua(db database.DB, node *blockNode, block *blockutil.BlockAbe) error {
+// so that the call on newUTxoRingEntriesMLP can be replaced by call on this function.
+func (view *UtxoRingViewpoint) newUTxoRingEntriesAconcagua(db database.DB, node *blockNode, block *abeutil.BlockAbe) error {
 	if node == nil || block == nil {
 		return AssertError("newUTxoRingEntriesAconcagua: newUTxoRingEntriesAconcagua is called with nil node or nil block.")
 	}
@@ -29,11 +29,11 @@ func (view *UTxoRingViewpoint) newUTxoRingEntriesAconcagua(db database.DB, node 
 		return AssertError("newUTxoRingEntriesAconcagua: newUTxoRingEntriesAconcagua is called with node where node.height % BlockNumPerRingGroup != BlockNumPerRingGroup-1.")
 	}
 
-	if !view.bestHash.IsEqual(block.BlockHash()) {
+	if !view.bestHash.IsEqual(block.Hash()) {
 		return AssertError("newUTxoRingEntriesAconcagua: newUTxoRingEntriesAconcagua is called with block's hash not equal to the view.bestHash")
 	}
 
-	if !node.hash.IsEqual(block.BlockHash()) {
+	if !node.hash.IsEqual(block.Hash()) {
 		return AssertError("newUTxoRingEntriesAconcagua: newUTxoRingEntriesAconcagua is called with block that has different hash with the node.")
 	}
 
@@ -41,7 +41,7 @@ func (view *UTxoRingViewpoint) newUTxoRingEntriesAconcagua(db database.DB, node 
 	blockNum := blockNumPerRingGroup
 	//	read blocks from database
 	prevNode := node.parent
-	blocks := make([]*blockutil.BlockAbe, blockNum)
+	blocks := make([]*abeutil.BlockAbe, blockNum)
 	blocks[blockNum-1] = block
 	for i := blockNum - 2; i >= 0; i-- {
 		if prevNode == nil {
@@ -69,7 +69,7 @@ func (view *UTxoRingViewpoint) newUTxoRingEntriesAconcagua(db database.DB, node 
 				node.hash, ringBlockHeight, ringId))
 		} else {
 			// here still use InitNewUTxoRingEntryMLP
-			newUTxoRingEntry := InitNewUTxoRingEntryMLP(txoRing)
+			newUTxoRingEntry := InitNewUtxoRingEntryMLP(txoRing)
 			view.entries[ringId] = newUTxoRingEntry
 		}
 	}
@@ -82,7 +82,7 @@ func (view *UTxoRingViewpoint) newUTxoRingEntriesAconcagua(db database.DB, node 
 //
 // This function is backward compatible with the function BuildTxoRingsMLP,
 // so that the call on BuildTxoRingsMLP can be replaced by the call on this function.
-func BuildTxoRingsAconcagua(blockNumPerRingGroup int, txoRingSize int, blocks []*blockutil.BlockAbe) (txoRings map[wire.RingId]*wire.TxoRing, err error) {
+func BuildTxoRingsAconcagua(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.BlockAbe) (txoRings map[wire.RingId]*wire.TxoRing, err error) {
 	//blockNum := blockNumPerRingGroup
 
 	if blockNumPerRingGroup < 1 {
@@ -111,20 +111,21 @@ func BuildTxoRingsAconcagua(blockNumPerRingGroup int, txoRingSize int, blocks []
 	//	blockHashesStr is used only for the hint of hash-collision happening
 	for i := 0; i < blockNumPerRingGroup; i++ {
 		// copy(blockHashStr[i*chainhash.HashSize:], blocks[i].Hash()[:])
-		blockHashesStrBytes = append(blockHashesStrBytes, blocks[i].BlockHash().String()...)
+		blockHashesStrBytes = append(blockHashesStrBytes, blocks[i].Hash().String()...)
 		if i != blockNumPerRingGroup-1 {
 			blockHashesStrBytes = append(blockHashesStrBytes, ","...)
 		}
 	}
 	blockHashesStr := string(blockHashesStrBytes)
 
-	// 2025.07.16 Aconcagua Fork
-	// With the Aconcagua-fork, one more TxVersion, say TxVersion_Height_500000_Aconcagua, is added.
-	// For TxVersion_Height_500000_Aconcagua, the Txos may also have three privacy-level, say, RingCTPre, RingCT, and Pseudonym,
+	// 2025.09.18 Aconcagua Fork
+	// With the Aconcagua-fork, one more TxVersion, say TxVersion_Height_450000_Aconcagua, is added.
+	// For TxVersion_Height_450000_Aconcagua, the Txos may also have four privacy-level,
+	// say, RingCTPre, RingCT, Pseudonym, PseudonymCT
 	// (todo: for leveled-storage, there are more cases)
 	// - the Txos of RingCTPre and RingCT will be collected together and divided into rings,
-	// - the Txos of Pseudonym will be collected and divided into rings with size 1.
-	// - (todo: for form aconcagua fork, Pseudonym coins will not need three blocks to form rings.)
+	// - the Txos of Pseudonym and PseudonymCT will be collected and divided into rings with size 1.
+	// - (todo: for leveled-storage, Pseudonym coins will not need three blocks to form rings.)
 
 	//	2023.12.24 MLP Fork
 	//	With the MLP_Fork, there are two TxVersions, say, TxVersion_Height_0 and TxVersion_Height_300000_MLPAUT,
@@ -153,14 +154,14 @@ func BuildTxoRingsAconcagua(blockNumPerRingGroup int, txoRingSize int, blocks []
 	txoSortStr := make([]byte, blockNumPerRingGroup*chainhash.HashSize+chainhash.HashSize+chainhash.HashSize+1)
 	//	(1) block1.hash, block2.hash, block3.hash
 	for i := 0; i < blockNumPerRingGroup; i++ {
-		copy(txoSortStr[i*chainhash.HashSize:], blocks[i].BlockHash()[:])
+		copy(txoSortStr[i*chainhash.HashSize:], blocks[i].Hash()[:])
 	}
 
 	blockHashes := make([]*chainhash.Hash, blockNumPerRingGroup) // blockHashes is collected for later use in buildTxoRingsFromTxos
 	for i := 0; i < blockNumPerRingGroup; i++ {
-		blockHashes[i] = blocks[i].BlockHash()
+		blockHashes[i] = blocks[i].Hash()
 
-		blockHash := blocks[i].BlockHash()
+		blockHash := blocks[i].Hash()
 		blockHeight := blocks[i].Height()
 
 		//	(2) block hash
@@ -168,21 +169,16 @@ func BuildTxoRingsAconcagua(blockNumPerRingGroup int, txoRingSize int, blocks []
 
 		//	coinbase transaction
 		cbTx := blocks[i].Transactions()[0]
-		// isCbTx, err := cbTx.IsCoinBase()
-		//maybeCbTx, err := wire.MaybeCoinBase(cbTx.MsgTx())
-		//if err != nil {
-		//	return nil, err
-		//}
-		//if !maybeCbTx {
-		//	return nil, AssertError(fmt.Sprintf("BuildTxoRingsMLP: the %d -th input block's first transaction is not coinbase transaction", i))
-		//}
-		if !cbTx.IsCoinbase() {
+		isCbTx, err := cbTx.IsCoinBase()
+		if err != nil {
+			return nil, err
+		}
+		if !isCbTx {
 			return nil, AssertError(fmt.Sprintf("BuildTxoRingsAconcagua: the %d -th input block's first transaction is not coinbase transaction", i))
-
 		}
 
 		//	(3) tx hash
-		txHash := cbTx.TxHash()
+		txHash := cbTx.Hash()
 		copy(txoSortStr[(blockNumPerRingGroup+1)*chainhash.HashSize:], txHash[:])
 
 		for outIndex, txOut := range cbTx.MsgTx().TxOuts {
@@ -204,7 +200,7 @@ func BuildTxoRingsAconcagua(blockNumPerRingGroup int, txoRingSize int, blocks []
 			case wire.TxVersion_Height_0:
 				allCoinbaseRmTxoWithTxVersionInit = append(allCoinbaseRmTxoWithTxVersionInit, ringMemberTxo)
 
-			case wire.TxVersion_Height_300000_MLPAUT:
+			case wire.TxVersion_Height_MLPAUT_300000:
 				privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
 				if err != nil {
 					return nil, err
@@ -223,19 +219,16 @@ func BuildTxoRingsAconcagua(blockNumPerRingGroup int, txoRingSize int, blocks []
 					return nil, AssertError(fmt.Sprintf("BuildTxoRingsAconcagua: the %d -th input block's coinbase transaction's %d -th TxOut's PrivacyLevel (%d) is not supported.", i, outIndex, privacyLevel))
 				}
 
-			case wire.TxVersion_Height_500000_Aconcagua:
+			case wire.TxVersion_Height_450000_Aconcagua:
 				privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
 				if err != nil {
 					return nil, err
 				}
 				switch privacyLevel {
-				case abecryptoxkey.PrivacyLevelRINGCTPre:
+				case abecryptoxkey.PrivacyLevelRINGCTPre, abecryptoxkey.PrivacyLevelRINGCT:
 					allCoinbaseRmTxoWithTxVersionAconcaguaRCT = append(allCoinbaseRmTxoWithTxVersionAconcaguaRCT, ringMemberTxo)
 
-				case abecryptoxkey.PrivacyLevelRINGCT:
-					allCoinbaseRmTxoWithTxVersionAconcaguaRCT = append(allCoinbaseRmTxoWithTxVersionAconcaguaRCT, ringMemberTxo)
-
-				case abecryptoxkey.PrivacyLevelPSEUDONYM:
+				case abecryptoxkey.PrivacyLevelPSEUDONYM, abecryptoxkey.PrivacyLevelPSEUDONYMCT:
 					allCoinbaseRmTxoWithTxVersionAconcaguaSDN = append(allCoinbaseRmTxoWithTxVersionAconcaguaSDN, ringMemberTxo)
 
 				default:
@@ -249,20 +242,17 @@ func BuildTxoRingsAconcagua(blockNumPerRingGroup int, txoRingSize int, blocks []
 
 		//	transfer transactions
 		for t, trTx := range blocks[i].Transactions()[1:] {
-			//isCbTx, err = trTx.IsCoinBase()
-			//maybeCbTx, err = wire.MaybeCoinBase(trTx.MsgTx())
-			//if err != nil {
-			//	return nil, err
-			//}
-			//if maybeCbTx {
-			//	return nil, AssertError(fmt.Sprintf("BuildTxoRingsMLP: the %d -th input block's %d -th transaction is a coinbase transaction", i, t))
-			//}
-			if trTx.IsCoinbase() {
+
+			isCbTx, err = trTx.IsCoinBase()
+			if err != nil {
+				return nil, err
+			}
+			if isCbTx {
 				return nil, AssertError(fmt.Sprintf("BuildTxoRingsAconcagua: the %d -th input block's %d -th transaction is a coinbase transaction", i, t))
 			}
 
 			//	(3) tx hash
-			txHash = trTx.TxHash()
+			txHash = trTx.Hash()
 			copy(txoSortStr[(blockNumPerRingGroup+1)*chainhash.HashSize:], txHash[:])
 
 			for outIndex, txOut := range trTx.MsgTx().TxOuts {
@@ -284,7 +274,7 @@ func BuildTxoRingsAconcagua(blockNumPerRingGroup int, txoRingSize int, blocks []
 				case wire.TxVersion_Height_0:
 					allTransferRmTxoWithTxVersionInit = append(allTransferRmTxoWithTxVersionInit, ringMemberTxo)
 
-				case wire.TxVersion_Height_300000_MLPAUT:
+				case wire.TxVersion_Height_MLPAUT_300000:
 					privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
 					if err != nil {
 						return nil, err
@@ -303,19 +293,16 @@ func BuildTxoRingsAconcagua(blockNumPerRingGroup int, txoRingSize int, blocks []
 						return nil, AssertError(fmt.Sprintf("BuildTxoRingsAconcagua: the %d -th input block's %d -th transaction's %d -th TxOut's PrivacyLevel (%d) is not supported.", i, t, outIndex, privacyLevel))
 					}
 
-				case wire.TxVersion_Height_500000_Aconcagua:
+				case wire.TxVersion_Height_450000_Aconcagua:
 					privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
 					if err != nil {
 						return nil, err
 					}
 					switch privacyLevel {
-					case abecryptoxkey.PrivacyLevelRINGCTPre:
+					case abecryptoxkey.PrivacyLevelRINGCTPre, abecryptoxkey.PrivacyLevelRINGCT:
 						allTransferRmTxoWithTxVersionAconcaguaRCT = append(allTransferRmTxoWithTxVersionAconcaguaRCT, ringMemberTxo)
 
-					case abecryptoxkey.PrivacyLevelRINGCT:
-						allTransferRmTxoWithTxVersionAconcaguaRCT = append(allTransferRmTxoWithTxVersionAconcaguaRCT, ringMemberTxo)
-
-					case abecryptoxkey.PrivacyLevelPSEUDONYM:
+					case abecryptoxkey.PrivacyLevelPSEUDONYM, abecryptoxkey.PrivacyLevelPSEUDONYMCT:
 						allTransferRmTxoWithTxVersionAconcaguaSDN = append(allTransferRmTxoWithTxVersionAconcaguaSDN, ringMemberTxo)
 
 					default:

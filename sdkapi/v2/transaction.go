@@ -667,7 +667,8 @@ func BuildTransferTxRequestDescFromBlocks(
 		blockNumPerRingGroup := wire.GetBlockNumPerRingGroupByBlockHeight(startBlockHeight)
 		ringSize := wire.GetTxoRingSizeByBlockHeight(startBlockHeight)
 
-		txoRings, err := blockchain.BuildTxoRingsMLP(int(blockNumPerRingGroup), int(ringSize), blocks[blockIdx:blockIdx+int(blockNumPerRingGroup)])
+		// txoRings, err := blockchain.BuildTxoRingsMLP(int(blockNumPerRingGroup), int(ringSize), blocks[blockIdx:blockIdx+int(blockNumPerRingGroup)])
+		txoRings, err := blockchain.BuildTxoRingsAconcagua(int(blockNumPerRingGroup), int(ringSize), blocks[blockIdx:blockIdx+int(blockNumPerRingGroup)])
 		if err != nil {
 			return nil, err
 		}
@@ -976,7 +977,8 @@ func GenerateCoinSerialNumberByRootSeeds(
 		blockNumPerRingGroup := wire.GetBlockNumPerRingGroupByBlockHeight(startBlockHeight)
 		ringSize := wire.GetTxoRingSizeByBlockHeight(startBlockHeight)
 
-		txoRings, err := blockchain.BuildTxoRingsMLP(int(blockNumPerRingGroup), int(ringSize), blocks[blockIdx:blockIdx+int(blockNumPerRingGroup)])
+		// txoRings, err := blockchain.BuildTxoRingsMLP(int(blockNumPerRingGroup), int(ringSize), blocks[blockIdx:blockIdx+int(blockNumPerRingGroup)])
+		txoRings, err := blockchain.BuildTxoRingsAconcagua(int(blockNumPerRingGroup), int(ringSize), blocks[blockIdx:blockIdx+int(blockNumPerRingGroup)])
 		if err != nil {
 			return nil, err
 		}
@@ -1124,7 +1126,8 @@ func GenerateCoinSerialNumberByRandSeeds(
 		blockNumPerRingGroup := wire.GetBlockNumPerRingGroupByBlockHeight(startBlockHeight)
 		ringSize := wire.GetTxoRingSizeByBlockHeight(startBlockHeight)
 
-		txoRings, err := blockchain.BuildTxoRingsMLP(int(blockNumPerRingGroup), int(ringSize), blocks[blockIdx:blockIdx+int(blockNumPerRingGroup)])
+		// txoRings, err := blockchain.BuildTxoRingsMLP(int(blockNumPerRingGroup), int(ringSize), blocks[blockIdx:blockIdx+int(blockNumPerRingGroup)])
+		txoRings, err := blockchain.BuildTxoRingsAconcagua(int(blockNumPerRingGroup), int(ringSize), blocks[blockIdx:blockIdx+int(blockNumPerRingGroup)])
 		if err != nil {
 			return nil, err
 		}
@@ -1273,7 +1276,9 @@ func GenerateCoinSerialNumberByKeys(
 		blockNumPerRingGroup := wire.GetBlockNumPerRingGroupByBlockHeight(startBlockHeight)
 		ringSize := wire.GetTxoRingSizeByBlockHeight(startBlockHeight)
 
-		txoRings, err := blockchain.BuildTxoRingsMLP(int(blockNumPerRingGroup), int(ringSize), blocks[blockIdx:blockIdx+int(blockNumPerRingGroup)])
+		// txoRings, err := blockchain.BuildTxoRingsMLP(int(blockNumPerRingGroup), int(ringSize), blocks[blockIdx:blockIdx+int(blockNumPerRingGroup)])
+		txoRings, err := blockchain.BuildTxoRingsAconcagua(int(blockNumPerRingGroup), int(ringSize), blocks[blockIdx:blockIdx+int(blockNumPerRingGroup)])
+
 		if err != nil {
 			return nil, err
 		}
