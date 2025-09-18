@@ -136,7 +136,7 @@ func BuildTxoRingsAconcagua(blockNumPerRingGroup int, txoRingSize int, blocks []
 
 	allCoinbaseRmTxoWithTxVersionInit := make([]*RingMemberTxo, 0, defaultCoinbaseRmTxoNumWithTxVersionInit)
 	allTransferRmTxoWithTxVersionInit := make([]*RingMemberTxo, 0, defaultTransferRmTxoNumWithTxVersionInit)
-	
+
 	allCoinbaseRmTxoWithTxVersionMLPAUTRCT := make([]*RingMemberTxo, 0, defaultCoinbaseRmTxoNumWithTxVersionMLPAUTRCT)
 	allCoinbaseRmTxoWithTxVersionMLPAUTSDN := make([]*RingMemberTxo, 0, defaultCoinbaseRmTxoNumWithTxVersionMLPAUTSDN)
 	allTransferRmTxoWithTxVersionMLPAUTRCT := make([]*RingMemberTxo, 0, defaultTransferRmTxoNumWithTxVersionMLPAUTRCT)
@@ -536,25 +536,6 @@ func BuildTxoRingsAconcagua(blockNumPerRingGroup int, txoRingSize int, blocks []
 
 	return rstTxoRings, nil
 
-}
-
-// InitNewUTxoRingEntryAconcagua initializes a new UTxoRingEntry from the input wire.TxoRing.
-// todo: enable the packedFlags to support its privacy level.
-func InitNewUTxoRingEntryAconcagua(txoRing *wire.TxoRing) *UTxoRingEntry {
-	uTxoRingEntry := &UTxoRingEntry{
-		Version:              txoRing.Version,
-		ringBlockHeight:      txoRing.RingBlockHeight,
-		outPointRing:         txoRing.OutPointRing,
-		txOuts:               txoRing.TxOuts,
-		serialNumbers:        nil,
-		consumingBlockHashes: nil,
-		packedFlags:          trfModified, // note that New implies Modified.
-	}
-
-	if txoRing.IsCoinbase {
-		uTxoRingEntry.packedFlags |= trfCoinBase
-	}
-	return uTxoRingEntry
 }
 
 // txoOrderHashForBuildingRing returns a hash of the input txoSortStr, which will be used to order the Txos.
