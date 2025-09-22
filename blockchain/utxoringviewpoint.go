@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"sort"
+
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/wire"
-	"io"
-	"sort"
 )
 
 // BuildTxoRings apply a chain-rule to organize the Txos of input blocks to TxoRings.

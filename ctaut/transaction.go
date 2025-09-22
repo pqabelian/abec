@@ -984,6 +984,7 @@ var ErrInValidIndex = errors.New("not a valid index")
 //
 // - do sanity-check for AUT transaction, including
 //   - no repeat issuer tokens for registration/re-registration
+//   - no tokens parasitized on invalid type coin
 //   - check configuration
 //
 // Note that the input part needs to be filled with the help of blockchain.

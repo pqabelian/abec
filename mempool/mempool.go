@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -76,8 +77,8 @@ type Config struct {
 	FetchUtxoView func(*abeutil.Tx) (*blockchain.UtxoViewpoint, error)
 
 	FetchUtxoRingView func(*abeutil.TxAbe) (*blockchain.UtxoRingViewpoint, error)
-	FetchAUTView      func(*abeutil.TxAbe) (*blockchain.AUTViewpoint, error)
-	FetchCTAUTView    func(ctAutTx ctaut.Transaction) (*blockchain.CTAUTViewpoint, error)
+	//FetchAUTView      func(*abeutil.TxAbe) (*blockchain.AUTViewpoint, error)
+	FetchCTAUTView func(ctAutTx ctaut.Transaction) (*blockchain.CTAUTViewpoint, error)
 
 	// BestHeight defines the function to use to access the block height of
 	// the current best chain.
@@ -741,7 +742,7 @@ func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 		for _, txIn := range txDesc.Tx.MsgTx().TxIns {
 			ringHash := txIn.PreviousOutPointRing.Hash()
 			if _, ringExists := mp.outpointsAbe[ringHash]; ringExists {
-				delete(mp.outpointsAbe[ringHash], string(txIn.SerialNumber))
+				delete(mp.outpointsAbe[ringHash], hex.EncodeToString(txIn.SerialNumber))
 			}
 		}
 
@@ -759,15 +760,15 @@ func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 		atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
 	}
 
-	autTx, err := tx.AUTTransaction()
+	ctautTx, err := tx.CTAUTTransaction()
 	if err != nil {
 		// This should not happen, since mempool should accept tx which has error on extracting AutTransaction.
 		log.Warnf("removeTransactionAbe: error happens when extracting AutTransaction from Tx %s: %v", tx.Hash(), err)
 		return
 	}
-	if autTx != nil {
-		if autTx.Type() == aut.Registration {
-			delete(mp.registeredAUTName, hex.EncodeToString(autTx.AUTIdentifier()))
+	if ctautTx != nil {
+		if ctautTx.Type() == aut.Registration {
+			delete(mp.registeredAUTName, hex.EncodeToString(ctautTx.AUTIdentifier()))
 		}
 	}
 }
@@ -812,7 +813,7 @@ func (mp *TxPool) RemoveDoubleSpendsAbe(tx *abeutil.TxAbe) {
 	for _, txIn := range tx.MsgTx().TxIns {
 		ringHash := txIn.PreviousOutPointRing.Hash()
 		if _, exists := mp.outpointsAbe[ringHash]; exists {
-			if txRedeemer, ok := mp.outpointsAbe[txIn.PreviousOutPointRing.Hash()][string(txIn.SerialNumber)]; ok {
+			if txRedeemer, ok := mp.outpointsAbe[txIn.PreviousOutPointRing.Hash()][hex.EncodeToString(txIn.SerialNumber)]; ok {
 				//	This happens when tx is included in a block received, but not in mempool.
 				if !txRedeemer.Hash().IsEqual(tx.Hash()) {
 					mp.removeTransactionAbe(txRedeemer)
@@ -828,10 +829,8 @@ func (mp *TxPool) RemoveDoubleSpendsAbe(tx *abeutil.TxAbe) {
 // helper for maybeAcceptTransactionAbe.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint,
-	ctautView *blockchain.CTAUTViewpoint,
-	tx *abeutil.TxAbe,
-	height int32, fee uint64, fromDiskCache bool) *TxDescAbe {
+func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, ctautView *blockchain.CTAUTViewpoint,
+	tx *abeutil.TxAbe, height int32, fee uint64, fromDiskCache bool) (*TxDescAbe, error) {
 	// Add the transaction to the pool and mark the referenced outpoints
 	// as spent by the pool.
 	txD := &TxDescAbe{
@@ -872,7 +871,7 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint,
 		if _, err := mp.cfg.TxCacheRotator.Write(txHash.String(), content); err == nil {
 			mp.diskPool[*tx.Hash()] = struct{}{}
 			log.Infof("successful to save transaction %s into disk, current mempool:%d, current cached in disk:%d", txHash, len(mp.poolAbe), len(mp.diskPool))
-			return txD
+			return txD, nil
 		}
 		log.Warnf("Fail to cache transaction %s using disk, save it at memory", txHash)
 	}
@@ -891,7 +890,7 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint,
 			mp.outpointsAbe[txIn.PreviousOutPointRing.Hash()] = make(map[string]*abeutil.TxAbe)
 		}
 
-		mp.outpointsAbe[txIn.PreviousOutPointRing.Hash()][string(txIn.SerialNumber)] = tx
+		mp.outpointsAbe[txIn.PreviousOutPointRing.Hash()][hex.EncodeToString(txIn.SerialNumber)] = tx
 	}
 	atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
 
@@ -902,20 +901,22 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint,
 		mp.cfg.AddrIndex.AddUnconfirmedTx(tx, utxoView)
 	}*/
 
-	autTx, err := tx.AUTTransaction()
+	ctautTx, err := tx.CTAUTTransaction()
 	if err != nil {
 		// This should not happen, since before addTransactionAbe, the transaction should have been checked
 		log.Warnf("addTransactionAbe: fail to add Tx %s to mempool, since error happens when extracting AutTransaction: %v", tx.Hash(), err)
+		return nil, errors.New("fail to extract CT-AUT transaction")
 	}
-	if autTx != nil {
-		switch autTransaction := autTx.(type) {
-		case *aut.RegistrationTx:
+	if ctautTx != nil {
+		switch autTransaction := ctautTx.(type) {
+		case *ctaut.RegistrationTx:
 			if mp.expiredHeightAUT[autTransaction.ExpireHeight] == nil {
 				mp.expiredHeightAUT[autTransaction.ExpireHeight] = map[chainhash.Hash]*TxDescAbe{}
 			}
 			mp.expiredHeightAUT[autTransaction.ExpireHeight][*txD.Tx.Hash()] = txD
+
 			mp.registeredAUTName[hex.EncodeToString(autTransaction.AUTIdentifier())] = *tx.Hash()
-		case *aut.ReRegistrationTx:
+		case *ctaut.ReRegistrationTx:
 			if mp.expiredHeightAUT[autTransaction.ExpireHeight] == nil {
 				mp.expiredHeightAUT[autTransaction.ExpireHeight] = map[chainhash.Hash]*TxDescAbe{}
 			}
@@ -930,7 +931,7 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint,
 		mp.cfg.FeeEstimator.ObserveTransaction(txD)
 	}
 
-	return txD
+	return txD, nil
 }
 
 // checkPoolDoubleSpend checks whether or not the passed transaction is
@@ -974,7 +975,7 @@ func (mp *TxPool) checkPoolDoubleSpendAbe(tx *abeutil.TxAbe) error {
 			continue
 		}
 
-		conflictTx, ok := mp.outpointsAbe[txIn.PreviousOutPointRing.Hash()][string(txIn.SerialNumber)]
+		conflictTx, ok := mp.outpointsAbe[txIn.PreviousOutPointRing.Hash()][hex.EncodeToString(txIn.SerialNumber)]
 		if !ok {
 			continue
 		}
@@ -1273,7 +1274,7 @@ func (mp *TxPool) txConflicts(tx *abeutil.Tx) map[chainhash.Hash]*abeutil.Tx {
 func (mp *TxPool) txConflictsAbe(tx *abeutil.TxAbe) map[chainhash.Hash]*abeutil.TxAbe {
 	conflicts := make(map[chainhash.Hash]*abeutil.TxAbe)
 	for _, txIn := range tx.MsgTx().TxIns {
-		conflict, ok := mp.outpointsAbe[txIn.PreviousOutPointRing.Hash()][string(txIn.SerialNumber)]
+		conflict, ok := mp.outpointsAbe[txIn.PreviousOutPointRing.Hash()][hex.EncodeToString(txIn.SerialNumber)]
 		if !ok {
 			continue
 		}
@@ -1338,12 +1339,13 @@ func (mp *TxPool) fetchInputUtxoRingsAbe(tx *abeutil.TxAbe) (*blockchain.UtxoRin
 
 // fetch relevant info withAUT transaction
 func (mp *TxPool) fetchInputAUT(tx *abeutil.TxAbe) (*blockchain.AUTViewpoint, error) {
-	autView, err := mp.cfg.FetchAUTView(tx)
-	if err != nil {
-		return nil, err
-	}
-
-	return autView, nil
+	//autView, err := mp.cfg.FetchAUTView(tx)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//return autView, nil
+	return nil, errors.New("AUT is not supported")
 }
 func (mp *TxPool) fetchInputCTAUT(ctAutTx ctaut.Transaction) (*blockchain.CTAUTViewpoint, error) {
 	ctAutView, err := mp.cfg.FetchCTAUTView(ctAutTx)
@@ -1905,7 +1907,10 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 		}
 	}
 
-	txD := mp.addTransactionAbe(utxoRingView, ctAutView, tx, bestHeight, txFee, fromDiskCache)
+	txD, err := mp.addTransactionAbe(utxoRingView, ctAutView, tx, bestHeight, txFee, fromDiskCache)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	log.Debugf("Accepted transaction %v (version %08x, input %d, output %d, memo size %d bytes, serialized size %d bytes, full size %d bytes) "+
 		"(pool size: %v)", txHash, tx.MsgTx().Version, len(tx.MsgTx().TxIns), len(tx.MsgTx().TxOuts), len(tx.MsgTx().TxMemo),

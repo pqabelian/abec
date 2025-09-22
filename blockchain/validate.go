@@ -600,7 +600,6 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 
 		// for output part, all tokens must be parasitized in the output with valid version
 		txOuts := tx.MsgTx().TxOuts
-		// TODO_DONE extract output to check chain rule for AUT in package aut
 		for _, coin := range ctautTransaction.TxOutputs() {
 			index := coin.Index
 			if txOuts[index].Version < wire.TxVersion_Height_450000_Aconcagua {
