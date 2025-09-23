@@ -317,6 +317,7 @@ func WriteVarBytes(w io.Writer, bytes []byte) error {
 	return err
 }
 
+// todo(ctaut): should have a WriteByte(). or directly use the lib function.
 func ReadByte(r io.Reader) (byte, error) {
 	oneByte := make([]byte, 1)
 	_, err := io.ReadFull(r, oneByte)

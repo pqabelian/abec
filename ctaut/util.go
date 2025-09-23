@@ -68,6 +68,8 @@ func writeIssuerTokens(b bytes.Buffer, issuerTokens [][]byte) error {
 	}
 	return nil
 }
+
+// todo(ctaut): numIssuer == 0 should be checked here?
 func readIssuerTokens(r io.Reader) ([][]byte, error) {
 	var numIssuer uint64
 	var err error
@@ -85,12 +87,12 @@ func readIssuerTokens(r io.Reader) ([][]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		if len(issuerTokens[i]) != IssuerTokenLength {
+		if len(issuerTokens[i]) != IssuerTokenLength { // todo(ctaut): need to discuss and confirm
 			return nil, ErrInValidAUTTx
 		}
 
 		key := hex.EncodeToString(issuerTokens[i])
-		if _, ok := claimedCoinAddresses[key]; ok {
+		if _, ok := claimedCoinAddresses[key]; ok { // todo(ctaut): cannot repeat? consistent with the design?
 			return nil, ErrInValidAUTTx
 		}
 		claimedCoinAddresses[key] = struct{}{}
@@ -106,6 +108,8 @@ func writeWitnessHash(b bytes.Buffer, witnessHash chainhash.Hash) error {
 	return WriteVarBytes(&b, witnessHash[:])
 }
 func readWitnessHash(r io.Reader) (chainhash.Hash, error) {
+	// todo(ctaut): why use var bytes? it increases the NewHash() part.
+	// todo(ctaut): "memo" is not correct.
 	witnessHashBytes, err := ReadVarBytes(r, chainhash.HashSize, "memo")
 	if err != nil {
 		return chainhash.InvalidHash, err
@@ -117,9 +121,12 @@ func readWitnessHash(r io.Reader) (chainhash.Hash, error) {
 	return *witnessHash, nil
 }
 
+// todo(ctaut): why define this function?
 func writeAutMemo(b bytes.Buffer, autMemo []byte) error {
 	return WriteVarBytes(&b, autMemo)
 }
+
+// todo(ctaut): the length check does not make sense, since it is checked in ReadVarBytes.
 func readAutMemo(r io.Reader) ([]byte, error) {
 	autMemo, err := ReadVarBytes(r, MaxAUTMemoLength, "autmemo")
 	if err != nil {
@@ -131,9 +138,12 @@ func readAutMemo(r io.Reader) ([]byte, error) {
 	return autMemo, nil
 }
 
+// todo(ctaut): why define this function?
 func writeMemo(b bytes.Buffer, memo []byte) error {
 	return WriteVarBytes(&b, memo)
 }
+
+// todo(ctaut): the length check does not make sense, since it is checked in ReadVarBytes.
 func readMemo(r io.Reader) ([]byte, error) {
 	memo, err := ReadVarBytes(r, MaxAUTTxMemoLength, "memo")
 	if err != nil {
@@ -145,6 +155,7 @@ func readMemo(r io.Reader) ([]byte, error) {
 	return memo, nil
 }
 
+// todo(ctaut): add 's' to the name?
 func writeCTAUTTxoScript(b bytes.Buffer, scripts [][]byte) error {
 	err := WriteVarInt(&b, uint64(len(scripts)))
 	if err != nil {
@@ -175,12 +186,16 @@ func readCTAUTTxoScript(r io.Reader, expectedLength int) ([][]byte, error) {
 			return nil, err
 		}
 		if len(ctAUTTxoScripts[i]) > MaxAUTTxoScriptLength {
+			// todo(ctaut): the check does not make sense
+			// todo(ctaut): the length is not correct.
 			return nil, ErrInValidAUTTx
 		}
 	}
 	return ctAUTTxoScripts, nil
 }
 
+// todo(ctaut): add comment to define the rules
+// todo(ctaut): HostTxoSanityCheck
 func CheckTxoSanity(txHash chainhash.Hash, outputIndex int, txOut *wire.TxOutAbe) ([]byte, error) {
 	privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
 	if err != nil {
@@ -200,6 +215,7 @@ func CheckTxoSanity(txHash chainhash.Hash, outputIndex int, txOut *wire.TxOutAbe
 	return coinAddress, nil
 }
 
+// todo(ctaut): add comments to define the rules
 func populateCTAUTOutputs(autTransaction Transaction, msgTx *wire.MsgTxAbe) error {
 	startIdx := 0
 	for ; startIdx < len(msgTx.TxOuts); startIdx++ {
@@ -220,11 +236,13 @@ func populateCTAUTOutputs(autTransaction Transaction, msgTx *wire.MsgTxAbe) erro
 		break
 	}
 
+	// todo(ctaut): NumTxOutputs() here is a typically inappropriate use.
 	if startIdx+autTransaction.NumTxOutputs() > len(msgTx.TxOuts) {
 		return fmt.Errorf("claim %d outputs for CTAUT but only remain %d outputs in host transaction",
 			autTransaction.NumTxOutputs(), len(msgTx.TxOuts)-startIdx)
 	}
 
+	// todo(ctaut): seems not correct. it is possible startIdx is not hosting ctaut. need define the rules
 	txHash := msgTx.TxHash()
 	autTxOuts := make([]*CTAUTToken, autTransaction.NumTxOutputs())
 	for i := 0; i < autTransaction.NumTxOutputs(); i++ {
@@ -250,6 +268,7 @@ func populateCTAUTOutputs(autTransaction Transaction, msgTx *wire.MsgTxAbe) erro
 	return autTransaction.setTxOutputs(autTxOuts)
 }
 
+// todo(ctaut): define the rules on the mint/update threshold.
 func matchIssuerTokens(issuerTokens [][]byte, outputs []*CTAUTToken) error {
 	claimedIssuerTokens := map[string]struct{}{}
 	for i := 0; i < len(issuerTokens); i++ {
@@ -265,7 +284,7 @@ func matchIssuerTokens(issuerTokens [][]byte, outputs []*CTAUTToken) error {
 		return fmt.Errorf("claimed repeated issue token")
 	}
 
-	//	todo(Alice): should not have coinAddress at this layer, how to match the token and actual coin address
+	//	todo(ctaut): should not have coinAddress at this layer, how to match the token and actual coin address
 	tokenCoinAddresses := map[string]struct{}{}
 	for i := 0; i < len(outputs); i++ {
 		key := hex.EncodeToString(outputs[i].CoinAddress)

@@ -41,15 +41,17 @@ func (o OutPoint) String() string {
 	return string(buf)
 }
 
+// todo(ctaut): this is for database storage or only memeory? why has CoinAddress and ValueScript?
 type CTAUTToken struct {
-	Version uint32
-	OutPoint
+	Version     uint32
+	OutPoint           // todo(ctaut): HostOutPoint OutPoint
 	ValueScript []byte // optional from root coin
 	CoinAddress []byte
 }
 
 type TransactionType = uint8
 
+// todo(ctaut): shift the Mint and ReRegistration?
 const (
 	Registration   TransactionType = 0
 	Mint           TransactionType = 1
@@ -58,6 +60,7 @@ const (
 	Burn           TransactionType = 4
 )
 
+// todo(ctaut): defined as []byte?
 const CommonPrefix = "CTAUTSCRIPT"
 
 const CommonPrefixLength = 11
@@ -68,12 +71,14 @@ const MaxAUTMemoLength = 1024
 const MaxUnitLength = 20
 const MaxMinUnitLength = 20
 
+// todo(ctaut): shall be uint64(1)<<51 - 1 ?
 const MaxAmount = uint64(1<<51 - 1)
 
 // IssuerTokenLength would be length of coin address for pseudonym address (193)
-const IssuerTokenLength = 193
-const MaxIssuerNum = 10
+const IssuerTokenLength = 193 // todo(ctaut): is this right? pseudonymCT ?
+const MaxIssuerNum = 10       // todo(ctaut): Is this right?
 
+// todo(ctaut): MaxAUTTxoScriptLength is not correct, it may be larger than 1024.
 const MaxAUTTxoScriptLength = 1024
 const MaxAUTTxMemoLength = 1024
 
@@ -177,7 +182,7 @@ func (info *Metadata) Clone() *Metadata {
 // [UnitScale] the scale between unit and minUnit, would not be changed anymore
 // [AutMemo] a byte array with max length
 //
-// [Planed Total Amount] an integer range in [1<<51 -1)
+// [Planed Total Amount] an integer range in [1, 1<<51 -1)
 // <IssuerTokens> an array with length N of hash, each one represents a public key (represented by a pseudonym coin address)
 // <IssuerUpdateThreshold> An integer update_t <= N
 // <IssueTokensThreshold> An integer mint_t <= N
@@ -191,7 +196,8 @@ func (info *Metadata) Clone() *Metadata {
 // Why this is dupliating the Info?
 // todo(Alice): for the common fields, using the same order as the definition, the particular fields
 type RegistrationTx struct {
-	CTAutIdentifier []byte // identifier
+	CTAutIdentifier []byte // identifier // todo(ctaut): how to guarantee that there is no repeated identifier? how about use Hash?
+	// todo(ctaut): use Hash(symbol, registeredTime)
 
 	CTAutSymbol []byte // symbol
 	UnitName    []byte
@@ -201,8 +207,8 @@ type RegistrationTx struct {
 
 	PlannedTotalAmount    uint64
 	IssuerTokens          [][]byte
-	IssueTokensThreshold  uint8
-	IssuerUpdateThreshold uint8
+	IssueTokensThreshold  uint8 // todo(ctaut): MintThreshold
+	IssuerUpdateThreshold uint8 // todo(ctaut): UpdateThreshold
 	ExpireHeight          int32
 
 	OutAutRootCoinNum uint8
@@ -220,7 +226,7 @@ func (tx *RegistrationTx) AUTIdentifier() []byte {
 }
 
 func (tx *RegistrationTx) Serialize() ([]byte, error) {
-	// todo(Alice): initialize a space first
+	// todo(ctaut): initialize a space first?
 	// w := bytes.NewBuffer(make([]byte, tx.SerializeSize()))
 	var b bytes.Buffer
 	var err error
@@ -274,6 +280,7 @@ func (tx *RegistrationTx) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
+	// todo(ctaut): does not wrire TxIns and TxOuts?
 	return b.Bytes(), nil
 }
 func (tx *RegistrationTx) Deserialize(r io.Reader) error {
@@ -287,6 +294,7 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 	if err != nil {
 		return err
 	}
+	// todo(ctaut): discuss on shall the ckecks are preformed here; the ckeck on len > MaxSymbolLength does not make sense here
 	if len(tx.CTAutSymbol) == 0 || len(tx.CTAutSymbol) > MaxSymbolLength {
 		return ErrInValidAUTTx
 	}
@@ -295,6 +303,7 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 	if err != nil {
 		return err
 	}
+	// todo(ctaut): discuss on shall the ckecks are preformed here; the ckeck on len > MaxUnitLength does not make sense here
 	if len(tx.UnitName) == 0 || len(tx.UnitName) > MaxUnitLength {
 		return ErrInValidAUTTx
 	}
@@ -303,6 +312,7 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 	if err != nil {
 		return err
 	}
+	// todo(ctaut): discuss on shall the ckecks are preformed here; the ckeck on len > MaxMinUnitLength does not make sense here
 	if len(tx.MinUnitName) == 0 || len(tx.MinUnitName) > MaxMinUnitLength {
 		return ErrInValidAUTTx
 	}
@@ -320,6 +330,7 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 	if tx.PlannedTotalAmount, err = ReadVarInt(r); err != nil {
 		return err
 	}
+	// todo(ctaut): what is the unit for PlannedTotalAmount?
 	if tx.PlannedTotalAmount == 0 || tx.PlannedTotalAmount > MaxAmount {
 		return ErrInValidAUTTx
 	}
@@ -360,6 +371,7 @@ func (tx *RegistrationTx) Deserialize(r io.Reader) error {
 	}
 
 	// TODO extra
+	// todo(ctaut): define a sanity-check function?
 	if tx.UnitScale > tx.PlannedTotalAmount {
 		return errors.New("an AUT with invalid scale")
 	}
@@ -374,18 +386,21 @@ func (tx *RegistrationTx) SetTxInputs(autTxIns []*CTAUTToken) error {
 	if len(autTxIns) != 0 {
 		return fmt.Errorf("invalid inputs")
 	}
-	tx.TxIns = autTxIns
+	tx.TxIns = autTxIns // todo(ctaut): directly nil?
 	return nil
 }
 
 func (tx *RegistrationTx) NumTxOutputs() int {
-	return int(tx.OutAutRootCoinNum)
+	return int(tx.OutAutRootCoinNum) // todo(ctaut): the funtion output uint8?
 }
 
+// todo(ctaut): always output nil?
 func (tx *RegistrationTx) TxInputs() []*CTAUTToken {
 	return tx.TxIns
 }
 
+// todo(ctaut): shall have functions Get/SetOutAutRootCoinNum()?   NumTxOutputs() should use tx.TxOuts?
+// todo(ctaut): redundant? double-check? or consistent?
 func (tx *RegistrationTx) setTxOutputs(autTxouts []*CTAUTToken) error {
 	if len(autTxouts) != int(tx.OutAutRootCoinNum) {
 		return errors.New("invalid set inputs")
@@ -393,6 +408,8 @@ func (tx *RegistrationTx) setTxOutputs(autTxouts []*CTAUTToken) error {
 	tx.TxOuts = autTxouts
 	return nil
 }
+
+// todo(ctaut): consider it together with setTxOutputs
 func (tx *RegistrationTx) TxOutputs() []*CTAUTToken {
 	return tx.TxOuts
 }
@@ -407,21 +424,25 @@ var _ Transaction = &RegistrationTx{}
 // <AUTTxoScripts> an array of n byte array each one for an AUTCoin
 // <WitnessHash> a byte array with fixed length
 // <Memo> a byte array with max length, for this transaction
+// todo(ctaut): the comments need to be improved.
 
 type MintTx struct {
 	AutIdentifier []byte
 
 	Vin              uint64
 	InAutRootCoinNum uint8
-	OutAutCoinNum    uint8
+	OutAutCoinNum    uint8 // todo(ctaut): explicitly specify the number of plain-aut and the number of ct-aut? not specified, will call underlying API to extract AutTxoType?
 	AUTTxoScripts    [][]byte
-	WitnessHash      chainhash.Hash
+	WitnessHash      chainhash.Hash // todo(ctaut): move to the last position
 	Memo             []byte
 
+	// todo(ctaut): these are the memory-cached content?
 	TxIns  []*CTAUTToken
 	TxOuts []*CTAUTToken
 }
 
+// todo(ctaut): the Type is serialized so that deserialization can obtain it at the first time.
+// todo(ctaut): how about add a field in the structure?
 func (tx *MintTx) Type() TransactionType {
 	return Mint
 }
@@ -472,6 +493,8 @@ func (tx *MintTx) Deserialize(r io.Reader) error {
 	if tx.Vin, err = ReadVarInt(r); err != nil {
 		return err
 	}
+
+	// todo(ctaut): shall perform the checks here? add a standalone sanity-check function?
 	if tx.Vin == 0 || tx.Vin > MaxAmount {
 		return ErrInValidAUTTx
 	}
@@ -502,9 +525,14 @@ func (tx *MintTx) Deserialize(r io.Reader) error {
 	return nil
 }
 
+// todo(ctaut): should have Set/GetInAutRootCoinNum()
+// todo(ctaut): SetTxInputs(), TxInputs(), NumTxInputs() should be a suite, or NumTxInputs() is removed.
 func (tx *MintTx) NumTxInputs() int {
 	return int(tx.InAutRootCoinNum)
 }
+
+// todo(ctaut): add comment to explain that SetInAutRootCoinNum() should be call before SetTxInputs().
+// todo(ctaut): add a sanity-check function to guarantee the consistence between InAutRootCoinNum and TxIns. or make a unique data source.
 func (tx *MintTx) SetTxInputs(autTxIns []*CTAUTToken) error {
 	if len(autTxIns) != int(tx.InAutRootCoinNum) {
 		return fmt.Errorf("invalid inputs")
@@ -512,13 +540,17 @@ func (tx *MintTx) SetTxInputs(autTxIns []*CTAUTToken) error {
 	tx.TxIns = autTxIns
 	return nil
 }
+
 func (tx *MintTx) TxInputs() []*CTAUTToken {
 	return tx.TxIns
 }
 
+// todo(ctaut): should have Set/GetOutAutCoinNum()
+// todo(ctaut): setTxOutputs(), TxOutputs(), NumTxOutputs() should be a suite, or NumTxOutputs() is removed.
 func (tx *MintTx) NumTxOutputs() int {
 	return int(tx.OutAutCoinNum)
 }
+
 func (tx *MintTx) setTxOutputs(autTxouts []*CTAUTToken) error {
 	if len(autTxouts) != int(tx.OutAutCoinNum) {
 		return errors.New("invalid set inputs")
@@ -552,8 +584,8 @@ type ReRegistrationTx struct {
 
 	PlannedTotalAmount    uint64
 	IssuerTokens          [][]byte
-	IssueTokensThreshold  uint8
-	IssuerUpdateThreshold uint8
+	IssueTokensThreshold  uint8 // todo(ctaut): MintThreshold
+	IssuerUpdateThreshold uint8 // todo(ctaut): UpdateThreshold
 	ExpireHeight          int32
 
 	InAutRootCoinNum  uint8
@@ -687,9 +719,15 @@ func (tx *ReRegistrationTx) Deserialize(r io.Reader) error {
 	return nil
 }
 
+// todo(ctaut): add Set/Get functions for InAutRootCoinNum
+// todo(ctaut): NumTxInputs(), SetTxInputs(), TxInputs() should use the same data source.
+// todo(ctaut): the consistence between InAutRootCoinNum and TxIns.
+// todo(ctaut): add standalone sanity-check functions.
 func (tx *ReRegistrationTx) NumTxInputs() int {
 	return int(tx.InAutRootCoinNum)
 }
+
+// todo(ctaut): add comment to clarify that SetTxInputs should be called after SetInAutRootCoinNum()
 func (tx *ReRegistrationTx) SetTxInputs(autTxIns []*CTAUTToken) error {
 	if len(autTxIns) != int(tx.InAutRootCoinNum) {
 		return fmt.Errorf("invalid inputs")
@@ -700,9 +738,16 @@ func (tx *ReRegistrationTx) SetTxInputs(autTxIns []*CTAUTToken) error {
 func (tx *ReRegistrationTx) TxInputs() []*CTAUTToken {
 	return tx.TxIns
 }
+
+// todo(ctaut): add Set/Get functions for OutAutRootCoinNum
+// todo(ctaut): NumTxOutputs(), setTxOutputs(), TxOutputs() should use the same data source.
+// todo(ctaut): the consistence between OutAutRootCoinNum and TxOuts.
+// todo(ctaut): add standalone sanity-check function.
 func (tx *ReRegistrationTx) NumTxOutputs() int {
 	return int(tx.OutAutRootCoinNum)
 }
+
+// todo(ctaut): add comment to clarify that setTxOutputs should be called after SetOutAutRootCoinNum()
 func (tx *ReRegistrationTx) setTxOutputs(autTxouts []*CTAUTToken) error {
 	if len(autTxouts) != int(tx.OutAutRootCoinNum) {
 		return errors.New("invalid set inputs")
@@ -815,9 +860,14 @@ func (tx *TransferTx) Deserialize(r io.Reader) error {
 	return nil
 }
 
+// todo(ctaut): NumTxInputs(), SetTxInputs(), TxInputs() should use the same data source.
+// todo(ctaut): add Set/Get functions for InAutCoinNum?
+// todo(ctaut): add a standalone sanity-chech function?
 func (tx *TransferTx) NumTxInputs() int {
 	return int(tx.InAutCoinNum)
 }
+
+// todo(ctaut): add comment that call this function after SetInAutCoinNum() is called.
 func (tx *TransferTx) SetTxInputs(autTxIns []*CTAUTToken) error {
 	if len(autTxIns) != int(tx.InAutCoinNum) {
 		return fmt.Errorf("invalid inputs")
@@ -829,6 +879,9 @@ func (tx *TransferTx) TxInputs() []*CTAUTToken {
 	return tx.TxIns
 }
 
+// todo(ctaut): NumTxOutputs(), setTxOutputs(), TxOutputs() should use the same data source.
+// todo(ctaut): add Set/Get functions for OutAutCoinNum?
+// todo(ctaut): add a standalone sanity-chech function?
 func (tx *TransferTx) NumTxOutputs() int {
 	return int(tx.OutAutCoinNum)
 }
@@ -852,7 +905,7 @@ var _ Transaction = &TransferTx{}
 // <Vout> an integer, representing the amount of AUTCoins to be burned
 // <WitnessHash> a byte array with fixed length, for balance proof
 // <Memo> a byte array with max length, for this transaction
-
+// todo(ctaut): improve the comments
 type BurnTx struct {
 	AutIdentifier []byte
 
@@ -867,6 +920,7 @@ type BurnTx struct {
 	TxOuts []*CTAUTToken
 }
 
+// todo(ctaut): why here, rather than the last position.
 var _ Transaction = &BurnTx{}
 
 func (tx *BurnTx) Type() TransactionType {
@@ -907,6 +961,8 @@ func (tx *BurnTx) Serialize() ([]byte, error) {
 
 	return b.Bytes(), nil
 }
+
+// todo(ctaut): add a standalone sanity-check function, and call it at the end of deserialize
 func (tx *BurnTx) Deserialize(r io.Reader) error {
 	var err error
 	if tx.AutIdentifier, err = readPrefix(r, Burn); err != nil {
@@ -945,9 +1001,14 @@ func (tx *BurnTx) Deserialize(r io.Reader) error {
 	return nil
 }
 
+// todo(ctaut): NumTxInputs(), SetTxInputs(), TxInputs() should use the same data source.
+// todo(ctaut): add Set/Get functions for InAutCoinNum?
+// todo(ctaut): add a standalone sanity-chech function?
 func (tx *BurnTx) NumTxInputs() int {
 	return int(tx.InAutCoinNum)
 }
+
+// todo(ctaut): add a standalone sanity-check function
 func (tx *BurnTx) SetTxInputs(autTxIns []*CTAUTToken) error {
 	if len(autTxIns) != int(tx.InAutCoinNum) {
 		return fmt.Errorf("invalid inputs")
@@ -958,9 +1019,15 @@ func (tx *BurnTx) SetTxInputs(autTxIns []*CTAUTToken) error {
 func (tx *BurnTx) TxInputs() []*CTAUTToken {
 	return tx.TxIns
 }
+
+// todo(ctaut): NumTxOutputs(), setTxOutputs(), TxOutputs() should use the same data source.
+// todo(ctaut): add Set/Get functions for OutAutCoinNum?
+// todo(ctaut): add a standalone sanity-chech function?
 func (tx *BurnTx) NumTxOutputs() int {
 	return int(tx.OutAutCoinNum)
 }
+
+// todo(ctaut): add a standalone sanity-check function
 func (tx *BurnTx) setTxOutputs(autTxouts []*CTAUTToken) error {
 	if len(autTxouts) != int(tx.OutAutCoinNum) {
 		return errors.New("invalid set inputs")
@@ -968,6 +1035,7 @@ func (tx *BurnTx) setTxOutputs(autTxouts []*CTAUTToken) error {
 	tx.TxOuts = autTxouts
 	return nil
 }
+
 func (tx *BurnTx) TxOutputs() []*CTAUTToken {
 	return nil
 }
@@ -996,6 +1064,10 @@ func ExtractCTAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 	if !bytes.Equal(tx.TxMemo[:CommonPrefixLength], []byte(CommonPrefix)) {
 		return nil, nil
 	}
+
+	// todo(ctaut): why +1? "CTAUTSCRIPT" will result (nil, nil) or (nil, err)
+	// todo(ctaut): only if ctaut-script's CommonPrefixLength is the the start position, it will be recognized as ctaut-script.
+	// todo(ctaut): what "txMemo" should be shown at the front end?
 
 	//	extract
 	switch tx.TxMemo[CommonPrefixLength] {
@@ -1047,6 +1119,7 @@ func ExtractCTAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 
 		// for outputs, fill out the script
 		for i := 0; i < len(autTransaction.TxOuts); i++ {
+			// todo(ctaut): why fill now? could not earlier or simpler? "ValueScript" is appropriate?
 			autTransaction.TxOuts[i].ValueScript = autTransaction.AUTTxoScripts[i]
 		}
 
@@ -1069,6 +1142,7 @@ func ExtractCTAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 
 		// for outputs, fill out the script
 		for i := 0; i < len(autTransaction.TxOuts); i++ {
+			// todo(ctaut): why fill now? could not earlier or simpler? "ValueScript" is appropriate?
 			autTransaction.TxOuts[i].ValueScript = autTransaction.AUTTxoScripts[i]
 		}
 
@@ -1080,6 +1154,7 @@ func ExtractCTAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 
 		// for outputs, fill out the script
 		for i := 0; i < len(autTransaction.TxOuts); i++ {
+			// todo(ctaut): why fill now? could not earlier or simpler? "ValueScript" is appropriate?
 			autTransaction.TxOuts[i].ValueScript = autTransaction.AUTTxoScripts[i]
 		}
 
