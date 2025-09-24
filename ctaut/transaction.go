@@ -195,6 +195,7 @@ func (info *Metadata) Clone() *Metadata {
 // and each AUT instance has its Memo (simialr to a description of the AutInstance).
 // Why this is dupliating the Info?
 // todo(Alice): for the common fields, using the same order as the definition, the particular fields
+// todo(ctaut): use non-exported fileds, since functions are provided.
 type RegistrationTx struct {
 	CTAutIdentifier []byte // identifier // todo(ctaut): how to guarantee that there is no repeated identifier? how about use Hash?
 	// todo(ctaut): use Hash(symbol, registeredTime)
