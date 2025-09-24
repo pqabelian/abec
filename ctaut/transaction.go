@@ -14,11 +14,7 @@ import (
 
 // OutPoint defines an aut data type that is used to track previous
 // transaction outputs.
-// todo(AUT): Hash --> TxHash
-// refer to Abel.OutPoint? or Aut.(TxHash, Index)?
-// type OutPoint wire.OutPointAbe
-// or refer to OutPointAbe in the Txs?
-// todo(ctaut): HostOutPoint = wire.OutPoint
+// todo(ctaut): HostOutPoint = wire.OutPoint. confirmed.
 type OutPoint struct {
 	TxHash chainhash.Hash
 	Index  uint8
@@ -43,16 +39,17 @@ func (o OutPoint) String() string {
 }
 
 // todo(ctaut): this is for database storage or only memeory? why has CoinAddress and ValueScript?
+// todo(ctaut): define an interface? only a case needs coinAddress.
 type CTAUTToken struct {
 	Version     uint32
-	OutPoint           // todo(ctaut): HostOutPoint OutPoint
-	ValueScript []byte // optional from root coin
+	OutPoint           // todo(ctaut): hostOutPoint HostOutPoint; confirmed. referred to the Host on Abelian.
+	ValueScript []byte // optional from root coin // todo(ctaut): used to denote AUT value.
 	CoinAddress []byte
 }
 
 type TransactionType = uint8
 
-// todo(ctaut): shift the Mint and ReRegistration?
+// todo(ctaut): shift the Mint and ReRegistration? confirmed.
 const (
 	Registration   TransactionType = 0
 	Mint           TransactionType = 1
@@ -61,7 +58,7 @@ const (
 	Burn           TransactionType = 4
 )
 
-// todo(ctaut): defined as []byte?
+// todo(ctaut): defined as []byte? think.
 const CommonPrefix = "CTAUTSCRIPT"
 
 const CommonPrefixLength = 11
@@ -72,14 +69,14 @@ const MaxAUTMemoLength = 1024
 const MaxUnitLength = 20
 const MaxMinUnitLength = 20
 
-// todo(ctaut): shall be uint64(1)<<51 - 1 ?
+// todo(ctaut): shall be uint64(1)<<51 - 1. confirmed.
 const MaxAmount = uint64(1<<51 - 1)
 
 // IssuerTokenLength would be length of coin address for pseudonym address (193)
-const IssuerTokenLength = 193 // todo(ctaut): is this right? pseudonymCT ?
-const MaxIssuerNum = 10       // todo(ctaut): Is this right?
+const IssuerTokenLength = 193 // todo(ctaut): is this right? pseudonymCT ? think.
+const MaxIssuerNum = 10       // todo(ctaut): Is this right? consider together with the threshold rule.
 
-// todo(ctaut): MaxAUTTxoScriptLength is not correct, it may be larger than 1024.
+// todo(ctaut): MaxAUTTxoScriptLength is not correct, it may be larger than 1024. confirmed. compute it.
 const MaxAUTTxoScriptLength = 1024
 const MaxAUTTxMemoLength = 1024
 
@@ -112,7 +109,7 @@ type Transaction interface {
 type Metadata struct {
 	// todo(ctaut): has confirmed that these fields will not change? add a registeredTime?
 	CTAutIdentifier []byte // unique identifier
-	CTAutSymbol     []byte // symbol for public view
+	CTAutSymbol     []byte // symbol for public view // todo(ctaut): confirm whether the CTAutSymbol is unique.
 	UnitName        []byte // can not chang anymore
 	MinUnitName     []byte // can not chang anymore
 	UnitScale       uint64 // can not change anymore
@@ -211,10 +208,10 @@ type RegistrationTx struct {
 	PlannedTotalAmount    uint64
 	IssuerTokens          [][]byte
 	IssueTokensThreshold  uint8 // todo(ctaut): MintThreshold
-	IssuerUpdateThreshold uint8 // todo(ctaut): UpdateThreshold
+	IssuerUpdateThreshold uint8 // todo(ctaut): ReregisterThreshold
 	ExpireHeight          int32
 
-	OutAutRootCoinNum uint8
+	OutAutRootCoinNum uint8 // value is set in deserialize, so, do not provide set function, but provide get function.
 	Memo              []byte
 
 	TxIns  []*CTAUTToken
@@ -1061,11 +1058,15 @@ var ErrInValidIndex = errors.New("not a valid index")
 // Note that the input part needs to be filled with the help of blockchain.
 func ExtractCTAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 	// could not be an AUT transaction
-	if len(tx.TxMemo) <= CommonPrefixLength+1 {
+	if len(tx.TxMemo) < CommonPrefixLength {
 		return nil, nil
 	}
 	if !bytes.Equal(tx.TxMemo[:CommonPrefixLength], []byte(CommonPrefix)) {
 		return nil, nil
+	}
+
+	if len(tx.TxMemo) == CommonPrefixLength {
+		return nil, fmt.Errorf("the memo start with %s, but have no content", CommonPrefix)
 	}
 
 	// todo(ctaut): why +1? "CTAUTSCRIPT" will result (nil, nil) or (nil, err)

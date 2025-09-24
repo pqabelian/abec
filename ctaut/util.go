@@ -195,7 +195,7 @@ func readCTAUTTxoScript(r io.Reader, expectedLength int) ([][]byte, error) {
 }
 
 // todo(ctaut): add comment to define the rules
-// todo(ctaut): HostTxoSanityCheck
+// todo(ctaut): HostTxoQualifi??Check
 func CheckTxoSanity(txHash chainhash.Hash, outputIndex int, txOut *wire.TxOutAbe) ([]byte, error) {
 	privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
 	if err != nil {
