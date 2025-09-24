@@ -109,6 +109,7 @@ type Transaction interface {
 // TransferTx would update no fields
 // BurnTx would update no fields
 type Metadata struct {
+	// todo(ctaut): has confirmed that these fields will not change? add a registeredTime?
 	CTAutIdentifier []byte // unique identifier
 	CTAutSymbol     []byte // symbol for public view
 	UnitName        []byte // can not chang anymore
@@ -118,7 +119,7 @@ type Metadata struct {
 
 	PlannedTotalAmount uint64 // can change with re-register
 	// todo(AUT): using SHA3-512, define a standalone hash in AUT. Hash(CoinAddress)?
-	IssuerTokens          [][]byte //[] coin address
+	IssuerTokens          [][]byte //[] coin address	// todo(ctaut): use hash or keys?
 	IssueTokensThreshold  uint8    // it works for all mint tx before next re-register where can change this field
 	IssuerUpdateThreshold uint8    // it works for next re-register, and can change this field with next re-register
 	ExpireHeight          int32    // next re-register must be before this height
