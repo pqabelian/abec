@@ -18,6 +18,7 @@ import (
 // refer to Abel.OutPoint? or Aut.(TxHash, Index)?
 // type OutPoint wire.OutPointAbe
 // or refer to OutPointAbe in the Txs?
+// todo(ctaut): HostOutPoint = wire.OutPoint
 type OutPoint struct {
 	TxHash chainhash.Hash
 	Index  uint8
