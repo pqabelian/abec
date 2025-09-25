@@ -71,8 +71,7 @@ func AutTransferTxGen(txVersion uint32, autTxInputDescs []*AutTxInputDesc, autTx
 
 }
 
-// TransferTxVerify verifies the input transferTx.
-// todo: review
+// AutTransferTxVerify verifies the input AutTransferTx.
 func AutTransferTxVerify(autTransferTx *wire.AutTransferTx) error {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(autTransferTx.Version)
 	if err != nil {
@@ -86,7 +85,7 @@ func AutTransferTxVerify(autTransferTx *wire.AutTransferTx) error {
 			return err
 		}
 	default:
-		return fmt.Errorf("TransferTxVerify: Unsupported crypto scheme")
+		return fmt.Errorf("AutTransferTxVerify: Unsupported crypto scheme")
 	}
 
 	return nil
