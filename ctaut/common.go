@@ -317,6 +317,22 @@ func WriteVarBytes(w io.Writer, bytes []byte) error {
 	return err
 }
 
+func ReadFixedBytes(r io.Reader, length int) ([]byte, error) {
+	res := make([]byte, length)
+	_, err := io.ReadFull(r, res)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+func WriteFixedBytes(w io.Writer, bytes []byte) error {
+	_, err := w.Write(bytes)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // todo(ctaut): should have a WriteByte(). or directly use the lib function.
 func ReadByte(r io.Reader) (byte, error) {
 	oneByte := make([]byte, 1)
@@ -325,4 +341,10 @@ func ReadByte(r io.Reader) (byte, error) {
 		return 0, err
 	}
 	return oneByte[0], nil
+}
+
+// todo(ctaut): should have a WriteByte(). or directly use the lib function.
+func WriteByte(w io.Writer, oneByte byte) error {
+	_, err := w.Write([]byte{oneByte})
+	return err
 }

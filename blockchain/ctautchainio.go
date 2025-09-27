@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/ctaut"
 	"github.com/abesuite/abec/database"
@@ -17,24 +16,24 @@ import (
 )
 
 var (
-	// Confidential Transaction - Abelian User Token (CTAUT) state
-	ctautInstanceBucketName     = []byte("ctautinstance")
-	ctautCoinBucketName         = []byte("ctautcoin")
-	ctautSpendJournalBucketName = []byte("ctautspendjournal")
+	// Confidential Transaction AUTScript - Abelian User Token (CTAUT) state
+	ctAutInstanceBucketName     = []byte("ctautinstance")
+	ctAutTokenBucketName        = []byte("ctauttoken")
+	ctAutSpendJournalBucketName = []byte("ctautspendjournal")
 )
 
 func createBucketForCTAUT(meta database.Bucket) error {
-	_, err := meta.CreateBucket(ctautInstanceBucketName)
+	_, err := meta.CreateBucket(ctAutInstanceBucketName)
 	if err != nil {
 		return err
 	}
 
-	_, err = meta.CreateBucket(ctautCoinBucketName)
+	_, err = meta.CreateBucket(ctAutTokenBucketName)
 	if err != nil {
 		return err
 	}
 
-	_, err = meta.CreateBucket(ctautSpendJournalBucketName)
+	_, err = meta.CreateBucket(ctAutSpendJournalBucketName)
 	if err != nil {
 		return err
 	}
@@ -48,237 +47,20 @@ var ctautOutpointKeyPool = sync.Pool{
 	},
 }
 
-func ctautOutpointKey(outpoint ctaut.OutPoint) *[]byte {
+func ctautOutpointKey(outpoint ctaut.HostOutPoint) *[]byte {
 	// A VLQ employs an MSB encoding, so they are useful not only to reduce
 	// the amount of storage space, but also so iteration of utxos when
 	// doing byte-wise comparisons will produce them in order.
 	key := ctautOutpointKeyPool.Get().(*[]byte)
 	idx := uint64(outpoint.Index)
 	*key = (*key)[:chainhash.HashSize+serializeSizeVLQ(idx)]
-	copy(*key, outpoint.TxHash[:])
+	copy(*key, outpoint.Hash[:])
 	putVLQ((*key)[chainhash.HashSize:], idx)
 	return key
 }
 
 func recycleCTAUTOutpointKey(key *[]byte) {
 	ctautOutpointKeyPool.Put(key)
-}
-func serializeCTAUTInstanceSize(info *ctaut.Metadata) int {
-	if info == nil {
-		return 0
-	}
-	n :=
-		/*identifier, actually fixed length */ wire.VarIntSerializeSize(uint64(len(info.CTAutIdentifier))) + len(info.CTAutIdentifier) +
-			/* symbol, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutSymbol))) + len(info.CTAutSymbol) +
-			/* memo, variable length */ wire.VarIntSerializeSize(uint64(len(info.AutMemo))) + len(info.AutMemo) +
-			/* update threshold */ 1 +
-			/* issue threshold */ 1 +
-			/* planned amount */ wire.VarIntSerializeSize(info.PlannedTotalAmount) +
-			/* expire height */ wire.VarIntSerializeSize(uint64(info.ExpireHeight))
-
-	n += /* number of issuer tokens */ wire.VarIntSerializeSize(uint64(len(info.IssuerTokens)))
-	for i := 0; i < len(info.IssuerTokens); i++ {
-		/* actually fixed length */
-		n += wire.VarIntSerializeSize(uint64(len(info.IssuerTokens[i]))) + len(info.IssuerTokens[i])
-	}
-
-	n += /* unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.UnitName))) + len(info.UnitName) +
-		/* minimum unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.MinUnitName))) + len(info.MinUnitName) +
-		/* scale, variable length */ wire.VarIntSerializeSize(info.UnitScale) +
-		/* minted amount,variable length */ wire.VarIntSerializeSize(info.MintedAmount)
-
-	n += /* number of issuer tokens */ wire.VarIntSerializeSize(uint64(len(info.RootCoinSet)))
-	for point := range info.RootCoinSet {
-		n += wire.VarIntSerializeSize(uint64(len(point.TxHash))) + len(point.TxHash)
-		n += 1
-	}
-	for i := 0; i < len(info.RootCoinSet); i++ {
-		/* actually fixed length */
-		n += wire.VarIntSerializeSize(uint64(len(info.IssuerTokens[i]))) + len(info.IssuerTokens[i])
-		n += 1
-	}
-
-	return n
-}
-func serializeCTAUTMetadata(info *ctaut.Metadata) ([]byte, error) {
-	if info == nil {
-		return nil, errors.New("nil pointer to aut.Metadata for serialize")
-	}
-	// Calculate the size needed to serialize AUT info.
-	size := serializeCTAUTInstanceSize(info)
-	// Serialize the header code followed by the compressed unspent
-	// transaction output.
-	buff := bytes.NewBuffer(make([]byte, 0, size))
-	err := wire.WriteVarBytes(buff, 0, info.CTAutIdentifier)
-	if err != nil {
-		return nil, err
-	}
-	err = wire.WriteVarBytes(buff, 0, info.CTAutSymbol)
-	if err != nil {
-		return nil, err
-	}
-	err = wire.WriteVarBytes(buff, 0, info.AutMemo)
-	if err != nil {
-		return nil, err
-	}
-
-	err = buff.WriteByte(info.IssuerUpdateThreshold)
-	if err != nil {
-		return nil, err
-	}
-	err = buff.WriteByte(info.IssueTokensThreshold)
-	if err != nil {
-		return nil, err
-	}
-
-	err = wire.WriteVarInt(buff, 0, info.PlannedTotalAmount)
-	if err != nil {
-		return nil, err
-	}
-	err = wire.WriteVarInt(buff, 0, uint64(info.ExpireHeight))
-	if err != nil {
-		return nil, err
-	}
-
-	err = wire.WriteVarInt(buff, 0, uint64(len(info.IssuerTokens)))
-	if err != nil {
-		return nil, err
-	}
-	for i := 0; i < len(info.IssuerTokens); i++ {
-		err = wire.WriteVarBytes(buff, 0, info.IssuerTokens[i])
-		if err != nil {
-			return nil, errors.New("error to write issuer token")
-		}
-	}
-
-	err = wire.WriteVarBytes(buff, 0, info.UnitName)
-	if err != nil {
-		return nil, err
-	}
-	err = wire.WriteVarBytes(buff, 0, info.MinUnitName)
-	if err != nil {
-		return nil, err
-	}
-	err = wire.WriteVarInt(buff, 0, info.UnitScale)
-	if err != nil {
-		return nil, err
-	}
-	err = wire.WriteVarInt(buff, 0, info.MintedAmount)
-	if err != nil {
-		return nil, err
-	}
-
-	err = wire.WriteVarInt(buff, 0, uint64(len(info.RootCoinSet)))
-	if err != nil {
-		return nil, err
-	}
-	for point := range info.RootCoinSet {
-		err = wire.WriteVarBytes(buff, 0, point.TxHash[:])
-		if err != nil {
-			return nil, errors.New("error to write point")
-		}
-		err = buff.WriteByte(point.Index)
-		if err != nil {
-			return nil, errors.New("error to write point index")
-		}
-	}
-
-	return buff.Bytes(), nil
-}
-func deserializeCTAUTMetadata(serialized []byte) (*ctaut.Metadata, error) {
-	// Serialize the header code followed by the compressed unspent
-	// transaction output.
-	info := &ctaut.Metadata{}
-	var err error
-	buff := bytes.NewReader(serialized)
-	info.CTAutIdentifier, err = wire.ReadVarBytes(buff, 0, aut.IdentifierLength, "identifier")
-	if err != nil {
-		return nil, err
-	}
-	info.CTAutSymbol, err = wire.ReadVarBytes(buff, 0, aut.MaxSymbolLength, "symbol")
-	if err != nil {
-		return nil, err
-	}
-	info.AutMemo, err = wire.ReadVarBytes(buff, 0, aut.MaxAUTMemoLength, "memo")
-	if err != nil {
-		return nil, err
-	}
-
-	info.IssuerUpdateThreshold, err = buff.ReadByte()
-	if err != nil {
-		return nil, err
-	}
-	info.IssueTokensThreshold, err = buff.ReadByte()
-	if err != nil {
-		return nil, err
-	}
-
-	info.PlannedTotalAmount, err = wire.ReadVarInt(buff, 0)
-	if err != nil {
-		return nil, err
-	}
-	expiredHeight, err := wire.ReadVarInt(buff, 0)
-	if err != nil {
-		return nil, err
-	}
-	info.ExpireHeight = int32(expiredHeight)
-
-	issuerNum, err := wire.ReadVarInt(buff, 0)
-	if err != nil {
-		return nil, err
-	}
-	info.IssuerTokens = make([][]byte, issuerNum)
-	for i := uint64(0); i < issuerNum; i++ {
-		info.IssuerTokens[i], err = wire.ReadVarBytes(buff, 0, aut.IssuerTokenLength, "issuerToken")
-		if err != nil {
-			return nil, errors.New("error to write issuer token")
-		}
-	}
-
-	info.UnitName, err = wire.ReadVarBytes(buff, 0, aut.MaxUnitLength, "unit")
-	if err != nil {
-		return nil, err
-	}
-	info.MinUnitName, err = wire.ReadVarBytes(buff, 0, aut.MaxMinUnitLength, "minunit")
-	if err != nil {
-		return nil, err
-	}
-	info.UnitScale, err = wire.ReadVarInt(buff, 0)
-	if err != nil {
-		return nil, err
-	}
-	info.MintedAmount, err = wire.ReadVarInt(buff, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	rootCoinNum, err := wire.ReadVarInt(buff, 0)
-	if err != nil {
-		return nil, err
-	}
-	info.RootCoinSet = make(map[ctaut.OutPoint]struct{}, rootCoinNum)
-	for i := uint64(0); i < issuerNum; i++ {
-		txHashBytes, err := wire.ReadVarBytes(buff, 0, chainhash.HashSize, "hash")
-		if err != nil {
-			return nil, errors.New("error to write issuer token")
-		}
-		txHash, err := chainhash.NewHash(txHashBytes)
-		if err != nil {
-			return nil, errors.New("invalid hash for ctaut point")
-		}
-
-		index, err := buff.ReadByte()
-		if err != nil {
-			return nil, err
-		}
-		point := ctaut.OutPoint{
-			TxHash: *txHash,
-			Index:  index,
-		}
-		info.RootCoinSet[point] = struct{}{}
-	}
-
-	return info, nil
 }
 
 type SpentCTAUTType int
@@ -338,7 +120,7 @@ func spentCTAUTSerializeSize(stxo SpentCTAUT) (int, error) {
 
 		// +1 to represent nil for before
 		size += 1
-		serializedBefore, err := serializeCTAUTMetadata(updated.Before)
+		serializedBefore, err := updated.Before.Serialize()
 		if err != nil {
 			return 0, err
 		}
@@ -349,7 +131,7 @@ func spentCTAUTSerializeSize(stxo SpentCTAUT) (int, error) {
 
 		// +1 to represent nil for after
 		size += 1
-		sizeAfter, err := serializeCTAUTMetadata(updated.After)
+		sizeAfter, err := updated.After.Serialize()
 		if err != nil {
 			return 0, err
 		}
@@ -390,7 +172,7 @@ func putSpentCTAUT(target []byte, stxo SpentCTAUT) (int, error) {
 		offset += putVLQ(target[offset:], headerCode)
 
 		// +1 to represent nil
-		serializedBefore, err := serializeCTAUTMetadata(updated.Before)
+		serializedBefore, err := updated.Before.Serialize()
 		if err != nil {
 			return 0, err
 		}
@@ -407,7 +189,7 @@ func putSpentCTAUT(target []byte, stxo SpentCTAUT) (int, error) {
 			offset += len(serializedBefore)
 		}
 
-		serializedAfter, err := serializeCTAUTMetadata(updated.After)
+		serializedAfter, err := updated.After.Serialize()
 		if err != nil {
 			return 0, err
 		}
@@ -492,7 +274,7 @@ func decodeSpentCTAUT(serialized []byte) (SpentCTAUT, int, error) {
 					"after reserved")
 			}
 
-			res.Before, err = deserializeCTAUTMetadata(serialized[offset : offset+int(sizeOfInfo)])
+			err = res.Before.Deserialize(bytes.NewReader(serialized[offset : offset+int(sizeOfInfo)]))
 			if err != nil {
 				return nil, offset, errDeserialize("unexpected end of data " +
 					"after reserved")
@@ -511,7 +293,7 @@ func decodeSpentCTAUT(serialized []byte) (SpentCTAUT, int, error) {
 				return nil, offset, errDeserialize("unexpected end of data " +
 					"after reserved")
 			}
-			res.After, err = deserializeCTAUTMetadata(serialized[offset : offset+int(sizeOfInfo)])
+			err = res.After.Deserialize(bytes.NewReader(serialized[offset : offset+int(sizeOfInfo)]))
 			if err != nil {
 				return nil, offset, errDeserialize("unexpected end of data " +
 					"after reserved")
@@ -555,7 +337,7 @@ func serializeSpendJournalEntryCTAUT(stxos []SpentCTAUT) ([]byte, error) {
 	return serialized, nil
 
 }
-func deserializeSpendJournalEntryCTAUT(serialized []byte, txns []ctaut.Transaction) ([]SpentCTAUT, error) {
+func deserializeSpendJournalEntryCTAUT(serialized []byte, txns []ctaut.CTAUTScript) ([]SpentCTAUT, error) {
 	// Calculate the total number of stxos.
 	numStxos := len(txns)
 
@@ -592,7 +374,7 @@ func deserializeSpendJournalEntryCTAUT(serialized []byte, txns []ctaut.Transacti
 }
 
 func dbPutSpendJournalEntryCTAUT(dbTx database.Tx, blockHash *chainhash.Hash, sauts []SpentCTAUT) error {
-	spendJournalBucket := dbTx.Metadata().Bucket(ctautSpendJournalBucketName)
+	spendJournalBucket := dbTx.Metadata().Bucket(ctAutSpendJournalBucketName)
 	serialized, err := serializeSpendJournalEntryCTAUT(sauts)
 	if err != nil {
 		return err
@@ -605,10 +387,10 @@ func dbPutSpendJournalEntryCTAUT(dbTx database.Tx, blockHash *chainhash.Hash, sa
 }
 func dbFetchSpendJournalEntryCTAUT(dbTx database.Tx, block *abeutil.BlockAbe) ([]SpentCTAUT, error) {
 	// Exclude the coinbase transaction since it can't spend anything.
-	spendJournalBucket := dbTx.Metadata().Bucket(ctautSpendJournalBucketName)
+	spendJournalBucket := dbTx.Metadata().Bucket(ctAutSpendJournalBucketName)
 	serialized := spendJournalBucket.Get(block.Hash()[:])
 
-	ctAUTTransactions := block.CTAUTTransactions()
+	ctAUTTransactions := block.CTAUTScripts()
 	stxos, err := deserializeSpendJournalEntryCTAUT(serialized, ctAUTTransactions)
 	if err != nil {
 		// Ensure any deserialization errors are returned as database
@@ -628,7 +410,7 @@ func dbFetchSpendJournalEntryCTAUT(dbTx database.Tx, block *abeutil.BlockAbe) ([
 	return stxos, nil
 }
 func dbRemoveSpendJournalEntryCTAUT(dbTx database.Tx, blockHash *chainhash.Hash) error {
-	spendJournalBucket := dbTx.Metadata().Bucket(ctautSpendJournalBucketName)
+	spendJournalBucket := dbTx.Metadata().Bucket(ctAutSpendJournalBucketName)
 	return spendJournalBucket.Delete(blockHash[:])
 }
 
@@ -674,15 +456,15 @@ func deserializeCTAUTCoin(serialized []byte) (*CTAUTCoin, error) {
 
 	reader := bytes.NewReader(serialized[8:])
 
-	identifier, err := wire.ReadVarBytes(reader, 0, ctaut.IdentifierLength, "identifier")
+	identifier, err := wire.ReadVarBytes(reader, 0, ctaut.CTAUTIdentifierLength, "identifier")
 	if err != nil {
 		return nil, err
 	}
-	if len(identifier) != ctaut.IdentifierLength {
+	if len(identifier) != ctaut.CTAUTIdentifierLength {
 		return nil, errors.New("invalid identifier")
 	}
 
-	script, err := wire.ReadVarBytes(reader, 0, ctaut.MaxAUTTxoScriptLength, "script")
+	script, err := wire.ReadVarBytes(reader, 0, ctaut.MaxAUTValueScriptLength, "script")
 	if err != nil {
 		return nil, err
 	}
@@ -690,15 +472,15 @@ func deserializeCTAUTCoin(serialized []byte) (*CTAUTCoin, error) {
 	return NewCTAUTCoin(identifier, script, blockHeight), nil
 }
 
-func dbFetchCTAUTCoin(dbTx database.Tx, outpoint ctaut.OutPoint) (*CTAUTCoin, error) {
+func dbFetchCTAUTCoin(dbTx database.Tx, outpoint ctaut.HostOutPoint) (*CTAUTCoin, error) {
 	// Fetch the unspent transaction output information for the passed
 	// transaction output.  Return now when there is no entry.
 	key := ctautOutpointKey(outpoint)
-	ctautCoinBucket := dbTx.Metadata().Bucket(ctautCoinBucketName)
-	if ctautCoinBucket == nil {
+	ctAutTokenBucket := dbTx.Metadata().Bucket(ctAutTokenBucketName)
+	if ctAutTokenBucket == nil {
 		return nil, errors.New("bucket for ctaut coin is not exist")
 	}
-	serializedCoin := ctautCoinBucket.Get(*key)
+	serializedCoin := ctAutTokenBucket.Get(*key)
 	recycleCTAUTOutpointKey(key)
 	if serializedCoin == nil {
 		return nil, nil
@@ -733,14 +515,15 @@ func dbFetchCTAUTCoin(dbTx database.Tx, outpoint ctaut.OutPoint) (*CTAUTCoin, er
 func dbFetchCTAUTMetadata(dbTx database.Tx, key []byte) (*ctaut.Metadata, error) {
 	// Fetch the unspent transaction output information for the passed
 	// transaction output.  Return now when there is no entry.
-	autInfoBucket := dbTx.Metadata().Bucket(ctautInstanceBucketName)
+	autInfoBucket := dbTx.Metadata().Bucket(ctAutInstanceBucketName)
 	serializedAUTInfo := autInfoBucket.Get(key)
 	if serializedAUTInfo == nil {
 		return nil, nil
 	}
 
 	// Deserialize the utxo entry and return it.
-	metadata, err := deserializeCTAUTMetadata(serializedAUTInfo)
+	var metadata ctaut.Metadata
+	err := metadata.Deserialize(bytes.NewReader(serializedAUTInfo))
 	if err != nil {
 		// Ensure any deserialization errors are returned as database
 		// corruption errors.
@@ -755,11 +538,11 @@ func dbFetchCTAUTMetadata(dbTx database.Tx, key []byte) (*ctaut.Metadata, error)
 		return nil, err
 	}
 
-	return metadata, nil
+	return &metadata, nil
 }
 func dbRemoveCTAUTInstance(dbTx database.Tx, instanceToDel map[string]struct{}, blockHeight int32, blockHash chainhash.Hash) error {
-	ctautInstanceBucket := dbTx.Metadata().Bucket(ctautInstanceBucketName)
-	ctautCoinBucket := dbTx.Metadata().Bucket(ctautCoinBucketName)
+	ctautInstanceBucket := dbTx.Metadata().Bucket(ctAutInstanceBucketName)
+	ctAutTokenBucket := dbTx.Metadata().Bucket(ctAutTokenBucketName)
 
 	for autIdentifierKey, _ := range instanceToDel {
 		autIdentifier, _ := hex.DecodeString(autIdentifierKey)
@@ -768,7 +551,7 @@ func dbRemoveCTAUTInstance(dbTx database.Tx, instanceToDel map[string]struct{}, 
 			return err
 		}
 
-		err = ctautCoinBucket.Delete(autIdentifier)
+		err = ctAutTokenBucket.Delete(autIdentifier)
 		if err != nil {
 			return err
 		}
@@ -780,17 +563,17 @@ func dbRemoveCTAUTInstance(dbTx database.Tx, instanceToDel map[string]struct{}, 
 }
 
 func dbPutCTAUTView(dbTx database.Tx, view *CTAUTViewpoint, blockHeight int32, blockHash chainhash.Hash) error {
-	ctautInfoBucket := dbTx.Metadata().Bucket(ctautInstanceBucketName)
-	ctautCoinBucket := dbTx.Metadata().Bucket(ctautCoinBucketName)
+	ctAutInfoBucket := dbTx.Metadata().Bucket(ctAutInstanceBucketName)
+	ctAutTokenBucket := dbTx.Metadata().Bucket(ctAutTokenBucketName)
 	for identifierKey, instance := range view.instances {
 		identifier := instance.metadata.CTAutIdentifier
 
 		// Serialize and store the utxo entry.
-		serializedCTAUTInfo, err := serializeCTAUTMetadata(instance.metadata)
+		serializedCTAUTInfo, err := instance.metadata.Serialize()
 		if err != nil {
 			return err
 		}
-		err = ctautInfoBucket.Put(identifier, serializedCTAUTInfo)
+		err = ctAutInfoBucket.Put(identifier[:], serializedCTAUTInfo)
 		if err != nil {
 			return err
 		}
@@ -803,13 +586,13 @@ func dbPutCTAUTView(dbTx database.Tx, view *CTAUTViewpoint, blockHeight int32, b
 			// Remove the utxo entry if it is spent.
 			if coin.IsSpent() {
 				key := ctautOutpointKey(outpoint)
-				err = ctautCoinBucket.Delete(*key) // if rollback, would restore by spend journal
+				err = ctAutTokenBucket.Delete(*key) // if rollback, would restore by spend journal
 				recycleOutpointKey(key)
 				if err != nil {
 					return err
 				}
 				log.Debugf(`the token (%s,%d) for CTAUT identified by %s is spent at height %d (block hash %s):`,
-					outpoint.TxHash.String(), outpoint.Index, identifierKey, blockHeight, blockHash)
+					outpoint.Hash.String(), outpoint.Index, identifierKey, blockHeight, blockHash)
 
 				continue
 			}
@@ -820,7 +603,7 @@ func dbPutCTAUTView(dbTx database.Tx, view *CTAUTViewpoint, blockHeight int32, b
 				return err
 			}
 			key := ctautOutpointKey(outpoint)
-			err = ctautCoinBucket.Put(*key, serializedCoin)
+			err = ctAutTokenBucket.Put(*key, serializedCoin)
 			// NOTE: The key is intentionally not recycled here since the
 			// database interface contract prohibits modifications.  It will
 			// be garbage collected normally when the database is done with
@@ -829,7 +612,7 @@ func dbPutCTAUTView(dbTx database.Tx, view *CTAUTViewpoint, blockHeight int32, b
 				return err
 			}
 			log.Debugf(`the token (%s,%d) in AUT identified by %s is stored at height %d (block hash %s):`,
-				outpoint.TxHash.String(), outpoint.Index, identifierKey, blockHeight, blockHash)
+				outpoint.Hash.String(), outpoint.Index, identifierKey, blockHeight, blockHash)
 		}
 
 	}

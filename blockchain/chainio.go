@@ -2535,7 +2535,7 @@ func (b *BlockChain) initChainState() error {
 		hasBlockIndex = dbTx.Metadata().Bucket(blockIndexBucketName) != nil
 		hasDeletedWitnessFileBucket = dbTx.Metadata().Bucket(deletedWitnessFileBucketName) != nil
 		hasAUTRelevantBucket = dbTx.Metadata().Bucket(autInfoBucketName) != nil
-		hasCTAUTRelevantBucket = dbTx.Metadata().Bucket(ctautInstanceBucketName) != nil
+		hasCTAUTRelevantBucket = dbTx.Metadata().Bucket(ctAutInstanceBucketName) != nil
 
 		if b.chainParams.Net != wire.MainNet {
 			workedHeightScope = dbFetchWorkedFakePowBlockScope(dbTx)

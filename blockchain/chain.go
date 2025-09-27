@@ -1330,7 +1330,7 @@ func countSpentOutputsCTAUT(block *abeutil.BlockAbe) int {
 		//	num++
 		//}
 
-		autTx, err := tx.CTAUTTransaction()
+		autTx, err := tx.GetCTAUTScript()
 		if err != nil {
 			//	This should not happen
 			log.Warnf("countSpentOutputsAUT: error happens when extracting AutTransaction from Tx %s: %v", tx.Hash(), err)
@@ -1481,7 +1481,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			return err
 		}
 
-		ctautInstanceToDel, err = ctautView.disconnectTransactions(b.db, block, sctauts)
+		ctautInstanceToDel, err = ctautView.disconnectCTAUTScripts(b.db, block, sctauts)
 		if err != nil {
 			return err
 		}
@@ -1598,7 +1598,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 				return err
 			}
 
-			err = ctautView.fetchInputCTAUTUtxos(b.db, block, view)
+			err = ctautView.fetchConsumedCTAUTTokens(b.db, block, view)
 			if err != nil {
 				return err
 			}
@@ -1693,7 +1693,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			return err
 		}
 
-		unregisteredInstances, err := ctautView.disconnectTransactions(b.db, block, detachSpentCTAUTs[i])
+		unregisteredInstances, err := ctautView.disconnectCTAUTScripts(b.db, block, detachSpentCTAUTs[i])
 		if err != nil {
 			return err
 		}
@@ -1782,7 +1782,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			return err
 		}
 
-		err = ctautView.fetchInputCTAUTUtxos(b.db, block, view)
+		err = ctautView.fetchConsumedCTAUTTokens(b.db, block, view)
 		if err != nil {
 			return err
 		}
@@ -1932,7 +1932,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 				return false, err
 			}
 
-			err = ctautView.fetchInputCTAUTUtxos(b.db, block, view)
+			err = ctautView.fetchConsumedCTAUTTokens(b.db, block, view)
 			if err != nil {
 				return false, err
 			}

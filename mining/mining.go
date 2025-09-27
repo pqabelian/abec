@@ -3,6 +3,7 @@ package mining
 import (
 	"container/heap"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"time"
 
@@ -505,7 +506,7 @@ func spendTransaction(utxoView *blockchain.UtxoViewpoint, tx *abeutil.Tx, height
 // todo(ABE): the block is unknown yet, use hainhash.ZeroHash as the block hash consuming the serialNumber
 // Move this function to blockchain package
 func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, tx *abeutil.TxAbe,
-	ctautView *blockchain.CTAUTViewpoint, ctautTx ctaut.Transaction, blockHeight int32) error {
+	ctAutView *blockchain.CTAUTViewpoint, ctautTx ctaut.CTAUTScript, blockHeight int32) error {
 	for _, txIn := range tx.MsgTx().TxIns {
 		entry := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())
 		if entry != nil {
@@ -515,7 +516,7 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, tx *abeutil
 
 	// CTAUT
 	if ctautTx != nil {
-		err := ctautView.SpendTransaction(ctautTx, tx.Hash(), blockHeight)
+		err := ctAutView.SpendCTAutScript(ctautTx, tx.Hash(), blockHeight)
 		if err != nil {
 			return err
 		}
@@ -817,33 +818,37 @@ mempoolLoop:
 			}
 		}
 
-		ctautTx, err := tx.CTAUTTransaction()
+		ctAutScript, err := tx.CTAUTTScript(func(ringHash chainhash.Hash) (*wire.TxOutAbe, error) {
+			ringEntry := utxoRings.LookupEntry(ringHash)
+			if ringEntry == nil {
+				return nil, errors.New("no such ring found")
+			}
+			txOuts := ringEntry.TxOuts()
+			if len(txOuts) == 0 {
+				return nil, errors.New("an empty ring found")
+			}
+			return txOuts[0], nil
+		})
 		if err != nil {
 			log.Debugf("Skipping tx %s because it "+
 				"contains an invalid CTAUT transaction: %v",
 				tx.Hash(), err)
 			continue
 		}
-
-		// fill out the input here
-		err = blockchain.PopulateCTAUTInputs(ctautTx, tx, nextBlockHeight, utxoRings)
-		if err != nil {
-			log.Debugf("fail to populate consumed outpoints for CT-AUT transaction")
-			continue
-		}
-
-		ctautView, err := g.chain.FetchCTAUTView(ctautTx)
-		if err != nil {
-			log.Warnf("Unable to fetch ctaut view for tx %s: %v",
-				tx.Hash(), err)
-			continue
-		}
-		err = blockchain.CheckCTAUTTransactionInputs(ctautTx, tx, nextBlockHeight, ctautView, g.chainParams)
-		if err != nil {
-			log.Debugf("Skipping tx %s because it "+
-				"contains an invalid CTAUT transaction: %v",
-				tx.Hash(), err)
-			continue
+		var ctAutView *blockchain.CTAUTViewpoint
+		if ctAutScript != nil {
+			ctAutView, err = g.chain.FetchCTAUTView(ctAutScript)
+			if err != nil {
+				log.Warnf("Unable to fetch ctaut view for tx %s: %v", tx.Hash(), err)
+				continue
+			}
+			err = blockchain.CheckCTAUTTransactionInputs(ctAutScript, tx, nextBlockHeight, ctAutView, g.chainParams)
+			if err != nil {
+				log.Debugf("Skipping tx %s because it "+
+					"contains an invalid CTAUT transaction: %v",
+					tx.Hash(), err)
+				continue
+			}
 		}
 
 		prioItem := &txPrioItemAbe{tx: tx}
@@ -868,7 +873,7 @@ mempoolLoop:
 		// if blockUtxoRings.Entries() has the same utxoRing,
 		// just replace, as the utxoRing in utxoRings is queried from the latest database
 		mergeUtxoRingView(blockUtxoRings, utxoRings)
-		mergeCTAUTView(blockCTAUTView, ctautView)
+		mergeCTAUTView(blockCTAUTView, ctAutView)
 	}
 
 	log.Tracef("Priority queue len %d", priorityQueue.Len())
@@ -991,21 +996,24 @@ mempoolLoop:
 			continue
 		}
 
-		ctautTx, err := tx.CTAUTTransaction()
+		ctAutScript, err := tx.CTAUTTScript(func(ringHash chainhash.Hash) (*wire.TxOutAbe, error) {
+			ringEntry := blockUtxoRings.LookupEntry(ringHash)
+			if ringEntry == nil {
+				return nil, errors.New("no such ring found")
+			}
+			txOuts := ringEntry.TxOuts()
+			if len(txOuts) == 0 {
+				return nil, errors.New("an empty ring found")
+			}
+			return txOuts[0], nil
+		})
 		if err != nil {
 			log.Debugf("Skipping tx %s due to error in "+
-				"CTAUTTransaction: %v", tx.Hash(), err)
+				"CTAUTTScript: %v", tx.Hash(), err)
 			continue
 		}
-		if ctautTx != nil {
-			// fill out the input here
-			err = blockchain.PopulateCTAUTInputs(ctautTx, tx, nextBlockHeight, blockUtxoRings)
-			if err != nil {
-				log.Debugf("fail to populate consumed outpoints for CT-AUT transaction")
-				continue
-			}
-
-			err = blockchain.CheckCTAUTTransactionInputs(ctautTx, tx, nextBlockHeight, blockCTAUTView, g.chainParams)
+		if ctAutScript != nil {
+			err = blockchain.CheckCTAUTTransactionInputs(ctAutScript, tx, nextBlockHeight, blockCTAUTView, g.chainParams)
 			if err != nil {
 				log.Debugf("Skipping tx %s due to error in "+
 					"CheckTransactionInputsAUT: %v", tx.Hash(), err)
@@ -1017,7 +1025,7 @@ mempoolLoop:
 		// an entry for it to ensure any transactions which reference
 		// this one have it available as an input and can ensure they
 		// aren't double spending.
-		err = spendTransactionAbe(blockUtxoRings, tx, blockCTAUTView, ctautTx, nextBlockHeight)
+		err = spendTransactionAbe(blockUtxoRings, tx, blockCTAUTView, ctAutScript, nextBlockHeight)
 		if err != nil {
 			log.Debugf("Skipping tx %s due to error in "+
 				"spendTransactionAbe: %v", tx.Hash(), err)

@@ -13,46 +13,54 @@ import (
 	"github.com/abesuite/abec/wire"
 )
 
-func writePrefix(b bytes.Buffer, ctautTxType TransactionType, identifier []byte) error {
-	_, err := b.WriteString(CommonPrefix)
-	if err != nil {
-		return err
-	}
+var zeroIdentifier = [CTAUTIdentifierLength]byte{}
 
-	err = b.WriteByte(ctautTxType)
-	if err != nil {
-		return err
+func init() {
+	for i := 0; i < CTAUTIdentifierLength; i++ {
+		zeroIdentifier[i] = 0
 	}
-	return WriteVarBytes(&b, identifier)
 }
 
-func readPrefix(r io.Reader, expectedCtAutTxType TransactionType) ([]byte, error) {
-	commprefix := make([]byte, len(CommonPrefix))
-	_, err := io.ReadFull(r, commprefix)
+func writePrefix(b bytes.Buffer, ctautTxType CTAUTScriptType, identifier [CTAUTIdentifierLength]byte) error {
+	err := WriteFixedBytes(&b, []byte(commonPrefix))
 	if err != nil {
-		return nil, ErrNonAutTx
-	}
-	if !bytes.Equal(commprefix, []byte(CommonPrefix)) {
-		return nil, ErrNonAutTx
+		return err
 	}
 
-	typeByte := make([]byte, 1)
-	_, err = io.ReadFull(r, typeByte)
+	err = WriteByte(&b, ctautTxType)
 	if err != nil {
-		return nil, err
-	}
-	if typeByte[0] != expectedCtAutTxType {
-		return nil, ErrInValidAUTTx
+		return err
 	}
 
-	identifier, err := ReadVarBytes(r, IdentifierLength, "identifier")
+	return WriteFixedBytes(&b, identifier[:])
+}
+
+func readPrefix(r io.Reader, expectedCtAutTxType CTAUTScriptType) ([CTAUTIdentifierLength]byte, error) {
+	var res [CTAUTIdentifierLength]byte
+
+	commprefix, err := ReadFixedBytes(r, len(commonPrefix))
 	if err != nil {
-		return nil, err
+		return res, ErrNonAutTx
 	}
-	if len(identifier) != IdentifierLength {
-		return nil, ErrInValidAUTTx
+	if !bytes.Equal(commprefix, []byte(commonPrefix)) {
+		return res, ErrNonAutTx
 	}
-	return identifier, nil
+
+	ctAutScriptType, err := ReadByte(r)
+	if err != nil {
+		return res, err
+	}
+	if ctAutScriptType != expectedCtAutTxType {
+		return res, ErrInValidAUTTx
+	}
+
+	identifier, err := ReadFixedBytes(r, CTAUTIdentifierLength)
+	if err != nil {
+		return res, err
+	}
+	copy(res[:], identifier)
+
+	return res, nil
 }
 
 func writeIssuerTokens(b bytes.Buffer, issuerTokens [][]byte) error {
@@ -76,18 +84,15 @@ func readIssuerTokens(r io.Reader) ([][]byte, error) {
 	if numIssuer, err = ReadVarInt(r); err != nil {
 		return nil, err
 	}
-	if numIssuer == 0 || numIssuer > MaxIssuerNum {
-		return nil, ErrInValidAUTTx
-	}
 
 	claimedCoinAddresses := map[string]struct{}{}
 	issuerTokens := make([][]byte, numIssuer)
 	for i := 0; i < len(issuerTokens); i++ {
-		issuerTokens[i], err = ReadVarBytes(r, IssuerTokenLength, "issuerToken")
+		issuerTokens[i], err = ReadVarBytes(r, issuerTokenLength, "issuerToken")
 		if err != nil {
 			return nil, err
 		}
-		if len(issuerTokens[i]) != IssuerTokenLength { // todo(ctaut): need to discuss and confirm
+		if len(issuerTokens[i]) != issuerTokenLength { // todo(ctaut): need to discuss and confirm
 			return nil, ErrInValidAUTTx
 		}
 
@@ -128,11 +133,11 @@ func writeAutMemo(b bytes.Buffer, autMemo []byte) error {
 
 // todo(ctaut): the length check does not make sense, since it is checked in ReadVarBytes.
 func readAutMemo(r io.Reader) ([]byte, error) {
-	autMemo, err := ReadVarBytes(r, MaxAUTMemoLength, "autmemo")
+	autMemo, err := ReadVarBytes(r, maxCTAUTMemoLength, "autmemo")
 	if err != nil {
 		return nil, err
 	}
-	if len(autMemo) > MaxAUTMemoLength {
+	if len(autMemo) > maxCTAUTMemoLength {
 		return nil, ErrInValidAUTTx
 	}
 	return autMemo, nil
@@ -145,18 +150,18 @@ func writeMemo(b bytes.Buffer, memo []byte) error {
 
 // todo(ctaut): the length check does not make sense, since it is checked in ReadVarBytes.
 func readMemo(r io.Reader) ([]byte, error) {
-	memo, err := ReadVarBytes(r, MaxAUTTxMemoLength, "memo")
+	memo, err := ReadVarBytes(r, maxMemoLength, "memo")
 	if err != nil {
 		return nil, err
 	}
-	if len(memo) > MaxAUTTxMemoLength {
+	if len(memo) > maxMemoLength {
 		return nil, ErrInValidAUTTx
 	}
 	return memo, nil
 }
 
 // todo(ctaut): add 's' to the name?
-func writeCTAUTTxoScript(b bytes.Buffer, scripts [][]byte) error {
+func writeCTAUTTxoScripts(b bytes.Buffer, scripts [][]byte) error {
 	err := WriteVarInt(&b, uint64(len(scripts)))
 	if err != nil {
 		return err
@@ -169,34 +174,52 @@ func writeCTAUTTxoScript(b bytes.Buffer, scripts [][]byte) error {
 	}
 	return nil
 }
-func readCTAUTTxoScript(r io.Reader, expectedLength int) ([][]byte, error) {
-	var numOutAutCoins uint64
+func readCTAUTTxoScript(r io.Reader, expectedCTTokenLength int, expectedPlainTokenLength int) ([][]byte, error) {
 	var err error
-	if numOutAutCoins, err = ReadVarInt(r); err != nil {
+
+	var numCTAutCoins uint64
+	if numCTAutCoins, err = ReadVarInt(r); err != nil {
 		return nil, err
 	}
-	if uint64(expectedLength) != numOutAutCoins {
+	if uint64(expectedCTTokenLength) != numCTAutCoins {
 		return nil, errors.New("mis-match output coin")
 	}
 
-	ctAUTTxoScripts := make([][]byte, numOutAutCoins)
-	for i := 0; i < len(ctAUTTxoScripts); i++ {
-		ctAUTTxoScripts[i], err = ReadVarBytes(r, MaxAUTTxoScriptLength, "an AUT with invalid txo script")
+	var numPlainAutCoins uint64
+	if numPlainAutCoins, err = ReadVarInt(r); err != nil {
+		return nil, err
+	}
+	if uint64(expectedPlainTokenLength) != numPlainAutCoins {
+		return nil, errors.New("mis-match output coin")
+	}
+
+	ctAUTTxoScripts := make([][]byte, expectedCTTokenLength+expectedPlainTokenLength)
+	for i := 0; i < expectedCTTokenLength; i++ {
+		ctAUTTxoScripts[i], err = ReadVarBytes(r, MaxAUTValueScriptLength, "an AUT with invalid txo script")
 		if err != nil {
 			return nil, err
 		}
-		if len(ctAUTTxoScripts[i]) > MaxAUTTxoScriptLength {
+		if len(ctAUTTxoScripts[i]) > MaxAUTValueScriptLength {
 			// todo(ctaut): the check does not make sense
 			// todo(ctaut): the length is not correct.
 			return nil, ErrInValidAUTTx
 		}
 	}
+
+	for i := expectedCTTokenLength; i < expectedCTTokenLength+expectedPlainTokenLength; i++ {
+		ctAUTTxoScripts[i], err = ReadVarBytes(r, MaxAUTValueScriptLength, "an AUT with invalid txo script")
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return ctAUTTxoScripts, nil
 }
 
-// todo(ctaut): add comment to define the rules
-// todo(ctaut): HostTxoQualifi??Check
-func CheckTxoSanity(txHash chainhash.Hash, outputIndex int, txOut *wire.TxOutAbe) ([]byte, error) {
+// CheckHostTxoParasiticity would check the following rule:
+// 1. the privacy level MUST be abecryptoxkey.PrivacyLevelPSEUDONYMCT, note that this means the value in txo is public
+// 2. the value must be 1 Neutrino
+func CheckHostTxoParasiticity(txHash chainhash.Hash, outputIndex int, txOut *wire.TxOutAbe) ([]byte, error) {
 	privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
 	if err != nil {
 		return nil, fmt.Errorf("fail to extract the privacy level from transaction %s:%s", txHash, err.Error())
@@ -215,8 +238,9 @@ func CheckTxoSanity(txHash chainhash.Hash, outputIndex int, txOut *wire.TxOutAbe
 	return coinAddress, nil
 }
 
+// populateGeneratedCTAUTTokens would get the specified host output from the host transaction
 // todo(ctaut): add comments to define the rules
-func populateCTAUTOutputs(autTransaction Transaction, msgTx *wire.MsgTxAbe) error {
+func populateGeneratedCTAUTTokens(autTx CTAUTScript, msgTx *wire.MsgTxAbe) error {
 	startIdx := 0
 	for ; startIdx < len(msgTx.TxOuts); startIdx++ {
 		txOut := msgTx.TxOuts[startIdx]
@@ -237,35 +261,125 @@ func populateCTAUTOutputs(autTransaction Transaction, msgTx *wire.MsgTxAbe) erro
 	}
 
 	// todo(ctaut): NumTxOutputs() here is a typically inappropriate use.
-	if startIdx+autTransaction.NumTxOutputs() > len(msgTx.TxOuts) {
+	numOutput, err := getNumGeneratedTokens(autTx)
+	if err != nil {
+		return err
+	}
+	if startIdx+numOutput > len(msgTx.TxOuts) {
 		return fmt.Errorf("claim %d outputs for CTAUT but only remain %d outputs in host transaction",
-			autTransaction.NumTxOutputs(), len(msgTx.TxOuts)-startIdx)
+			numOutput, len(msgTx.TxOuts)-startIdx)
 	}
 
 	// todo(ctaut): seems not correct. it is possible startIdx is not hosting ctaut. need define the rules
 	txHash := msgTx.TxHash()
-	autTxOuts := make([]*CTAUTToken, autTransaction.NumTxOutputs())
-	for i := 0; i < autTransaction.NumTxOutputs(); i++ {
+	autTxOuts := make([]*CTAUTToken, numOutput)
+	for i := 0; i < numOutput; i++ {
 		index := startIdx + i
 		txOut := msgTx.TxOuts[index]
 
-		coinAddress, err := CheckTxoSanity(txHash, index, txOut)
+		coinAddress, err := CheckHostTxoParasiticity(txHash, index, txOut)
 		if err != nil {
 			return err
 		}
 
 		autTxOuts[i] = &CTAUTToken{
 			Version: txOut.Version,
-			OutPoint: OutPoint{
-				TxHash: txHash,
-				Index:  uint8(index),
+			HostOutPoint: HostOutPoint{
+				Hash:  txHash,
+				Index: uint32(index),
 			},
 			ValueScript: nil, // nil for root coin, fill out for coin later
 			CoinAddress: coinAddress,
 		}
 	}
 
-	return autTransaction.setTxOutputs(autTxOuts)
+	return autTx.setConsumedTokens(autTxOuts)
+}
+func populateConsumedCTAUTTokens(autTx CTAUTScript, msgTx *wire.MsgTxAbe,
+	lookupHostOutput func(ringHash chainhash.Hash) (*wire.TxOutAbe, error)) error {
+	if autTx == nil {
+		return nil
+	}
+	txHash := msgTx.TxHash()
+
+	hostedTxIns := msgTx.TxIns
+	startIndex := 0
+	for ; startIndex < len(hostedTxIns); startIndex++ {
+		// sanity-check
+		ringHash := hostedTxIns[startIndex].PreviousOutPointRing.Hash()
+		txOut, err := lookupHostOutput(ringHash)
+		if err != nil {
+			return err
+		}
+
+		privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
+		if err != nil {
+			return err
+		}
+
+		// skip fully-privacy area
+		if privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre ||
+			privacyLevel == abecryptoxkey.PrivacyLevelRINGCT {
+			continue
+		}
+
+		if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+			return fmt.Errorf("expect privacy level %d but got %d",
+				abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
+		}
+		break
+	}
+
+	numInCoins, err := getNumConsumedTokens(autTx)
+	if err != nil {
+		return err
+	}
+	if startIndex+numInCoins > len(hostedTxIns) {
+		return fmt.Errorf("claim %d (root) coins but only remain %d outputs",
+			numInCoins, len(hostedTxIns)-startIndex)
+	}
+
+	autTxIns := make([]*CTAUTToken, numInCoins)
+	for i := 0; i < len(autTxIns); i++ {
+		hostIndex := startIndex + i
+
+		// sanity-check
+		ringHash := hostedTxIns[hostIndex].PreviousOutPointRing.Hash()
+		txOut, err := lookupHostOutput(ringHash)
+		if err != nil {
+			return err
+		}
+
+		privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
+		if err != nil {
+			return err
+		}
+		if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+			return fmt.Errorf("expect privacy level %d but got %d",
+				abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
+		}
+
+		// fill out with the first item in ring
+		ringIdx := 0
+		outpoint := HostOutPoint{
+			Hash:  hostedTxIns[hostIndex].PreviousOutPointRing.OutPoints[ringIdx].TxHash,
+			Index: uint32(hostedTxIns[hostIndex].PreviousOutPointRing.OutPoints[ringIdx].Index),
+		}
+
+		coinAddress, err := CheckHostTxoParasiticity(outpoint.Hash, int(outpoint.Index), txOut)
+		if err != nil {
+			return fmt.Errorf("transaction %s try to consume UTXO at Ring %s is not a valid output", txHash,
+				hostedTxIns[hostIndex].PreviousOutPointRing.Hash())
+		}
+
+		autTxIns[i] = &CTAUTToken{
+			HostOutPoint: outpoint,
+			Version:      hostedTxIns[hostIndex].PreviousOutPointRing.Version,
+			ValueScript:  nil,         // will be populated later with CTAUTViewpoint
+			CoinAddress:  coinAddress, // required by root coin while optional for coin
+		}
+	}
+	return autTx.setConsumedTokens(autTxIns)
 }
 
 // todo(ctaut): define the rules on the mint/update threshold.

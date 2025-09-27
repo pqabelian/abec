@@ -5,13 +5,14 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
+	"math"
+	"strconv"
+
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
-	"io"
-	"math"
-	"strconv"
 )
 
 const (
@@ -1258,7 +1259,7 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 			if err != nil {
 				return nil, fmt.Errorf("fail to parse %d-th issuer token for aut from transaction %s", i, txHash)
 			}
-			if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM && privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+			if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
 				return nil, fmt.Errorf("specified %d-th issuer token is invalid for aut from transaction %s", i, txHash)
 			}
 			key := hex.EncodeToString(coinAddress)
@@ -1358,7 +1359,7 @@ func ExtractAutTransaction(tx *wire.MsgTxAbe) (autTx Transaction, err error) {
 			if err != nil {
 				return nil, fmt.Errorf("fail to parse %d-th issuer token for aut from transaction %s", i, txHash)
 			}
-			if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM && privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+			if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
 				return nil, fmt.Errorf("specified %d-th issuer token is invalid for aut from transaction %s", i, txHash)
 			}
 			key := hex.EncodeToString(coinAddress)
@@ -1488,7 +1489,7 @@ func CheckTxoSanity(txHash chainhash.Hash, outputIndex int, txOut *wire.TxOutAbe
 	if err != nil {
 		return nil, fmt.Errorf("fail to extract the privacy level from transaction %s:%s", txHash, err.Error())
 	}
-	if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM && privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+	if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
 		return nil, fmt.Errorf("invalid privacy level to %d-th output from transaction %s", outputIndex, txHash)
 	}
 	coinAddress, coinValue, err := abecryptox.PseudonymTxoCoinParse(txOut)

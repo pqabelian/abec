@@ -54,8 +54,8 @@ type BlockAbe struct {
 	autTransactions  []aut.Transaction
 	autTxnsGenerated bool
 
-	ctautTransactions  []ctaut.Transaction
-	ctautTxnsGenerated bool
+	ctAutScripts          []ctaut.CTAUTScript
+	ctAutScriptsGenerated bool
 }
 
 // Abe to do
@@ -385,17 +385,17 @@ func (b *BlockAbe) AUTTransactions() []aut.Transaction {
 	b.autTxnsGenerated = true
 	return b.autTransactions
 }
-func (b *BlockAbe) CTAUTTransactions() []ctaut.Transaction {
+func (b *BlockAbe) CTAUTScripts() []ctaut.CTAUTScript {
 	// Return transactions if they have ALL already been generated.  This
 	// flag is necessary because the wrapped transactions are lazily
 	// generated in a sparse fashion.
-	if b.ctautTxnsGenerated {
-		return b.ctautTransactions
+	if b.ctAutScriptsGenerated {
+		return b.ctAutScripts
 	}
 
 	// Generate slice to hold all of the wrapped transactions if needed.
-	if len(b.ctautTransactions) == 0 {
-		b.ctautTransactions = make([]ctaut.Transaction, 0, len(b.msgBlock.Transactions))
+	if len(b.ctAutScripts) == 0 {
+		b.ctAutScripts = make([]ctaut.CTAUTScript, 0, len(b.msgBlock.Transactions))
 	}
 
 	// Generate and cache the wrapped autTransactions for all that haven't
@@ -411,7 +411,7 @@ func (b *BlockAbe) CTAUTTransactions() []ctaut.Transaction {
 			continue
 		}
 
-		autTx, err := txAbe.CTAUTTransaction()
+		autTx, err := txAbe.GetCTAUTScript()
 		if err != nil {
 			//	this should not happen
 			log.Warnf("AUTTransactions: error happens when getting AutTransaction from the %d-th transaction (%s) of the block: %v", i, txAbe.Hash(), err)
@@ -421,11 +421,11 @@ func (b *BlockAbe) CTAUTTransactions() []ctaut.Transaction {
 			log.Debugf("AUTTransactions: skip non-AUT transaction %s", txAbe.Hash())
 			continue
 		}
-		b.ctautTransactions = append(b.ctautTransactions, autTx)
+		b.ctAutScripts = append(b.ctAutScripts, autTx)
 	}
 
-	b.ctautTxnsGenerated = true
-	return b.ctautTransactions
+	b.ctAutScriptsGenerated = true
+	return b.ctAutScripts
 }
 
 // TxHash returns the hash for the requested transaction number in the Block.

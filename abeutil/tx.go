@@ -2,6 +2,7 @@ package abeutil
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 
 	"github.com/abesuite/abec/aut"
@@ -43,9 +44,9 @@ type TxAbe struct {
 	autTx     aut.Transaction
 	errAUTTx  error
 
-	ctAutTxDone bool
-	ctAutTx     ctaut.Transaction
-	errCTAUTTx  error
+	ctAutScriptDone bool
+	ctAutScript     ctaut.CTAUTScript
+	errCTAUTScript  error
 }
 
 // MsgTx returns the underlying wire.MsgTx for the transaction.
@@ -75,15 +76,27 @@ func (tx *TxAbe) AUTTransaction() (aut.Transaction, error) {
 
 	return tx.autTx, tx.errAUTTx
 }
-func (tx *TxAbe) CTAUTTransaction() (ctaut.Transaction, error) {
+
+// GetCTAUTScript would get the CTAUTTScript directly, that MUST be extracted before, otherwise error would be return
+func (tx *TxAbe) GetCTAUTScript() (ctaut.CTAUTScript, error) {
 	if tx.autTxDone {
-		return tx.ctAutTx, tx.errCTAUTTx
+		return tx.ctAutScript, tx.errCTAUTScript
 	}
-	tx.ctAutTxDone = true
+	return nil, fmt.Errorf("the CTAUTTScript should be call firstly")
+}
 
-	tx.ctAutTx, tx.errCTAUTTx = ctaut.ExtractCTAutTransaction(tx.MsgTx())
+// CTAUTTScript would extract the AUT script from memo in transaction
+func (tx *TxAbe) CTAUTTScript(lookupHostTxo func(ringHash chainhash.Hash) (*wire.TxOutAbe, error)) (ctaut.CTAUTScript, error) {
+	// TODO(ctaut) return err?
+	if tx.autTxDone {
 
-	return tx.ctAutTx, tx.errCTAUTTx
+		return tx.ctAutScript, tx.errCTAUTScript
+	}
+	tx.ctAutScriptDone = true
+
+	tx.ctAutScript, tx.errCTAUTScript = ctaut.ExtractCTAUTScript(tx.MsgTx(), lookupHostTxo)
+
+	return tx.ctAutScript, tx.errCTAUTScript
 }
 
 func (tx *TxAbe) InvType() wire.InvType {

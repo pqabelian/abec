@@ -14,7 +14,6 @@ import (
 
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
@@ -78,7 +77,7 @@ type Config struct {
 
 	FetchUtxoRingView func(*abeutil.TxAbe) (*blockchain.UtxoRingViewpoint, error)
 	//FetchAUTView      func(*abeutil.TxAbe) (*blockchain.AUTViewpoint, error)
-	FetchCTAUTView func(ctAutTx ctaut.Transaction) (*blockchain.CTAUTViewpoint, error)
+	FetchCTAUTView func(ctAutTx ctaut.CTAUTScript) (*blockchain.CTAUTViewpoint, error)
 
 	// BestHeight defines the function to use to access the block height of
 	// the current best chain.
@@ -227,8 +226,8 @@ type TxPool struct {
 	outpointsAbe     map[chainhash.Hash]map[string]*abeutil.TxAbe                    //TODO(abe):why use two layers map                 //	corresponding to btc's outpoints, using hash rather then TxIn as the key for map
 	orphansByPrevAbe map[chainhash.Hash]map[string]map[chainhash.Hash]*abeutil.TxAbe // corresponding to btc's orphansByPrev //TODO type transfer??? []byte -> string
 
-	expiredHeightAUT  map[int32]map[chainhash.Hash]*TxDescAbe
-	registeredAUTName map[string]chainhash.Hash
+	expiredHeightAUT map[int32]map[chainhash.Hash]*TxDescAbe
+	//registeredAUTName map[string]chainhash.Hash
 
 	txMonitorMu  sync.Mutex
 	txMonitoring bool
@@ -760,15 +759,20 @@ func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 		atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
 	}
 
-	ctautTx, err := tx.CTAUTTransaction()
+	script, err := tx.GetCTAUTScript()
 	if err != nil {
 		// This should not happen, since mempool should accept tx which has error on extracting AutTransaction.
 		log.Warnf("removeTransactionAbe: error happens when extracting AutTransaction from Tx %s: %v", tx.Hash(), err)
 		return
 	}
-	if ctautTx != nil {
-		if ctautTx.Type() == aut.Registration {
-			delete(mp.registeredAUTName, hex.EncodeToString(ctautTx.AUTIdentifier()))
+	if script != nil {
+		if script.Type() == ctaut.Registration {
+			ctAutScript := script.(*ctaut.RegistrationScript)
+			willExpiredCTAut := mp.expiredHeightAUT[ctAutScript.ExpireHeight()]
+			delete(willExpiredCTAut, *tx.Hash())
+			if len(willExpiredCTAut) > 0 {
+				mp.expiredHeightAUT[ctAutScript.ExpireHeight()] = willExpiredCTAut
+			}
 		}
 	}
 }
@@ -860,7 +864,10 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 
 		// store this transation into disk
 		buff := &bytes.Buffer{}
-		tx.MsgTx().SerializeFull(buff)
+		err := tx.MsgTx().SerializeFull(buff)
+		if err != nil {
+			return nil, err
+		}
 
 		// write to transaction cache rotator
 		// [transaction_size] [transaction_content]
@@ -901,26 +908,29 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 		mp.cfg.AddrIndex.AddUnconfirmedTx(tx, utxoView)
 	}*/
 
-	ctautTx, err := tx.CTAUTTransaction()
+	script, err := tx.GetCTAUTScript()
 	if err != nil {
 		// This should not happen, since before addTransactionAbe, the transaction should have been checked
 		log.Warnf("addTransactionAbe: fail to add Tx %s to mempool, since error happens when extracting AutTransaction: %v", tx.Hash(), err)
 		return nil, errors.New("fail to extract CT-AUT transaction")
 	}
-	if ctautTx != nil {
-		switch autTransaction := ctautTx.(type) {
-		case *ctaut.RegistrationTx:
-			if mp.expiredHeightAUT[autTransaction.ExpireHeight] == nil {
-				mp.expiredHeightAUT[autTransaction.ExpireHeight] = map[chainhash.Hash]*TxDescAbe{}
+	if script != nil {
+		switch ctAutScript := script.(type) {
+		case *ctaut.RegistrationScript:
+			expireHeight := ctAutScript.ExpireHeight()
+			if mp.expiredHeightAUT[expireHeight] == nil {
+				mp.expiredHeightAUT[expireHeight] = map[chainhash.Hash]*TxDescAbe{}
 			}
-			mp.expiredHeightAUT[autTransaction.ExpireHeight][*txD.Tx.Hash()] = txD
+			mp.expiredHeightAUT[expireHeight][*txD.Tx.Hash()] = txD
 
-			mp.registeredAUTName[hex.EncodeToString(autTransaction.AUTIdentifier())] = *tx.Hash()
-		case *ctaut.ReRegistrationTx:
-			if mp.expiredHeightAUT[autTransaction.ExpireHeight] == nil {
-				mp.expiredHeightAUT[autTransaction.ExpireHeight] = map[chainhash.Hash]*TxDescAbe{}
+			//identifier := autTransaction.Identifier()
+			//mp.registeredAUTName[hex.EncodeToString(identifier[:])] = *tx.Hash()
+		case *ctaut.ReRegistrationScript:
+			expireHeight := ctAutScript.ExpireHeight()
+			if mp.expiredHeightAUT[expireHeight] == nil {
+				mp.expiredHeightAUT[expireHeight] = map[chainhash.Hash]*TxDescAbe{}
 			}
-			mp.expiredHeightAUT[autTransaction.ExpireHeight][*txD.Tx.Hash()] = txD
+			mp.expiredHeightAUT[expireHeight][*txD.Tx.Hash()] = txD
 		default:
 			// nothing to do
 		}
@@ -1347,7 +1357,7 @@ func (mp *TxPool) fetchInputAUT(tx *abeutil.TxAbe) (*blockchain.AUTViewpoint, er
 	//return autView, nil
 	return nil, errors.New("AUT is not supported")
 }
-func (mp *TxPool) fetchInputCTAUT(ctAutTx ctaut.Transaction) (*blockchain.CTAUTViewpoint, error) {
+func (mp *TxPool) fetchInputCTAUT(ctAutTx ctaut.CTAUTScript) (*blockchain.CTAUTViewpoint, error) {
 	ctAutView, err := mp.cfg.FetchCTAUTView(ctAutTx)
 	if err != nil {
 		return nil, err
@@ -1861,7 +1871,18 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	// == CT-AUT checking rule ==
 	var ctAutView *blockchain.CTAUTViewpoint
 
-	ctAutTx, err := tx.CTAUTTransaction()
+	ctAutTx, err := tx.CTAUTTScript(func(ringHash chainhash.Hash) (*wire.TxOutAbe, error) {
+		ringEntry := utxoRingView.LookupEntry(ringHash)
+		if ringEntry == nil {
+			return nil, fmt.Errorf("no such txo ring found")
+		}
+		txOuts := ringEntry.TxOuts()
+		// assert
+		if len(txOuts) == 0 {
+			return nil, fmt.Errorf("an empty ring found")
+		}
+		return txOuts[0], nil
+	})
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
 			return nil, nil, chainRuleError(cerr)
@@ -1870,12 +1891,6 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	}
 
 	if ctAutTx != nil {
-		// fill out the input here
-		err = blockchain.PopulateCTAUTInputs(ctAutTx, tx, nextBlockHeight, utxoRingView)
-		if err != nil {
-			return nil, nil, fmt.Errorf("fail to populate consumed outpoints for CT-AUT transaction")
-		}
-
 		ctAutView, err = mp.fetchInputCTAUT(ctAutTx)
 		if err != nil {
 			if cerr, ok := err.(blockchain.RuleError); ok {
@@ -1884,19 +1899,19 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 			return nil, nil, err
 		}
 		// Ensure that no multiply transactions try register instances of the same identifier
-		if ctAutTx.Type() == ctaut.Registration {
-			if registerAUTTxHash, exist := mp.registeredAUTName[hex.EncodeToString(ctAutTx.AUTIdentifier())]; exist {
-				str := fmt.Sprintf("transaction %v has register CTAUT instance earlier than transaction %v",
-					registerAUTTxHash, txHash)
-				return nil, nil, txRuleError(wire.RejectInvalid, str)
-			}
-		}
+		//if ctAutTx.Type() == ctaut.Registration {
+		//	identifier := ctAutTx.Identifier()
+		//	if registerAUTTxHash, exist := mp.registeredAUTName[hex.EncodeToString(identifier[:])]; exist {
+		//		str := fmt.Sprintf("transaction %v has register CTAUT instance earlier than transaction %v",
+		//			registerAUTTxHash, txHash)
+		//		return nil, nil, txRuleError(wire.RejectInvalid, str)
+		//	}
+		//}
 		// TODO AUT Check with blockchain, including:
-		// - check threshold
-		// - constraint output which can be used as an AUTCoin
-		// - whether the specified AUT exists
-		// - check existence of input
-		// - check balance for output and input
+		// - whether the specified instance exists on Abelian
+		// - check whether the claimed threshold is met
+		// - check whether the claimed configuration is met
+		// - check whether the input is spendable
 		err = blockchain.CheckCTAUTTransactionInputs(ctAutTx, tx, nextBlockHeight,
 			ctAutView, mp.cfg.ChainParams)
 		if err != nil {
@@ -2268,6 +2283,7 @@ func (mp *TxPool) clearOutdatedTransaction(nextHeight int32) {
 		// nothing
 	}
 
+	// TODO(ctaut) delete transaction try to register or re-register after it claimed expiry height
 }
 
 // New returns a new memory pool for validating and storing standalone
@@ -2287,7 +2303,7 @@ func New(cfg *Config) *TxPool {
 		outpointsAbe:     make(map[chainhash.Hash]map[string]*abeutil.TxAbe),
 		orphansByPrevAbe: make(map[chainhash.Hash]map[string]map[chainhash.Hash]*abeutil.TxAbe),
 
-		expiredHeightAUT:  make(map[int32]map[chainhash.Hash]*TxDescAbe),
-		registeredAUTName: make(map[string]chainhash.Hash),
+		expiredHeightAUT: make(map[int32]map[chainhash.Hash]*TxDescAbe),
+		//registeredAUTName: make(map[string]chainhash.Hash),
 	}
 }

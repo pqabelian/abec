@@ -27,7 +27,7 @@ metadata, including the following fields:
        - a byte array with max length (1024)
    - issuers, used to auth for subsequent operations on instances (mint/re-register)
      - an array with length N of pseudonymous address (193-byte)
-     - N MUST less than or equal to 10
+     - N MUST less than or equal to 10, TODO Di
    - issuance threshold, 
      - an integer, less than or equal to N
    - re-registration threshold
