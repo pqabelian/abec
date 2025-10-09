@@ -564,11 +564,14 @@ func (msg *MsgBlock) SerializeSize() int {
 	// transactions.
 	// todo: (EthashPow)
 	// n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
-	n := blockHeaderLen
-	// todo(MLP):
-	if msg.Header.Version >= int32(BlockVersionEthashPow) {
-		n = blockHeaderLenEthash
-	}
+	//n := blockHeaderLen
+	//// todo(MLP):
+	//if msg.Header.Version >= int32(BlockVersionEthashPow) {
+	//	n = blockHeaderLenEthash
+	//}
+
+	n := msg.Header.SerializeSize()
+
 	n += VarIntSerializeSize(uint64(len(msg.Transactions)))
 
 	for _, tx := range msg.Transactions {
@@ -585,11 +588,14 @@ func (msg *MsgBlock) SerializeSizeStripped() int {
 	// transactions.
 	//	todo: (EthashPoW)
 	//n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
-	n := blockHeaderLen
-	// todo(MLP):
-	if msg.Header.Version >= int32(BlockVersionEthashPow) {
-		n = blockHeaderLenEthash
-	}
+	//n := blockHeaderLen
+	//// todo(MLP):
+	//if msg.Header.Version >= int32(BlockVersionEthashPow) {
+	//	n = blockHeaderLenEthash
+	//}
+
+	n := msg.Header.SerializeSize()
+
 	n += VarIntSerializeSize(uint64(len(msg.Transactions)))
 
 	for _, tx := range msg.Transactions {
@@ -603,11 +609,14 @@ func (msg *MsgBlockAbe) SerializeSizeStripped() int {
 	// transactions.
 	// todo: (EthashPoW)
 	//n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
-	n := blockHeaderLen
-	// todo(MLP):
-	if msg.Header.Version >= int32(BlockVersionEthashPow) {
-		n = blockHeaderLenEthash
-	}
+	//n := blockHeaderLen
+	//// todo(MLP):
+	//if msg.Header.Version >= int32(BlockVersionEthashPow) {
+	//	n = blockHeaderLenEthash
+	//}
+
+	n := msg.Header.SerializeSize()
+
 	n += VarIntSerializeSize(uint64(len(msg.Transactions)))
 
 	for _, tx := range msg.Transactions {
@@ -652,11 +661,14 @@ func (msg *MsgBlockAbe) SerializeSize() int {
 	// transactions.
 	// todo: (EthashPoW)
 	// n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
-	n := blockHeaderLen
-	// todo(MLP):
-	if msg.Header.Version >= int32(BlockVersionEthashPow) {
-		n = blockHeaderLenEthash
-	}
+	//n := blockHeaderLen
+	//// todo(MLP):
+	//if msg.Header.Version >= int32(BlockVersionEthashPow) {
+	//	n = blockHeaderLenEthash
+	//}
+
+	n := msg.Header.SerializeSize()
+
 	n += VarIntSerializeSize(uint64(len(msg.Transactions)))
 
 	for _, tx := range msg.Transactions {

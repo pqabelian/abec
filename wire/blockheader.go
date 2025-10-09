@@ -81,13 +81,6 @@ type BlockHeader struct {
 	MixDigest chainhash.Hash `json:"mixHash"`
 }
 
-// blockHeaderLen is a constant that represents the number of bytes for a block
-// header.
-const blockHeaderLen = 80
-
-// todo: (EthashPoW)
-const blockHeaderLenEthash = 120 // 4 + 2*32 + 4 + 4 + 4 + 8 + 32
-
 const blockHeaderContentLen = 80 // 4 + 2*32 + 4 + 4 + 4
 
 const (
