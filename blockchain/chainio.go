@@ -25,11 +25,11 @@ import (
 )
 
 const (
-	// blockHdrSize is the size of a block header.  This is simply the
-	// constant from wire and is only provided here for convenience since
-	// wire.MaxBlockHeaderPayload is quite long.
-	//	todo: (EthashPoW) all codes related to blockHdrSize need to be modified.
-	blockHdrSize = wire.MaxBlockHeaderPayloadEthash
+	//// blockHdrSize is the size of a block header.  This is simply the
+	//// constant from wire and is only provided here for convenience since
+	//// wire.MaxBlockHeaderPayload is quite long.
+	////	todo: (EthashPoW) all codes related to blockHdrSize need to be modified.
+	// blockHdrSize = wire.MaxBlockHeaderPayloadEthash
 
 	// latestUtxoSetBucketVersion is the current version of the utxo set
 	// bucket that is used to track all unspent outputs.
@@ -2555,12 +2555,12 @@ func (b *BlockChain) initChainState() error {
 	}
 
 	// todo: 202207 need refactor to remove
-	if !hasBlockIndex {
-		err := migrateBlockIndex(b.db)
-		if err != nil {
-			return nil
-		}
-	}
+	//if !hasBlockIndex {
+	//	err := migrateBlockIndex(b.db)
+	//	if err != nil {
+	//		return nil
+	//	}
+	//}
 
 	if !hasDeletedWitnessFileBucket {
 		// Create the bucket that houses the meta infos of deleted witness file,

@@ -730,14 +730,21 @@ func (g *BlkTmplGenerator) NewBlockTemplate(cryptoAddressPayTo []byte) (*BlockTe
 	log.Debugf("Considering %d transactions for inclusion to new block",
 		len(sourceTxns))
 
+	// Calculate the next expected block version based on the state of the rule change deployments.
+	nextBlockVersion, err := g.chain.CalcNextBlockVersion()
+	if err != nil {
+		return nil, err
+	}
+
 	//	todo: (EthashPow)
 	//	blockHeaderOverhead is the max number of bytes it takes to serialize a block header and max possible transaction count.
 	//	It is a maximum possible value, rather than an accurate value.
 	// blockHeaderOverhead := wire.MaxBlockHeaderPayload + wire.MaxVarIntPayload
-	blockHeaderOverhead := wire.MaxBlockHeaderPayload
-	if nextBlockHeight >= g.chainParams.BlockHeightEthashPoW {
-		blockHeaderOverhead = wire.MaxBlockHeaderPayloadEthash
-	}
+	//blockHeaderOverhead := wire.MaxBlockHeaderPayload
+	//if nextBlockHeight >= g.chainParams.BlockHeightEthashPoW {
+	//	blockHeaderOverhead = wire.MaxBlockHeaderPayloadEthash
+	//}
+	blockHeaderOverhead := wire.GetBlockHeaderSize(nextBlockVersion)
 	blockHeaderOverhead += wire.MaxVarIntPayload
 
 mempoolLoop:
@@ -1077,14 +1084,7 @@ mempoolLoop:
 	if err != nil {
 		return nil, err
 	}
-
-	// Calculate the next expected block version based on the state of the
-	// rule change deployments.
-	nextBlockVersion, err := g.chain.CalcNextBlockVersion()
-	if err != nil {
-		return nil, err
-	}
-
+	
 	// Create a new block ready to be solved.
 	//	todo: (EthashPoW)
 	var merkleRoot *chainhash.Hash

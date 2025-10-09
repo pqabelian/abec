@@ -48,10 +48,16 @@ func TestBlkTmplGenerator_NewBlockTemplate_UpdateExtraNonceAbe(t *testing.T) {
 	coinbaseTx := abeutil.NewTxAbe(coinbaseTxMsg)
 	blockTxns = append(blockTxns, coinbaseTx)
 
-	blockHeaderOverhead := wire.MaxBlockHeaderPayload
-	if nextBlockHeight >= int32(BlockHeightEthashPoW) {
-		blockHeaderOverhead = wire.MaxBlockHeaderPayloadEthash
-	}
+	// Calculate the next expected block version based on the state of the
+	// rule change deployments.
+	nextBlockVersion := int32(wire.BlockVersionEthashPow)
+
+	//blockHeaderOverhead := wire.MaxBlockHeaderPayload
+	//if nextBlockHeight >= int32(BlockHeightEthashPoW) {
+	//	blockHeaderOverhead = wire.MaxBlockHeaderPayloadEthash
+	//}
+
+	blockHeaderOverhead := wire.GetBlockHeaderSize(nextBlockVersion)
 	blockHeaderOverhead += wire.MaxVarIntPayload
 
 	blockSize := uint32((blockHeaderOverhead) + coinbaseTx.MsgTx().SerializeSize())
@@ -75,11 +81,7 @@ func TestBlkTmplGenerator_NewBlockTemplate_UpdateExtraNonceAbe(t *testing.T) {
 
 	ts := time.Now()
 	reqDifficulty := uint32(0x1d017c38)
-
-	// Calculate the next expected block version based on the state of the
-	// rule change deployments.
-	nextBlockVersion := int32(wire.BlockVersionEthashPow)
-
+	
 	var merkleRoot *chainhash.Hash
 	var siblingHashes []*chainhash.Hash
 

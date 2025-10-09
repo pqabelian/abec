@@ -29,12 +29,12 @@ const (
 	// metadataDbName is the name used for the metadata database.
 	metadataDbName = "metadata"
 
-	// blockHdrSize is the size of a block header.  This is simply the
-	// constant from wire and is only provided here for convenience since
-	// wire.MaxBlockHeaderPayload is quite long.
-	//	todo: (EthashPoW)
-	//	blockHdrSize is used in two functions, and the two functions are not used by current Abelian.
-	blockHdrSize = wire.MaxBlockHeaderPayloadEthash
+	//// blockHdrSize is the size of a block header.  This is simply the
+	//// constant from wire and is only provided here for convenience since
+	//// wire.MaxBlockHeaderPayload is quite long.
+	////	todo: (EthashPoW)
+	////	blockHdrSize is used in two functions, and the two functions are not used by current Abelian.
+	//blockHdrSize = wire.MaxBlockHeaderPayloadEthash
 
 	// blockHdrOffset defines the offsets into a block index row for the
 	// block header.
@@ -1390,10 +1390,16 @@ func (tx *transaction) fetchWitnessRow(hash *chainhash.Hash) ([]byte, error) {
 //	1) FetchBlockHeader <-- dbFetchHeaderByHash <-- dbFetchHeaderByHeight, which is not called by any function.
 //	2) FetchBlockHeader <-- (cmd *headersCmd) Execute, which is in abec/database/cmd/dbtool/, and will be not used normally by Abelian.
 func (tx *transaction) FetchBlockHeader(hash *chainhash.Hash) ([]byte, error) {
+	blockHeaderSize := uint32(wire.GetBlockHeaderSizeMax())
 	return tx.FetchBlockRegion(&database.BlockRegion{
 		Hash:   hash,
 		Offset: 0,
-		Len:    blockHdrSize,
+		Len:    blockHeaderSize,
+		// todo: note that different version blockHeaders have different BlockHeaderSize,
+		// it is fine to use wire.BlockHeaderSizeMax here, since a block contains at least one (coinbase) transaction,
+		// so that using wire.BlockHeaderSizeMax will not exceeds the block size.
+		// For those blockHeaders with smaller size than wire.BlockHeaderSizeMax,
+		// when deserializing, some bytes will be not used.
 	})
 }
 
@@ -1417,11 +1423,18 @@ func (tx *transaction) FetchBlockHeader(hash *chainhash.Hash) ([]byte, error) {
 //	blockHdrSize is not accurate for block with height < BlockHeightEthashPoW
 //	1) FetchBlockHeaders <-- (cmd *headersCmd) Execute, which is in abec/database/cmd/dbtool/, and will be not used normally by Abelian.
 func (tx *transaction) FetchBlockHeaders(hashes []chainhash.Hash) ([][]byte, error) {
+	blockHeaderSize := uint32(wire.GetBlockHeaderSizeMax())
+
 	regions := make([]database.BlockRegion, len(hashes))
 	for i := range hashes {
 		regions[i].Hash = &hashes[i]
 		regions[i].Offset = 0
-		regions[i].Len = blockHdrSize
+		regions[i].Len = blockHeaderSize
+		// todo: note that different version blockHeaders have different BlockHeaderSize,
+		// it is fine to use wire.BlockHeaderSizeMax here, since a block contains at least one (coinbase) transaction,
+		// so that using wire.BlockHeaderSizeMax will not exceeds the block size.
+		// For those blockHeaders with smaller size than wire.BlockHeaderSizeMax,
+		// when deserializing, some bytes will be not used.
 	}
 	return tx.FetchBlockRegions(regions)
 }

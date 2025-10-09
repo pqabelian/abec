@@ -32,18 +32,6 @@ const (
 
 var MixDigestDummy chainhash.Hash = chainhash.InvalidHash // different pointer, same content
 
-// MaxBlockHeaderPayload is the maximum number of bytes a block header can be.
-// Version 4 bytes + Timestamp 4 bytes + Bits 4 bytes + Nonce 4 bytes +
-// PrevBlock and MerkleRoot hashes.
-// todo: (EthashPoW) set this value to be a variable. Note that this value is used for mining (i.e., frequently called).
-const MaxBlockHeaderPayload = 16 + (chainhash.HashSize * 2)
-
-//	todo: (EthashPoW)
-//
-// Version 4 bytes + Timestamp 4 bytes + Bits 4 bytes + NonceExt 8 bytes + Height 4 bytes
-// PrevBlock, MerkleRoot, and MixDigest hashes
-const MaxBlockHeaderPayloadEthash = 24 + (chainhash.HashSize * 3)
-
 // BlockHeader defines information about a block and is used in the bitcoin
 // block (MsgBlock) and headers (MsgHeaders) messages.
 type BlockHeader struct {
