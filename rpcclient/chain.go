@@ -732,7 +732,8 @@ func (r FutureGetBlockHeaderResult) Receive() (*wire.BlockHeader, error) {
 
 	// Deserialize the blockheader and return it.
 	var bh wire.BlockHeader
-	err = bh.Deserialize(bytes.NewReader(serializedBH))
+	//err = bh.Deserialize(bytes.NewReader(serializedBH))
+	err = bh.Deserialize(serializedBH)
 	if err != nil {
 		return &bh, err
 	}

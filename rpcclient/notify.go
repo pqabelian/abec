@@ -585,7 +585,8 @@ func parseFilteredBlockConnectedParams(params []json.RawMessage) (int32,
 
 	// Deserialize block header from slice of bytes.
 	var blockHeader wire.BlockHeader
-	err = blockHeader.Deserialize(bytes.NewReader(blockHeaderBytes))
+	//err = blockHeader.Deserialize(bytes.NewReader(blockHeaderBytes))
+	err = blockHeader.Deserialize(blockHeaderBytes)
 	if err != nil {
 		return 0, nil, nil, err
 	}
@@ -640,7 +641,8 @@ func parseFilteredBlockDisconnectedParams(params []json.RawMessage) (int32,
 
 	// Deserialize block header from slice of bytes.
 	var blockHeader wire.BlockHeader
-	err = blockHeader.Deserialize(bytes.NewReader(blockHeaderBytes))
+	// err = blockHeader.Deserialize(bytes.NewReader(blockHeaderBytes))
+	err = blockHeader.Deserialize(blockHeaderBytes)
 	if err != nil {
 		return 0, nil, err
 	}

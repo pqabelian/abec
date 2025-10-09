@@ -2838,7 +2838,8 @@ func deserializeBlockRow(blockRow []byte) (*wire.BlockHeader, blockStatus, error
 	buffer := bytes.NewReader(blockRow)
 
 	var header wire.BlockHeader
-	err := header.Deserialize(buffer)
+	// err := header.Deserialize(buffer)
+	err := header.ReadBlockHeader(buffer, 0)
 	if err != nil {
 		return nil, statusNone, err
 	}
@@ -2860,7 +2861,8 @@ func dbFetchHeaderByHash(dbTx database.Tx, hash *chainhash.Hash) (*wire.BlockHea
 	}
 
 	var header wire.BlockHeader
-	err = header.Deserialize(bytes.NewReader(headerBytes))
+	//err = header.Deserialize(bytes.NewReader(headerBytes))
+	err = header.Deserialize(headerBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -2940,9 +2942,12 @@ func dbStoreBlockNode(dbTx database.Tx, node *blockNode) error {
 	// Serialize block data to be stored.
 	//	todo: (EthashPoW) use MaxBlockHeaderPayload rather than blockHdrSize, to avoid misunderstanding
 	// w := bytes.NewBuffer(make([]byte, 0, blockHdrSize+1))
-	w := bytes.NewBuffer(make([]byte, 0, wire.MaxBlockHeaderPayloadEthash+1))
+	// w := bytes.NewBuffer(make([]byte, 0, wire.MaxBlockHeaderPayloadEthash+1))
+
 	header := node.Header()
-	err := header.Serialize(w)
+	// err := header.Serialize(w)
+	w := bytes.NewBuffer(make([]byte, 0, header.SerializeSize()+1))
+	err := header.WriteBlockHeader(w, 0)
 	if err != nil {
 		return err
 	}

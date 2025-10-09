@@ -1718,13 +1718,14 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 	// When the verbose flag isn't set, simply return the serialized block
 	// header as a hex-encoded string.
 	if c.Verbose != nil && !*c.Verbose {
-		var headerBuf bytes.Buffer
-		err := blockHeader.Serialize(&headerBuf)
+		//var headerBuf bytes.Buffer
+		//err := blockHeader.Serialize(&headerBuf)
+		serializedBlockHeader, err := blockHeader.Serialize()
 		if err != nil {
 			context := "Failed to serialize block header"
 			return nil, internalRPCError(err.Error(), context)
 		}
-		return hex.EncodeToString(headerBuf.Bytes()), nil
+		return hex.EncodeToString(serializedBlockHeader), nil
 	}
 
 	// The verbose flag is set, so generate the JSON object and return it.
@@ -3055,15 +3056,16 @@ func handleGetHeaders(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 
 	// Return the serialized block headers as hex-encoded strings.
 	hexBlockHeaders := make([]string, len(headers))
-	var buf bytes.Buffer
+	//var buf bytes.Buffer
 	for i, h := range headers {
-		err := h.Serialize(&buf)
+		// err := h.Serialize(&buf)
+		serializedBlockHeader, err := h.Serialize()
 		if err != nil {
 			return nil, internalRPCError(err.Error(),
 				"Failed to serialize block header")
 		}
-		hexBlockHeaders[i] = hex.EncodeToString(buf.Bytes())
-		buf.Reset()
+		hexBlockHeaders[i] = hex.EncodeToString(serializedBlockHeader)
+		//buf.Reset()
 	}
 	return hexBlockHeaders, nil
 }

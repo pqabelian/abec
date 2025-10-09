@@ -32,10 +32,11 @@ func (msg *MsgPrunedBlock) ClearTransactions() {
 // opposed to decoding blocks from the wire.
 
 func (msg *MsgPrunedBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
-	err := readBlockHeader(r, pver, &msg.Header)
+	err := msg.Header.ReadBlockHeader(r, pver)
 	if err != nil {
 		return err
 	}
+
 	// TODO: There are something problem becasuse the transaction version would be updated in the future
 	// Use TxVersion_Unknown temporary, this would be immediately set after Deserialize
 	msg.CoinbaseTx = NewMsgTxAbe(TxVersion_Unknown)
@@ -93,7 +94,7 @@ func (msg *MsgPrunedBlock) Deserialize(r io.Reader) error {
 }
 
 func (msg *MsgPrunedBlock) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
-	err := writeBlockHeader(w, pver, &msg.Header)
+	err := msg.Header.WriteBlockHeader(w, pver)
 	if err != nil {
 		return err
 	}
