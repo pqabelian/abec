@@ -1084,7 +1084,7 @@ mempoolLoop:
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Create a new block ready to be solved.
 	//	todo: (EthashPoW)
 	var merkleRoot *chainhash.Hash
