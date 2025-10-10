@@ -3,6 +3,7 @@ package blockchain
 import (
 	"fmt"
 	"github.com/abesuite/abec/abeutil"
+	"github.com/abesuite/abec/blockchain/ruleerror"
 	"github.com/abesuite/abec/database"
 )
 
@@ -32,10 +33,10 @@ func (b *BlockChain) maybeAcceptBlockAbe(block *abeutil.BlockAbe, flags Behavior
 	prevNode := b.index.LookupNode(prevHash)
 	if prevNode == nil {
 		str := fmt.Sprintf("previous block %s is unknown", prevHash)
-		return false, ruleError(ErrPreviousBlockUnknown, str)
+		return false, ruleerror.NewRuleError(ruleerror.ErrPreviousBlockUnknown, str)
 	} else if b.index.NodeStatus(prevNode).KnownInvalid() {
 		str := fmt.Sprintf("previous block %s is known to be invalid", prevHash)
-		return false, ruleError(ErrInvalidAncestorBlock, str)
+		return false, ruleerror.NewRuleError(ruleerror.ErrInvalidAncestorBlock, str)
 	}
 
 	blockHeight := prevNode.height + 1

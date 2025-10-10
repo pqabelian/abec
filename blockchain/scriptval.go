@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abeutil"
+	"github.com/abesuite/abec/blockchain/ruleerror"
 	"github.com/abesuite/abec/txscript"
 	"runtime"
 	"time"
@@ -148,7 +149,7 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 		err = abecryptox.CoinbaseTxVerify(tx.MsgTx())
 		if err != nil {
 			str := fmt.Sprintf("coinbase transaction %s verify failed: %v", tx.Hash(), err)
-			return ruleError(ErrScriptValidation, str)
+			return ruleerror.NewRuleError(ruleerror.ErrScriptValidation, str)
 		}
 
 		//if !isValid {
@@ -169,7 +170,7 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 				"transaction %s:%d",
 				tx.MsgTx().TxIns[i].PreviousOutPointRing, tx.Hash(),
 				i)
-			return ruleError(ErrMissingTxOut, str)
+			return ruleerror.NewRuleError(ruleerror.ErrMissingTxOut, str)
 		}
 
 		serializedTxoList := utxoRing.TxOuts()
@@ -181,7 +182,7 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 	err = abecryptox.TransferTxVerify(tx.MsgTx(), abeTxInDetail)
 	if err != nil {
 		str := fmt.Sprintf("transaction %s verify failed: %v", tx.Hash(), err)
-		return ruleError(ErrScriptValidation, str)
+		return ruleerror.NewRuleError(ruleerror.ErrScriptValidation, str)
 	}
 	//if !isValid {
 	//	str := fmt.Sprintf("transaction %s verify failed", tx.Hash())
@@ -206,7 +207,7 @@ func checkBlockScriptsAbe(block *abeutil.BlockAbe, utxoRingView *UtxoRingViewpoi
 
 		if !allTxs[i].HasTxWitness() {
 			str := fmt.Sprintf("transaction %s verify failed due to no witness", allTxs[i].Hash())
-			return ruleError(ErrWitnessMissing, str)
+			return ruleerror.NewRuleError(ruleerror.ErrWitnessMissing, str)
 		}
 
 		txVI := &txValidateItem{

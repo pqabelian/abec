@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/abesuite/abec/blockchain/ruleerror"
 	"math"
 	"math/big"
 	"time"
@@ -305,12 +306,12 @@ func CheckTransactionSanity(tx *abeutil.Tx) error {
 	// A transaction must have at least one input.
 	msgTx := tx.MsgTx()
 	if len(msgTx.TxIn) == 0 {
-		return ruleError(ErrNoTxInputs, "transaction has no inputs")
+		return ruleerror.NewRuleError(ruleerror.ErrNoTxInputs, "transaction has no inputs")
 	}
 
 	// A transaction must have at least one output.
 	if len(msgTx.TxOut) == 0 {
-		return ruleError(ErrNoTxOutputs, "transaction has no outputs")
+		return ruleerror.NewRuleError(ruleerror.ErrNoTxOutputs, "transaction has no outputs")
 	}
 
 	// A transaction must not exceed the maximum allowed block payload when
@@ -319,7 +320,7 @@ func CheckTransactionSanity(tx *abeutil.Tx) error {
 	if serializedTxSize > MaxBlockBaseSize {
 		str := fmt.Sprintf("serialized transaction is too big - got "+
 			"%d, max %d", serializedTxSize, MaxBlockBaseSize)
-		return ruleError(ErrTxTooBig, str)
+		return ruleerror.NewRuleError(ruleerror.ErrTxTooBig, str)
 	}
 
 	// Ensure the transaction amounts are in range.  Each transaction
@@ -334,13 +335,13 @@ func CheckTransactionSanity(tx *abeutil.Tx) error {
 		if satoshi < 0 {
 			str := fmt.Sprintf("transaction output has negative "+
 				"value of %v", satoshi)
-			return ruleError(ErrBadTxOutValue, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBadTxOutValue, str)
 		}
 		if satoshi > abeutil.MaxSatoshi {
 			str := fmt.Sprintf("transaction output value of %v is "+
 				"higher than max allowed value of %v", satoshi,
 				abeutil.MaxSatoshi)
-			return ruleError(ErrBadTxOutValue, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBadTxOutValue, str)
 		}
 
 		// Two's complement int64 overflow guarantees that any overflow
@@ -351,14 +352,14 @@ func CheckTransactionSanity(tx *abeutil.Tx) error {
 			str := fmt.Sprintf("total value of all transaction "+
 				"outputs exceeds max allowed value of %v",
 				abeutil.MaxSatoshi)
-			return ruleError(ErrBadTxOutValue, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBadTxOutValue, str)
 		}
 		if totalSatoshi > abeutil.MaxSatoshi {
 			str := fmt.Sprintf("total value of all transaction "+
 				"outputs is %v which is higher than max "+
 				"allowed value of %v", totalSatoshi,
 				abeutil.MaxSatoshi)
-			return ruleError(ErrBadTxOutValue, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBadTxOutValue, str)
 		}
 	}
 
@@ -366,7 +367,7 @@ func CheckTransactionSanity(tx *abeutil.Tx) error {
 	existingTxOut := make(map[wire.OutPoint]struct{})
 	for _, txIn := range msgTx.TxIn {
 		if _, exists := existingTxOut[txIn.PreviousOutPoint]; exists {
-			return ruleError(ErrDuplicateTxInputs, "transaction "+
+			return ruleerror.NewRuleError(ruleerror.ErrDuplicateTxInputs, "transaction "+
 				"contains duplicate inputs")
 		}
 		existingTxOut[txIn.PreviousOutPoint] = struct{}{}
@@ -379,14 +380,14 @@ func CheckTransactionSanity(tx *abeutil.Tx) error {
 			str := fmt.Sprintf("coinbase transaction script length "+
 				"of %d is out of range (min: %d, max: %d)",
 				slen, MinCoinbaseScriptLen, MaxCoinbaseScriptLen)
-			return ruleError(ErrBadCoinbaseScriptLen, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBadCoinbaseBasicRule, str)
 		}
 	} else {
 		// Previous transaction outputs referenced by the inputs to this
 		// transaction must not be null.
 		for _, txIn := range msgTx.TxIn {
 			if isNullOutpoint(&txIn.PreviousOutPoint) {
-				return ruleError(ErrBadTxInput, "transaction "+
+				return ruleerror.NewRuleError(ruleerror.ErrBadTxInput, "transaction "+
 					"input refers to previous output that "+
 					"is null")
 			}
@@ -415,13 +416,13 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 	// A transaction must have at least one input.
 	msgTx := tx.MsgTx()
 	if len(msgTx.TxIns) == 0 {
-		return ruleError(ErrNoTxInputs, "transaction has no inputs")
+		return ruleerror.NewRuleError(ruleerror.ErrNoTxInputs, "transaction has no inputs")
 	}
 
 	// A transaction must have at least one output.
 	//	here only does not check the situation of TxoDetails
 	if len(msgTx.TxOuts) == 0 {
-		return ruleError(ErrNoTxOutputs, "transaction has no outputs")
+		return ruleerror.NewRuleError(ruleerror.ErrNoTxOutputs, "transaction has no outputs")
 	}
 
 	// At this moment, ABE limits the numbers of inputs and outputs, so does not consider the payload size
@@ -431,7 +432,7 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 	}
 	if len(msgTx.TxIns) > txInputMaxNum {
 		str := fmt.Sprintf("the number of inputs exceeds the allowd max number %d", txInputMaxNum)
-		return ruleError(ErrTooManyTxInputs, str)
+		return ruleerror.NewRuleError(ruleerror.ErrTooManyTxInputs, str)
 	}
 	txOutputMaxNum, err := abecryptoxparam.GetTxOutputMaxNum(msgTx.Version)
 	if err != nil {
@@ -439,16 +440,16 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 	}
 	if len(msgTx.TxOuts) > txOutputMaxNum {
 		str := fmt.Sprintf("the number of txo exceeds the allowd max number %d", txOutputMaxNum)
-		return ruleError(ErrTooManyTxOutputs, str)
+		return ruleerror.NewRuleError(ruleerror.ErrTooManyTxOutputs, str)
 	}
 
 	if msgTx.TxFee < 0 {
 		str := fmt.Sprintf("transaction output has negative value of %v", msgTx.TxFee)
-		return ruleError(ErrBadTxFeeValue, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBadTxFeeValue, str)
 	}
 	if msgTx.TxFee > abeutil.MaxNeutrino {
 		str := fmt.Sprintf("transaction fee of %v is higher than max allowed value of %v", msgTx.TxFee, abeutil.MaxSatoshi)
-		return ruleError(ErrBadTxFeeValue, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBadTxFeeValue, str)
 	}
 
 	// A transaction must not exceed the maximum allowed block payload when serialized.
@@ -456,14 +457,14 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 	if serializedTxSize > MaxBlockBaseSizeMLPAUT {
 		str := fmt.Sprintf("serialized transaction is too big - got "+
 			"%d, max %d", serializedTxSize, MaxBlockBaseSizeMLPAUT)
-		return ruleError(ErrTxTooBig, str)
+		return ruleerror.NewRuleError(ruleerror.ErrTxTooBig, str)
 	}
 
 	serializedTxFullSize := tx.MsgTx().SerializeSizeFull()
 	if serializedTxFullSize > MaxBlockFullSizeMLPAUT {
 		str := fmt.Sprintf("serialized full transaction is too big - got "+
 			"%d, max %d", serializedTxSize, MaxBlockFullSizeMLPAUT)
-		return ruleError(ErrTxTooBig, str)
+		return ruleerror.NewRuleError(ruleerror.ErrTxTooBig, str)
 	}
 
 	isCb, err := IsCoinBaseAbe(tx)
@@ -523,10 +524,10 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		}
 
 		if len(txIn.SerialNumber) == 0 {
-			return ruleError(ErrBadTxInput, "transaction input refers to a serial number that is null")
+			return ruleerror.NewRuleError(ruleerror.ErrBadTxInput, "transaction input refers to a serial number that is null")
 		}
 		if bytes.Compare(txIn.SerialNumber, nullSn) == 0 {
-			return ruleError(ErrBadTxInput, "transaction input refers to a serial number that is null")
+			return ruleerror.NewRuleError(ruleerror.ErrBadTxInput, "transaction input refers to a serial number that is null")
 		}
 
 		if txIn.PreviousOutPointRing.Version != msgTx.Version {
@@ -540,7 +541,7 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 			} else {
 				str := fmt.Sprintf("transaction's %d -th input refers to an OutPointRing with ring version "+
 					"%d, which is different from msgTx.Version %d, and this is not in the expected cases", i, txIn.PreviousOutPointRing.Version, msgTx.Version)
-				return ruleError(ErrBadTxInput, str)
+				return ruleerror.NewRuleError(ruleerror.ErrBadTxInput, str)
 			}
 		}
 
@@ -558,14 +559,14 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		if blkHashNum != int(blockNumPerRingGroup) {
 			str := fmt.Sprintf("transaction's %d -th input refers to an OutPointRing with block-hash-number "+
 				"%d, should be %d", i, blkHashNum, blockNumPerRingGroup)
-			return ruleError(ErrBadTxInput, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBadTxInput, str)
 		}
 
 		ringSize := len(txIn.PreviousOutPointRing.OutPoints)
 		if ringSize > int(txoRingSize) {
 			str := fmt.Sprintf("transaction's %d -th input refers to an OutPointRing with ring-size too big: "+
 				"%d, max %d", i, ringSize, txoRingSize)
-			return ruleError(ErrBadTxInput, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBadTxInput, str)
 		}
 
 		ringHash := txIn.PreviousOutPointRing.Hash()
@@ -575,7 +576,7 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 
 		snStr := hex.EncodeToString(txIn.SerialNumber)
 		if _, snExists := consumedOutPoints[ringHash][snStr]; snExists {
-			return ruleError(ErrDuplicateTxInputs, "transaction "+
+			return ruleerror.NewRuleError(ruleerror.ErrDuplicateTxInputs, "transaction "+
 				"contains duplicate inputs")
 		}
 
@@ -586,11 +587,11 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 	ctAutTx, err := tx.GetCTAUTScript()
 	if err != nil {
 		str := fmt.Sprintf("error hapeens when extracting AutTransaction from Tx %s: %v", tx.Hash(), err)
-		return ruleError(ErrCTAUTBadForm, str)
+		return ruleerror.NewRuleError(ruleerror.ErrCTAUTBadForm, str)
 	}
 	if ctAutTx != nil {
 		if tx.MsgTx().Version < wire.TxVersion_Height_450000_Aconcagua {
-			return ruleError(ErrTxVersionForCTAUT, "transaction "+
+			return ruleerror.NewRuleError(ruleerror.ErrTxVersionForCTAUT, "transaction "+
 				"contains CTAUT but the transaction version is invalid")
 		}
 
@@ -601,7 +602,7 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		for _, coin := range ctAutTx.GeneratedTokens() {
 			index := coin.HostOutPoint.Index
 			if txOuts[index].Version < wire.TxVersion_Height_450000_Aconcagua {
-				return ruleError(ErrTxVersionForCTAUT, "transaction "+
+				return ruleerror.NewRuleError(ruleerror.ErrTxVersionForCTAUT, "transaction "+
 					"contains CTAUT but the parasitized output has invalid version")
 			}
 		}
@@ -624,14 +625,14 @@ func checkProofOfWork(header *wire.BlockHeader, ethash *ethash.Ethash, powLimit 
 	if target.Sign() <= 0 {
 		str := fmt.Sprintf("block target difficulty of %064x is too low",
 			target)
-		return ruleError(ErrUnexpectedDifficulty, str)
+		return ruleerror.NewRuleError(ruleerror.ErrUnexpectedDifficulty, str)
 	}
 
 	// The target difficulty must be less than the maximum allowed.
 	if target.Cmp(powLimit) > 0 {
 		str := fmt.Sprintf("block target difficulty of %064x is "+
 			"higher than max of %064x", target, powLimit)
-		return ruleError(ErrUnexpectedDifficulty, str)
+		return ruleerror.NewRuleError(ruleerror.ErrUnexpectedDifficulty, str)
 	}
 
 	// The block hash must be less than the claimed target unless the flag
@@ -652,7 +653,7 @@ func checkProofOfWork(header *wire.BlockHeader, ethash *ethash.Ethash, powLimit 
 			if hashNum.Cmp(target) > 0 {
 				str := fmt.Sprintf("block hash of %064x is higher than "+
 					"expected max of %064x", hashNum, target)
-				return ruleError(ErrHighHash, str)
+				return ruleerror.NewRuleError(ruleerror.ErrHighHash, str)
 			}
 		}
 	}
@@ -714,7 +715,7 @@ func CountP2SHSigOps(tx *abeutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint)
 				"transaction %s:%d either does not exist or "+
 				"has already been spent", txIn.PreviousOutPoint,
 				tx.Hash(), txInIndex)
-			return 0, ruleError(ErrMissingTxOut, str)
+			return 0, ruleerror.NewRuleError(ruleerror.ErrMissingTxOut, str)
 		}
 
 		// We're only interested in pay-to-script-hash types, so skip
@@ -738,7 +739,7 @@ func CountP2SHSigOps(tx *abeutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint)
 			str := fmt.Sprintf("the public key script from output "+
 				"%v contains too many signature operations - "+
 				"overflow", txIn.PreviousOutPoint)
-			return 0, ruleError(ErrTooManySigOps, str)
+			return 0, ruleerror.NewRuleError(ruleerror.ErrTooManySerialNumbers, str) // todo: not accurate, will remove
 		}
 	}
 
@@ -775,7 +776,7 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, ethash *ethash.Ethash, pow
 	if !header.Timestamp.Equal(time.Unix(header.Timestamp.Unix(), 0)) {
 		str := fmt.Sprintf("block timestamp of %v has a higher "+
 			"precision than one second", header.Timestamp)
-		return ruleError(ErrInvalidTime, str)
+		return ruleerror.NewRuleError(ruleerror.ErrInvalidTime, str)
 	}
 
 	// Ensure the block time is not too far in the future.
@@ -784,7 +785,7 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, ethash *ethash.Ethash, pow
 	if header.Timestamp.After(maxTimestamp) {
 		str := fmt.Sprintf("block timestamp of %v is too far in the "+
 			"future", header.Timestamp)
-		return ruleError(ErrTimeTooNew, str)
+		return ruleerror.NewRuleError(ruleerror.ErrTimeTooNew, str)
 	}
 
 	return nil
@@ -808,7 +809,7 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 	// A block must have at least one transaction.
 	numTx := len(msgBlock.Transactions)
 	if numTx == 0 {
-		return ruleError(ErrNoTransactions, "block does not contain "+
+		return ruleerror.NewRuleError(ruleerror.ErrNoTransactions, "block does not contain "+
 			"any transactions")
 	}
 
@@ -818,7 +819,7 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 	if numTx > MaxBlockBaseSize {
 		str := fmt.Sprintf("block contains too many transactions - "+
 			"got %d, max %d", numTx, MaxBlockBaseSize)
-		return ruleError(ErrBlockTooBig, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBlockTooBig, str)
 	}
 
 	// A block must not exceed the maximum allowed block payload when
@@ -827,13 +828,13 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 	if serializedSize > MaxBlockBaseSize {
 		str := fmt.Sprintf("serialized block is too big - got %d, "+
 			"max %d", serializedSize, MaxBlockBaseSize)
-		return ruleError(ErrBlockTooBig, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBlockTooBig, str)
 	}
 
 	// The first transaction in a block must be a coinbase.
 	transactions := block.Transactions()
 	if !IsCoinBase(transactions[0]) {
-		return ruleError(ErrFirstTxNotCoinbase, "first transaction in "+
+		return ruleerror.NewRuleError(ruleerror.ErrFirstTxNotCoinbase, "first transaction in "+
 			"block is not a coinbase")
 	}
 
@@ -842,7 +843,7 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 		if IsCoinBase(tx) {
 			str := fmt.Sprintf("block contains second coinbase at "+
 				"index %d", i+1)
-			return ruleError(ErrMultipleCoinbases, str)
+			return ruleerror.NewRuleError(ruleerror.ErrMultipleCoinbases, str)
 		}
 	}
 
@@ -867,7 +868,7 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 		str := fmt.Sprintf("block merkle root is invalid - block "+
 			"header indicates %v, but calculated value is %v",
 			header.MerkleRoot, calculatedMerkleRoot)
-		return ruleError(ErrBadMerkleRoot, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBadMerkleRoot, str)
 	}
 
 	// Check for duplicate transactions.  This check will be fairly quick
@@ -879,7 +880,7 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 		if _, exists := existingTxHashes[*hash]; exists {
 			str := fmt.Sprintf("block contains duplicate "+
 				"transaction %v", hash)
-			return ruleError(ErrDuplicateTx, str)
+			return ruleerror.NewRuleError(ruleerror.ErrDuplicateTx, str)
 		}
 		existingTxHashes[*hash] = struct{}{}
 	}
@@ -896,7 +897,7 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 			str := fmt.Sprintf("block contains too many signature "+
 				"operations - got %v, max %v", totalSigOps,
 				MaxBlockSigOpsCost)
-			return ruleError(ErrTooManySigOps, str)
+			return ruleerror.NewRuleError(ruleerror.ErrTooManySerialNumbers, str) // todo: not accurate, will remove
 		}
 	}
 
@@ -933,7 +934,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainPa
 	// A block must have at least one transaction.
 	numTx := len(msgBlock.Transactions)
 	if numTx == 0 {
-		return ruleError(ErrNoTransactions, "block does not contain "+
+		return ruleerror.NewRuleError(ruleerror.ErrNoTransactions, "block does not contain "+
 			"any transactions")
 	}
 
@@ -955,7 +956,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainPa
 		if serializedSize > MaxBlockBaseSizeMLPAUT {
 			str := fmt.Sprintf("serialized block content is too big - got %d, "+
 				"max %d", serializedSize, MaxBlockBaseSizeMLPAUT)
-			return ruleError(ErrBlockTooBig, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBlockTooBig, str)
 		}
 
 		// TODO(MLPAUT) add block full size check here
@@ -963,7 +964,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainPa
 		if serializedFullSize > MaxBlockFullSizeMLPAUT {
 			str := fmt.Sprintf("serialized block is too big - got %d, "+
 				"max %d", serializedSize, MaxBlockFullSizeMLPAUT)
-			return ruleError(ErrBlockTooBig, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBlockTooBig, str)
 		}
 
 	} else {
@@ -971,7 +972,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainPa
 		if serializedSize > MaxBlockBaseSize {
 			str := fmt.Sprintf("serialized block is too big - got %d, "+
 				"max %d", serializedSize, MaxBlockBaseSize)
-			return ruleError(ErrBlockTooBig, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBlockTooBig, str)
 		}
 	}
 
@@ -982,7 +983,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainPa
 		return err
 	}
 	if !isCb {
-		return ruleError(ErrFirstTxNotCoinbase, "first transaction in "+
+		return ruleerror.NewRuleError(ruleerror.ErrFirstTxNotCoinbase, "first transaction in "+
 			"block is not a coinbase")
 	}
 
@@ -996,7 +997,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainPa
 		if isCb {
 			str := fmt.Sprintf("block contains second coinbase at "+
 				"index %d", i+1)
-			return ruleError(ErrMultipleCoinbases, str)
+			return ruleerror.NewRuleError(ruleerror.ErrMultipleCoinbases, str)
 		}
 	}
 
@@ -1009,7 +1010,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainPa
 		if _, exists := existingTxHashes[*hash]; exists {
 			str := fmt.Sprintf("block contains duplicate "+
 				"transaction %v", hash)
-			return ruleError(ErrDuplicateTx, str)
+			return ruleerror.NewRuleError(ruleerror.ErrDuplicateTx, str)
 		}
 		existingTxHashes[*hash] = struct{}{}
 	}
@@ -1040,7 +1041,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainPa
 			str := fmt.Sprintf("block merkle root is invalid - block "+
 				"header indicates %v, but calculated value is %v",
 				header.MerkleRoot, calculatedMerkleRoot)
-			return ruleError(ErrBadMerkleRoot, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBadMerkleRoot, str)
 		}
 	} else {
 		merkles := BuildMerkleTreeStoreAbe(block.Transactions(), false)
@@ -1049,7 +1050,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainPa
 			str := fmt.Sprintf("block merkle root is invalid - block "+
 				"header indicates %v, but calculated value is %v",
 				header.MerkleRoot, calculatedMerkleRoot)
-			return ruleError(ErrBadMerkleRoot, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBadMerkleRoot, str)
 		}
 	}
 
@@ -1071,7 +1072,7 @@ func ExtractCoinbaseHeight(coinbaseTx *abeutil.Tx) (int32, error) {
 			"version %d or greater must start with the " +
 			"length of the serialized block height"
 		str = fmt.Sprintf(str, serializedHeightVersion)
-		return 0, ruleError(ErrMissingCoinbaseHeight, str)
+		return 0, ruleerror.NewRuleError(ruleerror.ErrMissingCoinbaseHeight, str)
 	}
 
 	// Detect the case when the block height is a small integer encoded with
@@ -1092,7 +1093,7 @@ func ExtractCoinbaseHeight(coinbaseTx *abeutil.Tx) (int32, error) {
 			"version %d or greater must start with the " +
 			"serialized block height"
 		str = fmt.Sprintf(str, serializedLen)
-		return 0, ruleError(ErrMissingCoinbaseHeight, str)
+		return 0, ruleerror.NewRuleError(ruleerror.ErrMissingCoinbaseHeight, str)
 	}
 
 	serializedHeightBytes := make([]byte, 8)
@@ -1107,7 +1108,7 @@ func ExtractCoinbaseHeight(coinbaseTx *abeutil.Tx) (int32, error) {
 func ExtractCoinbaseHeightAbe(coinbaseTx *abeutil.TxAbe) (int32, error) {
 	if coinbaseTx == nil {
 		str := "Cannot extract blockHeight from a coinbase transaction that is null"
-		return 0, ruleError(ErrMissingCoinbaseHeight, str)
+		return 0, ruleerror.NewRuleError(ruleerror.ErrMissingCoinbaseHeight, str)
 	}
 
 	//isCb, err := coinbaseTx.IsCoinBase()
@@ -1139,7 +1140,7 @@ func checkSerializedHeight(coinbaseTx *abeutil.Tx, wantHeight int32) error {
 		str := fmt.Sprintf("the coinbase signature script serialized "+
 			"block height is %d when %d was expected",
 			serializedHeight, wantHeight)
-		return ruleError(ErrBadCoinbaseHeight, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBadCoinbaseHeight, str)
 	}
 	return nil
 }
@@ -1157,7 +1158,7 @@ func checkSerializedHeightAbe(coinbaseTx *abeutil.TxAbe, wantHeight int32) error
 		str := fmt.Sprintf("the coinbase signature script serialized "+
 			"block height is %d when %d was expected",
 			serializedHeight, wantHeight)
-		return ruleError(ErrBadCoinbaseHeight, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBadCoinbaseHeight, str)
 	}
 	return nil
 }
@@ -1191,7 +1192,7 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 		if blockDifficulty != expectedDifficulty {
 			str := "block difficulty of %d is not the expected value of %d"
 			str = fmt.Sprintf(str, blockDifficulty, expectedDifficulty)
-			return ruleError(ErrUnexpectedDifficulty, str)
+			return ruleerror.NewRuleError(ruleerror.ErrUnexpectedDifficulty, str)
 		}
 
 		// Ensure the timestamp for the block header is after the
@@ -1200,7 +1201,7 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 		if !header.Timestamp.After(medianTime) {
 			str := "block timestamp of %v is not after expected %v"
 			str = fmt.Sprintf(str, header.Timestamp, medianTime)
-			return ruleError(ErrTimeTooOld, str)
+			return ruleerror.NewRuleError(ruleerror.ErrTimeTooOld, str)
 		}
 	}
 
@@ -1214,7 +1215,7 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 	if blockHeight >= b.chainParams.BlockHeightEthashPoW {
 		if header.Height != blockHeight {
 			str := fmt.Sprintf("block has height %d while its prevNode has height %d", header.Height, prevNode.height)
-			return ruleError(ErrMismatchedBlockHeightWithPrevNode, str)
+			return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightWithPrevNode, str)
 		}
 
 		// ToDo(MLP):
@@ -1232,29 +1233,29 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 				str := fmt.Sprintf("block has height %d, it should have version %08x for Aconcagua, "+
 					"rather than the version %08x",
 					header.Height, int32(wire.BlockVersionAconcagua), header.Version)
-				return ruleError(ErrMismatchedBlockHeightAndVersion, str)
+				return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
 			}
 		} else if header.Height >= b.chainParams.BlockHeightMLPAUT {
 			if header.Version != int32(wire.BlockVersionMLPAUT) {
 				str := fmt.Sprintf("block has height %d, it should have version %08x for MLPAUT, rather than the version %08x", header.Height, int32(wire.BlockVersionMLPAUT), header.Version)
-				return ruleError(ErrMismatchedBlockHeightAndVersion, str)
+				return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
 			}
 		} else if header.Height >= b.chainParams.BlockHeightDSA {
 			if header.Version != int32(wire.BlockVersionDSA) {
 				str := fmt.Sprintf("block has height %d, it should have version %08x for DSA, rather than the version %08x", header.Height, int32(wire.BlockVersionDSA), header.Version)
-				return ruleError(ErrMismatchedBlockHeightAndVersion, str)
+				return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
 			}
 		} else {
 			if header.Version != int32(wire.BlockVersionEthashPow) {
 				str := fmt.Sprintf("block has height %d, it should have version %08x for EthashPoW, rather than the version %08x", header.Height, int32(wire.BlockVersionEthashPow), header.Version)
-				return ruleError(ErrMismatchedBlockHeightAndVersion, str)
+				return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
 			}
 		}
 
 	} else { // blockHeight < b.chainParams.BlockHeightEthashPoW
 		if header.Version != int32(BlockVersionInitial) {
 			str := fmt.Sprintf("block has height %d, it should have version %08x, rather than the version %08x", header.Height, int32(BlockVersionInitial), header.Version)
-			return ruleError(ErrMismatchedBlockHeightAndVersion, str)
+			return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
 		}
 	}
 
@@ -1263,7 +1264,7 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 	if !b.verifyCheckpoint(blockHeight, &blockHash) {
 		str := fmt.Sprintf("block at height %d does not match "+
 			"checkpoint hash", blockHeight)
-		return ruleError(ErrBadCheckpoint, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBadCheckpoint, str)
 	}
 
 	// Find the previous checkpoint and prevent blocks which fork the main
@@ -1278,7 +1279,7 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 		str := fmt.Sprintf("block at height %d forks the main chain "+
 			"before the previous checkpoint at height %d",
 			blockHeight, checkpointNode.height)
-		return ruleError(ErrForkTooOld, str)
+		return ruleerror.NewRuleError(ruleerror.ErrForkTooOld, str)
 	}
 
 	return nil
@@ -1437,18 +1438,18 @@ func checkStandardCoinbaseTxIn(coinbaseTx *wire.MsgTxAbe, blockHash *chainhash.H
 	isCb, err := coinbaseTx.IsCoinBase()
 	if err != nil {
 		str := fmt.Sprintf("checkStandardCoinbaseTxIn: error happens when calling coinbaseTx.IsCoinBase() on the coinbaseTx of block %s : %v", blockHash, err)
-		return ruleError(ErrBadTxInput, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBadTxInput, str)
 	}
 
 	if !isCb {
 		str := fmt.Sprintf("checkStandardCoinbaseTxIn: the coinbaseTx of block %s is not a coinbaseTx", blockHash)
-		return ruleError(ErrBadTxInput, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBadTxInput, str)
 	}
 
 	err = wire.CheckStandardCoinbaseTxIn(coinbaseTx)
 	if err != nil {
 		str := fmt.Sprintf("checkStandardCoinbaseTxIn: error happens when calling wire.CheckStandardCoinbaseTxIn() on the coinbaseTx of block %s : %v", blockHash, err)
-		return ruleError(ErrBadTxInput, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBadTxInput, str)
 	}
 
 	return nil
@@ -1536,7 +1537,7 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *abeutil.Block, view *U
 			str := fmt.Sprintf("tried to overwrite transaction %v "+
 				"at block height %d that is not fully spent",
 				outpoint.Hash, utxo.BlockHeight())
-			return ruleError(ErrOverwriteTx, str)
+			return ruleerror.NewRuleError(ruleerror.ErrOverwriteTx, str)
 		}
 	}
 
@@ -1602,7 +1603,7 @@ func CheckTransactionInputs(tx *abeutil.Tx, txHeight int32, utxoView *UtxoViewpo
 				"transaction %s:%d either does not exist or "+
 				"has already been spent", txIn.PreviousOutPoint,
 				tx.Hash(), txInIndex)
-			return 0, ruleError(ErrMissingTxOut, str)
+			return 0, ruleerror.NewRuleError(ruleerror.ErrMissingTxOut, str)
 		}
 
 		// Ensure the transaction is not spending coins which have not
@@ -1618,7 +1619,7 @@ func CheckTransactionInputs(tx *abeutil.Tx, txHeight int32, utxoView *UtxoViewpo
 					"of %v blocks", txIn.PreviousOutPoint,
 					originHeight, txHeight,
 					coinbaseMaturity)
-				return 0, ruleError(ErrImmatureSpend, str)
+				return 0, ruleerror.NewRuleError(ruleerror.ErrImmatureSpend, str)
 			}
 		}
 
@@ -1632,14 +1633,14 @@ func CheckTransactionInputs(tx *abeutil.Tx, txHeight int32, utxoView *UtxoViewpo
 		if originTxSatoshi < 0 {
 			str := fmt.Sprintf("transaction output has negative "+
 				"value of %v", abeutil.Amount(originTxSatoshi))
-			return 0, ruleError(ErrBadTxOutValue, str)
+			return 0, ruleerror.NewRuleError(ruleerror.ErrBadTxOutValue, str)
 		}
 		if originTxSatoshi > abeutil.MaxSatoshi {
 			str := fmt.Sprintf("transaction output value of %v is "+
 				"higher than max allowed value of %v",
 				abeutil.Amount(originTxSatoshi),
 				abeutil.MaxSatoshi)
-			return 0, ruleError(ErrBadTxOutValue, str)
+			return 0, ruleerror.NewRuleError(ruleerror.ErrBadTxOutValue, str)
 		}
 
 		// The total of all outputs must not be more than the max
@@ -1653,7 +1654,7 @@ func CheckTransactionInputs(tx *abeutil.Tx, txHeight int32, utxoView *UtxoViewpo
 				"inputs is %v which is higher than max "+
 				"allowed value of %v", totalSatoshiIn,
 				abeutil.MaxSatoshi)
-			return 0, ruleError(ErrBadTxOutValue, str)
+			return 0, ruleerror.NewRuleError(ruleerror.ErrBadTxOutValue, str)
 		}
 	}
 
@@ -1670,7 +1671,7 @@ func CheckTransactionInputs(tx *abeutil.Tx, txHeight int32, utxoView *UtxoViewpo
 		str := fmt.Sprintf("total value of all transaction inputs for "+
 			"transaction %v is %v which is less than the amount "+
 			"spent of %v", txHash, totalSatoshiIn, totalSatoshiOut)
-		return 0, ruleError(ErrSpendTooHigh, str)
+		return 0, ruleerror.NewRuleError(ruleerror.ErrSpendTooHigh, str)
 	}
 
 	// NOTE: bitcoind checks if the transaction fees are < 0 here, but that
@@ -1704,7 +1705,7 @@ func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *
 			str := fmt.Sprintf("TXO Ring %s (txIn %s) referenced from "+
 				"transaction %s:%d has a empty serialNumber", txIn.PreviousOutPointRing.RingId(), txIn.String(),
 				tx.Hash(), txInIndex)
-			return ruleError(ErrMissingTxOut, str)
+			return ruleerror.NewRuleError(ruleerror.ErrMissingTxOut, str)
 		}
 
 		utxoRing := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())
@@ -1712,13 +1713,13 @@ func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *
 			str := fmt.Sprintf("TXO Ring %s (txIn %s) referenced from "+
 				"transaction %s:%d does not exist", txIn.PreviousOutPointRing.RingId(), txIn.String(),
 				tx.Hash(), txInIndex)
-			return ruleError(ErrMissingTxOut, str)
+			return ruleerror.NewRuleError(ruleerror.ErrMissingTxOut, str)
 		}
 		if utxoRing.IsSpent(txIn.SerialNumber) {
 			str := fmt.Sprintf("TXO Ring %s (txIn %s) referenced from "+
 				"transaction %s:%d has already been spent", txIn.PreviousOutPointRing.RingId(), txIn.String(),
 				tx.Hash(), txInIndex)
-			return ruleError(ErrMissingTxOut, str)
+			return ruleerror.NewRuleError(ruleerror.ErrMissingTxOut, str)
 			// Abe to do: update the ErrMissingTxOut to ErrMissingTxOutRing
 		}
 
@@ -1735,7 +1736,7 @@ func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *
 					"of %v blocks", txIn.String(),
 					originHeight, txHeight,
 					coinbaseMaturity)
-				return ruleError(ErrImmatureSpend, str)
+				return ruleerror.NewRuleError(ruleerror.ErrImmatureSpend, str)
 			}
 		}
 	}
@@ -2497,7 +2498,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 		lastTotalFees := totalFees
 		totalFees += tx.MsgTx().TxFee
 		if totalFees < lastTotalFees {
-			return ruleError(ErrBadFees, "total fees for block "+
+			return ruleerror.NewRuleError(ruleerror.ErrBadFees, "total fees for block "+
 				"overflows accumulator")
 		}
 
@@ -2534,7 +2535,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 		str := fmt.Sprintf("coinbase transaction for block pays %v "+
 			"which is more than expected value of %v",
 			totalNeutrinoOut, expectedNeutrinoOut)
-		return ruleError(ErrBadCoinbaseValue, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBadCoinbaseValue, str)
 	}
 
 	// Don't run scripts if this node is before the latest known good
@@ -2659,14 +2660,14 @@ func (b *BlockChain) CheckConnectBlockTemplateAbe(block *abeutil.BlockAbe) error
 	if tip.hash != header.PrevBlock {
 		str := fmt.Sprintf("previous block must be the current chain tip %v, "+
 			"instead got %v", tip.hash, header.PrevBlock)
-		return ruleError(ErrPrevBlockNotBest, str)
+		return ruleerror.NewRuleError(ruleerror.ErrPrevBlockNotBest, str)
 	}
 
 	//	todo: (EthashPoW)
 	if header.Height != tip.height+1 {
 		str := fmt.Sprintf("the height of block (template) must be 1 greater than that of the current chain tip %v (%d), "+
 			"instead got %d", tip.hash, tip.height, header.Height)
-		return ruleError(ErrMismatchedBlockHeightWithPrevNode, str)
+		return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightWithPrevNode, str)
 	}
 
 	//	todo: (EthashPoW)

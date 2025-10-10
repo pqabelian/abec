@@ -7,6 +7,7 @@ package blockchain
 import (
 	"container/list"
 	"fmt"
+	"github.com/abesuite/abec/blockchain/ruleerror"
 	"math/big"
 	"strings"
 	"sync"
@@ -488,7 +489,7 @@ func (b *BlockChain) calcSequenceLock(node *blockNode, tx *abeutil.Tx, utxoView 
 				"transaction %s:%d either does not exist or "+
 				"has already been spent", txIn.PreviousOutPoint,
 				tx.Hash(), txInIndex)
-			return sequenceLock, ruleError(ErrMissingTxOut, str)
+			return sequenceLock, ruleerror.NewRuleError(ruleerror.ErrMissingTxOut, str)
 		}
 
 		// If the input height is set to the mempool height, then we
@@ -1620,8 +1621,8 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			// descendants as having an invalid ancestor.
 			err = b.checkConnectBlockAbe(n, block, view, nil, ctautView, nil)
 			if err != nil {
-				if ruleErr, ok := err.(RuleError); ok {
-					if ruleErr.ErrorCode == ErrWitnessMissing {
+				if ruleErr, ok := err.(ruleerror.RuleError); ok {
+					if ruleErr.ErrorCode == ruleerror.ErrWitnessMissing {
 						b.index.SetStatusFlags(n, statusWitnessMissing)
 					} else {
 						b.index.SetStatusFlags(n, statusValidateFailed)
@@ -1906,7 +1907,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 			err := b.checkConnectBlockAbe(node, block, view, &stxos, ctautView, &sctauts)
 			if err == nil {
 				b.index.SetStatusFlags(node, statusValid)
-			} else if _, ok := err.(RuleError); ok {
+			} else if _, ok := err.(ruleerror.RuleError); ok {
 				b.index.SetStatusFlags(node, statusValidateFailed)
 			} else {
 				return false, err
@@ -1968,7 +1969,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 			// If we got hit with a rule error, then we'll mark
 			// that status of the block as invalid and flush the
 			// index state to disk before returning with the error.
-			if _, ok := err.(RuleError); ok {
+			if _, ok := err.(ruleerror.RuleError); ok {
 				b.index.SetStatusFlags(
 					node, statusValidateFailed,
 				)
