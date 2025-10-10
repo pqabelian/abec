@@ -289,7 +289,7 @@ func TestMakeDataset(t *testing.T) {
 }
 
 func TestMakeDatasetMultiple(t *testing.T) {
-	ethash := New(defaultEthashCfg)
+	ethash := NewEthashPow(defaultEthashCfg)
 
 	ticker := time.NewTicker(time.Second * 10)
 	defer ticker.Stop()
@@ -344,7 +344,7 @@ func TestMakeDatasetMultiple(t *testing.T) {
 }
 
 func TestHashimoto(t *testing.T) {
-	ethash := New(defaultEthashCfg)
+	ethash := NewEthashPow(defaultEthashCfg)
 
 	contentHash := chainhash.ChainHash([]byte("test"))
 
@@ -649,7 +649,7 @@ func TestCacheContent(t *testing.T) {
 		fmt.Println("i=", i, cache[i], "-i", cache[len(cache)-1-i])
 	}
 
-	ethash := New(defaultEthashCfg)
+	ethash := NewEthashPow(defaultEthashCfg)
 	dataset := ethash.dataset(epoch, false)
 	dsSize := datasetSize(epoch)
 
