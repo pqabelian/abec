@@ -470,16 +470,21 @@ func (b *Block) TxLoc() ([]wire.TxLoc, error) {
 // TxLoc is built from BlockAbe --> serialized to TxAbeIndexEntry --> put into Bucket-txIndexKey (key = txHash, value=(blockId, TxLoc))
 // --> Fetched into BlockRegion --> used by FetchBlockRegion and FetchWitnessRegion --> put into TxWitness
 func (b *BlockAbe) TxLoc() ([]wire.TxAbeLoc, error) {
-	var offset, witOffset int
+	//var offset, witOffset int
+	//
+	//if b.msgBlock.Header.Version >= int32(wire.BlockVersionEthashPow) {
+	//	offset = 120
+	//} else {
+	//	offset = 80
+	//}
+	//offset = offset + wire.VarIntSerializeSize(uint64(len(b.msgBlock.Transactions)))
 
-	if b.msgBlock.Header.Version >= int32(wire.BlockVersionEthashPow) {
-		offset = 120
-	} else {
-		offset = 80
-	}
-	offset = offset + wire.VarIntSerializeSize(uint64(len(b.msgBlock.Transactions)))
+	// blockHeader
+	offset := b.MsgBlock().Header.SerializeSize()
+	// Tx number
+	offset = offset + wire.VarIntSerializeSize(uint64(len(b.Transactions())))
 
-	witOffset = 4 // witness number
+	witOffset := 4 // witness number
 
 	txs := b.Transactions()
 	res := make([]wire.TxAbeLoc, len(txs))
