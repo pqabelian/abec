@@ -2525,14 +2525,14 @@ func (b *BlockChain) createChainState() error {
 func (b *BlockChain) initChainState() error {
 	// Determine the state of the chain database. We may need to initialize
 	// everything from scratch or upgrade certain buckets.
-	var initialized, hasBlockIndex bool
+	var initialized bool
 	var hasDeletedWitnessFileBucket bool
 	var hasAUTRelevantBucket bool
 	var hasCTAUTRelevantBucket bool
 	var workedHeightScope, readyHeightScope []BlockHeightScope
 	err := b.db.View(func(dbTx database.Tx) error {
 		initialized = dbTx.Metadata().Get(chainStateKeyName) != nil
-		hasBlockIndex = dbTx.Metadata().Bucket(blockIndexBucketName) != nil
+		// hasBlockIndex = dbTx.Metadata().Bucket(blockIndexBucketName) != nil
 		hasDeletedWitnessFileBucket = dbTx.Metadata().Bucket(deletedWitnessFileBucketName) != nil
 		hasAUTRelevantBucket = dbTx.Metadata().Bucket(autInfoBucketName) != nil
 		hasCTAUTRelevantBucket = dbTx.Metadata().Bucket(ctAutInstanceBucketName) != nil
