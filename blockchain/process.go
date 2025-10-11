@@ -6,7 +6,6 @@ import (
 	"github.com/abesuite/abec/blockchain/consensus"
 	"github.com/abesuite/abec/blockchain/ruleerror"
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/database"
 	"time"
 )

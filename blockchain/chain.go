@@ -7,6 +7,7 @@ package blockchain
 import (
 	"container/list"
 	"fmt"
+	"github.com/abesuite/abec/blockchain/consensus"
 	"github.com/abesuite/abec/blockchain/ruleerror"
 	"math/big"
 	"strings"
@@ -17,7 +18,6 @@ import (
 	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
@@ -1429,7 +1429,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 	for e := detachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
 		blockHeader := n.Header()
-		log.Debugf("DETACH: Block %s (seal hash %s, height %d) is trying to detach", n.hash, ethash.SealHash(&blockHeader), n.height)
+		log.Debugf("DETACH: Block %s (seal hash %s, height %d) is trying to detach", n.hash, consensus.SealHashFast(&blockHeader), n.height)
 
 		var block *abeutil.BlockAbe
 		err := b.db.View(func(dbTx database.Tx) error {
@@ -1570,7 +1570,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 	for e := attachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
 		blockHeader := n.Header()
-		log.Debugf("ATTACH: Block %s (seal hash %s, height %d) is trying to attach", n.hash, ethash.SealHash(&blockHeader), n.height)
+		log.Debugf("ATTACH: Block %s (seal hash %s, height %d) is trying to attach", n.hash, consensus.SealHashFast(&blockHeader), n.height)
 
 		var block *abeutil.BlockAbe
 		err := b.db.View(func(dbTx database.Tx) error {
@@ -1673,7 +1673,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 	for i, e := 0, detachNodes.Front(); e != nil; i, e = i+1, e.Next() {
 		n := e.Value.(*blockNode)
 		block := detachBlocks[i]
-		log.Debugf("DETACH: Block %s (seal hash %s, height %d) is detaching", n.hash, ethash.SealHash(&block.MsgBlock().Header), n.height)
+		log.Debugf("DETACH: Block %s (seal hash %s, height %d) is detaching", n.hash, consensus.SealHashFast(&block.MsgBlock().Header), n.height)
 
 		viewToDel := NewUtxoRingViewpoint()
 		viewToDel.SetBestHash(block.Hash())
@@ -1774,7 +1774,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 	for i, e := 0, attachNodes.Front(); e != nil; i, e = i+1, e.Next() {
 		n := e.Value.(*blockNode)
 		block := attachBlocks[i]
-		log.Debugf("ATTACH: Block %s (seal hash %s, height %d) is attaching", n.hash, ethash.SealHash(&block.MsgBlock().Header), n.height)
+		log.Debugf("ATTACH: Block %s (seal hash %s, height %d) is attaching", n.hash, consensus.SealHashFast(&block.MsgBlock().Header), n.height)
 
 		// Load all of the utxos referenced by the block that aren't
 		// already in the view.
@@ -2003,11 +2003,11 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 		if fork.hash.IsEqual(parentHash) {
 			log.Infof("FORK: Block %v (seal hash %v) forks the chain at height %d"+
 				"/block %v, but does not cause a reorganize",
-				node.hash, ethash.SealHash(&block.MsgBlock().Header), fork.height, fork.hash)
+				node.hash, consensus.SealHashFast(&block.MsgBlock().Header), fork.height, fork.hash)
 		} else {
 			log.Infof("EXTEND FORK: Block %v (seal hash %v) extends a side chain "+
 				"which forks the chain at height %d/block %v",
-				node.hash, ethash.SealHash(&block.MsgBlock().Header), fork.height, fork.hash)
+				node.hash, consensus.SealHashFast(&block.MsgBlock().Header), fork.height, fork.hash)
 		}
 
 		return false, nil
@@ -2023,7 +2023,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 	detachNodes, attachNodes := b.getReorganizeNodesAbe(node)
 
 	// Reorganize the chain.
-	log.Infof("REORGANIZE: Block %v (seal hash %v) at height %d is causing a reorganize.", node.hash, ethash.SealHash(&block.MsgBlock().Header), node.height)
+	log.Infof("REORGANIZE: Block %v (seal hash %v) at height %d is causing a reorganize.", node.hash, consensus.SealHashFast(&block.MsgBlock().Header), node.height)
 	// todo_DONE(MLP): reviewed on 2024.01.05
 	err := b.reorganizeChainAbe(detachNodes, attachNodes)
 
