@@ -305,13 +305,13 @@ func (bh *BlockHeader) WriteBlockHeader(w io.Writer, pver uint32) error {
 		err = writeElements(w,
 			bh.Version, &bh.PrevBlock, &bh.MerkleRoot, sec64, bh.Height,
 			bh.Bits, bh.BitsSecond, bh.PowScaleSecond, bh.ConsensusApplied,
-			bh.NonceExt, bh.MixDigest)
+			bh.NonceExt, &bh.MixDigest)
 
 	} else if bh.Version >= int32(BlockVersionEthashPow) {
 		sec32 := uint32(bh.Timestamp.Unix())
 		err = writeElements(w,
 			bh.Version, &bh.PrevBlock, &bh.MerkleRoot, sec32, bh.Bits, bh.Height,
-			bh.NonceExt, bh.MixDigest)
+			bh.NonceExt, &bh.MixDigest)
 
 	} else { // for bh.Version < int32(BlockVersionEthashPow)
 		sec32 := uint32(bh.Timestamp.Unix())
