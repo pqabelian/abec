@@ -169,8 +169,8 @@ func (b *BlockChain) initBlockNode(node *blockNode, blockHeader *wire.BlockHeade
 				}
 			}
 		} else {
-			if blockHeader.Version != int32(BlockVersionInitial) {
-				str := fmt.Sprintf("block has height %d, it should have version %08x, rather than the version %08x", blockHeader.Height, int32(BlockVersionInitial), blockHeader.Version)
+			if blockHeader.Version != int32(wire.BlockVersionInitial) {
+				str := fmt.Sprintf("block has height %d, it should have version %08x, rather than the version %08x", blockHeader.Height, int32(wire.BlockVersionInitial), blockHeader.Version)
 				return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
 			}
 		}

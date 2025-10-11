@@ -1275,8 +1275,8 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 		}
 
 	} else { // blockHeight < b.chainParams.BlockHeightEthashPoW
-		if header.Version != int32(BlockVersionInitial) {
-			str := fmt.Sprintf("block has height %d, it should have version %08x, rather than the version %08x", header.Height, int32(BlockVersionInitial), header.Version)
+		if header.Version != int32(wire.BlockVersionInitial) {
+			str := fmt.Sprintf("block has height %d, it should have version %08x, rather than the version %08x", header.Height, int32(wire.BlockVersionInitial), header.Version)
 			return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
 		}
 	}
