@@ -2,6 +2,8 @@ package syncmgr
 
 import (
 	"container/list"
+	"github.com/abesuite/abec/blockchain/consensus"
+	"github.com/abesuite/abec/blockchain/ruleerror"
 	"math/rand"
 	"net"
 	"sync"
@@ -12,7 +14,6 @@ import (
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/mempool"
 	peerpkg "github.com/abesuite/abec/peer"
@@ -207,7 +208,7 @@ type SyncManager struct {
 	started        int32
 	shutdown       int32
 	chain          *blockchain.BlockChain
-	ethash         *ethash.Ethash // todo: (ethmining)
+	powConsensus   *consensus.PowConsensus
 	txMemPool      *mempool.TxPool
 	chainParams    *chaincfg.Params
 	progressLogger *blockProgressLogger
@@ -1055,13 +1056,13 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 	// handling, etc.
 	//	todo (EthashPoW): 202207
 	// todo_DONE(MLP): reviewed on 2024.01.05
-	_, isOrphan, err := sm.chain.ProcessBlockAbe(bmsg.block, sm.ethash, behaviorFlags)
+	_, isOrphan, err := sm.chain.ProcessBlockAbe(bmsg.block, sm.powConsensus, behaviorFlags)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
 		// it as such.  Otherwise, something really did go wrong, so log
 		// it as an actual error.
-		if _, ok := err.(blockchain.RuleError); ok {
+		if _, ok := err.(ruleerror.RuleError); ok {
 			log.Infof("Rejected block %v from %s: %v", blockHash,
 				peer, err)
 		} else {
@@ -1359,13 +1360,13 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	block := abeutil.NewBlockAbe(&msgBlockAbe)
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
-	_, isOrphan, err := sm.chain.ProcessBlockAbe(block, sm.ethash, behaviorFlags)
+	_, isOrphan, err := sm.chain.ProcessBlockAbe(block, sm.powConsensus, behaviorFlags)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
 		// it as such.  Otherwise, something really did go wrong, so log
 		// it as an actual error.
-		if _, ok := err.(blockchain.RuleError); ok {
+		if _, ok := err.(ruleerror.RuleError); ok {
 			log.Infof("Rejected block %v from %s: %v", blockHash,
 				peer, err)
 		} else {
@@ -2077,7 +2078,7 @@ out:
 
 			case processBlockMsgAbe:
 				//	todo (EthashPoW): 202207
-				_, isOrphan, err := sm.chain.ProcessBlockAbe(msg.block, sm.ethash, msg.flags)
+				_, isOrphan, err := sm.chain.ProcessBlockAbe(msg.block, sm.powConsensus, msg.flags)
 				if err != nil {
 					msg.reply <- processBlockResponse{
 						isOrphan: false,
@@ -2429,13 +2430,13 @@ func (sm *SyncManager) Pause() chan<- struct{} {
 
 // New constructs a new SyncManager. Use Start to begin processing asynchronous
 // block, tx, and inv updates.
-func New(config *Config) (*SyncManager, error) {
+func NewSyncManager(config *Config) (*SyncManager, error) {
 	sm := SyncManager{
 		nodeType:        config.NodeType,
 		peerNotifier:    config.PeerNotifier,
 		chain:           config.Chain,
 		txMemPool:       config.TxMemPool,
-		ethash:          config.Ethash, // todo: (EthashPoW)
+		powConsensus:    config.PowConsensus,
 		chainParams:     config.ChainParams,
 		rejectedTxns:    make(map[chainhash.Hash]struct{}),
 		requestedTxns:   make(map[chainhash.Hash]struct{}),

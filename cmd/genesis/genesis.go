@@ -7,6 +7,7 @@ import (
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
+	"github.com/abesuite/abec/blockchain/consensus/nakamotopowinit"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 	"log"
@@ -154,15 +155,18 @@ func gensis() {
 		Transactions: []*wire.MsgTxAbe{genesisCoinbaseTx},
 		WitnessHashs: []*chainhash.Hash{&genesisWitnessHash},
 	}
+	nakamotoPowInit := nakamotopowinit.NewNakamotoPowInit()
 	now := time.Now()
 	for i := uint32(0); i <= ^uint32(0); i++ {
 		genesisBlock.Header.Nonce = i
 		if i%10000000 == 0 {
 			fmt.Fprintf(f, "current i = %d\n", i)
 		}
-		hash := genesisBlock.Header.BlockHash()
+		// hash := genesisBlock.Header.BlockHash()
 		targetDifficulty := blockchain.CompactToBig(genesisBlock.Header.Bits)
-		if blockchain.HashToBig(&hash).Cmp(targetDifficulty) <= 0 {
+		//if blockchain.HashToBig(&hash).Cmp(targetDifficulty) <= 0 {
+		if nakamotoPowInit.VerifySeal(&genesisBlock.Header, targetDifficulty) == nil {
+			hash := genesisBlock.Header.BlockHash()
 			fmt.Fprintln(f, "Successful!")
 			fmt.Fprintln(f, "genesis block hash:")
 			for i := 0; i < len(hash); i++ {

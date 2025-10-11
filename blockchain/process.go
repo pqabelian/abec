@@ -3,6 +3,7 @@ package blockchain
 import (
 	"fmt"
 	"github.com/abesuite/abec/abeutil"
+	"github.com/abesuite/abec/blockchain/consensus"
 	"github.com/abesuite/abec/blockchain/ruleerror"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/consensus/ethash"
@@ -148,7 +149,7 @@ func (b *BlockChain) processOrphansAbe(hash *chainhash.Hash, flags BehaviorFlags
 //     todo (EthashPoW): 202207
 //
 // todo_DONE(MLP): reviewed on 2024.01.05
-func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.Ethash, flags BehaviorFlags) (bool, bool, error) {
+func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, powConsensus *consensus.PowConsensus, flags BehaviorFlags) (bool, bool, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
 
@@ -184,7 +185,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.
 	// 4. no duplicated transaction
 	// 5. merkle tree root
 	// 6. transaction sanity (input,output,fee,serialized size, ring+sn, aut)
-	err = checkBlockSanityAbe(block, ethashObj, b.chainParams, b.timeSource, flags)
+	err = checkBlockSanityAbe(block, powConsensus, b.chainParams, b.timeSource, flags)
 	if err != nil {
 		return false, false, err
 	}
@@ -236,7 +237,8 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.
 		return false, false, err
 	}
 	if !prevHashExists {
-		log.Infof("Adding orphan block %v (seal hash %v) with parent %v", blockHash, ethash.SealHash(&block.MsgBlock().Header), prevHash)
+		log.Infof("Adding orphan block %v (seal hash %v) with parent %v", blockHash, consensus.SealHashFast(&block.MsgBlock().Header), prevHash)
+
 		b.addOrphanBlock(block)
 
 		return false, true, nil
@@ -260,7 +262,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.
 		return false, false, err
 	}
 
-	log.Debugf("Accepted block %v (seal hash %v), height %v, tx %v", blockHash, ethash.SealHash(&block.MsgBlock().Header), block.Height(), len(block.Transactions()))
+	log.Debugf("Accepted block %v (seal hash %v), height %v, tx %v", blockHash, consensus.SealHashFast(&block.MsgBlock().Header), block.Height(), len(block.Transactions()))
 
 	return isMainChain, false, nil
 }

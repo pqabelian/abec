@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/abesuite/abec/blockchain/consensus"
 	"math"
 	"net"
 	"os"
@@ -26,7 +27,6 @@ import (
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/connmgr"
-	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/mempool"
 	"github.com/abesuite/abec/mempool/rotator"
@@ -210,7 +210,7 @@ type server struct {
 	witnessManager       *witnessmgr.WitnessManager
 	chain                *blockchain.BlockChain
 	txMemPool            *mempool.TxPool
-	ethash               *ethash.Ethash // todo: (ethmining)
+	powConsensus         *consensus.PowConsensus
 	cpuMiner             *cpuminer.CPUMiner
 	externalMiner        *externalminer.ExternalMiner
 	modifyRebroadcastInv chan interface{}
@@ -2672,16 +2672,16 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	}
 	s.txMemPool = mempool.New(&txC)
 	//	todo: (EthashPoW)
-	cfg.EthashConfig.BlockHeightStart = s.chainParams.BlockHeightEthashPoW
-	cfg.EthashConfig.EpochLength = s.chainParams.EthashEpochLength
-	s.ethash = ethash.New(cfg.EthashConfig)
+	cfg.ethashConfig.BlockHeightStart = s.chainParams.BlockHeightEthashPoW
+	cfg.ethashConfig.EpochLength = s.chainParams.EthashEpochLength
+	s.powConsensus = consensus.NewPowConsensus(cfg.ethashConfig)
 
-	s.syncManager, err = syncmgr.New(&syncmgr.Config{
+	s.syncManager, err = syncmgr.NewSyncManager(&syncmgr.Config{
 		NodeType:           cfg.nodeType,
 		PeerNotifier:       &s, // serve
 		Chain:              s.chain,
 		TxMemPool:          s.txMemPool,
-		Ethash:             s.ethash, // todo: (EthashPoW)
+		PowConsensus:       s.powConsensus,
 		ChainParams:        s.chainParams,
 		DisableCheckpoints: cfg.DisableCheckpoints,
 		MaxPeers:           cfg.MaxPeers,
@@ -2739,9 +2739,11 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		}
 	}
 
-	s.cpuMiner = cpuminer.New(&cpuminer.Config{
+	// s.powConsensus --> cpuminer.Config.powConsensus
+	// Note that cpuminer holds cpuminer.Config and can use cfg to access PowConsensus
+	s.cpuMiner = cpuminer.NewCPUMiner(&cpuminer.Config{
 		ChainParams:            chainParams,
-		Ethash:                 s.ethash, // todo: (EthashPoW)
+		PowConsensus:           s.powConsensus,
 		FakePowHeightScope:     s.chain.FakePoWHeightScopes(),
 		BlockTemplateGenerator: blockTemplateGenerator,
 		MiningAddrs:            cfg.miningAddrs,
@@ -2751,9 +2753,11 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		IsCurrent:              s.syncManager.IsCurrent,
 	})
 
-	s.externalMiner = externalminer.New(&externalminer.Config{
+	// s.powConsensus --> externalminer.Config.powConsensus
+	// Note that externalminer holds externalminer.Config and can use cfg to access PowConsensus
+	s.externalMiner = externalminer.NewExternalMiner(&externalminer.Config{
 		ChainParams:            chainParams,
-		Ethash:                 s.ethash,
+		PowConsensus:           s.powConsensus,
 		BlockTemplateGenerator: blockTemplateGenerator,
 		MiningAddrs:            cfg.miningAddrs,
 		ProcessBlock:           s.syncManager.ProcessBlock,
@@ -2860,20 +2864,19 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		}
 
 		s.rpcServer, err = newRPCServer(&rpcserverConfig{
-			Listeners:   rpcListeners,
-			StartupTime: s.startupTime,
-			ConnMgr:     &rpcConnManager{&s},
-			SyncMgr:     &rpcSyncMgr{&s, s.syncManager},
-			TimeSource:  s.timeSource,
-			Chain:       s.chain,
-			ChainParams: chainParams,
-			DB:          db,
-			TxMemPool:   s.txMemPool,
-			// todo: (EthashPoW) 202207
-			Ethash:    s.ethash,
-			Generator: blockTemplateGenerator,
-			CPUMiner:  s.cpuMiner,
-			// todo: 2023.05.11 At this moment, the ExternalMiner here is not used,
+			Listeners:    rpcListeners,
+			StartupTime:  s.startupTime,
+			ConnMgr:      &rpcConnManager{&s},
+			SyncMgr:      &rpcSyncMgr{&s, s.syncManager},
+			TimeSource:   s.timeSource,
+			Chain:        s.chain,
+			ChainParams:  chainParams,
+			DB:           db,
+			TxMemPool:    s.txMemPool,
+			PowConsensus: s.powConsensus,
+			Generator:    blockTemplateGenerator,
+			CPUMiner:     s.cpuMiner,
+			// The ExternalMiner here is not used,
 			// since we use rpcServerGetWork to respond the requests of getwork.
 			ExternalMiner: s.externalMiner,
 			TxIndex:       s.txIndex,
@@ -2900,18 +2903,19 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 			return nil, errors.New("RPCS: No valid listen address for getwork")
 		}
 
+		// s.powConsensus --> rpcserverConfig.powConsensus
+		// Note that rpcServerGetWork holds rpcserverConfig and can use cfg to access PowConsensus
 		s.rpcServerGetWork, err = newRPCServer(&rpcserverConfig{
-			Listeners:   rpcListeners,
-			StartupTime: s.startupTime,
-			ConnMgr:     &rpcConnManager{&s},
-			SyncMgr:     &rpcSyncMgr{&s, s.syncManager},
-			TimeSource:  s.timeSource,
-			Chain:       s.chain,
-			ChainParams: chainParams,
-			DB:          db,
-			TxMemPool:   s.txMemPool,
-			// todo: (EthashPoW) 202207
-			Ethash:        s.ethash,
+			Listeners:     rpcListeners,
+			StartupTime:   s.startupTime,
+			ConnMgr:       &rpcConnManager{&s},
+			SyncMgr:       &rpcSyncMgr{&s, s.syncManager},
+			TimeSource:    s.timeSource,
+			Chain:         s.chain,
+			ChainParams:   chainParams,
+			DB:            db,
+			TxMemPool:     s.txMemPool,
+			PowConsensus:  s.powConsensus,
 			Generator:     blockTemplateGenerator,
 			CPUMiner:      s.cpuMiner,
 			ExternalMiner: s.externalMiner,

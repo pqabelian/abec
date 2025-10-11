@@ -13,10 +13,11 @@ import (
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
+	"github.com/abesuite/abec/blockchain/consensus"
 	"github.com/abesuite/abec/blockchain/indexers"
+	"github.com/abesuite/abec/blockchain/ruleerror"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/mempool"
 	"github.com/abesuite/abec/mining"
@@ -1604,7 +1605,7 @@ func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 		NextHash:    nextHashString,
 		ContentHash: blockHeader.ContentHash().String(),
 		MixDigest:   blockHeader.MixDigest.String(),
-		SealHash:    ethash.SealHash(blockHeader).String(),
+		SealHash:    consensus.SealHashFast(blockHeader).String(),
 	}
 	if blockHeader.Height >= s.cfg.ChainParams.BlockHeightEthashPoW {
 		blockReply.Nonce = blockHeader.NonceExt
@@ -2568,103 +2569,103 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 func chainErrToGBTErrString(err error) string {
 	// When the passed error is not a RuleError, just return a generic
 	// rejected string with the error text.
-	ruleErr, ok := err.(blockchain.RuleError)
+	ruleErr, ok := err.(ruleerror.RuleError)
 	if !ok {
 		return "rejected: " + err.Error()
 	}
 
 	switch ruleErr.ErrorCode {
-	case blockchain.ErrDuplicateBlock:
+	case ruleerror.ErrDuplicateBlock:
 		return "duplicate"
-	case blockchain.ErrBlockTooBig:
+	case ruleerror.ErrBlockTooBig:
 		return "bad-blk-length"
 		//	todo(ABE): ABE does not use weight
-	case blockchain.ErrBlockWeightTooHigh:
+	case ruleerror.ErrBlockWeightTooHigh:
 		return "bad-blk-weight"
-	case blockchain.ErrBlockVersionTooOld:
+	case ruleerror.ErrBlockVersionTooOld:
 		return "bad-version"
-	case blockchain.ErrInvalidTime:
+	case ruleerror.ErrInvalidTime:
 		return "bad-time"
-	case blockchain.ErrTimeTooOld:
+	case ruleerror.ErrTimeTooOld:
 		return "time-too-old"
-	case blockchain.ErrTimeTooNew:
+	case ruleerror.ErrTimeTooNew:
 		return "time-too-new"
-	case blockchain.ErrDifficultyTooLow:
+	case ruleerror.ErrDifficultyTooLow:
 		return "bad-diffbits"
-	case blockchain.ErrUnexpectedDifficulty:
+	case ruleerror.ErrUnexpectedDifficulty:
 		return "bad-diffbits"
-	case blockchain.ErrMismatchedBlockHeightWithPrevNode:
+	case ruleerror.ErrMismatchedBlockHeightWithPrevNode:
 		return "bad-height"
-	case blockchain.ErrMismatchedBlockHeightAndVersion:
+	case ruleerror.ErrMismatchedBlockHeightAndVersion:
 		return "bad-height-version"
-	case blockchain.ErrHighHash:
+	case ruleerror.ErrHighHash:
 		return "high-hash"
-	case blockchain.ErrBadMerkleRoot:
+	case ruleerror.ErrBadMerkleRoot:
 		return "bad-txnmrklroot"
-	case blockchain.ErrBadCheckpoint:
+	case ruleerror.ErrBadCheckpoint:
 		return "bad-checkpoint"
-	case blockchain.ErrForkTooOld:
+	case ruleerror.ErrForkTooOld:
 		return "fork-too-old"
-	case blockchain.ErrCheckpointTimeTooOld:
+	case ruleerror.ErrCheckpointTimeTooOld:
 		return "checkpoint-time-too-old"
-	case blockchain.ErrNoTransactions:
+	case ruleerror.ErrNoTransactions:
 		return "bad-txns-none"
-	case blockchain.ErrNoTxInputs:
+	case ruleerror.ErrNoTxInputs:
 		return "bad-txns-noinputs"
-	case blockchain.ErrNoTxOutputs:
+	case ruleerror.ErrNoTxOutputs:
 		return "bad-txns-nooutputs"
-	case blockchain.ErrTxTooBig:
+	case ruleerror.ErrTxTooBig:
 		return "bad-txns-size"
-	case blockchain.ErrBadTxOutValue:
+	case ruleerror.ErrBadTxOutValue:
 		return "bad-txns-outputvalue"
-	case blockchain.ErrDuplicateTxInputs:
+	case ruleerror.ErrDuplicateTxInputs:
 		return "bad-txns-dupinputs"
-	case blockchain.ErrBadTxInput:
+	case ruleerror.ErrBadTxInput:
 		return "bad-txns-badinput"
-	case blockchain.ErrMissingTxOut:
+	case ruleerror.ErrMissingTxOut:
 		return "bad-txns-missinginput"
-	case blockchain.ErrUnfinalizedTx:
-		return "bad-txns-unfinalizedtx"
-	case blockchain.ErrDuplicateTx:
+	case ruleerror.ErrNilTx:
+		return "bad-txns-nil-tx"
+	case ruleerror.ErrDuplicateTx:
 		return "bad-txns-duplicate"
-	case blockchain.ErrOverwriteTx:
+	case ruleerror.ErrOverwriteTx:
 		return "bad-txns-overwrite"
-	case blockchain.ErrImmatureSpend:
+	case ruleerror.ErrImmatureSpend:
 		return "bad-txns-maturity"
-	case blockchain.ErrSpendTooHigh:
+	case ruleerror.ErrSpendTooHigh:
 		return "bad-txns-highspend"
-	case blockchain.ErrBadFees:
+	case ruleerror.ErrBadFees:
 		return "bad-txns-fees"
 		//	todo(ABE):
-	case blockchain.ErrTooManySigOps:
-		return "high-sigops"
-	case blockchain.ErrFirstTxNotCoinbase:
+	case ruleerror.ErrTooManySerialNumbers:
+		return "too-many-serialnumbers"
+	case ruleerror.ErrFirstTxNotCoinbase:
 		return "bad-txns-nocoinbase"
-	case blockchain.ErrMultipleCoinbases:
+	case ruleerror.ErrMultipleCoinbases:
 		return "bad-txns-multicoinbase"
-	case blockchain.ErrBadCoinbaseScriptLen:
+	case ruleerror.ErrBadCoinbaseBasicRule:
 		return "bad-cb-length"
-	case blockchain.ErrBadCoinbaseValue:
+	case ruleerror.ErrBadCoinbaseValue:
 		return "bad-cb-value"
-	case blockchain.ErrMissingCoinbaseHeight:
+	case ruleerror.ErrMissingCoinbaseHeight:
 		return "bad-cb-height"
-	case blockchain.ErrBadCoinbaseHeight:
+	case ruleerror.ErrBadCoinbaseHeight:
 		return "bad-cb-height"
-	case blockchain.ErrScriptMalformed:
+	case ruleerror.ErrScriptMalformed:
 		return "bad-script-malformed"
-	case blockchain.ErrScriptValidation:
+	case ruleerror.ErrScriptValidation:
 		return "bad-script-validate"
-	case blockchain.ErrUnexpectedWitness:
+	case ruleerror.ErrUnexpectedWitness:
 		return "unexpected-witness"
-	case blockchain.ErrInvalidWitnessCommitment:
+	case ruleerror.ErrInvalidWitnessCommitment:
 		return "bad-witness-nonce-size"
-	case blockchain.ErrWitnessCommitmentMismatch:
+	case ruleerror.ErrWitnessCommitmentMismatch:
 		return "bad-witness-merkle-match"
-	case blockchain.ErrPreviousBlockUnknown:
+	case ruleerror.ErrPreviousBlockUnknown:
 		return "prev-blk-not-found"
-	case blockchain.ErrInvalidAncestorBlock:
+	case ruleerror.ErrInvalidAncestorBlock:
 		return "bad-prevblk"
-	case blockchain.ErrPrevBlockNotBest:
+	case ruleerror.ErrPrevBlockNotBest:
 		return "inconclusive-not-best-prvblk"
 	}
 
@@ -2716,7 +2717,7 @@ func handleGetBlockTemplateProposal(s *rpcServer, request *abejson.TemplateReque
 	}
 
 	if err := s.cfg.Chain.CheckConnectBlockTemplateAbe(block); err != nil {
-		if _, ok := err.(blockchain.RuleError); !ok {
+		if _, ok := err.(ruleerror.RuleError); !ok {
 			errStr := fmt.Sprintf("Failed to process block proposal: %v", err)
 			rpcsLog.Error(errStr)
 			return nil, &abejson.RPCError{
@@ -4692,7 +4693,7 @@ func verifyChain(s *rpcServer, level, depth int32) error {
 		// Level 1 does basic chain sanity checks.
 		if level > 0 {
 			// todo: (EthashPoW) 202207
-			err := blockchain.CheckBlockSanity(block, s.cfg.Ethash,
+			err := blockchain.CheckBlockSanity(block, s.cfg.PowConsensus,
 				s.cfg.ChainParams, s.cfg.TimeSource)
 			if err != nil {
 				rpcsLog.Errorf("Verify is unable to validate "+
@@ -5540,8 +5541,8 @@ type rpcserverConfig struct {
 	// TxMemPool defines the transaction memory pool to interact with.
 	TxMemPool *mempool.TxPool
 
-	// todo: (EthashPow) 202207
-	Ethash *ethash.Ethash
+	// PowConsensus defines the PoW consensus to interact with.
+	PowConsensus *consensus.PowConsensus
 
 	// These fields allow the RPC server to interface with mining.
 	//

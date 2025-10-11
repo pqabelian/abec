@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/abesuite/abec/blockchain/consensus"
 	"github.com/abesuite/abec/blockchain/ruleerror"
 	"math"
 	"math/big"
@@ -17,7 +18,6 @@ import (
 	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/ctaut"
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
@@ -619,7 +619,7 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 //   - BFNoPoWCheck: The check to ensure the block hash is less than the target
 //     difficulty is not performed.
 //     //	todo: (EthashPoW)
-func checkProofOfWork(header *wire.BlockHeader, ethash *ethash.Ethash, powLimit *big.Int, flags BehaviorFlags) error {
+func checkProofOfWork(header *wire.BlockHeader, powConsensus *consensus.PowConsensus, powLimit *big.Int, flags BehaviorFlags) error {
 	// The target difficulty must be larger than zero.
 	target := CompactToBig(header.Bits)
 	if target.Sign() <= 0 {
@@ -635,27 +635,49 @@ func checkProofOfWork(header *wire.BlockHeader, ethash *ethash.Ethash, powLimit 
 		return ruleerror.NewRuleError(ruleerror.ErrUnexpectedDifficulty, str)
 	}
 
+	// todo: Aconcagua review
+	targetSecond := CompactToBig(header.BitsSecond)
+	if header.Version >= wire.BlockVersionAconcagua {
+		// hybridPow enabled
+		// The target difficulty must be larger than zero.
+		if targetSecond.Sign() <= 0 {
+			str := fmt.Sprintf("block target difficulty second of %064x is too low",
+				targetSecond)
+			return ruleerror.NewRuleError(ruleerror.ErrUnexpectedDifficulty, str)
+		}
+
+		// The target difficulty must be less than the maximum allowed.
+		if targetSecond.Cmp(powLimit) > 0 {
+			str := fmt.Sprintf("block target difficulty second of %064x is "+
+				"higher than max of %064x", targetSecond, powLimit)
+			return ruleerror.NewRuleError(ruleerror.ErrUnexpectedDifficulty, str)
+		}
+	} else { // header.Version < wire.BlockVersionAconcagua
+		// targetSecond should not be used, so that it does not need to be checked.
+	}
+
 	// The block hash must be less than the claimed target unless the flag
 	// to avoid proof of work checks is set.
 	if flags&BFNoPoWCheck != BFNoPoWCheck {
-		// The block hash must be less than the claimed target.
-		// todo: (EthashPoW)
-		// It is necessary to use header.Version, rather than the Height as the branch condition.
-		// todo(MLP):
-		if header.Version >= int32(wire.BlockVersionEthashPow) {
-			err := ethash.VerifySeal(header, target)
-			if err != nil {
-				return err
-			}
-		} else {
-			hash := header.BlockHash()
-			hashNum := HashToBig(&hash)
-			if hashNum.Cmp(target) > 0 {
-				str := fmt.Sprintf("block hash of %064x is higher than "+
-					"expected max of %064x", hashNum, target)
-				return ruleerror.NewRuleError(ruleerror.ErrHighHash, str)
-			}
-		}
+		//// The block hash must be less than the claimed target.
+		//// todo: (EthashPoW)
+		//// It is necessary to use header.Version, rather than the Height as the branch condition.
+		//// todo(MLP):
+		//if header.Version >= int32(wire.BlockVersionEthashPow) {
+		//	err := ethash.VerifySeal(header, target)
+		//	if err != nil {
+		//		return err
+		//	}
+		//} else {
+		//	hash := header.BlockHash()
+		//	hashNum := HashToBig(&hash)
+		//	if hashNum.Cmp(target) > 0 {
+		//		str := fmt.Sprintf("block hash of %064x is higher than "+
+		//			"expected max of %064x", hashNum, target)
+		//		return ruleerror.NewRuleError(ruleerror.ErrHighHash, str)
+		//	}
+		//}
+		return powConsensus.VerifySeal(header, target, targetSecond)
 	}
 
 	return nil
@@ -757,13 +779,13 @@ func CountP2SHSigOps(tx *abeutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint)
 // are needed to pass along to checkProofOfWork.
 // todo: (EthashPoW)
 // reviewed on 2024.01.03, by Alice
-func checkBlockHeaderSanity(header *wire.BlockHeader, ethash *ethash.Ethash, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
+func checkBlockHeaderSanity(header *wire.BlockHeader, powConsensus *consensus.PowConsensus, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
 	// Ensure the proof of work bits in the block header is in min/max range
 	// and the block hash is less than the target value described by the
 	// bits.
 	//	todo: (EthashPoW)
 	// todo(MLP): done, reviewed on 2024.01.03, by Alice
-	err := checkProofOfWork(header, ethash, powLimit, flags)
+	err := checkProofOfWork(header, powConsensus, powLimit, flags)
 	if err != nil {
 		return err
 	}
@@ -920,13 +942,13 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 //
 // todo: (EthashPoW)
 // reviewed on 2024.01.03 by Alice
-func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainParams *chaincfg.Params, timeSource MedianTimeSource, flags BehaviorFlags) error {
+func checkBlockSanityAbe(block *abeutil.BlockAbe, powConsensus *consensus.PowConsensus, chainParams *chaincfg.Params, timeSource MedianTimeSource, flags BehaviorFlags) error {
 	powLimit := chainParams.PowLimit
 	msgBlock := block.MsgBlock()
 	header := &msgBlock.Header
 	//	todo: (EthashPoW)
 	// todo_DONE(MLP): reviewed on 2024.01.03, by Alice
-	err := checkBlockHeaderSanity(header, ethash, powLimit, timeSource, flags)
+	err := checkBlockHeaderSanity(header, powConsensus, powLimit, timeSource, flags)
 	if err != nil {
 		return err
 	}
@@ -1058,8 +1080,8 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainPa
 }
 
 // todo: (EthashPoW) 202207
-func CheckBlockSanity(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainParams *chaincfg.Params, timeSource MedianTimeSource) error {
-	return checkBlockSanityAbe(block, ethash, chainParams, timeSource, BFNone)
+func CheckBlockSanity(block *abeutil.BlockAbe, powConsensus *consensus.PowConsensus, chainParams *chaincfg.Params, timeSource MedianTimeSource) error {
+	return checkBlockSanityAbe(block, powConsensus, chainParams, timeSource, BFNone)
 }
 
 // ExtractCoinbaseHeight attempts to extract the height of the block from the
