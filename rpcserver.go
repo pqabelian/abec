@@ -1585,6 +1585,11 @@ func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 
 	params := s.cfg.ChainParams
 	blockHeader := &blk.MsgBlock().Header
+	headerContentHash, err := consensus.HeaderContentHash(blockHeader)
+	if err != nil {
+		context := fmt.Sprintf("error happened when calling HeaderContentHash() on blockTemplate.MsgBlock.Header: %v", err)
+		return nil, internalRPCError(err.Error(), context)
+	}
 	blockReply := abejson.GetBlockAbeVerboseResult{
 		Hash:          c.Hash,
 		Version:       blockHeader.Version,
@@ -1603,7 +1608,7 @@ func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 		Bits:        strconv.FormatInt(int64(blockHeader.Bits), 16),
 		Difficulty:  getDifficultyRatio(blockHeader.Bits, params),
 		NextHash:    nextHashString,
-		ContentHash: blockHeader.ContentHash().String(),
+		ContentHash: headerContentHash.String(),
 		MixDigest:   blockHeader.MixDigest.String(),
 		SealHash:    consensus.SealHashFast(blockHeader).String(),
 	}

@@ -81,7 +81,7 @@ func TestBlkTmplGenerator_NewBlockTemplate_UpdateExtraNonceAbe(t *testing.T) {
 
 	ts := time.Now()
 	reqDifficulty := uint32(0x1d017c38)
-	
+
 	var merkleRoot *chainhash.Hash
 	var siblingHashes []*chainhash.Hash
 
@@ -124,7 +124,22 @@ func TestBlkTmplGenerator_NewBlockTemplate_UpdateExtraNonceAbe(t *testing.T) {
 		SiblingHashes:   siblingHashes, // todo: (EthashPow)
 	}
 
-	fmt.Println("original contentHash:", blkTemplate.BlockAbe.Header.ContentHash())
+	hdrCon, err := blkTemplate.BlockAbe.Header.HeaderContent()
+	if err != nil {
+		fmt.Println(err)
+	}
+	var hdrConHash chainhash.Hash
+	if blkTemplate.BlockAbe.Header.Version >= int32(wire.BlockVersionAconcagua) {
+
+		hdrConHash = chainhash.ChainHash(hdrCon)
+	} else if blkTemplate.BlockAbe.Header.Version >= int32(wire.BlockVersionEthashPow) {
+		hdrConHash = chainhash.ChainHash(hdrCon)
+
+	} else { // for bh.Version < int32(BlockVersionEthashPow)
+		hdrConHash = chainhash.DoubleHashH(hdrCon)
+	}
+
+	fmt.Println("original contentHash:", hdrConHash)
 	fmt.Println("original merkle root:", merkleRoot)
 	fmt.Println("original merkle siblings[0]:", siblingHashes[0])
 	merkleRootComputed := blockchain.ComputeMerkleRootBySiblingHashes(siblingHashes)
@@ -134,7 +149,21 @@ func TestBlkTmplGenerator_NewBlockTemplate_UpdateExtraNonceAbe(t *testing.T) {
 	for extraNonce := uint64(0); extraNonce < 10; extraNonce++ {
 		g.UpdateExtraNonceAbeEthash(blkTemplate, extraNonce)
 		fmt.Println("i:", extraNonce)
-		fmt.Println("i contentHash:", blkTemplate.BlockAbe.Header.ContentHash())
+
+		hdrCon, err = blkTemplate.BlockAbe.Header.HeaderContent()
+		if err != nil {
+			fmt.Println(err)
+		}
+		if blkTemplate.BlockAbe.Header.Version >= int32(wire.BlockVersionAconcagua) {
+			hdrConHash = chainhash.ChainHash(hdrCon)
+		} else if blkTemplate.BlockAbe.Header.Version >= int32(wire.BlockVersionEthashPow) {
+			hdrConHash = chainhash.ChainHash(hdrCon)
+
+		} else { // for bh.Version < int32(BlockVersionEthashPow)
+			hdrConHash = chainhash.DoubleHashH(hdrCon)
+		}
+
+		fmt.Println("i contentHash:", hdrConHash)
 		fmt.Println("i merkle siblings[0]:", siblingHashes[0])
 		merkleRootComputed := blockchain.ComputeMerkleRootBySiblingHashes(siblingHashes)
 		fmt.Println("i merkle root (computed):", merkleRootComputed)

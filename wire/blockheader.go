@@ -412,30 +412,3 @@ func (bh *BlockHeader) Deserialize(serializedBlockHeader []byte) error {
 	return bh.ReadBlockHeader(r, 0)
 
 }
-
-// todo (aconcagua):
-
-// todo: (EthashPoW)
-// ContentHash returns the hash of a block prior to it being sealed.
-// Ignore the error returns since there is no way the
-// encode could fail except being out of memory which would cause a
-// run-time panic.
-func (h *BlockHeader) ContentHash() chainhash.Hash {
-
-	buf := bytes.NewBuffer(make([]byte, 0, blockHeaderContentLen))
-
-	sec := uint32(h.Timestamp.Unix())
-	_ = writeElements(buf, h.Version, &h.PrevBlock, &h.MerkleRoot,
-		sec, h.Bits, h.Height)
-
-	return chainhash.ChainHash(buf.Bytes())
-}
-
-func (h *BlockHeader) ContentHashExcludeTime() chainhash.Hash {
-
-	buf := bytes.NewBuffer(make([]byte, 0, blockHeaderContentLen))
-
-	_ = writeElements(buf, h.Version, &h.PrevBlock, &h.MerkleRoot, h.Bits, h.Height)
-
-	return chainhash.ChainHash(buf.Bytes())
-}

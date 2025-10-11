@@ -28,8 +28,15 @@ func (sharedTemplate *SharedBlockTemplate) Id() string {
 		return sharedTemplate.id
 	}
 
-	contentHashExTime := sharedTemplate.BlockTemplate.BlockAbe.Header.ContentHashExcludeTime()
-	sharedTemplate.id = hex.EncodeToString(contentHashExTime[:])
+	// contentHashExTime := sharedTemplate.BlockTemplate.MsgBlock.Header.ContentHashExcludeTime()
+	hdConExtTime, err := sharedTemplate.BlockTemplate.BlockAbe.Header.HeaderContentExcludeTimestamp()
+	if err != nil {
+		// should not happen
+		return chainhash.InvalidHash.String()
+	}
+	hdConExTimeHash := chainhash.ChainHash(hdConExtTime)
+
+	sharedTemplate.id = hex.EncodeToString(hdConExTimeHash[:])
 
 	return sharedTemplate.id
 }
