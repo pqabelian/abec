@@ -2436,6 +2436,7 @@ func checkMiningAddrValidity(addr []byte) bool {
 	verifyBytes := addr[:len(addr)-32]
 	dstHash0 := addr[len(addr)-32:]
 	dstHash, _ := chainhash.NewHash(dstHash0)
+	// todo: it is fine to use DoubleHashH for checksum, even after Aconcagua upgrade.
 	realHash := chainhash.DoubleHashH(verifyBytes)
 	if !dstHash.IsEqual(&realHash) {
 		return false

@@ -288,7 +288,7 @@ func pqringctxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme
 				return nil, err
 			}
 
-			lgrTxoId := pqringctxLedgerTxoIdGen(ringId, uint8(j))
+			lgrTxoId := pqringctxLedgerTxoIdGen(ringId, uint8(j), abeTxInputDescs[i].txoRing.TxOuts[j].Version)
 
 			lgrTxoList[j] = pqringctxapi.NewLgrTxo(txoMLP, lgrTxoId)
 		}
@@ -526,7 +526,7 @@ func pqringctxTransferTxVerify(pp *pqringctxapi.PublicParameter, transferTx *wir
 			if err != nil {
 				return err
 			}
-			lgrTxoId := pqringctxLedgerTxoIdGen(ringId, uint8(j))
+			lgrTxoId := pqringctxLedgerTxoIdGen(ringId, uint8(j), abeTxInDetails[i].txoList[j].Version)
 			lgrTxoList[j] = pqringctxapi.NewLgrTxo(txoMLP, lgrTxoId)
 		}
 
@@ -577,7 +577,7 @@ func pqringctxTransferTxVerify(pp *pqringctxapi.PublicParameter, transferTx *wir
 // This must keep the same as that in pqringct.ledgerTxoIdGen.
 // reviewed on 2023.12.08
 // reviewed on 2023.12.21
-func pqringctxLedgerTxoIdGen(ringId wire.RingId, index uint8) []byte {
+func pqringctxLedgerTxoIdGen(ringId wire.RingId, index uint8, txoVersion uint32) []byte {
 	w := bytes.NewBuffer(make([]byte, 0, chainhash.HashSize+1))
 	var err error
 	// ringId
@@ -591,6 +591,11 @@ func pqringctxLedgerTxoIdGen(ringId wire.RingId, index uint8) []byte {
 		return nil
 	}
 	// todo: in Aconcagua fork, here need use SHA3-256 while using DoubleHash to have backward compatibility
+	if txoVersion >= wire.TxVersion_Height_450000_Aconcagua {
+		lgrTxoIdHash := chainhash.ChainHash(w.Bytes())
+		return lgrTxoIdHash[:]
+	}
+
 	return chainhash.DoubleHashB(w.Bytes())
 }
 
@@ -894,7 +899,7 @@ func pqringctxTxoCoinSerialNumberGenByRootSeed(pp *pqringctxapi.PublicParameter,
 	}
 	coinAddressType := txoMLP.CoinAddressType()
 
-	txolid := pqringctxLedgerTxoIdGen(ringId, txoIndexInRing)
+	txolid := pqringctxLedgerTxoIdGen(ringId, txoIndexInRing, abeTxo.Version)
 
 	lgrTxo := pqringctxapi.NewLgrTxo(txoMLP, txolid)
 
@@ -965,7 +970,7 @@ func pqringctxTxoCoinSerialNumberGenByRandSeed(pp *pqringctxapi.PublicParameter,
 	}
 	coinAddressType := txoMLP.CoinAddressType()
 
-	txolid := pqringctxLedgerTxoIdGen(ringId, txoIndexInRing)
+	txolid := pqringctxLedgerTxoIdGen(ringId, txoIndexInRing, abeTxo.Version)
 
 	lgrTxo := pqringctxapi.NewLgrTxo(txoMLP, txolid)
 
@@ -1023,7 +1028,7 @@ func pqringctxTxoCoinSerialNumberGenByKey(pp *pqringctxapi.PublicParameter, cryp
 	}
 	coinAddressType := txoMLP.CoinAddressType()
 
-	txolid := pqringctxLedgerTxoIdGen(ringId, txoIndexInRing)
+	txolid := pqringctxLedgerTxoIdGen(ringId, txoIndexInRing, abeTxo.Version)
 
 	lgrTxo := pqringctxapi.NewLgrTxo(txoMLP, txolid)
 

@@ -182,6 +182,13 @@ func (outPointRing *OutPointRing) String() string {
 func (outPointRing *OutPointRing) Hash() chainhash.Hash {
 	buf := bytes.NewBuffer(make([]byte, 0, outPointRing.SerializeSize()))
 	_ = WriteOutPointRing(buf, 0, outPointRing.Version, outPointRing)
+
+	// todo: In Aconcagua upgrade, use SHA3-256 with compatibility
+	// todo: review
+	if outPointRing.Version >= TxVersion_Height_450000_Aconcagua {
+		return chainhash.ChainHash(buf.Bytes())
+	}
+
 	return chainhash.DoubleHashH(buf.Bytes())
 }
 
@@ -498,6 +505,12 @@ func NewTxInAbe(serialNumber []byte, previousOutPointRing *OutPointRing) *TxInAb
 func (txIn *TxInAbe) RingMemberHash() chainhash.Hash {
 	buf := bytes.NewBuffer(make([]byte, 0, txIn.PreviousOutPointRing.SerializeSize()))
 	_ = WriteOutPointRing(buf, 0, txIn.PreviousOutPointRing.Version, &txIn.PreviousOutPointRing)
+
+	// todo: is not used and will be removed
+	if txIn.PreviousOutPointRing.Version >= TxVersion_Height_450000_Aconcagua {
+		return chainhash.ChainHash(buf.Bytes())
+	}
+
 	return chainhash.DoubleHashH(buf.Bytes())
 }
 
@@ -593,6 +606,12 @@ func (msg *MsgTxAbe) TxHash() chainhash.Hash {
 	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSize()))
 	_ = msg.Serialize(buf)
 
+	// In Aconcagua fork, use SHA3-256 with backward compatibility
+	// todo: review
+	if msg.Version >= TxVersion_Height_450000_Aconcagua {
+		return chainhash.ChainHash(buf.Bytes())
+	}
+
 	// todo: (ethhash mining) Shall we use new Hash function
 	//	need to check what is the functionality of TxHash: OutPoint, outpoint is formalized in ring
 	//  TxHash is computed based what block it is contained in?
@@ -603,6 +622,12 @@ func (msg *MsgTxAbe) TxHash() chainhash.Hash {
 func (msg *MsgTxAbe) TxHashFull() chainhash.Hash {
 	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSizeFull()))
 	_ = msg.SerializeFull(buf)
+
+	// In Aconcagua fork, use SHA3-256 with backward compatibility
+	// todo: review
+	if msg.Version >= TxVersion_Height_450000_Aconcagua {
+		return chainhash.ChainHash(buf.Bytes())
+	}
 
 	// todo: (ethhash mining) Shall we use new Hash function
 	return chainhash.DoubleHashH(buf.Bytes())
@@ -618,6 +643,13 @@ func (msg *MsgTxAbe) TxWitnessHash() *chainhash.Hash {
 	// cause a run-time panic.
 	if msg.TxWitness == nil {
 		return nil
+	}
+
+	// In Aconcagua fork, use SHA3-256 with backward compatibility
+	// todo: review
+	if msg.Version >= TxVersion_Height_450000_Aconcagua {
+		witnessHash := chainhash.ChainHash(msg.TxWitness)
+		return &witnessHash
 	}
 
 	witnessHash := chainhash.DoubleHashH(msg.TxWitness)

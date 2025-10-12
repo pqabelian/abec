@@ -60,6 +60,7 @@ func HashMerkleBranches(left *chainhash.Hash, right *chainhash.Hash) *chainhash.
 	copy(hash[:chainhash.HashSize], left[:])
 	copy(hash[chainhash.HashSize:], right[:])
 
+	// todo: To be backward compatible, here still uses DoubleHash, even after Aconcagua upgrade.
 	newHash := chainhash.DoubleHashH(hash[:])
 	return &newHash
 }
@@ -211,6 +212,7 @@ func BuildMerkleTreeStoreAbe(transactions []*abeutil.TxAbe, witness bool) []*cha
 		// todo (ethminming): there is a bug, since for extraNonce update, the tx.txHash has been cached, it is inconsist with the update coinbaseTx.
 		copy(tmp[:chainhash.HashSize], tx.Hash()[:])
 		copy(tmp[chainhash.HashSize:], tx.TxWitnessHash()[:])
+		// todo: To be backward compatible, here still uses DoubleHash, even after Aconcagua upgrade.
 		tHash := chainhash.DoubleHashH(tmp)
 		merkles[i] = &tHash
 	}
@@ -468,6 +470,7 @@ func ValidateWitnessCommitment(blk *abeutil.Block) error {
 	copy(witnessPreimage[:], witnessMerkleRoot[:])
 	copy(witnessPreimage[chainhash.HashSize:], witnessNonce)
 
+	// todo: it is fine to use DoubleHashH here, since it is not used and will be removed
 	computedCommitment := chainhash.DoubleHashB(witnessPreimage[:])
 	if !bytes.Equal(computedCommitment, witnessCommitment) {
 		str := fmt.Sprintf("witness commitment does not match: "+

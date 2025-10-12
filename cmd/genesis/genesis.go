@@ -137,7 +137,8 @@ func gensis() {
 	fmt.Fprintln(f, "Time:")
 	fmt.Fprintf(f, "%#x\n", currentTime.Unix())
 	fmt.Fprintln(f)
-	genesisWitnessHash := chainhash.DoubleHashH(genesisCoinbaseTx.TxWitness)
+	// genesisWitnessHash := chainhash.DoubleHashH(genesisCoinbaseTx.TxWitness)
+	genesisWitnessHash := genesisCoinbaseTx.TxWitnessHash()
 	fmt.Fprintln(f, "coinbase witness hash")
 	for i := 0; i < len(genesisWitnessHash); i++ {
 		fmt.Fprintf(f, "%#2x, ", genesisWitnessHash[i])

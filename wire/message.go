@@ -333,6 +333,7 @@ func WriteMessageWithEncodingN(w io.Writer, msg Message, pver uint32,
 	hdr.magic = btcnet
 	hdr.command = cmd
 	hdr.length = uint32(lenp)
+	// todo: to be backward compatible, here still uses DoubleHash
 	copy(hdr.checksum[:], chainhash.DoubleHashB(payload)[0:4])
 
 	// Encode the header for the message.  This is done to a buffer
@@ -428,6 +429,7 @@ func ReadMessageWithEncodingN(r io.Reader, pver uint32, btcnet AbelianNet,
 	}
 
 	// Test checksum.
+	// todo: to be backward compatible, here still uses DoubleHash
 	checksum := chainhash.DoubleHashB(payload)[0:4]
 	if !bytes.Equal(checksum[:], hdr.checksum[:]) {
 		str := fmt.Sprintf("payload checksum failed - header "+

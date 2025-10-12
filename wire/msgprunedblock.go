@@ -16,8 +16,9 @@ type MsgPrunedBlock struct {
 
 func (msg *MsgPrunedBlock) AddTransactionHash(tx *MsgTxAbe) error {
 	msg.TransactionHashes = append(msg.TransactionHashes, tx.TxHash())
-	witHash := chainhash.DoubleHashH(tx.TxWitness)
-	msg.WitnessHashs = append(msg.WitnessHashs, witHash)
+	//witHash := chainhash.DoubleHashH(tx.TxWitness)
+	witHash := tx.TxWitnessHash()
+	msg.WitnessHashs = append(msg.WitnessHashs, *witHash)
 	return nil
 }
 
@@ -140,7 +141,7 @@ func (msg *MsgPrunedBlock) SerializeSize() int {
 	//	n = blockHeaderLenEthash
 	//}
 	n := msg.Header.SerializeSize()
-	
+
 	n += msg.CoinbaseTx.SerializeSizeFull() + VarIntSerializeSize(uint64(len(msg.TransactionHashes))) + len(msg.TransactionHashes)*32 + len(msg.WitnessHashs)*32
 
 	return n

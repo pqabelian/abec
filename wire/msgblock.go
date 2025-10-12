@@ -87,8 +87,9 @@ func (msg *MsgBlock) AddTransaction(tx *MsgTx) error {
 
 func (msg *MsgBlockAbe) AddTransaction(tx *MsgTxAbe) error {
 	msg.Transactions = append(msg.Transactions, tx)
-	witHash := chainhash.DoubleHashH(tx.TxWitness)
-	msg.WitnessHashs = append(msg.WitnessHashs, &witHash)
+	// witHash := chainhash.DoubleHashH(tx.TxWitness)
+	witHash := tx.TxWitnessHash()
+	msg.WitnessHashs = append(msg.WitnessHashs, witHash)
 	return nil
 }
 

@@ -81,6 +81,7 @@ func BuildTxoRings(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.
 		for outIndex, txOut := range coinBaseTx.MsgTx().TxOuts {
 			txoSortStr[(blockNumPerRingGroup+2)*chainhash.HashSize] = uint8(outIndex)
 
+			// todo: To be backward compatible, here still uses DoubleHashH, even after Aconcagua upgrade. will have a new BuildRing function for Aconcagua.
 			txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
 			ringMemberTxo := NewRingMemberTxo(coinBaseTx.MsgTx().Version, &txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
@@ -93,6 +94,7 @@ func BuildTxoRings(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.
 			for outIndex, txOut := range tx.MsgTx().TxOuts {
 				txoSortStr[(blockNumPerRingGroup+2)*chainhash.HashSize] = uint8(outIndex)
 
+				// todo: To be backward compatible, here still uses DoubleHashH, even after Aconcagua upgrade. will have a new BuildRing function for Aconcagua.
 				txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
 				ringMemberTxo := NewRingMemberTxo(tx.MsgTx().Version, &txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
@@ -1311,6 +1313,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 		for outIndex, txOut := range coinBaseTx.MsgTx().TxOuts {
 			txoSortStr[(blockNum+2)*chainhash.HashSize] = uint8(outIndex)
 
+			// todo: doubleHash, it does matter, since it is not used and will be removed
 			txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
 			ringMemberTxo := NewRingMemberTxo(coinBaseTx.MsgTx().Version, &txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
@@ -1323,6 +1326,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 			for outIndex, txOut := range tx.MsgTx().TxOuts {
 				txoSortStr[(blockNum+2)*chainhash.HashSize] = uint8(outIndex)
 
+				// todo: doubleHash, it does matter, since it is not used and will be removed
 				txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
 				ringMemberTxo := NewRingMemberTxo(tx.MsgTx().Version, &txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)

@@ -170,6 +170,7 @@ func BuildTxoRingsMLP(blockNumPerRingGroup int, txoRingSize int, blocks []*abeut
 			//	(4) outIndex
 			txoSortStr[(blockNumPerRingGroup+2)*chainhash.HashSize] = uint8(outIndex)
 
+			// todo: To be backward compatible, here still uses DoubleHashH, even after Aconcagua upgrade. will have a new BuildRing function for Aconcagua.
 			txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
 			ringMemberTxo := NewRingMemberTxo(txOut.Version, &txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
@@ -225,6 +226,7 @@ func BuildTxoRingsMLP(blockNumPerRingGroup int, txoRingSize int, blocks []*abeut
 				//	(4) outIndex
 				txoSortStr[(blockNumPerRingGroup+2)*chainhash.HashSize] = uint8(outIndex)
 
+				// todo: To be backward compatible, here still uses DoubleHashH, even after Aconcagua upgrade. will have a new BuildRing function for Aconcagua.
 				txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
 				ringMemberTxo := NewRingMemberTxo(txOut.Version, &txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)

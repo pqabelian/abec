@@ -297,7 +297,7 @@ func (namgr *NetAddrManager) getNewBucket(netAddr, srcAddr *wire.NetAddress) int
 	data1 = append(data1, namgr.key[:]...)
 	data1 = append(data1, []byte(GroupKey(netAddr))...)
 	data1 = append(data1, []byte(GroupKey(srcAddr))...)
-	hash1 := chainhash.DoubleHashB(data1)
+	hash1 := chainhash.DoubleHashB(data1) // todo: to be backward compatible, here still uses DoubleHash
 	hash64 := binary.LittleEndian.Uint64(hash1)
 	hash64 %= newBucketsPerGroup
 	var hashbuf [8]byte
@@ -307,7 +307,7 @@ func (namgr *NetAddrManager) getNewBucket(netAddr, srcAddr *wire.NetAddress) int
 	data2 = append(data2, GroupKey(srcAddr)...)
 	data2 = append(data2, hashbuf[:]...)
 
-	hash2 := chainhash.DoubleHashB(data2)
+	hash2 := chainhash.DoubleHashB(data2) // todo: to be backward compatible, here still uses DoubleHash
 	return int(binary.LittleEndian.Uint64(hash2) % newBucketCount)
 }
 
@@ -317,7 +317,7 @@ func (namgr *NetAddrManager) getTriedBucket(netAddr *wire.NetAddress) int {
 	data1 := []byte{}
 	data1 = append(data1, namgr.key[:]...)
 	data1 = append(data1, []byte(NetAddressKey(netAddr))...)
-	hash1 := chainhash.DoubleHashB(data1)
+	hash1 := chainhash.DoubleHashB(data1) // todo: to be backward compatible, here still uses DoubleHash
 	hash64 := binary.LittleEndian.Uint64(hash1)
 	hash64 %= triedBucketsPerGroup
 	var hashbuf [8]byte
@@ -327,7 +327,7 @@ func (namgr *NetAddrManager) getTriedBucket(netAddr *wire.NetAddress) int {
 	data2 = append(data2, GroupKey(netAddr)...)
 	data2 = append(data2, hashbuf[:]...)
 
-	hash2 := chainhash.DoubleHashB(data2)
+	hash2 := chainhash.DoubleHashB(data2) // todo: to be backward compatible, here still uses DoubleHash
 	return int(binary.LittleEndian.Uint64(hash2) % triedBucketCount)
 }
 

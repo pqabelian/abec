@@ -2009,6 +2009,7 @@ func opcodeHash256(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
+	// todo: doubleHash, it does matter, since it is not used and will be removed
 	vm.dstack.PushByteArray(chainhash.DoubleHashB(buf))
 	return nil
 }
