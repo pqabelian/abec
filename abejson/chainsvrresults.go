@@ -756,6 +756,7 @@ type InfoChainResult struct {
 	Blocks               int32   `json:"blocks"`
 	BestBlockHash        string  `json:"bestblockhash"`
 	WorkSum              string  `json:"worksum"`
+	WorkSumSecondScaled  string  `json:"worksumsecondscaled"` // added for Aconcagua upgrade
 	TimeOffset           int64   `json:"timeoffset"`
 	Connections          int32   `json:"connections"`
 	Proxy                string  `json:"proxy"`

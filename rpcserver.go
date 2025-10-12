@@ -3108,6 +3108,7 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		Blocks:               best.Height,
 		BestBlockHash:        best.Hash.String(),
 		WorkSum:              s.cfg.Chain.BestChainWorkSum().String(),
+		WorkSumSecondScaled:  s.cfg.Chain.BestChainWorkSumSecondScaled().String(), //	added for Aconcagua upgrade
 		TimeOffset:           int64(s.cfg.TimeSource.Offset().Seconds()),
 		Connections:          s.cfg.ConnMgr.ConnectedCount(),
 		Proxy:                cfg.Proxy,

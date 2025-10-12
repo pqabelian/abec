@@ -752,7 +752,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *abeutil.Block,
 	// Atomically insert info into the database.
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
-		err := dbPutBestState(dbTx, state, node.workSum)
+		err := dbPutBestState(dbTx, state, node.workSum, node.workSumSecondScaled)
 		if err != nil {
 			return err
 		}
@@ -902,7 +902,7 @@ func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 	// Atomically insert info into the database.
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
-		err := dbPutBestState(dbTx, state, node.workSum)
+		err := dbPutBestState(dbTx, state, node.workSum, node.workSumSecondScaled)
 		if err != nil {
 			return err
 		}
@@ -1031,7 +1031,7 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *abeutil.Block, view
 
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
-		err := dbPutBestState(dbTx, state, node.workSum)
+		err := dbPutBestState(dbTx, state, node.workSum, node.workSumSecondScaled)
 		if err != nil {
 			return err
 		}
@@ -1155,7 +1155,7 @@ func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe
 
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
-		err := dbPutBestState(dbTx, state, node.workSum)
+		err := dbPutBestState(dbTx, state, node.workSum, node.workSumSecondScaled)
 		if err != nil {
 			return err
 		}
@@ -2092,6 +2092,14 @@ func (b *BlockChain) BestSnapshot() *BestState {
 func (b *BlockChain) BestChainWorkSum() *big.Int {
 	bestNode := b.bestChain.Tip()
 	return bestNode.workSum
+}
+
+// BestChainWorkSumSecondScaled
+// added for Aconcagua
+// todo: review
+func (b *BlockChain) BestChainWorkSumSecondScaled() *big.Int {
+	bestNode := b.bestChain.Tip()
+	return bestNode.workSumSecondScaled
 }
 
 // HeaderByHash returns the block header identified by the given hash or an
