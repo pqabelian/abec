@@ -154,7 +154,7 @@ func gensis() {
 			Nonce:      0,
 		},
 		Transactions: []*wire.MsgTxAbe{genesisCoinbaseTx},
-		WitnessHashs: []*chainhash.Hash{&genesisWitnessHash},
+		WitnessHashs: []*chainhash.Hash{genesisWitnessHash},
 	}
 	nakamotoPowInit := nakamotopowinit.NewNakamotoPowInit()
 	now := time.Now()

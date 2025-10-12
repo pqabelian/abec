@@ -1997,7 +1997,23 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 
 	// We're extending (or creating) a side chain, but the cumulative
 	// work for this new side chain is not enough to make it the new chain.
-	if node.workSum.Cmp(b.bestChain.Tip().workSum) <= 0 {
+	// todo: Aconcagua review
+	nodeTotalWorkSum := big.NewInt(0)
+	tipTotalWorkSum := big.NewInt(0)
+	if node.height >= b.chainParams.BlockHeightAconcagua {
+		nodeTotalWorkSum = nodeTotalWorkSum.Add(node.workSum, node.workSumSecondScaled)
+	} else {
+		nodeTotalWorkSum = node.workSum
+	}
+
+	if b.bestChain.Tip().height >= b.chainParams.BlockHeightAconcagua {
+		tipTotalWorkSum = tipTotalWorkSum.Add(b.bestChain.Tip().workSum, b.bestChain.Tip().workSumSecondScaled)
+	} else {
+		tipTotalWorkSum = b.bestChain.Tip().workSum
+	}
+
+	// if node.workSum.Cmp(b.bestChain.Tip().workSum) <= 0 {
+	if nodeTotalWorkSum.Cmp(tipTotalWorkSum) <= 0 {
 		// Log information about how the block is forking the chain.
 		fork := b.bestChain.FindFork(node)
 		if fork.hash.IsEqual(parentHash) {
@@ -2679,9 +2695,9 @@ func New(config *Config) (*BlockChain, error) {
 	}
 
 	bestNode := b.bestChain.Tip()
-	log.Infof("Chain state (height %d, hash %v, totaltx %d, work %v)",
+	log.Infof("Chain state (height %d, hash %v, totaltx %d, work sum %v, work sum (by second PoW) %v)",
 		bestNode.height, bestNode.hash, b.stateSnapshot.TotalTxns,
-		bestNode.workSum)
+		bestNode.workSum, bestNode.workSumSecondScaled)
 
 	return &b, nil
 }
