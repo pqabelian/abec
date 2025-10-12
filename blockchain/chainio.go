@@ -2224,11 +2224,11 @@ func dbFetchHashByHeight(dbTx database.Tx, height int32) (*chainhash.Hash, error
 // -----------------------------------------------------------------------------
 // The best chain state consists of the best block hash and height, the total
 // number of transactions up to and including those in the best block, and the
-// accumulated work sum up to and including the best block.
+// accumulated work sum and work sumSecondScaled up to and including the best block.
 //
 // The serialized format is:
 //
-//   <block hash><block height><total txns><work sum length><work sum>
+//   <block hash><block height><total txns><work sum length><work sum><workSumSecondScaled length><workSumSecondScaled>
 //
 //   Field             Type             Size
 //   block hash        chainhash.Hash   chainhash.HashSize
@@ -2236,36 +2236,58 @@ func dbFetchHashByHeight(dbTx database.Tx, height int32) (*chainhash.Hash, error
 //   total txns        uint64           8 bytes
 //   work sum length   uint32           4 bytes
 //   work sum          big.Int          work sum length
+//   workSumSecondScaled length   uint32           4 bytes
+//   workSumSecondScaled          big.Int          workSumSecondScaled length
 // -----------------------------------------------------------------------------
 
 // bestChainState represents the data to be stored the database for the current
 // best chain state.
 type bestChainState struct {
-	hash      chainhash.Hash
-	height    uint32
-	totalTxns uint64
-	workSum   *big.Int
+	hash                chainhash.Hash
+	height              uint32
+	totalTxns           uint64
+	workSum             *big.Int
+	workSumSecondScaled *big.Int // for Aconcagua upgrade
 }
 
 // serializeBestChainState returns the serialization of the passed block best
 // chain state.  This is data to be stored in the chain state bucket.
+// todo: Aconcagua Review
 func serializeBestChainState(state bestChainState) []byte {
 	// Calculate the full size needed to serialize the chain state.
 	workSumBytes := state.workSum.Bytes()
 	workSumBytesLen := uint32(len(workSumBytes))
-	serializedLen := chainhash.HashSize + 4 + 8 + 4 + workSumBytesLen
+
+	workSumSecondScaledBytes := state.workSumSecondScaled.Bytes()
+	workSumSecondScaledBytesLen := uint32(len(workSumSecondScaledBytes))
+
+	// serializedLen := chainhash.HashSize + 4 + 8 + 4 + workSumBytesLen
+	serializedLen := chainhash.HashSize + 4 + 8 + 4 + workSumBytesLen + 4 + workSumSecondScaledBytesLen
 
 	// Serialize the chain state.
 	serializedData := make([]byte, serializedLen)
+
 	copy(serializedData[0:chainhash.HashSize], state.hash[:])
 	offset := uint32(chainhash.HashSize)
+
 	byteOrder.PutUint32(serializedData[offset:], state.height)
 	offset += 4
+
 	byteOrder.PutUint64(serializedData[offset:], state.totalTxns)
 	offset += 8
+
 	byteOrder.PutUint32(serializedData[offset:], workSumBytesLen)
 	offset += 4
+
 	copy(serializedData[offset:], workSumBytes)
+	offset += workSumBytesLen
+
+	byteOrder.PutUint32(serializedData[offset:], workSumSecondScaledBytesLen)
+	offset += 4
+
+	copy(serializedData[offset:], workSumSecondScaledBytes)
+	offset += workSumSecondScaledBytesLen
+
 	return serializedData[:]
 }
 
@@ -2273,6 +2295,7 @@ func serializeBestChainState(state bestChainState) []byte {
 // state.  This is data stored in the chain state bucket and is updated after
 // every block is connected or disconnected form the main chain.
 // block.
+// todo: Aconcagua Review
 func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
 	// Ensure the serialized data has enough bytes to properly deserialize
 	// the hash, height, total transactions, and work sum length.
@@ -2286,15 +2309,17 @@ func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
 	state := bestChainState{}
 	copy(state.hash[:], serializedData[0:chainhash.HashSize])
 	offset := uint32(chainhash.HashSize)
+
 	state.height = byteOrder.Uint32(serializedData[offset : offset+4])
 	offset += 4
+
 	state.totalTxns = byteOrder.Uint64(serializedData[offset : offset+8])
 	offset += 8
+
 	workSumBytesLen := byteOrder.Uint32(serializedData[offset : offset+4])
 	offset += 4
 
-	// Ensure the serialized data has enough bytes to deserialize the work
-	// sum.
+	// Ensure the serialized data has enough bytes to deserialize the work sum.
 	if uint32(len(serializedData[offset:])) < workSumBytesLen {
 		return bestChainState{}, database.Error{
 			ErrorCode:   database.ErrCorruption,
@@ -2304,18 +2329,64 @@ func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
 	workSumBytes := serializedData[offset : offset+workSumBytesLen]
 	state.workSum = new(big.Int).SetBytes(workSumBytes)
 
+	offsetEnd := offset + workSumBytesLen
+
+	// for Aconcagua upgrade
+	if offsetEnd < offset {
+		// overflow: workSumBytes is for BigInt.bytes, such an overflow should not happen.
+		// the work for each block is at most 2^256, needing at most 32 bytes to denote.
+		// based on complexity theory, we can assume that the work for each block is at most 2^128, needing at most 16 bytes to store.
+		// block height is defined as int32, this means the workSum is at most 20 bytes.
+		return bestChainState{}, database.Error{
+			ErrorCode:   database.ErrCorruption,
+			Description: "corrupt best chain state",
+		}
+	}
+
+	offset = offsetEnd
+
+	if offset == uint32(len(serializedData)) {
+		// This is a state stored before Aconcagua upgrade
+		return state, nil
+	}
+
+	// Aconcagua-fork stores the workSumSecondScaled,
+	// even the state is a node with height < BlockHeightAconcagua (where the workSumSecondScaled = 0)
+	if uint32(len(serializedData)) < offset+4 {
+		return bestChainState{}, database.Error{
+			ErrorCode:   database.ErrCorruption,
+			Description: "corrupt best chain state",
+		}
+	}
+
+	workSumSecondScaledBytesLen := byteOrder.Uint32(serializedData[offset : offset+4])
+	offset += 4
+
+	// Ensure the serialized data has enough bytes to deserialize the workSumSecondScaled.
+	if uint32(len(serializedData[offset:])) < workSumSecondScaledBytesLen {
+		return bestChainState{}, database.Error{
+			ErrorCode:   database.ErrCorruption,
+			Description: "corrupt best chain state",
+		}
+	}
+	workSumSecondScaledBytes := serializedData[offset : offset+workSumSecondScaledBytesLen]
+	// offset += workSumSecondScaledBytesLen
+	state.workSumSecondScaled = new(big.Int).SetBytes(workSumSecondScaledBytes)
+
 	return state, nil
 }
 
 // dbPutBestState uses an existing database transaction to update the best chain
 // state with the given parameters.
-func dbPutBestState(dbTx database.Tx, snapshot *BestState, workSum *big.Int) error {
+// todo: Aconcagua review
+func dbPutBestState(dbTx database.Tx, snapshot *BestState, workSum *big.Int, workSumSecondScaled *big.Int) error {
 	// Serialize the current best chain state.
 	serializedData := serializeBestChainState(bestChainState{
-		hash:      snapshot.Hash,
-		height:    uint32(snapshot.Height),
-		totalTxns: snapshot.TotalTxns,
-		workSum:   workSum,
+		hash:                snapshot.Hash,
+		height:              uint32(snapshot.Height),
+		totalTxns:           snapshot.TotalTxns,
+		workSum:             workSum,
+		workSumSecondScaled: workSumSecondScaled,
 	})
 
 	// Store the current best chain state into the database.
@@ -2508,7 +2579,7 @@ func (b *BlockChain) createChainState() error {
 		}
 
 		// Store the current best chain state into the database.
-		err = dbPutBestState(dbTx, b.stateSnapshot, node.workSum)
+		err = dbPutBestState(dbTx, b.stateSnapshot, node.workSum, node.workSumSecondScaled)
 		if err != nil {
 			return err
 		}
@@ -2690,9 +2761,7 @@ func (b *BlockChain) initChainState() error {
 
 			// Initialize the block node for the block, connect it,
 			// and add it to the block index.
-			node := new(blockNode)
-			//	todo: (EthashPoW)
-			err = b.initBlockNode(node, header, parent)
+			node, err := b.newBlockNode(header, parent)
 			if err != nil {
 				return err
 			}

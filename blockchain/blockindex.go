@@ -66,7 +66,7 @@ func (status blockStatus) KnownInvalid() bool {
 	return status&(statusValidateFailed|statusInvalidAncestor) != 0
 }
 
-// blockNode represents a block within the block chain and is primarily used to
+// blockNode represents a block within the blockchain and is primarily used to
 // aid in selecting the best chain to be the main chain.  The main chain is
 // stored into the block database.
 type blockNode struct {
@@ -80,31 +80,47 @@ type blockNode struct {
 	// parent is the parent block for this node.
 	parent *blockNode
 
-	//	todo: (EthashPoW)
 	// hash is the double sha 256 of the block for BlockVersionInitial,
-	//	while beging chainhash.ChainHash (actually SHA3-256) for the block.
+	// while being chainhash.ChainHash (actually SHA3-256) for the block.
 	hash chainhash.Hash
 
-	// workSum is the total amount of work in the chain up to and including
-	// this node.
+	// workSum is the total amount of PoW1-work in the chain up to and including this node.
 	workSum *big.Int
 
-	// height is the position in the block chain.
-	height int32
+	// workSumSecond is the total amount of PoW2-work in the chain up to and including this node.
+	//
+	// For each block, the workSecond is computed from its bitsSecond by CalcWork(), then
+	// the workSumSecond of the corresponding node is obtained by (lastNode.workSumSecond + thisBlock.workSecond).
+	//
+	// workSumSecond will be used to compute bitsSecond for future blocks.
+	workSumSecond *big.Int // for Aconcagua upgrade
+
+	// workSumSecondScaled is the total amount of PoW2-work scale to Pow1-work in the chain up to and including this node.
+	//
+	// For each block, the workSecond is computed from its bitsSecond by CalcWork(), then
+	// the workSumSecondScaled of the corresponding node is obtained by
+	// (lastNode.workSumSecondScaled + thisBlock.workSecond * thisBlock.powScaleSecond).
+	//
+	// workSumSecondScaled will be used to compute to the chainTotalWorkSum of chain and
+	// then determine the chain with most PoW, where chainTotalWorkSum = latestNode.workSum + latestNode.workSumSecondScaled.
+	workSumSecondScaled *big.Int // for Aconcagua upgrade
 
 	// Some fields from block headers to aid in best chain selection and
 	// reconstructing headers from memory.  These must be treated as
 	// immutable and are intentionally ordered to avoid padding on 64-bit
 	// platforms.
-	version    int32
-	bits       uint32
-	nonce      uint32
-	timestamp  int64
-	merkleRoot chainhash.Hash
 
-	// todo: (EthashPoW) 202207
-	nonceExt  uint64
-	mixDigest chainhash.Hash
+	version          int32
+	height           int32
+	merkleRoot       chainhash.Hash
+	timestamp        int64
+	bits             uint32
+	bitsSecond       uint32 // for Aconcagua upgrade
+	powScaleSecond   uint32 // for Aconcagua upgrade
+	nonce            uint32
+	nonceExt         uint64
+	mixDigest        chainhash.Hash
+	consensusApplied wire.ConsensusProtocol // for Aconcagua upgrade
 
 	// status is a bit field representing the validation state of the block. The
 	// status field, unlike the other fields, may be written to and so should
@@ -113,84 +129,150 @@ type blockNode struct {
 	status blockStatus
 }
 
-// initBlockNode initializes a block node from the given header and parent node,
+// newBlockNode returns a new block node for the given block header and parent node,
 // calculating the height and workSum from the respective fields on the parent.
-// This function is NOT safe for concurrent access.  It must only be called when
-// initially creating a node.
-func (b *BlockChain) initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *blockNode) error {
-	*node = blockNode{
-		hash:       blockHeader.BlockHash(),
-		workSum:    CalcWork(blockHeader.Bits),
-		version:    blockHeader.Version,
-		bits:       blockHeader.Bits,
-		nonce:      blockHeader.Nonce,
-		timestamp:  blockHeader.Timestamp.Unix(),
-		merkleRoot: blockHeader.MerkleRoot,
-		// todo: (EthashPow) 202207
-		height:    blockHeader.Height,
-		nonceExt:  blockHeader.NonceExt,
-		mixDigest: blockHeader.MixDigest,
-	}
-	if parent != nil {
-		node.parent = parent
-		node.height = parent.height + 1
-		node.workSum = node.workSum.Add(parent.workSum, node.workSum)
-		// todo: (EthashPow) 202207
-		if node.height >= b.chainParams.BlockHeightEthashPoW {
-			//	Since BlockHeightEthashPoW, blockHeader contains Height.
-			if blockHeader.Height != node.height {
-				errStr := fmt.Sprintf("Block %v has height %d, while its parent has height %d", node.hash, blockHeader.Height, parent.height)
-				return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightWithPrevNode, errStr)
-			}
+// This function is NOT safe for concurrent access.
+// todo: Aconcagua review
+func (b *BlockChain) newBlockNode(blockHeader *wire.BlockHeader, parent *blockNode) (*blockNode, error) {
+	//var node blockNode
+	//err := b.initBlockNode(&node, blockHeader, parent)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//return &node, nil
 
-			// Added by Alice, 2024.05.11, for DSA
-			// todo(DSA): review
-			//	todo: when more versions appear, we need to refactor here.
-			if blockHeader.Height >= b.chainParams.BlockHeightAconcagua {
-				if blockHeader.Version != int32(wire.BlockVersionAconcagua) {
-					str := fmt.Sprintf("block has height %d, it should have version %08x for Aconcagua upgrade, rather than version %08x",
-						blockHeader.Height, int32(wire.BlockVersionAconcagua), blockHeader.Version)
-					return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
-				}
-			} else if blockHeader.Height >= b.chainParams.BlockHeightMLPAUT {
-				if blockHeader.Version != int32(wire.BlockVersionMLPAUT) {
-					str := fmt.Sprintf("block has height %d, it should have version %08x for MLPAUT, rather than version %08x", blockHeader.Height, int32(wire.BlockVersionMLPAUT), blockHeader.Version)
-					return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
-				}
-			} else if blockHeader.Height >= b.chainParams.BlockHeightDSA {
-				if blockHeader.Version != int32(wire.BlockVersionDSA) {
-					str := fmt.Sprintf("block has height %d, it should have version %08x for DSA, rather than version %08x", blockHeader.Height, int32(wire.BlockVersionDSA), blockHeader.Version)
-					return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
-				}
-			} else {
-				if blockHeader.Version != int32(wire.BlockVersionEthashPow) {
-					str := fmt.Sprintf("block has height %d, it should have version %08x for EthashPoW, rather than the version %08x", blockHeader.Height, int32(wire.BlockVersionEthashPow), blockHeader.Version)
-					return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
-				}
-			}
-		} else {
-			if blockHeader.Version != int32(wire.BlockVersionInitial) {
-				str := fmt.Sprintf("block has height %d, it should have version %08x, rather than the version %08x", blockHeader.Height, int32(wire.BlockVersionInitial), blockHeader.Version)
-				return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
-			}
+	node := &blockNode{
+		hash:             blockHeader.BlockHash(),
+		version:          blockHeader.Version,
+		merkleRoot:       blockHeader.MerkleRoot,
+		timestamp:        blockHeader.Timestamp.Unix(),
+		height:           blockHeader.Height, // Note that before BlockHeightEthashPoW, blockHeader does not have Height.
+		bits:             blockHeader.Bits,
+		bitsSecond:       blockHeader.BitsSecond,       // Note that before BlockHeightAconcagua, blockHeader does not have BitsSecond.
+		powScaleSecond:   blockHeader.PowScaleSecond,   // Note that before BlockHeightAconcagua, blockHeader does not have PowScaleSecond.
+		consensusApplied: blockHeader.ConsensusApplied, // Note that before BlockHeightAconcagua, blockHeader does not have consensusApplied.
+		nonce:            blockHeader.Nonce,            // Note that after BlockHeightEthashPoW, blockHeader does not have Nonce.
+		nonceExt:         blockHeader.NonceExt,         // Note that before BlockHeightEthashPoW, blockHeader does not have NonceExt.
+		mixDigest:        blockHeader.MixDigest,        // Note that before BlockHeightEthashPoW, blockHeader does not have MixDigest.
+	}
+
+	if parent == nil {
+		// genesis block node
+		node.parent = nil
+		node.height = 0 // here explicitly set node.height to 0
+
+		// set the three workSums
+		node.workSum = CalcWork(blockHeader.Bits)
+
+		// for genesis block, the following two workSum make no sense and are set to 0
+		node.workSumSecond = big.NewInt(0)
+		node.workSumSecondScaled = big.NewInt(0)
+
+		return node, nil
+	}
+
+	// below handles the case of parent != nil
+
+	// set height first, since the meanings of the fields depend on the height
+	node.parent = parent
+	node.height = parent.height + 1
+
+	// check the match between block height and block version
+	if node.height >= b.chainParams.BlockHeightEthashPoW {
+		//	Since BlockHeightEthashPoW, blockHeader contains Height.
+		if blockHeader.Height != node.height {
+			errStr := fmt.Sprintf("Block %v has height %d, while its parent has height %d",
+				node.hash, blockHeader.Height, parent.height)
+			return nil, ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightWithPrevNode, errStr)
 		}
 	}
 
-	return nil
-}
-
-// newBlockNode returns a new block node for the given block header and parent
-// node, calculating the height and workSum from the respective fields on the
-// parent. This function is NOT safe for concurrent access.
-//
-//	todo: (EthashPoW)
-func (b *BlockChain) newBlockNode(blockHeader *wire.BlockHeader, parent *blockNode) (*blockNode, error) {
-	var node blockNode
-	err := b.initBlockNode(&node, blockHeader, parent)
-	if err != nil {
-		return nil, err
+	// Now node.height is correct
+	//	todo: when more versions appear, we need to refactor here.
+	if node.height >= b.chainParams.BlockHeightAconcagua {
+		if blockHeader.Version != int32(wire.BlockVersionAconcagua) {
+			str := fmt.Sprintf("block has height %d, it should have version %08x for Aconcagua upgrade, rather than version %08x",
+				blockHeader.Height, int32(wire.BlockVersionAconcagua), blockHeader.Version)
+			return nil, ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
+		}
+	} else if node.height >= b.chainParams.BlockHeightMLPAUT {
+		if blockHeader.Version != int32(wire.BlockVersionMLPAUT) {
+			str := fmt.Sprintf("block has height %d, it should have version %08x for MLPAUT, rather than version %08x",
+				blockHeader.Height, int32(wire.BlockVersionMLPAUT), blockHeader.Version)
+			return nil, ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
+		}
+	} else if node.height >= b.chainParams.BlockHeightDSA {
+		if blockHeader.Version != int32(wire.BlockVersionDSA) {
+			str := fmt.Sprintf("block has height %d, it should have version %08x for DSA, rather than version %08x",
+				blockHeader.Height, int32(wire.BlockVersionDSA), blockHeader.Version)
+			return nil, ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
+		}
+	} else if node.height >= b.chainParams.BlockHeightEthashPoW {
+		if blockHeader.Version != int32(wire.BlockVersionEthashPow) {
+			str := fmt.Sprintf("block has height %d, it should have version %08x for EthashPoW, rather than the version %08x",
+				blockHeader.Height, int32(wire.BlockVersionEthashPow), blockHeader.Version)
+			return nil, ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
+		}
+	} else { // node.height < b.chainParams.BlockHeightEthashPoW
+		if blockHeader.Version != int32(wire.BlockVersionInitial) {
+			str := fmt.Sprintf("block has height %d, it should have version %08x, rather than the version %08x",
+				blockHeader.Height, int32(wire.BlockVersionInitial), blockHeader.Version)
+			return nil, ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
+		}
 	}
-	return &node, nil
+
+	// set the workSums
+	if node.height >= b.chainParams.BlockHeightAconcagua {
+		// hybridPoW
+
+		// compute node's workSum
+		switch blockHeader.ConsensusApplied {
+		case wire.ConsensusNakamotoPow:
+			work := CalcWork(blockHeader.Bits)
+			node.workSum = new(big.Int).Add(parent.workSum, work)
+
+			//node.workSumSecond keep unchanged
+			// make a copy to avoid unconscious change
+			node.workSumSecond = new(big.Int).SetBytes(parent.workSumSecond.Bytes())
+
+			node.workSumSecondScaled = new(big.Int).SetBytes(parent.workSumSecondScaled.Bytes())
+
+		case wire.ConsensusEthashPow:
+			// node.workSum keep unchanged
+			// make a copy to avoid unconscious change
+			node.workSum = new(big.Int).SetBytes(parent.workSum.Bytes())
+
+			workSecond := CalcWork(blockHeader.BitsSecond)
+			node.workSumSecond = new(big.Int).Add(parent.workSumSecond, workSecond)
+
+			powScaleSecond := big.NewInt(int64(blockHeader.PowScaleSecond))
+			workSecondScaled := new(big.Int).Mul(powScaleSecond, workSecond)
+			node.workSumSecondScaled = new(big.Int).Add(parent.workSumSecondScaled, workSecondScaled)
+
+		default:
+			return nil, fmt.Errorf("newBlockNode: the input blockHeader has an unknown consensusApplied: %v",
+				blockHeader.ConsensusApplied)
+		}
+
+	} else { // for block height <= b.chainParams.BlockHeightAconcagua-1
+		// soloPow
+
+		// compute the node's workSum
+		work := CalcWork(blockHeader.Bits)
+		node.workSum = new(big.Int).Add(parent.workSum, work)
+
+		// set the node's workSumSecond to be 0
+		// THIS IS VERY IMPORTANT!
+		// THIS IS VERY IMPORTANT!
+		// THIS IS VERY IMPORTANT!
+		// since the workSumSecond and workSumSecondScaled at node.height == b.chainParams.BlockHeightAconcagua-1 will
+		// be the start of Aconcagua fork's hybridPow
+		node.workSumSecond = big.NewInt(0)
+		node.workSumSecondScaled = big.NewInt(0)
+		// End of IMPORTANT notice.
+	}
+
+	return node, nil
 }
 
 // Header constructs a block header from the node and returns it.
@@ -203,23 +285,23 @@ func (node *blockNode) Header() wire.BlockHeader {
 		prevHash = &node.parent.hash
 	}
 	return wire.BlockHeader{
-		Version:    node.version,
-		PrevBlock:  *prevHash,
-		MerkleRoot: node.merkleRoot,
-		Timestamp:  time.Unix(node.timestamp, 0),
-		Bits:       node.bits,
-		Nonce:      node.nonce,
-		// todo: (ethmining) 202207
-		NonceExt:  node.nonceExt,
-		MixDigest: node.mixDigest,
-		Height:    node.height,
+		Version:          node.version,
+		PrevBlock:        *prevHash,
+		MerkleRoot:       node.merkleRoot,
+		Timestamp:        time.Unix(node.timestamp, 0),
+		Height:           node.height,
+		Bits:             node.bits,
+		BitsSecond:       node.bitsSecond,
+		PowScaleSecond:   node.powScaleSecond,
+		ConsensusApplied: node.consensusApplied,
+		Nonce:            node.nonce,
+		NonceExt:         node.nonceExt,
+		MixDigest:        node.mixDigest,
 	}
 }
 
-// Ancestor returns the ancestor block node at the provided height by following
-// the chain backwards from this node.  The returned block will be nil when a
-// height is requested that is after the height of the passed node or is less
-// than zero.
+// Ancestor returns the ancestor block node at the provided height by following the chain backwards from this node.
+// The returned block will be nil when a height is requested that is after the height of the passed node or is less than zero.
 //
 // This function is safe for concurrent access.
 func (node *blockNode) Ancestor(height int32) *blockNode {
@@ -230,6 +312,7 @@ func (node *blockNode) Ancestor(height int32) *blockNode {
 	n := node
 	for ; n != nil && n.height != height; n = n.parent {
 		// Intentionally left blank
+		// note that it will stop when n.height == height
 	}
 
 	return n
@@ -248,6 +331,8 @@ func (node *blockNode) RelativeAncestor(distance int32) *blockNode {
 // prior to, and including, the block node.
 //
 // This function is safe for concurrent access.
+// todo: fix the bug but need to be carefully, since checkBlockHeaderContextAbe checks this time.
+// before fix it, make sure the existing data does not become invalid.
 func (node *blockNode) CalcPastMedianTime() time.Time {
 	// Create a slice of the previous few block timestamps used to calculate
 	// the median per the number defined by the constant medianTimeBlocks.
@@ -312,7 +397,7 @@ func newBlockIndex(db database.DB, chainParams *chaincfg.Params) *blockIndex {
 	}
 }
 
-// HaveBlock returns whether or not the block index contains the provided hash.
+// HaveBlock returns whether the block index contains the provided hash.
 //
 // This function is safe for concurrent access.
 func (bi *blockIndex) HaveBlock(hash *chainhash.Hash) bool {
@@ -385,8 +470,8 @@ func (bi *blockIndex) UnsetStatusFlags(node *blockNode, flags blockStatus) {
 	bi.Unlock()
 }
 
-// flushToDB writes all dirty block nodes to the database. If all writes
-// succeed, this clears the dirty set.
+// flushToDB writes all dirty block nodes to the database.
+// If all writes succeed, this clears the dirty set.
 func (bi *blockIndex) flushToDB() error {
 	bi.Lock()
 	if len(bi.dirty) == 0 {
@@ -406,6 +491,7 @@ func (bi *blockIndex) flushToDB() error {
 
 	// If write was successful, clear the dirty set.
 	if err == nil {
+		// todo: confirm: use pointer as the key for map?
 		bi.dirty = make(map[*blockNode]struct{})
 	}
 
