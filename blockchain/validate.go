@@ -612,13 +612,13 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 }
 
 // checkProofOfWork ensures the block header bits which indicate the target
-// difficulty is in min/max range and that the block hash is less than the
+// difficulty is in min/max range and that the pow hash is less than the
 // target difficulty as claimed.
 //
 // The flags modify the behavior of this function as follows:
-//   - BFNoPoWCheck: The check to ensure the block hash is less than the target
-//     difficulty is not performed.
-//     //	todo: (EthashPoW)
+//   - BFNoPoWCheck: The check to ensure the pow hash is less than the target difficulty is not performed.
+//
+// todo: Aconcagua review
 func checkProofOfWork(header *wire.BlockHeader, powConsensus *consensus.PowConsensus, powLimit *big.Int, flags BehaviorFlags) error {
 	// The target difficulty must be larger than zero.
 	target := CompactToBig(header.Bits)
@@ -656,13 +656,11 @@ func checkProofOfWork(header *wire.BlockHeader, powConsensus *consensus.PowConse
 		// targetSecond should not be used, so that it does not need to be checked.
 	}
 
-	// The block hash must be less than the claimed target unless the flag
+	// The pow hash must be less than the claimed target unless the flag
 	// to avoid proof of work checks is set.
 	if flags&BFNoPoWCheck != BFNoPoWCheck {
-		//// The block hash must be less than the claimed target.
-		//// todo: (EthashPoW)
+		//// The pow hash must be less than the claimed target.
 		//// It is necessary to use header.Version, rather than the Height as the branch condition.
-		//// todo(MLP):
 		//if header.Version >= int32(wire.BlockVersionEthashPow) {
 		//	err := ethash.VerifySeal(header, target)
 		//	if err != nil {
@@ -670,7 +668,7 @@ func checkProofOfWork(header *wire.BlockHeader, powConsensus *consensus.PowConse
 		//	}
 		//} else {
 		//	hash := header.BlockHash()
-		//	hashNum := HashToBig(&hash)
+		//	hashNum := consensus.HashToBig(hash)
 		//	if hashNum.Cmp(target) > 0 {
 		//		str := fmt.Sprintf("block hash of %064x is higher than "+
 		//			"expected max of %064x", hashNum, target)
@@ -927,15 +925,15 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 }
 
 // checkBlockSanityAbe performs some preliminary checks on a block to ensure it is
-// sane before continuing with block processing.  These checks are context free.
-//  1. Check sanity of block header (checkBlockHeaderSanity)
-//  2. There is at least one transaction in the block
-//  3. The block size (without witness) is smaller than MaxBlockBaseSize
-//  4. The block full size (with witness) is smaller than MaxBlockFullSize
-//  5. The first transaction is coinbase and there is only one coinbase in the block
-//  6. No duplicate transactions (same tx hash)
-//  7. The merkle root is correctly computed with the given transactions
-//  8. Preliminary check on each transaction (CheckTransactionSanityAbe)
+// sane before continuing with block processing. These checks are context free.
+//  1. Check sanity of block header (checkBlockHeaderSanity), including the PoW.
+//  2. There is at least one transaction in the block.
+//  3. The block size (without witness) is smaller than RuleMaxBlockBaseSize.
+//  4. The block full size (with witness) is smaller than RuleMaxBlockFullSize.
+//  5. The first transaction is coinbase and there is only one coinbase in the block.
+//  6. No duplicate transactions (same tx hash).
+//  7. Preliminary check on each transaction (CheckTransactionSanityAbe).
+//  8. The merkle root is correctly computed with the given transactions.
 //
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkBlockHeaderSanity.
@@ -1186,35 +1184,63 @@ func checkSerializedHeightAbe(coinbaseTx *abeutil.TxAbe, wantHeight int32) error
 }
 
 // checkBlockHeaderContextAbe performs several validation checks on the block header
-// which depend on its position within the block chain.
+// which depend on its position within the blockchain.
+// In particular,
+// 1. Check the difficulty is correctly computed (if not fast add)
+// 2. Check the timestamp is after the median time of last several blocks (if not fast add)
+// 3. If this height is checkpoint, check if the block hash matches the checkpoint
+// 4. Ensure the height of block is after the latest checkpoint
 //
 // The flags modify the behavior of this function as follows:
-//   - BFFastAdd: All checks except those involving comparing the header against
-//     the checkpoints are not performed.
+//   - BFFastAdd: All checks except those involving comparing the header against the checkpoints are not performed.
 //
 // This function MUST be called with the chain state lock held (for writes).
-//  1. Check the difficulty is correctly computed (if not fast add)
-//  2. Check the timestamp is after the median time of last several blocks (if not fast add)
-//  3. If this height is checkpoint, check if the block hash matches the checkpoint
-//  4. Ensure the height of block is after the latest checkpoint
-//
-// reviewed on 2024.01.03, by Alice for MLP
+// todo: Aconcagua review
 func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNode *blockNode, flags BehaviorFlags) error {
+
+	if header == nil {
+		return fmt.Errorf("checkBlockHeaderContextAbe: the input block header is nil")
+	}
+
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	if !fastAdd {
 		// Ensure the difficulty specified in the block header matches
-		// the calculated difficulty based on the previous block and
-		// difficulty retarget rules.
-		expectedDifficulty, err := b.calcNextRequiredDifficulty(prevNode,
-			header.Timestamp)
-		if err != nil {
-			return err
-		}
-		blockDifficulty := header.Bits
-		if blockDifficulty != expectedDifficulty {
-			str := "block difficulty of %d is not the expected value of %d"
-			str = fmt.Sprintf(str, blockDifficulty, expectedDifficulty)
-			return ruleerror.NewRuleError(ruleerror.ErrUnexpectedDifficulty, str)
+		// the calculated difficulty based on the previous block and difficulty retarget rules.
+		if header.Version >= int32(wire.BlockVersionAconcagua) {
+			expectedDifficultyVector, err := b.calcNextRequiredDifficultyVectorAconcagua(prevNode, header.Timestamp)
+			if err != nil {
+				return err
+			}
+			log.Infof("check header diff vector, header target: %x, target: %x", header.Bits, expectedDifficultyVector.Bits)
+
+			if header.Bits != expectedDifficultyVector.Bits {
+				str := "block difficulty of %d is not the expected value of %d"
+				str = fmt.Sprintf(str, header.Bits, expectedDifficultyVector.Bits)
+				return ruleerror.NewRuleError(ruleerror.ErrUnexpectedDifficulty, str)
+			}
+
+			if header.BitsSecond != expectedDifficultyVector.BitsSecond {
+				str := "block difficulty second of %d is not the expected value of %d"
+				str = fmt.Sprintf(str, header.BitsSecond, expectedDifficultyVector.BitsSecond)
+				return ruleerror.NewRuleError(ruleerror.ErrUnexpectedDifficulty, str)
+			}
+
+			if header.PowScaleSecond != expectedDifficultyVector.PowScaleSecond {
+				str := "block PowScaleSecond of %d is not the expected value of %d"
+				str = fmt.Sprintf(str, header.PowScaleSecond, expectedDifficultyVector.PowScaleSecond)
+				return ruleerror.NewRuleError(ruleerror.ErrUnexpectedDifficulty, str)
+			}
+		} else { // header.Version < int32(wire.BlockVersionAconcagua)
+			expectedDifficulty, err := b.calcNextRequiredDifficulty(prevNode,
+				header.Timestamp)
+			if err != nil {
+				return err
+			}
+			if header.Bits != expectedDifficulty {
+				str := "block difficulty of %d is not the expected value of %d"
+				str = fmt.Sprintf(str, header.Bits, expectedDifficulty)
+				return ruleerror.NewRuleError(ruleerror.ErrUnexpectedDifficulty, str)
+			}
 		}
 
 		// Ensure the timestamp for the block header is after the
@@ -1227,56 +1253,49 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 		}
 	}
 
-	// The height of this block is one more than the referenced previous
-	// block.
+	// The height of this block is one more than the referenced previous block.
 	blockHeight := prevNode.height + 1
-	// todo:(EthashPoW)
 	//	This is VERY necessary.
-	//	Now, the blockHeight of block/node is set, we can check the whether the header.Height and header.Version are set correctly.
-	//	This will prevent an updated Abelian node from accepting an old-version block.
+	//	Now, the blockHeight of block/node is set, we can check whether the header.Height and header.Version are set correctly.
+	//	This will prevent an updated abelian node from accepting an old-version block.
 	if blockHeight >= b.chainParams.BlockHeightEthashPoW {
-		if header.Height != blockHeight {
+		if blockHeight != header.Height {
 			str := fmt.Sprintf("block has height %d while its prevNode has height %d", header.Height, prevNode.height)
 			return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightWithPrevNode, str)
 		}
+	}
+	// now blockHeight is correct
 
-		// ToDo(MLP):
-		////	todo: when more versions appear, we need to refactor here.
-		//if header.Version != int32(wire.BlockVersionEthashPow) {
-		//	str := fmt.Sprintf("block has height %d, it should have version %d for EthashPoW, rather than the old version %d", header.Height, int32(wire.BlockVersionEthashPow), header.Version)
-		//	return ruleError(ErrMismatchedBlockHeightAndVersion, str)
-		//
-		//}
-		//	todo: when more versions appear, we need to refactor here.
-		// Added by Alice, 2024.05.11, for DSA
-		// todo(DSA): review
-		if header.Height >= b.chainParams.BlockHeightAconcagua {
-			if header.Version != int32(wire.BlockVersionAconcagua) {
-				str := fmt.Sprintf("block has height %d, it should have version %08x for Aconcagua, "+
-					"rather than the version %08x",
-					header.Height, int32(wire.BlockVersionAconcagua), header.Version)
-				return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
-			}
-		} else if header.Height >= b.chainParams.BlockHeightMLPAUT {
-			if header.Version != int32(wire.BlockVersionMLPAUT) {
-				str := fmt.Sprintf("block has height %d, it should have version %08x for MLPAUT, rather than the version %08x", header.Height, int32(wire.BlockVersionMLPAUT), header.Version)
-				return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
-			}
-		} else if header.Height >= b.chainParams.BlockHeightDSA {
-			if header.Version != int32(wire.BlockVersionDSA) {
-				str := fmt.Sprintf("block has height %d, it should have version %08x for DSA, rather than the version %08x", header.Height, int32(wire.BlockVersionDSA), header.Version)
-				return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
-			}
-		} else {
-			if header.Version != int32(wire.BlockVersionEthashPow) {
-				str := fmt.Sprintf("block has height %d, it should have version %08x for EthashPoW, rather than the version %08x", header.Height, int32(wire.BlockVersionEthashPow), header.Version)
-				return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
-			}
+	//	todo: when more versions appear, we need to refactor here.
+	if blockHeight >= b.chainParams.BlockHeightAconcagua {
+		if header.Version != int32(wire.BlockVersionAconcagua) {
+			str := fmt.Sprintf("block has height %d, it should have version %08x for Aconcagua, "+
+				"rather than the version %08x",
+				header.Height, int32(wire.BlockVersionAconcagua), header.Version)
+			return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
 		}
-
+	} else if blockHeight >= b.chainParams.BlockHeightMLPAUT {
+		if header.Version != int32(wire.BlockVersionMLPAUT) {
+			str := fmt.Sprintf("block has height %d, it should have version %08x for MLPAUT, "+
+				"rather than the version %08x", header.Height, int32(wire.BlockVersionMLPAUT), header.Version)
+			return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
+		}
+	} else if blockHeight >= b.chainParams.BlockHeightDSA {
+		if header.Version != int32(wire.BlockVersionDSA) {
+			str := fmt.Sprintf("block has height %d, it should have version %08x for DSA, rather than the version %08x",
+				header.Height, int32(wire.BlockVersionDSA), header.Version)
+			return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
+		}
+	} else if blockHeight >= b.chainParams.BlockHeightEthashPoW {
+		if header.Version != int32(wire.BlockVersionEthashPow) {
+			str := fmt.Sprintf("block has height %d, it should have version %08x for EthashPoW, rather than the version %08x",
+				header.Height, int32(wire.BlockVersionEthashPow), header.Version)
+			return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
+		}
 	} else { // blockHeight < b.chainParams.BlockHeightEthashPoW
 		if header.Version != int32(wire.BlockVersionInitial) {
-			str := fmt.Sprintf("block has height %d, it should have version %08x, rather than the version %08x", header.Height, int32(wire.BlockVersionInitial), header.Version)
+			str := fmt.Sprintf("block has height %d, it should have version %08x, rather than the version %08x",
+				header.Height, int32(wire.BlockVersionInitial), header.Version)
 			return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
 		}
 	}
@@ -1289,8 +1308,8 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 		return ruleerror.NewRuleError(ruleerror.ErrBadCheckpoint, str)
 	}
 
-	// Find the previous checkpoint and prevent blocks which fork the main
-	// chain before it.  This prevents storage of new, otherwise valid,
+	// Find the previous checkpoint and prevent blocks which fork the main chain before it.
+	// This prevents storage of new, otherwise valid,
 	// blocks which build off of old blocks that are likely at a much easier
 	// difficulty and therefore could be used to waste cache and disk space.
 	checkpointNode, err := b.findPreviousCheckpoint()
@@ -1308,13 +1327,16 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 }
 
 // checkBlockContextAbe performs several validation checks on the block which depend
-// on its position within the block chain.
+// on its position within the blockchain.
+// In particular,
+// 1. Check the block header context (checkBlockHeaderContextAbe)
+// 2. Check if the block height is written into the coinbase transaction (if not fastAdd)
 //
 // The flags modify the behavior of this function as follows:
 //   - BFFastAdd: The transaction are not checked to see if they are finalized
 //
-// The flags are also passed to checkBlockHeaderContext.  See its documentation
-// for how the flags modify its behavior.
+// The flags are also passed to checkBlockHeaderContext.
+// See its documentation for how the flags modify its behavior.
 //
 // This function MUST be called with the chain state lock held (for writes).
 //  1. Check the block header context (checkBlockHeaderContextAbe)

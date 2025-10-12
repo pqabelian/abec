@@ -697,7 +697,6 @@ func (g *BlkTmplGenerator) NewBlockTemplate(cryptoAddressPayTo []byte) (*BlockTe
 	}
 	subsidy := blockchain.CalcBlockSubsidy(nextBlockHeight, g.chainParams)
 
-	// TODO review from here 20240125
 	// Get the current source transactions and create a priority queue to
 	// hold the transactions which are ready for inclusion into a block
 	// along with some priority related and fee metadata.  Reserve the same
@@ -1080,7 +1079,9 @@ mempoolLoop:
 	// is potentially adjusted to ensure it comes after the median time of
 	// the last several blocks per the chain consensus rules.
 	ts := medianAdjustedTime(best, g.timeSource)
-	reqDifficulty, err := g.chain.CalcNextRequiredDifficulty(ts)
+	// todo: Aconcagua review
+	// reqDifficulty, err := g.chain.CalcNextRequiredDifficulty(ts)
+	reqDifficultyVector, err := g.chain.CalcNextRequiredDifficultyVector(ts)
 	if err != nil {
 		return nil, err
 	}
@@ -1099,12 +1100,15 @@ mempoolLoop:
 
 	var msgBlock wire.MsgBlockAbe
 	msgBlock.Header = wire.BlockHeader{
-		Version:    nextBlockVersion,
-		PrevBlock:  best.Hash,
-		MerkleRoot: *merkleRoot,
-		Timestamp:  ts,
-		Bits:       reqDifficulty,
-		Height:     nextBlockHeight, // todo: (EthashPow)
+		Version:          nextBlockVersion,
+		PrevBlock:        best.Hash,
+		MerkleRoot:       *merkleRoot,
+		Timestamp:        ts,
+		Height:           nextBlockHeight,
+		Bits:             reqDifficultyVector.Bits,
+		BitsSecond:       reqDifficultyVector.BitsSecond,
+		PowScaleSecond:   reqDifficultyVector.PowScaleSecond,
+		ConsensusApplied: wire.ConsensusNakamotoPow, // just a default value, the caller needs to set this field by its own choice
 	}
 	for _, tx := range blockTxns {
 		if err := msgBlock.AddTransaction(tx.MsgTx()); err != nil {
