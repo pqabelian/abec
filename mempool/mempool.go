@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/abesuite/abec/blockchain/ruleerror"
 	"math"
 	"os"
 	"sync"
@@ -1657,7 +1658,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	// transactions are allowed into blocks.
 	err := blockchain.CheckTransactionSanityAbe(tx)
 	if err != nil {
-		if cerr, ok := err.(blockchain.RuleError); ok {
+		if cerr, ok := err.(ruleerror.RuleError); ok {
 			return nil, nil, chainRuleError(cerr)
 		}
 		return nil, nil, err
@@ -1737,7 +1738,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	// without needing to do a separate lookup.
 	utxoRingView, err := mp.fetchInputUtxoRingsAbe(tx)
 	if err != nil {
-		if cerr, ok := err.(blockchain.RuleError); ok {
+		if cerr, ok := err.(ruleerror.RuleError); ok {
 			return nil, nil, chainRuleError(cerr)
 		}
 		return nil, nil, err
@@ -1767,7 +1768,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	// used later.
 	err = blockchain.CheckTransactionInputsAbe(tx, nextBlockHeight, utxoRingView, mp.cfg.ChainParams)
 	if err != nil {
-		if cerr, ok := err.(blockchain.RuleError); ok {
+		if cerr, ok := err.(ruleerror.RuleError); ok {
 			return nil, nil, chainRuleError(cerr)
 		}
 		return nil, nil, err
@@ -1884,7 +1885,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 		return txOuts[0], nil
 	})
 	if err != nil {
-		if cerr, ok := err.(blockchain.RuleError); ok {
+		if cerr, ok := err.(ruleerror.RuleError); ok {
 			return nil, nil, chainRuleError(cerr)
 		}
 		return nil, nil, err
@@ -1893,7 +1894,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	if ctAutTx != nil {
 		ctAutView, err = mp.fetchInputCTAUT(ctAutTx)
 		if err != nil {
-			if cerr, ok := err.(blockchain.RuleError); ok {
+			if cerr, ok := err.(ruleerror.RuleError); ok {
 				return nil, nil, chainRuleError(cerr)
 			}
 			return nil, nil, err
@@ -1915,7 +1916,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 		err = blockchain.CheckCTAUTTransactionInputs(ctAutTx, tx, nextBlockHeight,
 			ctAutView, mp.cfg.ChainParams)
 		if err != nil {
-			if cerr, ok := err.(blockchain.RuleError); ok {
+			if cerr, ok := err.(ruleerror.RuleError); ok {
 				return nil, nil, chainRuleError(cerr)
 			}
 			return nil, nil, err
