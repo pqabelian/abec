@@ -1202,6 +1202,26 @@ func (g *BlkTmplGenerator) UpdateBlockTimeAbeEthash(blockTemplate *BlockTemplate
 	return nil
 }
 
+func (g *BlkTmplGenerator) UpdateBlockTimeAconcagua(blockTemplate *BlockTemplate) error {
+	// The new timestamp is potentially adjusted to ensure it comes after
+	// the median time of the last several blocks per the chain consensus rules.
+	newTime := medianAdjustedTime(g.chain.BestSnapshot(), g.timeSource)
+	blockTemplate.BlockAbe.Header.Timestamp = newTime
+
+	// Recalculate the difficulty if running on a network that requires it.
+	if g.chainParams.ReduceMinDifficulty {
+		difficultyVector, err := g.chain.CalcNextRequiredDifficultyVector(newTime)
+		if err != nil {
+			return err
+		}
+		blockTemplate.BlockAbe.Header.Bits = difficultyVector.Bits
+		blockTemplate.BlockAbe.Header.BitsSecond = difficultyVector.BitsSecond
+		blockTemplate.BlockAbe.Header.PowScaleSecond = difficultyVector.PowScaleSecond
+	}
+
+	return nil
+}
+
 // UpdateExtraNonce updates the extra nonce in the coinbase script of the passed
 // block by regenerating the coinbase script with the passed value and block
 // height.  It also recalculates and updates the new merkle root that results

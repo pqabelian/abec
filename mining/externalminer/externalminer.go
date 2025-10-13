@@ -1,7 +1,6 @@
 package externalminer
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"github.com/abesuite/abec/abeutil"
@@ -256,7 +255,7 @@ out:
 						} else {
 							//	just update the timestamp of the latestBlockTemplate
 							needGenerateNewTemplate = false
-							m.g.UpdateBlockTimeAbeEthash(m.latestBlockTemplate.BlockTemplate)
+							m.g.UpdateBlockTimeAconcagua(m.latestBlockTemplate.BlockTemplate)
 							// note that for mainnet, this just updates timestamp,
 							// while in testnet or simnet, this may update the Bits field, depends on m.cfg.ChainParams.ReduceMinDifficulty
 							if m.cfg.ChainParams.ReduceMinDifficulty {
@@ -405,7 +404,8 @@ out:
 	m.wg.Done()
 }
 
-func (m *ExternalMiner) submitBlockEthash(block *abeutil.BlockAbe) bool {
+// submitBlock submits the input block to network after ensuring it passes all the consensus validation rules.
+func (m *ExternalMiner) submitBlock(block *abeutil.BlockAbe) bool {
 	m.submitBlockLock.Lock()
 	defer m.submitBlockLock.Unlock()
 
@@ -413,7 +413,7 @@ func (m *ExternalMiner) submitBlockEthash(block *abeutil.BlockAbe) bool {
 	// Usually the case is detected and all work on the stale block is halted to start work on a new block,
 	// but the check only happens periodically, so it is possible a block was found and submitted in between.
 	msgBlock := block.MsgBlock()
-	if !msgBlock.Header.PrevBlock.IsEqual(&m.g.BestSnapshot().Hash) {
+	if !msgBlock.Header.PrevBlock.IsEqual(&m.cfg.BlockTemplateGenerator.BestSnapshot().Hash) {
 		//	As block-submission related information is important, we set it to be Info rather than debug-info.
 		log.Infof("Block submitted via external miner with previous "+
 			"block %s is stale", msgBlock.Header.PrevBlock)

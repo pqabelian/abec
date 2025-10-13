@@ -479,7 +479,7 @@ search:
 					break search
 				}
 
-				m.cfg.BlockTemplateGenerator.UpdateBlockTimeAbeEthash(blockTemplate)
+				m.cfg.BlockTemplateGenerator.UpdateBlockTimeAconcagua(blockTemplate)
 
 				// TimeStamp update will cause the update of contentHash.
 				headerContentHash, err = consensus.HeaderContentHash(&blockTemplate.BlockAbe.Header)
@@ -613,7 +613,7 @@ func (m *CPUMiner) solveBlockNakamotoAconcagua(blockTemplate *mining.BlockTempla
 						return false
 					}
 
-					m.cfg.BlockTemplateGenerator.UpdateBlockTimeAbeEthash(blockTemplate)
+					m.cfg.BlockTemplateGenerator.UpdateBlockTimeAconcagua(blockTemplate)
 					//	UpdateBlockTimeAbeEthash() may update header.Bits, depending on m.cfg.ChainParams.ReduceMinDifficulty
 					if m.cfg.ChainParams.ReduceMinDifficulty {
 						targetDifficulty = blockchain.CompactToBig(header.BitsSecond)
