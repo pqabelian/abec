@@ -75,7 +75,6 @@ type Config struct {
 // system which is typically sufficient.
 type ExternalMiner struct {
 	sync.Mutex
-	g                *mining.BlkTmplGenerator
 	cfg              Config
 	started          bool
 	submitBlockLock  sync.Mutex
@@ -222,7 +221,7 @@ out:
 			} else {
 				m.submitBlockLock.Lock()
 
-				curHeight := m.g.BestSnapshot().Height
+				curHeight := m.cfg.BlockTemplateGenerator.BestSnapshot().Height
 				if curHeight != 0 && !m.cfg.IsCurrent() {
 					err := errors.New("the tip of local chain is not current, please try again later")
 					getWorkReq.Err <- err
@@ -235,7 +234,7 @@ out:
 					if m.latestBlockTemplate == nil {
 						needGenerateNewTemplate = true
 					} else {
-						best := m.g.BestSnapshot()
+						best := m.cfg.BlockTemplateGenerator.BestSnapshot()
 						if !m.latestBlockTemplate.BlockTemplate.BlockAbe.Header.PrevBlock.IsEqual(&best.Hash) {
 							//	all activate blockTemplates and jobs are outdated, shall be cleaned
 							m.activeBlockTemplates = make(map[string]*SharedBlockTemplate)
@@ -244,7 +243,7 @@ out:
 
 							m.latestBlockTemplate = nil
 							needGenerateNewTemplate = true
-						} else if m.g.TxSource().LastUpdated().After(m.latestBlockTemplate.BlockTemplate.BlockAbe.Header.Timestamp) {
+						} else if m.cfg.BlockTemplateGenerator.TxSource().LastUpdated().After(m.latestBlockTemplate.BlockTemplate.BlockAbe.Header.Timestamp) {
 							// The mempool is updated after the last update of timestamp of latestBlockTemplate.
 							// Generating a new block template as the latestBlockTemplate to guarantee it is consistent with the mempool:
 							// (1) if new transactions are added into the mempool, the new latestBlockTemplate may collect the new transactions;
@@ -255,7 +254,7 @@ out:
 						} else {
 							//	just update the timestamp of the latestBlockTemplate
 							needGenerateNewTemplate = false
-							m.g.UpdateBlockTimeAconcagua(m.latestBlockTemplate.BlockTemplate)
+							m.cfg.BlockTemplateGenerator.UpdateBlockTimeAconcagua(m.latestBlockTemplate.BlockTemplate)
 							// note that for mainnet, this just updates timestamp,
 							// while in testnet or simnet, this may update the Bits field, depends on m.cfg.ChainParams.ReduceMinDifficulty
 							if m.cfg.ChainParams.ReduceMinDifficulty {
@@ -273,7 +272,7 @@ out:
 						// Create a new block template using the available transactions
 						// in the memory pool as a source of transactions to potentially
 						// include in the block.
-						newTemplate, err := m.g.NewBlockTemplate(payToAddr)
+						newTemplate, err := m.cfg.BlockTemplateGenerator.NewBlockTemplate(payToAddr)
 						if err != nil {
 							log.Debugf("Fail to re-generate external miner's latest blocktemplate")
 
@@ -554,7 +553,6 @@ func (m *ExternalMiner) HandleSubmitHashRateReq(req *SubmitHashRateReq) {
 // type for more details.
 func NewExternalMiner(cfg *Config) *ExternalMiner {
 	return &ExternalMiner{
-		g:   cfg.BlockTemplateGenerator,
 		cfg: *cfg,
 	}
 }
