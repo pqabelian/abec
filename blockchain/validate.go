@@ -1206,11 +1206,11 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 	if !fastAdd {
 		// Ensure the difficulty specified in the block header matches
 		// the calculated difficulty based on the previous block and difficulty retarget rules.
+		expectedDifficultyVector, err := b.calcNextRequiredDifficultyVectorAconcagua(prevNode, header.Timestamp)
+		if err != nil {
+			return err
+		}
 		if header.Version >= int32(wire.BlockVersionAconcagua) {
-			expectedDifficultyVector, err := b.calcNextRequiredDifficultyVectorAconcagua(prevNode, header.Timestamp)
-			if err != nil {
-				return err
-			}
 			log.Infof("check header diff vector, header target: %x, target: %x", header.Bits, expectedDifficultyVector.Bits)
 
 			if header.Bits != expectedDifficultyVector.Bits {
@@ -1231,14 +1231,9 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 				return ruleerror.NewRuleError(ruleerror.ErrUnexpectedDifficulty, str)
 			}
 		} else { // header.Version < int32(wire.BlockVersionAconcagua)
-			expectedDifficulty, err := b.calcNextRequiredDifficulty(prevNode,
-				header.Timestamp)
-			if err != nil {
-				return err
-			}
-			if header.Bits != expectedDifficulty {
+			if header.Bits != expectedDifficultyVector.Bits {
 				str := "block difficulty of %d is not the expected value of %d"
-				str = fmt.Sprintf(str, header.Bits, expectedDifficulty)
+				str = fmt.Sprintf(str, header.Bits, expectedDifficultyVector.Bits)
 				return ruleerror.NewRuleError(ruleerror.ErrUnexpectedDifficulty, str)
 			}
 		}
