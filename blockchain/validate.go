@@ -1206,7 +1206,7 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 	if !fastAdd {
 		// Ensure the difficulty specified in the block header matches
 		// the calculated difficulty based on the previous block and difficulty retarget rules.
-		expectedDifficultyVector, err := b.calcNextRequiredDifficultyVectorAconcagua(prevNode, header.Timestamp)
+		expectedDifficultyVector, err := b.calcNextRequiredDifficultyVector(prevNode, header.Timestamp)
 		if err != nil {
 			return err
 		}
