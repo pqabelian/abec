@@ -11,6 +11,7 @@ import (
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/mining"
+	"github.com/abesuite/abec/wire"
 	"math/rand"
 	"strings"
 	"sync"
@@ -272,7 +273,8 @@ out:
 						// Create a new block template using the available transactions
 						// in the memory pool as a source of transactions to potentially
 						// include in the block.
-						newTemplate, err := m.cfg.BlockTemplateGenerator.NewBlockTemplate(payToAddr)
+						exampleConsensus := wire.ConsensusEthashPow // Note that this is just an example value.
+						newTemplate, err := m.cfg.BlockTemplateGenerator.NewBlockTemplate(exampleConsensus, payToAddr)
 						if err != nil {
 							log.Debugf("Fail to re-generate external miner's latest blocktemplate")
 

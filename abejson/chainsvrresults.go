@@ -380,8 +380,9 @@ type GetBlockTemplateResult struct {
 	SubmitOld   *bool  `json:"submitold,omitempty"`
 
 	// Basic pool extension from BIP 0023.
-	Target  string `json:"target,omitempty"`
-	Expires int64  `json:"expires,omitempty"`
+	Target       string `json:"target,omitempty"`
+	TargetSecond string `json:"targetSecond,omitempty"`
+	Expires      int64  `json:"expires,omitempty"`
 
 	// Mutations from BIP 0023.
 	MaxTime    int64    `json:"maxtime,omitempty"`

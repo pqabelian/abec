@@ -343,6 +343,8 @@ type TemplateRequest struct {
 
 	// MiningAddr should be filled if there is 'useownaddr' in capabilities
 	MiningAddr string `json:"miningaddr,omitempty"`
+	
+	ConsensusApplied uint8 `json:"consensusApplied,omitempty"`
 }
 
 // convertTemplateRequestField potentially converts the provided value as

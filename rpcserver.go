@@ -369,7 +369,7 @@ type reqTemplate struct {
 	prevHash      *chainhash.Hash // chain status
 	lastTxUpdate  time.Time
 	minTimestamp  time.Time
-	template      *mining.BlockTemplate
+	template      *mining.BlockTemplate // todo: refactor the name
 }
 
 // gbtWorkState houses state that is used in between multiple RPC invocations to
@@ -2015,18 +2015,12 @@ func GetExtraNonceOffset(tx *wire.MsgTxAbe) (int64, error) {
 }
 
 // updateBlockTemplate creates or updates a block template for the work state.
-// A new block template will be generated when the current best block has
-// changed or the transactions in the memory pool have been updated and it has
-// been long enough since the last template was generated.  Otherwise, the
-// timestamp for the existing block template is updated (and possibly the
-// difficulty on testnet per the consesus rules).  Finally, if the
-// useCoinbaseValue flag is false and the existing block template does not
-// already contain a valid payment address, the block template will be updated
-// with a randomly selected payment address from the list of configured
-// addresses.
-//
-// This function MUST be called with the state locked.
-func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bool, useOwnAddr bool, miningAddr []byte) error {
+// A new block template will be generated when the current best block has changed or
+// the transactions in the memory pool have been updated and it has been long enough since the last template was generated.
+// Otherwise, the timestamp for the existing block template is updated (and possibly the difficulty on testnet per the consensus rules).
+// todo: refactor
+// todo: consider the cache for the consensusApplied
+func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, consensusApplied wire.ConsensusProtocol, useOwnAddr bool, ownMiningAddr abeutil.AbelAddress) error {
 	generator := s.cfg.Generator
 	lastTxUpdate := generator.TxSource().LastUpdated()
 	if lastTxUpdate.IsZero() {
@@ -2040,26 +2034,28 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		return internalRPCError("Failed to create new block "+
 			"template: cannot find mining address in abec configuration", "")
 	}
-	var payToAddr []byte
-	if !useOwnAddr && !useCoinbaseValue {
+
+	var payToCryptoAddress []byte
+	if !useOwnAddr {
 		rand.Seed(time.Now().UnixNano())
-		payToAddr = cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))].CryptoAddress()
+		payToCryptoAddress = cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))].CryptoAddress()
+	} else {
+		if ownMiningAddr == nil {
+			return internalRPCError("Failed to create new block "+
+				"template: useOwnAddr == true but the input miningAddr is nil", "")
+		}
+		payToCryptoAddress = ownMiningAddr.CryptoAddress()
 	}
 
-	if useOwnAddr {
-		payToAddr = miningAddr
-	}
-
-	// Generate a new block template when the current best block has
-	// changed or the transactions in the memory pool have been updated and
-	// it has been at least gbtRegenerateSecond since the last template was
-	// generated.
+	// Generate a new block template when the current best block has changed or
+	// the transactions in the memory pool have been updated and
+	// it has been at least gbtRegenerateSecond since the last template was generated.
 	var msgBlock *wire.MsgBlockAbe
 	var targetDifficulty string
 	latestHash := &s.cfg.Chain.BestSnapshot().Hash
 	template := state.template
 	if useOwnAddr {
-		template = state.templates[hex.EncodeToString(miningAddr)]
+		template = state.templates[hex.EncodeToString(payToCryptoAddress)]
 	}
 	if template == nil ||
 		template.prevHash == nil || !template.prevHash.IsEqual(latestHash) ||
@@ -2076,17 +2072,15 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 			}
 		}
 
-		// Reset the previous best hash the block template was generated
-		// against so any errors below cause the next invocation to try
-		// again.
+		// Reset the previous best hash the block template was generated against
+		// so any errors below cause the next invocation to try again.
 		template.prevHash = nil
 
-		// Create a new block template that has a coinbase which anyone
-		// can redeem.  This is only acceptable because the returned
-		// block template doesn't include the coinbase, so the caller
-		// will ultimately create their own coinbase which pays to the
+		// Create a new block template that has a coinbase which anyone can redeem.
+		// This is only acceptable because the returned block template doesn't include the coinbase,
+		// so the caller will ultimately create their own coinbase which pays to the
 		// appropriate address(es).
-		blkTemplate, err := generator.NewBlockTemplate(payToAddr)
+		blkTemplate, err := generator.NewBlockTemplate(consensusApplied, payToCryptoAddress)
 		if err != nil {
 			return internalRPCError("Failed to create new block "+
 				"template: "+err.Error(), "")
@@ -2097,8 +2091,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 			blockchain.CompactToBig(msgBlock.Header.Bits))
 
 		// Get the minimum allowed timestamp for the block based on the
-		// median timestamp of the last several blocks per the chain
-		// consensus rules.
+		// median timestamp of the last several blocks per the chain consensus rules.
 		best := s.cfg.Chain.BestSnapshot()
 		minTimestamp := mining.MinimumMedianTime(best)
 
@@ -2107,100 +2100,53 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		template.lastTxUpdate = lastTxUpdate
 		template.prevHash = latestHash
 		template.minTimestamp = minTimestamp
-		// Update work state to ensure another block template isn't
-		// generated until needed.
+		// Update work state to ensure another block template isn't generated until needed.
 		if useOwnAddr {
-			state.templates[hex.EncodeToString(miningAddr)] = template
+			state.templates[hex.EncodeToString(payToCryptoAddress)] = template
 		} else {
 			state.template = template
 		}
 
-		rpcsLog.Debugf("Generated block template (timestamp %v, "+
+		rpcsLog.Infof("Generated block template (timestamp %v, "+
 			"target %s, merkle root %s)",
 			msgBlock.Header.Timestamp, targetDifficulty,
 			msgBlock.Header.MerkleRoot)
 
-		// Notify any clients that are long polling about the new
-		// template.
+		// Notify any clients that are long polling about the new template.
 		state.notifyLongPollers(latestHash, lastTxUpdate)
 	} else {
 		// At this point, there is a saved block template and another
 		// request for a template was made, but either the available
-		// transactions haven't change or it hasn't been long enough to
-		// trigger a new block template to be generated.  So, update the
-		// existing block template.
-
-		// When the caller requires a full coinbase as opposed to only
-		// the pertinent details needed to create their own coinbase,
-		// add a payment address to the output of the coinbase of the
-		// template if it doesn't already have one.  Since this requires
-		// mining addresses to be specified via the config, an error is
-		// returned if none have been specified.
-		// todo (ABE): maybe deleted or modified in the future
-		if !useCoinbaseValue && !template.template.ValidPayAddress {
-			// Choose a payment address at random.
-			rand.Seed(time.Now().UnixNano())
-			payToAddr := cfg.miningAddrs[rand.Intn(len(cfg.MiningAddrs))].CryptoAddress()
-
-			// Update the block coinbase output of the template to
-			// pay to the randomly selected payment address.
-			//	todo(ABE): remove
-			/*			pkScript, err := txscript.PayToAddrScript(payToAddr)
-						if err != nil {
-							context := "Failed to create pay-to-addr script"
-							return internalRPCError(err.Error(), context)
-						}
-						template.Block.Transactions[0].TxOut[0].PkScript = pkScript
-						template.ValidPayAddress = true*/
-
-			//addressScript, err := txscript.PayToAddressScriptAbe(payToAddr)
-			//if err != nil {
-			//	context := "Failed to create addressScript"
-			//	return internalRPCError(err.Error(), context)
-			//}
-			// TODO: 20210609 there is wrongly code
-			template.template.BlockAbe.Transactions[0].TxOuts[0].TxoScript = payToAddr
-			template.template.ValidPayAddress = true
-
-			// Update the merkle root.
-			block := abeutil.NewBlock(template.template.Block)
-			merkles := blockchain.BuildMerkleTreeStore(block.Transactions(), false)
-			template.template.Block.Header.MerkleRoot = *merkles[len(merkles)-1]
-		}
+		// transactions haven't changed or it hasn't been long enough to
+		// trigger a new block template to be generated.
+		// So, update the existing block template.
 
 		// Set locals for convenience.
-		msgBlock = template.template.BlockAbe
-		targetDifficulty = fmt.Sprintf("%064x",
-			blockchain.CompactToBig(msgBlock.Header.Bits))
-
 		// Update the time of the block template to the current time
 		// while accounting for the median time of the past several
 		// blocks per the chain consensus rules.
-		generator.UpdateBlockTimeAbe(msgBlock)
-		msgBlock.Header.Nonce = 0
-		msgBlock.Header.NonceExt = 0
+		generator.UpdateBlockTimeAconcagua(template.template)
+		template.template.BlockAbe.Header.Nonce = 0
+		template.template.BlockAbe.Header.NonceExt = 0
 
-		rpcsLog.Debugf("Updated block template (timestamp %v, "+
-			"target %s)", msgBlock.Header.Timestamp,
-			targetDifficulty)
+		rpcsLog.Infof("Updated block template (timestamp %v, "+
+			"target %064x)", template.template.BlockAbe.Header.Timestamp,
+			blockchain.CompactToBig(template.template.BlockAbe.Header.Bits))
 	}
 
 	return nil
 }
 
-// blockTemplateResult returns the current block template associated with the
-// state as a abejson.GetBlockTemplateResult that is ready to be encoded to JSON
-// and returned to the caller.
-//
+// blockTemplateResult returns the current block template associated with the state
+// as an abejson.GetBlockTemplateResult that is ready to be encoded to JSON and returned to the caller.
 // This function MUST be called with the state locked.
-func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, miningAddress []byte, submitOld *bool) (*abejson.GetBlockTemplateResult, error) {
+func (state *gbtWorkState) blockTemplateResult(miningAddr abeutil.AbelAddress, submitOld *bool) (*abejson.GetBlockTemplateResult, error) {
 	// Ensure the timestamps are still in valid range for the template.
 	// This should really only ever happen if the local clock is changed
-	// after the template is generated, but it's important to avoid serving
-	// invalid block templates.
+	// after the template is generated, but it's important to avoid serving invalid block templates.
 	template := state.template
-	if len(miningAddress) != 0 {
-		template = state.templates[hex.EncodeToString(miningAddress)]
+	if miningAddr != nil {
+		template = state.templates[hex.EncodeToString(miningAddr.CryptoAddress())]
 	}
 	if template == nil {
 		return nil, &abejson.RPCError{
@@ -2224,20 +2170,19 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, miningAddr
 		}
 	}
 
-	// Convert each transaction in the block template to a template result
-	// transaction.  The result does not include the coinbase, so notice
-	// the adjustments to the various lengths and indices.
+	// Convert each transaction in the block template to a template result transaction.
+	// The result does not include the coinbase, so notice the adjustments to the various lengths and indices.
 	numTx := len(msgBlock.Transactions)
 	transactions := make([]abejson.GetBlockTemplateResultTxAbe, 0, numTx-1)
 	txIndex := make(map[chainhash.Hash]int64, numTx)
 	for i, tx := range msgBlock.Transactions {
-		txHash := tx.TxHash()
-		txIndex[txHash] = int64(i)
-
 		// Skip the coinbase transaction.
 		if i == 0 {
 			continue
 		}
+
+		txHash := tx.TxHash()
+		txIndex[txHash] = int64(i)
 
 		// Serialize the transaction for later conversion to hex.
 		//txBuf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
@@ -2258,11 +2203,12 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, miningAddr
 		transactions = append(transactions, resultTx)
 	}
 
-	// Generate the block template reply.  Note that following mutations are
-	// implied by the included or omission of fields:
+	// Generate the block template reply.
+	// Note that following mutations are implied by the included or omission of fields:
 	//  Including MinTime -> time/decrement
 	//  Omitting CoinbaseTxn -> coinbase, generation
 	targetDifficulty := fmt.Sprintf("%064x", blockchain.CompactToBig(header.Bits))
+	targetDifficultySecond := fmt.Sprintf("%064x", blockchain.CompactToBig(header.BitsSecond))
 	templateID := encodeTemplateID(template.prevHash, template.lastGenerated)
 	reply := abejson.GetBlockTemplateResult{
 		Bits:             strconv.FormatInt(int64(header.Bits), 16),
@@ -2272,67 +2218,48 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, miningAddr
 		CurTime:          header.Timestamp.Unix(),
 		Height:           int64(template.template.Height),
 		PreviousHash:     header.PrevBlock.String(),
-		//		WeightLimit:  blockchain.MaxBlockWeight,
-		//		SigOpLimit:   blockchain.MaxBlockSigOpsCost,
-		SizeLimit:    wire.MaxBlockPayload,
-		Transactions: transactions,
-		Version:      header.Version,
-		LongPollID:   templateID,
-		SubmitOld:    submitOld,
-		Target:       targetDifficulty,
-		MinTime:      template.minTimestamp.Unix(),
-		MaxTime:      maxTime.Unix(),
-		Mutable:      gbtMutableFields,
-		NonceRange:   gbtNonceRange,
-		Capabilities: gbtCapabilities,
+		SizeLimit:        wire.MaxBlockPayload,
+		Transactions:     transactions,
+		Version:          header.Version,
+		LongPollID:       templateID,
+		SubmitOld:        submitOld,
+		Target:           targetDifficulty,
+		TargetSecond:     targetDifficultySecond,
+		MinTime:          template.minTimestamp.Unix(),
+		MaxTime:          maxTime.Unix(),
+		Mutable:          gbtMutableFields,
+		NonceRange:       gbtNonceRange,
+		Capabilities:     gbtCapabilities,
 	}
 
-	if useCoinbaseValue {
-		// todo (ABE): currently coinbaseValue not supported
-		return nil, &abejson.RPCError{
-			Code:    abejson.ErrRPCInternal.Code,
-			Message: "Coinbase value is not supported",
-		}
-	} else {
-		// Ensure the template has a valid payment address associated
-		// with it when a full coinbase is requested.
-		if !template.template.ValidPayAddress {
-			return nil, &abejson.RPCError{
-				Code: abejson.ErrRPCInternal.Code,
-				Message: "A coinbase transaction has been " +
-					"requested, but the server has not " +
-					"been configured with any payment " +
-					"addresses via --miningaddr",
-			}
-		}
-
-		// Serialize the transaction for conversion to hex.
-		tx := msgBlock.Transactions[0]
-		txBuf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSizeFull()))
-		if err := tx.SerializeFull(txBuf); err != nil {
-			context := "Failed to serialize transaction"
-			return nil, internalRPCError(err.Error(), context)
-		}
-
-		offset, err := GetExtraNonceOffset(tx)
-		if err != nil {
-			return nil, err
-		}
-
-		witnessOffset := tx.SerializeSize()
-
-		resultTx := abejson.GetBlockTemplateResultCoinbase{
-			Data:             hex.EncodeToString(txBuf.Bytes()),
-			TxHash:           tx.TxHash().String(),
-			WitnessHash:      msgBlock.WitnessHashs[0].String(),
-			Fee:              template.template.BlockAbe.Transactions[0].TxFee,
-			ExtraNonceOffset: offset,
-			ExtraNonceLen:    8,
-			WitnessOffset:    int64(witnessOffset),
-		}
-
-		reply.CoinbaseTxn = &resultTx
+	// the coinbase tx	begin
+	// Serialize the transaction for conversion to hex.
+	tx := msgBlock.Transactions[0]
+	txBuf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSizeFull()))
+	if err := tx.SerializeFull(txBuf); err != nil {
+		context := "Failed to serialize transaction"
+		return nil, internalRPCError(err.Error(), context)
 	}
+
+	offset, err := GetExtraNonceOffset(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	witnessOffset := tx.SerializeSize()
+
+	resultTx := abejson.GetBlockTemplateResultCoinbase{
+		Data:             hex.EncodeToString(txBuf.Bytes()),
+		TxHash:           tx.TxHash().String(),
+		WitnessHash:      msgBlock.WitnessHashs[0].String(),
+		Fee:              template.template.BlockAbe.Transactions[0].TxFee,
+		ExtraNonceOffset: offset,
+		ExtraNonceLen:    8,
+		WitnessOffset:    int64(witnessOffset),
+	}
+
+	reply.CoinbaseTxn = &resultTx
+	// the coinbase tx	end
 
 	return &reply, nil
 }
@@ -2354,7 +2281,8 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 	// be manually unlocked before waiting for a notification about block
 	// template changes.
 
-	if err := state.updateBlockTemplate(s, useCoinbaseValue, false, nil); err != nil {
+	// todo: not used and will be removed, set wire.ConsensusNone
+	if err := state.updateBlockTemplate(s, wire.ConsensusNone, false, nil); err != nil {
 		state.Unlock()
 		return nil, err
 	}
@@ -2363,7 +2291,8 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 	// the caller is invalid.
 	prevHash, lastGenerated, err := decodeTemplateID(longPollID)
 	if err != nil {
-		result, err := state.blockTemplateResult(useCoinbaseValue, nil, nil)
+		// todo: not used and will be removed, set nil
+		result, err := state.blockTemplateResult(nil, nil)
 		if err != nil {
 			state.Unlock()
 			return nil, err
@@ -2384,7 +2313,8 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 		// old block template depending on whether or not a solution has
 		// already been found and added to the block chain.
 		submitOld := prevHash.IsEqual(prevTemplateHash)
-		result, err := state.blockTemplateResult(useCoinbaseValue, nil,
+		// todo: not used and will be removed, set nil
+		result, err := state.blockTemplateResult(nil,
 			&submitOld)
 		if err != nil {
 			state.Unlock()
@@ -2417,7 +2347,8 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 	state.Lock()
 	defer state.Unlock()
 
-	if err := state.updateBlockTemplate(s, useCoinbaseValue, false, nil); err != nil {
+	// todo: not used and will be removed, set wire.ConsensusNone
+	if err := state.updateBlockTemplate(s, wire.ConsensusNone, false, nil); err != nil {
 		return nil, err
 	}
 
@@ -2425,7 +2356,8 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 	// block template depending on whether or not a solution has already
 	// been found and added to the block chain.
 	submitOld := prevHash.IsEqual(&state.template.template.Block.Header.PrevBlock)
-	result, err := state.blockTemplateResult(useCoinbaseValue, nil, &submitOld)
+	// todo: not used and will be removed, set nil
+	result, err := state.blockTemplateResult(nil, &submitOld)
 	if err != nil {
 		return nil, err
 	}
@@ -2460,39 +2392,25 @@ func checkMiningAddrValidity(addr []byte) bool {
 }
 
 // handleGetBlockTemplateRequest is a helper for handleGetBlockTemplate which
-// deals with generating and returning block templates to the caller.  It
-// handles both long poll requests as well as regular requests.  In addition,
-// it detects the capabilities reported by the caller in regards to whether or
-// not it supports creating its own coinbase (the coinbasetxn and coinbasevalue
-// capabilities) and modifies the returned block template accordingly.
+// deals with generating and returning block templates to the caller.
+// todo: consider request is nil when use request.ConsensusApplied .
 func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateRequest, closeChan <-chan struct{}) (interface{}, error) {
 	// Extract the relevant passed capabilities and restrict the result to
-	// either a coinbase value or a coinbase transaction object depending on
-	// the request. Default to providing a coinbase transaction.
-	// todo (ABE): currently we do not support useCoinbaseValue, hence the useCoinbaseValue is always false
-	useCoinbaseValue := false
+	// either a coinbase value or a coinbase transaction object depending on the request.
+	// As so far, only "useOwnAddr" is supported.
 	useOwnAddr := false
 	if request != nil {
-		var hasCoinbaseValue, hasCoinbaseTxn bool
 		for _, capability := range request.Capabilities {
 			switch capability {
-			case "coinbasetxn":
-				hasCoinbaseTxn = true
-			case "coinbasevalue":
-				hasCoinbaseValue = true
 			case "useownaddr":
 				useOwnAddr = true
 			}
-		}
-
-		if !hasCoinbaseTxn && hasCoinbaseValue {
-			useCoinbaseValue = true
 		}
 	}
 
 	// When a coinbase transaction has been requested, respond with an error
 	// if there are no addresses to pay the created block template to.
-	if !useCoinbaseValue && !useOwnAddr && len(cfg.miningAddrs) == 0 {
+	if !useOwnAddr && len(cfg.miningAddrs) == 0 {
 		return nil, &abejson.RPCError{
 			Code: abejson.ErrRPCInternal.Code,
 			Message: "Using mining address provided by abec, " +
@@ -2501,9 +2419,8 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 		}
 	}
 
-	// If useownaddr is true, check if there is mining address in request
-	// also check the validity of the address
-	var miningAddrBytes []byte = nil
+	// If useOwnAddr is true, parse the request.MiningAddr to AbelAddress
+	var ownMiningAddr abeutil.AbelAddress = nil
 	if useOwnAddr {
 		if request.MiningAddr == "" {
 			return nil, &abejson.RPCError{
@@ -2512,21 +2429,21 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 					"but there is mining address in request",
 			}
 		}
-		miningAddrBytesAll, err := hex.DecodeString(request.MiningAddr)
+		var err error
+
+		ownMiningAddr, err = abeutil.DecodeAbelAddress(request.MiningAddr)
 		if err != nil {
 			return nil, &abejson.RPCError{
 				Code:    abejson.ErrRPCInternal.Code,
-				Message: "Invalid mining address",
+				Message: "useOwnAddr == true but provided mining address is invalid",
 			}
 		}
-		isValidAddr := checkMiningAddrValidity(miningAddrBytesAll)
-		if !isValidAddr {
+		if !ownMiningAddr.IsForNet(activeNetParams.Params) {
 			return nil, &abejson.RPCError{
 				Code:    abejson.ErrRPCInternal.Code,
-				Message: "Invalid mining address",
+				Message: "provided mining address does not match the network",
 			}
 		}
-		miningAddrBytes = miningAddrBytesAll[1 : len(miningAddrBytesAll)-32]
 	}
 
 	// Return an error if there are no peers connected since there is no
@@ -2555,7 +2472,6 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 	// When a long poll ID was provided, this is a long poll request by the
 	// client to be notified when block template referenced by the ID should
 	// be replaced with a new one.
-	// todo (ABE): long poll is not implemented yet
 	if request != nil && request.LongPollID != "" {
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCInternal.Code,
@@ -2576,11 +2492,12 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 	// seconds since the last template was generated.  Otherwise, the
 	// timestamp for the existing block template is updated (and possibly
 	// the difficulty on testnet per the consesus rules).
-	if err := state.updateBlockTemplate(s, useCoinbaseValue, useOwnAddr, miningAddrBytes); err != nil {
+	if err := state.updateBlockTemplate(s, wire.ConsensusProtocol(request.ConsensusApplied), useOwnAddr, ownMiningAddr); err != nil {
 		return nil, err
 	}
 
-	return state.blockTemplateResult(useCoinbaseValue, miningAddrBytes, nil)
+	// rpcsLog.Infof("template prev block hash: %s", hex.EncodeToString((*state.template.prevHash)[:]))
+	return state.blockTemplateResult(ownMiningAddr, nil)
 }
 
 // chainErrToGBTErrString converts an error returned from btcchain to a string

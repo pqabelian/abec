@@ -703,7 +703,8 @@ out:
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially include in the block.
-		template, err := m.cfg.BlockTemplateGenerator.NewBlockTemplate(payToAddr)
+		exampleConsensus := wire.ConsensusNakamotoPow // Note that this is just an example value.
+		template, err := m.cfg.BlockTemplateGenerator.NewBlockTemplate(exampleConsensus, payToAddr)
 		// todo: set a ConsensusApplied
 		// template.MsgBlock.Header.ConsensusApplied = wire.ConsensusNakamotoPow
 		m.submitBlockLock.Unlock()
@@ -982,7 +983,8 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially include in the block.
-		template, err := m.cfg.BlockTemplateGenerator.NewBlockTemplate(payToAddr)
+		exampleConsensus := wire.ConsensusNakamotoPow // Note that this is just an example value.
+		template, err := m.cfg.BlockTemplateGenerator.NewBlockTemplate(exampleConsensus, payToAddr)
 
 		m.submitBlockLock.Unlock()
 		if err != nil {

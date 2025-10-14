@@ -665,7 +665,7 @@ func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
 //	 -----------------------------------  --
 //
 // reviewed on 2024.01.01, by Alice
-func (g *BlkTmplGenerator) NewBlockTemplate(cryptoAddressPayTo []byte) (*BlockTemplate, error) {
+func (g *BlkTmplGenerator) NewBlockTemplate(consensusApplied wire.ConsensusProtocol, cryptoAddressPayTo []byte) (*BlockTemplate, error) {
 	// Extend the most recently known best block.
 	best := g.chain.BestSnapshot()
 	nextBlockHeight := best.Height + 1
@@ -680,18 +680,22 @@ func (g *BlkTmplGenerator) NewBlockTemplate(cryptoAddressPayTo []byte) (*BlockTe
 	// identical transaction for block version 1).
 	//extraNonce := uint64(0)
 	// ToDo(MLP): If there are more versions, we need to added here.
-	txVersion := wire.TxVersion
+	cbTxVersion := wire.TxVersion
 	if nextBlockHeight >= g.chainParams.BlockHeightAconcagua {
-		txVersion = wire.TxVersion_Height_450000_Aconcagua
+		cbTxVersion = wire.TxVersion_Height_450000_Aconcagua
+
+		if consensusApplied != wire.ConsensusNakamotoPow && consensusApplied != wire.ConsensusEthashPow {
+			return nil, fmt.Errorf("for height %d, the input consensusApplied is not ConsensusNakamotoPow or ConsensusEthashPow", nextBlockHeight)
+		}
 	} else if nextBlockHeight >= g.chainParams.BlockHeightMLPAUT {
-		txVersion = wire.TxVersion_Height_MLPAUT_300000
+		cbTxVersion = wire.TxVersion_Height_MLPAUT_300000
 	} else {
-		txVersion = wire.TxVersion_Height_0
+		cbTxVersion = wire.TxVersion_Height_0
 	}
 
 	// At this moment, we do not need to support output for coinbaseTx,
 	// since it will require the mechanism on separating the total output value to the multiple output Txos.
-	coinbaseTxMsg, err := createCoinbaseTxAbeMsgTemplate(nextBlockHeight, txVersion, cryptoAddressPayTo)
+	coinbaseTxMsg, err := createCoinbaseTxAbeMsgTemplate(nextBlockHeight, cbTxVersion, cryptoAddressPayTo)
 	if err != nil {
 		return nil, err
 	}
@@ -1108,7 +1112,7 @@ mempoolLoop:
 		Bits:             reqDifficultyVector.Bits,
 		BitsSecond:       reqDifficultyVector.BitsSecond,
 		PowScaleSecond:   reqDifficultyVector.PowScaleSecond,
-		ConsensusApplied: wire.ConsensusNakamotoPow, // just a default value, the caller needs to set this field by its own choice
+		ConsensusApplied: consensusApplied,
 	}
 	for _, tx := range blockTxns {
 		if err := msgBlock.AddTransaction(tx.MsgTx()); err != nil {
