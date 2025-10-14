@@ -71,9 +71,12 @@ type orphanBlockAbe struct {
 type BestState struct {
 	Hash chainhash.Hash // The hash of the block.
 	// todo: (ethmining), the BlockHeader's prevBlock is set using this hash. Thus, need to set the hash based on the update situation
-	Height    int32  // The height of the block.
-	Bits      uint32 // The difficulty bits of the block.
-	BlockSize uint64 // The size of the block.
+	Height           int32  // The height of the block.
+	Bits             uint32 // The difficulty bits of the block.
+	BitsSecond       uint32 // The difficulty bits of the block.
+	PowScaleSecond   uint32
+	ConsensusApplied wire.ConsensusProtocol
+	BlockSize        uint64 // The size of the block.
 	//	todo(ABE): ABE does not ues weight.
 	BlockWeight uint64    // The weight of the block.
 	NumTxns     uint64    // The number of txns in the block.
@@ -86,14 +89,17 @@ func newBestState(node *blockNode, blockSize, blockWeight, numTxns,
 	totalTxns uint64, medianTime time.Time) *BestState {
 
 	return &BestState{
-		Hash:        node.hash,
-		Height:      node.height,
-		Bits:        node.bits,
-		BlockSize:   blockSize,
-		BlockWeight: blockWeight,
-		NumTxns:     numTxns,
-		TotalTxns:   totalTxns,
-		MedianTime:  medianTime,
+		Hash:             node.hash,
+		Height:           node.height,
+		Bits:             node.bits,
+		BitsSecond:       node.bitsSecond,
+		PowScaleSecond:   node.powScaleSecond,
+		ConsensusApplied: node.consensusApplied,
+		BlockSize:        blockSize,
+		BlockWeight:      blockWeight,
+		NumTxns:          numTxns,
+		TotalTxns:        totalTxns,
+		MedianTime:       medianTime,
 	}
 }
 

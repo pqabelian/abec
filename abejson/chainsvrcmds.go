@@ -543,6 +543,12 @@ func NewGetDifficultyCmd() *GetDifficultyCmd {
 	return &GetDifficultyCmd{}
 }
 
+type GetDifficultyRatioVectorCmd struct{}
+
+func NewGetDifficultyRatioVectorCmd() *GetDifficultyRatioVectorCmd {
+	return &GetDifficultyRatioVectorCmd{}
+}
+
 // GetGenerateCmd defines the getgenerate JSON-RPC command.
 type GetGenerateCmd struct{}
 
@@ -1053,6 +1059,7 @@ func init() {
 	MustRegisterCmd("getchaintxstats", (*GetChainTxStatsCmd)(nil), flags)
 	MustRegisterCmd("getconnectioncount", (*GetConnectionCountCmd)(nil), flags)
 	MustRegisterCmd("getdifficulty", (*GetDifficultyCmd)(nil), flags)
+	MustRegisterCmd("getdifficultyratiovector", (*GetDifficultyRatioVectorCmd)(nil), flags)
 	MustRegisterCmd("getgenerate", (*GetGenerateCmd)(nil), flags)
 	MustRegisterCmd("gethashespersec", (*GetHashesPerSecCmd)(nil), flags)
 	MustRegisterCmd("getinfo", (*GetInfoCmd)(nil), flags)

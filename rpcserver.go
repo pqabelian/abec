@@ -150,20 +150,21 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	// TODO(ABE): ABE does not support filter.
 	//"getcfilter":            handleGetCFilter,
 	//"getcfilterheader":      handleGetCFilterHeader,
-	"getconnectioncount": handleGetConnectionCount,
-	"getcurrentnet":      handleGetCurrentNet,
-	"getdifficulty":      handleGetDifficulty,
-	"getgenerate":        handleGetGenerate,
-	"gethashespersec":    handleGetHashesPerSec,
-	"getheaders":         handleGetHeaders,
-	"getinfo":            handleGetInfo,
-	"getmempoolinfo":     handleGetMempoolInfo,
-	"getmininginfo":      handleGetMiningInfo,
-	"getnettotals":       handleGetNetTotals,
-	"getnetworkhashps":   handleGetNetworkHashPS,
-	"getpeerinfo":        handleGetPeerInfo,
-	"getrawmempool":      handleGetRawMempool,
-	"getrawtransaction":  handleGetRawTransaction,
+	"getconnectioncount":       handleGetConnectionCount,
+	"getcurrentnet":            handleGetCurrentNet,
+	"getdifficulty":            handleGetDifficulty,
+	"getdifficultyratiovector": handleGetDifficultyRatioVector,
+	"getgenerate":              handleGetGenerate,
+	"gethashespersec":          handleGetHashesPerSec,
+	"getheaders":               handleGetHeaders,
+	"getinfo":                  handleGetInfo,
+	"getmempoolinfo":           handleGetMempoolInfo,
+	"getmininginfo":            handleGetMiningInfo,
+	"getnettotals":             handleGetNetTotals,
+	"getnetworkhashps":         handleGetNetworkHashPS,
+	"getpeerinfo":              handleGetPeerInfo,
+	"getrawmempool":            handleGetRawMempool,
+	"getrawtransaction":        handleGetRawTransaction,
 	//	todo(ABE): ABE does not support 'GetTxOutCmd', as it seems that this command is to get Txo from transactions in mempool and utxo of main chain.
 	//"gettxout":              handleGetTxOut,
 	"getutxoring": handleGetUtxoRing,
@@ -1605,12 +1606,16 @@ func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 		Fullsize: int32(blk.MsgBlock().SerializeSize()),
 		//StrippedSize:  int32(blk.MsgBlock().SerializeSizeStripped()),
 		//Weight:        int32(blockchain.GetBlockWeight(blk)),
-		Bits:        strconv.FormatInt(int64(blockHeader.Bits), 16),
-		Difficulty:  getDifficultyRatio(blockHeader.Bits, params),
-		NextHash:    nextHashString,
-		ContentHash: headerContentHash.String(),
-		MixDigest:   blockHeader.MixDigest.String(),
-		SealHash:    consensus.SealHashFast(blockHeader).String(),
+		Bits:             strconv.FormatInt(int64(blockHeader.Bits), 16),
+		Difficulty:       getDifficultyRatio(blockHeader.Bits, params),
+		BitsSecond:       strconv.FormatInt(int64(blockHeader.BitsSecond), 16),
+		DifficultySecond: getDifficultyRatio(blockHeader.BitsSecond, params),
+		PowScaleSecond:   blockHeader.PowScaleSecond,
+		ConsensusApplied: uint8(blockHeader.ConsensusApplied),
+		NextHash:         nextHashString,
+		ContentHash:      headerContentHash.String(),
+		MixDigest:        blockHeader.MixDigest.String(),
+		SealHash:         consensus.SealHashFast(blockHeader).String(),
 	}
 	if blockHeader.Height >= s.cfg.ChainParams.BlockHeightEthashPoW {
 		blockReply.Nonce = blockHeader.NonceExt
@@ -1670,13 +1675,15 @@ func handleGetBlockChainInfo(s *rpcServer, cmd interface{}, closeChan <-chan str
 	chainSnapshot := chain.BestSnapshot()
 
 	chainInfo := &abejson.GetBlockChainInfoResult{
-		Chain:         params.Name,
-		Blocks:        chainSnapshot.Height,
-		Headers:       chainSnapshot.Height,
-		BestBlockHash: chainSnapshot.Hash.String(),
-		Difficulty:    getDifficultyRatio(chainSnapshot.Bits, params),
-		MedianTime:    chainSnapshot.MedianTime.Unix(),
-		Pruned:        false,
+		Chain:            params.Name,
+		Blocks:           chainSnapshot.Height,
+		Headers:          chainSnapshot.Height,
+		BestBlockHash:    chainSnapshot.Hash.String(),
+		Difficulty:       getDifficultyRatio(chainSnapshot.Bits, params),
+		DifficultySecond: getDifficultyRatio(chainSnapshot.BitsSecond, params),
+		PowScaleSecond:   chainSnapshot.PowScaleSecond,
+		MedianTime:       chainSnapshot.MedianTime.Unix(),
+		Pruned:           false,
 		//	todo(ABE):
 		SoftForks: &abejson.SoftForks{},
 	}
@@ -1757,18 +1764,22 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 
 	params := s.cfg.ChainParams
 	blockHeaderReply := abejson.GetBlockHeaderVerboseResult{
-		Hash:          c.Hash,
-		Confirmations: int64(1 + best.Height - blockHeight),
-		Height:        blockHeight,
-		Version:       blockHeader.Version,
-		VersionHex:    fmt.Sprintf("%08x", blockHeader.Version),
-		MerkleRoot:    blockHeader.MerkleRoot.String(),
-		NextHash:      nextHashString,
-		PreviousHash:  blockHeader.PrevBlock.String(),
-		Nonce:         uint64(blockHeader.Nonce),
-		Time:          blockHeader.Timestamp.Unix(),
-		Bits:          strconv.FormatInt(int64(blockHeader.Bits), 16),
-		Difficulty:    getDifficultyRatio(blockHeader.Bits, params),
+		Hash:             c.Hash,
+		Confirmations:    int64(1 + best.Height - blockHeight),
+		Height:           blockHeight,
+		Version:          blockHeader.Version,
+		VersionHex:       fmt.Sprintf("%08x", blockHeader.Version),
+		MerkleRoot:       blockHeader.MerkleRoot.String(),
+		NextHash:         nextHashString,
+		PreviousHash:     blockHeader.PrevBlock.String(),
+		Nonce:            uint64(blockHeader.Nonce),
+		Time:             blockHeader.Timestamp.Unix(),
+		Bits:             strconv.FormatInt(int64(blockHeader.Bits), 16),
+		Difficulty:       getDifficultyRatio(blockHeader.Bits, params),
+		BitsSecond:       strconv.FormatInt(int64(blockHeader.BitsSecond), 16),
+		DifficultySecond: getDifficultyRatio(blockHeader.BitsSecond, params),
+		PowScaleSecond:   blockHeader.PowScaleSecond,
+		ConsensusApplied: uint8(blockHeader.ConsensusApplied),
 	}
 	return blockHeaderReply, nil
 }
@@ -2254,10 +2265,13 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, miningAddr
 	targetDifficulty := fmt.Sprintf("%064x", blockchain.CompactToBig(header.Bits))
 	templateID := encodeTemplateID(template.prevHash, template.lastGenerated)
 	reply := abejson.GetBlockTemplateResult{
-		Bits:         strconv.FormatInt(int64(header.Bits), 16),
-		CurTime:      header.Timestamp.Unix(),
-		Height:       int64(template.template.Height),
-		PreviousHash: header.PrevBlock.String(),
+		Bits:             strconv.FormatInt(int64(header.Bits), 16),
+		BitsSecond:       strconv.FormatInt(int64(header.BitsSecond), 16),
+		PowScaleSecond:   header.PowScaleSecond,
+		ConsensusApplied: uint8(header.ConsensusApplied),
+		CurTime:          header.Timestamp.Unix(),
+		Height:           int64(template.template.Height),
+		PreviousHash:     header.PrevBlock.String(),
 		//		WeightLimit:  blockchain.MaxBlockWeight,
 		//		SigOpLimit:   blockchain.MaxBlockSigOpsCost,
 		SizeLimit:    wire.MaxBlockPayload,
@@ -3025,6 +3039,17 @@ func handleGetDifficulty(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 	return getDifficultyRatio(best.Bits, s.cfg.ChainParams), nil
 }
 
+func handleGetDifficultyRatioVector(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	best := s.cfg.Chain.BestSnapshot()
+
+	var ret abejson.GetDifficultyRatioVectorResult
+	ret.DifficultyRatio = getDifficultyRatio(best.Bits, s.cfg.ChainParams)
+	ret.DifficultyRatioSecond = getDifficultyRatio(best.BitsSecond, s.cfg.ChainParams)
+	ret.PowScaleSecond = best.PowScaleSecond
+
+	return ret, nil
+}
+
 // handleGetGenerate implements the getgenerate command.
 func handleGetGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	return s.cfg.CPUMiner.IsMining(), nil
@@ -3113,6 +3138,8 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		Connections:          s.cfg.ConnMgr.ConnectedCount(),
 		Proxy:                cfg.Proxy,
 		Difficulty:           getDifficultyRatio(best.Bits, s.cfg.ChainParams),
+		DifficultySecond:     getDifficultyRatio(best.BitsSecond, s.cfg.ChainParams),
+		PowScaleSecond:       best.PowScaleSecond,
 		TestNet:              cfg.TestNet3,
 		RelayFee:             cfg.minRelayTxFee.ToABE(),
 		NodeType:             nodeType.String(),
@@ -3168,6 +3195,9 @@ func handleGetMiningInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		CurrentBlockWeight: best.BlockWeight,
 		CurrentBlockTx:     best.NumTxns,
 		Difficulty:         getDifficultyRatio(best.Bits, s.cfg.ChainParams),
+		DifficultySecond:   getDifficultyRatio(best.BitsSecond, s.cfg.ChainParams),
+		PowScaleSecond:     best.PowScaleSecond,
+		ConsensusApplied:   uint8(best.ConsensusApplied),
 		Generate:           s.cfg.CPUMiner.IsMining(),
 		GenProcLimit:       s.cfg.CPUMiner.NumWorkers(),
 		HashesPerSec:       int64(s.cfg.CPUMiner.HashesPerSecond()),
