@@ -6,12 +6,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/blockchain/ruleerror"
 	"math"
 	"os"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/abesuite/abec/blockchain/ruleerror"
 
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
@@ -760,7 +761,7 @@ func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 		atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
 	}
 
-	script, err := tx.GetCTAUTScript()
+	script, err := tx.CTAUTTScript()
 	if err != nil {
 		// This should not happen, since mempool should accept tx which has error on extracting AutTransaction.
 		log.Warnf("removeTransactionAbe: error happens when extracting AutTransaction from Tx %s: %v", tx.Hash(), err)
@@ -909,7 +910,7 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 		mp.cfg.AddrIndex.AddUnconfirmedTx(tx, utxoView)
 	}*/
 
-	script, err := tx.GetCTAUTScript()
+	script, err := tx.CTAUTTScript()
 	if err != nil {
 		// This should not happen, since before addTransactionAbe, the transaction should have been checked
 		log.Warnf("addTransactionAbe: fail to add Tx %s to mempool, since error happens when extracting AutTransaction: %v", tx.Hash(), err)
@@ -1872,18 +1873,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	// == CT-AUT checking rule ==
 	var ctAutView *blockchain.CTAUTViewpoint
 
-	ctAutTx, err := tx.CTAUTTScript(func(ringHash chainhash.Hash) (*wire.TxOutAbe, error) {
-		ringEntry := utxoRingView.LookupEntry(ringHash)
-		if ringEntry == nil {
-			return nil, fmt.Errorf("no such txo ring found")
-		}
-		txOuts := ringEntry.TxOuts()
-		// assert
-		if len(txOuts) == 0 {
-			return nil, fmt.Errorf("an empty ring found")
-		}
-		return txOuts[0], nil
-	})
+	ctAutScript, err := tx.CTAUTTScript()
 	if err != nil {
 		if cerr, ok := err.(ruleerror.RuleError); ok {
 			return nil, nil, chainRuleError(cerr)
@@ -1891,29 +1881,37 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 		return nil, nil, err
 	}
 
-	if ctAutTx != nil {
-		ctAutView, err = mp.fetchInputCTAUT(ctAutTx)
+	if ctAutScript != nil {
+		err = ctaut.PresetHostOutpointForCTAUT(ctAutScript, tx.MsgTx(), func(ringHash chainhash.Hash) (*wire.TxOutAbe, error) {
+			ringEntry := utxoRingView.LookupEntry(ringHash)
+			if ringEntry == nil {
+				return nil, fmt.Errorf("no such txo ring found")
+			}
+			txOuts := ringEntry.TxOuts()
+			// assert
+			if len(txOuts) == 0 {
+				return nil, fmt.Errorf("an empty ring found")
+			}
+			return txOuts[0], nil
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+
+		ctAutView, err = mp.fetchInputCTAUT(ctAutScript)
 		if err != nil {
 			if cerr, ok := err.(ruleerror.RuleError); ok {
 				return nil, nil, chainRuleError(cerr)
 			}
 			return nil, nil, err
 		}
-		// Ensure that no multiply transactions try register instances of the same identifier
-		//if ctAutTx.Type() == ctaut.Registration {
-		//	identifier := ctAutTx.Identifier()
-		//	if registerAUTTxHash, exist := mp.registeredAUTName[hex.EncodeToString(identifier[:])]; exist {
-		//		str := fmt.Sprintf("transaction %v has register CTAUT instance earlier than transaction %v",
-		//			registerAUTTxHash, txHash)
-		//		return nil, nil, txRuleError(wire.RejectInvalid, str)
-		//	}
-		//}
+
 		// TODO AUT Check with blockchain, including:
 		// - whether the specified instance exists on Abelian
 		// - check whether the claimed threshold is met
 		// - check whether the claimed configuration is met
 		// - check whether the input is spendable
-		err = blockchain.CheckCTAUTTransactionInputs(ctAutTx, tx, nextBlockHeight,
+		err = blockchain.ValidateCTAUTScript(ctAutScript, tx, nextBlockHeight,
 			ctAutView, mp.cfg.ChainParams)
 		if err != nil {
 			if cerr, ok := err.(ruleerror.RuleError); ok {

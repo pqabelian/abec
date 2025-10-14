@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	//"reflect"
 	"sync"
 
 	"github.com/abesuite/abec/abeutil"
@@ -443,8 +444,16 @@ func serializeCTAUTCoin(coin *CTAUTCoin) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	serializedCTAUTCoin := buff.Bytes()
 
-	return buff.Bytes(), nil
+	//deserializedCoin, err := deserializeCTAUTCoin(serializedCTAUTCoin)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//if !reflect.DeepEqual(coin, deserializedCoin) {
+	//	return nil, fmt.Errorf("unmatched CTAUTCoin serialized/deserialized")
+	//}
+	return serializedCTAUTCoin, nil
 }
 func deserializeCTAUTCoin(serialized []byte) (*CTAUTCoin, error) {
 	if len(serialized) < 8 {
@@ -611,7 +620,7 @@ func dbPutCTAUTView(dbTx database.Tx, view *CTAUTViewpoint, blockHeight int32, b
 			if err != nil {
 				return err
 			}
-			log.Debugf(`the token (%s,%d) in AUT identified by %s is stored at height %d (block hash %s):`,
+			log.Debugf(`the token (%s,%d) for CTAUT identified by %s is stored at height %d (block hash %s):`,
 				outpoint.Hash.String(), outpoint.Index, identifierKey, blockHeight, blockHash)
 		}
 

@@ -13,7 +13,8 @@ const (
 	MAXALLOWED uint32 = 4294967295 // 2^32-1
 	// MaxAllowedTxMemoSize is larger than package abecryptoparam (for pqringct), to Support AUT script.
 	// todo(ctaut): re-compute and decide this value.
-	MaxAllowedTxMemoSize uint32 = 65536 // 2^16, 64K bytes
+	//MaxAllowedTxMemoSize uint32 = 65536 // 2^16, 64K bytes
+	MaxAllowedTxMemoSize uint32 = 128 * 1024 // 2^17, 128K bytes
 	// MaxAllowedSerialNumberSize must have the same value as that in package abecryptoparam (for pqringct).
 	MaxAllowedSerialNumberSize uint32 = 64       // 512 bits = 64 bytes
 	MaxAllowedTxWitnessSize    uint32 = 16777216 // 2^24, 16M bytes

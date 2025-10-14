@@ -2,7 +2,6 @@ package abeutil
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 
 	"github.com/abesuite/abec/aut"
@@ -77,24 +76,15 @@ func (tx *TxAbe) AUTTransaction() (aut.Transaction, error) {
 	return tx.autTx, tx.errAUTTx
 }
 
-// GetCTAUTScript would get the CTAUTTScript directly, that MUST be extracted before, otherwise error would be return
-func (tx *TxAbe) GetCTAUTScript() (ctaut.CTAUTScript, error) {
-	if tx.autTxDone {
-		return tx.ctAutScript, tx.errCTAUTScript
-	}
-	return nil, fmt.Errorf("the CTAUTTScript should be call firstly")
-}
-
 // CTAUTTScript would extract the AUT script from memo in transaction
-func (tx *TxAbe) CTAUTTScript(lookupHostTxo func(ringHash chainhash.Hash) (*wire.TxOutAbe, error)) (ctaut.CTAUTScript, error) {
+func (tx *TxAbe) CTAUTTScript() (ctaut.CTAUTScript, error) {
 	// TODO(ctaut) return err?
-	if tx.autTxDone {
-
+	if tx.ctAutScriptDone {
 		return tx.ctAutScript, tx.errCTAUTScript
 	}
 	tx.ctAutScriptDone = true
 
-	tx.ctAutScript, tx.errCTAUTScript = ctaut.ExtractCTAUTScript(tx.MsgTx(), lookupHostTxo)
+	tx.ctAutScript, tx.errCTAUTScript = ctaut.ExtractCTAUTScript(tx.MsgTx())
 
 	return tx.ctAutScript, tx.errCTAUTScript
 }

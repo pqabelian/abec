@@ -411,7 +411,7 @@ func (b *BlockAbe) CTAUTScripts() []ctaut.CTAUTScript {
 			continue
 		}
 
-		autTx, err := txAbe.GetCTAUTScript()
+		autTx, err := txAbe.CTAUTTScript()
 		if err != nil {
 			//	this should not happen
 			log.Warnf("AUTTransactions: error happens when getting AutTransaction from the %d-th transaction (%s) of the block: %v", i, txAbe.Hash(), err)

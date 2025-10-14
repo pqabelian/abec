@@ -20,6 +20,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
@@ -2735,6 +2736,20 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		for i := 0; i < len(cfg.miningAddrs); i++ {
 			if cfg.miningAddrs[i].CryptoScheme() != abecryptoxparam.CryptoSchemePQRingCT {
 				return nil, fmt.Errorf("address with crypto scheme other than %d address is disallow until height %d", abecryptoxparam.CryptoSchemePQRingCT, s.chainParams.BlockHeightMLPAUT)
+			}
+		}
+	} else if s.chain.BestSnapshot().Height+1 < s.chainParams.BlockHeightAconcagua {
+		// Check address, disallow higher address with crypto scheme
+		for i := 0; i < len(cfg.miningAddrs); i++ {
+			if cfg.miningAddrs[i].CryptoScheme() != abecryptoxparam.CryptoSchemePQRingCT {
+				return nil, fmt.Errorf("address with crypto scheme other than %d address is disallow until height %d", abecryptoxparam.CryptoSchemePQRingCT, s.chainParams.BlockHeightMLPAUT)
+			}
+			privacyLevel, _, _, err := abecryptoxkey.CryptoAddressParse(cfg.miningAddrs[i].CryptoAddress())
+			if err != nil {
+				return nil, fmt.Errorf("fail to get privacy level from address")
+			}
+			if privacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+				return nil, fmt.Errorf("address with privacy level other than %d address is disallow until height %d", abecryptoxkey.PrivacyLevelPSEUDONYMCT, s.chainParams.BlockHeightAconcagua)
 			}
 		}
 	}

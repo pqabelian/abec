@@ -3,13 +3,13 @@ package ctaut
 import (
 	"bytes"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/chainhash"
+	ctautwire "github.com/abesuite/abec/ctaut/wire"
 	"github.com/abesuite/abec/wire"
 )
 
@@ -21,55 +21,55 @@ func init() {
 	}
 }
 
-func writePrefix(b bytes.Buffer, ctautTxType CTAUTScriptType, identifier [CTAUTIdentifierLength]byte) error {
-	err := WriteFixedBytes(&b, []byte(commonPrefix))
+func writePrefix(b *bytes.Buffer, ctautTxType CTAUTScriptType, identifier [CTAUTIdentifierLength]byte) error {
+	err := WriteFixedBytes(b, []byte(commonPrefix))
 	if err != nil {
 		return err
 	}
 
-	err = WriteByte(&b, ctautTxType)
+	err = WriteByte(b, ctautTxType)
 	if err != nil {
 		return err
 	}
 
-	return WriteFixedBytes(&b, identifier[:])
+	return WriteFixedBytes(b, identifier[:])
 }
 
-func readPrefix(r io.Reader, expectedCtAutTxType CTAUTScriptType) ([CTAUTIdentifierLength]byte, error) {
+func readPrefix(r io.Reader, expectedCtAutTxType CTAUTScriptType) ([CTAUTIdentifierLength]byte, CTAUTScriptType, error) {
 	var res [CTAUTIdentifierLength]byte
 
 	commprefix, err := ReadFixedBytes(r, len(commonPrefix))
 	if err != nil {
-		return res, ErrNonAutTx
+		return res, 0, ErrNonAutTx
 	}
 	if !bytes.Equal(commprefix, []byte(commonPrefix)) {
-		return res, ErrNonAutTx
+		return res, 0, ErrNonAutTx
 	}
 
 	ctAutScriptType, err := ReadByte(r)
 	if err != nil {
-		return res, err
+		return res, 0, err
 	}
 	if ctAutScriptType != expectedCtAutTxType {
-		return res, ErrInValidAUTTx
+		return res, 0, ErrInValidAUTTx
 	}
 
 	identifier, err := ReadFixedBytes(r, CTAUTIdentifierLength)
 	if err != nil {
-		return res, err
+		return res, 0, err
 	}
 	copy(res[:], identifier)
 
-	return res, nil
+	return res, ctAutScriptType, nil
 }
 
-func writeIssuerTokens(b bytes.Buffer, issuerTokens [][]byte) error {
-	err := WriteVarInt(&b, uint64(len(issuerTokens)))
+func writeIssuerTokens(b *bytes.Buffer, issuerTokens [][]byte) error {
+	err := WriteVarInt(b, uint64(len(issuerTokens)))
 	if err != nil {
 		return err
 	}
 	for _, issuer := range issuerTokens {
-		err = WriteVarBytes(&b, issuer[:])
+		err = WriteVarBytes(b, issuer[:])
 		if err != nil {
 			return err
 		}
@@ -109,8 +109,8 @@ func readIssuerTokens(r io.Reader) ([][]byte, error) {
 	return issuerTokens, nil
 }
 
-func writeWitnessHash(b bytes.Buffer, witnessHash chainhash.Hash) error {
-	return WriteVarBytes(&b, witnessHash[:])
+func writeWitnessHash(b *bytes.Buffer, witnessHash chainhash.Hash) error {
+	return WriteVarBytes(b, witnessHash[:])
 }
 func readWitnessHash(r io.Reader) (chainhash.Hash, error) {
 	// todo(ctaut): why use var bytes? it increases the NewHash() part.
@@ -127,47 +127,47 @@ func readWitnessHash(r io.Reader) (chainhash.Hash, error) {
 }
 
 // todo(ctaut): why define this function?
-func writeAutMemo(b bytes.Buffer, autMemo []byte) error {
-	return WriteVarBytes(&b, autMemo)
+func writeAutMemo(b *bytes.Buffer, autMemo []byte) error {
+	return WriteVarBytes(b, autMemo)
 }
 
 // todo(ctaut): the length check does not make sense, since it is checked in ReadVarBytes.
 func readAutMemo(r io.Reader) ([]byte, error) {
-	autMemo, err := ReadVarBytes(r, maxCTAUTMemoLength, "autmemo")
+	autMemo, err := ReadVarBytes(r, MaxCTAUTMemoLength, "autmemo")
 	if err != nil {
 		return nil, err
 	}
-	if len(autMemo) > maxCTAUTMemoLength {
+	if len(autMemo) > MaxCTAUTMemoLength {
 		return nil, ErrInValidAUTTx
 	}
 	return autMemo, nil
 }
 
 // todo(ctaut): why define this function?
-func writeMemo(b bytes.Buffer, memo []byte) error {
-	return WriteVarBytes(&b, memo)
+func writeMemo(b *bytes.Buffer, memo []byte) error {
+	return WriteVarBytes(b, memo)
 }
 
 // todo(ctaut): the length check does not make sense, since it is checked in ReadVarBytes.
 func readMemo(r io.Reader) ([]byte, error) {
-	memo, err := ReadVarBytes(r, maxMemoLength, "memo")
+	memo, err := ReadVarBytes(r, MaxMemoLength, "memo")
 	if err != nil {
 		return nil, err
 	}
-	if len(memo) > maxMemoLength {
+	if len(memo) > MaxMemoLength {
 		return nil, ErrInValidAUTTx
 	}
 	return memo, nil
 }
 
 // todo(ctaut): add 's' to the name?
-func writeCTAUTTxoScripts(b bytes.Buffer, scripts [][]byte) error {
-	err := WriteVarInt(&b, uint64(len(scripts)))
+func writeCTAUTTxoScripts(b *bytes.Buffer, scripts [][]byte) error {
+	err := WriteVarInt(b, uint64(len(scripts)))
 	if err != nil {
 		return err
 	}
 	for _, txoScript := range scripts {
-		err = WriteVarBytes(&b, txoScript)
+		err = WriteVarBytes(b, txoScript)
 		if err != nil {
 			return err
 		}
@@ -177,24 +177,12 @@ func writeCTAUTTxoScripts(b bytes.Buffer, scripts [][]byte) error {
 func readCTAUTTxoScript(r io.Reader, expectedCTTokenLength int, expectedPlainTokenLength int) ([][]byte, error) {
 	var err error
 
-	var numCTAutCoins uint64
-	if numCTAutCoins, err = ReadVarInt(r); err != nil {
+	var numAutCoins uint64
+	if numAutCoins, err = ReadVarInt(r); err != nil {
 		return nil, err
 	}
-	if uint64(expectedCTTokenLength) != numCTAutCoins {
-		return nil, errors.New("mis-match output coin")
-	}
-
-	var numPlainAutCoins uint64
-	if numPlainAutCoins, err = ReadVarInt(r); err != nil {
-		return nil, err
-	}
-	if uint64(expectedPlainTokenLength) != numPlainAutCoins {
-		return nil, errors.New("mis-match output coin")
-	}
-
-	ctAUTTxoScripts := make([][]byte, expectedCTTokenLength+expectedPlainTokenLength)
-	for i := 0; i < expectedCTTokenLength; i++ {
+	ctAUTTxoScripts := make([][]byte, numAutCoins)
+	for i := uint64(0); i < numAutCoins; i++ {
 		ctAUTTxoScripts[i], err = ReadVarBytes(r, MaxAUTValueScriptLength, "an AUT with invalid txo script")
 		if err != nil {
 			return nil, err
@@ -205,11 +193,32 @@ func readCTAUTTxoScript(r io.Reader, expectedCTTokenLength int, expectedPlainTok
 			return nil, ErrInValidAUTTx
 		}
 	}
+	if int(numAutCoins) != expectedCTTokenLength+expectedPlainTokenLength {
+		return nil, ErrInValidAUTTx
+	}
 
-	for i := expectedCTTokenLength; i < expectedCTTokenLength+expectedPlainTokenLength; i++ {
-		ctAUTTxoScripts[i], err = ReadVarBytes(r, MaxAUTValueScriptLength, "an AUT with invalid txo script")
+	for i := 0; i < expectedCTTokenLength; i++ {
+		autTxoType, err := abecryptox.GetAutTxoType(&ctautwire.AutTxo{
+			Version:   wire.TxVersion, // TODO support standalone version for CT-AUT
+			TxoScript: ctAUTTxoScripts[i],
+		})
 		if err != nil {
 			return nil, err
+		}
+		if autTxoType != abecryptox.AutTxoTypeHidden {
+			return nil, ErrInValidAUTTx
+		}
+	}
+	for i := expectedCTTokenLength; i < expectedCTTokenLength+expectedPlainTokenLength; i++ {
+		autTxoType, err := abecryptox.GetAutTxoType(&ctautwire.AutTxo{
+			Version:   wire.TxVersion, // TODO support standalone version for CT-AUT
+			TxoScript: ctAUTTxoScripts[i],
+		})
+		if err != nil {
+			return nil, err
+		}
+		if autTxoType != abecryptox.AutTxoTypePublic {
+			return nil, ErrInValidAUTTx
 		}
 	}
 
@@ -238,15 +247,15 @@ func CheckHostTxoParasiticity(txHash chainhash.Hash, outputIndex int, txOut *wir
 	return coinAddress, nil
 }
 
-// populateGeneratedCTAUTTokens would get the specified host output from the host transaction
+// GetGeneratedCTAUTTokens would get the specified host output from the host transaction
 // todo(ctaut): add comments to define the rules
-func populateGeneratedCTAUTTokens(autTx CTAUTScript, msgTx *wire.MsgTxAbe) error {
+func GetGeneratedCTAUTTokens(numCTAUTTokens int, txHash chainhash.Hash, txOuts []*wire.TxOutAbe) ([]*CTAUTToken, error) {
 	startIdx := 0
-	for ; startIdx < len(msgTx.TxOuts); startIdx++ {
-		txOut := msgTx.TxOuts[startIdx]
+	for ; startIdx < len(txOuts); startIdx++ {
+		txOut := txOuts[startIdx]
 		privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre ||
 			privacyLevel == abecryptoxkey.PrivacyLevelRINGCT {
@@ -254,32 +263,26 @@ func populateGeneratedCTAUTTokens(autTx CTAUTScript, msgTx *wire.MsgTxAbe) error
 		}
 
 		if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
-			return fmt.Errorf("expect privacy level %d but got %d",
+			return nil, fmt.Errorf("expect privacy level %d but got %d",
 				abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
 		}
 		break
 	}
 
-	// todo(ctaut): NumTxOutputs() here is a typically inappropriate use.
-	numOutput, err := getNumGeneratedTokens(autTx)
-	if err != nil {
-		return err
-	}
-	if startIdx+numOutput > len(msgTx.TxOuts) {
-		return fmt.Errorf("claim %d outputs for CTAUT but only remain %d outputs in host transaction",
-			numOutput, len(msgTx.TxOuts)-startIdx)
+	if startIdx+numCTAUTTokens > len(txOuts) {
+		return nil, fmt.Errorf("claim %d outputs for CTAUT but only remain %d outputs in host transaction",
+			numCTAUTTokens, len(txOuts)-startIdx)
 	}
 
 	// todo(ctaut): seems not correct. it is possible startIdx is not hosting ctaut. need define the rules
-	txHash := msgTx.TxHash()
-	autTxOuts := make([]*CTAUTToken, numOutput)
-	for i := 0; i < numOutput; i++ {
+	autTxOuts := make([]*CTAUTToken, numCTAUTTokens)
+	for i := 0; i < numCTAUTTokens; i++ {
 		index := startIdx + i
-		txOut := msgTx.TxOuts[index]
+		txOut := txOuts[index]
 
 		coinAddress, err := CheckHostTxoParasiticity(txHash, index, txOut)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		autTxOuts[i] = &CTAUTToken{
@@ -292,12 +295,14 @@ func populateGeneratedCTAUTTokens(autTx CTAUTScript, msgTx *wire.MsgTxAbe) error
 			CoinAddress: coinAddress,
 		}
 	}
-
-	return autTx.setConsumedTokens(autTxOuts)
+	return autTxOuts, nil
 }
-func populateConsumedCTAUTTokens(autTx CTAUTScript, msgTx *wire.MsgTxAbe,
+func populateConsumedCTAUTTokens(script CTAUTScript, msgTx *wire.MsgTxAbe,
 	lookupHostOutput func(ringHash chainhash.Hash) (*wire.TxOutAbe, error)) error {
-	if autTx == nil {
+	if script == nil {
+		return nil
+	}
+	if script.Type() == Registration {
 		return nil
 	}
 	txHash := msgTx.TxHash()
@@ -330,7 +335,7 @@ func populateConsumedCTAUTTokens(autTx CTAUTScript, msgTx *wire.MsgTxAbe,
 		break
 	}
 
-	numInCoins, err := getNumConsumedTokens(autTx)
+	numInCoins, err := getNumConsumedTokens(script)
 	if err != nil {
 		return err
 	}
@@ -379,7 +384,7 @@ func populateConsumedCTAUTTokens(autTx CTAUTScript, msgTx *wire.MsgTxAbe,
 			CoinAddress:  coinAddress, // required by root coin while optional for coin
 		}
 	}
-	return autTx.setConsumedTokens(autTxIns)
+	return script.setConsumedTokens(autTxIns)
 }
 
 // todo(ctaut): define the rules on the mint/update threshold.

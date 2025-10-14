@@ -438,7 +438,7 @@ UnitScale: %v -> %v`, string(autTransaction.AutIdentifier),
 			log.Debugf("%s", point)
 		}
 		log.Debugf("Enabled RootCoin: len = %d", len(autTransaction.TxOuts))
-		for _, point := range autTransaction.TxOuts {
+		for point := range autTransaction.TxOuts {
 			log.Debugf("%s", point)
 		}
 

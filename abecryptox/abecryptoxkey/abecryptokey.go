@@ -3,6 +3,7 @@ package abecryptoxkey
 import (
 	"errors"
 	"fmt"
+
 	"github.com/abesuite/abec/abecrypto"
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
@@ -97,6 +98,18 @@ func CryptoAddressKeyReGenByRootSeedsFromPublicRand(cryptoScheme abecryptoxparam
 
 	default:
 		return nil, nil, nil, nil, nil, fmt.Errorf("CryptoAddressKeyReGenByRootSeedsFromPublicRand: cryptoScheme (%d) is not supported", cryptoScheme)
+	}
+	//return nil, nil, nil, nil, nil
+}
+func CoinValueKeyReGenByRootSeedsFromPublicRand(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
+	coinValueKeyRootSeed []byte, publicRand []byte) (cryptoVpk []byte, cryptoVsk []byte, err error) {
+
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+		return pqringctxCoinValueKeyReGenByRootSeedsFromPublicRand(abecryptoxparam.PQRingCTXPP, cryptoScheme, privacyLevel, coinValueKeyRootSeed, publicRand)
+
+	default:
+		return nil, nil, fmt.Errorf("CryptoAddressKeyReGenByRootSeedsFromPublicRand: cryptoScheme (%d) is not supported", cryptoScheme)
 	}
 	//return nil, nil, nil, nil, nil
 }

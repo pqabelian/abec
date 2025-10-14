@@ -2680,7 +2680,7 @@ func (b *BlockChain) initChainState() error {
 		}
 	}
 	if !hasCTAUTRelevantBucket {
-		log.Infof("Creating bucket for aut information...")
+		log.Infof("Creating bucket for ct-aut information...")
 		err = b.db.Update(func(dbTx database.Tx) error {
 			meta := dbTx.Metadata()
 			err = createBucketForCTAUT(meta)

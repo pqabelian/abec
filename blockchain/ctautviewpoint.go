@@ -94,6 +94,7 @@ type CTAUTCoin struct {
 	// how it affects alignment on 64-bit platforms.  The current order is
 	// specifically crafted to result in minimal padding.  There will be a
 	// lot of these in memory, so a few extra bytes of padding adds up.
+	version     uint32 // TODO
 	script      []byte
 	blockHeight int32 // Height of block containing tx.
 
@@ -102,6 +103,10 @@ type CTAUTCoin struct {
 	// since it was loaded.  This approach is used in order to reduce memory
 	// usage since there will be a lot of these in memory.
 	packedFlags ctAutFlags
+}
+
+func (coin *CTAUTCoin) Script() []byte {
+	return coin.script
 }
 
 // isModified returns whether or not the output has been modified since it was
@@ -271,19 +276,23 @@ func (view *CTAUTViewpoint) connectRegistrationScript(script *ctaut.Registration
 		*sctauts = append(*sctauts, stxo)
 	}
 
-	log.Debugf(`In transaction %s, AUT with identifier %s with following configuration is registered: Symbol: %v,
-	ReregistrationThreshold: %v, MintThreshold: %v, PlannedTotalAmount: %v,
-	ExpireHeight: %v, unitName: %v, minUnitName: %v, UnitScale: %v`,
-		txHash,
-		identifierKey, hex.EncodeToString(metadata.CTAutSymbol),
-		metadata.MintedAmount, metadata.ReregistrationThreshold, metadata.PlannedTotalAmount,
-		metadata.ExpireHeight,
-		hex.EncodeToString(metadata.BaseUnitName), hex.EncodeToString(metadata.SubUnitName), metadata.UnitScale)
+	log.Debugf(`In transaction %s, AUT with identifier %s with following configuration is registered: 
+    Name: %v, Symbol: %v, ExpireHeight: %v,
+	BaseUnitName: %v, SubUnitName: %v, UnitScale: %v,
+	ReregistrationThreshold: %v, MintThreshold: %v, PlannedTotalSupply: %v`,
+		txHash, identifierKey,
+		hex.EncodeToString(metadata.CTAutName), hex.EncodeToString(metadata.CTAutSymbol), metadata.ExpireHeight,
+		hex.EncodeToString(metadata.BaseUnitName), hex.EncodeToString(metadata.SubUnitName), metadata.UnitScale,
+		metadata.ReregistrationThreshold, metadata.MintThreshold, metadata.PlannedTotalSupply,
+	)
 	log.Debugf("Totoal %d issuers", len(metadata.IssuerTokens))
 	for i := 0; i < len(metadata.IssuerTokens); i++ {
 		log.Debugf("\t %d-th: %s", i, hex.EncodeToString(metadata.IssuerTokens[i]))
 	}
-
+	log.Debugf("Enabled RootCoin: len = %d", len(metadata.RootTokenSet))
+	for point := range metadata.RootTokenSet {
+		log.Debugf("%s", point)
+	}
 	return nil
 }
 func (view *CTAUTViewpoint) connectReRegistrationScript(script *ctaut.ReRegistrationScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
@@ -319,12 +328,12 @@ func (view *CTAUTViewpoint) connectReRegistrationScript(script *ctaut.ReRegistra
 	}
 	log.Debugf(`Re-register AUT with identifier %s with following configuration: Symbol: %s -> %s,
 ReregistrationThreshold: %v -> %v, MintThreshold: %v -> %v,
-PlannedTotalAmount: %v -> %v, ExpireHeight: %v -> %v,
+PlannedTotalSupply: %v -> %v, ExpireHeight: %v -> %v,
 UnitScale: %v -> %v`, identifierKey,
 		hex.EncodeToString(previousMetadata.CTAutSymbol), hex.EncodeToString(metadata.CTAutSymbol),
 		previousMetadata.ReregistrationThreshold, metadata.ReregistrationThreshold,
 		previousMetadata.MintThreshold, metadata.MintThreshold,
-		previousMetadata.PlannedTotalAmount, metadata.PlannedTotalAmount,
+		previousMetadata.PlannedTotalSupply, metadata.PlannedTotalSupply,
 		previousMetadata.ExpireHeight, metadata.ExpireHeight,
 		previousMetadata.UnitScale, metadata.UnitScale,
 	)
@@ -342,7 +351,7 @@ UnitScale: %v -> %v`, identifierKey,
 		log.Debugf("%s", point)
 	}
 	log.Debugf("Enabled RootCoin: len = %d", len(metadata.RootTokenSet))
-	for _, point := range metadata.RootTokenSet {
+	for point := range metadata.RootTokenSet {
 		log.Debugf("%s", point)
 	}
 	return nil
@@ -389,13 +398,18 @@ func (view *CTAUTViewpoint) connectMintScript(script *ctaut.MintScript, txHash c
 	wouldMintedAmount := script.Vin()
 	if info.MintedAmount+wouldMintedAmount < info.MintedAmount {
 		return fmt.Errorf("an mint AUT transaction %s try to mint AUT exceed planned amount %d for AUT identified by %s",
-			txHash, info.PlannedTotalAmount, identifierKey)
+			txHash, info.PlannedTotalSupply, identifierKey)
 	}
 	info.MintedAmount += wouldMintedAmount
 
+	// 2. add generated token
+	for _, token := range script.GeneratedTokens() {
+		view.instances[identifierKey].Add(token.HostOutPoint, NewCTAUTCoin(identifier[:], token.ValueScript, blockHeight))
+	}
+
 	log.Debugf(`Mint %d AUT coins for identifier %s (minted amount %d /planned total amount %d) with %d issuer tokens`,
 		wouldMintedAmount, identifierKey,
-		info.MintedAmount, info.PlannedTotalAmount, len(txIns))
+		info.MintedAmount, info.PlannedTotalSupply, len(txIns))
 	return nil
 }
 
@@ -498,7 +512,7 @@ func (view *CTAUTViewpoint) connectBurnScript(script *ctaut.BurnTx, txHash chain
 // view does not contain the required utxos.
 // TODO Check consistence with mining.spendTransactionAbe
 func (view *CTAUTViewpoint) connectTransaction(tx *abeutil.TxAbe, blockHeight int32, sctauts *[]SpentCTAUT) error {
-	ctAutScript, err := tx.GetCTAUTScript()
+	ctAutScript, err := tx.CTAUTTScript()
 	if err != nil {
 		return err
 	}
@@ -905,28 +919,33 @@ func (view *CTAUTViewpoint) fetchCTAUTMain(db database.DB, outpoints map[ctaut.H
 			}
 		}
 
-		if view.instances[autIdentifierKey].coins == nil {
-			view.instances[autIdentifierKey].coins = make(map[ctaut.HostOutPoint]*CTAUTCoin, len(outpoints))
-		}
-		for outpoint := range outpoints {
-			// when the view has corresponding outpoints, do not
-			// fetch from database, it means that outpoint has fetched
-			if view.instances[autIdentifierKey].coins[outpoint] != nil {
-				continue
+		if view.instances[autIdentifierKey] != nil {
+			if view.instances[autIdentifierKey].coins == nil {
+				view.instances[autIdentifierKey].coins = make(map[ctaut.HostOutPoint]*CTAUTCoin, len(outpoints))
 			}
+			for outpoint := range outpoints {
+				// when the view has corresponding outpoints, do not
+				// fetch from database, it means that outpoint has fetched
+				if view.instances[autIdentifierKey].coins[outpoint] != nil {
+					continue
+				}
 
-			coin, err := dbFetchCTAUTCoin(dbTx, outpoint)
-			if err != nil {
-				return err
+				coin, err := dbFetchCTAUTCoin(dbTx, outpoint)
+				if err != nil {
+					return err
+				}
+				// assert
+				if coin == nil {
+					return fmt.Errorf("invalid fetch for point (%s, %d) for CTAUT instance %s",
+						outpoint.Hash, outpoint.Index, autIdentifierKey)
+				}
+				if !bytes.Equal(coin.identifier, identifier) {
+					return fmt.Errorf("invalid fetch for point (%s, %d) for CTAUT instance %s",
+						outpoint.Hash, outpoint.Index, autIdentifierKey)
+				}
+				view.instances[autIdentifierKey].coins[outpoint] = coin
 			}
-			// assert
-			if !bytes.Equal(coin.identifier, identifier) {
-				return fmt.Errorf("invalid fetch for point (%s, %d) for CTAUT instance %s",
-					outpoint.Hash, outpoint.Index, autIdentifierKey)
-			}
-			view.instances[autIdentifierKey].coins[outpoint] = coin
 		}
-
 		return nil
 	})
 }
@@ -942,29 +961,37 @@ func (view *CTAUTViewpoint) fetchConsumedCTAUTTokens(db database.DB, block *abeu
 		// which has no inputs) collecting them into sets of what is needed and
 		// what is already known (in-flight).
 		neededSet := make(map[ctaut.HostOutPoint]struct{}) // it is not in the same block
-		ctAutScript, err := tx.CTAUTTScript(func(ringHash chainhash.Hash) (*wire.TxOutAbe, error) {
-			ringEntry := hostView.LookupEntry(ringHash)
-			if ringEntry == nil {
-				return nil, errors.New("no such ring found")
-			}
-			txOuts := ringEntry.txOuts
-			if len(txOuts) == 0 {
-				return nil, errors.New("an empty ring found")
-			}
-			return txOuts[0], nil
-		})
+		ctAutScript, err := tx.CTAUTTScript()
 		if err != nil {
 			//	if a tx.AUTTransaction() returns error, such a transaction should not be accepted by mempool or a block.
 			return err
 		}
 		if ctAutScript != nil {
+			err = ctaut.PresetHostOutpointForCTAUT(ctAutScript, tx.MsgTx(), func(ringHash chainhash.Hash) (*wire.TxOutAbe, error) {
+				ringEntry := hostView.LookupEntry(ringHash)
+				if ringEntry == nil {
+					return nil, errors.New("no such ring found")
+				}
+				txOuts := ringEntry.txOuts
+				if len(txOuts) == 0 {
+					return nil, errors.New("an empty ring found")
+				}
+				return txOuts[0], nil
+			})
+			if err != nil {
+				return err
+			}
+
 			identifier := ctAutScript.Identifier()
-			for _, txIn := range ctAutScript.ConsumedTokens() {
-				token := view.LookupCTAUTCoin(identifier[:], txIn.HostOutPoint)
-				if token == nil {
-					neededSet[txIn.HostOutPoint] = struct{}{}
+			if ctAutScript.Type() == ctaut.Transfer || ctAutScript.Type() == ctaut.Burn {
+				for _, txIn := range ctAutScript.ConsumedTokens() {
+					token := view.LookupCTAUTCoin(identifier[:], txIn.HostOutPoint)
+					if token == nil {
+						neededSet[txIn.HostOutPoint] = struct{}{}
+					}
 				}
 			}
+
 			// Request the input utxos from the database.
 			err = view.fetchCTAUTMain(db, neededSet, identifier[:])
 			if err != nil {
@@ -1070,6 +1097,9 @@ func (b *BlockChain) FetchCTAUTView(ctAutScript ctaut.CTAUTScript) (*CTAUTViewpo
 		identifier := ctAutScript.Identifier()
 		err = view.fetchCTAUTMain(b.db, neededSet, identifier[:])
 	}()
+	if err != nil {
+		return nil, err
+	}
 
 	return view, err
 }

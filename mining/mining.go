@@ -828,17 +828,7 @@ mempoolLoop:
 			}
 		}
 
-		ctAutScript, err := tx.CTAUTTScript(func(ringHash chainhash.Hash) (*wire.TxOutAbe, error) {
-			ringEntry := utxoRings.LookupEntry(ringHash)
-			if ringEntry == nil {
-				return nil, errors.New("no such ring found")
-			}
-			txOuts := ringEntry.TxOuts()
-			if len(txOuts) == 0 {
-				return nil, errors.New("an empty ring found")
-			}
-			return txOuts[0], nil
-		})
+		ctAutScript, err := tx.CTAUTTScript()
 		if err != nil {
 			log.Debugf("Skipping tx %s because it "+
 				"contains an invalid CTAUT transaction: %v",
@@ -847,12 +837,28 @@ mempoolLoop:
 		}
 		var ctAutView *blockchain.CTAUTViewpoint
 		if ctAutScript != nil {
+			err = ctaut.PresetHostOutpointForCTAUT(ctAutScript, tx.MsgTx(), func(ringHash chainhash.Hash) (*wire.TxOutAbe, error) {
+				ringEntry := utxoRings.LookupEntry(ringHash)
+				if ringEntry == nil {
+					return nil, errors.New("no such ring found")
+				}
+				txOuts := ringEntry.TxOuts()
+				if len(txOuts) == 0 {
+					return nil, errors.New("an empty ring found")
+				}
+				return txOuts[0], nil
+			})
+			if err != nil {
+				return nil, err
+			}
+
 			ctAutView, err = g.chain.FetchCTAUTView(ctAutScript)
 			if err != nil {
 				log.Warnf("Unable to fetch ctaut view for tx %s: %v", tx.Hash(), err)
 				continue
 			}
-			err = blockchain.CheckCTAUTTransactionInputs(ctAutScript, tx, nextBlockHeight, ctAutView, g.chainParams)
+
+			err = blockchain.ValidateCTAUTScript(ctAutScript, tx, nextBlockHeight, ctAutView, g.chainParams)
 			if err != nil {
 				log.Debugf("Skipping tx %s because it "+
 					"contains an invalid CTAUT transaction: %v",
@@ -1006,24 +1012,29 @@ mempoolLoop:
 			continue
 		}
 
-		ctAutScript, err := tx.CTAUTTScript(func(ringHash chainhash.Hash) (*wire.TxOutAbe, error) {
-			ringEntry := blockUtxoRings.LookupEntry(ringHash)
-			if ringEntry == nil {
-				return nil, errors.New("no such ring found")
-			}
-			txOuts := ringEntry.TxOuts()
-			if len(txOuts) == 0 {
-				return nil, errors.New("an empty ring found")
-			}
-			return txOuts[0], nil
-		})
+		ctAutScript, err := tx.CTAUTTScript()
 		if err != nil {
 			log.Debugf("Skipping tx %s due to error in "+
 				"CTAUTTScript: %v", tx.Hash(), err)
 			continue
 		}
 		if ctAutScript != nil {
-			err = blockchain.CheckCTAUTTransactionInputs(ctAutScript, tx, nextBlockHeight, blockCTAUTView, g.chainParams)
+			err = ctaut.PresetHostOutpointForCTAUT(ctAutScript, tx.MsgTx(), func(ringHash chainhash.Hash) (*wire.TxOutAbe, error) {
+				ringEntry := blockUtxoRings.LookupEntry(ringHash)
+				if ringEntry == nil {
+					return nil, errors.New("no such ring found")
+				}
+				txOuts := ringEntry.TxOuts()
+				if len(txOuts) == 0 {
+					return nil, errors.New("an empty ring found")
+				}
+				return txOuts[0], nil
+			})
+			if err != nil {
+				return nil, err
+			}
+
+			err = blockchain.ValidateCTAUTScript(ctAutScript, tx, nextBlockHeight, blockCTAUTView, g.chainParams)
 			if err != nil {
 				log.Debugf("Skipping tx %s due to error in "+
 					"CheckTransactionInputsAUT: %v", tx.Hash(), err)

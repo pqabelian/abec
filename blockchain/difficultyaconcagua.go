@@ -106,7 +106,11 @@ func (b *BlockChain) calcNextRequiredDifficultyVectorAconcagua(lastNode *blockNo
 		for _, scope := range b.fakePoWHeightScopes {
 			nextHeight := lastNode.height + 1
 			if scope.StartHeight <= nextHeight && nextHeight < scope.EndHeight {
-				difficultyVector = NewDifficultyVector(lastNode.bits, lastNode.bitsSecond, b.getPowScaleSecond(nextHeight))
+				if lastNode.height+1 == b.chainParams.BlockHeightAconcagua {
+					difficultyVector = NewDifficultyVector(lastNode.bits, lastNode.bits, b.getPowScaleSecond(nextHeight))
+				} else {
+					difficultyVector = NewDifficultyVector(lastNode.bits, lastNode.bitsSecond, b.getPowScaleSecond(nextHeight))
+				}
 				return difficultyVector, nil
 			}
 		}

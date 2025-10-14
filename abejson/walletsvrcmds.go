@@ -845,6 +845,72 @@ type RegisterAUTTransactionCmd struct {
 	UnitScale             uint64
 }
 
+type RegisterCTAUTCmd struct {
+	//AUTIdentifier string
+	CTAUTName    string
+	CTAUTSymbol  string
+	BaseUnitName string
+	SubUnitName  string
+	UnitScale    uint64
+
+	CTAUTMemo string
+
+	PlannedTotalAmount uint64
+	IssuerTokens       []string
+	IssuerTimes        int
+
+	MintThreshold       uint8
+	ReRegisterThreshold uint8
+	ExpireHeight        int32
+}
+type ReRegisterCTAUTCmd struct {
+	AUTIdentifier string
+
+	CTAUTMemo string
+
+	PlannedTotalAmount uint64
+	IssuerTokens       []string
+	IssuerTimes        int
+
+	MintThreshold       uint8
+	ReRegisterThreshold uint8
+	ExpireHeight        int32
+
+	AUTIssuerUpdateThreshold uint8
+	Memo                     string
+}
+
+type CTAUTPair struct {
+	Address string `json:"address"`
+	Value   uint64 `json:"value"`
+	Hidden  bool   `json:"hidden"`
+}
+type MintCTAUTCmd struct {
+	AUTIdentifier string
+
+	Vin        uint64
+	Recipients []*CTAUTPair
+
+	CTAUTMintThreshold uint8
+	Memo               string
+}
+type TransferCTAUTCmd struct {
+	AUTIdentifier string
+
+	Recipients []*CTAUTPair
+
+	Memo          string
+	ChangeAddress string
+}
+type BurnCTAUTCmd struct {
+	AUTIdentifier string
+
+	Recipients []*CTAUTPair // the first recipient would be marked burned
+
+	Memo          string
+	ChangeAddress string
+}
+
 func NewRegisterAUTTransactionCmd(autIdentifier string, autSymbol string,
 	issuerTokens []string, issuerTimes int, expireHeight int32,
 	issuerTokenThreshold uint8, IssuerUpdateThreshold uint8, plannedTotalAmount uint64,
@@ -1184,6 +1250,12 @@ func init() {
 	MustRegisterCmd("burnaut", (*BurnAUTTransactionCmd)(nil), flags)
 	MustRegisterCmd("getautbalance", (*GetAUTBalanceCmd)(nil), flags)
 	MustRegisterCmd("burnautbalance", (*BurnAUTBalanceCmd)(nil), flags)
+
+	MustRegisterCmd("registerctaut", (*RegisterCTAUTCmd)(nil), flags)
+	MustRegisterCmd("reregisterctaut", (*ReRegisterCTAUTCmd)(nil), flags)
+	MustRegisterCmd("mintctaut", (*MintCTAUTCmd)(nil), flags)
+	MustRegisterCmd("transferctaut", (*TransferCTAUTCmd)(nil), flags)
+	MustRegisterCmd("burnctaut", (*BurnCTAUTCmd)(nil), flags)
 
 	MustRegisterCmd("generateaddressabe", (*GenerateAddressCmd)(nil), flags)
 	MustRegisterCmd("listfreeaddresses", (*ListFreeAddressesCmd)(nil), flags)
