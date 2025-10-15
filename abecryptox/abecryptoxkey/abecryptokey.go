@@ -101,12 +101,12 @@ func CryptoAddressKeyReGenByRootSeedsFromPublicRand(cryptoScheme abecryptoxparam
 	}
 	//return nil, nil, nil, nil, nil
 }
-func CoinValueKeyReGenByRootSeedsFromPublicRand(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
+func CryptoValueKeyReGenByRootSeedsFromPublicRand(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
 	coinValueKeyRootSeed []byte, publicRand []byte) (cryptoVpk []byte, cryptoVsk []byte, err error) {
 
 	switch cryptoScheme {
 	case abecryptoxparam.CryptoSchemePQRingCTX:
-		return pqringctxCoinValueKeyReGenByRootSeedsFromPublicRand(abecryptoxparam.PQRingCTXPP, cryptoScheme, privacyLevel, coinValueKeyRootSeed, publicRand)
+		return pqringctxCryptoValueKeyReGenByRootSeedsFromPublicRand(abecryptoxparam.PQRingCTXPP, cryptoScheme, privacyLevel, coinValueKeyRootSeed, publicRand)
 
 	default:
 		return nil, nil, fmt.Errorf("CryptoAddressKeyReGenByRootSeedsFromPublicRand: cryptoScheme (%d) is not supported", cryptoScheme)
@@ -258,6 +258,20 @@ func ExtractCryptoSchemeFromCryptoValueSecretKey(cryptoValueSecretKey []byte) (c
 
 	//	Note that in both PQRingCT and PQRingCTX, the first 4 bytes of cryptoValueSecretKey is serialization of the crypto-scheme
 	cryptoScheme, err = abecryptoxparam.DeserializeCryptoScheme(cryptoValueSecretKey[:4])
+	if err != nil {
+		return 0, err
+	}
+
+	return cryptoScheme, err
+}
+
+func ExtractCryptoSchemeFromCryptoValuePublicKey(cryptoValuePublicKey []byte) (cryptoScheme abecryptoxparam.CryptoScheme, err error) {
+	if len(cryptoValuePublicKey) < 4 {
+		return 0, fmt.Errorf("ExtractCryptoSchemeFromCryptoValuePublicKey: incorrect length of cryptoValuePublicKey: %d", len(cryptoValuePublicKey))
+	}
+
+	//	Note that in both PQRingCT and PQRingCTX, the first 4 bytes of cryptoValueSecretKey is serialization of the crypto-scheme
+	cryptoScheme, err = abecryptoxparam.DeserializeCryptoScheme(cryptoValuePublicKey[:4])
 	if err != nil {
 		return 0, err
 	}
@@ -471,6 +485,29 @@ func CryptoValueSecretKeyParse(cryptoVsk []byte) (privacyLevel PrivacyLevel,
 	}
 
 	return privacyLevel, coinValueSecretKey, nil
+
+}
+func CryptoValuePublicKeyParse(cryptoVpk []byte) (privacyLevel PrivacyLevel,
+	coinValuePublicKey []byte,
+	err error) {
+
+	cryptoScheme, err := ExtractCryptoSchemeFromCryptoValuePublicKey(cryptoVpk)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+		privacyLevel, coinValuePublicKey, err = pqringctxCryptoValuePublicKeyParse(abecryptoxparam.PQRingCTXPP, cryptoScheme, cryptoVpk)
+		if err != nil {
+			return 0, nil, err
+		}
+
+	default:
+		return 0, nil, errors.New("CryptoValueSecretKeyParse: unsupported crypto-scheme")
+	}
+
+	return privacyLevel, coinValuePublicKey, nil
 
 }
 

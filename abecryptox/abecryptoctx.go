@@ -130,7 +130,7 @@ func GetAutTxoScriptSize(txVersion uint32, autTxoType AutTxoType) (int, error) {
 }
 
 // ExtractAutTxoValue extracts the value of the input AutTxo.
-func ExtractAutTxoValue(autTxo *wire.AutTxo, coinaValuePublicKey []byte, cryptoValueSecretKey []byte) (uint64, error) {
+func ExtractAutTxoValue(autTxo *wire.AutTxo, cryptoValuePublicKey []byte, cryptoValueSecretKey []byte) (uint64, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(autTxo.Version)
 	if err != nil {
 		return 0, err
@@ -138,7 +138,7 @@ func ExtractAutTxoValue(autTxo *wire.AutTxo, coinaValuePublicKey []byte, cryptoV
 
 	switch cryptoScheme {
 	case abecryptoxparam.CryptoSchemePQRingCTX:
-		return pqringctxExtractValueFromAutTxo(abecryptoxparam.PQRingCTXPP, cryptoScheme, autTxo, coinaValuePublicKey, cryptoValueSecretKey)
+		return pqringctxExtractValueFromAutTxo(abecryptoxparam.PQRingCTXPP, cryptoScheme, autTxo, cryptoValuePublicKey, cryptoValueSecretKey)
 
 	default:
 		return 0, fmt.Errorf("PseudonymTxoCoinParse: the cryptoScheme (%d) implied by abeTxo.Version is not supported", cryptoScheme)

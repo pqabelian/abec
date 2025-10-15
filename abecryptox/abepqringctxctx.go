@@ -3,6 +3,7 @@ package abecryptox
 import (
 	"fmt"
 
+	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/ctaut/wire"
 	"github.com/cryptosuite/pqringctx/pqringctxapi"
@@ -317,7 +318,7 @@ func pqringctxGetAutTxoScriptSize(pp *pqringctxapi.PublicParameter, autTxoType A
 // pqringctxExtractValueFromAutTxo extracts the value of the input AutTxo,
 // using the input (coinValuePublicKey, coinValueSecretKey).
 func pqringctxExtractValueFromAutTxo(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
-	autTxo *wire.AutTxo, coinValuePublicKey []byte, coinValueSecretKey []byte) (value uint64, err error) {
+	autTxo *wire.AutTxo, cryptoValuePublicKey []byte, cryptoValueSecretKey []byte) (value uint64, err error) {
 	cryptoSchemeInTxo, err := abecryptoxparam.GetCryptoSchemeByTxVersion(autTxo.Version)
 	if err != nil {
 		return 0, err
@@ -325,6 +326,29 @@ func pqringctxExtractValueFromAutTxo(pp *pqringctxapi.PublicParameter, cryptoSch
 
 	if cryptoSchemeInTxo != cryptoScheme {
 		return 0, fmt.Errorf("pqringctxExtractValueFromAutTxo: unmatched cryptoScheme for the input AutTxo")
+	}
+
+	var coinValuePublicKey []byte
+	var coinValueSecretKey []byte
+	if len(cryptoValueSecretKey) != 0 && len(cryptoValuePublicKey) != 0 {
+		privacyLevelInCryptoValueSecretKey, coinValueSecretKeyTemp, err := abecryptoxkey.CryptoValueSecretKeyParse(cryptoValueSecretKey)
+		if err != nil {
+			return 0, err
+		}
+		privacyLevelInCryptoValuePublicKey, coinValuePublicKeyTemp, err := abecryptoxkey.CryptoValuePublicKeyParse(cryptoValuePublicKey)
+		if err != nil {
+			return 0, err
+		}
+		if privacyLevelInCryptoValueSecretKey != privacyLevelInCryptoValuePublicKey {
+			return 0, fmt.Errorf("pqringctxExtractValueFromAutTxo: unmatched privacyLevel for the input cryptoValueSecretKey and cryptoValuePublicKey")
+		}
+
+		coinValuePublicKey = coinValuePublicKeyTemp
+		coinValueSecretKey = coinValueSecretKeyTemp
+
+	} else {
+		coinValuePublicKey = nil
+		coinValueSecretKey = nil
 	}
 
 	// NOTE: As the abepqringctx-layer obtained CtxTxo (associated in CtxTransferTx/CtxCoinbaseTx)
