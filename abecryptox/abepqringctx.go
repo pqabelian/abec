@@ -272,7 +272,7 @@ func pqringctxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme
 	cryptoTxInputDescs := make([]*pqringctxapi.TxInputDescMLP, inputNum)
 	for i := 0; i < inputNum; i++ {
 		txInRingVersion := transferTxMsgTemplate.TxIns[i].PreviousOutPointRing.Version
-		err = RuleCheckOnTxInputVersion(txInRingVersion, transferTxMsgTemplate.Version)
+		err = pqringctxRuleCheckOnTxInputVersion(pp, txInRingVersion, transferTxMsgTemplate.Version)
 		if err != nil {
 			return nil, fmt.Errorf("pqringctxTransferTxGen: the transferTxMsgTemplate has version = %d, "+
 				"but the %d -th txInput has version = %d, which is out of the allowed ones",
@@ -493,20 +493,11 @@ func pqringctxTransferTxVerify(pp *pqringctxapi.PublicParameter, transferTx *wir
 	//	txInputs
 	cryptoTxInputMLPs := make([]*pqringctxapi.TxInputMLP, inputNum)
 	for i := 0; i < inputNum; i++ {
-		if transferTx.TxIns[i].PreviousOutPointRing.Version != transferTx.Version {
-			if transferTx.TxIns[i].PreviousOutPointRing.Version == wire.TxVersion_Height_0 &&
-				transferTx.Version == wire.TxVersion_Height_MLPAUT_300000 {
-				//	allowed
-			} else if transferTx.TxIns[i].PreviousOutPointRing.Version == wire.TxVersion_Height_0 &&
-				transferTx.Version == wire.TxVersion_Height_450000_Aconcagua {
-				//	allowed
-			} else if transferTx.TxIns[i].PreviousOutPointRing.Version == wire.TxVersion_Height_MLPAUT_300000 &&
-				transferTx.Version == wire.TxVersion_Height_450000_Aconcagua {
-				//	allowed
-			} else {
-				//	not in the allowed cases
-				return fmt.Errorf("pqringctxTransferTxVerify: transferTx.TxIns[%d].PreviousOutPointRing.Version (%d) is out of design", i, transferTx.TxIns[i].PreviousOutPointRing.Version)
-			}
+		err = pqringctxRuleCheckOnTxInputVersion(pp, transferTx.TxIns[i].PreviousOutPointRing.Version, transferTx.Version)
+		if err != nil {
+			return fmt.Errorf("pqringctxTransferTxVerify: transferTx.TxIns[%d].PreviousOutPointRing.Version (%d) and , "+
+				"transferTx.Version (%d) fail to pass the RuleCheckOnTxInputVersion: %v",
+				i, transferTx.TxIns[i].PreviousOutPointRing.Version, transferTx.Version, err)
 		}
 
 		//	to be self-contained, the serial number should be checked
