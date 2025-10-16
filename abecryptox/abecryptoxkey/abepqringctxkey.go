@@ -108,7 +108,7 @@ func pqringctxCryptoAddressKeyGenByRootSeeds(pp *pqringctxapi.PublicParameter,
 	return cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, cryptoDetectorKey, nil
 }
 
-func pqringctxCoinValueKeyGenByRootSeeds(pp *pqringctxapi.PublicParameter,
+func pqringctxCryptoValueKeyGenByRootSeeds(pp *pqringctxapi.PublicParameter,
 	cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
 	coinValueKeyRootSeed []byte) (cryptoVpk []byte, cryptoVsk []byte, err error) {
 
