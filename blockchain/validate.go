@@ -470,6 +470,23 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		return ruleerror.NewRuleError(ruleerror.ErrTxTooBig, str)
 	}
 
+	// The rules of (txoVersion, PrivacyLevel) need to be checked, since the ring-rules need this.
+	for j := 0; j < len(msgTx.TxOuts); j++ {
+		txOut := msgTx.TxOuts[j]
+		privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
+		if err != nil {
+			return err
+		}
+
+		err = abecryptox.RuleCheckOnTxoVersionPrivacyLevel(txOut.Version, privacyLevel)
+		if err != nil {
+			str := fmt.Sprintf("msgTx.TxOuts[%d]'s (version, privacyLevel) (%d, %d,) "+
+				"fail to pass the RuleCheckOnTxoVersionPrivacyLevel: %v",
+				j, txOut.Version, privacyLevel, err)
+			return ruleerror.NewRuleError(ruleerror.ErrMismatchedTxoVersionAndPrivacyLevel, str)
+		}
+	}
+
 	isCb, err := IsCoinBaseAbe(tx)
 	if err != nil {
 		return err

@@ -125,10 +125,12 @@ const (
 	// valid block may only contain unique transactions.
 	ErrDuplicateTx
 
+	// ErrMismatchedTxoVersionAndPrivacyLevel
 	// ErrOverwriteTx indicates a block contains a transaction that has
 	// the same hash as a previous transaction which has not been fully
 	// spent.
-	ErrOverwriteTx
+	// ErrOverwriteTx
+	ErrMismatchedTxoVersionAndPrivacyLevel
 
 	// ErrImmatureSpend indicates a transaction is attempting to spend a
 	// coinbase that has not yet reached the required maturity.
@@ -173,10 +175,12 @@ const (
 	// the expected value.
 	ErrBadCoinbaseHeight
 
+	// ErrTxVersionNotSupported
 	// ErrScriptMalformed indicates a transaction script is malformed in
 	// some way.  For example, it might be longer than the maximum allowed
 	// length or fail to parse.
-	ErrScriptMalformed
+	// ErrScriptMalformed
+	ErrTxVersionNotSupported
 
 	// ErrScriptValidation indicates the result of executing transaction
 	// script failed.  The error covers any failure when executing scripts
@@ -246,20 +250,22 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrMissingTxOut:                      "ErrMissingTxOut",
 	ErrNilTx:                             "ErrNilTx",
 	ErrDuplicateTx:                       "ErrDuplicateTx",
-	ErrOverwriteTx:                       "ErrOverwriteTx",
-	ErrImmatureSpend:                     "ErrImmatureSpend",
-	ErrSpendTooHigh:                      "ErrSpendTooHigh",
-	ErrBadFees:                           "ErrBadFees",
+	// ErrOverwriteTx:                       "ErrOverwriteTx",
+	ErrMismatchedTxoVersionAndPrivacyLevel: "ErrMismatchedTxoVersionAndPrivacyLevel",
+	ErrImmatureSpend:                       "ErrImmatureSpend",
+	ErrSpendTooHigh:                        "ErrSpendTooHigh",
+	ErrBadFees:                             "ErrBadFees",
 	//ErrTooManySigOps:                     "ErrTooManySigOps",
 	ErrTooManySerialNumbers: "ErrTooManySerialNumbers",
 	ErrFirstTxNotCoinbase:   "ErrFirstTxNotCoinbase",
 	ErrMultipleCoinbases:    "ErrMultipleCoinbases",
 	//ErrBadCoinbaseScriptLen:              "ErrBadCoinbaseScriptLen",
-	ErrBadCoinbaseBasicRule:      "ErrBadCoinbaseBasicRule",
-	ErrBadCoinbaseValue:          "ErrBadCoinbaseValue",
-	ErrMissingCoinbaseHeight:     "ErrMissingCoinbaseHeight",
-	ErrBadCoinbaseHeight:         "ErrBadCoinbaseHeight",
-	ErrScriptMalformed:           "ErrScriptMalformed",
+	ErrBadCoinbaseBasicRule:  "ErrBadCoinbaseBasicRule",
+	ErrBadCoinbaseValue:      "ErrBadCoinbaseValue",
+	ErrMissingCoinbaseHeight: "ErrMissingCoinbaseHeight",
+	ErrBadCoinbaseHeight:     "ErrBadCoinbaseHeight",
+	//ErrScriptMalformed:           "ErrScriptMalformed",
+	ErrTxVersionNotSupported:     "ErrTxVersionNotSupported",
 	ErrScriptValidation:          "ErrScriptValidation",
 	ErrUnexpectedWitness:         "ErrUnexpectedWitness",
 	ErrInvalidWitnessCommitment:  "ErrInvalidWitnessCommitment",

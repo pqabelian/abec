@@ -23,9 +23,17 @@ func pqringctxCoinbaseTxGen(pp *pqringctxapi.PublicParameter, abeTxOutputDescs [
 	//	parse AbeTxOutputDesc to pqringctx.TxOutputDesc
 	txOutputDescs := make([]*pqringctxapi.TxOutputDescMLP, len(abeTxOutputDescs))
 	for j := 0; j < len(abeTxOutputDescs); j++ {
-		_, coinAddress, coinValuePK, err := abecryptoxkey.CryptoAddressParse(abeTxOutputDescs[j].cryptoAddress)
+		privacyLevel, coinAddress, coinValuePK, err := abecryptoxkey.CryptoAddressParse(abeTxOutputDescs[j].cryptoAddress)
 		if err != nil {
 			return nil, err
+		}
+
+		// The rules of (txoVersion, PrivacyLevel) need to be checked, since the ring-rules need this.
+		err = pqringctxRuleCheckOnTxoVersionPrivacyLevel(pp, coinbaseTxMsgTemplate.Version, privacyLevel)
+		if err != nil {
+			return nil, fmt.Errorf("pqringctxCoinbaseTxGen: (coinbaseTxMsgTemplate.Version, abeTxOutputDescs[%d].cryptoAddress's privacyLevel) (%d, %d) "+
+				"fail to pass the RuleCheckOnTxoVersionPrivacyLevel: %v",
+				coinbaseTxMsgTemplate.Version, j, privacyLevel, err)
 		}
 
 		txOutputDescs[j] = pqringctxapi.NewTxOutputDescMLP(coinAddress, coinValuePK, abeTxOutputDescs[j].value)
@@ -84,12 +92,25 @@ func pqringctxCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, coinbaseTx *wir
 
 	txoMLPs := make([]pqringctxapi.TxoMLP, len(coinbaseTx.TxOuts))
 	for i := 0; i < len(coinbaseTx.TxOuts); i++ {
-		if coinbaseTx.TxOuts[i].Version != coinbaseTx.Version {
+		txOut := coinbaseTx.TxOuts[i]
+		if txOut.Version != coinbaseTx.Version {
 			return fmt.Errorf("pqringctxCoinbaseTxVerify: coinbaseTx.TxOuts[%d].Version (%d) != coinbaseTx.Version (%d)",
-				i, coinbaseTx.TxOuts[i].Version, coinbaseTx.Version)
+				i, txOut.Version, coinbaseTx.Version)
 		}
 
-		txoMLPs[i], err = pqringctxapi.DeserializeTxo(pp, coinbaseTx.TxOuts[i].TxoScript)
+		// The rules of (txoVersion, PrivacyLevel) need to be checked, since the ring-rules need this.
+		privacyLevel, err := GetTxoPrivacyLevel(txOut)
+		if err != nil {
+			return err
+		}
+		err = pqringctxRuleCheckOnTxoVersionPrivacyLevel(pp, txOut.Version, privacyLevel)
+		if err != nil {
+			return fmt.Errorf("pqringctxCoinbaseTxVerify: coinbaseTx.TxOuts[%d]'s (Version, privacyLevel) (%d, %d) "+
+				"fail to pass the RuleCheckOnTxoVersionPrivacyLevel: %v",
+				i, txOut.Version, privacyLevel, err)
+		}
+
+		txoMLPs[i], err = pqringctxapi.DeserializeTxo(pp, txOut.TxoScript)
 		if err != nil {
 			return err
 		}
@@ -413,9 +434,17 @@ func pqringctxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme
 	//	cryptoTxOutputDescs
 	cryptoTxOutputDescs := make([]*pqringctxapi.TxOutputDescMLP, outputNum)
 	for j := 0; j < outputNum; j++ {
-		_, coinAddress, coinValuePublicKey, err := abecryptoxkey.CryptoAddressParse(abeTxOutputDescs[j].cryptoAddress)
+		privacyLevel, coinAddress, coinValuePublicKey, err := abecryptoxkey.CryptoAddressParse(abeTxOutputDescs[j].cryptoAddress)
 		if err != nil {
 			return nil, err
+		}
+
+		// The rules of (txoVersion, PrivacyLevel) need to be checked, since the ring-rules need this.
+		err = pqringctxRuleCheckOnTxoVersionPrivacyLevel(pp, transferTxMsgTemplate.Version, privacyLevel)
+		if err != nil {
+			return nil, fmt.Errorf("pqringctxCoinbaseTxGen: (transferTxMsgTemplate.Version, abeTxOutputDescs[%d].cryptoAddress's privacyLevel) (%d, %d) "+
+				"fail to pass the RuleCheckOnTxoVersionPrivacyLevel: %v",
+				transferTxMsgTemplate.Version, j, privacyLevel, err)
 		}
 
 		cryptoTxOutputDescs[j] = pqringctxapi.NewTxOutputDescMLP(coinAddress, coinValuePublicKey, abeTxOutputDescs[j].value)
@@ -536,13 +565,27 @@ func pqringctxTransferTxVerify(pp *pqringctxapi.PublicParameter, transferTx *wir
 	//	txos
 	cryptoTxoMLPs := make([]pqringctxapi.TxoMLP, outputNum)
 	for j := 0; j < outputNum; j++ {
-		if transferTx.TxOuts[j].Version != transferTx.Version {
+		txOut := transferTx.TxOuts[j]
+
+		if txOut.Version != transferTx.Version {
 			return fmt.Errorf("pqringctxTransferTxVerify: transferTx.TxOuts[%d].Version (%d) != transferTx.Version (%d)",
-				j, transferTx.TxOuts[j].Version, transferTx.Version)
+				j, txOut.Version, transferTx.Version)
 			//	The output Txos of a transaction should have the same version as the transaction.
 		}
 
-		cryptoTxoMLPs[j], err = pqringctxapi.DeserializeTxo(pp, transferTx.TxOuts[j].TxoScript)
+		// The rules of (txoVersion, PrivacyLevel) need to be checked, since the ring-rules need this.
+		privacyLevel, err := GetTxoPrivacyLevel(txOut)
+		if err != nil {
+			return err
+		}
+		err = pqringctxRuleCheckOnTxoVersionPrivacyLevel(pp, txOut.Version, privacyLevel)
+		if err != nil {
+			return fmt.Errorf("pqringctxTransferTxVerify: transferTx.TxOuts[%d]'s (Version, privacyLevel) (%d, %d) "+
+				"fail to pass the RuleCheckOnTxoVersionPrivacyLevel: %v",
+				j, txOut.Version, privacyLevel, err)
+		}
+
+		cryptoTxoMLPs[j], err = pqringctxapi.DeserializeTxo(pp, txOut.TxoScript)
 		if err != nil {
 			return err
 		}
