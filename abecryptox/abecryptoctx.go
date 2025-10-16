@@ -2,7 +2,6 @@ package abecryptox
 
 import (
 	"fmt"
-
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/ctaut/wire"
 )
@@ -187,3 +186,42 @@ func GetAutTransferTxWitnessSizeByDesc(txVersion uint32,
 }
 
 //	APIs for TxWitness	end
+
+// APIs for ruleChecks	begin
+
+// AutRuleCheckOnTxoVersionType checks the match between HostTxo's Version and AutTxoType.
+//
+// When new TxVersion is added, rules need to be added here.
+func AutRuleCheckOnTxoVersionType(hostTxoVersion uint32, autTxoType AutTxoType) error {
+	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(hostTxoVersion)
+	if err != nil {
+		return err
+	}
+
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+		return pqringctxAutRuleCheckOnTxoVersionType(abecryptoxparam.PQRingCTXPP, hostTxoVersion, autTxoType)
+
+	default:
+		return fmt.Errorf("AutRuleCheckOnTxoVersionType: Unsupported hostTxoVersion (%d)", hostTxoVersion)
+	}
+}
+
+// AutRuleCheckOnTxInputVersion checks the match between TxInput's Version and Tx's Version.
+//
+// When new TxVersion is added, rules need to be added here.
+func AutRuleCheckOnTxInputVersion(txInputVersion uint32, txVersion uint32) error {
+	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
+	if err != nil {
+		return err
+	}
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+		return pqringctxAutRuleCheckOnTxInputVersion(abecryptoxparam.PQRingCTXPP, txInputVersion, txVersion)
+
+	default:
+		return fmt.Errorf("AutRuleCheckOnTxInputVersion: Unsupported txVersion (%d)", txVersion)
+	}
+}
+
+//	APIs for ruleChecks	end
