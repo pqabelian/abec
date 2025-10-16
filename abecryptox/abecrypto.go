@@ -612,3 +612,64 @@ func GetTrTxWitnessSerializeSizeApprox(txVersion uint32,
 }
 
 //	APIs for TxWitness	end
+
+// APIs for ruleChecks	begin
+
+// RuleCheckOnTxoVersionPrivacyLevel checks the match between Txo's Version and PrivacyLevel.
+//
+// When new TxVersion is added, rules need to be added here.
+func RuleCheckOnTxoVersionPrivacyLevel(txoVersion uint32, privacyLevel abecryptoxkey.PrivacyLevel) error {
+	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txoVersion)
+	if err != nil {
+		return err
+	}
+
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCT:
+		if txoVersion == wire.TxVersion_Height_0 && privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre {
+			// allowed case
+			// for CryptoSchemePQRingCT,
+			// PrivacyLevel is not introduced yet,
+			// and this backward compatible case is the only allowed case.
+			return nil
+		}
+		return fmt.Errorf("RuleCheckOnTxoVersionPrivacyLevel: (txoVersion, privacyLevel) (%d, %d) "+
+			"implies CryptoSchemePQRingCT, but is not (TxVersion_Height_0, PrivacyLevelRINGCTPre)", txoVersion, privacyLevel)
+
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+		return pqringctxRuleCheckOnTxoVersionPrivacyLevel(abecryptoxparam.PQRingCTXPP, txoVersion, privacyLevel)
+
+	default:
+		return fmt.Errorf("RuleCheckOnTxoVersionPrivacyLevel: Unsupported txoVersion (%d)", txoVersion)
+	}
+}
+
+// RuleCheckOnTxInputVersion checks the match between TxInput's Version and Tx's Version.
+//
+// When new TxVersion is added, rules need to be added here.
+func RuleCheckOnTxInputVersion(txInputVersion uint32, txVersion uint32) error {
+	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
+	if err != nil {
+		return err
+	}
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCT:
+		if txInputVersion == wire.TxVersion_Height_0 && txVersion == wire.TxVersion_Height_0 {
+			// allowed case
+			// for CryptoSchemePQRingCT,
+			// only TxVersion_Height_0 appears,
+			// and this backward compatible case is the only allowed case.
+			return nil
+		}
+		return fmt.Errorf("RuleCheckOnTxInputVersion: (txInputVersion, txVersion) (%d, %d) "+
+			"implies CryptoSchemePQRingCT, but is not (TxVersion_Height_0, TxVersion_Height_0)", txInputVersion, txVersion)
+
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+		return pqringctxRuleCheckOnTxInputVersion(abecryptoxparam.PQRingCTXPP, txInputVersion, txVersion)
+
+	default:
+		return fmt.Errorf("RuleCheckOnTxInputVersion: Unsupported txVersion (%d)", txVersion)
+	}
+}
+
+//	APIs for ruleChecks	end

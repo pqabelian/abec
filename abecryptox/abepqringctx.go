@@ -1152,3 +1152,93 @@ func pqringctxGetTxWitnessTrTxSerializeSizeByDesc(pp *pqringctxapi.PublicParamet
 }
 
 //	APIs for TxWitnesses	end
+
+// APIs for ruleChecks	begin
+
+// pqringctxRuleCheckOnTxoVersionPrivacyLevel checks the match between Txo's Version and PrivacyLevel.
+//
+// When new TxVersion is added, rules need to be added here.
+func pqringctxRuleCheckOnTxoVersionPrivacyLevel(pp *pqringctxapi.PublicParameter, txoVersion uint32, privacyLevel abecryptoxkey.PrivacyLevel) error {
+	switch txoVersion {
+	case wire.TxVersion_Height_0:
+		if privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre {
+			// allowed cases
+		} else {
+			return fmt.Errorf("pqringctxRuleCheckOnTxoVersionPrivacyLevel: txoVersion is %d, "+
+				"but the PrivacyLevel (%d) is not PrivacyLevelRINGCTPre",
+				txoVersion, privacyLevel)
+		}
+
+	case wire.TxVersion_Height_MLPAUT_300000:
+		if privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre ||
+			privacyLevel == abecryptoxkey.PrivacyLevelRINGCT ||
+			privacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYM {
+			// allowed cases
+		} else {
+			return fmt.Errorf("pqringctxRuleCheckOnTxoVersionPrivacyLevel: txoVersion is %d, "+
+				"but the PrivacyLevel (%d) is not PrivacyLevelRINGCTPre",
+				txoVersion, privacyLevel)
+		}
+
+	case wire.TxVersion_Height_450000_Aconcagua:
+		if privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre ||
+			privacyLevel == abecryptoxkey.PrivacyLevelRINGCT ||
+			privacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYM {
+			// allowed cases
+		} else {
+			return fmt.Errorf("pqringctxRuleCheckOnTxoVersionPrivacyLevel: txoVersion is %d, "+
+				"but the PrivacyLevel (%d) is not PrivacyLevelRINGCTPre",
+				txoVersion, privacyLevel)
+		}
+	default:
+		return fmt.Errorf("pqringctxRuleCheckOnTxoVersionPrivacyLevel: txoVersion (%d) is not supported",
+			txoVersion)
+	}
+
+	return nil
+}
+
+// pqringctxRuleCheckOnTxInputVersion checks the match between TxInput's Version and Tx's Version.
+//
+// When new TxVersion is added, rules need to be added here.
+func pqringctxRuleCheckOnTxInputVersion(pp *pqringctxapi.PublicParameter, txInputVersion uint32, txVersion uint32) error {
+
+	switch txVersion {
+	case wire.TxVersion_Height_0:
+		if txInputVersion == wire.TxVersion_Height_0 {
+			// allowed cases
+		} else {
+			return fmt.Errorf("pqringctxRuleCheckOnTxInputVersion: (txInputVersion, txVersion) (%d, %d), "+
+				"is not allowed/supported",
+				txInputVersion, txVersion)
+		}
+
+	case wire.TxVersion_Height_MLPAUT_300000:
+		if txInputVersion == wire.TxVersion_Height_0 ||
+			txInputVersion == wire.TxVersion_Height_MLPAUT_300000 {
+			// allowed cases
+		} else {
+			return fmt.Errorf("pqringctxRuleCheckOnTxInputVersion: (txInputVersion, txVersion) (%d, %d), "+
+				"is not allowed/supported",
+				txInputVersion, txVersion)
+		}
+
+	case wire.TxVersion_Height_450000_Aconcagua:
+		if txInputVersion == wire.TxVersion_Height_0 ||
+			txInputVersion == wire.TxVersion_Height_MLPAUT_300000 ||
+			txInputVersion == wire.TxVersion_Height_450000_Aconcagua {
+			// allowed cases
+		} else {
+			return fmt.Errorf("pqringctxRuleCheckOnTxInputVersion: (txInputVersion, txVersion) (%d, %d), "+
+				"is not allowed/supported",
+				txInputVersion, txVersion)
+		}
+	default:
+		return fmt.Errorf("pqringctxRuleCheckOnTxInputVersion: txVersion (%d) is not supported",
+			txVersion)
+	}
+
+	return nil
+}
+
+// APIs for ruleChecks	end
