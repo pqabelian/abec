@@ -249,7 +249,11 @@ func CheckHostTxoParasiticity(txHash chainhash.Hash, outputIndex int, txOut *wir
 
 // GetGeneratedCTAUTTokens would get the specified host output from the host transaction
 // todo(ctaut): add comments to define the rules
-func GetGeneratedCTAUTTokens(numCTAUTTokens int, txHash chainhash.Hash, txOuts []*wire.TxOutAbe) ([]*CTAUTToken, error) {
+func GetGeneratedCTAUTTokens(script CTAUTScript, txHash chainhash.Hash, txOuts []*wire.TxOutAbe) ([]*CTAUTToken, error) {
+	numCTAUTTokens, err := GetNumGeneratedTokens(script)
+	if err != nil {
+		return nil, err
+	}
 	startIdx := 0
 	for ; startIdx < len(txOuts); startIdx++ {
 		txOut := txOuts[startIdx]
@@ -295,6 +299,28 @@ func GetGeneratedCTAUTTokens(numCTAUTTokens int, txHash chainhash.Hash, txOuts [
 			CoinAddress: coinAddress,
 		}
 	}
+
+	switch ctAUTScript := script.(type) {
+	case *RegistrationScript:
+		// nothing to do
+	case *ReRegistrationScript:
+	// nothing to do
+	case *MintScript:
+		for i := 0; i < numCTAUTTokens; i++ {
+			autTxOuts[i].ValueScript = ctAUTScript.valueScripts[i]
+		}
+	case *TransferScript:
+		for i := 0; i < numCTAUTTokens; i++ {
+			autTxOuts[i].ValueScript = ctAUTScript.autTxoScripts[i]
+		}
+	case *BurnScript:
+		for i := 0; i < numCTAUTTokens; i++ {
+			autTxOuts[i].ValueScript = ctAUTScript.valueScripts[i]
+		}
+	default:
+		return nil, fmt.Errorf("unexpected aut transaction type %d", script.Type())
+	}
+
 	return autTxOuts, nil
 }
 func populateConsumedCTAUTTokens(script CTAUTScript, msgTx *wire.MsgTxAbe,

@@ -2331,7 +2331,7 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctaut.TransferScript, tx *
 	return nil
 }
 
-func checkCTAUTBurnTransactionInputs(ctAutScript *ctaut.BurnTx, tx *abeutil.TxAbe, txHeight int32,
+func checkCTAUTBurnTransactionInputs(ctAutScript *ctaut.BurnScript, tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
 	identifier := ctAutScript.Identifier()
 	identifierKey := CTAUTIdentifierKey(identifier[:])
@@ -2449,7 +2449,7 @@ func ValidateCTAUTScript(script ctaut.CTAUTScript, tx *abeutil.TxAbe, txHeight i
 			return err
 		}
 
-	case *ctaut.BurnTx:
+	case *ctaut.BurnScript:
 		// populate consumed tokens
 		presetConsumedTokens := ctautScript.ConsumedTokens()
 		identifier := ctautScript.Identifier()

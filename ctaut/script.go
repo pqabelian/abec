@@ -36,7 +36,7 @@ type HostOutPoint = wire.OutPoint
 //
 // # TransferScript would be used to transfer tokens between users, it would not affect any of the fields in Metadata
 //
-// BurnTx would be used to burn some tokens, it would not affect any of the fields in Metadata
+// BurnScript would be used to burn some tokens, it would not affect any of the fields in Metadata
 type Metadata struct {
 	// The TxHash of the host transaction (i.e. txid) where the registration script is located would be used as its instance identifier
 	// identifiers for different instances are unique
@@ -1424,7 +1424,7 @@ func (script *TransferScript) setGeneratedTokens(generatedTokens []*CTAUTToken) 
 
 var _ CTAUTScript = &TransferScript{}
 
-// BurnTx would be the structured script parsed from memo in host transaction,
+// BurnScript would be the structured script parsed from memo in host transaction,
 // 1. the number of consumed CT-Token and Plain-Token MUST be explicit specified
 // 2. the number of generated CT-Token and Plain-Token MUST be explicit specified, and corresponding value scripts,
 // and NOTE THAT the first Plain-Token would be marked burned -> TODO add check logic
@@ -1432,7 +1432,7 @@ var _ CTAUTScript = &TransferScript{}
 // 3. consumedTokens would be populated with the help of host transaction and corresponding wire.TxoRing
 // 4. generatedTokens would be populated with the function populateGeneratedCTAUTTokens with the help of host transaction
 //
-// BurnTx would be serialized with following format
+// BurnScript would be serialized with following format
 // <Common Prefix> "CTAUTSCRIPT" "4"
 // <Identifier> a byte array with fixed length
 // <Number of CTAUTTokens> A number n, Explicitly specify the 0~(m-1)-th pseudonym TXO of outputs in host transaction as CT-Token
@@ -1442,7 +1442,7 @@ var _ CTAUTScript = &TransferScript{}
 // <ValueScript> an array of n byte array, represent the amount for an AUTToken
 // <WitnessHash> a byte array with fixed length
 // <Memo> a byte array with max length, for this transaction
-type BurnTx struct {
+type BurnScript struct {
 	version         uint32
 	scriptType      CTAUTScriptType
 	ctAutIdentifier [CTAUTIdentifierLength]byte
@@ -1460,15 +1460,15 @@ type BurnTx struct {
 	generatedTokens []*CTAUTToken
 }
 
-func (script *BurnTx) WitnessHash() chainhash.Hash {
+func (script *BurnScript) WitnessHash() chainhash.Hash {
 	return script.witnessHash
 }
 
-func (script *BurnTx) Version() uint32 {
+func (script *BurnScript) Version() uint32 {
 	return script.version
 }
 
-func NewBurnTx(
+func NewBurnScript(
 	ctAutIdentifier [CTAUTIdentifierLength]byte,
 	inCTAutTokenNum uint8,
 	inPlainAutTokenNum uint8,
@@ -1477,8 +1477,8 @@ func NewBurnTx(
 	valueScripts [][]byte,
 	witnessHash chainhash.Hash,
 	memo []byte,
-) *BurnTx {
-	return &BurnTx{
+) *BurnScript {
+	return &BurnScript{
 		scriptType:          Burn,
 		ctAutIdentifier:     ctAutIdentifier,
 		inCTAutTokenNum:     inCTAutTokenNum,
@@ -1493,15 +1493,15 @@ func NewBurnTx(
 	}
 }
 
-func (script *BurnTx) Type() CTAUTScriptType {
+func (script *BurnScript) Type() CTAUTScriptType {
 	return script.scriptType
 }
 
-func (script *BurnTx) Identifier() [CTAUTIdentifierLength]byte {
+func (script *BurnScript) Identifier() [CTAUTIdentifierLength]byte {
 	return script.ctAutIdentifier
 }
 
-func (script *BurnTx) Serialize() ([]byte, error) {
+func (script *BurnScript) Serialize() ([]byte, error) {
 	var b bytes.Buffer
 	var err error
 
@@ -1537,7 +1537,7 @@ func (script *BurnTx) Serialize() ([]byte, error) {
 }
 
 // todo(ctaut): add a standalone sanity-check function, and call it at the end of deserialize
-func (script *BurnTx) Deserialize(r io.Reader) error {
+func (script *BurnScript) Deserialize(r io.Reader) error {
 	var err error
 	if script.ctAutIdentifier, script.scriptType, err = readPrefix(r, Burn); err != nil {
 		return err
@@ -1575,7 +1575,7 @@ func (script *BurnTx) Deserialize(r io.Reader) error {
 
 	return nil
 }
-func (script *BurnTx) SanityCheck() error {
+func (script *BurnScript) SanityCheck() error {
 	if script.scriptType != Burn {
 		return errors.New("unexpected type for burn script")
 	}
@@ -1620,20 +1620,20 @@ func (script *BurnTx) SanityCheck() error {
 	return nil
 }
 
-func (script *BurnTx) ConsumedTokens() []*CTAUTToken {
+func (script *BurnScript) ConsumedTokens() []*CTAUTToken {
 	return script.consumedTokens
 }
-func (script *BurnTx) setConsumedTokens(consumedTokens []*CTAUTToken) error {
+func (script *BurnScript) setConsumedTokens(consumedTokens []*CTAUTToken) error {
 	if len(consumedTokens) != int(script.inCTAutTokenNum)+int(script.inPlainAutTokenNum) {
 		return errors.New("mismatched number of consumed tokens")
 	}
 	script.consumedTokens = consumedTokens
 	return nil
 }
-func (script *BurnTx) GeneratedTokens() []*CTAUTToken {
+func (script *BurnScript) GeneratedTokens() []*CTAUTToken {
 	return script.generatedTokens
 }
-func (script *BurnTx) setGeneratedTokens(generatedTokens []*CTAUTToken) error {
+func (script *BurnScript) setGeneratedTokens(generatedTokens []*CTAUTToken) error {
 	if len(generatedTokens) != int(script.outCTAutTokenNum)+int(script.outPlainAutTokenNum) {
 		return errors.New("mismatched number of consumed tokens")
 	}
@@ -1644,7 +1644,7 @@ func (script *BurnTx) setGeneratedTokens(generatedTokens []*CTAUTToken) error {
 	return nil
 }
 
-var _ CTAUTScript = &BurnTx{}
+var _ CTAUTScript = &BurnScript{}
 
 var ErrNonAutTx = errors.New("not a AUT transaction")
 var ErrInValidAUTTx = errors.New("not a valid AUT transaction")
@@ -1659,7 +1659,7 @@ func getNumConsumedTokens(autTx CTAUTScript) (int, error) {
 		return int(autTransaction.inAutRootTokenNum), nil
 	case *TransferScript:
 		return int(autTransaction.inCTAutTokenNum + autTransaction.inPlainAutTokenNum), nil
-	case *BurnTx:
+	case *BurnScript:
 		return int(autTransaction.inCTAutTokenNum + autTransaction.inPlainAutTokenNum), nil
 	default:
 		return 0, errors.New("unkown aut transaction type")
@@ -1675,14 +1675,14 @@ func GetNumGeneratedTokens(autTx CTAUTScript) (int, error) {
 		return int(autTransaction.outCTAutTokenNum + autTransaction.outPlainAutTokenNum), nil
 	case *TransferScript:
 		return int(autTransaction.outCTAutTokenNum + autTransaction.outPlainAutTokenNum), nil
-	case *BurnTx:
+	case *BurnScript:
 		return int(autTransaction.outCTAutTokenNum + autTransaction.outPlainAutTokenNum), nil
 	default:
 		return 0, errors.New("unkown aut transaction type")
 	}
 }
 
-func ParseCTAUTScript(memo []byte) (autScript CTAUTScript, err error) {
+func ParseCTAUTScript(txHash chainhash.Hash, memo []byte) (autScript CTAUTScript, err error) {
 	// could not be an AUT transaction
 	if len(memo) < len(commonPrefix) {
 		return nil, nil
@@ -1718,7 +1718,7 @@ func ParseCTAUTScript(memo []byte) (autScript CTAUTScript, err error) {
 			version: wire.TxVersion,
 		}
 	case Burn:
-		autScript = &BurnTx{
+		autScript = &BurnScript{
 			version: wire.TxVersion,
 		}
 	default:
@@ -1729,6 +1729,14 @@ func ParseCTAUTScript(memo []byte) (autScript CTAUTScript, err error) {
 	if err != nil {
 		return nil, err
 	}
+	if memo[len(commonPrefix)] == Registration {
+		ctAUTScript, ok := autScript.(*RegistrationScript)
+		if !ok {
+			return nil, ErrInValidAUTTx
+		}
+		ctAUTScript.ctAutIdentifier = txHash
+	}
+
 	return autScript, nil
 }
 
@@ -1745,19 +1753,15 @@ func ParseCTAUTScript(memo []byte) (autScript CTAUTScript, err error) {
 // - no double spending token
 // - no overflow
 func ExtractCTAUTScript(tx *wire.MsgTxAbe) (autScript CTAUTScript, err error) {
-	autScript, err = ParseCTAUTScript(tx.TxMemo)
+	autScript, err = ParseCTAUTScript(tx.TxHash(), tx.TxMemo)
 	if err != nil {
 		return nil, err
 	}
 	if autScript == nil {
 		return nil, nil
 	}
-	numOutput, err := GetNumGeneratedTokens(autScript)
-	if err != nil {
-		return nil, err
-	}
 
-	tokens, err := GetGeneratedCTAUTTokens(numOutput, tx.TxHash(), tx.TxOuts)
+	tokens, err := GetGeneratedCTAUTTokens(autScript, tx.TxHash(), tx.TxOuts)
 	if err != nil {
 		return nil, err
 	}
@@ -1766,10 +1770,8 @@ func ExtractCTAUTScript(tx *wire.MsgTxAbe) (autScript CTAUTScript, err error) {
 		return nil, err
 	}
 
-	txHash := tx.TxHash()
 	switch script := autScript.(type) {
 	case *RegistrationScript:
-		copy(script.ctAutIdentifier[:], txHash[:])
 		// for inputs, there is no rules
 
 		// for outputs, the claimed issuer tokens must match the generated tokens exactly
@@ -1812,7 +1814,7 @@ func ExtractCTAUTScript(tx *wire.MsgTxAbe) (autScript CTAUTScript, err error) {
 		//	return nil, fmt.Errorf("mismatch witness for script")
 		//}
 
-	case *BurnTx:
+	case *BurnScript:
 		// for inputs, note that here is no enough information to
 		// 1. check the legality of token
 		// 2. check the mint threshold is meet

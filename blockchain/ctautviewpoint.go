@@ -457,7 +457,7 @@ func (view *CTAUTViewpoint) connectTransferScript(script *ctaut.TransferScript, 
 
 	return nil
 }
-func (view *CTAUTViewpoint) connectBurnScript(script *ctaut.BurnTx, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
+func (view *CTAUTViewpoint) connectBurnScript(script *ctaut.BurnScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
 	identifier := script.Identifier()
 	identifierKey := CTAUTIdentifierKey(identifier[:])
 	instance, exist := view.instances[identifierKey]
@@ -544,7 +544,7 @@ func (view *CTAUTViewpoint) connectTransaction(tx *abeutil.TxAbe, blockHeight in
 			return err
 		}
 
-	case *ctaut.BurnTx:
+	case *ctaut.BurnScript:
 		err = view.connectBurnScript(script, *txHash, blockHeight, sctauts)
 		if err != nil {
 			return err
@@ -740,7 +740,7 @@ func (view *CTAUTViewpoint) disconnectTransferTransaction(db database.DB, script
 
 	return nil, nil
 }
-func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, script *ctaut.BurnTx,
+func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, script *ctaut.BurnScript,
 	blockHeight int32, sctaut SpentCTAUT) (map[string]struct{}, error) {
 	identifier := script.Identifier()
 	identifierKey := CTAUTIdentifierKey(identifier[:])
@@ -851,7 +851,7 @@ func (view *CTAUTViewpoint) disconnectCTAUTScripts(db database.DB, block *abeuti
 					"spent transaction out information: %s", err))
 			}
 
-		case *ctaut.BurnTx:
+		case *ctaut.BurnScript:
 			_, err := view.disconnectBurnTransaction(db, script, blockHeight, sauts[txIdx])
 			if err != nil {
 				return nil, AssertError(fmt.Sprintf("disconnectTransactions called with bad "+
@@ -1026,7 +1026,7 @@ func (view *CTAUTViewpoint) SpendCTAutScript(ctAutScript ctaut.CTAUTScript, txHa
 		if err != nil {
 			return err
 		}
-	case *ctaut.BurnTx:
+	case *ctaut.BurnScript:
 		err = view.connectBurnScript(script, *txHash, blockHeight, nil)
 		if err != nil {
 			return err
@@ -1079,7 +1079,7 @@ func (b *BlockChain) FetchCTAUTView(ctAutScript ctaut.CTAUTScript) (*CTAUTViewpo
 		for i := 0; i < len(consumedTokens); i++ {
 			neededSet[consumedTokens[i].HostOutPoint] = struct{}{}
 		}
-	case *ctaut.BurnTx:
+	case *ctaut.BurnScript:
 		consumedTokens := script.ConsumedTokens()
 		for i := 0; i < len(consumedTokens); i++ {
 			neededSet[consumedTokens[i].HostOutPoint] = struct{}{}
