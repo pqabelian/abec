@@ -550,19 +550,12 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 			return ruleerror.NewRuleError(ruleerror.ErrBadTxInput, "transaction input refers to a serial number that is null")
 		}
 
-		if txIn.PreviousOutPointRing.Version != msgTx.Version {
-			// todo: when there are more cases of TxVersion, we may need hardcode more cases here.
-			if txIn.PreviousOutPointRing.Version == wire.TxVersion_Height_0 && msgTx.Version == wire.TxVersion_Height_MLPAUT_300000 {
-				//	allowed case, nothing to do
-			} else if txIn.PreviousOutPointRing.Version == wire.TxVersion_Height_0 && msgTx.Version == wire.TxVersion_Height_450000_Aconcagua {
-				//	allowed case, nothing to do
-			} else if txIn.PreviousOutPointRing.Version == wire.TxVersion_Height_MLPAUT_300000 && msgTx.Version == wire.TxVersion_Height_450000_Aconcagua {
-				//	allowed case, nothing to do
-			} else {
-				str := fmt.Sprintf("transaction's %d -th input refers to an OutPointRing with ring version "+
-					"%d, which is different from msgTx.Version %d, and this is not in the expected cases", i, txIn.PreviousOutPointRing.Version, msgTx.Version)
-				return ruleerror.NewRuleError(ruleerror.ErrBadTxInput, str)
-			}
+		err = abecryptox.RuleCheckOnTxInputVersion(txIn.PreviousOutPointRing.Version, msgTx.Version)
+		if err != nil {
+			str := fmt.Sprintf("msgTx.TxIns[%d] refers to an OutPointRing with ring version %d, "+
+				"while msgTx.Version %d, failing to pass the RuleCheckOnTxInputVersion: %v",
+				i, txIn.PreviousOutPointRing.Version, msgTx.Version, err)
+			return ruleerror.NewRuleError(ruleerror.ErrBadTxInput, str)
 		}
 
 		//	todo: When the fork with different blockNumPerRingGroup happens, hard code here.
@@ -1596,7 +1589,8 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *abeutil.Block, view *U
 			str := fmt.Sprintf("tried to overwrite transaction %v "+
 				"at block height %d that is not fully spent",
 				outpoint.Hash, utxo.BlockHeight())
-			return ruleerror.NewRuleError(ruleerror.ErrOverwriteTx, str)
+			//return ruleerror.NewRuleError(ruleerror.ErrOverwriteTx, str)
+			return ruleerror.NewRuleError(ruleerror.ErrForkTooOld, str) // will be removed, just put a random error
 		}
 	}
 
