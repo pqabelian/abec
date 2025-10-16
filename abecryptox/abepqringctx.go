@@ -1183,7 +1183,8 @@ func pqringctxRuleCheckOnTxoVersionPrivacyLevel(pp *pqringctxapi.PublicParameter
 	case wire.TxVersion_Height_450000_Aconcagua:
 		if privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre ||
 			privacyLevel == abecryptoxkey.PrivacyLevelRINGCT ||
-			privacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYM {
+			privacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYM ||
+			privacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYMCT {
 			// allowed cases
 		} else {
 			return fmt.Errorf("pqringctxRuleCheckOnTxoVersionPrivacyLevel: txoVersion is %d, "+
