@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"sort"
+
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
@@ -11,8 +14,6 @@ import (
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
-	"io"
-	"sort"
 )
 
 var TxVersion = wire.TxVersion

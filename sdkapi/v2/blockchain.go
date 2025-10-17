@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
-	"io"
 )
 
 func GetTxoRingSizeByBlockHeight(height int32) uint8 {
@@ -104,6 +105,13 @@ type OutPointRing struct {
 	OutPoints []*OutPoint
 }
 
+func (outpointRing *OutPointRing) RingId() (string, error) {
+	wireOutpointRing, err := outPointRing2ChainOutPointRing(outpointRing)
+	if err != nil {
+		return "", err
+	}
+	return wireOutpointRing.RingId().String(), nil
+}
 func NewOutPointRing(version uint32, blockIDs []string, outpoints []*OutPoint) (*OutPointRing, error) {
 	return &OutPointRing{
 		Version:   TxVersion,

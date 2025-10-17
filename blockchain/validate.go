@@ -599,7 +599,7 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 	// todo(CTAUT): to review
 	ctAutTx, err := tx.CTAUTTScript()
 	if err != nil {
-		str := fmt.Sprintf("error hapeens when extracting AutTransaction from Tx %s: %v", tx.Hash(), err)
+		str := fmt.Sprintf("error hapeens when extracting CT-AUT script from Tx %s: %v", tx.Hash(), err)
 		return ruleerror.NewRuleError(ruleerror.ErrCTAUTBadForm, str)
 	}
 	if ctAutTx != nil {
@@ -2376,6 +2376,7 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctaut.BurnScript, tx *abeutil.
 		willConsumedTokens[outpoint] = struct{}{}
 	}
 
+	// todo replace with inner implement
 	witnessHash := chainhash.HashH(tx.MsgTx().AutWitness)
 	claimedWitnessHash := ctAutScript.WitnessHash()
 	if !witnessHash.IsEqual(&claimedWitnessHash) {
@@ -2406,7 +2407,7 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctaut.BurnScript, tx *abeutil.
 
 	err := abecryptox.AutTransferTxVerify(trTx)
 	if err != nil {
-		return fmt.Errorf(`transaction %s try to transfer tokens but the witness verfied fail with %s`,
+		return fmt.Errorf(`transaction %s try to burn tokens but the witness verfied fail with %s`,
 			tx.Hash(), err)
 	}
 

@@ -9,6 +9,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"math/big"
+	"math/rand"
+	"net"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
@@ -27,18 +40,6 @@ import (
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
 	"github.com/gorilla/websocket"
-	"io"
-	"io/ioutil"
-	"math/big"
-	"math/rand"
-	"net"
-	"net/http"
-	"os"
-	"strconv"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 // API version constants
@@ -2565,8 +2566,8 @@ func chainErrToGBTErrString(err error) string {
 		return "bad-txns-nil-tx"
 	case ruleerror.ErrDuplicateTx:
 		return "bad-txns-duplicate"
-	case ruleerror.ErrOverwriteTx:
-		return "bad-txns-overwrite"
+	case ruleerror.ErrMismatchedTxoVersionAndPrivacyLevel:
+		return "bad-txns-mistmatch-version-privacylevel"
 	case ruleerror.ErrImmatureSpend:
 		return "bad-txns-maturity"
 	case ruleerror.ErrSpendTooHigh:
@@ -2588,8 +2589,8 @@ func chainErrToGBTErrString(err error) string {
 		return "bad-cb-height"
 	case ruleerror.ErrBadCoinbaseHeight:
 		return "bad-cb-height"
-	case ruleerror.ErrScriptMalformed:
-		return "bad-script-malformed"
+	case ruleerror.ErrTxVersionNotSupported:
+		return "bad-txns-unsupported-version"
 	case ruleerror.ErrScriptValidation:
 		return "bad-script-validate"
 	case ruleerror.ErrUnexpectedWitness:

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
@@ -38,10 +39,10 @@ func GetParamKeyGenPublicRandBytesLen(cryptoScheme CryptoScheme) (int, error) {
 type PrivacyLevel = abecryptoxkey.PrivacyLevel
 
 const (
-	PrivacyLevelRINGCTPre PrivacyLevel = abecryptoxkey.PrivacyLevelRINGCTPre //	hide the payer in ring, hide the amount by commitment, the default privacy-level in the initial version
-	PrivacyLevelRINGCT    PrivacyLevel = abecryptoxkey.PrivacyLevelRINGCT    //	hide the payer in ring, hide the amount by commitment, same as the initial version, but explicitly specified
-	PrivacyLevelPSEUDONYM PrivacyLevel = abecryptoxkey.PrivacyLevelPSEUDONYM //	pseudonym, i.e., hide the real identity
-	// PrivacyLevelRINGCTSA  PrivacyLevel = 3 //	(not supported at this moment) hide the payer in ring, hide the amount by commitment, hide the payee by SA
+	PrivacyLevelRINGCTPre   PrivacyLevel = abecryptoxkey.PrivacyLevelRINGCTPre   //	hide the payer in ring, hide the amount by commitment, the default privacy-level in the initial version
+	PrivacyLevelRINGCT      PrivacyLevel = abecryptoxkey.PrivacyLevelRINGCT      //	hide the payer in ring, hide the amount by commitment, same as the initial version, but explicitly specified
+	PrivacyLevelPSEUDONYM   PrivacyLevel = abecryptoxkey.PrivacyLevelPSEUDONYM   //	pseudonym, i.e., hide the real identity
+	PrivacyLevelPSEUDONYMCT              = abecryptoxkey.PrivacyLevelPSEUDONYMCT //	pseudonym + CT (confidential Transaction), i.e., hide the real identity and amount
 )
 
 func GetCryptoSchemeByTxVersion(txVersion uint32) (CryptoScheme, error) {
@@ -60,7 +61,14 @@ func CryptoAddressKeyGenByRootSeeds(cryptoScheme CryptoScheme, privacyLevel Priv
 		return nil, nil, nil, nil, nil, fmt.Errorf("unsupported crypto scheme %d", cryptoScheme)
 	}
 }
-
+func ExtractPublicRandFromTxo(txVersion uint32, serializedTxOut []byte) ([]byte, error) {
+	abeTxo := &wire.TxOutAbe{}
+	err := wire.ReadTxOutAbe(bytes.NewReader(serializedTxOut), 0, txVersion, abeTxo)
+	if err != nil {
+		return nil, err
+	}
+	return abecryptox.ExtractPublicRandFromTxo(abeTxo)
+}
 func ExtractPublicRandFromCryptoAddress(cryptoAddress []byte) (publicRand []byte, err error) {
 	return abecryptoxkey.ExtractPublicRandFromCryptoAddress(cryptoAddress)
 }
@@ -72,6 +80,11 @@ func CryptoAddressKeyReGenByRootSeedsFromPublicRand(cryptoScheme CryptoScheme, p
 	return abecryptoxkey.CryptoAddressKeyReGenByRootSeedsFromPublicRand(cryptoScheme, privacyLevel,
 		coinSpendKeyRootSeed, coinSerialNumberKeyRootSeed, coinValueKeyRootSeed,
 		coinDetectorRootKey, publicRand)
+}
+
+func CryptoValueKeyReGenByRootSeedsFromPublicRand(cryptoScheme CryptoScheme, privacyLevel PrivacyLevel,
+	coinValueKeyRootSeed []byte, publicRand []byte) (cryptoVpk []byte, cryptoVsk []byte, err error) {
+	return abecryptoxkey.CryptoValueKeyReGenByRootSeedsFromPublicRand(cryptoScheme, privacyLevel, coinValueKeyRootSeed, publicRand)
 }
 
 func RandSeedsGenByRootSeedsFromPublicRand(cryptoScheme CryptoScheme, privacyLevel PrivacyLevel,
@@ -154,7 +167,8 @@ func PrivacyLevelPseudonymTxoCoinParse(txVersion uint32, serializedTxOut []byte)
 	if err != nil {
 		return 0, fmt.Errorf("fail to extract the privacy level from transaction output: %v", err)
 	}
-	if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
+	if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM &&
+		privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
 		return 0, fmt.Errorf("can not extract from non-pseudonym output")
 	}
 	_, coinValue, err := abecryptox.PseudonymTxoCoinParse(abeTxo)
@@ -164,11 +178,6 @@ func PrivacyLevelPseudonymTxoCoinParse(txVersion uint32, serializedTxOut []byte)
 	return coinValue, nil
 }
 
-/*
-*
-ToDo: At this moment (2023.03.03), serializedTxOut is actually txoScript (which user obtains by RPC API).
-In later version, we need to modify the RPC API to provide serializedTxOut.
-*/
 func ExtractCoinValueFromSerializedTxOutByKeys(txVersion uint32, serializedTxOut []byte, cryptoAddress []byte, cryptoValueSecretKey []byte) (uint64, error) {
 	abeTxo := &wire.TxOutAbe{}
 	err := wire.ReadTxOutAbe(bytes.NewReader(serializedTxOut), 0, txVersion, abeTxo)
