@@ -413,7 +413,8 @@ func (b *BlockChain) calcNextRequiredDifficultyVectorAconcagua(lastNode *blockNo
 // getPowScaleSecond returns the PowScaleSecond corresponding to the passed blockHeight.
 func (b *BlockChain) getPowScaleSecond(blockHeight int32) uint32 {
 	// The system needs to preconfigure a map here.
-	return 1
+	// Based on test result on 2025.10, we set it to be 20.
+	return 20
 }
 
 // findPrevTestNetDifficultyVectorAconcagua returns the difficulty vector of the previous block which
