@@ -1607,19 +1607,21 @@ func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 		Fullsize: int32(blk.MsgBlock().SerializeSize()),
 		//StrippedSize:  int32(blk.MsgBlock().SerializeSizeStripped()),
 		//Weight:        int32(blockchain.GetBlockWeight(blk)),
-		Bits:             strconv.FormatInt(int64(blockHeader.Bits), 16),
-		Difficulty:       getDifficultyRatio(blockHeader.Bits, params),
-		BitsSecond:       strconv.FormatInt(int64(blockHeader.BitsSecond), 16),
-		DifficultySecond: getDifficultyRatio(blockHeader.BitsSecond, params),
-		PowScaleSecond:   blockHeader.PowScaleSecond,
-		ConsensusApplied: uint8(blockHeader.ConsensusApplied),
-		NextHash:         nextHashString,
-		ContentHash:      headerContentHash.String(),
-		MixDigest:        blockHeader.MixDigest.String(),
-		SealHash:         consensus.SealHashFast(blockHeader).String(),
+		Bits:        strconv.FormatInt(int64(blockHeader.Bits), 16),
+		Difficulty:  getDifficultyRatio(blockHeader.Bits, params),
+		NextHash:    nextHashString,
+		ContentHash: headerContentHash.String(),
+		MixDigest:   blockHeader.MixDigest.String(),
+		SealHash:    consensus.SealHashFast(blockHeader).String(),
 	}
 	if blockHeader.Height >= s.cfg.ChainParams.BlockHeightEthashPoW {
 		blockReply.Nonce = blockHeader.NonceExt
+	}
+	if blockHeader.Height >= s.cfg.ChainParams.BlockHeightAconcagua {
+		blockReply.BitsSecond = strconv.FormatInt(int64(blockHeader.BitsSecond), 16)
+		blockReply.DifficultySecond = getDifficultyRatio(blockHeader.BitsSecond, params)
+		blockReply.PowScaleSecond = blockHeader.PowScaleSecond
+		blockReply.ConsensusApplied = uint8(blockHeader.ConsensusApplied)
 	}
 
 	if *c.Verbosity == 1 {
