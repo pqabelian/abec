@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -1175,7 +1176,9 @@ func (view *UtxoRingViewpoint) disconnectTransactions(db database.DB, block *abe
 				return AssertError("disconnectTransactions called with bad " +
 					"spent transaction out information: the resulting Utxo of unspending is different from the one in STXO")
 			}
-			log.Debugf("try resume UTXORing %s with serial number %s", stxo.UtxoRing.outPointRing.Hash(), stxo.SerialNumber)
+			log.Debugf("try resume UTXORing %s with serial number %s",
+				stxo.UtxoRing.outPointRing.Hash(),
+				hex.EncodeToString(stxo.SerialNumber))
 		} else {
 			//	actually, can directly use the following codes to unspend
 			//	the above codes in if{} has the same effect, but with the strictest check.
@@ -1183,7 +1186,12 @@ func (view *UtxoRingViewpoint) disconnectTransactions(db database.DB, block *abe
 			loadUtxoRing := stxo.UtxoRing.Clone()
 			loadUtxoRing.packedFlags |= tfModified
 			view.entries[loadUtxoRing.outPointRing.Hash()] = loadUtxoRing
-			log.Debugf("try resume UTXORing %s from stxos", stxo.UtxoRing.outPointRing.Hash())
+			log.Debugf("try resume UTXORing %s with %d serial numbers from stxos",
+				stxo.UtxoRing.outPointRing.Hash(),
+				len(loadUtxoRing.serialNumbers))
+			for kk := 0; kk < len(loadUtxoRing.serialNumbers); kk++ {
+				log.Debugf("\t [%d]%s", kk, hex.EncodeToString(loadUtxoRing.serialNumbers[kk]))
+			}
 		}
 	}
 

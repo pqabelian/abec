@@ -7,8 +7,6 @@ import (
 	"io"
 
 	"github.com/abesuite/abec/aut"
-	"github.com/abesuite/abec/ctaut"
-
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 )
@@ -54,7 +52,7 @@ type BlockAbe struct {
 	autTransactions  []aut.Transaction
 	autTxnsGenerated bool
 
-	ctAutScripts          []ctaut.CTAUTScript
+	ctAutScripts          []*CTAUTScript
 	ctAutScriptsGenerated bool
 }
 
@@ -385,7 +383,7 @@ func (b *BlockAbe) AUTTransactions() []aut.Transaction {
 	b.autTxnsGenerated = true
 	return b.autTransactions
 }
-func (b *BlockAbe) CTAUTScripts() []ctaut.CTAUTScript {
+func (b *BlockAbe) CTAUTScripts() []*CTAUTScript {
 	// Return transactions if they have ALL already been generated.  This
 	// flag is necessary because the wrapped transactions are lazily
 	// generated in a sparse fashion.
@@ -395,7 +393,7 @@ func (b *BlockAbe) CTAUTScripts() []ctaut.CTAUTScript {
 
 	// Generate slice to hold all of the wrapped transactions if needed.
 	if len(b.ctAutScripts) == 0 {
-		b.ctAutScripts = make([]ctaut.CTAUTScript, 0, len(b.msgBlock.Transactions))
+		b.ctAutScripts = make([]*CTAUTScript, 0, len(b.msgBlock.Transactions))
 	}
 
 	// Generate and cache the wrapped autTransactions for all that haven't
@@ -411,17 +409,20 @@ func (b *BlockAbe) CTAUTScripts() []ctaut.CTAUTScript {
 			continue
 		}
 
-		autTx, err := txAbe.CTAUTTScript()
+		script, err := txAbe.CTAUTTScript()
 		if err != nil {
 			//	this should not happen
 			log.Warnf("AUTTransactions: error happens when getting AutTransaction from the %d-th transaction (%s) of the block: %v", i, txAbe.Hash(), err)
 			continue
 		}
-		if autTx == nil {
+		if script == nil {
 			log.Debugf("AUTTransactions: skip non-AUT transaction %s", txAbe.Hash())
 			continue
 		}
-		b.ctAutScripts = append(b.ctAutScripts, autTx)
+		b.ctAutScripts = append(b.ctAutScripts, &CTAUTScript{
+			HostTx: txAbe.msgTx,
+			Script: script,
+		})
 	}
 
 	b.ctAutScriptsGenerated = true

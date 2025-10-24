@@ -2077,7 +2077,10 @@ func dbPutUtxoRingView(dbTx database.Tx, view *UtxoRingViewpoint) error {
 		if err != nil {
 			return err
 		}
-		log.Debugf("store output point ring %d bytes with key %s", len(serialized), outPointRingHash.String())
+		log.Debugf("store output point ring %s with %d serial numbers:", outPointRingHash.String(), len(entry.serialNumbers))
+		for i := 0; i < len(entry.serialNumbers); i++ {
+			log.Debugf("\t [%d] %s", i, hex.EncodeToString(entry.serialNumbers[i]))
+		}
 	}
 
 	return nil

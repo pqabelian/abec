@@ -119,6 +119,7 @@ func spentCTAUTSerializeSize(stxo SpentCTAUT) (int, error) {
 		headerCode := uint64(updated.Height)
 		size += serializeSizeVLQ(headerCode)
 
+		size += 1
 		// +1 to represent nil for before
 		size += 1
 		serializedBefore, err := updated.Before.Serialize()
@@ -171,6 +172,12 @@ func putSpentCTAUT(target []byte, stxo SpentCTAUT) (int, error) {
 
 		headerCode := uint64(updated.Height)
 		offset += putVLQ(target[offset:], headerCode)
+
+		target[offset] = 0x00
+		if updated.IsReRegistration {
+			target[offset] = 0x01
+		}
+		offset += 1
 
 		// +1 to represent nil
 		serializedBefore, err := updated.Before.Serialize()
@@ -242,7 +249,7 @@ func decodeSpentCTAUT(serialized []byte) (SpentCTAUT, int, error) {
 
 			scriptSize, bytesRead := deserializeVLQ(serialized[offset:])
 			offset += bytesRead
-			if offset+int(scriptSize) >= len(serialized) {
+			if offset+int(scriptSize) > len(serialized) {
 				return nil, offset, errDeserialize("unexpected end of data for reading script")
 			}
 			res[i].Script = make([]byte, scriptSize)
@@ -261,6 +268,12 @@ func decodeSpentCTAUT(serialized []byte) (SpentCTAUT, int, error) {
 				"header code")
 		}
 		res.Height = int32(headerCode)
+
+		flag := serialized[offset]
+		offset += 1
+		if flag == 0x01 {
+			res.IsReRegistration = true
+		}
 
 		var err error
 		if serialized[offset] == 0 {
@@ -338,9 +351,9 @@ func serializeSpendJournalEntryCTAUT(stxos []SpentCTAUT) ([]byte, error) {
 	return serialized, nil
 
 }
-func deserializeSpendJournalEntryCTAUT(serialized []byte, txns []ctaut.CTAUTScript) ([]SpentCTAUT, error) {
+func deserializeSpendJournalEntryCTAUT(serialized []byte, scripts []*abeutil.CTAUTScript) ([]SpentCTAUT, error) {
 	// Calculate the total number of stxos.
-	numStxos := len(txns)
+	numStxos := len(scripts)
 
 	// When a block has no spent txouts there is nothing to serialize.
 	if len(serialized) == 0 && numStxos == 0 {
@@ -360,7 +373,7 @@ func deserializeSpendJournalEntryCTAUT(serialized []byte, txns []ctaut.CTAUTScri
 	stxoIdx := numStxos - 1
 	offset := 0
 	stxos := make([]SpentCTAUT, numStxos)
-	for txIdx := len(txns) - 1; txIdx >= 0; txIdx-- {
+	for txIdx := len(scripts) - 1; txIdx >= 0; txIdx-- {
 		stxo, n, err := decodeSpentCTAUT(serialized[offset:])
 		offset += n
 		stxos[txIdx] = stxo
@@ -391,8 +404,8 @@ func dbFetchSpendJournalEntryCTAUT(dbTx database.Tx, block *abeutil.BlockAbe) ([
 	spendJournalBucket := dbTx.Metadata().Bucket(ctAutSpendJournalBucketName)
 	serialized := spendJournalBucket.Get(block.Hash()[:])
 
-	ctAUTTransactions := block.CTAUTScripts()
-	stxos, err := deserializeSpendJournalEntryCTAUT(serialized, ctAUTTransactions)
+	scripts := block.CTAUTScripts()
+	stxos, err := deserializeSpendJournalEntryCTAUT(serialized, scripts)
 	if err != nil {
 		// Ensure any deserialization errors are returned as database
 		// corruption errors.

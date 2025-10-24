@@ -7,12 +7,13 @@ package blockchain
 import (
 	"container/list"
 	"fmt"
-	"github.com/abesuite/abec/blockchain/consensus"
-	"github.com/abesuite/abec/blockchain/ruleerror"
 	"math/big"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/abesuite/abec/blockchain/consensus"
+	"github.com/abesuite/abec/blockchain/ruleerror"
 
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/aut"
@@ -1488,7 +1489,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			return err
 		}
 
-		ctautInstanceToDel, err = ctautView.disconnectCTAUTScripts(b.db, block, sctauts)
+		ctautInstanceToDel, err = ctautView.disconnectCTAUTScripts(b.db, block, sctauts, view)
 		if err != nil {
 			return err
 		}
@@ -1700,7 +1701,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			return err
 		}
 
-		unregisteredInstances, err := ctautView.disconnectCTAUTScripts(b.db, block, detachSpentCTAUTs[i])
+		unregisteredInstances, err := ctautView.disconnectCTAUTScripts(b.db, block, detachSpentCTAUTs[i], view)
 		if err != nil {
 			return err
 		}

@@ -747,8 +747,10 @@ func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, script *ct
 
 	// fetch outpoint from database if not exist with instance in batch
 	outpoints := map[ctaut.HostOutPoint]struct{}{}
-	for _, coin := range script.GeneratedTokens() {
-		outpoints[coin.HostOutPoint] = struct{}{}
+	generatedTokens := script.GeneratedTokens()
+	for i := 1; i < len(generatedTokens); i++ {
+		token := generatedTokens[i]
+		outpoints[token.HostOutPoint] = struct{}{}
 	}
 	err := view.fetchCTAUTMain(db, outpoints, identifier[:])
 	if err != nil {
@@ -762,32 +764,32 @@ func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, script *ct
 			identifierKey)
 	}
 
-	txOuts := script.GeneratedTokens()
-	for i := len(txOuts); i > 0; i++ {
-		coin := txOuts[i]
+	for i := len(generatedTokens) - 1; i > 0; i-- {
+		coin := generatedTokens[i]
 		if _, exist := instance.coins[coin.HostOutPoint]; !exist {
 			return nil, fmt.Errorf("unknown coins %s for AUT instance %s", coin.HostOutPoint, identifierKey)
 		}
 		instance.coins[coin.HostOutPoint].Spend()
 	}
-	if _, exist := instance.coins[txOuts[0].HostOutPoint]; exist {
-		return nil, fmt.Errorf("should not exist coin %s for AUT instance %s", txOuts[0].HostOutPoint, identifierKey)
+	burnedToken := generatedTokens[0]
+	if _, exist := instance.coins[burnedToken.HostOutPoint]; exist {
+		return nil, fmt.Errorf("should not exist coin %s for AUT instance %s", burnedToken.HostOutPoint, identifierKey)
 	}
 
 	consumedAutTokens, ok := sctaut.(*SpentCTAUTTokens)
 	if !ok {
 		return nil, fmt.Errorf("invalid updated information")
 	}
-	txIns := script.ConsumedTokens()
+	claimedTokens := script.ConsumedTokens()
 	// assert
-	if len(txIns) != len(*consumedAutTokens) {
+	if len(claimedTokens) != len(*consumedAutTokens) {
 		return nil, fmt.Errorf("mismatched spend journal")
 	}
 	// TODO(CTAUT) consider order?
 	for i := len(*consumedAutTokens) - 1; i >= 0; i-- {
 		// TODO it seems there is no way to get script other than here
 		token := (*consumedAutTokens)[i]
-		coin := txIns[i]
+		coin := claimedTokens[i]
 		if _, ok := instance.coins[coin.HostOutPoint]; ok {
 			return nil, fmt.Errorf("duplicate coins %s for AUT instance %s", coin.HostOutPoint, identifierKey)
 		}
@@ -804,7 +806,8 @@ func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, script *ct
 //
 // NOTE: saut must not be modified anyway!!!
 func (view *CTAUTViewpoint) disconnectCTAUTScripts(db database.DB, block *abeutil.BlockAbe,
-	sauts []SpentCTAUT) (map[string]struct{}, error) {
+	sauts []SpentCTAUT, hostView *UtxoRingViewpoint,
+) (map[string]struct{}, error) {
 
 	// Sanity check the correct number of sauts are provided.
 	if len(sauts) != countSpentOutputsCTAUT(block) {
@@ -818,12 +821,26 @@ func (view *CTAUTViewpoint) disconnectCTAUTScripts(db database.DB, block *abeuti
 	// can spend from previous ones.
 	ctAutScripts := block.CTAUTScripts()
 	unregisteredCTAUTs := map[string]struct{}{}
-	for txIdx := len(ctAutScripts) - 1; txIdx >= 0; txIdx-- {
-		ctAutScript := ctAutScripts[txIdx]
+	for index := len(ctAutScripts) - 1; index >= 0; index-- {
+		ctAutScript := ctAutScripts[index]
 
-		switch script := ctAutScript.(type) {
+		err := ctaut.PresetHostOutpointForCTAUT(ctAutScript.Script, ctAutScript.HostTx, func(ringHash chainhash.Hash) (*wire.TxOutAbe, error) {
+			ringEntry := hostView.LookupEntry(ringHash)
+			if ringEntry == nil {
+				return nil, errors.New("no such ring found")
+			}
+			txOuts := ringEntry.txOuts
+			if len(txOuts) == 0 {
+				return nil, errors.New("an empty ring found")
+			}
+			return txOuts[0], nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		switch script := ctAutScript.Script.(type) {
 		case *ctaut.RegistrationScript:
-			unregisteredInstances, err := view.disconnectRegistrationTransaction(db, script, blockHeight, sauts[txIdx])
+			unregisteredInstances, err := view.disconnectRegistrationTransaction(db, script, blockHeight, sauts[index])
 			if err != nil {
 				return nil, AssertError(fmt.Sprintf("disconnectTransactions called with bad "+
 					"spent transaction out information: %s", err))
@@ -832,27 +849,27 @@ func (view *CTAUTViewpoint) disconnectCTAUTScripts(db database.DB, block *abeuti
 				unregisteredCTAUTs[identifier] = struct{}{}
 			}
 		case *ctaut.ReRegistrationScript:
-			_, err := view.disconnectReRegistrationTransaction(db, script, blockHeight, sauts[txIdx])
+			_, err := view.disconnectReRegistrationTransaction(db, script, blockHeight, sauts[index])
 			if err != nil {
 				return nil, AssertError(fmt.Sprintf("disconnectTransactions called with bad "+
 					"spent transaction out information: %s", err))
 			}
 		case *ctaut.MintScript:
-			_, err := view.disconnectMintTransaction(db, script, blockHeight, sauts[txIdx])
+			_, err := view.disconnectMintTransaction(db, script, blockHeight, sauts[index])
 			if err != nil {
 				return nil, AssertError(fmt.Sprintf("disconnectTransactions called with bad "+
 					"spent transaction out information: %s", err))
 			}
 
 		case *ctaut.TransferScript:
-			_, err := view.disconnectTransferTransaction(db, script, blockHeight, sauts[txIdx])
+			_, err := view.disconnectTransferTransaction(db, script, blockHeight, sauts[index])
 			if err != nil {
 				return nil, AssertError(fmt.Sprintf("disconnectTransactions called with bad "+
 					"spent transaction out information: %s", err))
 			}
 
 		case *ctaut.BurnScript:
-			_, err := view.disconnectBurnTransaction(db, script, blockHeight, sauts[txIdx])
+			_, err := view.disconnectBurnTransaction(db, script, blockHeight, sauts[index])
 			if err != nil {
 				return nil, AssertError(fmt.Sprintf("disconnectTransactions called with bad "+
 					"spent transaction out information: %s", err))
