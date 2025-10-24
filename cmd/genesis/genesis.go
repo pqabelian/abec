@@ -3,6 +3,10 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
+	"log"
+	"os"
+	"time"
+
 	"github.com/abesuite/abec/abecrypto"
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/abesuite/abec/abeutil"
@@ -10,9 +14,6 @@ import (
 	"github.com/abesuite/abec/blockchain/consensus/nakamotopowinit"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
-	"log"
-	"os"
-	"time"
 )
 
 func main() {
@@ -67,7 +68,7 @@ func gensis() {
 	for i := 0; i < len(txOutDescs); i++ {
 		txOutDescs[i] = abecrypto.NewAbeTxOutDesc(retSerializedCryptoAddress, 205_799_813_685_247)
 	}
-	txVersion := wire.TxVersion
+	txVersion := wire.TxVersion_Height_0
 	nullSerialNumer, _ := abecryptoparam.GetNullSerialNumber(txVersion)
 	cbTxTemplate := &wire.MsgTxAbe{
 		Version: txVersion,

@@ -72,11 +72,11 @@ func CoinbaseTxVerify(coinbaseTx *wire.MsgTxAbe) error {
 
 // CreateTransferTxMsgTemplateByRootSeeds creates a *wire.MsgTxAbe template, which will be used when calling TransferTxGen().
 // reviewed on 2023.12.31
-func CreateTransferTxMsgTemplateByRootSeeds(abeTxInputDescs []*AbeTxInputDescByRootSeeds, abeTxOutputDescs []*AbeTxOutputDesc, txFee uint64, txMemo []byte) (*wire.MsgTxAbe, error) {
+func CreateTransferTxMsgTemplateByRootSeeds(txVersion uint32, abeTxInputDescs []*AbeTxInputDescByRootSeeds, abeTxOutputDescs []*AbeTxOutputDesc, txFee uint64, txMemo []byte) (*wire.MsgTxAbe, error) {
 
 	//	Version
 	//	Note that new Tx must use the latest/current TxVersion.
-	txMsgTemplate := wire.NewMsgTxAbe(wire.TxVersion)
+	txMsgTemplate := wire.NewMsgTxAbe(txVersion)
 
 	//	TxIns     []*TxInAbe
 	for _, abeTxInputDesc := range abeTxInputDescs {
@@ -99,11 +99,11 @@ func CreateTransferTxMsgTemplateByRootSeeds(abeTxInputDescs []*AbeTxInputDescByR
 
 // CreateTransferTxMsgTemplateByRandSeeds creates a *wire.MsgTxAbe template, which will be used when calling TransferTxGen().
 // reviewed on 2023.12.31
-func CreateTransferTxMsgTemplateByRandSeeds(abeTxInputDescs []*AbeTxInputDescByRandSeeds, abeTxOutputDescs []*AbeTxOutputDesc, txFee uint64, txMemo []byte) (*wire.MsgTxAbe, error) {
+func CreateTransferTxMsgTemplateByRandSeeds(txVersion uint32, abeTxInputDescs []*AbeTxInputDescByRandSeeds, abeTxOutputDescs []*AbeTxOutputDesc, txFee uint64, txMemo []byte) (*wire.MsgTxAbe, error) {
 
 	//	Version
 	//	Note that new Tx must use the latest/current TxVersion.
-	txMsgTemplate := wire.NewMsgTxAbe(wire.TxVersion)
+	txMsgTemplate := wire.NewMsgTxAbe(txVersion)
 
 	//	TxIns     []*TxInAbe
 	for _, abeTxInputDesc := range abeTxInputDescs {
@@ -140,11 +140,11 @@ func CreateTransferTxMsgTemplateByRandSeeds(abeTxInputDescs []*AbeTxInputDescByR
 // a caller may use other methods to create a TransferTxMsgTemplate.
 // reviewed on 2023.12.21
 // reviewed on 2023.12.31
-func CreateTransferTxMsgTemplateByKeys(abeTxInputDescs []*AbeTxInputDescByKeys, abeTxOutputDescs []*AbeTxOutputDesc, txFee uint64, txMemo []byte) (*wire.MsgTxAbe, error) {
+func CreateTransferTxMsgTemplateByKeys(txVersion uint32, abeTxInputDescs []*AbeTxInputDescByKeys, abeTxOutputDescs []*AbeTxOutputDesc, txFee uint64, txMemo []byte) (*wire.MsgTxAbe, error) {
 
 	//	Version
 	//	Note that new Tx must use the latest/current TxVersion.
-	txMsgTemplate := wire.NewMsgTxAbe(wire.TxVersion)
+	txMsgTemplate := wire.NewMsgTxAbe(txVersion)
 
 	//	TxIns     []*TxInAbe
 	for _, abeTxInputDesc := range abeTxInputDescs {

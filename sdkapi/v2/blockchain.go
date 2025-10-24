@@ -114,7 +114,7 @@ func (outpointRing *OutPointRing) RingId() (string, error) {
 }
 func NewOutPointRing(version uint32, blockIDs []string, outpoints []*OutPoint) (*OutPointRing, error) {
 	return &OutPointRing{
-		Version:   TxVersion,
+		Version:   version,
 		BlockIDs:  blockIDs,
 		OutPoints: outpoints,
 	}, nil
