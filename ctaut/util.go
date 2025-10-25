@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"math"
 
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
@@ -21,8 +22,13 @@ func init() {
 	}
 }
 
-func writePrefix(b *bytes.Buffer, ctautTxType CTAUTScriptType, identifier [CTAUTIdentifierLength]byte) error {
+func writePrefix(b *bytes.Buffer, version uint32, ctautTxType CTAUTScriptType, identifier [CTAUTIdentifierLength]byte) error {
 	err := WriteFixedBytes(b, []byte(commonPrefix))
+	if err != nil {
+		return err
+	}
+
+	err = WriteVarInt(b, uint64(version))
 	if err != nil {
 		return err
 	}
@@ -35,32 +41,40 @@ func writePrefix(b *bytes.Buffer, ctautTxType CTAUTScriptType, identifier [CTAUT
 	return WriteFixedBytes(b, identifier[:])
 }
 
-func readPrefix(r io.Reader, expectedCtAutTxType CTAUTScriptType) ([CTAUTIdentifierLength]byte, CTAUTScriptType, error) {
+func readPrefix(r io.Reader, expectedCtAutTxType CTAUTScriptType) (uint32, [CTAUTIdentifierLength]byte, CTAUTScriptType, error) {
 	var res [CTAUTIdentifierLength]byte
 
 	commprefix, err := ReadFixedBytes(r, len(commonPrefix))
 	if err != nil {
-		return res, 0, ErrNonAutTx
+		return 0, res, 0, ErrNonAutTx
 	}
 	if !bytes.Equal(commprefix, []byte(commonPrefix)) {
-		return res, 0, ErrNonAutTx
+		return 0, res, 0, ErrNonAutTx
+	}
+
+	version, err := ReadVarInt(r)
+	if err != nil {
+		return 0, res, 0, err
+	}
+	if version > math.MaxUint32 {
+		return 0, res, 0, ErrInValidAUTTx
 	}
 
 	ctAutScriptType, err := ReadByte(r)
 	if err != nil {
-		return res, 0, err
+		return 0, res, 0, err
 	}
 	if ctAutScriptType != expectedCtAutTxType {
-		return res, 0, ErrInValidAUTTx
+		return 0, res, 0, ErrInValidAUTTx
 	}
 
 	identifier, err := ReadFixedBytes(r, CTAUTIdentifierLength)
 	if err != nil {
-		return res, 0, err
+		return 0, res, 0, err
 	}
 	copy(res[:], identifier)
 
-	return res, ctAutScriptType, nil
+	return uint32(version), res, ctAutScriptType, nil
 }
 
 func writeIssuerTokens(b *bytes.Buffer, issuerTokens [][]byte) error {
@@ -181,27 +195,25 @@ func readCTAUTTxoScript(r io.Reader, expectedCTTokenLength int, expectedPlainTok
 	if numAutCoins, err = ReadVarInt(r); err != nil {
 		return nil, err
 	}
-	ctAUTTxoScripts := make([][]byte, numAutCoins)
-	for i := uint64(0); i < numAutCoins; i++ {
-		ctAUTTxoScripts[i], err = ReadVarBytes(r, MaxAUTValueScriptLength, "an AUT with invalid txo script")
-		if err != nil {
-			return nil, err
-		}
-		if len(ctAUTTxoScripts[i]) > MaxAUTValueScriptLength {
-			// todo(ctaut): the check does not make sense
-			// todo(ctaut): the length is not correct.
-			return nil, ErrInValidAUTTx
-		}
-	}
 	if int(numAutCoins) != expectedCTTokenLength+expectedPlainTokenLength {
 		return nil, ErrInValidAUTTx
 	}
 
+	valueScripts := make([][]byte, numAutCoins)
+	for i := uint64(0); i < numAutCoins; i++ {
+		valueScripts[i], err = ReadVarBytes(r, MaxAUTValueScriptLength, "valueScript")
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	for i := 0; i < expectedCTTokenLength; i++ {
-		autTxoType, err := abecryptox.GetAutTxoType(&ctautwire.AutTxo{
-			Version:   wire.TxVersion, // TODO support standalone version for CT-AUT
-			TxoScript: ctAUTTxoScripts[i],
-		})
+		autTxo := &ctautwire.AutTxo{}
+		err = autTxo.Deserialize(bytes.NewReader(valueScripts[i]))
+		if err != nil {
+			return nil, err
+		}
+		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
 		if err != nil {
 			return nil, err
 		}
@@ -210,10 +222,12 @@ func readCTAUTTxoScript(r io.Reader, expectedCTTokenLength int, expectedPlainTok
 		}
 	}
 	for i := expectedCTTokenLength; i < expectedCTTokenLength+expectedPlainTokenLength; i++ {
-		autTxoType, err := abecryptox.GetAutTxoType(&ctautwire.AutTxo{
-			Version:   wire.TxVersion, // TODO support standalone version for CT-AUT
-			TxoScript: ctAUTTxoScripts[i],
-		})
+		autTxo := &ctautwire.AutTxo{}
+		err = autTxo.Deserialize(bytes.NewReader(valueScripts[i]))
+		if err != nil {
+			return nil, err
+		}
+		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
 		if err != nil {
 			return nil, err
 		}
@@ -222,7 +236,7 @@ func readCTAUTTxoScript(r io.Reader, expectedCTTokenLength int, expectedPlainTok
 		}
 	}
 
-	return ctAUTTxoScripts, nil
+	return valueScripts, nil
 }
 
 // CheckHostTxoParasiticity would check the following rule:
@@ -250,10 +264,7 @@ func CheckHostTxoParasiticity(txHash chainhash.Hash, outputIndex int, txOut *wir
 // GetGeneratedCTAUTTokens would get the specified host output from the host transaction
 // todo(ctaut): add comments to define the rules
 func GetGeneratedCTAUTTokens(script CTAUTScript, txHash chainhash.Hash, txOuts []*wire.TxOutAbe) ([]*CTAUTToken, error) {
-	numCTAUTTokens, err := GetNumGeneratedTokens(script)
-	if err != nil {
-		return nil, err
-	}
+	numCTAUTTokens := script.NumGeneratedTokens()
 	startIdx := 0
 	for ; startIdx < len(txOuts); startIdx++ {
 		txOut := txOuts[startIdx]
@@ -311,7 +322,7 @@ func GetGeneratedCTAUTTokens(script CTAUTScript, txHash chainhash.Hash, txOuts [
 		}
 	case *TransferScript:
 		for i := 0; i < numCTAUTTokens; i++ {
-			autTxOuts[i].ValueScript = ctAUTScript.autTxoScripts[i]
+			autTxOuts[i].ValueScript = ctAUTScript.valueScripts[i]
 		}
 	case *BurnScript:
 		for i := 0; i < numCTAUTTokens; i++ {
@@ -322,95 +333,6 @@ func GetGeneratedCTAUTTokens(script CTAUTScript, txHash chainhash.Hash, txOuts [
 	}
 
 	return autTxOuts, nil
-}
-func populateConsumedCTAUTTokens(script CTAUTScript, msgTx *wire.MsgTxAbe,
-	lookupHostOutput func(ringHash chainhash.Hash) (*wire.TxOutAbe, error)) error {
-	if script == nil {
-		return nil
-	}
-	if script.Type() == Registration {
-		return nil
-	}
-	txHash := msgTx.TxHash()
-
-	hostedTxIns := msgTx.TxIns
-	startIndex := 0
-	for ; startIndex < len(hostedTxIns); startIndex++ {
-		// sanity-check
-		ringHash := hostedTxIns[startIndex].PreviousOutPointRing.Hash()
-		txOut, err := lookupHostOutput(ringHash)
-		if err != nil {
-			return err
-		}
-
-		privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
-		if err != nil {
-			return err
-		}
-
-		// skip fully-privacy area
-		if privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre ||
-			privacyLevel == abecryptoxkey.PrivacyLevelRINGCT {
-			continue
-		}
-
-		if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
-			return fmt.Errorf("expect privacy level %d but got %d",
-				abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
-		}
-		break
-	}
-
-	numInCoins, err := getNumConsumedTokens(script)
-	if err != nil {
-		return err
-	}
-	if startIndex+numInCoins > len(hostedTxIns) {
-		return fmt.Errorf("claim %d (root) coins but only remain %d outputs",
-			numInCoins, len(hostedTxIns)-startIndex)
-	}
-
-	autTxIns := make([]*CTAUTToken, numInCoins)
-	for i := 0; i < len(autTxIns); i++ {
-		hostIndex := startIndex + i
-
-		// sanity-check
-		ringHash := hostedTxIns[hostIndex].PreviousOutPointRing.Hash()
-		txOut, err := lookupHostOutput(ringHash)
-		if err != nil {
-			return err
-		}
-
-		privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
-		if err != nil {
-			return err
-		}
-		if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
-			return fmt.Errorf("expect privacy level %d but got %d",
-				abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
-		}
-
-		// fill out with the first item in ring
-		ringIdx := 0
-		outpoint := HostOutPoint{
-			Hash:  hostedTxIns[hostIndex].PreviousOutPointRing.OutPoints[ringIdx].TxHash,
-			Index: uint32(hostedTxIns[hostIndex].PreviousOutPointRing.OutPoints[ringIdx].Index),
-		}
-
-		coinAddress, err := CheckHostTxoParasiticity(outpoint.Hash, int(outpoint.Index), txOut)
-		if err != nil {
-			return fmt.Errorf("transaction %s try to consume UTXO at Ring %s is not a valid output", txHash,
-				hostedTxIns[hostIndex].PreviousOutPointRing.Hash())
-		}
-
-		autTxIns[i] = &CTAUTToken{
-			HostOutPoint: outpoint,
-			Version:      hostedTxIns[hostIndex].PreviousOutPointRing.Version,
-			ValueScript:  nil,         // will be populated later with CTAUTViewpoint
-			CoinAddress:  coinAddress, // required by root coin while optional for coin
-		}
-	}
-	return script.setConsumedTokens(autTxIns)
 }
 
 // todo(ctaut): define the rules on the mint/update threshold.

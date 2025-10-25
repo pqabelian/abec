@@ -612,8 +612,12 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 
 		// for output part, all tokens must be parasitized in the output with valid version
 		txOuts := tx.MsgTx().TxOuts
-		for _, coin := range ctAutTx.GeneratedTokens() {
-			index := coin.HostOutPoint.Index
+		generatedTokens, err := ctAutTx.GeneratedTokens()
+		if err != nil {
+			return err
+		}
+		for _, token := range generatedTokens {
+			index := token.HostOutPoint.Index
 			if txOuts[index].Version < wire.TxVersion_Height_450000_Aconcagua {
 				return ruleerror.NewRuleError(ruleerror.ErrTxVersionForCTAUT, "transaction "+
 					"contains CTAUT but the parasitized output has invalid version")
@@ -2079,8 +2083,17 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 	return nil
 }
 
-func checkCTAUTRegistrationTransactionInputs(ctAutScript *ctaut.RegistrationScript, tx *abeutil.TxAbe, txHeight int32,
+func checkCTAUTRegistrationTransactionInputs(ctAutScript *ctaut.EnhancedCTAUTScript, tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
+	if ctAutScript.Type() != ctaut.Registration {
+		return fmt.Errorf("expected registration script, but got %d", ctAutScript.Type())
+	}
+
+	registrationScript, ok := ctAutScript.CTAUTScript.(*ctaut.RegistrationScript)
+	if !ok {
+		return fmt.Errorf("expected registration script, but got %d", ctAutScript.Type())
+	}
+
 	identifier := ctAutScript.Identifier()
 	identifierKey := CTAUTIdentifierKey(identifier[:])
 
@@ -2091,18 +2104,26 @@ func checkCTAUTRegistrationTransactionInputs(ctAutScript *ctaut.RegistrationScri
 	}
 
 	// if the claimed height will expire soon, reject it
-	if ctAutScript.ExpireHeight() <= txHeight {
+	if registrationScript.ExpireHeight() <= txHeight {
 		return fmt.Errorf("transaction %s try to register an AUT "+
 			"instance with expire height %d , but current block height %d, it will expire soon", tx.Hash(),
-			ctAutScript.ExpireHeight(), txHeight)
+			registrationScript.ExpireHeight(), txHeight)
 	}
 
 	return nil
 }
 
-func checkCTAUTReRegistrationTransactionInputs(ctAutScript *ctaut.ReRegistrationScript, tx *abeutil.TxAbe, txHeight int32,
+func checkCTAUTReRegistrationTransactionInputs(script *ctaut.EnhancedCTAUTScript, tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
-	identifier := ctAutScript.Identifier()
+	if script.Type() != ctaut.ReRegistration {
+		return fmt.Errorf("expected re-registration script, but got %d", script.Type())
+	}
+	reRegisterScript, ok := script.CTAUTScript.(*ctaut.ReRegistrationScript)
+	if !ok {
+		return fmt.Errorf("expected re-registration script, but got %d", script.Type())
+	}
+
+	identifier := script.Identifier()
 	identifierKey := CTAUTIdentifierKey(identifier[:])
 
 	instance, exist := ctautView.instances[identifierKey]
@@ -2125,7 +2146,10 @@ func checkCTAUTReRegistrationTransactionInputs(ctAutScript *ctaut.ReRegistration
 	// duplicated input or double spending?
 	willUsedIssueTokens := map[string]struct{}{}
 	willConsumedRootTokens := map[ctaut.HostOutPoint]struct{}{}
-	consumedTokens := ctAutScript.ConsumedTokens()
+	consumedTokens, err := script.ConsumedTokens()
+	if err != nil {
+		return err
+	}
 	for i := 0; i < len(consumedTokens); i++ {
 		outpoint := consumedTokens[i].HostOutPoint
 
@@ -2164,24 +2188,32 @@ func checkCTAUTReRegistrationTransactionInputs(ctAutScript *ctaut.ReRegistration
 
 	// check updated AUT info
 	// planned amount
-	if instance.metadata.MintedAmount > ctAutScript.PlannedTotalSupply() {
+	if instance.metadata.MintedAmount > reRegisterScript.PlannedTotalSupply() {
 		return fmt.Errorf("transaction %s try to update the planned total amount to %d but "+
-			"the AUT entry has mint %d", tx.Hash(), ctAutScript.PlannedTotalSupply(),
+			"the AUT entry has mint %d", tx.Hash(), reRegisterScript.PlannedTotalSupply(),
 			instance.metadata.MintedAmount)
 	}
 
 	// expiry
-	if ctAutScript.ExpireHeight() <= txHeight {
+	if reRegisterScript.ExpireHeight() <= txHeight {
 		return fmt.Errorf("transaction %s try to re-register the "+
 			"instance with expire height %d (current height %d)", tx.Hash(),
-			ctAutScript.ExpireHeight(), txHeight)
+			reRegisterScript.ExpireHeight(), txHeight)
 	}
 
 	return nil
 }
 
-func checkCTAUTMintTransactionInputs(ctAutScript *ctaut.MintScript, tx *abeutil.TxAbe, txHeight int32,
+func checkCTAUTMintTransactionInputs(ctAutScript *ctaut.EnhancedCTAUTScript, tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
+	if ctAutScript.Type() != ctaut.Mint {
+		return fmt.Errorf("expected mint script, but got %d", ctAutScript.Type())
+	}
+	mintScript, ok := ctAutScript.CTAUTScript.(*ctaut.MintScript)
+	if !ok {
+		return fmt.Errorf("expected mint script, but got %d", ctAutScript.Type())
+	}
+
 	identifier := ctAutScript.Identifier()
 	identifierKey := CTAUTIdentifierKey(identifier[:])
 
@@ -2199,7 +2231,10 @@ func checkCTAUTMintTransactionInputs(ctAutScript *ctaut.MintScript, tx *abeutil.
 	// duplicated input or double spending?
 	willUsedIssueTokens := map[string]struct{}{}
 	willConsumedRootTokens := map[ctaut.HostOutPoint]struct{}{}
-	consumedTokens := ctAutScript.ConsumedTokens()
+	consumedTokens, err := ctAutScript.ConsumedTokens()
+	if err != nil {
+		return err
+	}
 	for i := 0; i < len(consumedTokens); i++ {
 		outpoint := consumedTokens[i].HostOutPoint
 		if _, existOutpoint := instance.metadata.RootTokenSet[outpoint]; !existOutpoint {
@@ -2235,34 +2270,39 @@ func checkCTAUTMintTransactionInputs(ctAutScript *ctaut.MintScript, tx *abeutil.
 	}
 
 	// check the supply
-	if instance.metadata.MintedAmount+ctAutScript.Vin() > instance.metadata.PlannedTotalSupply {
-		return fmt.Errorf("transaction %s try to mint coin exceed it claimed planned %d",
-			tx.Hash(), instance.metadata.PlannedTotalSupply)
+	if instance.metadata.MintedAmount+mintScript.Vin() > instance.metadata.PlannedTotalSupply {
+		return fmt.Errorf("transaction %s try to mint coin exceed claimed planned %d with vin %d",
+			tx.Hash(), instance.metadata.PlannedTotalSupply, mintScript.Vin())
 	}
 
 	witnessHash := chainhash.HashH(tx.MsgTx().AutWitness)
-	claimedWitnessHash := ctAutScript.WitnessHash()
+	claimedWitnessHash := mintScript.WitnessHash()
 	if !witnessHash.IsEqual(&claimedWitnessHash) {
 		return fmt.Errorf("mismatch witness for script")
 	}
 
-	generatedTokens := ctAutScript.GeneratedTokens()
+	generatedTokens, err := ctAutScript.GeneratedTokens()
+	if err != nil {
+		return err
+	}
 	cbTx := &ctautwire.AutCoinbaseTx{
 		Version:   ctAutScript.Version(),
-		Vin:       ctAutScript.Vin(),
+		Vin:       mintScript.Vin(),
 		TxOuts:    make([]*ctautwire.AutTxo, len(generatedTokens)),
 		TxWitness: tx.MsgTx().AutWitness,
 	}
 
 	// for outputs, fill out the script
 	for i := 0; i < len(generatedTokens); i++ {
-		cbTx.TxOuts[i] = &ctautwire.AutTxo{
-			Version:   generatedTokens[i].Version,
-			TxoScript: generatedTokens[i].ValueScript,
+		autTxo := &ctautwire.AutTxo{}
+		err = autTxo.Deserialize(bytes.NewReader(generatedTokens[i].ValueScript))
+		if err != nil {
+			return err
 		}
+		cbTx.TxOuts[i] = autTxo
 	}
 
-	err := abecryptox.AutCoinbaseTxVerify(cbTx)
+	err = abecryptox.AutCoinbaseTxVerify(cbTx)
 	if err != nil {
 		return fmt.Errorf("transaction %s try to mint but the witness verfied fail with %s",
 			tx.Hash(), err)
@@ -2271,8 +2311,16 @@ func checkCTAUTMintTransactionInputs(ctAutScript *ctaut.MintScript, tx *abeutil.
 	return nil
 }
 
-func checkCTAUTTransferTransactionInputs(ctAutScript *ctaut.TransferScript, tx *abeutil.TxAbe, txHeight int32,
+func checkCTAUTTransferTransactionInputs(ctAutScript *ctaut.EnhancedCTAUTScript, tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
+	if ctAutScript.Type() != ctaut.Transfer {
+		return fmt.Errorf("expected transfer script, but got %d", ctAutScript.Type())
+	}
+	transferScript, ok := ctAutScript.CTAUTScript.(*ctaut.TransferScript)
+	if !ok {
+		return fmt.Errorf("expected transfer script, but got %d", ctAutScript.Type())
+	}
+
 	identifier := ctAutScript.Identifier()
 	identifierKey := CTAUTIdentifierKey(identifier[:])
 
@@ -2281,7 +2329,10 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctaut.TransferScript, tx *
 		return errors.New("an non-registration AUT transaction try to operate on non-existing AUT entry")
 	}
 
-	consumedTokens := ctAutScript.ConsumedTokens()
+	consumedTokens, err := ctAutScript.ConsumedTokens()
+	if err != nil {
+		return err
+	}
 
 	willConsumedTokens := map[ctaut.HostOutPoint]struct{}{}
 	for i := 0; i < len(consumedTokens); i++ {
@@ -2306,12 +2357,15 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctaut.TransferScript, tx *
 	}
 
 	witnessHash := chainhash.HashH(tx.MsgTx().AutWitness)
-	claimedWitnessHash := ctAutScript.WitnessHash()
+	claimedWitnessHash := transferScript.WitnessHash()
 	if !witnessHash.IsEqual(&claimedWitnessHash) {
 		return fmt.Errorf("mismatch witness for script")
 	}
 
-	generatedTokens := ctAutScript.GeneratedTokens()
+	generatedTokens, err := ctAutScript.GeneratedTokens()
+	if err != nil {
+		return err
+	}
 	trTx := &ctautwire.AutTransferTx{
 		Version:   ctAutScript.Version(),
 		TxIns:     make([]*ctautwire.AutTxo, 0, len(consumedTokens)),
@@ -2320,20 +2374,26 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctaut.TransferScript, tx *
 	}
 
 	for i := 0; i < len(consumedTokens); i++ {
-		trTx.TxIns = append(trTx.TxIns, &ctautwire.AutTxo{
-			Version:   consumedTokens[i].Version,
-			TxoScript: consumedTokens[i].ValueScript,
-		})
+		autTxo := &ctautwire.AutTxo{}
+		err = autTxo.Deserialize(bytes.NewReader(consumedTokens[i].ValueScript))
+		if err != nil {
+			return err
+		}
+
+		trTx.TxIns = append(trTx.TxIns, autTxo)
 	}
 
 	for i := 0; i < len(generatedTokens); i++ {
-		trTx.TxOuts = append(trTx.TxOuts, &ctautwire.AutTxo{
-			Version:   generatedTokens[i].Version,
-			TxoScript: generatedTokens[i].ValueScript,
-		})
+		autTxo := &ctautwire.AutTxo{}
+		err = autTxo.Deserialize(bytes.NewReader(generatedTokens[i].ValueScript))
+		if err != nil {
+			return err
+		}
+
+		trTx.TxOuts = append(trTx.TxOuts, autTxo)
 	}
 
-	err := abecryptox.AutTransferTxVerify(trTx)
+	err = abecryptox.AutTransferTxVerify(trTx)
 	if err != nil {
 		return fmt.Errorf(`transaction %s try to transfer tokens but the witness verfied fail with %s`,
 			tx.Hash(), err)
@@ -2342,8 +2402,16 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctaut.TransferScript, tx *
 	return nil
 }
 
-func checkCTAUTBurnTransactionInputs(ctAutScript *ctaut.BurnScript, tx *abeutil.TxAbe, txHeight int32,
+func checkCTAUTBurnTransactionInputs(ctAutScript *ctaut.EnhancedCTAUTScript, tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
+	if ctAutScript.Type() != ctaut.Burn {
+		return fmt.Errorf("expected burn script, but got %d", ctAutScript.Type())
+	}
+	burnScript, ok := ctAutScript.CTAUTScript.(*ctaut.BurnScript)
+	if !ok {
+		return fmt.Errorf("expected burn script, but got %d", ctAutScript.Type())
+	}
+
 	identifier := ctAutScript.Identifier()
 	identifierKey := CTAUTIdentifierKey(identifier[:])
 
@@ -2352,7 +2420,10 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctaut.BurnScript, tx *abeutil.
 		return errors.New("an non-registration AUT transaction try to operate on non-existing AUT entry")
 	}
 
-	consumedTokens := ctAutScript.ConsumedTokens()
+	consumedTokens, err := ctAutScript.ConsumedTokens()
+	if err != nil {
+		return err
+	}
 
 	willConsumedTokens := map[ctaut.HostOutPoint]struct{}{}
 	for i := 0; i < len(consumedTokens); i++ {
@@ -2378,12 +2449,15 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctaut.BurnScript, tx *abeutil.
 
 	// todo replace with inner implement
 	witnessHash := chainhash.HashH(tx.MsgTx().AutWitness)
-	claimedWitnessHash := ctAutScript.WitnessHash()
+	claimedWitnessHash := burnScript.WitnessHash()
 	if !witnessHash.IsEqual(&claimedWitnessHash) {
 		return fmt.Errorf("mismatch witness for script")
 	}
 
-	generatedTokens := ctAutScript.GeneratedTokens()
+	generatedTokens, err := ctAutScript.GeneratedTokens()
+	if err != nil {
+		return err
+	}
 	trTx := &ctautwire.AutTransferTx{
 		Version:   ctAutScript.Version(),
 		TxIns:     make([]*ctautwire.AutTxo, 0, len(consumedTokens)),
@@ -2392,20 +2466,26 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctaut.BurnScript, tx *abeutil.
 	}
 
 	for i := 0; i < len(consumedTokens); i++ {
-		trTx.TxIns = append(trTx.TxIns, &ctautwire.AutTxo{
-			Version:   consumedTokens[i].Version,
-			TxoScript: consumedTokens[i].ValueScript,
-		})
+		autTxo := &ctautwire.AutTxo{}
+		err = autTxo.Deserialize(bytes.NewReader(consumedTokens[i].ValueScript))
+		if err != nil {
+			return err
+		}
+
+		trTx.TxIns = append(trTx.TxIns, autTxo)
 	}
 
 	for i := 0; i < len(generatedTokens); i++ {
-		trTx.TxOuts = append(trTx.TxOuts, &ctautwire.AutTxo{
-			Version:   generatedTokens[i].Version,
-			TxoScript: generatedTokens[i].ValueScript,
-		})
+		autTxo := &ctautwire.AutTxo{}
+		err = autTxo.Deserialize(bytes.NewReader(generatedTokens[i].ValueScript))
+		if err != nil {
+			return err
+		}
+
+		trTx.TxOuts = append(trTx.TxOuts, autTxo)
 	}
 
-	err := abecryptox.AutTransferTxVerify(trTx)
+	err = abecryptox.AutTransferTxVerify(trTx)
 	if err != nil {
 		return fmt.Errorf(`transaction %s try to burn tokens but the witness verfied fail with %s`,
 			tx.Hash(), err)
@@ -2414,7 +2494,7 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctaut.BurnScript, tx *abeutil.
 	return nil
 }
 
-func ValidateCTAUTScript(script ctaut.CTAUTScript, tx *abeutil.TxAbe, txHeight int32,
+func ValidateCTAUTScript(script *ctaut.EnhancedCTAUTScript, tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
 	if tx == nil {
 		return fmt.Errorf("ValidateCTAUTScript: a nil transaction")
@@ -2424,29 +2504,32 @@ func ValidateCTAUTScript(script ctaut.CTAUTScript, tx *abeutil.TxAbe, txHeight i
 	}
 
 	var err error
-	switch ctautScript := script.(type) {
+	switch script.CTAUTScript.(type) {
 	case *ctaut.RegistrationScript:
-		err = checkCTAUTRegistrationTransactionInputs(ctautScript, tx, txHeight, ctautView, chainParams)
+		err = checkCTAUTRegistrationTransactionInputs(script, tx, txHeight, ctautView, chainParams)
 		if err != nil {
 			return err
 		}
 
 	case *ctaut.ReRegistrationScript:
-		err = checkCTAUTReRegistrationTransactionInputs(ctautScript, tx, txHeight, ctautView, chainParams)
+		err = checkCTAUTReRegistrationTransactionInputs(script, tx, txHeight, ctautView, chainParams)
 		if err != nil {
 			return err
 		}
 
 	case *ctaut.MintScript:
-		err = checkCTAUTMintTransactionInputs(ctautScript, tx, txHeight, ctautView, chainParams)
+		err = checkCTAUTMintTransactionInputs(script, tx, txHeight, ctautView, chainParams)
 		if err != nil {
 			return err
 		}
 
 	case *ctaut.TransferScript:
 		// populate consumed tokens
-		presetConsumedTokens := ctautScript.ConsumedTokens()
-		identifier := ctautScript.Identifier()
+		presetConsumedTokens, err := script.ConsumedTokens()
+		if err != nil {
+			return err
+		}
+		identifier := script.Identifier()
 		for i := 0; i < len(presetConsumedTokens); i++ {
 			outpoint := presetConsumedTokens[i].HostOutPoint
 			coin := ctautView.LookupCTAUTCoin(identifier[:], outpoint)
@@ -2456,15 +2539,18 @@ func ValidateCTAUTScript(script ctaut.CTAUTScript, tx *abeutil.TxAbe, txHeight i
 			presetConsumedTokens[i].ValueScript = coin.Script()
 		}
 
-		err = checkCTAUTTransferTransactionInputs(ctautScript, tx, txHeight, ctautView, chainParams)
+		err = checkCTAUTTransferTransactionInputs(script, tx, txHeight, ctautView, chainParams)
 		if err != nil {
 			return err
 		}
 
 	case *ctaut.BurnScript:
 		// populate consumed tokens
-		presetConsumedTokens := ctautScript.ConsumedTokens()
-		identifier := ctautScript.Identifier()
+		presetConsumedTokens, err := script.ConsumedTokens()
+		if err != nil {
+			return err
+		}
+		identifier := script.Identifier()
 		for i := 0; i < len(presetConsumedTokens); i++ {
 			outpoint := presetConsumedTokens[i].HostOutPoint
 			coin := ctautView.LookupCTAUTCoin(identifier[:], outpoint)
@@ -2475,7 +2561,7 @@ func ValidateCTAUTScript(script ctaut.CTAUTScript, tx *abeutil.TxAbe, txHeight i
 		}
 
 		// This branch is exactly the same checking as the previous one, except for all the differences in handling outputs
-		err = checkCTAUTBurnTransactionInputs(ctautScript, tx, txHeight, ctautView, chainParams)
+		err = checkCTAUTBurnTransactionInputs(script, tx, txHeight, ctautView, chainParams)
 		if err != nil {
 			return err
 		}

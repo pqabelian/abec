@@ -7,5 +7,5 @@ import (
 
 type CTAUTScript struct {
 	HostTx *wire.MsgTxAbe
-	Script ctaut.CTAUTScript
+	Script *ctaut.EnhancedCTAUTScript
 }

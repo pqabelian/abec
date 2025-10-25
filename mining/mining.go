@@ -506,7 +506,7 @@ func spendTransaction(utxoView *blockchain.UtxoViewpoint, tx *abeutil.Tx, height
 // todo(ABE): the block is unknown yet, use hainhash.ZeroHash as the block hash consuming the serialNumber
 // Move this function to blockchain package
 func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, tx *abeutil.TxAbe,
-	ctAutView *blockchain.CTAUTViewpoint, ctautTx ctaut.CTAUTScript, blockHeight int32) error {
+	ctAutView *blockchain.CTAUTViewpoint, ctautScript *ctaut.EnhancedCTAUTScript, blockHeight int32) error {
 	for _, txIn := range tx.MsgTx().TxIns {
 		entry := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())
 		if entry != nil {
@@ -515,8 +515,8 @@ func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, tx *abeutil
 	}
 
 	// CTAUT
-	if ctautTx != nil {
-		err := ctAutView.SpendCTAutScript(ctautTx, tx.Hash(), blockHeight)
+	if ctautScript != nil {
+		err := ctAutView.SpendCTAutScript(ctautScript, tx.Hash(), blockHeight)
 		if err != nil {
 			return err
 		}

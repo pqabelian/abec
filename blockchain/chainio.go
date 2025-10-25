@@ -2059,7 +2059,11 @@ func dbPutUtxoRingView(dbTx database.Tx, view *UtxoRingViewpoint) error {
 			if err != nil {
 				return err
 			}
-			log.Debugf("delete output point ring with key %s", outPointRingHash.String())
+			log.Debugf("delete output point ring %s with fully-spent %d serial numbers:",
+				outPointRingHash.String(), len(entry.serialNumbers))
+			for i := 0; i < len(entry.serialNumbers); i++ {
+				log.Debugf("\t [%d] %s", i, hex.EncodeToString(entry.serialNumbers[i]))
+			}
 			continue
 		}
 
@@ -2094,14 +2098,18 @@ func dbRemoveUtxoRingView(dbTx database.Tx, view *UtxoRingViewpoint) error {
 		return nil
 	}
 
-	for outPointRingHash, _ := range view.entries {
+	for outPointRingHash, entry := range view.entries {
 		key := outPointRingKey(outPointRingHash)
 		err := utxoRingBucket.Delete(*key)
 		recycleOutPointRingKey(key)
 		if err != nil {
 			return err
 		}
-		log.Debugf("delete output point ring with key %s", outPointRingHash.String())
+		log.Debugf("delete output point ring %s with %d serial numbers:",
+			outPointRingHash.String(), len(entry.serialNumbers))
+		for i := 0; i < len(entry.serialNumbers); i++ {
+			log.Debugf("\t [%d] %s", i, hex.EncodeToString(entry.serialNumbers[i]))
+		}
 	}
 
 	return nil
@@ -2847,7 +2855,7 @@ func (b *BlockChain) initChainState() error {
 		if scope.StartHeight <= currentHeight && currentHeight < scope.EndHeight {
 			workedHeightScope = append(workedHeightScope, BlockHeightScope{
 				StartHeight: scope.StartHeight,
-				EndHeight:   currentHeight,
+				EndHeight:   currentHeight + 1,
 			})
 			activeHeightScope = append(activeHeightScope, BlockHeightScope{
 				StartHeight: currentHeight + 1,

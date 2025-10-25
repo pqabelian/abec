@@ -9,6 +9,7 @@ import (
 	"reflect"
 
 	"github.com/abesuite/abec/abecryptox"
+	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/chainhash"
 	ctautwire "github.com/abesuite/abec/ctaut/wire"
 	"github.com/abesuite/abec/wire"
@@ -38,6 +39,7 @@ type HostOutPoint = wire.OutPoint
 //
 // BurnScript would be used to burn some tokens, it would not affect any of the fields in Metadata
 type Metadata struct {
+	Version uint32
 	// The TxHash of the host transaction (i.e. txid) where the registration script is located would be used as its instance identifier
 	// identifiers for different instances are unique
 	CTAutIdentifier chainhash.Hash // use chainhash.Hash directly
@@ -87,7 +89,8 @@ type Metadata struct {
 
 func (info *Metadata) SerializedSize() int {
 	n :=
-		/*identifier, actually fixed length */ wire.VarIntSerializeSize(uint64(len(info.CTAutIdentifier))) + len(info.CTAutIdentifier) +
+		/*version, fixed length */ wire.VarIntSerializeSize(uint64(info.Version)) +
+			/*identifier, actually fixed length */ wire.VarIntSerializeSize(uint64(len(info.CTAutIdentifier))) + len(info.CTAutIdentifier) +
 			/* name, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutName))) + len(info.CTAutName) +
 			/* symbol, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutSymbol))) + len(info.CTAutSymbol) +
 			/* base unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.BaseUnitName))) + len(info.BaseUnitName) +
@@ -133,6 +136,9 @@ func (info *Metadata) Serialize() ([]byte, error) {
 	// Serialize the header code followed by the compressed unspent
 	// transaction output.
 	buff := bytes.NewBuffer(make([]byte, 0, size))
+	if err = wire.WriteVarInt(buff, 0, uint64(info.Version)); err != nil {
+		return nil, err
+	}
 	if err = wire.WriteVarBytes(buff, 0, info.CTAutIdentifier[:]); err != nil {
 		return nil, err
 	}
@@ -219,6 +225,12 @@ func (info *Metadata) Deserialize(r io.Reader) error {
 	// Serialize the header code followed by the compressed unspent
 	// transaction output.
 	var err error
+	version, err := wire.ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	info.Version = uint32(version)
+
 	identifier, err := wire.ReadVarBytes(r, 0, CTAUTIdentifierLength, "identifier")
 	if err != nil {
 		return err
@@ -319,6 +331,7 @@ func (info *Metadata) Clone() *Metadata {
 
 	// ToDo(Alice): by the same order as the definition?
 	cloned := &Metadata{
+		Version:         info.Version,
 		CTAutIdentifier: [CTAUTIdentifierLength]byte{},
 
 		CTAutName:    make([]byte, len(info.CTAutName)),
@@ -362,35 +375,16 @@ func (info *Metadata) Clone() *Metadata {
 	return cloned
 }
 
-// todo(ctaut): this is for database storage or only memeory? why has CoinAddress and ValueScript?
-// todo(ctaut): define an interface? only a case needs coinAddress.
-// CTAUTToken holds the main information of token in memory, it would be used to check all rules
-type CTAUTToken struct {
-	// inheritance from host transaction
-	Version uint32
-	// used to track the host location on blockchain
-	HostOutPoint HostOutPoint
-	// For root token, value script would be nil,
-	// For normal token, value script could be interpreted to either a public value or a hidden value
-	// with abecryptox.ExtractAutTxoValue()
-	ValueScript []byte // todo(ctaut): used to denote AUT value.
-	// For all token, coin address would be used to indicate the ownership of token
-	// For root token, it would be used match the claimed issuers to recognize operational permission
-	CoinAddress []byte
-}
-
 type CTAUTScript interface {
 	Version() uint32
 	Type() CTAUTScriptType
 	Identifier() [CTAUTIdentifierLength]byte
+
 	Serialize() ([]byte, error)
 	Deserialize(io.Reader) error
 
-	setConsumedTokens([]*CTAUTToken) error
-	ConsumedTokens() []*CTAUTToken // TODO change to HostOutPoint, because no idea for corresponding value script
-
-	setGeneratedTokens([]*CTAUTToken) error
-	GeneratedTokens() []*CTAUTToken
+	NumConsumedTokens() int
+	NumGeneratedTokens() int
 }
 
 // RegistrationScript would be the structured script parsed from memo in host transaction,
@@ -439,12 +433,10 @@ type RegistrationScript struct {
 
 	outAutRootTokenNum uint8  // value is set in deserialize, so, do not provide set function, but provide get function.
 	memo               []byte // TODO memo -> scriptMemo
-
-	consumedTokens  []*CTAUTToken
-	generatedTokens []*CTAUTToken
 }
 
 func NewRegistrationScript(
+	version uint32,
 	ctAutName []byte,
 	ctAutSymbol []byte,
 	baseUnitName []byte,
@@ -460,6 +452,7 @@ func NewRegistrationScript(
 	memo []byte,
 ) *RegistrationScript {
 	return &RegistrationScript{
+		version:             version,
 		scriptType:          Registration,
 		ctAutIdentifier:     [CTAUTIdentifierLength]byte{},
 		ctAutName:           ctAutName,
@@ -475,8 +468,6 @@ func NewRegistrationScript(
 		expireHeight:        expireHeight,
 		outAutRootTokenNum:  outAutRootTokenNum,
 		memo:                memo,
-		consumedTokens:      nil,
-		generatedTokens:     nil,
 	}
 }
 func (script *RegistrationScript) Version() uint32 {
@@ -495,7 +486,7 @@ func (script *RegistrationScript) Serialize() ([]byte, error) {
 	var b bytes.Buffer
 	var err error
 
-	if err = writePrefix(&b, script.scriptType, script.ctAutIdentifier); err != nil {
+	if err = writePrefix(&b, script.version, script.scriptType, script.ctAutIdentifier); err != nil {
 		return nil, err
 	}
 	if err = WriteVarBytes(&b, script.ctAutName); err != nil {
@@ -546,7 +537,7 @@ func (script *RegistrationScript) Serialize() ([]byte, error) {
 func (script *RegistrationScript) Deserialize(r io.Reader) error {
 	var err error
 
-	if script.ctAutIdentifier, script.scriptType, err = readPrefix(r, Registration); err != nil {
+	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, Registration); err != nil {
 		return err
 	}
 	if script.ctAutName, err = ReadVarBytes(r, MaxCTAUTNameLength, "name"); err != nil {
@@ -598,6 +589,7 @@ func (script *RegistrationScript) Deserialize(r io.Reader) error {
 }
 
 func (script *RegistrationScript) SanityCheck() error {
+	// todo(ctaut): check version
 	if script.scriptType != Registration {
 		return errors.New("unexpected type for registration script")
 	}
@@ -650,55 +642,15 @@ func (script *RegistrationScript) SanityCheck() error {
 
 	return nil
 }
-
-func (script *RegistrationScript) ConsumedTokens() []*CTAUTToken /*error*/ {
-	// check nil or length
-	return script.consumedTokens
+func (script *RegistrationScript) NumConsumedTokens() int {
+	return 0
 }
-func (script *RegistrationScript) setConsumedTokens(consumedTokens []*CTAUTToken) error {
-	if len(consumedTokens) != 0 {
-		return errors.New("mismatched number of consumed tokens")
-	}
-	script.consumedTokens = consumedTokens
-	return nil
+func (script *RegistrationScript) NumGeneratedTokens() int {
+	return int(script.outAutRootTokenNum)
 }
 
-func (script *RegistrationScript) GeneratedTokens() []*CTAUTToken {
-	return script.generatedTokens
-}
-func (script *RegistrationScript) setGeneratedTokens(generatedTokens []*CTAUTToken) error {
-	if len(generatedTokens) != int(script.outAutRootTokenNum) {
-		return errors.New("mismatched number of consumed tokens")
-	}
-	script.generatedTokens = generatedTokens
-	return nil
-}
 func (script *RegistrationScript) ExpireHeight() int32 {
 	return script.expireHeight
-}
-
-func (script *RegistrationScript) Metadata() *Metadata {
-	rootTokenSet := map[HostOutPoint]struct{}{}
-	for i := 0; i < len(script.generatedTokens); i++ {
-		rootTokenSet[script.generatedTokens[i].HostOutPoint] = struct{}{}
-	}
-	return &Metadata{
-		CTAutIdentifier:         script.ctAutIdentifier,
-		CTAutName:               script.ctAutName,
-		CTAutSymbol:             script.ctAutSymbol,
-		BaseUnitName:            script.baseUnitName,
-		SubUnitName:             script.subUnitName,
-		UnitScale:               script.unitScale,
-		CTAutMemo:               script.ctAutMemo,
-		PlannedTotalSupply:      script.plannedTotalAmount,
-		IssuerTokens:            script.issuerTokens,
-		MintThreshold:           script.mintThreshold,
-		ReregistrationThreshold: script.reregisterThreshold,
-		ExpireHeight:            script.expireHeight,
-
-		MintedAmount: 0,
-		RootTokenSet: rootTokenSet,
-	}
 }
 
 var _ CTAUTScript = &RegistrationScript{}
@@ -738,12 +690,10 @@ type ReRegistrationScript struct {
 	inAutRootTokenNum  uint8
 	outAutRootTokenNum uint8
 	memo               []byte
-
-	consumedTokens  []*CTAUTToken
-	generatedTokens []*CTAUTToken
 }
 
 func NewReRegistrationScript(
+	version uint32,
 	ctAutIdentifier [CTAUTIdentifierLength]byte,
 	ctAutMemo []byte,
 	plannedTotalAmount uint64,
@@ -756,7 +706,7 @@ func NewReRegistrationScript(
 	memo []byte,
 ) *ReRegistrationScript {
 	return &ReRegistrationScript{
-		//TODO add version
+		version:             version,
 		scriptType:          ReRegistration,
 		ctAutIdentifier:     ctAutIdentifier,
 		ctAutMemo:           ctAutMemo,
@@ -768,8 +718,6 @@ func NewReRegistrationScript(
 		inAutRootTokenNum:   inAutRootTokenNum,
 		outAutRootTokenNum:  outAutRootTokenNum,
 		memo:                memo,
-		consumedTokens:      nil,
-		generatedTokens:     nil,
 	}
 }
 
@@ -796,7 +744,7 @@ func (script *ReRegistrationScript) Serialize() ([]byte, error) {
 	var b bytes.Buffer
 	var err error
 
-	if err = writePrefix(&b, script.scriptType, script.ctAutIdentifier); err != nil {
+	if err = writePrefix(&b, script.version, script.scriptType, script.ctAutIdentifier); err != nil {
 		return nil, err
 	}
 
@@ -841,7 +789,7 @@ func (script *ReRegistrationScript) Serialize() ([]byte, error) {
 func (script *ReRegistrationScript) Deserialize(r io.Reader) error {
 	var err error
 
-	if script.ctAutIdentifier, script.scriptType, err = readPrefix(r, ReRegistration); err != nil {
+	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, ReRegistration); err != nil {
 		return err
 	}
 
@@ -893,6 +841,8 @@ func (script *ReRegistrationScript) Deserialize(r io.Reader) error {
 	return nil
 }
 func (script *ReRegistrationScript) SanityCheck() error {
+	// todo(ctaut): check version
+
 	if script.scriptType != ReRegistration {
 		return errors.New("unexpected type for re-registration script")
 	}
@@ -930,62 +880,11 @@ func (script *ReRegistrationScript) SanityCheck() error {
 	return nil
 }
 
-func (script *ReRegistrationScript) ConsumedTokens() []*CTAUTToken {
-	return script.consumedTokens
+func (script *ReRegistrationScript) NumConsumedTokens() int {
+	return int(script.inAutRootTokenNum)
 }
-func (script *ReRegistrationScript) setConsumedTokens(consumedTokens []*CTAUTToken) error {
-	if len(consumedTokens) != int(script.inAutRootTokenNum) {
-		return errors.New("mismatched number of consumed tokens")
-	}
-	script.consumedTokens = consumedTokens
-	return nil
-}
-func (script *ReRegistrationScript) GeneratedTokens() []*CTAUTToken {
-	return script.generatedTokens
-}
-func (script *ReRegistrationScript) setGeneratedTokens(generatedTokens []*CTAUTToken) error {
-	if len(generatedTokens) != int(script.outAutRootTokenNum) {
-		return errors.New("mismatched number of consumed tokens")
-	}
-	script.generatedTokens = generatedTokens
-	return nil
-}
-
-func (script *ReRegistrationScript) UpdateMetadata(metadata *Metadata) error {
-	// assert
-	if !bytes.Equal(script.ctAutIdentifier[:], metadata.CTAutIdentifier[:]) {
-		return ErrInValidAUTTx
-	}
-	consumedTokens := script.consumedTokens
-	for i := 0; i < len(consumedTokens); i++ {
-		if _, ok := metadata.RootTokenSet[consumedTokens[i].HostOutPoint]; !ok {
-			return fmt.Errorf("an re-registration AUT transaction try to update AUT "+
-				"with non-existing/spent root token (%s,%d) for AUT identified by %s",
-				consumedTokens[i].HostOutPoint.Hash, consumedTokens[i].HostOutPoint.Index,
-				metadata.CTAutIdentifier)
-		}
-		delete(metadata.RootTokenSet, consumedTokens[i].HostOutPoint)
-	}
-
-	metadata.CTAutMemo = script.ctAutMemo
-	// assert here?
-	if metadata.MintedAmount > script.plannedTotalAmount {
-		return errors.New("re-registration transaction try to make planned amount less than minted amount")
-	}
-	metadata.PlannedTotalSupply = script.plannedTotalAmount
-
-	metadata.IssuerTokens = script.issuerTokens
-	metadata.MintThreshold = script.mintThreshold
-	metadata.ReregistrationThreshold = script.reregisterThreshold
-	metadata.ExpireHeight = script.expireHeight
-
-	// remove previous root tokens
-	metadata.RootTokenSet = make(map[HostOutPoint]struct{}, len(script.generatedTokens))
-	for i := 0; i < len(script.generatedTokens); i++ {
-		metadata.RootTokenSet[script.generatedTokens[i].HostOutPoint] = struct{}{}
-	}
-
-	return nil
+func (script *ReRegistrationScript) NumGeneratedTokens() int {
+	return int(script.outAutRootTokenNum)
 }
 
 var _ CTAUTScript = &ReRegistrationScript{}
@@ -1038,11 +937,13 @@ func (script *MintScript) Vin() uint64 {
 	return script.vin
 }
 
-func NewMintScript(ctAutIdentifier [CTAUTIdentifierLength]byte,
+func NewMintScript(version uint32,
+	ctAutIdentifier [CTAUTIdentifierLength]byte,
 	vin uint64, inAutRootTokenNum uint8,
 	outCTAutTokenNum uint8, outPlainAutTokenNum uint8, valueScripts [][]byte,
 	witnessHash chainhash.Hash, memo []byte) *MintScript {
 	return &MintScript{
+		version:             version,
 		scriptType:          Mint,
 		ctAutIdentifier:     ctAutIdentifier,
 		vin:                 vin,
@@ -1071,7 +972,7 @@ func (script *MintScript) Serialize() ([]byte, error) {
 	var b bytes.Buffer
 	var err error
 
-	if err = writePrefix(&b, script.scriptType, script.ctAutIdentifier); err != nil {
+	if err = writePrefix(&b, script.version, script.scriptType, script.ctAutIdentifier); err != nil {
 		return nil, err
 	}
 
@@ -1103,7 +1004,7 @@ func (script *MintScript) Serialize() ([]byte, error) {
 func (script *MintScript) Deserialize(r io.Reader) error {
 	var err error
 
-	if script.ctAutIdentifier, script.scriptType, err = readPrefix(r, Mint); err != nil {
+	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, Mint); err != nil {
 		return err
 	}
 
@@ -1137,6 +1038,8 @@ func (script *MintScript) Deserialize(r io.Reader) error {
 }
 
 func (script *MintScript) SanityCheck() error {
+	// todo(ctaut): check version
+
 	if script.scriptType != Mint {
 		return errors.New("unexpected type for mint script")
 	}
@@ -1156,10 +1059,13 @@ func (script *MintScript) SanityCheck() error {
 		return ErrInValidAUTTx
 	}
 	for i := 0; i < len(script.valueScripts); i++ {
-		autTxoType, err := abecryptox.GetAutTxoType(&ctautwire.AutTxo{
-			Version:   script.version,
-			TxoScript: script.valueScripts[i],
-		})
+		autTxo := &ctautwire.AutTxo{}
+		err := autTxo.Deserialize(bytes.NewReader(script.valueScripts[i]))
+		if err != nil {
+			return err
+		}
+
+		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
 		if err != nil {
 			return ErrInValidAUTTx
 		}
@@ -1180,28 +1086,12 @@ func (script *MintScript) SanityCheck() error {
 
 	return nil
 }
-func (script *MintScript) ConsumedTokens() []*CTAUTToken {
-	return script.consumedTokens
+
+func (script *MintScript) NumConsumedTokens() int {
+	return int(script.inAutRootTokenNum)
 }
-func (script *MintScript) setConsumedTokens(consumedTokens []*CTAUTToken) error {
-	if len(consumedTokens) != int(script.inAutRootTokenNum) {
-		return errors.New("mismatched number of consumed tokens")
-	}
-	script.consumedTokens = consumedTokens
-	return nil
-}
-func (script *MintScript) GeneratedTokens() []*CTAUTToken {
-	return script.generatedTokens
-}
-func (script *MintScript) setGeneratedTokens(generatedTokens []*CTAUTToken) error {
-	if len(generatedTokens) != int(script.outCTAutTokenNum)+int(script.outPlainAutTokenNum) {
-		return errors.New("mismatched number of consumed tokens")
-	}
-	for i := 0; i < len(generatedTokens); i++ {
-		generatedTokens[i].ValueScript = script.valueScripts[i]
-	}
-	script.generatedTokens = generatedTokens
-	return nil
+func (script *MintScript) NumGeneratedTokens() int {
+	return int(script.outCTAutTokenNum + script.outPlainAutTokenNum)
 }
 
 var _ CTAUTScript = &MintScript{}
@@ -1233,13 +1123,10 @@ type TransferScript struct {
 
 	outCTAutTokenNum    uint8
 	outPlainAutTokenNum uint8
-	autTxoScripts       [][]byte
+	valueScripts        [][]byte
 
 	witnessHash chainhash.Hash
 	memo        []byte
-
-	consumedTokens  []*CTAUTToken
-	generatedTokens []*CTAUTToken
 }
 
 func (script *TransferScript) WitnessHash() chainhash.Hash {
@@ -1251,6 +1138,7 @@ func (script *TransferScript) Version() uint32 {
 }
 
 func NewTransferScript(
+	version uint32,
 	ctAutIdentifier [CTAUTIdentifierLength]byte,
 	inCTAutTokenNum uint8,
 	inPlainAutTokenNum uint8,
@@ -1261,17 +1149,16 @@ func NewTransferScript(
 	memo []byte,
 ) *TransferScript {
 	return &TransferScript{
+		version:             version,
 		scriptType:          Transfer,
 		ctAutIdentifier:     ctAutIdentifier,
 		inCTAutTokenNum:     inCTAutTokenNum,
 		inPlainAutTokenNum:  inPlainAutTokenNum,
 		outCTAutTokenNum:    outCTAutTokenNum,
 		outPlainAutTokenNum: outPlainAutTokenNum,
-		autTxoScripts:       autTxoScripts,
+		valueScripts:        autTxoScripts,
 		witnessHash:         witnessHash,
 		memo:                memo,
-		consumedTokens:      nil,
-		generatedTokens:     nil,
 	}
 }
 
@@ -1287,7 +1174,7 @@ func (script *TransferScript) Serialize() ([]byte, error) {
 	var b bytes.Buffer
 	var err error
 
-	if err = writePrefix(&b, script.scriptType, script.ctAutIdentifier); err != nil {
+	if err = writePrefix(&b, script.version, script.scriptType, script.ctAutIdentifier); err != nil {
 		return nil, err
 	}
 
@@ -1304,7 +1191,7 @@ func (script *TransferScript) Serialize() ([]byte, error) {
 	if err = b.WriteByte(script.outPlainAutTokenNum); err != nil {
 		return nil, err
 	}
-	if err = writeCTAUTTxoScripts(&b, script.autTxoScripts); err != nil {
+	if err = writeCTAUTTxoScripts(&b, script.valueScripts); err != nil {
 		return nil, err
 	}
 
@@ -1319,7 +1206,7 @@ func (script *TransferScript) Serialize() ([]byte, error) {
 }
 func (script *TransferScript) Deserialize(r io.Reader) error {
 	var err error
-	if script.ctAutIdentifier, script.scriptType, err = readPrefix(r, Transfer); err != nil {
+	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, Transfer); err != nil {
 		return err
 	}
 
@@ -1336,7 +1223,7 @@ func (script *TransferScript) Deserialize(r io.Reader) error {
 	if script.outPlainAutTokenNum, err = ReadByte(r); err != nil {
 		return err
 	}
-	if script.autTxoScripts, err = readCTAUTTxoScript(r, int(script.outCTAutTokenNum), int(script.outPlainAutTokenNum)); err != nil {
+	if script.valueScripts, err = readCTAUTTxoScript(r, int(script.outCTAutTokenNum), int(script.outPlainAutTokenNum)); err != nil {
 		return err
 	}
 
@@ -1354,6 +1241,8 @@ func (script *TransferScript) Deserialize(r io.Reader) error {
 }
 
 func (script *TransferScript) SanityCheck() error {
+	// todo(ctaut): check version
+
 	if script.scriptType != Transfer {
 		return errors.New("unexpected type for transfer script")
 	}
@@ -1368,15 +1257,18 @@ func (script *TransferScript) SanityCheck() error {
 	if int(script.outCTAutTokenNum) > MaxNumCTToken {
 		return ErrInValidAUTTx
 	}
-	if len(script.autTxoScripts) != int(script.outCTAutTokenNum)+int(script.outPlainAutTokenNum) {
+	if len(script.valueScripts) != int(script.outCTAutTokenNum)+int(script.outPlainAutTokenNum) {
 		return ErrInValidAUTTx
 	}
 
-	for i := 0; i < len(script.autTxoScripts); i++ {
-		autTxoType, err := abecryptox.GetAutTxoType(&ctautwire.AutTxo{
-			Version:   script.version,
-			TxoScript: script.autTxoScripts[i],
-		})
+	for i := 0; i < len(script.valueScripts); i++ {
+		autTxo := &ctautwire.AutTxo{}
+		err := autTxo.Deserialize(bytes.NewReader(script.valueScripts[i]))
+		if err != nil {
+			return err
+		}
+
+		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
 		if err != nil {
 			return ErrInValidAUTTx
 		}
@@ -1398,28 +1290,11 @@ func (script *TransferScript) SanityCheck() error {
 	return nil
 }
 
-func (script *TransferScript) ConsumedTokens() []*CTAUTToken {
-	return script.consumedTokens
+func (script *TransferScript) NumConsumedTokens() int {
+	return int(script.inCTAutTokenNum + script.inPlainAutTokenNum)
 }
-func (script *TransferScript) setConsumedTokens(consumedTokens []*CTAUTToken) error {
-	if len(consumedTokens) != int(script.inCTAutTokenNum)+int(script.inPlainAutTokenNum) {
-		return errors.New("mismatched number of consumed tokens")
-	}
-	script.consumedTokens = consumedTokens
-	return nil
-}
-func (script *TransferScript) GeneratedTokens() []*CTAUTToken {
-	return script.generatedTokens
-}
-func (script *TransferScript) setGeneratedTokens(generatedTokens []*CTAUTToken) error {
-	if len(generatedTokens) != int(script.outCTAutTokenNum)+int(script.outPlainAutTokenNum) {
-		return errors.New("mismatched number of consumed tokens")
-	}
-	for i := 0; i < len(generatedTokens); i++ {
-		generatedTokens[i].ValueScript = script.autTxoScripts[i]
-	}
-	script.generatedTokens = generatedTokens
-	return nil
+func (script *TransferScript) NumGeneratedTokens() int {
+	return int(script.outCTAutTokenNum + script.outPlainAutTokenNum)
 }
 
 var _ CTAUTScript = &TransferScript{}
@@ -1469,6 +1344,7 @@ func (script *BurnScript) Version() uint32 {
 }
 
 func NewBurnScript(
+	version uint32,
 	ctAutIdentifier [CTAUTIdentifierLength]byte,
 	inCTAutTokenNum uint8,
 	inPlainAutTokenNum uint8,
@@ -1479,6 +1355,7 @@ func NewBurnScript(
 	memo []byte,
 ) *BurnScript {
 	return &BurnScript{
+		version:             version,
 		scriptType:          Burn,
 		ctAutIdentifier:     ctAutIdentifier,
 		inCTAutTokenNum:     inCTAutTokenNum,
@@ -1505,7 +1382,7 @@ func (script *BurnScript) Serialize() ([]byte, error) {
 	var b bytes.Buffer
 	var err error
 
-	if err = writePrefix(&b, script.scriptType, script.ctAutIdentifier); err != nil {
+	if err = writePrefix(&b, script.version, script.scriptType, script.ctAutIdentifier); err != nil {
 		return nil, err
 	}
 
@@ -1539,7 +1416,7 @@ func (script *BurnScript) Serialize() ([]byte, error) {
 // todo(ctaut): add a standalone sanity-check function, and call it at the end of deserialize
 func (script *BurnScript) Deserialize(r io.Reader) error {
 	var err error
-	if script.ctAutIdentifier, script.scriptType, err = readPrefix(r, Burn); err != nil {
+	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, Burn); err != nil {
 		return err
 	}
 
@@ -1576,6 +1453,8 @@ func (script *BurnScript) Deserialize(r io.Reader) error {
 	return nil
 }
 func (script *BurnScript) SanityCheck() error {
+	// todo(ctaut): check version
+
 	if script.scriptType != Burn {
 		return errors.New("unexpected type for burn script")
 	}
@@ -1595,10 +1474,12 @@ func (script *BurnScript) SanityCheck() error {
 	}
 
 	for i := 0; i < len(script.valueScripts); i++ {
-		autTxoType, err := abecryptox.GetAutTxoType(&ctautwire.AutTxo{
-			Version:   script.version,
-			TxoScript: script.valueScripts[i],
-		})
+		autTxo := &ctautwire.AutTxo{}
+		err := autTxo.Deserialize(bytes.NewReader(script.valueScripts[i]))
+		if err != nil {
+			return err
+		}
+		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
 		if err != nil {
 			return ErrInValidAUTTx
 		}
@@ -1619,29 +1500,11 @@ func (script *BurnScript) SanityCheck() error {
 
 	return nil
 }
-
-func (script *BurnScript) ConsumedTokens() []*CTAUTToken {
-	return script.consumedTokens
+func (script *BurnScript) NumConsumedTokens() int {
+	return int(script.inCTAutTokenNum + script.inPlainAutTokenNum)
 }
-func (script *BurnScript) setConsumedTokens(consumedTokens []*CTAUTToken) error {
-	if len(consumedTokens) != int(script.inCTAutTokenNum)+int(script.inPlainAutTokenNum) {
-		return errors.New("mismatched number of consumed tokens")
-	}
-	script.consumedTokens = consumedTokens
-	return nil
-}
-func (script *BurnScript) GeneratedTokens() []*CTAUTToken {
-	return script.generatedTokens
-}
-func (script *BurnScript) setGeneratedTokens(generatedTokens []*CTAUTToken) error {
-	if len(generatedTokens) != int(script.outCTAutTokenNum)+int(script.outPlainAutTokenNum) {
-		return errors.New("mismatched number of consumed tokens")
-	}
-	for i := 0; i < len(generatedTokens); i++ {
-		generatedTokens[i].ValueScript = script.valueScripts[i]
-	}
-	script.generatedTokens = generatedTokens
-	return nil
+func (script *BurnScript) NumGeneratedTokens() int {
+	return int(script.outCTAutTokenNum + script.outPlainAutTokenNum)
 }
 
 var _ CTAUTScript = &BurnScript{}
@@ -1649,40 +1512,8 @@ var _ CTAUTScript = &BurnScript{}
 var ErrNonAutTx = errors.New("not a AUT transaction")
 var ErrInValidAUTTx = errors.New("not a valid AUT transaction")
 
-func getNumConsumedTokens(autTx CTAUTScript) (int, error) {
-	switch autTransaction := autTx.(type) {
-	case *RegistrationScript:
-		return 0, nil
-	case *ReRegistrationScript:
-		return int(autTransaction.inAutRootTokenNum), nil
-	case *MintScript:
-		return int(autTransaction.inAutRootTokenNum), nil
-	case *TransferScript:
-		return int(autTransaction.inCTAutTokenNum + autTransaction.inPlainAutTokenNum), nil
-	case *BurnScript:
-		return int(autTransaction.inCTAutTokenNum + autTransaction.inPlainAutTokenNum), nil
-	default:
-		return 0, errors.New("unkown aut transaction type")
-	}
-}
-func GetNumGeneratedTokens(autTx CTAUTScript) (int, error) {
-	switch autTransaction := autTx.(type) {
-	case *RegistrationScript:
-		return int(autTransaction.outAutRootTokenNum), nil
-	case *ReRegistrationScript:
-		return int(autTransaction.outAutRootTokenNum), nil
-	case *MintScript:
-		return int(autTransaction.outCTAutTokenNum + autTransaction.outPlainAutTokenNum), nil
-	case *TransferScript:
-		return int(autTransaction.outCTAutTokenNum + autTransaction.outPlainAutTokenNum), nil
-	case *BurnScript:
-		return int(autTransaction.outCTAutTokenNum + autTransaction.outPlainAutTokenNum), nil
-	default:
-		return 0, errors.New("unkown aut transaction type")
-	}
-}
-
-func ParseCTAUTScript(txHash chainhash.Hash, memo []byte) (autScript CTAUTScript, err error) {
+// ParseCTAUTScript try to deserialize CTAUT script from transaction memo
+func ParseCTAUTScript(txVersion uint32, txHash chainhash.Hash, memo []byte) (script CTAUTScript, err error) {
 	// could not be an AUT transaction
 	if len(memo) < len(commonPrefix) {
 		return nil, nil
@@ -1699,61 +1530,240 @@ func ParseCTAUTScript(txHash chainhash.Hash, memo []byte) (autScript CTAUTScript
 	// todo(ctaut): only if ctaut-script's CommonPrefixLength is the the start position, it will be recognized as ctaut-script.
 	// todo(ctaut): what "txMemo" should be shown at the front end?
 
-	// inherit version from host transaction
-	switch memo[len(commonPrefix)] {
-	case Registration:
-		autScript = &RegistrationScript{
-			version: wire.TxVersion,
-		}
-	case Mint:
-		autScript = &MintScript{
-			version: wire.TxVersion,
-		}
-	case ReRegistration:
-		autScript = &ReRegistrationScript{
-			version: wire.TxVersion,
-		}
-	case Transfer:
-		autScript = &TransferScript{
-			version: wire.TxVersion,
-		}
-	case Burn:
-		autScript = &BurnScript{
-			version: wire.TxVersion,
-		}
-	default:
-		return nil, ErrInValidAUTTx
-	}
-	reader := bytes.NewBuffer(memo)
-	err = autScript.Deserialize(reader)
+	tmpReader := bytes.NewReader(memo[len(commonPrefix):])
+	version, err := ReadVarInt(tmpReader)
 	if err != nil {
 		return nil, err
 	}
-	if memo[len(commonPrefix)] == Registration {
-		ctAUTScript, ok := autScript.(*RegistrationScript)
+	if version > math.MaxUint32 {
+		return nil, ErrInValidAUTTx
+	}
+	// check the script version with the host version
+	if uint32(version) != txVersion {
+		return nil, ErrInValidAUTTx
+	}
+
+	scriptType, err := ReadByte(tmpReader)
+	if err != nil {
+		return nil, err
+	}
+
+	switch scriptType {
+	case Registration:
+		script = &RegistrationScript{}
+	case Mint:
+		script = &MintScript{}
+	case ReRegistration:
+		script = &ReRegistrationScript{}
+	case Transfer:
+		script = &TransferScript{}
+	case Burn:
+		script = &BurnScript{}
+	default:
+		return nil, ErrInValidAUTTx
+	}
+
+	// reset the reader to deserialize the complete script
+	reader := bytes.NewBuffer(memo)
+	err = script.Deserialize(reader)
+	if err != nil {
+		return nil, err
+	}
+
+	// check the script version with the host version
+	if script.Version() != txVersion {
+		return nil, ErrInValidAUTTx
+	}
+
+	// populate the identifier for registration script
+	if script.Type() == Registration {
+		ctAUTScript, ok := script.(*RegistrationScript)
 		if !ok {
 			return nil, ErrInValidAUTTx
 		}
 		ctAUTScript.ctAutIdentifier = txHash
 	}
 
-	return autScript, nil
+	return script, nil
+}
+
+// todo(ctaut): this is for database storage or only memeory? why has CoinAddress and ValueScript?
+// todo(ctaut): define an interface? only a case needs coinAddress.
+// CTAUTToken holds the main information of token in memory, it would be used to check all rules
+type CTAUTToken struct {
+	// inheritance from host transaction
+	Version uint32
+	// used to track the host location on blockchain
+	HostOutPoint HostOutPoint
+	// For root token, value script would be nil,
+	// For normal token, value script could be interpreted to either a public value or a hidden value
+	// with abecryptox.ExtractAutTxoValue()
+	ValueScript []byte // todo(ctaut): used to denote AUT value.
+	// For all token, coin address would be used to indicate the ownership of token
+	// For root token, it would be used match the claimed issuers to recognize operational permission
+	CoinAddress []byte
+}
+type EnhancedCTAUTScript struct {
+	CTAUTScript
+	consumedTokens  []*CTAUTToken
+	generatedTokens []*CTAUTToken
+}
+
+func (script *EnhancedCTAUTScript) ConsumedTokens() ([]*CTAUTToken, error) {
+	if script.consumedTokens == nil {
+		return nil, errors.New("consumed tokens not set")
+	}
+
+	return script.consumedTokens, nil
+}
+func (script *EnhancedCTAUTScript) setConsumedTokens(consumedTokens []*CTAUTToken) error {
+	if len(consumedTokens) != script.NumConsumedTokens() {
+		return errors.New("mismatched number of consumed tokens")
+	}
+
+	script.consumedTokens = consumedTokens
+	return nil
+}
+
+func (script *EnhancedCTAUTScript) GeneratedTokens() ([]*CTAUTToken, error) {
+	if script.generatedTokens == nil {
+		return nil, errors.New("generated tokens not set")
+	}
+
+	return script.generatedTokens, nil
+}
+func (script *EnhancedCTAUTScript) setGeneratedTokens(generatedTokens []*CTAUTToken) error {
+	if len(generatedTokens) != script.NumGeneratedTokens() {
+		return errors.New("mismatched number of consumed tokens")
+	}
+
+	switch ctautScript := script.CTAUTScript.(type) {
+	case *RegistrationScript:
+	case *ReRegistrationScript:
+	case *MintScript:
+		// assign value script to token
+		for i := 0; i < len(generatedTokens); i++ {
+			generatedTokens[i].ValueScript = ctautScript.valueScripts[i]
+		}
+	case *TransferScript:
+		// assign value script to token
+		for i := 0; i < len(generatedTokens); i++ {
+			generatedTokens[i].ValueScript = ctautScript.valueScripts[i]
+		}
+	case *BurnScript:
+		// assign value script to token
+		for i := 0; i < len(generatedTokens); i++ {
+			generatedTokens[i].ValueScript = ctautScript.valueScripts[i]
+		}
+	default:
+		return errors.New("unknown aut script type")
+	}
+	script.generatedTokens = generatedTokens
+
+	return nil
+}
+
+func (script *EnhancedCTAUTScript) Metadata() (*Metadata, error) {
+	if script.Type() != Registration {
+		return nil, errors.New("metadata only available for registration script")
+	}
+	if script.generatedTokens == nil {
+		return nil, errors.New("generated tokens not set")
+	}
+
+	registerScript, ok := script.CTAUTScript.(*RegistrationScript)
+	if !ok {
+		return nil, errors.New("metadata only available for registration script")
+	}
+
+	rootTokenSet := map[HostOutPoint]struct{}{}
+	for i := 0; i < len(script.generatedTokens); i++ {
+		rootTokenSet[script.generatedTokens[i].HostOutPoint] = struct{}{}
+	}
+	metadata := &Metadata{
+		Version:                 registerScript.version,
+		CTAutIdentifier:         registerScript.ctAutIdentifier,
+		CTAutName:               registerScript.ctAutName,
+		CTAutSymbol:             registerScript.ctAutSymbol,
+		BaseUnitName:            registerScript.baseUnitName,
+		SubUnitName:             registerScript.subUnitName,
+		UnitScale:               registerScript.unitScale,
+		CTAutMemo:               registerScript.ctAutMemo,
+		PlannedTotalSupply:      registerScript.plannedTotalAmount,
+		IssuerTokens:            registerScript.issuerTokens,
+		MintThreshold:           registerScript.mintThreshold,
+		ReregistrationThreshold: registerScript.reregisterThreshold,
+		ExpireHeight:            registerScript.expireHeight,
+
+		MintedAmount: 0,
+		RootTokenSet: rootTokenSet,
+	}
+	return metadata, nil
+}
+func (script *EnhancedCTAUTScript) UpdateMetadata(metadata *Metadata) error {
+	// assert
+	if script.Type() != ReRegistration {
+		return errors.New("update metadata only available for re-registration script")
+	}
+	identifier := script.Identifier()
+	if !bytes.Equal(identifier[:], metadata.CTAutIdentifier[:]) {
+		return ErrInValidAUTTx
+	}
+	consumedTokens := script.consumedTokens
+	for i := 0; i < len(consumedTokens); i++ {
+		if _, ok := metadata.RootTokenSet[consumedTokens[i].HostOutPoint]; !ok {
+			return fmt.Errorf("an re-registration AUT transaction try to update AUT "+
+				"with non-existing/spent root token (%s,%d) for AUT identified by %s",
+				consumedTokens[i].HostOutPoint.Hash, consumedTokens[i].HostOutPoint.Index,
+				metadata.CTAutIdentifier)
+		}
+		delete(metadata.RootTokenSet, consumedTokens[i].HostOutPoint)
+	}
+
+	reRegisterScript, ok := script.CTAUTScript.(*ReRegistrationScript)
+	if !ok {
+		return errors.New("update metadata only available for re-registration script")
+	}
+	metadata.CTAutMemo = reRegisterScript.ctAutMemo
+	// assert here?
+	if metadata.MintedAmount > reRegisterScript.plannedTotalAmount {
+		return errors.New("re-registration transaction try to make planned amount less than minted amount")
+	}
+	metadata.PlannedTotalSupply = reRegisterScript.plannedTotalAmount
+
+	metadata.IssuerTokens = reRegisterScript.issuerTokens
+	metadata.MintThreshold = reRegisterScript.mintThreshold
+	metadata.ReregistrationThreshold = reRegisterScript.reregisterThreshold
+	metadata.ExpireHeight = reRegisterScript.expireHeight
+
+	// remove previous root tokens
+	metadata.RootTokenSet = make(map[HostOutPoint]struct{}, len(script.generatedTokens))
+	for i := 0; i < len(script.generatedTokens); i++ {
+		metadata.RootTokenSet[script.generatedTokens[i].HostOutPoint] = struct{}{}
+	}
+
+	return nil
 }
 
 // ExtractCTAUTScript try to deserialize CTAUT script from transaction memo
 // if success, it would :
-// - populate the consumed tokens by CTAUT script by populateConsumedTokens
-// - populate the generated tokens by CTAUT script by populateGeneratedTokens
-// - do sanity-check for AUT transaction, including
-//   - no duplicate token is consumed in script
-//   - no token parasitized in invalid type coin
-//   - no conflict configuration found
+// - extract the well-formed script from memo with sanity check:
+//   - no conflict configuration
+//   - no token parasitized in invalid host output
 //
-// Note that the token legality and configuration rationalization MUST be checked with the help of instance on blockchain.
-// - no double spending token
-// - no overflow
-func ExtractCTAUTScript(tx *wire.MsgTxAbe) (autScript CTAUTScript, err error) {
-	autScript, err = ParseCTAUTScript(tx.TxHash(), tx.TxMemo)
+// - populate the generated tokens by CTAUT script by populateGeneratedTokens
+//
+// Note that the legality of consumed tokens and the effect of script MUST be checked
+// with the help of instance on blockchain.
+// - legality of host transaction input
+//   - no double/duplicate spending token
+//
+// - legality of witness
+// - effect on the instance
+//   - no overflow
+func ExtractCTAUTScript(tx *wire.MsgTxAbe) (enhancedScript *EnhancedCTAUTScript, err error) {
+	// parse script from memo and check well-formedness
+	autScript, err := ParseCTAUTScript(tx.Version, tx.TxHash(), tx.TxMemo)
 	if err != nil {
 		return nil, err
 	}
@@ -1761,11 +1771,17 @@ func ExtractCTAUTScript(tx *wire.MsgTxAbe) (autScript CTAUTScript, err error) {
 		return nil, nil
 	}
 
+	// populate the generated tokens with host transaction outputs
+	enhancedScript = &EnhancedCTAUTScript{
+		CTAUTScript:     autScript,
+		consumedTokens:  nil,
+		generatedTokens: nil,
+	}
 	tokens, err := GetGeneratedCTAUTTokens(autScript, tx.TxHash(), tx.TxOuts)
 	if err != nil {
 		return nil, err
 	}
-	err = autScript.setGeneratedTokens(tokens)
+	err = enhancedScript.setGeneratedTokens(tokens)
 	if err != nil {
 		return nil, err
 	}
@@ -1776,8 +1792,8 @@ func ExtractCTAUTScript(tx *wire.MsgTxAbe) (autScript CTAUTScript, err error) {
 
 		// for outputs, the claimed issuer tokens must match the generated tokens exactly
 		// - all issuer tokens must appear
-		// - No unclaimed issuer token appear
-		if err = matchIssuerTokens(script.issuerTokens, script.generatedTokens); err != nil {
+		// - no unclaimed issuer token appear
+		if err = matchIssuerTokens(script.issuerTokens, tokens); err != nil {
 			return nil, err
 		}
 	case *ReRegistrationScript:
@@ -1787,7 +1803,7 @@ func ExtractCTAUTScript(tx *wire.MsgTxAbe) (autScript CTAUTScript, err error) {
 		// Above checks have to be delayed until the instance could be seen
 
 		// for outputs, the claimed issuer tokens must match the outputs exactly
-		if err = matchIssuerTokens(script.issuerTokens, script.generatedTokens); err != nil {
+		if err = matchIssuerTokens(script.issuerTokens, tokens); err != nil {
 			return nil, err
 		}
 	case *MintScript:
@@ -1829,13 +1845,94 @@ func ExtractCTAUTScript(tx *wire.MsgTxAbe) (autScript CTAUTScript, err error) {
 		return nil, ErrInValidAUTTx
 	}
 
-	return autScript, nil
+	return enhancedScript, nil
 }
-func PresetHostOutpointForCTAUT(autScript CTAUTScript, tx *wire.MsgTxAbe, lookupHostTxo func(ringHash chainhash.Hash) (*wire.TxOutAbe, error)) error {
-	err := populateConsumedCTAUTTokens(autScript, tx, lookupHostTxo)
-	if err != nil {
-		return err
+
+// PresetHostOutpointForCTAUT would preset the host outpoint for consumed tokens with the help of
+// host transaction and ring
+func PresetHostOutpointForCTAUT(script *EnhancedCTAUTScript, msgTx *wire.MsgTxAbe,
+	lookupHostOutput func(ringHash chainhash.Hash) (*wire.TxOutAbe, error),
+) error {
+	if script == nil || script.CTAUTScript == nil {
+		return nil
+	}
+	if script.Type() == Registration {
+		return script.setConsumedTokens([]*CTAUTToken{})
+	}
+	txHash := msgTx.TxHash()
+
+	hostedTxIns := msgTx.TxIns
+	startIndex := 0
+	for ; startIndex < len(hostedTxIns); startIndex++ {
+		ringHash := hostedTxIns[startIndex].PreviousOutPointRing.Hash()
+		txOut, err := lookupHostOutput(ringHash)
+		if err != nil {
+			return err
+		}
+
+		privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
+		if err != nil {
+			return err
+		}
+
+		// skip fully-privacy area
+		if privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre ||
+			privacyLevel == abecryptoxkey.PrivacyLevelRINGCT {
+			continue
+		}
+
+		if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+			return fmt.Errorf("expect privacy level %d but got %d",
+				abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
+		}
+		break
 	}
 
-	return nil
+	numInCoins := script.NumConsumedTokens()
+	if startIndex+numInCoins > len(hostedTxIns) {
+		return fmt.Errorf("claim %d (root) coins but only remain %d outputs",
+			numInCoins, len(hostedTxIns)-startIndex)
+	}
+
+	consumedTokens := make([]*CTAUTToken, numInCoins)
+	for i := 0; i < len(consumedTokens); i++ {
+		hostIndex := startIndex + i
+
+		// sanity-check
+		ringHash := hostedTxIns[hostIndex].PreviousOutPointRing.Hash()
+		txOut, err := lookupHostOutput(ringHash)
+		if err != nil {
+			return err
+		}
+
+		privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
+		if err != nil {
+			return err
+		}
+		if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+			return fmt.Errorf("expect privacy level %d but got %d",
+				abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
+		}
+
+		// fill out with the first item in ring
+		ringIdx := 0
+		outpoint := HostOutPoint{
+			Hash:  hostedTxIns[hostIndex].PreviousOutPointRing.OutPoints[ringIdx].TxHash,
+			Index: uint32(hostedTxIns[hostIndex].PreviousOutPointRing.OutPoints[ringIdx].Index),
+		}
+
+		coinAddress, err := CheckHostTxoParasiticity(outpoint.Hash, int(outpoint.Index), txOut)
+		if err != nil {
+			return fmt.Errorf("transaction %s try to consume UTXO at Ring %s is not a valid output", txHash,
+				hostedTxIns[hostIndex].PreviousOutPointRing.Hash())
+		}
+
+		consumedTokens[i] = &CTAUTToken{
+			HostOutPoint: outpoint,
+			Version:      hostedTxIns[hostIndex].PreviousOutPointRing.Version,
+			ValueScript:  nil,         // will be populated later with CTAUTViewpoint
+			CoinAddress:  coinAddress, // required by root coin while optional for coin
+		}
+	}
+	return script.setConsumedTokens(consumedTokens)
 }

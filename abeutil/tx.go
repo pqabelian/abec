@@ -44,7 +44,7 @@ type TxAbe struct {
 	errAUTTx  error
 
 	ctAutScriptDone bool
-	ctAutScript     ctaut.CTAUTScript
+	ctAutScript     *ctaut.EnhancedCTAUTScript
 	errCTAUTScript  error
 }
 
@@ -77,7 +77,7 @@ func (tx *TxAbe) AUTTransaction() (aut.Transaction, error) {
 }
 
 // CTAUTTScript would extract the AUT script from memo in transaction
-func (tx *TxAbe) CTAUTTScript() (ctaut.CTAUTScript, error) {
+func (tx *TxAbe) CTAUTTScript() (*ctaut.EnhancedCTAUTScript, error) {
 	// TODO(ctaut) return err?
 	if tx.ctAutScriptDone {
 		return tx.ctAutScript, tx.errCTAUTScript

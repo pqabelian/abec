@@ -103,7 +103,7 @@ func (b *BlockChain) calcNextRequiredDifficultyVectorAconcagua(lastNode *blockNo
 
 	// bypass adjust difficulty when hit configured Fake PoW scope
 	if b.fakePoWHeightScopes != nil {
-		for _, scope := range b.fakePoWHeightScopes {
+		for _, scope := range b.FakePoWHeightScopes() {
 			nextHeight := lastNode.height + 1
 			if scope.StartHeight <= nextHeight && nextHeight < scope.EndHeight {
 				if lastNode.height+1 == b.chainParams.BlockHeightAconcagua {

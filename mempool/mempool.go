@@ -79,7 +79,7 @@ type Config struct {
 
 	FetchUtxoRingView func(*abeutil.TxAbe) (*blockchain.UtxoRingViewpoint, error)
 	//FetchAUTView      func(*abeutil.TxAbe) (*blockchain.AUTViewpoint, error)
-	FetchCTAUTView func(ctAutTx ctaut.CTAUTScript) (*blockchain.CTAUTViewpoint, error)
+	FetchCTAUTView func(ctAutScript *ctaut.EnhancedCTAUTScript) (*blockchain.CTAUTViewpoint, error)
 
 	// BestHeight defines the function to use to access the block height of
 	// the current best chain.
@@ -769,7 +769,7 @@ func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 	}
 	if script != nil {
 		if script.Type() == ctaut.Registration {
-			ctAutScript := script.(*ctaut.RegistrationScript)
+			ctAutScript := script.CTAUTScript.(*ctaut.RegistrationScript)
 			willExpiredCTAut := mp.expiredHeightAUT[ctAutScript.ExpireHeight()]
 			delete(willExpiredCTAut, *tx.Hash())
 			if len(willExpiredCTAut) > 0 {
@@ -917,7 +917,7 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 		return nil, errors.New("fail to extract CT-AUT transaction")
 	}
 	if script != nil {
-		switch ctAutScript := script.(type) {
+		switch ctAutScript := script.CTAUTScript.(type) {
 		case *ctaut.RegistrationScript:
 			expireHeight := ctAutScript.ExpireHeight()
 			if mp.expiredHeightAUT[expireHeight] == nil {
@@ -1359,8 +1359,8 @@ func (mp *TxPool) fetchInputAUT(tx *abeutil.TxAbe) (*blockchain.AUTViewpoint, er
 	//return autView, nil
 	return nil, errors.New("AUT is not supported")
 }
-func (mp *TxPool) fetchInputCTAUT(ctAutTx ctaut.CTAUTScript) (*blockchain.CTAUTViewpoint, error) {
-	ctAutView, err := mp.cfg.FetchCTAUTView(ctAutTx)
+func (mp *TxPool) fetchInputCTAUT(ctAutScript *ctaut.EnhancedCTAUTScript) (*blockchain.CTAUTViewpoint, error) {
+	ctAutView, err := mp.cfg.FetchCTAUTView(ctAutScript)
 	if err != nil {
 		return nil, err
 	}
