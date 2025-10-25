@@ -33,6 +33,7 @@ type CTAUTScript = ctaut.CTAUTScript
 type CTAUTRegisterScript ctaut.RegistrationScript
 
 func NewRegistrationScript(
+	version uint32,
 	ctAutName []byte,
 	ctAutSymbol []byte,
 	baseUnitName []byte,
@@ -47,7 +48,9 @@ func NewRegistrationScript(
 	outAutRootTokenNum uint8,
 	memo []byte,
 ) ([]byte, []byte, error) {
-	script := ctaut.NewRegistrationScript(ctAutName,
+	script := ctaut.NewRegistrationScript(
+		version,
+		ctAutName,
 		ctAutSymbol,
 		baseUnitName,
 		subUnitName,
@@ -71,6 +74,7 @@ func NewRegistrationScript(
 type CTAUTReRegisterScript = ctaut.ReRegistrationScript
 
 func NewReRegistrationScript(
+	version uint32,
 	ctAutIdentifier [CTAUTIdentifierLength]byte,
 	ctAutMemo []byte,
 	plannedTotalAmount uint64,
@@ -83,6 +87,7 @@ func NewReRegistrationScript(
 	memo []byte,
 ) ([]byte, []byte, error) {
 	script := ctaut.NewReRegistrationScript(
+		version,
 		ctAutIdentifier,
 		ctAutMemo,
 		plannedTotalAmount,
@@ -105,6 +110,7 @@ func NewReRegistrationScript(
 type CTAUTMintScript = ctaut.MintScript
 
 func NewMintScript(
+	version uint32,
 	ctAutIdentifier [CTAUTIdentifierLength]byte,
 	vin uint64,
 	inAutRootTokenNum uint8,
@@ -136,12 +142,18 @@ func NewMintScript(
 	}
 
 	valueScripts := make([][]byte, len(autCoinbaseTx.TxOuts))
-	for i, out := range autCoinbaseTx.TxOuts {
-		valueScripts[i] = out.TxoScript
+	for i, autTxo := range autCoinbaseTx.TxOuts {
+		buffer := bytes.NewBuffer(make([]byte, 0, autTxo.SerializeSize()))
+		err = autTxo.Serialize(buffer)
+		if err != nil {
+			return nil, nil, err
+		}
+		valueScripts[i] = buffer.Bytes()
 	}
 
 	witnessHash := chainhash.HashH(autCoinbaseTx.TxWitness)
 	script := ctaut.NewMintScript(
+		version,
 		ctAutIdentifier,
 		vin,
 		inAutRootTokenNum,
@@ -160,6 +172,7 @@ func NewMintScript(
 type CTAUTTransferScript = ctaut.TransferScript
 
 func NewTransferScript(
+	version uint32,
 	ctAutIdentifier [CTAUTIdentifierLength]byte,
 	autInputDescs []*AutTxInputDesc,
 	autOutputDescs []*AutTxOutputDesc,
@@ -171,9 +184,10 @@ func NewTransferScript(
 	inputDescs := make([]*abecryptox.AutTxInputDesc, len(autInputDescs))
 	for i := 0; i < len(autInputDescs); i++ {
 		autInputDesc := autInputDescs[i]
-		autTxo := &ctautwire.AutTxo{
-			Version:   autInputDesc.Version,
-			TxoScript: autInputDesc.ValueScript,
+		autTxo := &ctautwire.AutTxo{}
+		err := autTxo.Deserialize(bytes.NewReader(autInputDesc.ValueScript))
+		if err != nil {
+			return nil, nil, err
 		}
 
 		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
@@ -220,19 +234,25 @@ func NewTransferScript(
 		return nil, nil, err
 	}
 
-	autTxoScripts := make([][]byte, len(autTransferTx.TxOuts))
-	for i, out := range autTransferTx.TxOuts {
-		autTxoScripts[i] = out.TxoScript
+	valueScripts := make([][]byte, len(autTransferTx.TxOuts))
+	for i, autTxo := range autTransferTx.TxOuts {
+		buffer := bytes.NewBuffer(make([]byte, 0, autTxo.SerializeSize()))
+		err = autTxo.Serialize(buffer)
+		if err != nil {
+			return nil, nil, err
+		}
+		valueScripts[i] = buffer.Bytes()
 	}
 	witnessHash := chainhash.HashH(autTransferTx.TxWitness)
 
 	script := ctaut.NewTransferScript(
+		version,
 		ctAutIdentifier,
 		inCTAutTokenNum,
 		inPlainAutTokenNum,
 		outCTAutTokenNum,
 		outPlainAutTokenNum,
-		autTxoScripts,
+		valueScripts,
 		witnessHash,
 		memo,
 	)
@@ -246,6 +266,7 @@ func NewTransferScript(
 type CTAUTBurnScript = ctaut.BurnScript
 
 func NewBurnScript(
+	version uint32,
 	ctAutIdentifier [CTAUTIdentifierLength]byte,
 	autInputDescs []*AutTxInputDesc,
 	autOutputDescs []*AutTxOutputDesc,
@@ -256,9 +277,10 @@ func NewBurnScript(
 	inputDescs := make([]*abecryptox.AutTxInputDesc, len(autInputDescs))
 	for i := 0; i < len(autInputDescs); i++ {
 		autInputDesc := autInputDescs[i]
-		autTxo := &ctautwire.AutTxo{
-			Version:   autInputDesc.Version,
-			TxoScript: autInputDesc.ValueScript,
+		autTxo := &ctautwire.AutTxo{}
+		err := autTxo.Deserialize(bytes.NewReader(autInputDesc.ValueScript))
+		if err != nil {
+			return nil, nil, err
 		}
 
 		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
@@ -309,19 +331,25 @@ func NewBurnScript(
 		panic(err)
 	}
 
-	autTxoScripts := make([][]byte, len(autTransferTx.TxOuts))
-	for i, out := range autTransferTx.TxOuts {
-		autTxoScripts[i] = out.TxoScript
+	valueScripts := make([][]byte, len(autTransferTx.TxOuts))
+	for i, autTxo := range autTransferTx.TxOuts {
+		buffer := bytes.NewBuffer(make([]byte, 0, autTxo.SerializeSize()))
+		err = autTxo.Serialize(buffer)
+		if err != nil {
+			return nil, nil, err
+		}
+		valueScripts[i] = buffer.Bytes()
 	}
 	witnessHash := chainhash.HashH(autTransferTx.TxWitness)
 
 	script := ctaut.NewBurnScript(
+		version,
 		ctAutIdentifier,
 		inCTAutTokenNum,
 		inPlainAutTokenNum,
 		outCTAutTokenNum,
 		outPlainAutTokenNum,
-		autTxoScripts,
+		valueScripts,
 		witnessHash,
 		memo,
 	)
@@ -397,10 +425,12 @@ const (
 )
 
 func ExtractAutTokenValue(version uint32, valueScript []byte, cryptoValuePublicKey []byte, cryptoValueSecretKey []byte) (uint64, AutTokenType, error) {
-	autTxo := &ctautwire.AutTxo{
-		Version:   version,
-		TxoScript: valueScript,
+	autTxo := &ctautwire.AutTxo{}
+	err := autTxo.Deserialize(bytes.NewReader(valueScript))
+	if err != nil {
+		return 0, AutTokenTypeHidden, err
 	}
+
 	autTxoType, err := abecryptox.GetAutTxoType(autTxo)
 	if err != nil {
 		return 0, autTxoType, err
@@ -413,12 +443,12 @@ func ExtractAutTokenValue(version uint32, valueScript []byte, cryptoValuePublicK
 	return value, autTxoType, nil
 }
 
-func ParseCTAUTScript(txID string, memo []byte) (CTAUTScript, error) {
+func ParseCTAUTScript(txVersion uint32, txID string, memo []byte) (CTAUTScript, error) {
 	txHash, err := chainhash.NewHashFromStr(txID)
 	if err != nil {
 		return nil, err
 	}
-	return ctaut.ParseCTAUTScript(*txHash, memo)
+	return ctaut.ParseCTAUTScript(txVersion, *txHash, memo)
 }
 func GetGeneratedOutpoints(ctAutScript CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte) (uint32, []*OutPoint, [][]byte, error) {
 	if ctAutScript == nil {
@@ -482,7 +512,10 @@ func GetConsumedOutpoints(serializedTx []byte, rings map[string]*TxoRing) ([]*Ou
 	if err != nil {
 		return nil, err
 	}
-	consumedTokens := ctAutScript.ConsumedTokens()
+	consumedTokens, err := ctAutScript.ConsumedTokens()
+	if err != nil {
+		return nil, err
+	}
 	res := make([]*OutPoint, len(consumedTokens))
 	for i := 0; i < len(consumedTokens); i++ {
 		token := consumedTokens[i]
