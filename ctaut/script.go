@@ -416,7 +416,7 @@ type RegistrationScript struct {
 	scriptType CTAUTScriptType
 
 	// populate with txid of host transaction
-	ctAutIdentifier [CTAUTIdentifierLength]byte // zero-bytes, directly chainhash.Hash?
+	ctAutIdentifier [CTAUTIdentifierLength]byte
 
 	ctAutName    []byte
 	ctAutSymbol  []byte
@@ -433,6 +433,50 @@ type RegistrationScript struct {
 
 	outAutRootTokenNum uint8  // value is set in deserialize, so, do not provide set function, but provide get function.
 	memo               []byte // TODO memo -> scriptMemo
+}
+
+func (script *RegistrationScript) CtAutName() []byte {
+	return script.ctAutName
+}
+
+func (script *RegistrationScript) CtAutSymbol() []byte {
+	return script.ctAutSymbol
+}
+
+func (script *RegistrationScript) BaseUnitName() []byte {
+	return script.baseUnitName
+}
+
+func (script *RegistrationScript) SubUnitName() []byte {
+	return script.subUnitName
+}
+
+func (script *RegistrationScript) UnitScale() uint64 {
+	return script.unitScale
+}
+
+func (script *RegistrationScript) CtAutMemo() []byte {
+	return script.ctAutMemo
+}
+
+func (script *RegistrationScript) PlannedTotalAmount() uint64 {
+	return script.plannedTotalAmount
+}
+
+func (script *RegistrationScript) IssuerTokens() [][]byte {
+	return script.issuerTokens
+}
+
+func (script *RegistrationScript) MintThreshold() uint8 {
+	return script.mintThreshold
+}
+
+func (script *RegistrationScript) ReregisterThreshold() uint8 {
+	return script.reregisterThreshold
+}
+
+func (script *RegistrationScript) Memo() []byte {
+	return script.memo
 }
 
 func NewRegistrationScript(
@@ -690,6 +734,26 @@ type ReRegistrationScript struct {
 	inAutRootTokenNum  uint8
 	outAutRootTokenNum uint8
 	memo               []byte
+}
+
+func (script *ReRegistrationScript) CtAutMemo() []byte {
+	return script.ctAutMemo
+}
+
+func (script *ReRegistrationScript) PlannedTotalAmount() uint64 {
+	return script.plannedTotalAmount
+}
+
+func (script *ReRegistrationScript) IssuerTokens() [][]byte {
+	return script.issuerTokens
+}
+
+func (script *ReRegistrationScript) MintThreshold() uint8 {
+	return script.mintThreshold
+}
+
+func (script *ReRegistrationScript) ReregisterThreshold() uint8 {
+	return script.reregisterThreshold
 }
 
 func NewReRegistrationScript(

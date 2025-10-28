@@ -29,8 +29,10 @@ const (
 )
 
 type CTAUTScript = ctaut.CTAUTScript
+type HostOutPoint = ctaut.HostOutPoint
+type Metadata = ctaut.Metadata
 
-type CTAUTRegisterScript ctaut.RegistrationScript
+type CTAUTRegisterScript = ctaut.RegistrationScript
 
 func NewRegistrationScript(
 	version uint32,
@@ -450,6 +452,103 @@ func ParseCTAUTScript(txVersion uint32, txID string, memo []byte) (CTAUTScript, 
 	}
 	return ctaut.ParseCTAUTScript(txVersion, *txHash, memo)
 }
+func RegisteredCTAUTInstance(ctAutScript CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte) (*Metadata, error) {
+	if ctAutScript == nil {
+		return nil, errors.New("ctaut script is nil")
+	}
+	if ctAutScript.Type() != ctaut.Registration {
+		return nil, errors.New("ctaut script type is not Registration")
+	}
+	abeTxos := make([]*wire.TxOutAbe, len(serializedTxOuts))
+	for i := 0; i < len(serializedTxOuts); i++ {
+		abeTxo := &wire.TxOutAbe{}
+		err := wire.ReadTxOutAbe(bytes.NewReader(serializedTxOuts[i]), 0, txVersion, abeTxo)
+		if err != nil {
+			return nil, err
+		}
+		abeTxos[i] = abeTxo
+	}
+	txHash, err := chainhash.NewHashFromStr(txID)
+	if err != nil {
+		return nil, err
+	}
+
+	rootTokens, err := ctaut.GetGeneratedCTAUTTokens(ctAutScript, *txHash, abeTxos)
+	if err != nil {
+		return nil, err
+	}
+
+	registerScript := ctAutScript.(*ctaut.RegistrationScript)
+	metadata := &Metadata{
+		Version:                 registerScript.Version(),
+		CTAutIdentifier:         registerScript.Identifier(),
+		CTAutName:               registerScript.CtAutName(),
+		CTAutSymbol:             registerScript.CtAutSymbol(),
+		BaseUnitName:            registerScript.BaseUnitName(),
+		SubUnitName:             registerScript.SubUnitName(),
+		UnitScale:               registerScript.UnitScale(),
+		CTAutMemo:               registerScript.CtAutMemo(),
+		PlannedTotalSupply:      registerScript.PlannedTotalAmount(),
+		IssuerTokens:            registerScript.IssuerTokens(),
+		MintThreshold:           registerScript.MintThreshold(),
+		ReregistrationThreshold: registerScript.ReregisterThreshold(),
+		ExpireHeight:            registerScript.ExpireHeight(),
+		MintedAmount:            0,
+		BurnedAmount:            0,
+		RootTokenSet:            make(map[HostOutPoint]struct{}, len(rootTokens)),
+	}
+	for i := 0; i < len(rootTokens); i++ {
+		metadata.RootTokenSet[rootTokens[i].HostOutPoint] = struct{}{}
+	}
+	return metadata, nil
+}
+
+func ReRegisteredCTAUTInstance(ctAutScript CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte, metadata *Metadata) error {
+	if ctAutScript == nil {
+		return errors.New("ctaut script is nil")
+	}
+
+	if ctAutScript.Identifier() != metadata.CTAutIdentifier {
+		return errors.New("ctaut script identifier is not equal to metadata identifier")
+	}
+
+	if ctAutScript.Type() != ctaut.ReRegistration {
+		return errors.New("ctaut script type is not ReRegistration")
+	}
+	abeTxos := make([]*wire.TxOutAbe, len(serializedTxOuts))
+	for i := 0; i < len(serializedTxOuts); i++ {
+		abeTxo := &wire.TxOutAbe{}
+		err := wire.ReadTxOutAbe(bytes.NewReader(serializedTxOuts[i]), 0, txVersion, abeTxo)
+		if err != nil {
+			return err
+		}
+		abeTxos[i] = abeTxo
+	}
+	txHash, err := chainhash.NewHashFromStr(txID)
+	if err != nil {
+		return err
+	}
+
+	rootTokens, err := ctaut.GetGeneratedCTAUTTokens(ctAutScript, *txHash, abeTxos)
+	if err != nil {
+		return err
+	}
+
+	reRegisterScript := ctAutScript.(*ctaut.ReRegistrationScript)
+	metadata.CTAutMemo = reRegisterScript.CtAutMemo()
+	metadata.PlannedTotalSupply = reRegisterScript.PlannedTotalAmount()
+	metadata.IssuerTokens = reRegisterScript.IssuerTokens()
+	metadata.MintThreshold = reRegisterScript.MintThreshold()
+	metadata.ReregistrationThreshold = reRegisterScript.ReregisterThreshold()
+	metadata.ExpireHeight = reRegisterScript.ExpireHeight()
+
+	metadata.RootTokenSet = make(map[HostOutPoint]struct{}, len(rootTokens))
+	for i := 0; i < len(rootTokens); i++ {
+		metadata.RootTokenSet[rootTokens[i].HostOutPoint] = struct{}{}
+	}
+	return nil
+}
+
 func GetGeneratedOutpoints(ctAutScript CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte) (uint32, []*OutPoint, [][]byte, error) {
 	if ctAutScript == nil {
 		return 0, nil, nil, nil
