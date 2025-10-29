@@ -1678,19 +1678,20 @@ func handleGetBlockChainInfo(s *rpcServer, cmd interface{}, closeChan <-chan str
 	chainSnapshot := chain.BestSnapshot()
 
 	chainInfo := &abejson.GetBlockChainInfoResult{
-		Chain:            params.Name,
-		Blocks:           chainSnapshot.Height,
-		Headers:          chainSnapshot.Height,
-		BestBlockHash:    chainSnapshot.Hash.String(),
-		Difficulty:       getDifficultyRatio(chainSnapshot.Bits, params),
-		DifficultySecond: getDifficultyRatio(chainSnapshot.BitsSecond, params),
-		PowScaleSecond:   chainSnapshot.PowScaleSecond,
-		MedianTime:       chainSnapshot.MedianTime.Unix(),
-		Pruned:           false,
+		Chain:         params.Name,
+		Blocks:        chainSnapshot.Height,
+		Headers:       chainSnapshot.Height,
+		BestBlockHash: chainSnapshot.Hash.String(),
+		Difficulty:    getDifficultyRatio(chainSnapshot.Bits, params),
+		MedianTime:    chainSnapshot.MedianTime.Unix(),
+		Pruned:        false,
 		//	todo(ABE):
 		SoftForks: &abejson.SoftForks{},
 	}
-
+	if chainSnapshot.Height >= s.cfg.ChainParams.BlockHeightAconcagua {
+		chainInfo.DifficultySecond = getDifficultyRatio(chainSnapshot.BitsSecond, params)
+		chainInfo.PowScaleSecond = chainSnapshot.PowScaleSecond
+	}
 	return chainInfo, nil
 }
 
@@ -1767,23 +1768,27 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 
 	params := s.cfg.ChainParams
 	blockHeaderReply := abejson.GetBlockHeaderVerboseResult{
-		Hash:             c.Hash,
-		Confirmations:    int64(1 + best.Height - blockHeight),
-		Height:           blockHeight,
-		Version:          blockHeader.Version,
-		VersionHex:       fmt.Sprintf("%08x", blockHeader.Version),
-		MerkleRoot:       blockHeader.MerkleRoot.String(),
-		NextHash:         nextHashString,
-		PreviousHash:     blockHeader.PrevBlock.String(),
-		Nonce:            uint64(blockHeader.Nonce),
-		Time:             blockHeader.Timestamp.Unix(),
-		Bits:             strconv.FormatInt(int64(blockHeader.Bits), 16),
-		Difficulty:       getDifficultyRatio(blockHeader.Bits, params),
-		BitsSecond:       strconv.FormatInt(int64(blockHeader.BitsSecond), 16),
-		DifficultySecond: getDifficultyRatio(blockHeader.BitsSecond, params),
-		PowScaleSecond:   blockHeader.PowScaleSecond,
-		ConsensusApplied: uint8(blockHeader.ConsensusApplied),
+		Hash:          c.Hash,
+		Confirmations: int64(1 + best.Height - blockHeight),
+		Height:        blockHeight,
+		Version:       blockHeader.Version,
+		VersionHex:    fmt.Sprintf("%08x", blockHeader.Version),
+		MerkleRoot:    blockHeader.MerkleRoot.String(),
+		NextHash:      nextHashString,
+		PreviousHash:  blockHeader.PrevBlock.String(),
+		Nonce:         uint64(blockHeader.Nonce),
+		Time:          blockHeader.Timestamp.Unix(),
+		Bits:          strconv.FormatInt(int64(blockHeader.Bits), 16),
+		Difficulty:    getDifficultyRatio(blockHeader.Bits, params),
 	}
+
+	if blockHeader.Height >= s.cfg.ChainParams.BlockHeightAconcagua {
+		blockHeaderReply.BitsSecond = strconv.FormatInt(int64(blockHeader.BitsSecond), 16)
+		blockHeaderReply.DifficultySecond = getDifficultyRatio(blockHeader.BitsSecond, params)
+		blockHeaderReply.PowScaleSecond = blockHeader.PowScaleSecond
+		blockHeaderReply.ConsensusApplied = uint8(blockHeader.ConsensusApplied)
+	}
+
 	return blockHeaderReply, nil
 }
 
@@ -2211,6 +2216,9 @@ func (state *gbtWorkState) blockTemplateResult(miningAddr abeutil.AbelAddress, s
 	//  Including MinTime -> time/decrement
 	//  Omitting CoinbaseTxn -> coinbase, generation
 	targetDifficulty := fmt.Sprintf("%064x", blockchain.CompactToBig(header.Bits))
+	// TODO(aconcagua): with height as conditions, need add params to gbtWorkState
+	// 1. targetDifficultySecond
+	// 2. BitsSecond / PowScaleSecond / ConsensusApplied / TargetSecond
 	targetDifficultySecond := fmt.Sprintf("%064x", blockchain.CompactToBig(header.BitsSecond))
 	templateID := encodeTemplateID(template.prevHash, template.lastGenerated)
 	reply := abejson.GetBlockTemplateResult{
@@ -2962,6 +2970,7 @@ func handleGetDifficulty(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 func handleGetDifficultyRatioVector(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	best := s.cfg.Chain.BestSnapshot()
 
+	// TODO(aconcagua) with height as condition?
 	var ret abejson.GetDifficultyRatioVectorResult
 	ret.DifficultyRatio = getDifficultyRatio(best.Bits, s.cfg.ChainParams)
 	ret.DifficultyRatioSecond = getDifficultyRatio(best.BitsSecond, s.cfg.ChainParams)
@@ -3053,18 +3062,20 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		Blocks:               best.Height,
 		BestBlockHash:        best.Hash.String(),
 		WorkSum:              s.cfg.Chain.BestChainWorkSum().String(),
-		WorkSumSecondScaled:  s.cfg.Chain.BestChainWorkSumSecondScaled().String(), //	added for Aconcagua upgrade
 		TimeOffset:           int64(s.cfg.TimeSource.Offset().Seconds()),
 		Connections:          s.cfg.ConnMgr.ConnectedCount(),
 		Proxy:                cfg.Proxy,
 		Difficulty:           getDifficultyRatio(best.Bits, s.cfg.ChainParams),
-		DifficultySecond:     getDifficultyRatio(best.BitsSecond, s.cfg.ChainParams),
-		PowScaleSecond:       best.PowScaleSecond,
 		TestNet:              cfg.TestNet3,
 		RelayFee:             cfg.minRelayTxFee.ToABE(),
 		NodeType:             nodeType.String(),
 		WitnessServiceHeight: int32(witnessServiceHeight),
 		NetID:                s.cfg.ChainParams.AbelAddressNetId,
+	}
+	if best.Height >= s.cfg.ChainParams.BlockHeightAconcagua {
+		ret.WorkSumSecondScaled = s.cfg.Chain.BestChainWorkSumSecondScaled().String()
+		ret.DifficultySecond = getDifficultyRatio(best.BitsSecond, s.cfg.ChainParams)
+		ret.PowScaleSecond = best.PowScaleSecond
 	}
 
 	return ret, nil
@@ -3115,15 +3126,17 @@ func handleGetMiningInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		CurrentBlockWeight: best.BlockWeight,
 		CurrentBlockTx:     best.NumTxns,
 		Difficulty:         getDifficultyRatio(best.Bits, s.cfg.ChainParams),
-		DifficultySecond:   getDifficultyRatio(best.BitsSecond, s.cfg.ChainParams),
-		PowScaleSecond:     best.PowScaleSecond,
-		ConsensusApplied:   uint8(best.ConsensusApplied),
 		Generate:           s.cfg.CPUMiner.IsMining(),
 		GenProcLimit:       s.cfg.CPUMiner.NumWorkers(),
 		HashesPerSec:       int64(s.cfg.CPUMiner.HashesPerSecond()),
 		NetworkHashPS:      networkHashesPerSec,
 		PooledTx:           uint64(s.cfg.TxMemPool.Count()),
 		TestNet:            cfg.TestNet3,
+	}
+	if best.Height >= s.cfg.ChainParams.BlockHeightAconcagua {
+		result.DifficultySecond = getDifficultyRatio(best.BitsSecond, s.cfg.ChainParams)
+		result.PowScaleSecond = best.PowScaleSecond
+		result.ConsensusApplied = uint8(best.ConsensusApplied)
 	}
 	return &result, nil
 }
