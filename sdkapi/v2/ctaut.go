@@ -503,18 +503,18 @@ func RegisteredCTAUTInstance(ctAutScript CTAUTScript, txVersion uint32, txID str
 	return metadata, nil
 }
 
-func ReRegisteredCTAUTInstance(ctAutScript CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte, metadata *Metadata) error {
-	if ctAutScript == nil {
+func UpdateCTAUTInstance(script CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte, metadata *Metadata) error {
+	if script == nil {
 		return errors.New("ctaut script is nil")
 	}
+	if metadata == nil {
+		return errors.New("metadata is nil")
+	}
 
-	if ctAutScript.Identifier() != metadata.CTAutIdentifier {
+	if script.Identifier() != metadata.CTAutIdentifier {
 		return errors.New("ctaut script identifier is not equal to metadata identifier")
 	}
 
-	if ctAutScript.Type() != ctaut.ReRegistration {
-		return errors.New("ctaut script type is not ReRegistration")
-	}
 	abeTxos := make([]*wire.TxOutAbe, len(serializedTxOuts))
 	for i := 0; i < len(serializedTxOuts); i++ {
 		abeTxo := &wire.TxOutAbe{}
@@ -529,24 +529,70 @@ func ReRegisteredCTAUTInstance(ctAutScript CTAUTScript, txVersion uint32, txID s
 		return err
 	}
 
-	rootTokens, err := ctaut.GetGeneratedCTAUTTokens(ctAutScript, *txHash, abeTxos)
-	if err != nil {
-		return err
-	}
+	switch ctAutScript := script.(type) {
+	case *ctaut.RegistrationScript:
+		return errors.New("ctaut script type is Registration")
+	case *ctaut.ReRegistrationScript:
+		rootTokens, err := ctaut.GetGeneratedCTAUTTokens(ctAutScript, *txHash, abeTxos)
+		if err != nil {
+			return err
+		}
 
-	reRegisterScript := ctAutScript.(*ctaut.ReRegistrationScript)
-	metadata.CTAutMemo = reRegisterScript.CtAutMemo()
-	metadata.PlannedTotalSupply = reRegisterScript.PlannedTotalAmount()
-	metadata.IssuerTokens = reRegisterScript.IssuerTokens()
-	metadata.MintThreshold = reRegisterScript.MintThreshold()
-	metadata.ReregistrationThreshold = reRegisterScript.ReregisterThreshold()
-	metadata.ExpireHeight = reRegisterScript.ExpireHeight()
+		metadata.CTAutMemo = ctAutScript.CtAutMemo()
+		metadata.PlannedTotalSupply = ctAutScript.PlannedTotalAmount()
+		metadata.IssuerTokens = ctAutScript.IssuerTokens()
+		metadata.MintThreshold = ctAutScript.MintThreshold()
+		metadata.ReregistrationThreshold = ctAutScript.ReregisterThreshold()
+		metadata.ExpireHeight = ctAutScript.ExpireHeight()
 
-	metadata.RootTokenSet = make(map[HostOutPoint]struct{}, len(rootTokens))
-	for i := 0; i < len(rootTokens); i++ {
-		metadata.RootTokenSet[rootTokens[i].HostOutPoint] = struct{}{}
+		metadata.RootTokenSet = make(map[HostOutPoint]struct{}, len(rootTokens))
+		for i := 0; i < len(rootTokens); i++ {
+			metadata.RootTokenSet[rootTokens[i].HostOutPoint] = struct{}{}
+		}
+		return nil
+	case *ctaut.MintScript:
+		metadata.MintedAmount += ctAutScript.Vin()
+
+		return nil
+	case *ctaut.TransferScript:
+		// nothing to update
+
+		return nil
+	case *ctaut.BurnScript:
+		// the last token would be view as burned
+		tokens, err := ctaut.GetGeneratedCTAUTTokens(ctAutScript, *txHash, abeTxos)
+		if err != nil {
+			return err
+		}
+
+		if len(tokens) == 0 {
+			return errors.New("no tokens generated, should not happend")
+		}
+
+		autTxo := &ctautwire.AutTxo{}
+		err = autTxo.Deserialize(bytes.NewReader(tokens[len(tokens)-1].ValueScript))
+		if err != nil {
+			return err
+		}
+		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
+		if err != nil {
+			return err
+		}
+		if autTxoType == abecryptox.AutTxoTypeHidden {
+			return errors.New("burned token should not be hidden")
+		}
+
+		value, err := abecryptox.ExtractAutTxoValue(autTxo, nil, nil)
+		if err != nil {
+			return err
+		}
+
+		metadata.BurnedAmount += value
+		return nil
+
+	default:
+		return errors.New("ctaut script type is not supported")
 	}
-	return nil
 }
 
 func GetGeneratedOutpoints(ctAutScript CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte) (uint32, []*OutPoint, [][]byte, error) {
