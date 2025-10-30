@@ -2,6 +2,7 @@ package v2
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"sort"
@@ -30,7 +31,26 @@ const (
 
 type CTAUTScript = ctaut.CTAUTScript
 type HostOutPoint = ctaut.HostOutPoint
-type Metadata = ctaut.Metadata
+type Metadata struct {
+	Version         uint32
+	CTAutIdentifier string
+	CTAutName       string
+	CTAutSymbol     string
+	BaseUnitName    string
+	SubUnitName     string
+	UnitScale       uint64
+	CTAutMemo       string
+
+	PlannedTotalSupply      uint64
+	IssuerTokens            []string
+	MintThreshold           uint8
+	ReregistrationThreshold uint8
+	ExpireHeight            int32 // ReregistrationExpireHeight
+
+	MintedAmount uint64
+	BurnedAmount uint64
+	RootTokenSet map[HostOutPoint]struct{}
+}
 
 type CTAUTRegisterScript = ctaut.RegistrationScript
 
@@ -452,7 +472,7 @@ func ParseCTAUTScript(txVersion uint32, txID string, memo []byte) (CTAUTScript, 
 	}
 	return ctaut.ParseCTAUTScript(txVersion, *txHash, memo)
 }
-func RegisteredCTAUTInstance(ctAutScript CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte) (*Metadata, error) {
+func RegisteredCTAUTMetadata(ctAutScript CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte) (*Metadata, error) {
 	if ctAutScript == nil {
 		return nil, errors.New("ctaut script is nil")
 	}
@@ -468,42 +488,46 @@ func RegisteredCTAUTInstance(ctAutScript CTAUTScript, txVersion uint32, txID str
 		}
 		abeTxos[i] = abeTxo
 	}
-	txHash, err := chainhash.NewHashFromStr(txID)
-	if err != nil {
-		return nil, err
-	}
+	//txHash, err := chainhash.NewHashFromStr(txID)
+	//if err != nil {
+	//	return nil, err
+	//}
 
-	rootTokens, err := ctaut.GetGeneratedCTAUTTokens(ctAutScript, *txHash, abeTxos)
-	if err != nil {
-		return nil, err
-	}
+	//rootTokens, err := ctaut.GetGeneratedCTAUTTokens(ctAutScript, *txHash, abeTxos)
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	registerScript := ctAutScript.(*ctaut.RegistrationScript)
+	identifier := registerScript.Identifier()
+	issuerTokens := registerScript.IssuerTokens()
+	issuerTokenStrs := make([]string, len(issuerTokens))
+	for i := 0; i < len(issuerTokens); i++ {
+		issuerTokenStrs[i] = hex.EncodeToString(issuerTokens[i])
+	}
 	metadata := &Metadata{
 		Version:                 registerScript.Version(),
-		CTAutIdentifier:         registerScript.Identifier(),
-		CTAutName:               registerScript.CtAutName(),
-		CTAutSymbol:             registerScript.CtAutSymbol(),
-		BaseUnitName:            registerScript.BaseUnitName(),
-		SubUnitName:             registerScript.SubUnitName(),
+		CTAutIdentifier:         hex.EncodeToString(identifier[:]),
+		CTAutName:               hex.EncodeToString(registerScript.CtAutName()),
+		CTAutSymbol:             hex.EncodeToString(registerScript.CtAutSymbol()),
+		BaseUnitName:            hex.EncodeToString(registerScript.BaseUnitName()),
+		SubUnitName:             hex.EncodeToString(registerScript.SubUnitName()),
 		UnitScale:               registerScript.UnitScale(),
-		CTAutMemo:               registerScript.CtAutMemo(),
+		CTAutMemo:               hex.EncodeToString(registerScript.CtAutMemo()),
 		PlannedTotalSupply:      registerScript.PlannedTotalAmount(),
-		IssuerTokens:            registerScript.IssuerTokens(),
+		IssuerTokens:            issuerTokenStrs,
 		MintThreshold:           registerScript.MintThreshold(),
 		ReregistrationThreshold: registerScript.ReregisterThreshold(),
 		ExpireHeight:            registerScript.ExpireHeight(),
 		MintedAmount:            0,
 		BurnedAmount:            0,
-		RootTokenSet:            make(map[HostOutPoint]struct{}, len(rootTokens)),
+		//RootTokenSet:            make(map[HostOutPoint]struct{}, len(rootTokens)),
 	}
-	for i := 0; i < len(rootTokens); i++ {
-		metadata.RootTokenSet[rootTokens[i].HostOutPoint] = struct{}{}
-	}
+
 	return metadata, nil
 }
 
-func UpdateCTAUTInstance(script CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte, metadata *Metadata) error {
+func UpdateCTAUTMetadata(script CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte, metadata *Metadata) error {
 	if script == nil {
 		return errors.New("ctaut script is nil")
 	}
@@ -511,7 +535,8 @@ func UpdateCTAUTInstance(script CTAUTScript, txVersion uint32, txID string, seri
 		return errors.New("metadata is nil")
 	}
 
-	if script.Identifier() != metadata.CTAutIdentifier {
+	identifier := script.Identifier()
+	if hex.EncodeToString(identifier[:]) != metadata.CTAutIdentifier {
 		return errors.New("ctaut script identifier is not equal to metadata identifier")
 	}
 
@@ -533,22 +558,28 @@ func UpdateCTAUTInstance(script CTAUTScript, txVersion uint32, txID string, seri
 	case *ctaut.RegistrationScript:
 		return errors.New("ctaut script type is Registration")
 	case *ctaut.ReRegistrationScript:
-		rootTokens, err := ctaut.GetGeneratedCTAUTTokens(ctAutScript, *txHash, abeTxos)
-		if err != nil {
-			return err
+		//rootTokens, err := ctaut.GetGeneratedCTAUTTokens(ctAutScript, *txHash, abeTxos)
+		//if err != nil {
+		//	return err
+		//}
+
+		metadata.CTAutMemo = hex.EncodeToString(ctAutScript.CtAutMemo())
+		metadata.PlannedTotalSupply = ctAutScript.PlannedTotalAmount()
+
+		issuerTokens := ctAutScript.IssuerTokens()
+		metadata.IssuerTokens = make([]string, len(issuerTokens))
+		for i := 0; i < len(issuerTokens); i++ {
+			metadata.IssuerTokens[i] = hex.EncodeToString(issuerTokens[i])
 		}
 
-		metadata.CTAutMemo = ctAutScript.CtAutMemo()
-		metadata.PlannedTotalSupply = ctAutScript.PlannedTotalAmount()
-		metadata.IssuerTokens = ctAutScript.IssuerTokens()
 		metadata.MintThreshold = ctAutScript.MintThreshold()
 		metadata.ReregistrationThreshold = ctAutScript.ReregisterThreshold()
 		metadata.ExpireHeight = ctAutScript.ExpireHeight()
 
-		metadata.RootTokenSet = make(map[HostOutPoint]struct{}, len(rootTokens))
-		for i := 0; i < len(rootTokens); i++ {
-			metadata.RootTokenSet[rootTokens[i].HostOutPoint] = struct{}{}
-		}
+		//metadata.RootTokenSet = make(map[HostOutPoint]struct{}, len(rootTokens))
+		//for i := 0; i < len(rootTokens); i++ {
+		//	metadata.RootTokenSet[rootTokens[i].HostOutPoint] = struct{}{}
+		//}
 		return nil
 	case *ctaut.MintScript:
 		metadata.MintedAmount += ctAutScript.Vin()
