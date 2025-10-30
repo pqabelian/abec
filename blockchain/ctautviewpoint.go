@@ -53,10 +53,6 @@ type CTAUTInstance struct {
 }
 
 func NewCTAUTInstance(metadata *ctaut.Metadata, coins map[ctaut.HostOutPoint]*CTAUTCoin) *CTAUTInstance {
-	a := 2
-	switch a {
-	case 1, 2:
-	}
 	return &CTAUTInstance{metadata: metadata, coins: coins}
 }
 
