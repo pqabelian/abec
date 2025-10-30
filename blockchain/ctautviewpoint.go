@@ -544,12 +544,13 @@ func (view *CTAUTViewpoint) connectBurnScript(script *ctaut.EnhancedCTAUTScript,
 		view.instances[identifierKey].Add(generatedToken[i].HostOutPoint, coin)
 	}
 	burnedToken := generatedToken[len(generatedToken)-1]
-	log.Debugf("outpoint %s for AUT instance %s is burned", burnedToken.HostOutPoint, identifierKey)
 	// update the burned amount
-	burnedValue, err := abecryptox.ExtractAutTxoValue(&ctautwire.AutTxo{
-		Version:   burnedToken.Version,
-		TxoScript: burnedToken.ValueScript,
-	}, nil, nil)
+	autTxo := &ctautwire.AutTxo{}
+	err = autTxo.Deserialize(bytes.NewReader(burnedToken.ValueScript))
+	if err != nil {
+		return err
+	}
+	burnedValue, err := abecryptox.ExtractAutTxoValue(autTxo, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -563,6 +564,8 @@ func (view *CTAUTViewpoint) connectBurnScript(script *ctaut.EnhancedCTAUTScript,
 			txHash, view.instances[identifierKey].metadata.MintedAmount, identifierKey)
 	}
 	view.instances[identifierKey].metadata.BurnedAmount += burnedValue
+
+	log.Debugf("outpoint %s for AUT instance %s is burned, token value %d", burnedToken.HostOutPoint, identifierKey, burnedValue)
 
 	return nil
 }
@@ -870,10 +873,13 @@ func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, script *ct
 	if _, exist := instance.coins[burnedToken.HostOutPoint]; exist {
 		return nil, fmt.Errorf("should not exist coin %s for AUT instance %s", burnedToken.HostOutPoint, identifierKey)
 	}
-	burnedValue, err := abecryptox.ExtractAutTxoValue(&ctautwire.AutTxo{
-		Version:   burnedToken.Version,
-		TxoScript: burnedToken.ValueScript,
-	}, nil, nil)
+	// update the burned amount
+	autTxo := &ctautwire.AutTxo{}
+	err = autTxo.Deserialize(bytes.NewReader(burnedToken.ValueScript))
+	if err != nil {
+		return nil, err
+	}
+	burnedValue, err := abecryptox.ExtractAutTxoValue(autTxo, nil, nil)
 	if err != nil {
 		return nil, err
 	}
