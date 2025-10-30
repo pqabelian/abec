@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/ctaut"
+	ctautwire "github.com/abesuite/abec/ctaut/wire"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/wire"
 )
@@ -433,7 +435,8 @@ func (view *CTAUTViewpoint) connectMintScript(script *ctaut.EnhancedCTAUTScript,
 
 	log.Debugf(`Mint %d AUT coins for identifier %s (minted amount %d /planned total amount %d) with %d issuer tokens`,
 		wouldMintedAmount, identifierKey,
-		info.MintedAmount, info.PlannedTotalSupply, len(consumedTokens))
+		info.MintedAmount, info.PlannedTotalSupply,
+		len(consumedTokens))
 	return nil
 }
 
@@ -534,17 +537,36 @@ func (view *CTAUTViewpoint) connectBurnScript(script *ctaut.EnhancedCTAUTScript,
 		*sctauts = append(*sctauts, &sctaut)
 	}
 
-	// Rule: the first output would be viewed as destroyed/burned
 	generatedToken, err := script.GeneratedTokens()
 	if err != nil {
 		return err
 	}
-	log.Debugf("outpoint %s for AUT instance %s is burned", generatedToken[0].HostOutPoint, identifierKey)
 
-	for i := 1; i < len(generatedToken); i++ {
+	// Rule: the last output would be viewed as destroyed/burned
+	for i := 0; i < len(generatedToken)-1; i++ {
 		coin := NewCTAUTCoin(identifier[:], generatedToken[i].ValueScript, blockHeight)
 		view.instances[identifierKey].Add(generatedToken[i].HostOutPoint, coin)
 	}
+	burnedToken := generatedToken[len(generatedToken)-1]
+	log.Debugf("outpoint %s for AUT instance %s is burned", burnedToken.HostOutPoint, identifierKey)
+	// update the burned amount
+	burnedValue, err := abecryptox.ExtractAutTxoValue(&ctautwire.AutTxo{
+		Version:   burnedToken.Version,
+		TxoScript: burnedToken.ValueScript,
+	}, nil, nil)
+	if err != nil {
+		return err
+	}
+
+	if view.instances[identifierKey].metadata.BurnedAmount+burnedValue < view.instances[identifierKey].metadata.BurnedAmount {
+		return fmt.Errorf("a CT-AUT burn script in transaction %s try to burn token overflow the burned amount %d for AUT identified by %s",
+			txHash, view.instances[identifierKey].metadata.BurnedAmount, identifierKey)
+	}
+	if view.instances[identifierKey].metadata.BurnedAmount+burnedValue > view.instances[identifierKey].metadata.MintedAmount {
+		return fmt.Errorf("a CT-AUT burn script in transaction %s try to burn token exceed the minted amount %d for AUT identified by %s",
+			txHash, view.instances[identifierKey].metadata.MintedAmount, identifierKey)
+	}
+	view.instances[identifierKey].metadata.BurnedAmount += burnedValue
 
 	return nil
 }
@@ -823,8 +845,8 @@ func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, script *ct
 	// fetch outpoint from database if not exist with instance in batch
 	outpoints := map[ctaut.HostOutPoint]struct{}{}
 	generatedTokens, err := script.GeneratedTokens()
-	// Note that the first generated token would be burned, and thus not exist in database
-	for i := 1; i < len(generatedTokens); i++ {
+	// Note that the last generated token would be burned, and thus not exist in database
+	for i := 0; i < len(generatedTokens)-1; i++ {
 		token := generatedTokens[i]
 		outpoints[token.HostOutPoint] = struct{}{}
 	}
@@ -840,17 +862,26 @@ func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, script *ct
 			identifierKey)
 	}
 
-	for i := len(generatedTokens) - 1; i > 0; i-- {
+	// the last generated token would be burned
+	for i := len(generatedTokens) - 2; i >= 0; i-- {
 		coin := generatedTokens[i]
 		if _, exist := instance.coins[coin.HostOutPoint]; !exist {
 			return nil, fmt.Errorf("unknown coins %s for AUT instance %s", coin.HostOutPoint, identifierKey)
 		}
 		instance.coins[coin.HostOutPoint].Spend()
 	}
-	burnedToken := generatedTokens[0]
+	burnedToken := generatedTokens[len(generatedTokens)-1]
 	if _, exist := instance.coins[burnedToken.HostOutPoint]; exist {
 		return nil, fmt.Errorf("should not exist coin %s for AUT instance %s", burnedToken.HostOutPoint, identifierKey)
 	}
+	burnedValue, err := abecryptox.ExtractAutTxoValue(&ctautwire.AutTxo{
+		Version:   burnedToken.Version,
+		TxoScript: burnedToken.ValueScript,
+	}, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	instance.metadata.BurnedAmount -= burnedValue
 
 	consumedAutTokens, ok := sctaut.(*SpentCTAUTTokens)
 	if !ok {

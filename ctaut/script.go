@@ -112,6 +112,7 @@ func (info *Metadata) SerializedSize() int {
 			/* expire height */ wire.VarIntSerializeSize(uint64(info.ExpireHeight))
 
 	n += /* minted amount,variable length */ wire.VarIntSerializeSize(info.MintedAmount) +
+		/* minted amount,variable length */ wire.VarIntSerializeSize(info.BurnedAmount) +
 		/* number of issuer tokens */ wire.VarIntSerializeSize(uint64(len(info.RootTokenSet)))
 
 	for point := range info.RootTokenSet {
@@ -190,6 +191,11 @@ func (info *Metadata) Serialize() ([]byte, error) {
 	}
 
 	err = wire.WriteVarInt(buff, 0, info.MintedAmount)
+	if err != nil {
+		return nil, err
+	}
+
+	err = wire.WriteVarInt(buff, 0, info.BurnedAmount)
 	if err != nil {
 		return nil, err
 	}
@@ -293,6 +299,10 @@ func (info *Metadata) Deserialize(r io.Reader) error {
 	if err != nil {
 		return err
 	}
+	info.BurnedAmount, err = wire.ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
 
 	rootCoinNum, err := wire.ReadVarInt(r, 0)
 	if err != nil {
@@ -348,6 +358,7 @@ func (info *Metadata) Clone() *Metadata {
 		ExpireHeight:            info.ExpireHeight,
 
 		MintedAmount: info.MintedAmount,
+		BurnedAmount: info.BurnedAmount,
 		RootTokenSet: make(map[HostOutPoint]struct{}, len(info.RootTokenSet)),
 	}
 
@@ -988,9 +999,6 @@ type MintScript struct {
 	valueScripts        [][]byte
 	witnessHash         chainhash.Hash // todo(ctaut): move to the last position
 	memo                []byte
-
-	consumedTokens  []*CTAUTToken
-	generatedTokens []*CTAUTToken
 }
 
 func (script *MintScript) WitnessHash() chainhash.Hash {
@@ -1017,8 +1025,6 @@ func NewMintScript(version uint32,
 		valueScripts:        valueScripts,
 		witnessHash:         witnessHash,
 		memo:                memo,
-		consumedTokens:      nil,
-		generatedTokens:     nil,
 	}
 }
 
@@ -1394,9 +1400,6 @@ type BurnScript struct {
 
 	witnessHash chainhash.Hash
 	memo        []byte
-
-	consumedTokens  []*CTAUTToken
-	generatedTokens []*CTAUTToken
 }
 
 func (script *BurnScript) WitnessHash() chainhash.Hash {
@@ -1429,8 +1432,6 @@ func NewBurnScript(
 		valueScripts:        valueScripts,
 		witnessHash:         witnessHash,
 		memo:                memo,
-		consumedTokens:      nil,
-		generatedTokens:     nil,
 	}
 }
 
@@ -1655,7 +1656,7 @@ func ParseCTAUTScript(txVersion uint32, txHash chainhash.Hash, memo []byte) (scr
 // todo(ctaut): define an interface? only a case needs coinAddress.
 // CTAUTToken holds the main information of token in memory, it would be used to check all rules
 type CTAUTToken struct {
-	// inheritance from host transaction
+	// inheritance from host transaction output
 	Version uint32
 	// used to track the host location on blockchain
 	HostOutPoint HostOutPoint
@@ -1669,6 +1670,10 @@ type CTAUTToken struct {
 }
 type EnhancedCTAUTScript struct {
 	CTAUTScript
+
+	// Note that for following 2 fields:
+	// - if the value is nil, it means that the tokens is not set
+	// - if the value is empty slice, it means that the tokens is set but has no token
 	consumedTokens  []*CTAUTToken
 	generatedTokens []*CTAUTToken
 }
@@ -1701,27 +1706,6 @@ func (script *EnhancedCTAUTScript) setGeneratedTokens(generatedTokens []*CTAUTTo
 		return errors.New("mismatched number of consumed tokens")
 	}
 
-	switch ctautScript := script.CTAUTScript.(type) {
-	case *RegistrationScript:
-	case *ReRegistrationScript:
-	case *MintScript:
-		// assign value script to token
-		for i := 0; i < len(generatedTokens); i++ {
-			generatedTokens[i].ValueScript = ctautScript.valueScripts[i]
-		}
-	case *TransferScript:
-		// assign value script to token
-		for i := 0; i < len(generatedTokens); i++ {
-			generatedTokens[i].ValueScript = ctautScript.valueScripts[i]
-		}
-	case *BurnScript:
-		// assign value script to token
-		for i := 0; i < len(generatedTokens); i++ {
-			generatedTokens[i].ValueScript = ctautScript.valueScripts[i]
-		}
-	default:
-		return errors.New("unknown aut script type")
-	}
 	script.generatedTokens = generatedTokens
 
 	return nil
@@ -1760,6 +1744,7 @@ func (script *EnhancedCTAUTScript) Metadata() (*Metadata, error) {
 		ExpireHeight:            registerScript.expireHeight,
 
 		MintedAmount: 0,
+		BurnedAmount: 0,
 		RootTokenSet: rootTokenSet,
 	}
 	return metadata, nil
@@ -1874,7 +1859,8 @@ func ExtractCTAUTScript(tx *wire.MsgTxAbe) (enhancedScript *EnhancedCTAUTScript,
 		// for inputs, note that here is no enough information to
 		// 1. check the legality of token
 		// 2. check the mint threshold is meet
-		// 3. check the minted amount conflict with planned total amount
+		// 3. check the balance proof
+		// 4. check whether minted amount conflict with planned total amount
 		// Above checks have to be delayed until the instance could be seen
 
 		//witnessHash := chainhash.HashH(tx.AutWitness)
@@ -1885,8 +1871,7 @@ func ExtractCTAUTScript(tx *wire.MsgTxAbe) (enhancedScript *EnhancedCTAUTScript,
 	case *TransferScript:
 		// for inputs, note that here is no enough information to
 		// 1. check the legality of token
-		// 2. check the mint threshold is meet
-		// 3. check the minted amount conflict with planned total amount
+		// 2. check the balance proof
 		// Above checks have to be delayed until the instance could be seen
 
 		//witnessHash := chainhash.HashH(tx.AutWitness)
@@ -1897,9 +1882,24 @@ func ExtractCTAUTScript(tx *wire.MsgTxAbe) (enhancedScript *EnhancedCTAUTScript,
 	case *BurnScript:
 		// for inputs, note that here is no enough information to
 		// 1. check the legality of token
-		// 2. check the mint threshold is meet
-		// 3. check the minted amount conflict with planned total amount
+		// 2. check the balance proof
 		// Above checks have to be delayed until the instance could be seen
+
+		// for outputs, check the legality of burned token (a.k.a last generated token)
+		// Above ParseCTAUTScript() ensures the length of valueScripts is not less than 1
+		autTxo := &ctautwire.AutTxo{}
+		err = autTxo.Deserialize(bytes.NewReader(script.valueScripts[len(script.valueScripts)-1]))
+		if err != nil {
+			return nil, err
+		}
+		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
+		if err != nil {
+			return nil, fmt.Errorf("fail to get last aut txo type from burn script: %v")
+		}
+		// assert the last aut txo is public
+		if autTxoType != abecryptox.AutTxoTypePublic {
+			return nil, fmt.Errorf("last aut txo type must not public")
+		}
 
 		//witnessHash := chainhash.HashH(tx.AutWitness)
 		//if !witnessHash.IsEqual(&script.witnessHash) {
@@ -1989,6 +1989,13 @@ func PresetHostOutpointForCTAUT(script *EnhancedCTAUTScript, msgTx *wire.MsgTxAb
 		if err != nil {
 			return fmt.Errorf("transaction %s try to consume UTXO at Ring %s is not a valid output", txHash,
 				hostedTxIns[hostIndex].PreviousOutPointRing.Hash())
+		}
+
+		err = abecryptox.AutRuleCheckOnTxInputVersion(hostedTxIns[hostIndex].PreviousOutPointRing.Version, msgTx.Version)
+		if err != nil {
+			return fmt.Errorf("transaction %s try to consume CT-AUT token %s with version %d, but tx version is %d",
+				txHash, outpoint,
+				hostedTxIns[hostIndex].PreviousOutPointRing.Version, msgTx.Version)
 		}
 
 		consumedTokens[i] = &CTAUTToken{

@@ -1882,6 +1882,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	}
 
 	if ctAutScript != nil {
+		// preset the host outpoint with ring view
 		err = ctaut.PresetHostOutpointForCTAUT(ctAutScript, tx.MsgTx(), func(ringHash chainhash.Hash) (*wire.TxOutAbe, error) {
 			ringEntry := utxoRingView.LookupEntry(ringHash)
 			if ringEntry == nil {

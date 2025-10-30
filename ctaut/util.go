@@ -290,7 +290,7 @@ func GetGeneratedCTAUTTokens(script CTAUTScript, txHash chainhash.Hash, txOuts [
 	}
 
 	// todo(ctaut): seems not correct. it is possible startIdx is not hosting ctaut. need define the rules
-	autTxOuts := make([]*CTAUTToken, numCTAUTTokens)
+	generatedTokens := make([]*CTAUTToken, numCTAUTTokens)
 	for i := 0; i < numCTAUTTokens; i++ {
 		index := startIdx + i
 		txOut := txOuts[index]
@@ -300,7 +300,7 @@ func GetGeneratedCTAUTTokens(script CTAUTScript, txHash chainhash.Hash, txOuts [
 			return nil, err
 		}
 
-		autTxOuts[i] = &CTAUTToken{
+		generatedTokens[i] = &CTAUTToken{
 			Version: txOut.Version,
 			HostOutPoint: HostOutPoint{
 				Hash:  txHash,
@@ -313,26 +313,41 @@ func GetGeneratedCTAUTTokens(script CTAUTScript, txHash chainhash.Hash, txOuts [
 
 	switch ctAUTScript := script.(type) {
 	case *RegistrationScript:
-		// nothing to do
+		// no value script need to assign
 	case *ReRegistrationScript:
-	// nothing to do
+		// no value script need to assign
 	case *MintScript:
 		for i := 0; i < numCTAUTTokens; i++ {
-			autTxOuts[i].ValueScript = ctAUTScript.valueScripts[i]
+			err := RuleCheckOnTxoVersionType(generatedTokens[i].Version, ctAUTScript.valueScripts[i])
+			if err != nil {
+				return nil, err
+			}
+
+			generatedTokens[i].ValueScript = ctAUTScript.valueScripts[i]
 		}
 	case *TransferScript:
 		for i := 0; i < numCTAUTTokens; i++ {
-			autTxOuts[i].ValueScript = ctAUTScript.valueScripts[i]
+			err := RuleCheckOnTxoVersionType(generatedTokens[i].Version, ctAUTScript.valueScripts[i])
+			if err != nil {
+				return nil, err
+			}
+
+			generatedTokens[i].ValueScript = ctAUTScript.valueScripts[i]
 		}
 	case *BurnScript:
 		for i := 0; i < numCTAUTTokens; i++ {
-			autTxOuts[i].ValueScript = ctAUTScript.valueScripts[i]
+			err := RuleCheckOnTxoVersionType(generatedTokens[i].Version, ctAUTScript.valueScripts[i])
+			if err != nil {
+				return nil, err
+			}
+
+			generatedTokens[i].ValueScript = ctAUTScript.valueScripts[i]
 		}
 	default:
 		return nil, fmt.Errorf("unexpected aut transaction type %d", script.Type())
 	}
 
-	return autTxOuts, nil
+	return generatedTokens, nil
 }
 
 // todo(ctaut): define the rules on the mint/update threshold.
@@ -371,6 +386,24 @@ func matchIssuerTokens(issuerTokens [][]byte, outputs []*CTAUTToken) error {
 	}
 	if len(claimedIssuerTokens) != 0 {
 		return fmt.Errorf("claim unused issuer token")
+	}
+	return nil
+}
+
+func RuleCheckOnTxoVersionType(hostTxoVersion uint32, valueScript []byte) error {
+	autTxo := &ctautwire.AutTxo{}
+	err := autTxo.Deserialize(bytes.NewReader(valueScript))
+	if err != nil {
+		return err
+	}
+	autTxoType, err := abecryptox.GetAutTxoType(autTxo)
+	if err != nil {
+		return fmt.Errorf("fail to get last aut txo type from burn script: %v")
+	}
+
+	err = abecryptox.AutRuleCheckOnTxoVersionType(hostTxoVersion, autTxoType)
+	if err != nil {
+		return fmt.Errorf("fail to pass the AutRuleCheckOnTxoVersionType: %v", err)
 	}
 	return nil
 }
