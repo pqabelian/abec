@@ -1579,6 +1579,10 @@ var ErrInValidAUTTx = errors.New("not a valid AUT transaction")
 
 // ParseCTAUTScript try to deserialize CTAUT script from transaction memo
 func ParseCTAUTScript(txVersion uint32, txHash chainhash.Hash, memo []byte) (script CTAUTScript, err error) {
+	if txVersion < wire.TxVersion_Height_450000_Aconcagua {
+		return nil, nil
+	}
+
 	// could not be an AUT transaction
 	if len(memo) < len(commonPrefix) {
 		return nil, nil
@@ -1811,6 +1815,9 @@ func (script *EnhancedCTAUTScript) UpdateMetadata(metadata *Metadata) error {
 // - effect on the instance
 //   - no overflow
 func ExtractCTAUTScript(tx *wire.MsgTxAbe) (enhancedScript *EnhancedCTAUTScript, err error) {
+	if tx.Version < wire.TxVersion_Height_450000_Aconcagua {
+		return nil, nil
+	}
 	// parse script from memo and check well-formedness
 	autScript, err := ParseCTAUTScript(tx.Version, tx.TxHash(), tx.TxMemo)
 	if err != nil {
