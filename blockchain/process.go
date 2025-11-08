@@ -236,7 +236,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, powConsensus *cons
 		return false, false, err
 	}
 	if !prevHashExists {
-		log.Infof("Adding orphan block %v (seal hash %v) with parent %v", blockHash, consensus.SealHashFast(&block.MsgBlock().Header), prevHash)
+		log.Infof("Adding orphan block %v (height %d, seal hash %v) with parent %v", blockHash, blockHeader.Height, consensus.SealHashFast(blockHeader), prevHash)
 
 		b.addOrphanBlock(block)
 
