@@ -5,14 +5,11 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"time"
 )
 
 const (
 	// MaxVarIntPayload is the maximum payload size for a variable length integer.
 	MaxVarIntPayload = 9
-
-	MaxMessagePayload = 1024
 
 	// binaryFreeListMaxItems is the number of buffers to keep in the free
 	// list to use for binary serialization and deserialization.
@@ -170,16 +167,6 @@ var binarySerializer binaryFreeList = make(chan []byte, binaryFreeListMaxItems)
 // encoded variable length integer errors.
 var errNonCanonicalVarInt = "non-canonical varint %x - discriminant %x must " +
 	"encode a value greater than %x"
-
-// uint32Time represents a unix timestamp encoded with a uint32.  It is used as
-// a way to signal the readElement function how to decode a timestamp into a Go
-// time.Time since it is otherwise ambiguous.
-type uint32Time time.Time
-
-// int64Time represents a unix timestamp encoded with an int64.  It is used as
-// a way to signal the readElement function how to decode a timestamp into a Go
-// time.Time since it is otherwise ambiguous.
-type int64Time time.Time
 
 // ReadVarInt reads a variable length integer from r and returns it as a uint64.
 func ReadVarInt(r io.Reader) (uint64, error) {
@@ -348,3 +335,5 @@ func WriteByte(w io.Writer, oneByte byte) error {
 	_, err := w.Write([]byte{oneByte})
 	return err
 }
+
+// end of codes
