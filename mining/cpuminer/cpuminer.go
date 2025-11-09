@@ -433,14 +433,14 @@ func (m *CPUMiner) solveBlockEthash(blockTemplate *mining.BlockTemplate, ticker 
 	if m.cfg.ChainParams.Net != wire.MainNet && len(m.cfg.FakePowHeightScope) != 0 {
 		for _, scope := range m.cfg.FakePowHeightScope {
 			if scope.StartHeight <= blockTemplate.Height && blockTemplate.Height < scope.EndHeight {
+				header := blockTemplate.BlockAbe.Header
+				header.Nonce, header.MixDigest = 0, chainhash.Hash{}
 				log.Infof("Do not find EthPoW for height %d in range [%d,%d)",
 					blockTemplate.Height, scope.StartHeight, scope.EndHeight)
 				return true
 			}
 		}
-		header := blockTemplate.BlockAbe.Header
-		header.Nonce, header.MixDigest = 0, chainhash.Hash{}
-		return true
+
 	}
 	var (
 		// Create some convenience variables.
