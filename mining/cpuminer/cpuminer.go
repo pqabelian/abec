@@ -3,6 +3,11 @@ package cpuminer
 import (
 	"errors"
 	"fmt"
+	"math/rand"
+	"runtime"
+	"sync"
+	"time"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chaincfg"
@@ -10,10 +15,6 @@ import (
 	"github.com/abesuite/abec/consensus/ethash"
 	"github.com/abesuite/abec/mining"
 	"github.com/abesuite/abec/wire"
-	"math/rand"
-	"runtime"
-	"sync"
-	"time"
 )
 
 const (
@@ -216,9 +217,9 @@ func (m *CPUMiner) submitBlock(block *abeutil.BlockAbe) bool {
 		}
 
 		for _, scope := range m.cfg.FakePowHeightScope {
-			if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
+			if scope.StartHeight <= blockHeight && blockHeight < scope.EndHeight {
 				behavior |= blockchain.BFNoPoWCheck
-				log.Infof("Skip the PoW check for height %d in range [%d,%d]",
+				log.Infof("Skip the PoW check for height %d in range [%d,%d)",
 					blockHeight, scope.StartHeight, scope.EndHeight)
 				break
 			}
@@ -280,9 +281,9 @@ func (m *CPUMiner) submitBlockEthash(block *abeutil.BlockAbe) bool {
 			return false
 		}
 		for _, scope := range m.cfg.FakePowHeightScope {
-			if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
+			if scope.StartHeight <= blockHeight && blockHeight < scope.EndHeight {
 				behavior |= blockchain.BFNoPoWCheck
-				log.Infof("Skip the PoW check for height %d in range [%d,%d]",
+				log.Infof("Skip the PoW check for height %d in range [%d,%d)",
 					blockHeight, scope.StartHeight, scope.EndHeight)
 				break
 			}
@@ -331,8 +332,8 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlockAbe, blockHeight int32,
 
 	if m.cfg.ChainParams.Net != wire.MainNet && len(m.cfg.FakePowHeightScope) != 0 {
 		for _, scope := range m.cfg.FakePowHeightScope {
-			if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
-				log.Infof("Do not find PoW for height %d in range [%d,%d]",
+			if scope.StartHeight <= blockHeight && blockHeight < scope.EndHeight {
+				log.Infof("Do not find PoW for height %d in range [%d,%d)",
 					blockHeight, scope.StartHeight, scope.EndHeight)
 				return true
 			}
@@ -431,8 +432,8 @@ func (m *CPUMiner) solveBlockEthash(blockTemplate *mining.BlockTemplate, ticker 
 	// If we're running a fake PoW, simply return a 0 nonce immediately
 	if m.cfg.ChainParams.Net != wire.MainNet && len(m.cfg.FakePowHeightScope) != 0 {
 		for _, scope := range m.cfg.FakePowHeightScope {
-			if scope.StartHeight <= blockTemplate.Height && blockTemplate.Height <= scope.EndHeight {
-				log.Infof("Do not find EthPoW for height %d in range [%d,%d]",
+			if scope.StartHeight <= blockTemplate.Height && blockTemplate.Height < scope.EndHeight {
+				log.Infof("Do not find EthPoW for height %d in range [%d,%d)",
 					blockTemplate.Height, scope.StartHeight, scope.EndHeight)
 				return true
 			}

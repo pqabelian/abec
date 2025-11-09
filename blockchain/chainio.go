@@ -6,12 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/aut"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/database"
-	"github.com/abesuite/abec/wire"
 	"io"
 	"math"
 	"math/big"
@@ -21,6 +15,13 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
+	"github.com/abesuite/abec/abeutil"
+	"github.com/abesuite/abec/aut"
+	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/database"
+	"github.com/abesuite/abec/wire"
 )
 
 const (
@@ -2358,7 +2359,7 @@ func (b *BlockChain) createChainState() error {
 		for _, scope := range b.fakePoWHeightScopes {
 			if scope.StartHeight <= currentHeight && currentHeight < scope.EndHeight {
 				activeHeightScope = append(activeHeightScope, BlockHeightScope{
-					StartHeight: currentHeight + 1,
+					StartHeight: currentHeight,
 					EndHeight:   scope.EndHeight,
 				})
 			} else if currentHeight < scope.StartHeight {
@@ -2755,7 +2756,7 @@ func (b *BlockChain) initChainState() error {
 				EndHeight:   currentHeight,
 			})
 			activeHeightScope = append(activeHeightScope, BlockHeightScope{
-				StartHeight: currentHeight + 1,
+				StartHeight: currentHeight,
 				EndHeight:   scope.EndHeight,
 			})
 		} else if scope.EndHeight <= currentHeight {
@@ -2777,7 +2778,7 @@ func (b *BlockChain) initChainState() error {
 		for _, scope := range b.fakePoWHeightScopes {
 			if scope.StartHeight <= currentHeight && currentHeight < scope.EndHeight {
 				activeHeightScope = append(activeHeightScope, BlockHeightScope{
-					StartHeight: currentHeight + 1,
+					StartHeight: currentHeight,
 					EndHeight:   scope.EndHeight,
 				})
 			} else if currentHeight < scope.StartHeight {
