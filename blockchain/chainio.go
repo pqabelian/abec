@@ -2759,7 +2759,7 @@ func (b *BlockChain) initChainState() error {
 				StartHeight: currentHeight,
 				EndHeight:   scope.EndHeight,
 			})
-		} else if scope.EndHeight <= currentHeight {
+		} else if scope.EndHeight < currentHeight {
 			workedHeightScope = append(workedHeightScope, BlockHeightScope{
 				StartHeight: scope.StartHeight,
 				EndHeight:   scope.EndHeight,

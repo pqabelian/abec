@@ -2,6 +2,12 @@ package syncmgr
 
 import (
 	"container/list"
+	"math/rand"
+	"net"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chaincfg"
@@ -11,11 +17,6 @@ import (
 	"github.com/abesuite/abec/mempool"
 	peerpkg "github.com/abesuite/abec/peer"
 	"github.com/abesuite/abec/wire"
-	"math/rand"
-	"net"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 const (
@@ -1020,7 +1021,7 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 			}
 
 			for _, scope := range fakePoWHeightScopes {
-				if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
+				if scope.StartHeight <= blockHeight && blockHeight < scope.EndHeight {
 					behaviorFlags |= blockchain.BFNoPoWCheck
 					break
 				}
@@ -1282,7 +1283,7 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 			}
 
 			for _, scope := range fakePoWHeightScopes {
-				if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
+				if scope.StartHeight <= blockHeight && blockHeight < scope.EndHeight {
 					behaviorFlags |= blockchain.BFNoPoWCheck
 					break
 				}
