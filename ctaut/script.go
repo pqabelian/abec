@@ -44,7 +44,7 @@ type AutMetadata struct {
 	Version uint32
 	// The TxHash of the host transaction (i.e. txid) where the registration script is located would be used as its instance identifier
 	// identifiers for different instances are unique
-	CTAutIdentifier chainhash.Hash // use chainhash.Hash directly
+	AutIdentifier chainhash.Hash // use chainhash.Hash directly
 	// The name of token could be used to improve usability, but MUST NOT be assumed that the value must be present
 	// The full, descriptive and human-readable name of the token
 	// e.g. "Post-Quantum USD"
@@ -93,14 +93,14 @@ type AutMetadata struct {
 // todo: if only used locally, define as not-exported
 func (info *AutMetadata) SerializedSize() int {
 	n :=
-	/*version, fixed length */ wire.VarIntSerializeSize(uint64(info.Version)) +
-		/*identifier, actually fixed length */ wire.VarIntSerializeSize(uint64(len(info.CTAutIdentifier))) + len(info.CTAutIdentifier) +
-		/* name, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutName))) + len(info.CTAutName) +
-		/* symbol, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutSymbol))) + len(info.CTAutSymbol) +
-		/* base unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.BaseUnitName))) + len(info.BaseUnitName) +
-		/* sub unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.SubUnitName))) + len(info.SubUnitName) +
-		/* scale, variable length */ wire.VarIntSerializeSize(info.UnitScale) +
-		/* memo, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutMemo))) + len(info.CTAutMemo)
+		/*version, fixed length */ wire.VarIntSerializeSize(uint64(info.Version)) +
+			/*identifier, actually fixed length */ wire.VarIntSerializeSize(uint64(len(info.AutIdentifier))) + len(info.AutIdentifier) +
+			/* name, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutName))) + len(info.CTAutName) +
+			/* symbol, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutSymbol))) + len(info.CTAutSymbol) +
+			/* base unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.BaseUnitName))) + len(info.BaseUnitName) +
+			/* sub unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.SubUnitName))) + len(info.SubUnitName) +
+			/* scale, variable length */ wire.VarIntSerializeSize(info.UnitScale) +
+			/* memo, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutMemo))) + len(info.CTAutMemo)
 
 	n += /* planned amount */ wire.VarIntSerializeSize(info.PlannedTotalSupply)
 
@@ -111,9 +111,9 @@ func (info *AutMetadata) SerializedSize() int {
 	}
 
 	n +=
-	/* update threshold */ 1 +
-		/* issue threshold */ 1 +
-		/* expire height */ wire.VarIntSerializeSize(uint64(info.ExpireHeight))
+		/* update threshold */ 1 +
+			/* issue threshold */ 1 +
+			/* expire height */ wire.VarIntSerializeSize(uint64(info.ExpireHeight))
 
 	n += /* minted amount,variable length */ wire.VarIntSerializeSize(info.MintedAmount) +
 		/* minted amount,variable length */ wire.VarIntSerializeSize(info.BurnedAmount) +
@@ -149,7 +149,7 @@ func (info *AutMetadata) Serialize() ([]byte, error) {
 	if err = wire.WriteVarInt(buff, 0, uint64(info.Version)); err != nil {
 		return nil, err
 	}
-	if err = wire.WriteVarBytes(buff, 0, info.CTAutIdentifier[:]); err != nil {
+	if err = wire.WriteVarBytes(buff, 0, info.AutIdentifier[:]); err != nil {
 		return nil, err
 	}
 
@@ -258,7 +258,7 @@ func (info *AutMetadata) Deserialize(r io.Reader) error {
 	if len(identifier) != CTAUTIdentifierLength {
 		return errors.New("unexpected identifier length")
 	}
-	copy(info.CTAutIdentifier[:], identifier)
+	copy(info.AutIdentifier[:], identifier)
 
 	if info.CTAutName, err = wire.ReadVarBytes(r, 0, MaxCTAUTNameLength, "name"); err != nil {
 		return err
@@ -354,8 +354,8 @@ func (info *AutMetadata) Clone() *AutMetadata {
 
 	// ToDo(Alice): by the same order as the definition?
 	cloned := &AutMetadata{
-		Version:         info.Version,
-		CTAutIdentifier: [CTAUTIdentifierLength]byte{},
+		Version:       info.Version,
+		AutIdentifier: [CTAUTIdentifierLength]byte{},
 
 		CTAutName:    make([]byte, len(info.CTAutName)),
 		CTAutSymbol:  make([]byte, len(info.CTAutSymbol)),
@@ -375,7 +375,7 @@ func (info *AutMetadata) Clone() *AutMetadata {
 		RootTokenSet: make(map[HostOutPoint]struct{}, len(info.RootTokenSet)),
 	}
 
-	copy(cloned.CTAutIdentifier[:], info.CTAutIdentifier[:])
+	copy(cloned.AutIdentifier[:], info.AutIdentifier[:])
 
 	copy(cloned.CTAutSymbol, info.CTAutSymbol)
 	copy(cloned.CTAutName, info.CTAutName)
@@ -1819,7 +1819,7 @@ func (script *EnhancedCTAUTScript) Metadata() (*AutMetadata, error) {
 	}
 	metadata := &AutMetadata{
 		Version:                 registerScript.version,
-		CTAutIdentifier:         registerScript.ctAutIdentifier,
+		AutIdentifier:           registerScript.ctAutIdentifier,
 		CTAutName:               registerScript.ctAutName,
 		CTAutSymbol:             registerScript.ctAutSymbol,
 		BaseUnitName:            registerScript.baseUnitName,
@@ -1846,7 +1846,7 @@ func (script *EnhancedCTAUTScript) UpdateMetadata(metadata *AutMetadata) error {
 		return errors.New("update metadata only available for re-registration script")
 	}
 	identifier := script.Identifier()
-	if !bytes.Equal(identifier[:], metadata.CTAutIdentifier[:]) {
+	if !bytes.Equal(identifier[:], metadata.AutIdentifier[:]) {
 		return ErrInValidAUTTx
 	}
 	consumedTokens := script.consumedTokens
@@ -1855,7 +1855,7 @@ func (script *EnhancedCTAUTScript) UpdateMetadata(metadata *AutMetadata) error {
 			return fmt.Errorf("an re-registration AUT transaction try to update AUT "+
 				"with non-existing/spent root token (%s,%d) for AUT identified by %s",
 				consumedTokens[i].HostOutPoint.TxHash, consumedTokens[i].HostOutPoint.Index,
-				metadata.CTAutIdentifier)
+				metadata.AutIdentifier)
 		}
 		delete(metadata.RootTokenSet, consumedTokens[i].HostOutPoint)
 	}

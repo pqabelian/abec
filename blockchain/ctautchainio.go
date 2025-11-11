@@ -588,7 +588,7 @@ func dbPutCTAUTView(dbTx database.Tx, view *CTAUTViewpoint, blockHeight int32, b
 	ctAutInfoBucket := dbTx.Metadata().Bucket(ctAutInstanceBucketName)
 	ctAutTokenBucket := dbTx.Metadata().Bucket(ctAutTokenBucketName)
 	for identifierKey, instance := range view.instances {
-		identifier := instance.metadata.CTAutIdentifier
+		identifier := instance.metadata.AutIdentifier
 
 		// Serialize and store the utxo entry.
 		serializedCTAUTInfo, err := instance.metadata.Serialize()
