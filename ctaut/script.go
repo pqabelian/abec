@@ -40,7 +40,7 @@ type HostOutPoint = wire.OutPointAbe
 // BurnScript would be used to burn some tokens, it would not affect any of the fields in Metadata
 // todo: discuss use AutXXX, rather than CTAut ? affect too much?
 // todo: rename to AutMetadata?
-type Metadata struct {
+type AutMetadata struct {
 	Version uint32
 	// The TxHash of the host transaction (i.e. txid) where the registration script is located would be used as its instance identifier
 	// identifiers for different instances are unique
@@ -91,7 +91,7 @@ type Metadata struct {
 }
 
 // todo: if only used locally, define as not-exported
-func (info *Metadata) SerializedSize() int {
+func (info *AutMetadata) SerializedSize() int {
 	n :=
 		/*version, fixed length */ wire.VarIntSerializeSize(uint64(info.Version)) +
 			/*identifier, actually fixed length */ wire.VarIntSerializeSize(uint64(len(info.CTAutIdentifier))) + len(info.CTAutIdentifier) +
@@ -136,7 +136,7 @@ func (info *Metadata) SerializedSize() int {
 }
 
 // call abec.wire.WriteVarInt or call locally WriteVarInt?
-func (info *Metadata) Serialize() ([]byte, error) {
+func (info *AutMetadata) Serialize() ([]byte, error) {
 	if info == nil {
 		return nil, nil
 	}
@@ -228,7 +228,7 @@ func (info *Metadata) Serialize() ([]byte, error) {
 	serializedMetadata := buff.Bytes()
 
 	// todo: the following codes are necessary or only for test?
-	tmpMetadata := &Metadata{}
+	tmpMetadata := &AutMetadata{}
 	err = tmpMetadata.Deserialize(bytes.NewReader(serializedMetadata))
 	if err != nil {
 		return nil, err
@@ -239,7 +239,7 @@ func (info *Metadata) Serialize() ([]byte, error) {
 
 	return serializedMetadata, nil
 }
-func (info *Metadata) Deserialize(r io.Reader) error {
+func (info *AutMetadata) Deserialize(r io.Reader) error {
 	// Serialize the header code followed by the compressed unspent
 	// transaction output.
 	var err error
@@ -347,13 +347,13 @@ func (info *Metadata) Deserialize(r io.Reader) error {
 }
 
 // Clone returns a shallow copy of the utxo entry.
-func (info *Metadata) Clone() *Metadata {
+func (info *AutMetadata) Clone() *AutMetadata {
 	if info == nil {
 		return nil
 	}
 
 	// ToDo(Alice): by the same order as the definition?
-	cloned := &Metadata{
+	cloned := &AutMetadata{
 		Version:         info.Version,
 		CTAutIdentifier: [CTAUTIdentifierLength]byte{},
 
@@ -1800,7 +1800,7 @@ func (script *EnhancedCTAUTScript) setGeneratedTokens(generatedTokens []*CTAUTTo
 }
 
 // todo: AutMetadata
-func (script *EnhancedCTAUTScript) Metadata() (*Metadata, error) {
+func (script *EnhancedCTAUTScript) Metadata() (*AutMetadata, error) {
 	if script.Type() != Registration {
 		return nil, errors.New("metadata only available for registration script")
 	}
@@ -1817,7 +1817,7 @@ func (script *EnhancedCTAUTScript) Metadata() (*Metadata, error) {
 	for i := 0; i < len(script.generatedTokens); i++ {
 		rootTokenSet[script.generatedTokens[i].HostOutPoint] = struct{}{}
 	}
-	metadata := &Metadata{
+	metadata := &AutMetadata{
 		Version:                 registerScript.version,
 		CTAutIdentifier:         registerScript.ctAutIdentifier,
 		CTAutName:               registerScript.ctAutName,
@@ -1840,7 +1840,7 @@ func (script *EnhancedCTAUTScript) Metadata() (*Metadata, error) {
 }
 
 // todo: AutMetadata
-func (script *EnhancedCTAUTScript) UpdateMetadata(metadata *Metadata) error {
+func (script *EnhancedCTAUTScript) UpdateMetadata(metadata *AutMetadata) error {
 	// assert
 	if script.Type() != ReRegistration {
 		return errors.New("update metadata only available for re-registration script")

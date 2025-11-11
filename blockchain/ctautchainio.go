@@ -73,8 +73,8 @@ type SpentCTAUT interface {
 	Type() SpentCTAUTType
 }
 type UpdatedCTAUTInfo struct {
-	Before *ctaut.Metadata
-	After  *ctaut.Metadata
+	Before *ctaut.AutMetadata
+	After  *ctaut.AutMetadata
 
 	// Height is the height of the the block containing the creating tx.
 	Height int32
@@ -280,7 +280,7 @@ func decodeSpentCTAUT(serialized []byte) (SpentCTAUT, int, error) {
 			offset += 1
 		} else {
 			offset += 1
-			res.Before = &ctaut.Metadata{}
+			res.Before = &ctaut.AutMetadata{}
 			sizeOfInfo, bytesRead := deserializeVLQ(serialized[offset:])
 			offset += bytesRead
 			if offset >= len(serialized) {
@@ -300,7 +300,7 @@ func decodeSpentCTAUT(serialized []byte) (SpentCTAUT, int, error) {
 			offset += 1
 		} else {
 			offset += 1
-			res.After = &ctaut.Metadata{}
+			res.After = &ctaut.AutMetadata{}
 			sizeOfInfo, bytesRead := deserializeVLQ(serialized[offset:])
 			offset += bytesRead
 			if offset >= len(serialized) {
@@ -534,7 +534,7 @@ func dbFetchCTAUTCoin(dbTx database.Tx, outpoint ctaut.HostOutPoint) (*CTAUTCoin
 	return coin, nil
 }
 
-func dbFetchCTAUTMetadata(dbTx database.Tx, key []byte) (*ctaut.Metadata, error) {
+func dbFetchCTAUTMetadata(dbTx database.Tx, key []byte) (*ctaut.AutMetadata, error) {
 	// Fetch the unspent transaction output information for the passed
 	// transaction output.  Return now when there is no entry.
 	autInfoBucket := dbTx.Metadata().Bucket(ctAutInstanceBucketName)
@@ -544,7 +544,7 @@ func dbFetchCTAUTMetadata(dbTx database.Tx, key []byte) (*ctaut.Metadata, error)
 	}
 
 	// Deserialize the utxo entry and return it.
-	var metadata ctaut.Metadata
+	var metadata ctaut.AutMetadata
 	err := metadata.Deserialize(bytes.NewReader(serializedAUTInfo))
 	if err != nil {
 		// Ensure any deserialization errors are returned as database
@@ -614,7 +614,7 @@ func dbPutCTAUTView(dbTx database.Tx, view *CTAUTViewpoint, blockHeight int32, b
 					return err
 				}
 				log.Debugf(`the token (%s,%d) for CTAUT identified by %s is spent at height %d (block hash %s):`,
-					outpoint.Hash.String(), outpoint.Index, identifierKey, blockHeight, blockHash)
+					outpoint.TxHash.String(), outpoint.Index, identifierKey, blockHeight, blockHash)
 
 				continue
 			}
@@ -634,7 +634,7 @@ func dbPutCTAUTView(dbTx database.Tx, view *CTAUTViewpoint, blockHeight int32, b
 				return err
 			}
 			log.Debugf(`the token (%s,%d) for CTAUT identified by %s is stored at height %d (block hash %s):`,
-				outpoint.Hash.String(), outpoint.Index, identifierKey, blockHeight, blockHash)
+				outpoint.TxHash.String(), outpoint.Index, identifierKey, blockHeight, blockHash)
 		}
 
 	}

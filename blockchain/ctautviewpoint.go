@@ -48,11 +48,11 @@ const (
 // script, and how much it pays.
 // todo: AutEntry?
 type CTAUTInstance struct {
-	metadata *ctaut.Metadata
+	metadata *ctaut.AutMetadata
 	coins    map[ctaut.HostOutPoint]*CTAUTCoin
 }
 
-func NewCTAUTInstance(metadata *ctaut.Metadata, coins map[ctaut.HostOutPoint]*CTAUTCoin) *CTAUTInstance {
+func NewCTAUTInstance(metadata *ctaut.AutMetadata, coins map[ctaut.HostOutPoint]*CTAUTCoin) *CTAUTInstance {
 	return &CTAUTInstance{metadata: metadata, coins: coins}
 }
 
@@ -64,7 +64,7 @@ func (instance *CTAUTInstance) Add(outpiont ctaut.HostOutPoint, coin *CTAUTCoin)
 	instance.coins[outpiont] = coin
 }
 
-func (instance *CTAUTInstance) Metadata() *ctaut.Metadata {
+func (instance *CTAUTInstance) Metadata() *ctaut.AutMetadata {
 	return instance.metadata
 }
 func (instance *CTAUTInstance) AUTCoins() map[ctaut.HostOutPoint]*CTAUTCoin {
@@ -219,7 +219,7 @@ func (view *CTAUTViewpoint) LookupCTAUTCoin(identifier []byte, outpoint ctaut.Ho
 }
 
 // todo: function name LookupAutDesc
-func (view *CTAUTViewpoint) LookupCTAUTMetaInfo(identifier []byte) *ctaut.Metadata {
+func (view *CTAUTViewpoint) LookupCTAUTMetaInfo(identifier []byte) *ctaut.AutMetadata {
 	if view.instances == nil {
 		return nil
 	}
