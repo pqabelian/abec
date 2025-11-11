@@ -18,7 +18,7 @@ import (
 // HostOutPoint defines the host of aut token, it could be used to track previous tokens.
 type HostOutPoint = wire.OutPointAbe
 
-// Metadata maintains the metadata information of Abelian User Token (AUT) instance on Abelian
+// AutMetadata maintains the metadata information of Abelian User Token (AUT) instance on Abelian
 // 1. The identifier of AUT instance are UNIQUE
 // 2. Each instance has its own name, symbol, and unit name
 // 3. Each instance has its planned total issued amount
@@ -93,14 +93,14 @@ type AutMetadata struct {
 // todo: if only used locally, define as not-exported
 func (info *AutMetadata) SerializedSize() int {
 	n :=
-		/*version, fixed length */ wire.VarIntSerializeSize(uint64(info.Version)) +
-			/*identifier, actually fixed length */ wire.VarIntSerializeSize(uint64(len(info.CTAutIdentifier))) + len(info.CTAutIdentifier) +
-			/* name, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutName))) + len(info.CTAutName) +
-			/* symbol, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutSymbol))) + len(info.CTAutSymbol) +
-			/* base unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.BaseUnitName))) + len(info.BaseUnitName) +
-			/* sub unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.SubUnitName))) + len(info.SubUnitName) +
-			/* scale, variable length */ wire.VarIntSerializeSize(info.UnitScale) +
-			/* memo, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutMemo))) + len(info.CTAutMemo)
+	/*version, fixed length */ wire.VarIntSerializeSize(uint64(info.Version)) +
+		/*identifier, actually fixed length */ wire.VarIntSerializeSize(uint64(len(info.CTAutIdentifier))) + len(info.CTAutIdentifier) +
+		/* name, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutName))) + len(info.CTAutName) +
+		/* symbol, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutSymbol))) + len(info.CTAutSymbol) +
+		/* base unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.BaseUnitName))) + len(info.BaseUnitName) +
+		/* sub unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.SubUnitName))) + len(info.SubUnitName) +
+		/* scale, variable length */ wire.VarIntSerializeSize(info.UnitScale) +
+		/* memo, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutMemo))) + len(info.CTAutMemo)
 
 	n += /* planned amount */ wire.VarIntSerializeSize(info.PlannedTotalSupply)
 
@@ -111,9 +111,9 @@ func (info *AutMetadata) SerializedSize() int {
 	}
 
 	n +=
-		/* update threshold */ 1 +
-			/* issue threshold */ 1 +
-			/* expire height */ wire.VarIntSerializeSize(uint64(info.ExpireHeight))
+	/* update threshold */ 1 +
+		/* issue threshold */ 1 +
+		/* expire height */ wire.VarIntSerializeSize(uint64(info.ExpireHeight))
 
 	n += /* minted amount,variable length */ wire.VarIntSerializeSize(info.MintedAmount) +
 		/* minted amount,variable length */ wire.VarIntSerializeSize(info.BurnedAmount) +
