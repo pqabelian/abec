@@ -52,7 +52,7 @@ type AutMetadata struct {
 	// The symbol of token could be used to improve usability, but MUST NOT be assumed that the value must be present.
 	// A short, human-readable string that acts as a ticker for the token.
 	// e.g. "PQUSD"
-	CTAutSymbol []byte
+	AutSymbol []byte
 	// The name he commonly used units of tokens, could be used to user representation,
 	// but MUST NOT be assumed that the value must be present
 	// e.g. "USD"
@@ -93,14 +93,14 @@ type AutMetadata struct {
 // todo: if only used locally, define as not-exported
 func (info *AutMetadata) SerializedSize() int {
 	n :=
-	/*version, fixed length */ wire.VarIntSerializeSize(uint64(info.Version)) +
-		/*identifier, actually fixed length */ wire.VarIntSerializeSize(uint64(len(info.AutIdentifier))) + len(info.AutIdentifier) +
-		/* name, variable length */ wire.VarIntSerializeSize(uint64(len(info.AutName))) + len(info.AutName) +
-		/* symbol, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutSymbol))) + len(info.CTAutSymbol) +
-		/* base unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.BaseUnitName))) + len(info.BaseUnitName) +
-		/* sub unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.SubUnitName))) + len(info.SubUnitName) +
-		/* scale, variable length */ wire.VarIntSerializeSize(info.UnitScale) +
-		/* memo, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutMemo))) + len(info.CTAutMemo)
+		/*version, fixed length */ wire.VarIntSerializeSize(uint64(info.Version)) +
+			/*identifier, actually fixed length */ wire.VarIntSerializeSize(uint64(len(info.AutIdentifier))) + len(info.AutIdentifier) +
+			/* name, variable length */ wire.VarIntSerializeSize(uint64(len(info.AutName))) + len(info.AutName) +
+			/* symbol, variable length */ wire.VarIntSerializeSize(uint64(len(info.AutSymbol))) + len(info.AutSymbol) +
+			/* base unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.BaseUnitName))) + len(info.BaseUnitName) +
+			/* sub unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.SubUnitName))) + len(info.SubUnitName) +
+			/* scale, variable length */ wire.VarIntSerializeSize(info.UnitScale) +
+			/* memo, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutMemo))) + len(info.CTAutMemo)
 
 	n += /* planned amount */ wire.VarIntSerializeSize(info.PlannedTotalSupply)
 
@@ -111,9 +111,9 @@ func (info *AutMetadata) SerializedSize() int {
 	}
 
 	n +=
-	/* update threshold */ 1 +
-		/* issue threshold */ 1 +
-		/* expire height */ wire.VarIntSerializeSize(uint64(info.ExpireHeight))
+		/* update threshold */ 1 +
+			/* issue threshold */ 1 +
+			/* expire height */ wire.VarIntSerializeSize(uint64(info.ExpireHeight))
 
 	n += /* minted amount,variable length */ wire.VarIntSerializeSize(info.MintedAmount) +
 		/* minted amount,variable length */ wire.VarIntSerializeSize(info.BurnedAmount) +
@@ -156,7 +156,7 @@ func (info *AutMetadata) Serialize() ([]byte, error) {
 	if err = wire.WriteVarBytes(buff, 0, info.AutName); err != nil {
 		return nil, err
 	}
-	if err = wire.WriteVarBytes(buff, 0, info.CTAutSymbol); err != nil {
+	if err = wire.WriteVarBytes(buff, 0, info.AutSymbol); err != nil {
 		return nil, err
 	}
 
@@ -263,7 +263,7 @@ func (info *AutMetadata) Deserialize(r io.Reader) error {
 	if info.AutName, err = wire.ReadVarBytes(r, 0, MaxCTAUTNameLength, "name"); err != nil {
 		return err
 	}
-	if info.CTAutSymbol, err = wire.ReadVarBytes(r, 0, MaxCTAUTSymbolLength, "symbol"); err != nil {
+	if info.AutSymbol, err = wire.ReadVarBytes(r, 0, MaxCTAUTSymbolLength, "symbol"); err != nil {
 		return err
 	}
 	if info.BaseUnitName, err = wire.ReadVarBytes(r, 0, MaxBaseUnitLength, "unit"); err != nil {
@@ -358,7 +358,7 @@ func (info *AutMetadata) Clone() *AutMetadata {
 		AutIdentifier: [CTAUTIdentifierLength]byte{},
 
 		AutName:      make([]byte, len(info.AutName)),
-		CTAutSymbol:  make([]byte, len(info.CTAutSymbol)),
+		AutSymbol:    make([]byte, len(info.AutSymbol)),
 		BaseUnitName: make([]byte, len(info.BaseUnitName)),
 		SubUnitName:  make([]byte, len(info.SubUnitName)),
 		UnitScale:    info.UnitScale,
@@ -377,7 +377,7 @@ func (info *AutMetadata) Clone() *AutMetadata {
 
 	copy(cloned.AutIdentifier[:], info.AutIdentifier[:])
 
-	copy(cloned.CTAutSymbol, info.CTAutSymbol)
+	copy(cloned.AutSymbol, info.AutSymbol)
 	copy(cloned.AutName, info.AutName)
 	copy(cloned.BaseUnitName, info.BaseUnitName)
 	copy(cloned.SubUnitName, info.SubUnitName)
@@ -1821,7 +1821,7 @@ func (script *EnhancedCTAUTScript) Metadata() (*AutMetadata, error) {
 		Version:                 registerScript.version,
 		AutIdentifier:           registerScript.ctAutIdentifier,
 		AutName:                 registerScript.ctAutName,
-		CTAutSymbol:             registerScript.ctAutSymbol,
+		AutSymbol:               registerScript.ctAutSymbol,
 		BaseUnitName:            registerScript.baseUnitName,
 		SubUnitName:             registerScript.subUnitName,
 		UnitScale:               registerScript.unitScale,
