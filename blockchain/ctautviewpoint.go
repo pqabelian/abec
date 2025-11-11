@@ -282,7 +282,7 @@ func (view *CTAUTViewpoint) connectRegistrationScript(script *ctaut.EnhancedCTAU
 	}
 
 	log.Debugf("In transaction %s, CT-AUT with identifier %s with following configuration is registered:", txHash, identifierKey)
-	log.Debugf("\t Name: %v:", hex.EncodeToString(metadata.CTAutName))
+	log.Debugf("\t Name: %v:", hex.EncodeToString(metadata.AutName))
 	log.Debugf("\t Symbol: %v", hex.EncodeToString(metadata.CTAutSymbol))
 	log.Debugf("\t ExpireHeight: %v", metadata.ExpireHeight)
 	log.Debugf("\t BaseUnitName: %v", hex.EncodeToString(metadata.BaseUnitName))
