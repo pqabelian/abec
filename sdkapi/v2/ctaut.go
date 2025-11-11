@@ -647,7 +647,7 @@ func GetGeneratedOutpoints(ctAutScript CTAUTScript, txVersion uint32, txID strin
 	valueScripts := make([][]byte, len(generatedTokens))
 	for i := 0; i < len(generatedTokens); i++ {
 		token := generatedTokens[i]
-		res[i], err = NewOutPointFromTxIdStr(token.HostOutPoint.Hash.String(), uint8(token.HostOutPoint.Index))
+		res[i], err = NewOutPointFromTxIdStr(token.HostOutPoint.TxHash.String(), uint8(token.HostOutPoint.Index))
 		if err != nil {
 			return 0, nil, nil, err
 		}
@@ -689,7 +689,7 @@ func GetConsumedOutpoints(serializedTx []byte, rings map[string]*TxoRing) ([]*Ou
 	res := make([]*OutPoint, len(consumedTokens))
 	for i := 0; i < len(consumedTokens); i++ {
 		token := consumedTokens[i]
-		res[i], err = NewOutPointFromTxIdStr(token.HostOutPoint.Hash.String(), uint8(token.HostOutPoint.Index))
+		res[i], err = NewOutPointFromTxIdStr(token.HostOutPoint.TxHash.String(), uint8(token.HostOutPoint.Index))
 		if err != nil {
 			return nil, err
 		}

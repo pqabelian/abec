@@ -16,8 +16,7 @@ import (
 )
 
 // HostOutPoint defines the host of aut token, it could be used to track previous tokens.
-// todo: wrong, should be wire.OutPointAbe
-type HostOutPoint = wire.OutPoint
+type HostOutPoint = wire.OutPointAbe
 
 // Metadata maintains the metadata information of Abelian User Token (AUT) instance on Abelian
 // 1. The identifier of AUT instance are UNIQUE
@@ -124,7 +123,7 @@ func (info *Metadata) SerializedSize() int {
 		// todo: why use the key rather than the value?
 		// todo: call HostOutPoint's serialize size, which use a fixed bytes for Hash
 		// todo: the name should give clear meanings
-		n += wire.VarIntSerializeSize(uint64(len(point.Hash))) + len(point.Hash)
+		n += wire.VarIntSerializeSize(uint64(len(point.TxHash))) + len(point.TxHash)
 		n += 1
 	}
 	for i := 0; i < len(info.IssuerTokens); i++ {
@@ -216,7 +215,7 @@ func (info *Metadata) Serialize() ([]byte, error) {
 	}
 	for point := range info.RootTokenSet {
 		// todo: use fix length buff.Write(), and package it
-		err = wire.WriteVarBytes(buff, 0, point.Hash[:])
+		err = wire.WriteVarBytes(buff, 0, point.TxHash[:])
 		if err != nil {
 			return nil, errors.New("error to write point")
 		}
@@ -338,8 +337,8 @@ func (info *Metadata) Deserialize(r io.Reader) error {
 			return err
 		}
 		point := HostOutPoint{
-			Hash:  *txHash,
-			Index: uint32(index),
+			TxHash: *txHash,
+			Index:  index,
 		}
 		info.RootTokenSet[point] = struct{}{}
 	}
@@ -391,7 +390,7 @@ func (info *Metadata) Clone() *Metadata {
 
 	for outpoint := range info.RootTokenSet {
 		newOutpoint := HostOutPoint{}
-		copy(newOutpoint.Hash[:], outpoint.Hash[:])
+		copy(newOutpoint.TxHash[:], outpoint.TxHash[:])
 		newOutpoint.Index = outpoint.Index
 
 		cloned.RootTokenSet[newOutpoint] = struct{}{}
@@ -1855,7 +1854,7 @@ func (script *EnhancedCTAUTScript) UpdateMetadata(metadata *Metadata) error {
 		if _, ok := metadata.RootTokenSet[consumedTokens[i].HostOutPoint]; !ok {
 			return fmt.Errorf("an re-registration AUT transaction try to update AUT "+
 				"with non-existing/spent root token (%s,%d) for AUT identified by %s",
-				consumedTokens[i].HostOutPoint.Hash, consumedTokens[i].HostOutPoint.Index,
+				consumedTokens[i].HostOutPoint.TxHash, consumedTokens[i].HostOutPoint.Index,
 				metadata.CTAutIdentifier)
 		}
 		delete(metadata.RootTokenSet, consumedTokens[i].HostOutPoint)
@@ -2080,11 +2079,11 @@ func PresetHostOutpointForCTAUT(script *EnhancedCTAUTScript, msgTx *wire.MsgTxAb
 		// fill out with the first item in ring
 		ringIdx := 0
 		outpoint := HostOutPoint{
-			Hash:  hostedTxIns[hostIndex].PreviousOutPointRing.OutPoints[ringIdx].TxHash,
-			Index: uint32(hostedTxIns[hostIndex].PreviousOutPointRing.OutPoints[ringIdx].Index),
+			TxHash: hostedTxIns[hostIndex].PreviousOutPointRing.OutPoints[ringIdx].TxHash,
+			Index:  hostedTxIns[hostIndex].PreviousOutPointRing.OutPoints[ringIdx].Index,
 		}
 
-		coinAddress, err := CheckHostTxoParasiticity(outpoint.Hash, int(outpoint.Index), txOut)
+		coinAddress, err := CheckHostTxoParasiticity(outpoint.TxHash, outpoint.Index, txOut)
 		if err != nil {
 			return fmt.Errorf("transaction %s try to consume UTXO at Ring %s is not a valid output", txHash,
 				hostedTxIns[hostIndex].PreviousOutPointRing.Hash())

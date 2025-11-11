@@ -764,12 +764,12 @@ func (view *CTAUTViewpoint) disconnectMintTransaction(db database.DB, script *ct
 	}
 	for _, rootToken := range consumedTokens {
 		copiedAUTPoint := ctaut.HostOutPoint{}
-		copy(copiedAUTPoint.Hash[:], rootToken.HostOutPoint.Hash[:])
+		copy(copiedAUTPoint.TxHash[:], rootToken.HostOutPoint.TxHash[:])
 		copiedAUTPoint.Index = rootToken.HostOutPoint.Index
 
 		instance.metadata.RootTokenSet[copiedAUTPoint] = struct{}{}
 		log.Debugf("try to resume consumed root coin (%s,%d) for AUT identified by %s",
-			rootToken.HostOutPoint.Hash.String(), rootToken.HostOutPoint.Index, identifierKey)
+			rootToken.HostOutPoint.TxHash.String(), rootToken.HostOutPoint.Index, identifierKey)
 	}
 
 	return nil, nil

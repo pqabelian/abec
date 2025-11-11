@@ -2155,7 +2155,7 @@ func checkCTAUTReRegistrationTransactionInputs(script *ctaut.EnhancedCTAUTScript
 
 		if _, existOutpoint := instance.metadata.RootTokenSet[outpoint]; !existOutpoint {
 			return fmt.Errorf("transaction %s try to re-register with unknown root coin <%s:%d>",
-				tx.Hash(), outpoint.Hash, outpoint.Index)
+				tx.Hash(), outpoint.TxHash, outpoint.Index)
 		}
 
 		// check whether duplicate though it won't appear with the checking with hosted Abelian transaction
@@ -2239,7 +2239,7 @@ func checkCTAUTMintTransactionInputs(ctAutScript *ctaut.EnhancedCTAUTScript, tx 
 		outpoint := consumedTokens[i].HostOutPoint
 		if _, existOutpoint := instance.metadata.RootTokenSet[outpoint]; !existOutpoint {
 			return fmt.Errorf("transaction %s try to mint with unknown root coin <%s:%d>",
-				tx.Hash(), outpoint.Hash, outpoint.Index)
+				tx.Hash(), outpoint.TxHash, outpoint.Index)
 		}
 		// check whether duplicate though it won't appear with the checking with hosted Abelian transaction
 		if _, ok := willConsumedRootTokens[outpoint]; ok {
@@ -2341,7 +2341,7 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctaut.EnhancedCTAUTScript,
 		// ensure no duplicate
 		if _, ok := willConsumedTokens[outpoint]; ok {
 			return fmt.Errorf("transaction %s try to double spend the token <%s:%d>",
-				tx.Hash(), outpoint.Hash, outpoint.Index)
+				tx.Hash(), outpoint.TxHash, outpoint.Index)
 		}
 
 		coin := ctautView.LookupCTAUTCoin(identifier[:], outpoint)
@@ -2432,7 +2432,7 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctaut.EnhancedCTAUTScript, tx 
 		// ensure no duplicate
 		if _, ok := willConsumedTokens[outpoint]; ok {
 			return fmt.Errorf("transaction %s try to double spend the token <%s:%d>",
-				tx.Hash(), outpoint.Hash, outpoint.Index)
+				tx.Hash(), outpoint.TxHash, outpoint.Index)
 		}
 
 		coin := ctautView.LookupCTAUTCoin(identifier[:], outpoint)

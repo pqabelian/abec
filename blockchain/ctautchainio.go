@@ -55,7 +55,7 @@ func ctautOutpointKey(outpoint ctaut.HostOutPoint) *[]byte {
 	key := ctautOutpointKeyPool.Get().(*[]byte)
 	idx := uint64(outpoint.Index)
 	*key = (*key)[:chainhash.HashSize+serializeSizeVLQ(idx)]
-	copy(*key, outpoint.Hash[:])
+	copy(*key, outpoint.TxHash[:])
 	putVLQ((*key)[chainhash.HashSize:], idx)
 	return key
 }

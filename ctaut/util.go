@@ -248,7 +248,7 @@ func readCTAUTTxoScript(r io.Reader, expectedCTTokenLength int, expectedPlainTok
 // 1. the privacy level MUST be abecryptoxkey.PrivacyLevelPSEUDONYMCT, note that this means the value in txo is public
 // 2. the value must be 1 Neutrino
 // todo: txHash and outputIndex donot have actual use.
-func CheckHostTxoParasiticity(txHash chainhash.Hash, outputIndex int, txOut *wire.TxOutAbe) ([]byte, error) {
+func CheckHostTxoParasiticity(txHash chainhash.Hash, outputIndex uint8, txOut *wire.TxOutAbe) ([]byte, error) {
 	privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
 	if err != nil {
 		return nil, fmt.Errorf("fail to extract the privacy level from transaction %s:%s", txHash, err.Error())
@@ -307,7 +307,7 @@ func GetGeneratedCTAUTTokens(script CTAUTScript, txHash chainhash.Hash, txOuts [
 	// todo(ctaut): seems not correct. it is possible startIdx is not hosting ctaut. need define the rules
 	generatedTokens := make([]*CTAUTToken, numCTAUTTokens)
 	for i := 0; i < numCTAUTTokens; i++ {
-		index := startIdx + i
+		index := uint8(startIdx + i)
 		txOut := txOuts[index]
 
 		coinAddress, err := CheckHostTxoParasiticity(txHash, index, txOut)
@@ -318,8 +318,8 @@ func GetGeneratedCTAUTTokens(script CTAUTScript, txHash chainhash.Hash, txOuts [
 		generatedTokens[i] = &CTAUTToken{
 			Version: txOut.Version,
 			HostOutPoint: HostOutPoint{
-				Hash:  txHash,
-				Index: uint32(index),
+				TxHash: txHash,
+				Index:  index,
 			},
 			ValueScript: nil, // nil for root coin, fill out for coin later
 			CoinAddress: coinAddress,
