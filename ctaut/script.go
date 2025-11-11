@@ -65,7 +65,7 @@ type AutMetadata struct {
 	// e.g. 100
 	UnitScale uint64
 	// The memo for AUT instance
-	CTAutMemo []byte
+	AutMemo []byte
 
 	// The total amount of token would be issued, this means total limit for all MintScript
 	// Note that the amount would be counted in terms of subunit
@@ -93,14 +93,14 @@ type AutMetadata struct {
 // todo: if only used locally, define as not-exported
 func (info *AutMetadata) SerializedSize() int {
 	n :=
-		/*version, fixed length */ wire.VarIntSerializeSize(uint64(info.Version)) +
-			/*identifier, actually fixed length */ wire.VarIntSerializeSize(uint64(len(info.AutIdentifier))) + len(info.AutIdentifier) +
-			/* name, variable length */ wire.VarIntSerializeSize(uint64(len(info.AutName))) + len(info.AutName) +
-			/* symbol, variable length */ wire.VarIntSerializeSize(uint64(len(info.AutSymbol))) + len(info.AutSymbol) +
-			/* base unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.BaseUnitName))) + len(info.BaseUnitName) +
-			/* sub unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.SubUnitName))) + len(info.SubUnitName) +
-			/* scale, variable length */ wire.VarIntSerializeSize(info.UnitScale) +
-			/* memo, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutMemo))) + len(info.CTAutMemo)
+	/*version, fixed length */ wire.VarIntSerializeSize(uint64(info.Version)) +
+		/*identifier, actually fixed length */ wire.VarIntSerializeSize(uint64(len(info.AutIdentifier))) + len(info.AutIdentifier) +
+		/* name, variable length */ wire.VarIntSerializeSize(uint64(len(info.AutName))) + len(info.AutName) +
+		/* symbol, variable length */ wire.VarIntSerializeSize(uint64(len(info.AutSymbol))) + len(info.AutSymbol) +
+		/* base unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.BaseUnitName))) + len(info.BaseUnitName) +
+		/* sub unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.SubUnitName))) + len(info.SubUnitName) +
+		/* scale, variable length */ wire.VarIntSerializeSize(info.UnitScale) +
+		/* memo, variable length */ wire.VarIntSerializeSize(uint64(len(info.AutMemo))) + len(info.AutMemo)
 
 	n += /* planned amount */ wire.VarIntSerializeSize(info.PlannedTotalSupply)
 
@@ -111,9 +111,9 @@ func (info *AutMetadata) SerializedSize() int {
 	}
 
 	n +=
-		/* update threshold */ 1 +
-			/* issue threshold */ 1 +
-			/* expire height */ wire.VarIntSerializeSize(uint64(info.ExpireHeight))
+	/* update threshold */ 1 +
+		/* issue threshold */ 1 +
+		/* expire height */ wire.VarIntSerializeSize(uint64(info.ExpireHeight))
 
 	n += /* minted amount,variable length */ wire.VarIntSerializeSize(info.MintedAmount) +
 		/* minted amount,variable length */ wire.VarIntSerializeSize(info.BurnedAmount) +
@@ -170,7 +170,7 @@ func (info *AutMetadata) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	if err = wire.WriteVarBytes(buff, 0, info.CTAutMemo); err != nil {
+	if err = wire.WriteVarBytes(buff, 0, info.AutMemo); err != nil {
 		return nil, err
 	}
 
@@ -275,7 +275,7 @@ func (info *AutMetadata) Deserialize(r io.Reader) error {
 	if info.UnitScale, err = wire.ReadVarInt(r, 0); err != nil {
 		return err
 	}
-	if info.CTAutMemo, err = wire.ReadVarBytes(r, 0, MaxCTAUTMemoLength, "memo"); err != nil {
+	if info.AutMemo, err = wire.ReadVarBytes(r, 0, MaxCTAUTMemoLength, "AutMemo"); err != nil {
 		return err
 	}
 
@@ -362,7 +362,7 @@ func (info *AutMetadata) Clone() *AutMetadata {
 		BaseUnitName: make([]byte, len(info.BaseUnitName)),
 		SubUnitName:  make([]byte, len(info.SubUnitName)),
 		UnitScale:    info.UnitScale,
-		CTAutMemo:    make([]byte, len(info.CTAutMemo)),
+		AutMemo:      make([]byte, len(info.AutMemo)),
 
 		IssuerTokens:            make([][]byte, len(info.IssuerTokens)),
 		ReregistrationThreshold: info.ReregistrationThreshold,
@@ -381,7 +381,7 @@ func (info *AutMetadata) Clone() *AutMetadata {
 	copy(cloned.AutName, info.AutName)
 	copy(cloned.BaseUnitName, info.BaseUnitName)
 	copy(cloned.SubUnitName, info.SubUnitName)
-	copy(cloned.CTAutMemo, info.CTAutMemo)
+	copy(cloned.AutMemo, info.AutMemo)
 
 	for i := 0; i < len(info.IssuerTokens); i++ {
 		cloned.IssuerTokens[i] = make([]byte, len(info.IssuerTokens[i]))
@@ -1825,7 +1825,7 @@ func (script *EnhancedCTAUTScript) Metadata() (*AutMetadata, error) {
 		BaseUnitName:            registerScript.baseUnitName,
 		SubUnitName:             registerScript.subUnitName,
 		UnitScale:               registerScript.unitScale,
-		CTAutMemo:               registerScript.ctAutMemo,
+		AutMemo:                 registerScript.ctAutMemo,
 		PlannedTotalSupply:      registerScript.plannedTotalAmount,
 		IssuerTokens:            registerScript.issuerTokens,
 		MintThreshold:           registerScript.mintThreshold,
@@ -1864,7 +1864,7 @@ func (script *EnhancedCTAUTScript) UpdateMetadata(metadata *AutMetadata) error {
 	if !ok {
 		return errors.New("update metadata only available for re-registration script")
 	}
-	metadata.CTAutMemo = reRegisterScript.ctAutMemo
+	metadata.AutMemo = reRegisterScript.ctAutMemo
 	// assert here?
 	if metadata.MintedAmount > reRegisterScript.plannedTotalAmount {
 		return errors.New("re-registration transaction try to make planned amount less than minted amount")
