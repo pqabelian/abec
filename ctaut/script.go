@@ -94,14 +94,14 @@ type Metadata struct {
 // todo: if only used locally, define as not-exported
 func (info *Metadata) SerializedSize() int {
 	n :=
-		/*version, fixed length */ wire.VarIntSerializeSize(uint64(info.Version)) +
-			/*identifier, actually fixed length */ wire.VarIntSerializeSize(uint64(len(info.CTAutIdentifier))) + len(info.CTAutIdentifier) +
-			/* name, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutName))) + len(info.CTAutName) +
-			/* symbol, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutSymbol))) + len(info.CTAutSymbol) +
-			/* base unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.BaseUnitName))) + len(info.BaseUnitName) +
-			/* sub unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.SubUnitName))) + len(info.SubUnitName) +
-			/* scale, variable length */ wire.VarIntSerializeSize(info.UnitScale) +
-			/* memo, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutMemo))) + len(info.CTAutMemo)
+	/*version, fixed length */ wire.VarIntSerializeSize(uint64(info.Version)) +
+		/*identifier, actually fixed length */ wire.VarIntSerializeSize(uint64(len(info.CTAutIdentifier))) + len(info.CTAutIdentifier) +
+		/* name, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutName))) + len(info.CTAutName) +
+		/* symbol, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutSymbol))) + len(info.CTAutSymbol) +
+		/* base unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.BaseUnitName))) + len(info.BaseUnitName) +
+		/* sub unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.SubUnitName))) + len(info.SubUnitName) +
+		/* scale, variable length */ wire.VarIntSerializeSize(info.UnitScale) +
+		/* memo, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutMemo))) + len(info.CTAutMemo)
 
 	n += /* planned amount */ wire.VarIntSerializeSize(info.PlannedTotalSupply)
 
@@ -112,9 +112,9 @@ func (info *Metadata) SerializedSize() int {
 	}
 
 	n +=
-		/* update threshold */ 1 +
-			/* issue threshold */ 1 +
-			/* expire height */ wire.VarIntSerializeSize(uint64(info.ExpireHeight))
+	/* update threshold */ 1 +
+		/* issue threshold */ 1 +
+		/* expire height */ wire.VarIntSerializeSize(uint64(info.ExpireHeight))
 
 	n += /* minted amount,variable length */ wire.VarIntSerializeSize(info.MintedAmount) +
 		/* minted amount,variable length */ wire.VarIntSerializeSize(info.BurnedAmount) +
@@ -947,11 +947,7 @@ func (script *ReRegistrationScript) Deserialize(r io.Reader) error {
 		return err
 	}
 
-	if err = script.SanityCheck(); err != nil {
-		return nil // todo: bug
-	}
-
-	return nil
+	return script.SanityCheck()
 }
 
 func (script *ReRegistrationScript) SanityCheck() error {
