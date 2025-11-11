@@ -546,7 +546,7 @@ func (view *CTAUTViewpoint) connectBurnScript(script *ctaut.EnhancedCTAUTScript,
 	burnedToken := generatedToken[len(generatedToken)-1]
 	// update the burned amount
 	autTxo := &ctautwire.AutTxo{}
-	err = autTxo.Deserialize(bytes.NewReader(burnedToken.ValueScript))
+	err = autTxo.Deserialize(burnedToken.ValueScript)
 	if err != nil {
 		return err
 	}
@@ -875,7 +875,7 @@ func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, script *ct
 	}
 	// update the burned amount
 	autTxo := &ctautwire.AutTxo{}
-	err = autTxo.Deserialize(bytes.NewReader(burnedToken.ValueScript))
+	err = autTxo.Deserialize(burnedToken.ValueScript)
 	if err != nil {
 		return nil, err
 	}

@@ -165,12 +165,10 @@ func NewMintScript(
 
 	valueScripts := make([][]byte, len(autCoinbaseTx.TxOuts))
 	for i, autTxo := range autCoinbaseTx.TxOuts {
-		buffer := bytes.NewBuffer(make([]byte, 0, autTxo.SerializeSize()))
-		err = autTxo.Serialize(buffer)
+		valueScripts[i], err = autTxo.Serialize()
 		if err != nil {
 			return nil, nil, err
 		}
-		valueScripts[i] = buffer.Bytes()
 	}
 
 	witnessHash := chainhash.HashH(autCoinbaseTx.TxWitness)
@@ -207,7 +205,7 @@ func NewTransferScript(
 	for i := 0; i < len(autInputDescs); i++ {
 		autInputDesc := autInputDescs[i]
 		autTxo := &ctautwire.AutTxo{}
-		err := autTxo.Deserialize(bytes.NewReader(autInputDesc.ValueScript))
+		err := autTxo.Deserialize(autInputDesc.ValueScript)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -258,12 +256,10 @@ func NewTransferScript(
 
 	valueScripts := make([][]byte, len(autTransferTx.TxOuts))
 	for i, autTxo := range autTransferTx.TxOuts {
-		buffer := bytes.NewBuffer(make([]byte, 0, autTxo.SerializeSize()))
-		err = autTxo.Serialize(buffer)
+		valueScripts[i], err = autTxo.Serialize()
 		if err != nil {
 			return nil, nil, err
 		}
-		valueScripts[i] = buffer.Bytes()
 	}
 	witnessHash := chainhash.HashH(autTransferTx.TxWitness)
 
@@ -300,7 +296,7 @@ func NewBurnScript(
 	for i := 0; i < len(autInputDescs); i++ {
 		autInputDesc := autInputDescs[i]
 		autTxo := &ctautwire.AutTxo{}
-		err := autTxo.Deserialize(bytes.NewReader(autInputDesc.ValueScript))
+		err := autTxo.Deserialize(autInputDesc.ValueScript)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -355,12 +351,10 @@ func NewBurnScript(
 
 	valueScripts := make([][]byte, len(autTransferTx.TxOuts))
 	for i, autTxo := range autTransferTx.TxOuts {
-		buffer := bytes.NewBuffer(make([]byte, 0, autTxo.SerializeSize()))
-		err = autTxo.Serialize(buffer)
+		valueScripts[i], err = autTxo.Serialize()
 		if err != nil {
 			return nil, nil, err
 		}
-		valueScripts[i] = buffer.Bytes()
 	}
 	witnessHash := chainhash.HashH(autTransferTx.TxWitness)
 
@@ -448,7 +442,7 @@ const (
 
 func ExtractAutTokenValue(version uint32, valueScript []byte, cryptoValuePublicKey []byte, cryptoValueSecretKey []byte) (uint64, AutTokenType, error) {
 	autTxo := &ctautwire.AutTxo{}
-	err := autTxo.Deserialize(bytes.NewReader(valueScript))
+	err := autTxo.Deserialize(valueScript)
 	if err != nil {
 		return 0, AutTokenTypeHidden, err
 	}
@@ -601,7 +595,7 @@ func UpdateCTAUTMetadata(script CTAUTScript, txVersion uint32, txID string, seri
 		}
 
 		autTxo := &ctautwire.AutTxo{}
-		err = autTxo.Deserialize(bytes.NewReader(tokens[len(tokens)-1].ValueScript))
+		err = autTxo.Deserialize(tokens[len(tokens)-1].ValueScript)
 		if err != nil {
 			return err
 		}

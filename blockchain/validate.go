@@ -2295,7 +2295,7 @@ func checkCTAUTMintTransactionInputs(ctAutScript *ctaut.EnhancedCTAUTScript, tx 
 	// for outputs, fill out the script
 	for i := 0; i < len(generatedTokens); i++ {
 		autTxo := &ctautwire.AutTxo{}
-		err = autTxo.Deserialize(bytes.NewReader(generatedTokens[i].ValueScript))
+		err = autTxo.Deserialize(generatedTokens[i].ValueScript)
 		if err != nil {
 			return err
 		}
@@ -2375,7 +2375,7 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctaut.EnhancedCTAUTScript,
 
 	for i := 0; i < len(consumedTokens); i++ {
 		autTxo := &ctautwire.AutTxo{}
-		err = autTxo.Deserialize(bytes.NewReader(consumedTokens[i].ValueScript))
+		err = autTxo.Deserialize(consumedTokens[i].ValueScript)
 		if err != nil {
 			return err
 		}
@@ -2385,7 +2385,7 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctaut.EnhancedCTAUTScript,
 
 	for i := 0; i < len(generatedTokens); i++ {
 		autTxo := &ctautwire.AutTxo{}
-		err = autTxo.Deserialize(bytes.NewReader(generatedTokens[i].ValueScript))
+		err = autTxo.Deserialize(generatedTokens[i].ValueScript)
 		if err != nil {
 			return err
 		}
@@ -2467,7 +2467,7 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctaut.EnhancedCTAUTScript, tx 
 
 	for i := 0; i < len(consumedTokens); i++ {
 		autTxo := &ctautwire.AutTxo{}
-		err = autTxo.Deserialize(bytes.NewReader(consumedTokens[i].ValueScript))
+		err = autTxo.Deserialize(consumedTokens[i].ValueScript)
 		if err != nil {
 			return err
 		}
@@ -2477,7 +2477,7 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctaut.EnhancedCTAUTScript, tx 
 
 	for i := 0; i < len(generatedTokens); i++ {
 		autTxo := &ctautwire.AutTxo{}
-		err = autTxo.Deserialize(bytes.NewReader(generatedTokens[i].ValueScript))
+		err = autTxo.Deserialize(generatedTokens[i].ValueScript)
 		if err != nil {
 			return err
 		}

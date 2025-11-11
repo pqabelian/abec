@@ -214,7 +214,7 @@ func readCTAUTTxoScript(r io.Reader, expectedCTTokenLength int, expectedPlainTok
 
 	for i := 0; i < expectedCTTokenLength; i++ {
 		autTxo := &ctautwire.AutTxo{}
-		err = autTxo.Deserialize(bytes.NewReader(valueScripts[i]))
+		err = autTxo.Deserialize(valueScripts[i])
 		if err != nil {
 			return nil, err
 		}
@@ -228,7 +228,7 @@ func readCTAUTTxoScript(r io.Reader, expectedCTTokenLength int, expectedPlainTok
 	}
 	for i := expectedCTTokenLength; i < expectedCTTokenLength+expectedPlainTokenLength; i++ {
 		autTxo := &ctautwire.AutTxo{}
-		err = autTxo.Deserialize(bytes.NewReader(valueScripts[i]))
+		err = autTxo.Deserialize(valueScripts[i])
 		if err != nil {
 			return nil, err
 		}
@@ -407,7 +407,7 @@ func matchIssuerTokens(issuerTokens [][]byte, outputs []*CTAUTToken) error {
 
 func RuleCheckOnTxoVersionType(hostTxoVersion uint32, valueScript []byte) error {
 	autTxo := &ctautwire.AutTxo{}
-	err := autTxo.Deserialize(bytes.NewReader(valueScript))
+	err := autTxo.Deserialize(valueScript)
 	if err != nil {
 		return err
 	}

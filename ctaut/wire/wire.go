@@ -1,9 +1,10 @@
 package wire
 
 import (
-	"io"
-
+	"bytes"
+	"fmt"
 	"github.com/abesuite/abec/wire"
+	"math"
 )
 
 type AutTxo struct {
@@ -11,37 +12,45 @@ type AutTxo struct {
 	TxoScript []byte
 }
 
-// todo: the size and the serialize function are inconsistent.
 func (txo *AutTxo) SerializeSize() int {
-	return 4 + wire.VarIntSerializeSize(uint64(len(txo.TxoScript))) + len(txo.TxoScript)
+	return wire.VarIntSerializeSize(uint64(txo.Version)) +
+		wire.VarIntSerializeSize(uint64(len(txo.TxoScript))) + len(txo.TxoScript)
 }
 
-// todo: return bytes
-func (txo *AutTxo) Serialize(w io.Writer) error {
+func (txo *AutTxo) Serialize() ([]byte, error) {
+	w := bytes.NewBuffer(make([]byte, 0, txo.SerializeSize()))
+
 	err := wire.WriteVarInt(w, 0, uint64(txo.Version))
 	if err != nil {
-		return err
+		return nil, err
 	}
+
 	err = wire.WriteVarBytes(w, 0, txo.TxoScript)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return w.Bytes(), nil
 }
 
 // For aconcagua:
 // - hidden value script is 10959
 // - publuc value script is 9
+// todo:
 const MaxAUTValueScriptLength = 16 * 1024
 
-// todo: take bytes as input
-func (txo *AutTxo) Deserialize(r io.Reader) error {
+func (txo *AutTxo) Deserialize(serializedAutTxo []byte) error {
+	r := bytes.NewBuffer(serializedAutTxo)
+
 	version, err := wire.ReadVarInt(r, 0)
 	if err != nil {
 		return err
 	}
+	if version > math.MaxUint32 {
+		return fmt.Errorf("readed version (%d) is too big", version)
+	}
 	txo.Version = uint32(version)
-	if txo.TxoScript, err = wire.ReadVarBytes(r, 0, MaxAUTValueScriptLength, "aut txo script"); err != nil {
+
+	if txo.TxoScript, err = wire.ReadVarBytes(r, 0, MaxAUTValueScriptLength, "autTxo.TxoScript"); err != nil {
 		return err
 	}
 	return nil

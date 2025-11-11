@@ -94,14 +94,14 @@ type Metadata struct {
 // todo: if only used locally, define as not-exported
 func (info *Metadata) SerializedSize() int {
 	n :=
-	/*version, fixed length */ wire.VarIntSerializeSize(uint64(info.Version)) +
-		/*identifier, actually fixed length */ wire.VarIntSerializeSize(uint64(len(info.CTAutIdentifier))) + len(info.CTAutIdentifier) +
-		/* name, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutName))) + len(info.CTAutName) +
-		/* symbol, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutSymbol))) + len(info.CTAutSymbol) +
-		/* base unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.BaseUnitName))) + len(info.BaseUnitName) +
-		/* sub unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.SubUnitName))) + len(info.SubUnitName) +
-		/* scale, variable length */ wire.VarIntSerializeSize(info.UnitScale) +
-		/* memo, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutMemo))) + len(info.CTAutMemo)
+		/*version, fixed length */ wire.VarIntSerializeSize(uint64(info.Version)) +
+			/*identifier, actually fixed length */ wire.VarIntSerializeSize(uint64(len(info.CTAutIdentifier))) + len(info.CTAutIdentifier) +
+			/* name, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutName))) + len(info.CTAutName) +
+			/* symbol, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutSymbol))) + len(info.CTAutSymbol) +
+			/* base unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.BaseUnitName))) + len(info.BaseUnitName) +
+			/* sub unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.SubUnitName))) + len(info.SubUnitName) +
+			/* scale, variable length */ wire.VarIntSerializeSize(info.UnitScale) +
+			/* memo, variable length */ wire.VarIntSerializeSize(uint64(len(info.CTAutMemo))) + len(info.CTAutMemo)
 
 	n += /* planned amount */ wire.VarIntSerializeSize(info.PlannedTotalSupply)
 
@@ -112,9 +112,9 @@ func (info *Metadata) SerializedSize() int {
 	}
 
 	n +=
-	/* update threshold */ 1 +
-		/* issue threshold */ 1 +
-		/* expire height */ wire.VarIntSerializeSize(uint64(info.ExpireHeight))
+		/* update threshold */ 1 +
+			/* issue threshold */ 1 +
+			/* expire height */ wire.VarIntSerializeSize(uint64(info.ExpireHeight))
 
 	n += /* minted amount,variable length */ wire.VarIntSerializeSize(info.MintedAmount) +
 		/* minted amount,variable length */ wire.VarIntSerializeSize(info.BurnedAmount) +
@@ -1180,7 +1180,7 @@ func (script *MintScript) SanityCheck() error {
 	}
 	for i := 0; i < len(script.valueScripts); i++ {
 		autTxo := &ctautwire.AutTxo{}
-		err := autTxo.Deserialize(bytes.NewReader(script.valueScripts[i]))
+		err := autTxo.Deserialize(script.valueScripts[i])
 		if err != nil {
 			return err
 		}
@@ -1397,7 +1397,7 @@ func (script *TransferScript) SanityCheck() error {
 
 	for i := 0; i < len(script.valueScripts); i++ {
 		autTxo := &ctautwire.AutTxo{}
-		err := autTxo.Deserialize(bytes.NewReader(script.valueScripts[i]))
+		err := autTxo.Deserialize(script.valueScripts[i])
 		if err != nil {
 			return err
 		}
@@ -1615,7 +1615,7 @@ func (script *BurnScript) SanityCheck() error {
 
 	for i := 0; i < len(script.valueScripts); i++ {
 		autTxo := &ctautwire.AutTxo{}
-		err := autTxo.Deserialize(bytes.NewReader(script.valueScripts[i]))
+		err := autTxo.Deserialize(script.valueScripts[i])
 		if err != nil {
 			return err
 		}
@@ -1986,7 +1986,7 @@ func ExtractCTAUTScript(tx *wire.MsgTxAbe) (enhancedScript *EnhancedCTAUTScript,
 		// for outputs, check the legality of burned token (a.k.a last generated token)
 		// Above ParseCTAUTScript() ensures the length of valueScripts is not less than 1
 		autTxo := &ctautwire.AutTxo{}
-		err = autTxo.Deserialize(bytes.NewReader(script.valueScripts[len(script.valueScripts)-1]))
+		err = autTxo.Deserialize(script.valueScripts[len(script.valueScripts)-1])
 		if err != nil {
 			return nil, err
 		}
