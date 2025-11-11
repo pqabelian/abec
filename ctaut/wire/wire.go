@@ -11,6 +11,7 @@ type AutTxo struct {
 	TxoScript []byte
 }
 
+// todo: the size and the serialize function are inconsistent.
 func (txo *AutTxo) SerializeSize() int {
 	return 4 + wire.VarIntSerializeSize(uint64(len(txo.TxoScript))) + len(txo.TxoScript)
 }

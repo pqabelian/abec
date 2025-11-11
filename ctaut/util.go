@@ -22,13 +22,13 @@ func init() {
 	}
 }
 
-func writePrefix(b *bytes.Buffer, version uint32, ctautTxType CTAUTScriptType, identifier [CTAUTIdentifierLength]byte) error {
+func writePrefix(b *bytes.Buffer, scriptVersion uint32, ctautTxType CTAUTScriptType, autIdentifier [CTAUTIdentifierLength]byte) error {
 	err := WriteFixedBytes(b, []byte(commonPrefix))
 	if err != nil {
 		return err
 	}
 
-	err = WriteVarInt(b, uint64(version))
+	err = WriteVarInt(b, uint64(scriptVersion))
 	if err != nil {
 		return err
 	}
@@ -38,9 +38,10 @@ func writePrefix(b *bytes.Buffer, version uint32, ctautTxType CTAUTScriptType, i
 		return err
 	}
 
-	return WriteFixedBytes(b, identifier[:])
+	return WriteFixedBytes(b, autIdentifier[:])
 }
 
+// todo: discuss: shall remove expectedCtAutTxType? leave the check to the caller
 func readPrefix(r io.Reader, expectedCtAutTxType CTAUTScriptType) (uint32, [CTAUTIdentifierLength]byte, CTAUTScriptType, error) {
 	var res [CTAUTIdentifierLength]byte
 
@@ -52,11 +53,11 @@ func readPrefix(r io.Reader, expectedCtAutTxType CTAUTScriptType) (uint32, [CTAU
 		return 0, res, 0, ErrNonAutTx
 	}
 
-	version, err := ReadVarInt(r)
+	scriptVersion, err := ReadVarInt(r)
 	if err != nil {
 		return 0, res, 0, err
 	}
-	if version > math.MaxUint32 {
+	if scriptVersion > math.MaxUint32 {
 		return 0, res, 0, ErrInValidAUTTx
 	}
 
@@ -74,7 +75,7 @@ func readPrefix(r io.Reader, expectedCtAutTxType CTAUTScriptType) (uint32, [CTAU
 	}
 	copy(res[:], identifier)
 
-	return uint32(version), res, ctAutScriptType, nil
+	return uint32(scriptVersion), res, ctAutScriptType, nil
 }
 
 func writeIssuerTokens(b *bytes.Buffer, issuerTokens [][]byte) error {
@@ -123,6 +124,8 @@ func readIssuerTokens(r io.Reader) ([][]byte, error) {
 	return issuerTokens, nil
 }
 
+// todo: discuss to make a simple and symmetric; seems to package the read and write too much, so that the logic is a little strange.
+// todo: e.g., the serialize and deserialize Hash does not need package.
 func writeWitnessHash(b *bytes.Buffer, witnessHash chainhash.Hash) error {
 	return WriteVarBytes(b, witnessHash[:])
 }
@@ -141,6 +144,7 @@ func readWitnessHash(r io.Reader) (chainhash.Hash, error) {
 }
 
 // todo(ctaut): why define this function?
+// todo: only one caller
 func writeAutMemo(b *bytes.Buffer, autMemo []byte) error {
 	return WriteVarBytes(b, autMemo)
 }
@@ -158,6 +162,7 @@ func readAutMemo(r io.Reader) ([]byte, error) {
 }
 
 // todo(ctaut): why define this function?
+// the name is not clear. directly call in the serialize/deserialize
 func writeMemo(b *bytes.Buffer, memo []byte) error {
 	return WriteVarBytes(b, memo)
 }
@@ -242,6 +247,7 @@ func readCTAUTTxoScript(r io.Reader, expectedCTTokenLength int, expectedPlainTok
 // CheckHostTxoParasiticity would check the following rule:
 // 1. the privacy level MUST be abecryptoxkey.PrivacyLevelPSEUDONYMCT, note that this means the value in txo is public
 // 2. the value must be 1 Neutrino
+// todo: txHash and outputIndex donot have actual use.
 func CheckHostTxoParasiticity(txHash chainhash.Hash, outputIndex int, txOut *wire.TxOutAbe) ([]byte, error) {
 	privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
 	if err != nil {
@@ -251,6 +257,7 @@ func CheckHostTxoParasiticity(txHash chainhash.Hash, outputIndex int, txOut *wir
 		return nil, fmt.Errorf("invalid privacy level to %d-th output from transaction %s", outputIndex, txHash)
 	}
 
+	// todo: the above codes are necessary, since if it is not Pseudonym, the PseudonymTxoCoinParse will return error.
 	coinAddress, coinValue, err := abecryptox.PseudonymTxoCoinParse(txOut)
 	if err != nil {
 		return nil, fmt.Errorf("fail to parse %d-th output as an pseudonym txo from transaction %s", outputIndex, txHash)
@@ -258,6 +265,9 @@ func CheckHostTxoParasiticity(txHash chainhash.Hash, outputIndex int, txOut *wir
 	if coinValue != 1 {
 		return nil, fmt.Errorf("invalid value from %d-th output from transaction %s as AUT coin", outputIndex, txHash)
 	}
+
+	// remove the start codes, and check coinAddress here; need to add an api abecryptox.GetPrivacyLevelFromCoinAddress(),
+	// which does not parse all, to improve efficiency
 	return coinAddress, nil
 }
 
@@ -278,9 +288,14 @@ func GetGeneratedCTAUTTokens(script CTAUTScript, txHash chainhash.Hash, txOuts [
 		}
 
 		if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+			// todo: error? consider the case that there is no AutTokens.
+			// the error is assuming that this function is called with pre-condition that there must be AutTokens.
+			// i.e. numCTAUTTokens > 0, this should be claimed explicitly.
 			return nil, fmt.Errorf("expect privacy level %d but got %d",
 				abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
 		}
+		// todo: give the comments
+		// The AutHostTxos are at the start positions of Pseudonym-privacy Txos.
 		break
 	}
 
@@ -316,7 +331,7 @@ func GetGeneratedCTAUTTokens(script CTAUTScript, txHash chainhash.Hash, txOuts [
 		// no value script need to assign
 	case *ReRegistrationScript:
 		// no value script need to assign
-	case *MintScript:
+	case *MintScript: // todo: add TransferScript, BurnScript here?
 		for i := 0; i < numCTAUTTokens; i++ {
 			err := RuleCheckOnTxoVersionType(generatedTokens[i].Version, ctAUTScript.valueScripts[i])
 			if err != nil {
