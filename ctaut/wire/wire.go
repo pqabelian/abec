@@ -15,6 +15,8 @@ type AutTxo struct {
 func (txo *AutTxo) SerializeSize() int {
 	return 4 + wire.VarIntSerializeSize(uint64(len(txo.TxoScript))) + len(txo.TxoScript)
 }
+
+// todo: return bytes
 func (txo *AutTxo) Serialize(w io.Writer) error {
 	err := wire.WriteVarInt(w, 0, uint64(txo.Version))
 	if err != nil {
@@ -32,6 +34,7 @@ func (txo *AutTxo) Serialize(w io.Writer) error {
 // - publuc value script is 9
 const MaxAUTValueScriptLength = 16 * 1024
 
+// todo: take bytes as input
 func (txo *AutTxo) Deserialize(r io.Reader) error {
 	version, err := wire.ReadVarInt(r, 0)
 	if err != nil {
