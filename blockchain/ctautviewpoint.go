@@ -388,7 +388,7 @@ func (view *CTAUTViewpoint) connectMintScript(script *ctaut.EnhancedCTAUTScript,
 		if _, ok := info.RootTokenSet[consumedTokens[i].HostOutPoint]; !ok {
 			return fmt.Errorf(`an mint AUT transaction %s try to mint AUT with 
 				"non-existing/spent root coin (%s,%d) for AUT identified by %s`,
-				txHash, consumedTokens[i].HostOutPoint.Hash, consumedTokens[i].HostOutPoint.Index,
+				txHash, consumedTokens[i].HostOutPoint.TxHash, consumedTokens[i].HostOutPoint.Index,
 				identifierKey)
 		}
 		delete(info.RootTokenSet, consumedTokens[i].HostOutPoint)
@@ -460,7 +460,7 @@ func (view *CTAUTViewpoint) connectTransferScript(script *ctaut.EnhancedCTAUTScr
 		if err != nil {
 			return fmt.Errorf("an transfer AUT transaction %s try to spend "+
 				"non-existing/burn token (%s,%d) for AUT identified by %s but fail due to %s",
-				txHash, consumedTokens[i].HostOutPoint.Hash, consumedTokens[i].HostOutPoint.Index,
+				txHash, consumedTokens[i].HostOutPoint.TxHash, consumedTokens[i].HostOutPoint.Index,
 				identifierKey, err)
 		}
 
@@ -514,7 +514,7 @@ func (view *CTAUTViewpoint) connectBurnScript(script *ctaut.EnhancedCTAUTScript,
 		if err != nil {
 			return fmt.Errorf("an transfer AUT transaction %s try to spend "+
 				"non-existing/burn token (%s,%d) for AUT identified by %s but fail due to %s",
-				txHash, consumedTokens[i].HostOutPoint.Hash, consumedTokens[i].HostOutPoint.Index,
+				txHash, consumedTokens[i].HostOutPoint.TxHash, consumedTokens[i].HostOutPoint.Index,
 				identifierKey, err)
 		}
 
@@ -1066,11 +1066,11 @@ func (view *CTAUTViewpoint) fetchCTAUTMain(db database.DB, outpoints map[ctaut.H
 				// assert
 				if coin == nil {
 					return fmt.Errorf("invalid fetch for point (%s, %d) for CTAUT instance %s",
-						outpoint.Hash, outpoint.Index, autIdentifierKey)
+						outpoint.TxHash, outpoint.Index, autIdentifierKey)
 				}
 				if !bytes.Equal(coin.identifier, identifier) {
 					return fmt.Errorf("invalid fetch for point (%s, %d) for CTAUT instance %s",
-						outpoint.Hash, outpoint.Index, autIdentifierKey)
+						outpoint.TxHash, outpoint.Index, autIdentifierKey)
 				}
 				view.instances[autIdentifierKey].coins[outpoint] = coin
 			}

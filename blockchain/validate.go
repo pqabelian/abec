@@ -2161,13 +2161,13 @@ func checkCTAUTReRegistrationTransactionInputs(script *ctaut.EnhancedCTAUTScript
 		// check whether duplicate though it won't appear with the checking with hosted Abelian transaction
 		if _, ok := willConsumedRootTokens[outpoint]; ok {
 			return fmt.Errorf("transaction %s try to mint with repeated root coin <%s:%d>",
-				tx.Hash(), outpoint.Hash, outpoint.Index)
+				tx.Hash(), outpoint.TxHash, outpoint.Index)
 		}
 		willConsumedRootTokens[outpoint] = struct{}{}
 
 		if len(consumedTokens[i].CoinAddress) == 0 {
 			return fmt.Errorf("transaction %s try to mint with root coin <%s:%d>, but it has no coin address",
-				tx.Hash(), outpoint.Hash, outpoint.Index)
+				tx.Hash(), outpoint.TxHash, outpoint.Index)
 		}
 		issuerToken := hex.EncodeToString(consumedTokens[i].CoinAddress)
 
@@ -2244,13 +2244,13 @@ func checkCTAUTMintTransactionInputs(ctAutScript *ctaut.EnhancedCTAUTScript, tx 
 		// check whether duplicate though it won't appear with the checking with hosted Abelian transaction
 		if _, ok := willConsumedRootTokens[outpoint]; ok {
 			return fmt.Errorf("transaction %s try to mint with repeated root coin <%s:%d>",
-				tx.Hash(), outpoint.Hash, outpoint.Index)
+				tx.Hash(), outpoint.TxHash, outpoint.Index)
 		}
 		willConsumedRootTokens[outpoint] = struct{}{}
 
 		if len(consumedTokens[i].CoinAddress) == 0 {
 			return fmt.Errorf("transaction %s try to mint with root coin <%s:%d>, but it has no coin address",
-				tx.Hash(), outpoint.Hash, outpoint.Index)
+				tx.Hash(), outpoint.TxHash, outpoint.Index)
 		}
 		issuerToken := hex.EncodeToString(consumedTokens[i].CoinAddress)
 
