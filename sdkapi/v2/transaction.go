@@ -547,7 +547,7 @@ func BuildTransferTxRequestDescFromTxoRings(
 
 func GetAndSetHeight(block *abeutil.BlockAbe) error {
 	height := block.MsgBlock().Header.Height
-	if height == 0 {
+	if height == -1 {
 		if len(block.MsgBlock().Transactions) == 0 {
 			return errors.New("invalid block which do not include any transaction")
 		}
