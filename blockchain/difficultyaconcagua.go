@@ -364,7 +364,7 @@ func (b *BlockChain) calcNextRequiredDifficultyVectorAconcagua(lastNode *blockNo
 		newTargetBitsSecond = newTargetBits
 
 		log.Infof("Difficulty adjustment at height %d : newTargetBitsSecond is set the same as newTargetBits %08x (%064x)",
-			lastNode.height+1, newTargetSecond, CompactToBig(newTargetBits))
+			lastNode.height+1, newTargetBits, CompactToBig(newTargetBits))
 
 	} else {
 		borderHeight := b.chainParams.BlockHeightAconcagua + int32(len(dsaSmoothFactorsInt)-1)*b.blocksPerRetargetDSA
@@ -402,7 +402,7 @@ func (b *BlockChain) calcNextRequiredDifficultyVectorAconcagua(lastNode *blockNo
 	log.Infof("Old target Second %08x (%064x)", lastNode.bitsSecond, CompactToBig(lastNode.bitsSecond))
 	log.Infof("New target Second %08x (%064x)", newTargetBitsSecond, CompactToBig(newTargetBitsSecond))
 	log.Infof("Latest Slot timespan %v, Latest Slot's Hash Rate %v, Latest Slot's Hash Rate Second %v",
-		time.Duration(latestSlotTimeSpan)*time.Second, latestSlotAvgHR, avgHR)
+		time.Duration(latestSlotTimeSpan)*time.Second, latestSlotAvgHR, latestSlotAvgHRSecond)
 	log.Infof("Target timespan %v, Average Hash Rate %d, Target Hash Rate %d, Average Hash Rate Second %d, Target Hash Rate Second %d,",
 		b.chainParams.TargetTimespanDSA, avgHR, targetHR, avgHRSecond, targetHRSecond)
 
