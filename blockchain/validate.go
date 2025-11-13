@@ -2153,7 +2153,7 @@ func checkCTAUTReRegistrationTransactionInputs(script *ctaut.EnhancedCTAUTScript
 	for i := 0; i < len(consumedTokens); i++ {
 		outpoint := consumedTokens[i].HostOutPoint
 
-		if _, existOutpoint := instance.metadata.RootTokenSet[outpoint]; !existOutpoint {
+		if _, existOutpoint := instance.metadata.ActiveRootTokenSet[outpoint]; !existOutpoint {
 			return fmt.Errorf("transaction %s try to re-register with unknown root coin <%s:%d>",
 				tx.Hash(), outpoint.TxHash, outpoint.Index)
 		}
@@ -2237,14 +2237,14 @@ func checkCTAUTMintTransactionInputs(ctAutScript *ctaut.EnhancedCTAUTScript, tx 
 	}
 	for i := 0; i < len(consumedTokens); i++ {
 		outpoint := consumedTokens[i].HostOutPoint
-		if _, existOutpoint := instance.metadata.RootTokenSet[outpoint]; !existOutpoint {
+		if _, existOutpoint := instance.metadata.ActiveRootTokenSet[outpoint]; !existOutpoint {
 			return fmt.Errorf("transaction %s try to mint with unknown root coin <%s:%d>",
 				tx.Hash(), outpoint.TxHash, outpoint.Index)
 		}
 		// check whether duplicate though it won't appear with the checking with hosted Abelian transaction
 		if _, ok := willConsumedRootTokens[outpoint]; ok {
 			return fmt.Errorf("transaction %s try to mint with repeated root coin <%s:%d>",
-				tx.Hash(), outpoint.Hash, outpoint.Index)
+				tx.Hash(), outpoint.TxHash, outpoint.Index)
 		}
 		willConsumedRootTokens[outpoint] = struct{}{}
 
