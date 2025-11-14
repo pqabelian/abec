@@ -333,6 +333,11 @@ func (m *CPUMiner) solveBlockNakamotoInit(msgBlock *wire.MsgBlockAbe, blockHeigh
 				// Note that the timestamp in blockHeader is in second, so that different blockHeader may share the same timestamp.
 				// This seems to be the reason why we need extraNonce.
 
+				//	UpdateBlockTimeAbe() may update header.Bits, depending on m.cfg.ChainParams.ReduceMinDifficulty
+				if m.cfg.ChainParams.ReduceMinDifficulty {
+					targetDifficulty = blockchain.CompactToBig(header.Bits)
+				}
+
 			default:
 				// Non-blocking select to fall through
 			}
@@ -360,7 +365,7 @@ func (m *CPUMiner) solveBlockNakamotoInit(msgBlock *wire.MsgBlockAbe, blockHeigh
 	return false
 }
 
-// solveBlockEthash attempts to find some combination of a nonce, extra nonce, and current timestamp
+// solveBlockEthashInit attempts to find some combination of a nonce, extra nonce, and current timestamp
 // which makes the passed block hash to a value less than the target difficulty.
 // The timestamp is updated periodically and the passed block is modified with all tweaks during this process.
 // This means that when the function returns true, the block is ready for submission.
@@ -368,7 +373,7 @@ func (m *CPUMiner) solveBlockNakamotoInit(msgBlock *wire.MsgBlockAbe, blockHeigh
 // This function will return early with false when conditions that trigger a stale block
 // such as a new block showing up or periodically when there are new transactions and
 // enough time has elapsed without finding a solution.
-func (m *CPUMiner) solveBlockEthash(blockTemplate *mining.BlockTemplate, ticker *time.Ticker, quit chan struct{}) bool {
+func (m *CPUMiner) solveBlockEthashInit(blockTemplate *mining.BlockTemplate, ticker *time.Ticker, quit chan struct{}) bool {
 	// If we're running a fake PoW, simply return a 0 nonce immediately
 	if m.cfg.ChainParams.Net != wire.MainNet && len(m.cfg.FakePowHeightScope) != 0 {
 		for _, scope := range m.cfg.FakePowHeightScope {
@@ -393,18 +398,174 @@ func (m *CPUMiner) solveBlockEthash(blockTemplate *mining.BlockTemplate, ticker 
 	)
 
 	if header.Version < wire.BlockVersionEthashPow {
-		log.Errorf("wrong call on solveBlockEthash: header.Version (%x) < wire.BlockVersionEthashPow (%x)",
+		log.Errorf("wrong call on solveBlockEthashInit: header.Version (%x) < wire.BlockVersionEthashPow (%x)",
 			header.Version, wire.BlockVersionEthashPow)
 		return false
 	}
 
 	if header.Version >= wire.BlockVersionAconcagua {
-		if header.ConsensusApplied != wire.ConsensusEthashPow {
-			log.Errorf("wrong call on solveBlockEthash: header.Version (%x) >= wire.BlockVersionEthashPow (%x) and "+
-				"header.ConsensusApplied (%d) != wire.ConsensusEthashPow",
-				header.Version, wire.BlockVersionEthashPow, header.ConsensusApplied)
-			return false
+		log.Errorf("wrong call on solveBlockEthashInit: header.Version (%x) >= wire.BlockVersionAconcagua (%x)",
+			header.Version, wire.BlockVersionAconcagua)
+		return false
+	}
+
+	// Choose a random extra nonce offset for this block template and worker.
+	//	Based on the design that each generateBlocks() goroutine generates its own block template and call solveBlockEthash,
+	//	i.e., no generateBlocks() goroutines share the same block template (since it is randomized algorithm),
+	//	we do not need to worry that two goroutines will scan the same hash-value space.
+	enOffset, err := wire.RandomUint64()
+	if err != nil {
+		log.Errorf("Unexpected error while generating random "+
+			"extra nonce offset: %v", err)
+		enOffset = 0
+	}
+
+	// Initial state.
+	lastGenerated := time.Now()
+	lastTxUpdate := m.cfg.BlockTemplateGenerator.TxSource().LastUpdated()
+	hashesCompleted := uint64(0)
+
+	// Note that the entire extra nonce range is iterated and
+	// the offset is added relying on the fact that overflow will wrap around 0 as provided by the Go spec.
+	// it is unnecessary to check extraNonce < maxExtraNonce, since overflow will wrap around 0.
+
+	extraNonce := enOffset
+	rst := false
+search:
+	for {
+		// Update the extra nonce in the block template with the new value
+		// by update the coinbase nonce and
+		// setting the merkle root to the new value.
+		extraNonce++
+		m.cfg.BlockTemplateGenerator.UpdateExtraNonceAbeEthash(blockTemplate, extraNonce)
+
+		// compute the contentHash for current (ExtraNonce, timeStamp)
+		//contentHash := blockTemplate.MsgBlock.Header.ContentHash()
+		headerContentHash, err := consensus.HeaderContentHash(&blockTemplate.BlockAbe.Header)
+		if err != nil {
+			log.Errorf("error happened when calling HeaderContentHash() on blockTemplate.MsgBlock.Header: %v", err)
+			rst = false
+			break search
 		}
+
+		// Search through the entire nonce range for a solution while
+		// periodically checking for early quit and stale block conditions along with updates to the speed monitor.
+		//	it is unnecessary to check i <= maxNonceExt, since overflow will wrap around 0.
+		nonceExt := uint64(0)
+		for {
+			select {
+			case <-quit:
+				//return false
+				rst = false
+				break search
+
+			case <-ticker.C:
+				m.updateHashes <- hashesCompleted
+				hashesCompleted = 0
+
+				// The current block is stale if the best block has changed.
+				best := m.cfg.BlockTemplateGenerator.BestSnapshot()
+				if !header.PrevBlock.IsEqual(&best.Hash) {
+					//return false
+					rst = false
+					break search
+				}
+
+				// The current block is stale if
+				// the memory pool has been updated since the block template was generated
+				// and it has been at least one minute.
+				if lastTxUpdate != m.cfg.BlockTemplateGenerator.TxSource().LastUpdated() &&
+					time.Now().After(lastGenerated.Add(time.Minute)) {
+					//return false
+					rst = false
+					break search
+				}
+
+				m.cfg.BlockTemplateGenerator.UpdateBlockTimeAbeEthash(blockTemplate)
+
+				// TimeStamp update will cause the update of contentHash.
+				headerContentHash, err = consensus.HeaderContentHash(&blockTemplate.BlockAbe.Header)
+				if err != nil {
+					log.Errorf("error happened when calling HeaderContentHash() on blockTemplate.MsgBlock.Header: %v", err)
+					rst = false
+					break search
+				}
+
+				//	UpdateBlockTimeAbeEthash() may update header.Bits, depending on m.cfg.ChainParams.ReduceMinDifficulty
+				if m.cfg.ChainParams.ReduceMinDifficulty {
+					targetDifficulty = blockchain.CompactToBig(header.Bits)
+				}
+
+			default:
+				// Non-blocking select to fall through
+			}
+
+			// Update the nonce and test whether the nonce produce a valid header.
+			nonceExt++
+			//	Try a nonce for EthashPoW begin
+			found := m.cfg.PowConsensus.EthashPowTrySeal(epoch, *headerContentHash, nonceExt, targetDifficulty, header)
+			hashesCompleted += 1 //	HashRate actually means the tried number of nonce, rather than the tried hashes
+			//	Try a nonce for EthashPoW end
+
+			if found {
+				// The seal with the nonceExt is right. Yay!
+				//	 Note that the header's fields for valid seal has been set in TrySeal()
+				m.updateHashes <- hashesCompleted
+				//return true
+				rst = true
+				break search
+			}
+		}
+	}
+
+	//return false
+	return rst
+}
+
+// solveBlockEthashAconcagua attempts to find some combination of a nonce, extra nonce, and current timestamp
+// which makes the passed block hash to a value less than the target difficulty.
+// The timestamp is updated periodically and the passed block is modified with all tweaks during this process.
+// This means that when the function returns true, the block is ready for submission.
+//
+// This function will return early with false when conditions that trigger a stale block
+// such as a new block showing up or periodically when there are new transactions and
+// enough time has elapsed without finding a solution.
+func (m *CPUMiner) solveBlockEthashAconcagua(blockTemplate *mining.BlockTemplate, ticker *time.Ticker, quit chan struct{}) bool {
+	// If we're running a fake PoW, simply return a 0 nonce immediately
+	if m.cfg.ChainParams.Net != wire.MainNet && len(m.cfg.FakePowHeightScope) != 0 {
+		for _, scope := range m.cfg.FakePowHeightScope {
+			if scope.StartHeight <= blockTemplate.Height && blockTemplate.Height <= scope.EndHeight {
+				log.Infof("Do not find EthPoW for height %d in range [%d,%d]",
+					blockTemplate.Height, scope.StartHeight, scope.EndHeight)
+				return true
+			}
+		}
+		header := blockTemplate.BlockAbe.Header
+		header.Nonce = wire.NonceDummy
+		header.MixDigest = wire.MixDigestDummy
+		header.NonceExt = wire.NonceExtDummy
+		return true
+	}
+
+	var (
+		// Create some convenience variables.
+		header           = &blockTemplate.BlockAbe.Header
+		targetDifficulty = blockchain.CompactToBig(header.BitsSecond)
+		epoch            = m.cfg.PowConsensus.EthashPowEpoch(header.Height)
+	)
+
+	if header.Version < wire.BlockVersionAconcagua {
+		log.Errorf("wrong call on solveBlockEthashAconcagua: header.Version (%x) < wire.BlockVersionAconcagua (%x)",
+			header.Version, wire.BlockVersionAconcagua)
+		return false
+	}
+
+	// header.Version >= wire.BlockVersionAconcagua
+	if header.ConsensusApplied != wire.ConsensusEthashPow {
+		log.Errorf("wrong call on solveBlockEthashAconcagua: header.Version (%x) >= wire.BlockVersionAconcagua (%x) and "+
+			"header.ConsensusApplied (%d) != wire.ConsensusEthashPow",
+			header.Version, wire.BlockVersionAconcagua, header.ConsensusApplied)
+		return false
 	}
 
 	// Choose a random extra nonce offset for this block template and worker.
@@ -489,9 +650,9 @@ search:
 					break search
 				}
 
-				//	UpdateBlockTimeAbeEthash() may update header.Bits, depending on m.cfg.ChainParams.ReduceMinDifficulty
+				//	UpdateBlockTimeAconcagua() may update header.Bits, depending on m.cfg.ChainParams.ReduceMinDifficulty
 				if m.cfg.ChainParams.ReduceMinDifficulty {
-					targetDifficulty = blockchain.CompactToBig(header.Bits)
+					targetDifficulty = blockchain.CompactToBig(header.BitsSecond)
 				}
 
 			default:
@@ -561,7 +722,7 @@ func (m *CPUMiner) solveBlockNakamotoAconcagua(blockTemplate *mining.BlockTempla
 	// Create some convenience variables.
 	var (
 		header           = &blockTemplate.BlockAbe.Header
-		targetDifficulty = blockchain.CompactToBig(header.BitsSecond)
+		targetDifficulty = blockchain.CompactToBig(header.Bits)
 		sealHashPreImg   []byte
 	)
 
@@ -616,7 +777,7 @@ func (m *CPUMiner) solveBlockNakamotoAconcagua(blockTemplate *mining.BlockTempla
 					m.cfg.BlockTemplateGenerator.UpdateBlockTimeAconcagua(blockTemplate)
 					//	UpdateBlockTimeAbeEthash() may update header.Bits, depending on m.cfg.ChainParams.ReduceMinDifficulty
 					if m.cfg.ChainParams.ReduceMinDifficulty {
-						targetDifficulty = blockchain.CompactToBig(header.BitsSecond)
+						targetDifficulty = blockchain.CompactToBig(header.Bits)
 					}
 					sealHashPreImg, err = nakamotopowaconcagua.SealHashPreImage(header)
 					if err != nil {
@@ -731,7 +892,7 @@ out:
 			case wire.ConsensusNakamotoPow:
 				found = m.solveBlockNakamotoAconcagua(template, ticker, quit)
 			case wire.ConsensusEthashPow:
-				found = m.solveBlockEthash(template, ticker, quit)
+				found = m.solveBlockEthashAconcagua(template, ticker, quit)
 			default:
 				errStr := fmt.Sprintf("generateBlocks: Height >= BlockHeightAconcagua "+
 					"unsupported ConsensusApplied (%d) : %v",
@@ -740,7 +901,7 @@ out:
 				found = false
 			}
 		} else if template.Height >= m.cfg.ChainParams.BlockHeightEthashPoW {
-			found = m.solveBlockEthash(template, ticker, quit)
+			found = m.solveBlockEthashInit(template, ticker, quit)
 		} else {
 			found = m.solveBlockNakamotoInit(template.BlockAbe, curHeight+1, ticker, quit)
 		}
@@ -1006,7 +1167,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 			case wire.ConsensusNakamotoPow:
 				found = m.solveBlockNakamotoAconcagua(template, ticker, nil)
 			case wire.ConsensusEthashPow:
-				found = m.solveBlockEthash(template, ticker, nil)
+				found = m.solveBlockEthashAconcagua(template, ticker, nil)
 			default:
 				errStr := fmt.Sprintf("generateBlocks: Height >= BlockHeightAconcagua "+
 					"unsupported ConsensusApplied (%d) : %v",
@@ -1015,7 +1176,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 				found = false
 			}
 		} else if template.Height >= m.cfg.ChainParams.BlockHeightEthashPoW {
-			found = m.solveBlockEthash(template, ticker, nil)
+			found = m.solveBlockEthashInit(template, ticker, nil)
 		} else {
 			found = m.solveBlockNakamotoInit(template.BlockAbe, curHeight+1, ticker, nil)
 		}
