@@ -2104,10 +2104,10 @@ func checkCTAUTRegistrationTransactionInputs(ctAutScript *ctaut.EnhancedCTAUTScr
 	}
 
 	// if the claimed height will expire soon, reject it
-	if registrationScript.ExpireHeight() <= txHeight {
+	if registrationScript.ReregistrationExpireHeight() <= txHeight {
 		return fmt.Errorf("transaction %s try to register an AUT "+
 			"instance with expire height %d , but current block height %d, it will expire soon", tx.Hash(),
-			registrationScript.ExpireHeight(), txHeight)
+			registrationScript.ReregistrationExpireHeight(), txHeight)
 	}
 
 	return nil
@@ -2132,9 +2132,9 @@ func checkCTAUTReRegistrationTransactionInputs(script *ctaut.EnhancedCTAUTScript
 	}
 
 	// sanity check: expiry
-	if instance.metadata.ExpireHeight < txHeight {
+	if instance.metadata.ReregistrationExpireHeight < txHeight {
 		return fmt.Errorf("transaction %s try to re-register at height %d but "+
-			"the AUT entry claim its expire height %d when last registered", tx.Hash(), txHeight, instance.metadata.ExpireHeight)
+			"the AUT entry claim its expire height %d when last registered", tx.Hash(), txHeight, instance.metadata.ReregistrationExpireHeight)
 	}
 
 	claimedIssuerTokens := map[string]struct{}{}
@@ -2195,10 +2195,10 @@ func checkCTAUTReRegistrationTransactionInputs(script *ctaut.EnhancedCTAUTScript
 	}
 
 	// expiry
-	if reRegisterScript.ExpireHeight() <= txHeight {
+	if reRegisterScript.ReregistrationExpireHeight() <= txHeight {
 		return fmt.Errorf("transaction %s try to re-register the "+
 			"instance with expire height %d (current height %d)", tx.Hash(),
-			reRegisterScript.ExpireHeight(), txHeight)
+			reRegisterScript.ReregistrationExpireHeight(), txHeight)
 	}
 
 	return nil

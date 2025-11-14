@@ -770,10 +770,10 @@ func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 	if script != nil {
 		if script.Type() == ctaut.Registration {
 			ctAutScript := script.CTAUTScript.(*ctaut.RegistrationScript)
-			willExpiredCTAut := mp.expiredHeightAUT[ctAutScript.ExpireHeight()]
+			willExpiredCTAut := mp.expiredHeightAUT[ctAutScript.ReregistrationExpireHeight()]
 			delete(willExpiredCTAut, *tx.Hash())
 			if len(willExpiredCTAut) > 0 {
-				mp.expiredHeightAUT[ctAutScript.ExpireHeight()] = willExpiredCTAut
+				mp.expiredHeightAUT[ctAutScript.ReregistrationExpireHeight()] = willExpiredCTAut
 			}
 		}
 	}
@@ -919,7 +919,7 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 	if script != nil {
 		switch ctAutScript := script.CTAUTScript.(type) {
 		case *ctaut.RegistrationScript:
-			expireHeight := ctAutScript.ExpireHeight()
+			expireHeight := ctAutScript.ReregistrationExpireHeight()
 			if mp.expiredHeightAUT[expireHeight] == nil {
 				mp.expiredHeightAUT[expireHeight] = map[chainhash.Hash]*TxDescAbe{}
 			}
@@ -928,7 +928,7 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 			//identifier := autTransaction.Identifier()
 			//mp.registeredAUTName[hex.EncodeToString(identifier[:])] = *tx.Hash()
 		case *ctaut.ReRegistrationScript:
-			expireHeight := ctAutScript.ExpireHeight()
+			expireHeight := ctAutScript.ReregistrationExpireHeight()
 			if mp.expiredHeightAUT[expireHeight] == nil {
 				mp.expiredHeightAUT[expireHeight] = map[chainhash.Hash]*TxDescAbe{}
 			}

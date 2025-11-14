@@ -284,7 +284,7 @@ func (view *CTAUTViewpoint) connectRegistrationScript(script *ctaut.EnhancedCTAU
 	log.Debugf("In transaction %s, CT-AUT with identifier %s with following configuration is registered:", txHash, identifierKey)
 	log.Debugf("\t Name: %v:", hex.EncodeToString(metadata.AutName))
 	log.Debugf("\t Symbol: %v", hex.EncodeToString(metadata.AutSymbol))
-	log.Debugf("\t ExpireHeight: %v", metadata.ExpireHeight)
+	log.Debugf("\t ReregistrationExpireHeight: %v", metadata.ReregistrationExpireHeight)
 	log.Debugf("\t BaseUnitName: %v", hex.EncodeToString(metadata.BaseUnitName))
 	log.Debugf("\t SubUnitName: %v", hex.EncodeToString(metadata.SubUnitName))
 	log.Debugf("\t UnitScale: %v", metadata.UnitScale)
@@ -340,7 +340,7 @@ func (view *CTAUTViewpoint) connectReRegistrationScript(script *ctaut.EnhancedCT
 	log.Debugf("\t PlannedTotalSupply: %v -> %v", previousMetadata.PlannedTotalSupply, metadata.PlannedTotalSupply)
 	log.Debugf("\t MintThreshold: %v -> %v", previousMetadata.MintThreshold, metadata.MintThreshold)
 	log.Debugf("\t ReregistrationThreshold: %v -> %v", previousMetadata.ReregistrationThreshold, metadata.ReregistrationThreshold)
-	log.Debugf("\t ExpireHeight: %v -> %v", previousMetadata.ExpireHeight, metadata.ExpireHeight)
+	log.Debugf("\t ReregistrationExpireHeight: %v -> %v", previousMetadata.ReregistrationExpireHeight, metadata.ReregistrationExpireHeight)
 	log.Debugf("\t UnitScale: %v -> %v", previousMetadata.UnitScale, metadata.UnitScale)
 	log.Debugf("\t Previous IssuerTokens: len = %d", len(previousMetadata.IssuerTokens))
 	for i := 0; i < len(previousMetadata.IssuerTokens); i++ {

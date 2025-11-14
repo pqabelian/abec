@@ -45,7 +45,7 @@ type Metadata struct {
 	IssuerTokens            []string
 	MintThreshold           uint8
 	ReregistrationThreshold uint8
-	ExpireHeight            int32 // ReregistrationExpireHeight
+	ExpireHeight            int32 // ReregistrationExpireHeight // todo: ReregistrationExpireHeight
 
 	MintedAmount uint64
 	BurnedAmount uint64
@@ -512,7 +512,7 @@ func RegisteredCTAUTMetadata(ctAutScript CTAUTScript, txVersion uint32, txID str
 		IssuerTokens:            issuerTokenStrs,
 		MintThreshold:           registerScript.MintThreshold(),
 		ReregistrationThreshold: registerScript.ReregisterThreshold(),
-		ExpireHeight:            registerScript.ExpireHeight(),
+		ExpireHeight:            registerScript.ReregistrationExpireHeight(),
 		MintedAmount:            0,
 		BurnedAmount:            0,
 		//RootTokenSet:            make(map[HostOutPoint]struct{}, len(rootTokens)),
@@ -568,7 +568,7 @@ func UpdateCTAUTMetadata(script CTAUTScript, txVersion uint32, txID string, seri
 
 		metadata.MintThreshold = ctAutScript.MintThreshold()
 		metadata.ReregistrationThreshold = ctAutScript.ReregisterThreshold()
-		metadata.ExpireHeight = ctAutScript.ExpireHeight()
+		metadata.ExpireHeight = ctAutScript.ReregistrationExpireHeight()
 
 		//metadata.RootTokenSet = make(map[HostOutPoint]struct{}, len(rootTokens))
 		//for i := 0; i < len(rootTokens); i++ {
