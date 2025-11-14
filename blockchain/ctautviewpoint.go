@@ -364,7 +364,7 @@ func (view *CTAUTViewpoint) connectMintScript(script *ctaut.EnhancedCTAUTScript,
 	if script.Type() != ctaut.Mint {
 		return fmt.Errorf("expected mint script, but got %d")
 	}
-	mintScript, ok := script.CTAUTScript.(*ctaut.MintScript)
+	mintScript, ok := script.AutScript.(*ctaut.MintScript)
 	if !ok {
 		return fmt.Errorf("invalid script type for mint transaction")
 	}
@@ -586,7 +586,7 @@ func (view *CTAUTViewpoint) connectTransaction(tx *abeutil.TxAbe, blockHeight in
 	}
 	txHash := tx.Hash()
 
-	switch script.CTAUTScript.(type) {
+	switch script.AutScript.(type) {
 	case *ctaut.RegistrationScript:
 		err = view.connectRegistrationScript(script, *txHash, blockHeight, sctauts)
 		if err != nil {
@@ -950,7 +950,7 @@ func (view *CTAUTViewpoint) disconnectCTAUTScripts(db database.DB, block *abeuti
 		if err != nil {
 			return nil, err
 		}
-		switch ctAutScript.Script.CTAUTScript.(type) {
+		switch ctAutScript.Script.AutScript.(type) {
 		case *ctaut.RegistrationScript:
 			unregisteredInstances, err := view.disconnectRegistrationTransaction(db, ctAutScript.Script, blockHeight, sauts[index])
 			if err != nil {
@@ -1138,7 +1138,7 @@ func (view *CTAUTViewpoint) fetchConsumedCTAUTTokens(db database.DB, block *abeu
 
 func (view *CTAUTViewpoint) SpendCTAutScript(script *ctaut.EnhancedCTAUTScript, txHash *chainhash.Hash, blockHeight int32) error {
 	var err error
-	switch script.CTAUTScript.(type) {
+	switch script.AutScript.(type) {
 	case *ctaut.RegistrationScript:
 		err = view.connectRegistrationScript(script, *txHash, blockHeight, nil)
 		if err != nil {
@@ -1197,7 +1197,7 @@ func (b *BlockChain) FetchCTAUTView(script *ctaut.EnhancedCTAUTScript) (*CTAUTVi
 
 	neededSet := make(map[ctaut.HostOutPoint]struct{})
 
-	switch script.CTAUTScript.(type) {
+	switch script.AutScript.(type) {
 	case *ctaut.RegistrationScript:
 		// nothing
 		// all root coin would be fetched with instance

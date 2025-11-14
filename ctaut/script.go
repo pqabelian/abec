@@ -354,18 +354,19 @@ func (autMetadata *AutMetadata) Clone() *AutMetadata {
 		Version:       autMetadata.Version,
 		AutIdentifier: [CTAUTIdentifierLength]byte{},
 
-		AutName:      make([]byte, len(autMetadata.AutName)),
-		AutSymbol:    make([]byte, len(autMetadata.AutSymbol)),
-		BaseUnitName: make([]byte, len(autMetadata.BaseUnitName)),
-		SubUnitName:  make([]byte, len(autMetadata.SubUnitName)),
-		UnitScale:    autMetadata.UnitScale,
-		AutMemo:      make([]byte, len(autMetadata.AutMemo)),
+		AutName:            make([]byte, len(autMetadata.AutName)),
+		AutSymbol:          make([]byte, len(autMetadata.AutSymbol)),
+		BaseUnitName:       make([]byte, len(autMetadata.BaseUnitName)),
+		SubUnitName:        make([]byte, len(autMetadata.SubUnitName)),
+		UnitScale:          autMetadata.UnitScale,
+		AutMemo:            make([]byte, len(autMetadata.AutMemo)),
+		PlannedTotalSupply: autMetadata.PlannedTotalSupply,
 
-		IssuerTokens:               make([][]byte, len(autMetadata.IssuerTokens)),
+		IssuerTokens: make([][]byte, len(autMetadata.IssuerTokens)),
+
+		ReregistrationExpireHeight: autMetadata.ReregistrationExpireHeight,
 		ReregistrationThreshold:    autMetadata.ReregistrationThreshold,
 		MintThreshold:              autMetadata.MintThreshold,
-		PlannedTotalSupply:         autMetadata.PlannedTotalSupply,
-		ReregistrationExpireHeight: autMetadata.ReregistrationExpireHeight,
 
 		MintedAmount:       autMetadata.MintedAmount,
 		BurnedAmount:       autMetadata.BurnedAmount,
@@ -400,6 +401,18 @@ func (autMetadata *AutMetadata) Clone() *AutMetadata {
 // todo: as we add version control, could we modify the ScriptFlag to "AutScript"?
 // todo: To implement an interface, implement the functions or methods?
 type CTAUTScript interface {
+	Version() uint32
+	Type() CTAUTScriptType
+	Identifier() [CTAUTIdentifierLength]byte
+
+	Serialize() ([]byte, error)
+	Deserialize(io.Reader) error // todo: make it to be symmetric? say, take []byte as input?
+
+	NumConsumedTokens() int // todo: why not directly uint8? if leave it to be int, need to check when set this value.
+	NumGeneratedTokens() int
+}
+
+type AutScript interface {
 	Version() uint32
 	Type() CTAUTScriptType
 	Identifier() [CTAUTIdentifierLength]byte
@@ -735,7 +748,7 @@ func (script *RegistrationScript) ReregistrationExpireHeight() int32 {
 	return script.reregistrationExpireHeight
 }
 
-var _ CTAUTScript = &RegistrationScript{}
+var _ AutScript = &RegistrationScript{}
 
 // ReRegistrationScript would be the structured script parsed from memo in host transaction,
 // 1. The field values used to update the metadata will be extracted from the scripts with ReRegistrationScript.UpdateMetadata()
@@ -993,7 +1006,7 @@ func (script *ReRegistrationScript) NumGeneratedTokens() int {
 	return int(script.outAutRootTokenNum)
 }
 
-var _ CTAUTScript = &ReRegistrationScript{}
+var _ AutScript = &ReRegistrationScript{}
 
 // MintScript would be the structured script parsed from memo in host transaction,
 // 1. the minted amount with such a script MUST be explicit specified
@@ -1210,7 +1223,7 @@ func (script *MintScript) NumGeneratedTokens() int {
 	return int(script.outCTAutTokenNum + script.outPlainAutTokenNum)
 }
 
-var _ CTAUTScript = &MintScript{}
+var _ AutScript = &MintScript{}
 
 // TransferScript would be the structured script parsed from memo in host transaction,
 // 1. the number of consumed CT-Token and Plain-Token MUST be explicit specified
@@ -1427,7 +1440,7 @@ func (script *TransferScript) NumGeneratedTokens() int {
 	return int(script.outCTAutTokenNum + script.outPlainAutTokenNum)
 }
 
-var _ CTAUTScript = &TransferScript{}
+var _ AutScript = &TransferScript{}
 
 // BurnScript would be the structured script parsed from memo in host transaction,
 // 1. the number of consumed CT-Token and Plain-Token MUST be explicit specified
@@ -1645,15 +1658,15 @@ func (script *BurnScript) NumGeneratedTokens() int {
 	return int(script.outCTAutTokenNum + script.outPlainAutTokenNum)
 }
 
-var _ CTAUTScript = &BurnScript{}
+var _ AutScript = &BurnScript{}
 
 var ErrNonAutTx = errors.New("not a AUT transaction")
 var ErrInValidAUTTx = errors.New("not a valid AUT transaction")
 
-// ParseCTAUTScript try to deserialize CTAUT script from transaction memo
+// ParseAutScript try to deserialize CTAUT script from transaction memo
 // todo: rename memo to TxMemo
 // todo: why not use a MsgTxAbe as input?
-func ParseCTAUTScript(txVersion uint32, txHash chainhash.Hash, memo []byte) (script CTAUTScript, err error) {
+func ParseAutScript(txVersion uint32, txHash chainhash.Hash, memo []byte) (script AutScript, err error) {
 	if txVersion < wire.TxVersion_Height_464000_Aconcagua {
 		return nil, nil
 	}
@@ -1753,8 +1766,9 @@ type CTAUTToken struct {
 }
 
 // todo: what is this?
+// todo: rename
 type EnhancedCTAUTScript struct {
-	CTAUTScript
+	AutScript
 
 	// Note that for following 2 fields:
 	// - if the value is nil, it means that the tokens is not set
@@ -1805,7 +1819,7 @@ func (script *EnhancedCTAUTScript) Metadata() (*AutMetadata, error) {
 		return nil, errors.New("generated tokens not set")
 	}
 
-	registerScript, ok := script.CTAUTScript.(*RegistrationScript)
+	registerScript, ok := script.AutScript.(*RegistrationScript)
 	if !ok {
 		return nil, errors.New("metadata only available for registration script")
 	}
@@ -1857,7 +1871,7 @@ func (script *EnhancedCTAUTScript) UpdateMetadata(metadata *AutMetadata) error {
 		delete(metadata.ActiveRootTokenSet, consumedTokens[i].HostOutPoint)
 	}
 
-	reregisterScript, ok := script.CTAUTScript.(*ReRegistrationScript)
+	reregisterScript, ok := script.AutScript.(*ReRegistrationScript)
 	if !ok {
 		return errors.New("update metadata only available for re-registration script")
 	}
@@ -1901,12 +1915,13 @@ func (script *EnhancedCTAUTScript) UpdateMetadata(metadata *AutMetadata) error {
 //
 // todo: CTAUT to Aut?
 // todo: what is the relation with Parse
+// todo: rename to Aut
 func ExtractCTAUTScript(tx *wire.MsgTxAbe) (enhancedScript *EnhancedCTAUTScript, err error) {
 	if tx.Version < wire.TxVersion_Height_464000_Aconcagua {
 		return nil, nil
 	}
 	// parse script from memo and check well-formedness
-	autScript, err := ParseCTAUTScript(tx.Version, tx.TxHash(), tx.TxMemo)
+	autScript, err := ParseAutScript(tx.Version, tx.TxHash(), tx.TxMemo)
 	if err != nil {
 		return nil, err
 	}
@@ -1916,11 +1931,11 @@ func ExtractCTAUTScript(tx *wire.MsgTxAbe) (enhancedScript *EnhancedCTAUTScript,
 
 	// populate the generated tokens with host transaction outputs
 	enhancedScript = &EnhancedCTAUTScript{
-		CTAUTScript:     autScript,
+		AutScript:       autScript,
 		consumedTokens:  nil,
 		generatedTokens: nil,
 	}
-	tokens, err := GetGeneratedCTAUTTokens(autScript, tx.TxHash(), tx.TxOuts)
+	tokens, err := GetGeneratedAutTokens(autScript, tx.TxHash(), tx.TxOuts)
 	if err != nil {
 		return nil, err
 	}
@@ -2012,7 +2027,7 @@ func ExtractCTAUTScript(tx *wire.MsgTxAbe) (enhancedScript *EnhancedCTAUTScript,
 func PresetHostOutpointForCTAUT(script *EnhancedCTAUTScript, msgTx *wire.MsgTxAbe,
 	lookupHostOutput func(ringHash chainhash.Hash) (*wire.TxOutAbe, error),
 ) error {
-	if script == nil || script.CTAUTScript == nil {
+	if script == nil || script.AutScript == nil {
 		return nil
 	}
 	if script.Type() == Registration {

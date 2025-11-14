@@ -769,7 +769,7 @@ func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 	}
 	if script != nil {
 		if script.Type() == ctaut.Registration {
-			ctAutScript := script.CTAUTScript.(*ctaut.RegistrationScript)
+			ctAutScript := script.AutScript.(*ctaut.RegistrationScript)
 			willExpiredCTAut := mp.expiredHeightAUT[ctAutScript.ReregistrationExpireHeight()]
 			delete(willExpiredCTAut, *tx.Hash())
 			if len(willExpiredCTAut) > 0 {
@@ -917,7 +917,7 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 		return nil, errors.New("fail to extract CT-AUT transaction")
 	}
 	if script != nil {
-		switch ctAutScript := script.CTAUTScript.(type) {
+		switch ctAutScript := script.AutScript.(type) {
 		case *ctaut.RegistrationScript:
 			expireHeight := ctAutScript.ReregistrationExpireHeight()
 			if mp.expiredHeightAUT[expireHeight] == nil {

@@ -29,7 +29,7 @@ const (
 	CTAUTTypeBurn           CTAUTScriptType = ctaut.Burn
 )
 
-type CTAUTScript = ctaut.CTAUTScript
+type AutScript = ctaut.AutScript
 type HostOutPoint = ctaut.HostOutPoint
 type Metadata struct {
 	Version         uint32
@@ -459,18 +459,18 @@ func ExtractAutTokenValue(version uint32, valueScript []byte, cryptoValuePublicK
 	return value, autTxoType, nil
 }
 
-func ParseCTAUTScript(txVersion uint32, txID string, memo []byte) (CTAUTScript, error) {
+func ParseAutScript(txVersion uint32, txID string, memo []byte) (AutScript, error) {
 	txHash, err := chainhash.NewHashFromStr(txID)
 	if err != nil {
 		return nil, err
 	}
-	return ctaut.ParseCTAUTScript(txVersion, *txHash, memo)
+	return ctaut.ParseAutScript(txVersion, *txHash, memo)
 }
-func RegisteredCTAUTMetadata(ctAutScript CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte) (*Metadata, error) {
-	if ctAutScript == nil {
+func RegisteredAutMetadata(autScript AutScript, txVersion uint32, txID string, serializedTxOuts [][]byte) (*Metadata, error) {
+	if autScript == nil {
 		return nil, errors.New("ctaut script is nil")
 	}
-	if ctAutScript.Type() != ctaut.Registration {
+	if autScript.Type() != ctaut.Registration {
 		return nil, errors.New("ctaut script type is not Registration")
 	}
 	abeTxos := make([]*wire.TxOutAbe, len(serializedTxOuts))
@@ -487,12 +487,12 @@ func RegisteredCTAUTMetadata(ctAutScript CTAUTScript, txVersion uint32, txID str
 	//	return nil, err
 	//}
 
-	//rootTokens, err := ctaut.GetGeneratedCTAUTTokens(ctAutScript, *txHash, abeTxos)
+	//rootTokens, err := ctaut.GetGeneratedCTAUTTokens(autScript, *txHash, abeTxos)
 	//if err != nil {
 	//	return nil, err
 	//}
 
-	registerScript := ctAutScript.(*ctaut.RegistrationScript)
+	registerScript := autScript.(*ctaut.RegistrationScript)
 	identifier := registerScript.Identifier()
 	issuerTokens := registerScript.IssuerTokens()
 	issuerTokenStrs := make([]string, len(issuerTokens))
@@ -521,15 +521,15 @@ func RegisteredCTAUTMetadata(ctAutScript CTAUTScript, txVersion uint32, txID str
 	return metadata, nil
 }
 
-func UpdateCTAUTMetadata(script CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte, metadata *Metadata) error {
-	if script == nil {
+func UpdateAutMetadata(autScript AutScript, txVersion uint32, txID string, serializedTxOuts [][]byte, metadata *Metadata) error {
+	if autScript == nil {
 		return errors.New("ctaut script is nil")
 	}
 	if metadata == nil {
 		return errors.New("metadata is nil")
 	}
 
-	identifier := script.Identifier()
+	identifier := autScript.Identifier()
 	if hex.EncodeToString(identifier[:]) != metadata.CTAutIdentifier {
 		return errors.New("ctaut script identifier is not equal to metadata identifier")
 	}
@@ -548,7 +548,7 @@ func UpdateCTAUTMetadata(script CTAUTScript, txVersion uint32, txID string, seri
 		return err
 	}
 
-	switch ctAutScript := script.(type) {
+	switch ctAutScript := autScript.(type) {
 	case *ctaut.RegistrationScript:
 		return errors.New("ctaut script type is Registration")
 	case *ctaut.ReRegistrationScript:
@@ -585,7 +585,7 @@ func UpdateCTAUTMetadata(script CTAUTScript, txVersion uint32, txID string, seri
 		return nil
 	case *ctaut.BurnScript:
 		// the last token would be view as burned
-		tokens, err := ctaut.GetGeneratedCTAUTTokens(ctAutScript, *txHash, abeTxos)
+		tokens, err := ctaut.GetGeneratedAutTokens(ctAutScript, *txHash, abeTxos)
 		if err != nil {
 			return err
 		}
@@ -620,8 +620,8 @@ func UpdateCTAUTMetadata(script CTAUTScript, txVersion uint32, txID string, seri
 	}
 }
 
-func GetGeneratedOutpoints(ctAutScript CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte) (uint32, []*OutPoint, [][]byte, error) {
-	if ctAutScript == nil {
+func GetGeneratedOutpoints(autScript AutScript, txVersion uint32, txID string, serializedTxOuts [][]byte) (uint32, []*OutPoint, [][]byte, error) {
+	if autScript == nil {
 		return 0, nil, nil, nil
 	}
 	abeTxos := make([]*wire.TxOutAbe, len(serializedTxOuts))
@@ -638,7 +638,7 @@ func GetGeneratedOutpoints(ctAutScript CTAUTScript, txVersion uint32, txID strin
 		return 0, nil, nil, err
 	}
 
-	generatedTokens, err := ctaut.GetGeneratedCTAUTTokens(ctAutScript, *txHash, abeTxos)
+	generatedTokens, err := ctaut.GetGeneratedAutTokens(autScript, *txHash, abeTxos)
 	if err != nil {
 		return 0, nil, nil, err
 	}
@@ -653,7 +653,7 @@ func GetGeneratedOutpoints(ctAutScript CTAUTScript, txVersion uint32, txID strin
 		}
 		valueScripts[i] = token.ValueScript
 	}
-	return ctAutScript.Version(), res, valueScripts, nil
+	return autScript.Version(), res, valueScripts, nil
 }
 func GetConsumedOutpoints(serializedTx []byte, rings map[string]*TxoRing) ([]*OutPoint, error) {
 	tx, err := abeutil.NewTxAbeFromBytes(serializedTx)

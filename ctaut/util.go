@@ -271,9 +271,9 @@ func CheckHostTxoParasiticity(txHash chainhash.Hash, outputIndex uint8, txOut *w
 	return coinAddress, nil
 }
 
-// GetGeneratedCTAUTTokens would get the specified host output from the host transaction
+// GetGeneratedAutTokens would get the specified host output from the host transaction
 // todo(ctaut): add comments to define the rules
-func GetGeneratedCTAUTTokens(script CTAUTScript, txHash chainhash.Hash, txOuts []*wire.TxOutAbe) ([]*CTAUTToken, error) {
+func GetGeneratedAutTokens(script AutScript, txHash chainhash.Hash, txOuts []*wire.TxOutAbe) ([]*CTAUTToken, error) {
 	numCTAUTTokens := script.NumGeneratedTokens()
 	startIdx := 0
 	for ; startIdx < len(txOuts); startIdx++ {
