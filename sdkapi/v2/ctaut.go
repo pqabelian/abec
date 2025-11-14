@@ -916,7 +916,7 @@ func CreateTransferTxByCryptoKeysForCTAUT(serializedTransferTxRequestDesc []byte
 	return buf.Bytes(), &trTxId, nil
 }
 
-func CTAUTIdentifierKey(txID string) (res [ctaut.AutIdentifierLength]byte, err error) {
+func AutIdentifierKey(txID string) (res [ctaut.AutIdentifierLength]byte, err error) {
 	txHash, err := chainhash.NewHashFromStr(txID)
 	if err != nil {
 		return res, err
