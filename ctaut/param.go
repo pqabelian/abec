@@ -32,7 +32,6 @@ const MaxAutNameLength = 64
 // A short, human-readable string that acts as a ticker for the token.
 // The best practice in ERC-20 in length is on is 3~5 letters.
 
-const MaxCTAUTSymbolLength = 32
 const MaxAutSymbolLength = 32
 
 const MaxBaseUnitLength = 32
