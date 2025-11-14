@@ -1827,7 +1827,7 @@ func (script *EnhancedCTAUTScript) Metadata() (*AutMetadata, error) {
 		IssuerTokens:               registerScript.issuerTokens,
 		MintThreshold:              registerScript.mintThreshold,
 		ReregistrationThreshold:    registerScript.reregisterThreshold,
-		ReregistrationExpireHeight: registerScript.ReregistrationExpireHeight,
+		ReregistrationExpireHeight: registerScript.reregistrationExpireHeight,
 
 		MintedAmount:       0,
 		BurnedAmount:       0,
