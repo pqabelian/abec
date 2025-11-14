@@ -140,84 +140,84 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 	size := autMetadata.serializeSize()
 	// Serialize the header code followed by the compressed unspent
 	// transaction output.
-	buff := bytes.NewBuffer(make([]byte, 0, size))
+	w := bytes.NewBuffer(make([]byte, 0, size))
 
-	if err = wire.WriteVarInt(buff, 0, uint64(autMetadata.Version)); err != nil {
+	if err = wire.WriteVarInt(w, 0, uint64(autMetadata.Version)); err != nil {
 		return nil, err
 	}
-	if err = wire.WriteVarBytes(buff, 0, autMetadata.AutIdentifier[:]); err != nil {
-		return nil, err
-	}
-
-	if err = wire.WriteVarBytes(buff, 0, autMetadata.AutName); err != nil {
-		return nil, err
-	}
-	if err = wire.WriteVarBytes(buff, 0, autMetadata.AutSymbol); err != nil {
+	if err = wire.WriteVarBytes(w, 0, autMetadata.AutIdentifier[:]); err != nil {
 		return nil, err
 	}
 
-	if err = wire.WriteVarBytes(buff, 0, autMetadata.BaseUnitName); err != nil {
+	if err = wire.WriteVarBytes(w, 0, autMetadata.AutName); err != nil {
 		return nil, err
 	}
-	if err = wire.WriteVarBytes(buff, 0, autMetadata.SubUnitName); err != nil {
-		return nil, err
-	}
-	if err = wire.WriteVarInt(buff, 0, autMetadata.UnitScale); err != nil {
+	if err = wire.WriteVarBytes(w, 0, autMetadata.AutSymbol); err != nil {
 		return nil, err
 	}
 
-	if err = wire.WriteVarBytes(buff, 0, autMetadata.AutMemo); err != nil {
+	if err = wire.WriteVarBytes(w, 0, autMetadata.BaseUnitName); err != nil {
+		return nil, err
+	}
+	if err = wire.WriteVarBytes(w, 0, autMetadata.SubUnitName); err != nil {
+		return nil, err
+	}
+	if err = wire.WriteVarInt(w, 0, autMetadata.UnitScale); err != nil {
 		return nil, err
 	}
 
-	if err = wire.WriteVarInt(buff, 0, autMetadata.PlannedTotalSupply); err != nil {
+	if err = wire.WriteVarBytes(w, 0, autMetadata.AutMemo); err != nil {
 		return nil, err
 	}
 
-	err = wire.WriteVarInt(buff, 0, uint64(len(autMetadata.IssuerTokens)))
+	if err = wire.WriteVarInt(w, 0, autMetadata.PlannedTotalSupply); err != nil {
+		return nil, err
+	}
+
+	err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.IssuerTokens)))
 	if err != nil {
 		return nil, err
 	}
 	for i := 0; i < len(autMetadata.IssuerTokens); i++ {
-		err = wire.WriteVarBytes(buff, 0, autMetadata.IssuerTokens[i])
+		err = wire.WriteVarBytes(w, 0, autMetadata.IssuerTokens[i])
 		if err != nil {
 			return nil, fmt.Errorf("error to write issuer token: %v", err)
 		}
 	}
 
-	if err = wire.WriteVarInt(buff, 0, uint64(autMetadata.ReregistrationExpireHeight)); err != nil {
+	if err = wire.WriteVarInt(w, 0, uint64(autMetadata.ReregistrationExpireHeight)); err != nil {
 		return nil, err
 	}
 
-	if err = buff.WriteByte(autMetadata.ReregistrationThreshold); err != nil {
+	if err = w.WriteByte(autMetadata.ReregistrationThreshold); err != nil {
 		return nil, err
 	}
-	if err = buff.WriteByte(autMetadata.MintThreshold); err != nil {
+	if err = w.WriteByte(autMetadata.MintThreshold); err != nil {
 		return nil, err
 	}
 
-	err = wire.WriteVarInt(buff, 0, autMetadata.MintedAmount)
+	err = wire.WriteVarInt(w, 0, autMetadata.MintedAmount)
 	if err != nil {
 		return nil, err
 	}
 
-	err = wire.WriteVarInt(buff, 0, autMetadata.BurnedAmount)
+	err = wire.WriteVarInt(w, 0, autMetadata.BurnedAmount)
 	if err != nil {
 		return nil, err
 	}
 
-	err = wire.WriteVarInt(buff, 0, uint64(len(autMetadata.ActiveRootTokenSet)))
+	err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.ActiveRootTokenSet)))
 	if err != nil {
 		return nil, err
 	}
 	for hostOutPoint := range autMetadata.ActiveRootTokenSet {
-		err = wire.WriteOutPointAbe(buff, 0, 0, &hostOutPoint)
+		err = wire.WriteOutPointAbe(w, 0, 0, &hostOutPoint)
 		if err != nil {
 			return nil, fmt.Errorf("error to write active root token: %v", err)
 		}
 	}
 
-	serializedMetadata := buff.Bytes()
+	serializedMetadata := w.Bytes()
 
 	// todo: the following codes are necessary or only for test?
 	tmpMetadata := &AutMetadata{}
