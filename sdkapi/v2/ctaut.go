@@ -19,14 +19,14 @@ import (
 const TxVersionCTAUT = wire.TxVersion_Height_464000_Aconcagua
 const CTAUTIdentifierLength = ctaut.CTAUTIdentifierLength
 
-type CTAUTScriptType = ctaut.CTAUTScriptType
+type AutScriptType = ctaut.AutScriptType
 
 const (
-	CTAUTTypeRegistration   CTAUTScriptType = ctaut.Registration
-	CTAUTTypeReRegistration CTAUTScriptType = ctaut.ReRegistration
-	CTAUTTypeMint           CTAUTScriptType = ctaut.Mint
-	CTAUTTypeTransfer       CTAUTScriptType = ctaut.Transfer
-	CTAUTTypeBurn           CTAUTScriptType = ctaut.Burn
+	AutScriptTypeRegistration   AutScriptType = ctaut.Registration
+	AutScriptTypeReRegistration AutScriptType = ctaut.ReRegistration
+	AutScriptTypeMint           AutScriptType = ctaut.Mint
+	AutScriptTypeTransfer       AutScriptType = ctaut.Transfer
+	AutScriptTypeBurn           AutScriptType = ctaut.Burn
 )
 
 type AutScript = ctaut.AutScript

@@ -9,14 +9,14 @@ import (
 // Use a constant string to avoid unconscious modifications
 const commonPrefix = "AUTSCRIPT"
 
-type CTAUTScriptType = uint8
+type AutScriptType = uint8
 
 const (
-	Registration   CTAUTScriptType = 0
-	ReRegistration CTAUTScriptType = 1
-	Mint           CTAUTScriptType = 2
-	Transfer       CTAUTScriptType = 3
-	Burn           CTAUTScriptType = 4
+	Registration   AutScriptType = 0
+	ReRegistration AutScriptType = 1
+	Mint           AutScriptType = 2
+	Transfer       AutScriptType = 3
+	Burn           AutScriptType = 4
 )
 
 const CTAUTIdentifierLength = chainhash.HashSize

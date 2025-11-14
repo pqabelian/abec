@@ -22,7 +22,7 @@ func init() {
 	}
 }
 
-func writePrefix(b *bytes.Buffer, scriptVersion uint32, ctautTxType CTAUTScriptType, autIdentifier [CTAUTIdentifierLength]byte) error {
+func writePrefix(b *bytes.Buffer, scriptVersion uint32, autScriptType AutScriptType, autIdentifier [CTAUTIdentifierLength]byte) error {
 	err := WriteFixedBytes(b, []byte(commonPrefix))
 	if err != nil {
 		return err
@@ -33,7 +33,7 @@ func writePrefix(b *bytes.Buffer, scriptVersion uint32, ctautTxType CTAUTScriptT
 		return err
 	}
 
-	err = WriteByte(b, ctautTxType)
+	err = WriteByte(b, autScriptType)
 	if err != nil {
 		return err
 	}
@@ -42,7 +42,7 @@ func writePrefix(b *bytes.Buffer, scriptVersion uint32, ctautTxType CTAUTScriptT
 }
 
 // todo: discuss: shall remove expectedCtAutTxType? leave the check to the caller
-func readPrefix(r io.Reader, expectedCtAutTxType CTAUTScriptType) (uint32, [CTAUTIdentifierLength]byte, CTAUTScriptType, error) {
+func readPrefix(r io.Reader, expectedAutScriptType AutScriptType) (uint32, [CTAUTIdentifierLength]byte, AutScriptType, error) {
 	var res [CTAUTIdentifierLength]byte
 
 	commprefix, err := ReadFixedBytes(r, len(commonPrefix))
@@ -61,11 +61,11 @@ func readPrefix(r io.Reader, expectedCtAutTxType CTAUTScriptType) (uint32, [CTAU
 		return 0, res, 0, ErrInValidAUTTx
 	}
 
-	ctAutScriptType, err := ReadByte(r)
+	autScriptType, err := ReadByte(r)
 	if err != nil {
 		return 0, res, 0, err
 	}
-	if ctAutScriptType != expectedCtAutTxType {
+	if autScriptType != expectedAutScriptType {
 		return 0, res, 0, ErrInValidAUTTx
 	}
 
@@ -75,7 +75,7 @@ func readPrefix(r io.Reader, expectedCtAutTxType CTAUTScriptType) (uint32, [CTAU
 	}
 	copy(res[:], identifier)
 
-	return uint32(scriptVersion), res, ctAutScriptType, nil
+	return uint32(scriptVersion), res, autScriptType, nil
 }
 
 func writeIssuerTokens(b *bytes.Buffer, issuerTokens [][]byte) error {

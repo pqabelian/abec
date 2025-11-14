@@ -397,24 +397,9 @@ func (autMetadata *AutMetadata) Clone() *AutMetadata {
 	return cloned
 }
 
-// todo: AutScript?
-// todo: as we add version control, could we modify the ScriptFlag to "AutScript"?
-// todo: To implement an interface, implement the functions or methods?
-type CTAUTScript interface {
-	Version() uint32
-	Type() CTAUTScriptType
-	Identifier() [CTAUTIdentifierLength]byte
-
-	Serialize() ([]byte, error)
-	Deserialize(io.Reader) error // todo: make it to be symmetric? say, take []byte as input?
-
-	NumConsumedTokens() int // todo: why not directly uint8? if leave it to be int, need to check when set this value.
-	NumGeneratedTokens() int
-}
-
 type AutScript interface {
 	Version() uint32
-	Type() CTAUTScriptType
+	Type() AutScriptType
 	Identifier() [CTAUTIdentifierLength]byte
 
 	Serialize() ([]byte, error)
@@ -455,7 +440,7 @@ type RegistrationScript struct {
 	// that the same tx's version may support different autScriptVersion.
 	// // todo: if use the above design, the AutTxo.Version should use ScriptVersion, not the host-tx's version.
 	version    uint32 // TODO(CTAUT) add version field in script self, check the usage version and the relation with the version in host transaction
-	scriptType CTAUTScriptType
+	scriptType AutScriptType
 
 	// populate with txid of host transaction
 	ctAutIdentifier [CTAUTIdentifierLength]byte
@@ -559,7 +544,7 @@ func NewRegistrationScript(
 func (script *RegistrationScript) Version() uint32 {
 	return script.version
 }
-func (script *RegistrationScript) Type() CTAUTScriptType {
+func (script *RegistrationScript) Type() AutScriptType {
 	return script.scriptType
 }
 func (script *RegistrationScript) Identifier() [CTAUTIdentifierLength]byte {
@@ -771,7 +756,7 @@ var _ AutScript = &RegistrationScript{}
 // <Memo> a byte array with max length, for this transaction
 type ReRegistrationScript struct {
 	version         uint32
-	scriptType      CTAUTScriptType
+	scriptType      AutScriptType
 	ctAutIdentifier [CTAUTIdentifierLength]byte
 
 	ctAutMemo []byte
@@ -847,7 +832,7 @@ func (script *ReRegistrationScript) ReregistrationExpireHeight() int32 {
 func (script *ReRegistrationScript) Version() uint32 {
 	return script.version
 }
-func (script *ReRegistrationScript) Type() CTAUTScriptType {
+func (script *ReRegistrationScript) Type() AutScriptType {
 	return ReRegistration
 }
 
@@ -1027,7 +1012,7 @@ var _ AutScript = &ReRegistrationScript{}
 // <Memo> a byte array with max length, for this transaction
 type MintScript struct {
 	version         uint32
-	scriptType      CTAUTScriptType
+	scriptType      AutScriptType
 	ctAutIdentifier [CTAUTIdentifierLength]byte
 
 	vin uint64
@@ -1075,7 +1060,7 @@ func NewMintScript(version uint32,
 func (script *MintScript) Version() uint32 {
 	return script.version
 }
-func (script *MintScript) Type() CTAUTScriptType {
+func (script *MintScript) Type() AutScriptType {
 	return script.scriptType
 }
 func (script *MintScript) Identifier() [CTAUTIdentifierLength]byte {
@@ -1244,7 +1229,7 @@ var _ AutScript = &MintScript{}
 // <Memo> a byte array with max length, for this transaction
 type TransferScript struct {
 	version         uint32
-	scriptType      CTAUTScriptType
+	scriptType      AutScriptType
 	ctAutIdentifier [CTAUTIdentifierLength]byte
 
 	inCTAutTokenNum    uint8
@@ -1291,7 +1276,7 @@ func NewTransferScript(
 	}
 }
 
-func (script *TransferScript) Type() CTAUTScriptType {
+func (script *TransferScript) Type() AutScriptType {
 	return script.scriptType
 }
 
@@ -1462,7 +1447,7 @@ var _ AutScript = &TransferScript{}
 // <Memo> a byte array with max length, for this transaction
 type BurnScript struct {
 	version         uint32
-	scriptType      CTAUTScriptType
+	scriptType      AutScriptType
 	ctAutIdentifier [CTAUTIdentifierLength]byte
 
 	inCTAutTokenNum     uint8
@@ -1508,7 +1493,7 @@ func NewBurnScript(
 	}
 }
 
-func (script *BurnScript) Type() CTAUTScriptType {
+func (script *BurnScript) Type() AutScriptType {
 	return script.scriptType
 }
 
