@@ -1694,10 +1694,10 @@ func ParseAutScript(txVersion uint32, txHash chainhash.Hash, memo []byte) (scrip
 	switch scriptType {
 	case AutScriptTypeRegistration:
 		script = &RegistrationScript{}
-	case AutScriptTypeMint:
-		script = &MintScript{}
 	case AutScriptTypeReRegistration:
 		script = &ReRegistrationScript{}
+	case AutScriptTypeMint:
+		script = &MintScript{}
 	case AutScriptTypeTransfer:
 		script = &TransferScript{}
 	case AutScriptTypeBurn:
