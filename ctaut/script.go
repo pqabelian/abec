@@ -123,11 +123,6 @@ func (autMetadata *AutMetadata) serializeSize() int {
 		n += wire.VarIntSerializeSize(uint64(len(point.TxHash))) + len(point.TxHash)
 		n += 1
 	}
-	for i := 0; i < len(autMetadata.IssuerTokens); i++ {
-		// actually fixed length
-		n += wire.VarIntSerializeSize(uint64(len(autMetadata.IssuerTokens[i]))) + len(autMetadata.IssuerTokens[i])
-		n += 1
-	}
 
 	return n
 }
