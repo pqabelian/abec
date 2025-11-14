@@ -91,32 +91,30 @@ type AutMetadata struct {
 }
 
 func (autMetadata *AutMetadata) serializeSize() int {
-	n :=
-	/*version, fixed length */ wire.VarIntSerializeSize(uint64(autMetadata.Version)) +
-		/*identifier, actually fixed length */ wire.VarIntSerializeSize(uint64(len(autMetadata.AutIdentifier))) + len(autMetadata.AutIdentifier) +
-		/* name, variable length */ wire.VarIntSerializeSize(uint64(len(autMetadata.AutName))) + len(autMetadata.AutName) +
-		/* symbol, variable length */ wire.VarIntSerializeSize(uint64(len(autMetadata.AutSymbol))) + len(autMetadata.AutSymbol) +
-		/* base unit, variable length */ wire.VarIntSerializeSize(uint64(len(autMetadata.BaseUnitName))) + len(autMetadata.BaseUnitName) +
-		/* sub unit, variable length */ wire.VarIntSerializeSize(uint64(len(autMetadata.SubUnitName))) + len(autMetadata.SubUnitName) +
-		/* scale, variable length */ wire.VarIntSerializeSize(autMetadata.UnitScale) +
-		/* memo, variable length */ wire.VarIntSerializeSize(uint64(len(autMetadata.AutMemo))) + len(autMetadata.AutMemo)
+	n := wire.VarIntSerializeSize(uint64(autMetadata.Version)) + //version
+		wire.VarIntSerializeSize(uint64(len(autMetadata.AutIdentifier))) + len(autMetadata.AutIdentifier) + // identifier, actually fixed length
+		wire.VarIntSerializeSize(uint64(len(autMetadata.AutName))) + len(autMetadata.AutName) + // name, variable length
+		wire.VarIntSerializeSize(uint64(len(autMetadata.AutSymbol))) + len(autMetadata.AutSymbol) + // symbol, variable length
+		wire.VarIntSerializeSize(uint64(len(autMetadata.BaseUnitName))) + len(autMetadata.BaseUnitName) + // base unit, variable length
+		wire.VarIntSerializeSize(uint64(len(autMetadata.SubUnitName))) + len(autMetadata.SubUnitName) + // sub unit, variable length
+		wire.VarIntSerializeSize(autMetadata.UnitScale) + // scale, variable length
+		wire.VarIntSerializeSize(uint64(len(autMetadata.AutMemo))) + len(autMetadata.AutMemo) // memo, variable length
 
-	n += /* planned amount */ wire.VarIntSerializeSize(autMetadata.PlannedTotalSupply)
+	n += wire.VarIntSerializeSize(autMetadata.PlannedTotalSupply) // planned amount
 
-	n += /* number of issuer tokens */ wire.VarIntSerializeSize(uint64(len(autMetadata.IssuerTokens)))
+	n += wire.VarIntSerializeSize(uint64(len(autMetadata.IssuerTokens))) // number of issuer tokens
 	for i := 0; i < len(autMetadata.IssuerTokens); i++ {
-		/* actually fixed length */
+		// actually fixed length
 		n += wire.VarIntSerializeSize(uint64(len(autMetadata.IssuerTokens[i]))) + len(autMetadata.IssuerTokens[i])
 	}
 
-	n +=
-	/* update threshold */ 1 +
-		/* issue threshold */ 1 +
-		/* expire height */ wire.VarIntSerializeSize(uint64(autMetadata.ExpireHeight))
+	n += 1 + // reregister threshold
+		1 + // mint threshold
+		wire.VarIntSerializeSize(uint64(autMetadata.ExpireHeight)) // expire height
 
-	n += /* minted amount,variable length */ wire.VarIntSerializeSize(autMetadata.MintedAmount) +
-		/* minted amount,variable length */ wire.VarIntSerializeSize(autMetadata.BurnedAmount) +
-		/* number of issuer tokens */ wire.VarIntSerializeSize(uint64(len(autMetadata.ActiveRootTokenSet)))
+	n += wire.VarIntSerializeSize(autMetadata.MintedAmount) + // minted amount,variable length
+		wire.VarIntSerializeSize(autMetadata.BurnedAmount) + // minted amount,variable length
+		wire.VarIntSerializeSize(uint64(len(autMetadata.ActiveRootTokenSet))) // number of issuer tokens
 
 	for point := range autMetadata.ActiveRootTokenSet {
 		// todo: why use the key rather than the value?
@@ -126,7 +124,7 @@ func (autMetadata *AutMetadata) serializeSize() int {
 		n += 1
 	}
 	for i := 0; i < len(autMetadata.IssuerTokens); i++ {
-		/* actually fixed length */
+		// actually fixed length
 		n += wire.VarIntSerializeSize(uint64(len(autMetadata.IssuerTokens[i]))) + len(autMetadata.IssuerTokens[i])
 		n += 1
 	}
