@@ -11,7 +11,7 @@ import (
 	"github.com/abesuite/abec/wire"
 )
 
-var TxVersionV3 = wire.TxVersion_Height_450000_Aconcagua
+var TxVersionV3 = wire.TxVersion_Height_464000_Aconcagua
 
 func CreateTransferTxByRootSeedV3(serializedTransferTxRequestDesc []byte, rootSeeds []*CryptoRootSeed) (serializedTxFull []byte, txId *TxId, err error) {
 	txRequestDesc, err := deserializeTransferTxRequestDesc(serializedTransferTxRequestDesc)

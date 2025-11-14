@@ -1657,7 +1657,7 @@ var ErrInValidAUTTx = errors.New("not a valid AUT transaction")
 // todo: rename memo to TxMemo
 // todo: why not use a MsgTxAbe as input?
 func ParseCTAUTScript(txVersion uint32, txHash chainhash.Hash, memo []byte) (script CTAUTScript, err error) {
-	if txVersion < wire.TxVersion_Height_450000_Aconcagua {
+	if txVersion < wire.TxVersion_Height_464000_Aconcagua {
 		return nil, nil
 	}
 
@@ -1905,7 +1905,7 @@ func (script *EnhancedCTAUTScript) UpdateMetadata(metadata *AutMetadata) error {
 // todo: CTAUT to Aut?
 // todo: what is the relation with Parse
 func ExtractCTAUTScript(tx *wire.MsgTxAbe) (enhancedScript *EnhancedCTAUTScript, err error) {
-	if tx.Version < wire.TxVersion_Height_450000_Aconcagua {
+	if tx.Version < wire.TxVersion_Height_464000_Aconcagua {
 		return nil, nil
 	}
 	// parse script from memo and check well-formedness

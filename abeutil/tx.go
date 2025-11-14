@@ -78,7 +78,7 @@ func (tx *TxAbe) AUTTransaction() (aut.Transaction, error) {
 
 // CTAUTTScript would extract the AUT script from memo in transaction
 func (tx *TxAbe) CTAUTTScript() (*ctaut.EnhancedCTAUTScript, error) {
-	if tx.MsgTx().Version <= wire.TxVersion_Height_450000_Aconcagua {
+	if tx.MsgTx().Version <= wire.TxVersion_Height_464000_Aconcagua {
 		// The transactions with lower version do not support CTAUT
 		return nil, nil
 	}

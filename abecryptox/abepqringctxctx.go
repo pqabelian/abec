@@ -287,7 +287,7 @@ func pqringctxAutTransferTxVerify(pp *pqringctxapi.PublicParameter, autTransferT
 	//	txInputs
 	ctxTxInputs := make([]pqringctxapi.CtxTxo, inputNum)
 	for i := 0; i < inputNum; i++ {
-		
+
 		err = pqringctxAutRuleCheckOnTxInputVersion(pp, autTransferTx.TxIns[i].Version, autTransferTx.Version)
 		if err != nil {
 			return fmt.Errorf("pqringctxAutTransferTxVerify: autTransferTx.Version is %d, "+
@@ -442,7 +442,7 @@ func pqringctxGetAutTransferTxWitnessSizeByDesc(pp *pqringctxapi.PublicParameter
 // When new TxVersion is added, rules need to be added here.
 func pqringctxAutRuleCheckOnTxoVersionType(pp *pqringctxapi.PublicParameter, hostTxoVersion uint32, autType AutTxoType) error {
 	switch hostTxoVersion {
-	case hostwire.TxVersion_Height_450000_Aconcagua:
+	case hostwire.TxVersion_Height_464000_Aconcagua:
 		if autType == AutTxoTypeHidden || autType == AutTxoTypePublic {
 			// allowed cases
 		} else {
@@ -465,8 +465,8 @@ func pqringctxAutRuleCheckOnTxoVersionType(pp *pqringctxapi.PublicParameter, hos
 func pqringctxAutRuleCheckOnTxInputVersion(pp *pqringctxapi.PublicParameter, autTxInputVersion uint32, txVersion uint32) error {
 
 	switch txVersion {
-	case hostwire.TxVersion_Height_450000_Aconcagua:
-		if autTxInputVersion == hostwire.TxVersion_Height_450000_Aconcagua {
+	case hostwire.TxVersion_Height_464000_Aconcagua:
+		if autTxInputVersion == hostwire.TxVersion_Height_464000_Aconcagua {
 			// allowed cases
 		} else {
 			return fmt.Errorf("pqringctxAutRuleCheckOnTxInputVersion: (autTxInputVersion, txVersion) (%d, %d), "+

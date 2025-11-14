@@ -193,7 +193,7 @@ func (msg *MsgBlockAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding)
 			}
 			tx.TxWitness = tmp
 
-			if tx.Version >= TxVersion_Height_450000_Aconcagua {
+			if tx.Version >= TxVersion_Height_464000_Aconcagua {
 				tmp, err = ReadVarBytes(r, pver, abecryptoxparam.MaxAllowedAutWitnessSize, "tx.AutWitness")
 				if err != nil {
 					return err
@@ -488,7 +488,7 @@ func (msg *MsgBlockAbe) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding)
 				return err
 			}
 
-			if tx.Version >= TxVersion_Height_450000_Aconcagua {
+			if tx.Version >= TxVersion_Height_464000_Aconcagua {
 				err = WriteVarBytes(w, pver, tx.AutWitness)
 				if err != nil {
 					return err

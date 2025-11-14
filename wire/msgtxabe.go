@@ -185,7 +185,7 @@ func (outPointRing *OutPointRing) Hash() chainhash.Hash {
 
 	// todo: In Aconcagua upgrade, use SHA3-256 with compatibility
 	// todo: review
-	if outPointRing.Version >= TxVersion_Height_450000_Aconcagua {
+	if outPointRing.Version >= TxVersion_Height_464000_Aconcagua {
 		return chainhash.ChainHash(buf.Bytes())
 	}
 
@@ -507,7 +507,7 @@ func (txIn *TxInAbe) RingMemberHash() chainhash.Hash {
 	_ = WriteOutPointRing(buf, 0, txIn.PreviousOutPointRing.Version, &txIn.PreviousOutPointRing)
 
 	// todo: is not used and will be removed
-	if txIn.PreviousOutPointRing.Version >= TxVersion_Height_450000_Aconcagua {
+	if txIn.PreviousOutPointRing.Version >= TxVersion_Height_464000_Aconcagua {
 		return chainhash.ChainHash(buf.Bytes())
 	}
 
@@ -608,7 +608,7 @@ func (msg *MsgTxAbe) TxHash() chainhash.Hash {
 
 	// In Aconcagua fork, use SHA3-256 with backward compatibility
 	// todo: review
-	if msg.Version >= TxVersion_Height_450000_Aconcagua {
+	if msg.Version >= TxVersion_Height_464000_Aconcagua {
 		return chainhash.ChainHash(buf.Bytes())
 	}
 
@@ -625,7 +625,7 @@ func (msg *MsgTxAbe) TxHashFull() chainhash.Hash {
 
 	// In Aconcagua fork, use SHA3-256 with backward compatibility
 	// todo: review
-	if msg.Version >= TxVersion_Height_450000_Aconcagua {
+	if msg.Version >= TxVersion_Height_464000_Aconcagua {
 		return chainhash.ChainHash(buf.Bytes())
 	}
 
@@ -647,7 +647,7 @@ func (msg *MsgTxAbe) TxWitnessHash() *chainhash.Hash {
 
 	// In Aconcagua fork, use SHA3-256 with backward compatibility
 	// todo: review
-	if msg.Version >= TxVersion_Height_450000_Aconcagua {
+	if msg.Version >= TxVersion_Height_464000_Aconcagua {
 		witnessHash := chainhash.ChainHash(msg.TxWitness)
 		return &witnessHash
 	}
@@ -755,7 +755,7 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 		}
 		msg.TxWitness = txWitness
 
-		if msg.Version >= TxVersion_Height_450000_Aconcagua {
+		if msg.Version >= TxVersion_Height_464000_Aconcagua {
 			autWitness, err := ReadVarBytes(r, pver, abecryptoxparam.MaxAllowedAutWitnessSize, "AutWitness")
 			if err != nil {
 				return err
@@ -822,7 +822,7 @@ func (msg *MsgTxAbe) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) er
 			return err
 		}
 
-		if msg.Version >= TxVersion_Height_450000_Aconcagua {
+		if msg.Version >= TxVersion_Height_464000_Aconcagua {
 			err = WriteVarBytes(w, 0, msg.AutWitness)
 			if err != nil {
 				return err
@@ -881,7 +881,7 @@ func (msg *MsgTxAbe) SerializeSizeFull() int {
 
 	n = n + VarIntSerializeSize(uint64(len(msg.TxWitness))) + len(msg.TxWitness)
 
-	if msg.Version >= TxVersion_Height_450000_Aconcagua {
+	if msg.Version >= TxVersion_Height_464000_Aconcagua {
 		n = n + VarIntSerializeSize(uint64(len(msg.AutWitness))) + len(msg.AutWitness)
 	}
 

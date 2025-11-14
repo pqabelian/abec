@@ -16,7 +16,7 @@ import (
 	"github.com/abesuite/abec/wire"
 )
 
-const TxVersionCTAUT = wire.TxVersion_Height_450000_Aconcagua
+const TxVersionCTAUT = wire.TxVersion_Height_464000_Aconcagua
 const CTAUTIdentifierLength = ctaut.CTAUTIdentifierLength
 
 type CTAUTScriptType = ctaut.CTAUTScriptType

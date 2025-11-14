@@ -724,7 +724,7 @@ func BuildTransferTxRequestDescFromBlocks(
 }
 
 func CreateTransferTxByRootSeed(txVersion uint32, serializedTransferTxRequestDesc []byte, rootSeeds []*CryptoRootSeed) (serializedTxFull []byte, txId *TxId, err error) {
-	if txVersion == wire.TxVersion_Height_450000_Aconcagua {
+	if txVersion == wire.TxVersion_Height_464000_Aconcagua {
 		return CreateTransferTxByRootSeedV3(serializedTransferTxRequestDesc, rootSeeds)
 	} else if txVersion == wire.TxVersion_Height_MLPAUT_300000 {
 		return CreateTransferTxByRootSeedV2(serializedTransferTxRequestDesc, rootSeeds)
@@ -738,7 +738,7 @@ func CreateTransferTxByRootSeed(txVersion uint32, serializedTransferTxRequestDes
 // CreateTransferTxByCryptoKeys would use the result called by BuildTransferTxRequestDescFromBlocks or BuildTransferTxRequestDescFromTxoRings as the unsigned transaction
 // and the cryptoKeys should be matched in order for the input in unsigned transaction
 func CreateTransferTxByCryptoKeys(txVersion uint32, serializedTransferTxRequestDesc []byte, cryptoKeys []*CryptoKey) (serializedTxFull []byte, txId *TxId, err error) {
-	if txVersion == wire.TxVersion_Height_450000_Aconcagua {
+	if txVersion == wire.TxVersion_Height_464000_Aconcagua {
 		return CreateTransferTxByCryptoKeysV3(serializedTransferTxRequestDesc, cryptoKeys)
 	} else if txVersion == wire.TxVersion_Height_MLPAUT_300000 {
 		return CreateTransferTxByCryptoKeysV2(serializedTransferTxRequestDesc, cryptoKeys)

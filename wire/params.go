@@ -13,7 +13,7 @@ const (
 	// ToDo(MLP): how about not use iota?
 	TxVersion_Height_MLPAUT_300000 uint32 = 2
 
-	TxVersion_Height_450000_Aconcagua uint32 = 3 // the TxVersion since height 50 0000, corresponding to the Aconcagua upgrade/fork
+	TxVersion_Height_464000_Aconcagua uint32 = 3 // the TxVersion since height 50 0000, corresponding to the Aconcagua upgrade/fork
 
 )
 
@@ -42,7 +42,7 @@ const (
 
 	// TxVersion = TxVersion_Height_0
 	// TxVersion = TxVersion_Height_300000_MLPAUT
-	TxVersion = TxVersion_Height_450000_Aconcagua
+	TxVersion = TxVersion_Height_464000_Aconcagua
 )
 
 const (
@@ -110,7 +110,7 @@ func GetBlockNumPerRingGroupByRingVersion(version uint32) (uint8, error) {
 	case TxVersion_Height_MLPAUT_300000:
 		return BlockNumPerRingGroup, nil
 
-	case TxVersion_Height_450000_Aconcagua:
+	case TxVersion_Height_464000_Aconcagua:
 		return BlockNumPerRingGroup, nil
 
 	default:
@@ -134,7 +134,7 @@ func GetTxoRingSizeByRingVersion(version uint32) (uint8, error) {
 		return TxoRingSize, nil
 	case TxVersion_Height_MLPAUT_300000:
 		return TxoRingSize, nil
-	case TxVersion_Height_450000_Aconcagua:
+	case TxVersion_Height_464000_Aconcagua:
 		return TxoRingSize, nil
 
 	default:

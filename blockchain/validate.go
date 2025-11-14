@@ -603,7 +603,7 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		return ruleerror.NewRuleError(ruleerror.ErrCTAUTBadForm, str)
 	}
 	if ctAutTx != nil {
-		if tx.MsgTx().Version < wire.TxVersion_Height_450000_Aconcagua {
+		if tx.MsgTx().Version < wire.TxVersion_Height_464000_Aconcagua {
 			return ruleerror.NewRuleError(ruleerror.ErrTxVersionForCTAUT, "transaction "+
 				"contains CTAUT but the transaction version is invalid")
 		}
@@ -618,7 +618,7 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		}
 		for _, token := range generatedTokens {
 			index := token.HostOutPoint.Index
-			if txOuts[index].Version < wire.TxVersion_Height_450000_Aconcagua {
+			if txOuts[index].Version < wire.TxVersion_Height_464000_Aconcagua {
 				return ruleerror.NewRuleError(ruleerror.ErrTxVersionForCTAUT, "transaction "+
 					"contains CTAUT but the parasitized output has invalid version")
 			}
@@ -1394,19 +1394,19 @@ func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blo
 	if blockHeight >= b.chainParams.BlockHeightAconcaguaCommit {
 		//	the block should not contain transactions with earlier version
 		for i, tx := range block.Transactions() {
-			if tx.MsgTx().Version < wire.TxVersion_Height_450000_Aconcagua {
+			if tx.MsgTx().Version < wire.TxVersion_Height_464000_Aconcagua {
 				return fmt.Errorf("checkBlockContextAbe: the block has height %d, "+
 					"but its %d -th transaction has version %d", block.Height(), i, tx.MsgTx().Version)
 			}
 		}
 	} else if blockHeight >= b.chainParams.BlockHeightAconcagua {
-		if coinbaseTx.MsgTx().Version < wire.TxVersion_Height_450000_Aconcagua {
+		if coinbaseTx.MsgTx().Version < wire.TxVersion_Height_464000_Aconcagua {
 			return fmt.Errorf("checkBlockContextAbe: the block has height %d, but its first transaction (coinbase Tx) has version %d", block.Height(), coinbaseTx.MsgTx().Version)
 		}
 	} else {
 		// blockHeight < b.chainParams.BlockHeightAconcagua
 		for i, tx := range block.Transactions() {
-			if tx.MsgTx().Version >= wire.TxVersion_Height_450000_Aconcagua {
+			if tx.MsgTx().Version >= wire.TxVersion_Height_464000_Aconcagua {
 				return fmt.Errorf("checkBlockContextAbe: the block has height %d, "+
 					"but its %d -th transaction has version %d", block.Height(), i, tx.MsgTx().Version)
 			}

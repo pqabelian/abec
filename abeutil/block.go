@@ -660,7 +660,7 @@ func NewNeedSetResult(needsetResult *wire.MsgNeedSetResult, serialized []byte) *
 // in the format <4 bytes txWitnessLen> <4 bytes autWitnessLen> <txWitness> <autWitness>
 func EncodeTxWitnesses(txVersion uint32, txWitness []byte, autWitness []byte) []byte {
 
-	if txVersion >= wire.TxVersion_Height_450000_Aconcagua {
+	if txVersion >= wire.TxVersion_Height_464000_Aconcagua {
 		txWitnessLen := len(txWitness)
 		autWitnessLen := len(autWitness)
 
@@ -687,7 +687,7 @@ func EncodeTxWitnesses(txVersion uint32, txWitness []byte, autWitness []byte) []
 // If the format does not match that in EncodeTxWitnesses, an error is return.
 func DecodeTxWitnesses(txVersion uint32, witness []byte) (txWitness []byte, autWitness []byte, err error) {
 
-	if txVersion >= wire.TxVersion_Height_450000_Aconcagua {
+	if txVersion >= wire.TxVersion_Height_464000_Aconcagua {
 		if len(witness) == 0 {
 			return nil, nil, nil
 		}

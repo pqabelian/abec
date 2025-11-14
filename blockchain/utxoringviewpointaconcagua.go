@@ -220,7 +220,7 @@ func BuildTxoRingsAconcagua(blockNumPerRingGroup int, txoRingSize int, blocks []
 					return nil, AssertError(fmt.Sprintf("BuildTxoRingsAconcagua: the %d -th input block's coinbase transaction's %d -th TxOut's PrivacyLevel (%d) is not supported.", i, outIndex, privacyLevel))
 				}
 
-			case wire.TxVersion_Height_450000_Aconcagua:
+			case wire.TxVersion_Height_464000_Aconcagua:
 				privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
 				if err != nil {
 					return nil, err
@@ -294,7 +294,7 @@ func BuildTxoRingsAconcagua(blockNumPerRingGroup int, txoRingSize int, blocks []
 						return nil, AssertError(fmt.Sprintf("BuildTxoRingsAconcagua: the %d -th input block's %d -th transaction's %d -th TxOut's PrivacyLevel (%d) is not supported.", i, t, outIndex, privacyLevel))
 					}
 
-				case wire.TxVersion_Height_450000_Aconcagua:
+				case wire.TxVersion_Height_464000_Aconcagua:
 					privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
 					if err != nil {
 						return nil, err

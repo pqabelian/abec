@@ -608,7 +608,7 @@ func pqringctxLedgerTxoIdGen(ringId wire.RingId, index uint8, txoVersion uint32)
 		return nil
 	}
 	// todo: in Aconcagua fork, here need use SHA3-256 while using DoubleHash to have backward compatibility
-	if txoVersion >= wire.TxVersion_Height_450000_Aconcagua {
+	if txoVersion >= wire.TxVersion_Height_464000_Aconcagua {
 		lgrTxoIdHash := chainhash.ChainHash(w.Bytes())
 		return lgrTxoIdHash[:]
 	}
@@ -1197,7 +1197,7 @@ func pqringctxRuleCheckOnTxoVersionPrivacyLevel(pp *pqringctxapi.PublicParameter
 				txoVersion, privacyLevel)
 		}
 
-	case wire.TxVersion_Height_450000_Aconcagua:
+	case wire.TxVersion_Height_464000_Aconcagua:
 		if privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre ||
 			privacyLevel == abecryptoxkey.PrivacyLevelRINGCT ||
 			privacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYM ||
@@ -1241,10 +1241,10 @@ func pqringctxRuleCheckOnTxInputVersion(pp *pqringctxapi.PublicParameter, txInpu
 				txInputVersion, txVersion)
 		}
 
-	case wire.TxVersion_Height_450000_Aconcagua:
+	case wire.TxVersion_Height_464000_Aconcagua:
 		if txInputVersion == wire.TxVersion_Height_0 ||
 			txInputVersion == wire.TxVersion_Height_MLPAUT_300000 ||
-			txInputVersion == wire.TxVersion_Height_450000_Aconcagua {
+			txInputVersion == wire.TxVersion_Height_464000_Aconcagua {
 			// allowed cases
 		} else {
 			return fmt.Errorf("pqringctxRuleCheckOnTxInputVersion: (txInputVersion, txVersion) (%d, %d), "+

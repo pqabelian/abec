@@ -391,7 +391,7 @@ var MainNetParams = Params{
 	BlockHeightEra2Start: 400000,
 
 	// BlockHeightAconcagua specifies the block height from which Aconcagua fork starts.
-	BlockHeightAconcagua: 456_000,
+	BlockHeightAconcagua: 464_000,
 	// BlockHeightAconcaguaCommit specifies the block height
 	// from which new transactions with version before TxVersion_Height_450000_Aconcagua will not be accepted anymore.
 	BlockHeightAconcaguaCommit: 480_000,
@@ -489,7 +489,7 @@ var RegressionNetParams = Params{
 	BlockHeightEra2Start: 400000,
 
 	// BlockHeightAconcagua specifies the block height from which Aconcagua fork starts.
-	BlockHeightAconcagua: 456_000,
+	BlockHeightAconcagua: 464_000,
 	// BlockHeightAconcaguaCommit specifies the block height
 	// from which new transactions with version before TxVersion_Height_450000_Aconcagua will not be accepted anymore.
 	BlockHeightAconcaguaCommit: 480_000,
@@ -594,7 +594,7 @@ var TestNet3Params = Params{
 	BlockHeightEra2Start: 400000,
 
 	// BlockHeightAconcagua specifies the block height from which Aconcagua fork starts.
-	BlockHeightAconcagua: 456_000,
+	BlockHeightAconcagua: 464_000,
 	// BlockHeightAconcaguaCommit specifies the block height
 	// from which new transactions with version before TxVersion_Height_450000_Aconcagua will not be accepted anymore.
 	BlockHeightAconcaguaCommit: 480_000,
@@ -695,7 +695,7 @@ var SimNetParams = Params{
 	BlockHeightEra2Start: 400000,
 
 	// BlockHeightAconcagua specifies the block height from which Aconcagua fork starts.
-	BlockHeightAconcagua: 450_000,
+	BlockHeightAconcagua: 464_000,
 	// BlockHeightAconcaguaCommit specifies the block height
 	// from which new transactions with version before TxVersion_Height_450000_Aconcagua will not be accepted anymore.
 	BlockHeightAconcaguaCommit: 480_000,

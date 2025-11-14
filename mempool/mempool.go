@@ -1684,7 +1684,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	mp.clearOutdatedTransaction(nextBlockHeight)
 
 	if nextBlockHeight >= mp.cfg.ChainParams.BlockHeightAconcaguaCommit {
-		if tx.MsgTx().Version < wire.TxVersion_Height_450000_Aconcagua {
+		if tx.MsgTx().Version < wire.TxVersion_Height_464000_Aconcagua {
 			str := fmt.Sprintf("since from block with height %d, transactions with version %d will not be mined any more",
 				mp.cfg.ChainParams.BlockHeightAconcaguaCommit, tx.MsgTx().Version)
 			return nil, nil, txRuleError(wire.RejectInvalid, str)
@@ -2274,7 +2274,7 @@ func (mp *TxPool) clearOutdatedTransaction(nextHeight int32) {
 	case mp.cfg.ChainParams.BlockHeightAconcaguaCommit <= nextHeight && nextHeight < mp.cfg.ChainParams.BlockHeightAconcaguaCommit+10:
 		// TxVersion_Height_450000_Aconcagua
 		for _, txDesc := range mp.poolAbe {
-			if txDesc.Tx.MsgTx().Version < wire.TxVersion_Height_450000_Aconcagua {
+			if txDesc.Tx.MsgTx().Version < wire.TxVersion_Height_464000_Aconcagua {
 				mp.removeTransactionAbe(txDesc.Tx)
 				log.Infof("transaction %s has been removed from transaction pool", txDesc.Tx.Hash())
 			}

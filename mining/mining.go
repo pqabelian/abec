@@ -682,7 +682,7 @@ func (g *BlkTmplGenerator) NewBlockTemplate(consensusApplied wire.ConsensusProto
 	// ToDo(MLP): If there are more versions, we need to added here.
 	cbTxVersion := wire.TxVersion
 	if nextBlockHeight >= g.chainParams.BlockHeightAconcagua {
-		cbTxVersion = wire.TxVersion_Height_450000_Aconcagua
+		cbTxVersion = wire.TxVersion_Height_464000_Aconcagua
 
 		if consensusApplied != wire.ConsensusNakamotoPow && consensusApplied != wire.ConsensusEthashPow {
 			return nil, fmt.Errorf("for height %d, the input consensusApplied is not ConsensusNakamotoPow or ConsensusEthashPow", nextBlockHeight)
@@ -767,7 +767,7 @@ mempoolLoop:
 		//             1                    1/2                  2
 		// ToDo(MLP):
 		if nextBlockHeight >= g.chainParams.BlockHeightAconcaguaCommit {
-			if tx.MsgTx().Version < wire.TxVersion_Height_450000_Aconcagua {
+			if tx.MsgTx().Version < wire.TxVersion_Height_464000_Aconcagua {
 				log.Tracef("Skipping tx %s, since from block with height %d, "+
 					"transactions with version %d will not be mined any more",
 					tx.Hash(), g.chainParams.BlockHeightAconcaguaCommit, tx.MsgTx().Version)
@@ -776,7 +776,7 @@ mempoolLoop:
 		} else if nextBlockHeight >= g.chainParams.BlockHeightAconcagua {
 			// nothing to do
 		} else { //nextBlockHeight < g.chainParams.BlockHeightAconcagua
-			if tx.MsgTx().Version >= wire.TxVersion_Height_450000_Aconcagua {
+			if tx.MsgTx().Version >= wire.TxVersion_Height_464000_Aconcagua {
 				log.Tracef("Skipping tx %s, transactions with version %d would not be mined until height %d",
 					tx.Hash(), tx.MsgTx().Version, g.chainParams.BlockHeightAconcagua)
 				continue

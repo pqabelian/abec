@@ -714,7 +714,7 @@ func ledgerTxoIdGen(ringHash chainhash.Hash, index uint8, txoVersion uint32) []b
 		return nil
 	}
 
-	if txoVersion >= wire.TxVersion_Height_450000_Aconcagua {
+	if txoVersion >= wire.TxVersion_Height_464000_Aconcagua {
 		lgrTxoIdHash := chainhash.ChainHash(w.Bytes())
 		return lgrTxoIdHash[:]
 	}
