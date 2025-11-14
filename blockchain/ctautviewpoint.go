@@ -1021,7 +1021,7 @@ func (view *CTAUTViewpoint) commit() {
 // requested outpoint.  Spent outputs, or those which otherwise don't exist,
 // will result in a nil entry in the view.
 func (view *CTAUTViewpoint) fetchCTAUTMain(db database.DB, outpoints map[ctaut.HostOutPoint]struct{}, identifier []byte) error {
-	if len(identifier) != ctaut.CTAUTIdentifierLength {
+	if len(identifier) != ctaut.AutIdentifierLength {
 		return fmt.Errorf("invalid aut identifier:%v", identifier)
 	}
 

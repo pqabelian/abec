@@ -14,15 +14,15 @@ import (
 	"github.com/abesuite/abec/wire"
 )
 
-var zeroIdentifier = [CTAUTIdentifierLength]byte{}
+var zeroIdentifier = [AutIdentifierLength]byte{}
 
 func init() {
-	for i := 0; i < CTAUTIdentifierLength; i++ {
+	for i := 0; i < AutIdentifierLength; i++ {
 		zeroIdentifier[i] = 0
 	}
 }
 
-func writePrefix(b *bytes.Buffer, scriptVersion uint32, autScriptType AutScriptType, autIdentifier [CTAUTIdentifierLength]byte) error {
+func writePrefix(b *bytes.Buffer, scriptVersion uint32, autScriptType AutScriptType, autIdentifier [AutIdentifierLength]byte) error {
 	err := WriteFixedBytes(b, []byte(commonPrefix))
 	if err != nil {
 		return err
@@ -42,8 +42,8 @@ func writePrefix(b *bytes.Buffer, scriptVersion uint32, autScriptType AutScriptT
 }
 
 // todo: discuss: shall remove expectedCtAutTxType? leave the check to the caller
-func readPrefix(r io.Reader, expectedAutScriptType AutScriptType) (uint32, [CTAUTIdentifierLength]byte, AutScriptType, error) {
-	var res [CTAUTIdentifierLength]byte
+func readPrefix(r io.Reader, expectedAutScriptType AutScriptType) (uint32, [AutIdentifierLength]byte, AutScriptType, error) {
+	var res [AutIdentifierLength]byte
 
 	commprefix, err := ReadFixedBytes(r, len(commonPrefix))
 	if err != nil {
@@ -69,7 +69,7 @@ func readPrefix(r io.Reader, expectedAutScriptType AutScriptType) (uint32, [CTAU
 		return 0, res, 0, ErrInValidAUTTx
 	}
 
-	identifier, err := ReadFixedBytes(r, CTAUTIdentifierLength)
+	identifier, err := ReadFixedBytes(r, AutIdentifierLength)
 	if err != nil {
 		return 0, res, 0, err
 	}

@@ -19,7 +19,7 @@ const (
 	AutScriptTypeBurn           AutScriptType = 4
 )
 
-const CTAUTIdentifierLength = chainhash.HashSize
+const AutIdentifierLength = chainhash.HashSize
 
 // The following parameters would be chosen with the following references and actual limitation on Abelian
 // 1. https://github.com/MetaMask/metamask-extension/issues/9243

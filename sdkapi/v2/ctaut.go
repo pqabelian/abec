@@ -17,7 +17,7 @@ import (
 )
 
 const TxVersionCTAUT = wire.TxVersion_Height_464000_Aconcagua
-const CTAUTIdentifierLength = ctaut.CTAUTIdentifierLength
+const AutIdentifierLength = ctaut.AutIdentifierLength
 
 type AutScriptType = ctaut.AutScriptType
 
@@ -97,7 +97,7 @@ type CTAUTReRegisterScript = ctaut.ReRegistrationScript
 
 func NewReRegistrationScript(
 	version uint32,
-	ctAutIdentifier [CTAUTIdentifierLength]byte,
+	ctAutIdentifier [AutIdentifierLength]byte,
 	ctAutMemo []byte,
 	plannedTotalAmount uint64,
 	issuerTokens [][]byte,
@@ -133,7 +133,7 @@ type CTAUTMintScript = ctaut.MintScript
 
 func NewMintScript(
 	version uint32,
-	ctAutIdentifier [CTAUTIdentifierLength]byte,
+	ctAutIdentifier [AutIdentifierLength]byte,
 	vin uint64,
 	inAutRootTokenNum uint8,
 	autTxOutputDescs []*AutTxOutputDesc,
@@ -193,7 +193,7 @@ type CTAUTTransferScript = ctaut.TransferScript
 
 func NewTransferScript(
 	version uint32,
-	ctAutIdentifier [CTAUTIdentifierLength]byte,
+	ctAutIdentifier [AutIdentifierLength]byte,
 	autInputDescs []*AutTxInputDesc,
 	autOutputDescs []*AutTxOutputDesc,
 	memo []byte,
@@ -285,7 +285,7 @@ type CTAUTBurnScript = ctaut.BurnScript
 
 func NewBurnScript(
 	version uint32,
-	ctAutIdentifier [CTAUTIdentifierLength]byte,
+	ctAutIdentifier [AutIdentifierLength]byte,
 	autInputDescs []*AutTxInputDesc,
 	autOutputDescs []*AutTxOutputDesc,
 	memo []byte,
@@ -916,7 +916,7 @@ func CreateTransferTxByCryptoKeysForCTAUT(serializedTransferTxRequestDesc []byte
 	return buf.Bytes(), &trTxId, nil
 }
 
-func CTAUTIdentifierKey(txID string) (res [ctaut.CTAUTIdentifierLength]byte, err error) {
+func CTAUTIdentifierKey(txID string) (res [ctaut.AutIdentifierLength]byte, err error) {
 	txHash, err := chainhash.NewHashFromStr(txID)
 	if err != nil {
 		return res, err

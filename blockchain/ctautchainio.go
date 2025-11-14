@@ -478,11 +478,11 @@ func deserializeCTAUTCoin(serialized []byte) (*CTAUTCoin, error) {
 
 	reader := bytes.NewReader(serialized[8:])
 
-	identifier, err := wire.ReadVarBytes(reader, 0, ctaut.CTAUTIdentifierLength, "identifier")
+	identifier, err := wire.ReadVarBytes(reader, 0, ctaut.AutIdentifierLength, "identifier")
 	if err != nil {
 		return nil, err
 	}
-	if len(identifier) != ctaut.CTAUTIdentifierLength {
+	if len(identifier) != ctaut.AutIdentifierLength {
 		return nil, errors.New("invalid identifier")
 	}
 
