@@ -274,7 +274,7 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 	if autMetadata.UnitScale, err = wire.ReadVarInt(r, 0); err != nil {
 		return err
 	}
-	if autMetadata.AutMemo, err = wire.ReadVarBytes(r, 0, MaxCTAUTMemoLength, "AutMemo"); err != nil {
+	if autMetadata.AutMemo, err = wire.ReadVarBytes(r, 0, MaxAutMemoLength, "AutMemo"); err != nil {
 		return err
 	}
 
@@ -693,7 +693,7 @@ func (script *RegistrationScript) SanityCheck() error {
 	if script.unitScale == 0 || script.unitScale > MaxAmount || script.unitScale > script.plannedTotalAmount {
 		return ErrInValidAUTTx
 	}
-	if len(script.ctAutMemo) > MaxCTAUTMemoLength {
+	if len(script.ctAutMemo) > MaxAutMemoLength {
 		return ErrInValidAUTTx
 	}
 
@@ -951,7 +951,7 @@ func (script *ReRegistrationScript) SanityCheck() error {
 		return errors.New("unexpected type for re-registration script")
 	}
 
-	if len(script.ctAutMemo) > MaxCTAUTMemoLength {
+	if len(script.ctAutMemo) > MaxAutMemoLength {
 		return ErrInValidAUTTx
 	}
 

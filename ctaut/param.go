@@ -37,7 +37,7 @@ const MaxAutSymbolLength = 32
 const MaxBaseUnitLength = 32
 const MaxSubUnitLength = 32
 
-const MaxCTAUTMemoLength = 1024 // 1K
+const MaxAutMemoLength = 1024 // 1K
 
 // The following limitation are derived from the constraints of the underlying cryptographic scheme and parameters
 //  1. The value must be in the range (0, 2^51-1)
