@@ -2085,7 +2085,7 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 
 func checkCTAUTRegistrationTransactionInputs(ctAutScript *ctaut.EnhancedCTAUTScript, tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
-	if ctAutScript.Type() != ctaut.Registration {
+	if ctAutScript.Type() != ctaut.AutScriptTypeRegistration {
 		return fmt.Errorf("expected registration script, but got %d", ctAutScript.Type())
 	}
 
@@ -2115,7 +2115,7 @@ func checkCTAUTRegistrationTransactionInputs(ctAutScript *ctaut.EnhancedCTAUTScr
 
 func checkCTAUTReRegistrationTransactionInputs(script *ctaut.EnhancedCTAUTScript, tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
-	if script.Type() != ctaut.ReRegistration {
+	if script.Type() != ctaut.AutScriptTypeReRegistration {
 		return fmt.Errorf("expected re-registration script, but got %d", script.Type())
 	}
 	reRegisterScript, ok := script.AutScript.(*ctaut.ReRegistrationScript)
@@ -2206,7 +2206,7 @@ func checkCTAUTReRegistrationTransactionInputs(script *ctaut.EnhancedCTAUTScript
 
 func checkCTAUTMintTransactionInputs(ctAutScript *ctaut.EnhancedCTAUTScript, tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
-	if ctAutScript.Type() != ctaut.Mint {
+	if ctAutScript.Type() != ctaut.AutScriptTypeMint {
 		return fmt.Errorf("expected mint script, but got %d", ctAutScript.Type())
 	}
 	mintScript, ok := ctAutScript.AutScript.(*ctaut.MintScript)
@@ -2313,7 +2313,7 @@ func checkCTAUTMintTransactionInputs(ctAutScript *ctaut.EnhancedCTAUTScript, tx 
 
 func checkCTAUTTransferTransactionInputs(ctAutScript *ctaut.EnhancedCTAUTScript, tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
-	if ctAutScript.Type() != ctaut.Transfer {
+	if ctAutScript.Type() != ctaut.AutScriptTypeTransfer {
 		return fmt.Errorf("expected transfer script, but got %d", ctAutScript.Type())
 	}
 	transferScript, ok := ctAutScript.AutScript.(*ctaut.TransferScript)
@@ -2404,7 +2404,7 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctaut.EnhancedCTAUTScript,
 
 func checkCTAUTBurnTransactionInputs(ctAutScript *ctaut.EnhancedCTAUTScript, tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
-	if ctAutScript.Type() != ctaut.Burn {
+	if ctAutScript.Type() != ctaut.AutScriptTypeBurn {
 		return fmt.Errorf("expected burn script, but got %d", ctAutScript.Type())
 	}
 	burnScript, ok := ctAutScript.AutScript.(*ctaut.BurnScript)

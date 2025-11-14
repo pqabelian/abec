@@ -768,7 +768,7 @@ func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 		return
 	}
 	if script != nil {
-		if script.Type() == ctaut.Registration {
+		if script.Type() == ctaut.AutScriptTypeRegistration {
 			ctAutScript := script.AutScript.(*ctaut.RegistrationScript)
 			willExpiredCTAut := mp.expiredHeightAUT[ctAutScript.ReregistrationExpireHeight()]
 			delete(willExpiredCTAut, *tx.Hash())

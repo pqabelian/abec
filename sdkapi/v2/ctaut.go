@@ -22,11 +22,11 @@ const CTAUTIdentifierLength = ctaut.CTAUTIdentifierLength
 type AutScriptType = ctaut.AutScriptType
 
 const (
-	AutScriptTypeRegistration   AutScriptType = ctaut.Registration
-	AutScriptTypeReRegistration AutScriptType = ctaut.ReRegistration
-	AutScriptTypeMint           AutScriptType = ctaut.Mint
-	AutScriptTypeTransfer       AutScriptType = ctaut.Transfer
-	AutScriptTypeBurn           AutScriptType = ctaut.Burn
+	AutScriptTypeRegistration   AutScriptType = ctaut.AutScriptTypeRegistration
+	AutScriptTypeReRegistration AutScriptType = ctaut.AutScriptTypeReRegistration
+	AutScriptTypeMint           AutScriptType = ctaut.AutScriptTypeMint
+	AutScriptTypeTransfer       AutScriptType = ctaut.AutScriptTypeTransfer
+	AutScriptTypeBurn           AutScriptType = ctaut.AutScriptTypeBurn
 )
 
 type AutScript = ctaut.AutScript
@@ -468,10 +468,10 @@ func ParseAutScript(txVersion uint32, txID string, memo []byte) (AutScript, erro
 }
 func RegisteredAutMetadata(autScript AutScript, txVersion uint32, txID string, serializedTxOuts [][]byte) (*Metadata, error) {
 	if autScript == nil {
-		return nil, errors.New("ctaut script is nil")
+		return nil, errors.New("aut script is nil")
 	}
-	if autScript.Type() != ctaut.Registration {
-		return nil, errors.New("ctaut script type is not Registration")
+	if autScript.Type() != ctaut.AutScriptTypeRegistration {
+		return nil, errors.New("aut script type is not Registration")
 	}
 	abeTxos := make([]*wire.TxOutAbe, len(serializedTxOuts))
 	for i := 0; i < len(serializedTxOuts); i++ {

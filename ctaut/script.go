@@ -524,7 +524,7 @@ func NewRegistrationScript(
 ) *RegistrationScript {
 	return &RegistrationScript{
 		version:                    version,
-		scriptType:                 Registration,
+		scriptType:                 AutScriptTypeRegistration,
 		ctAutIdentifier:            [CTAUTIdentifierLength]byte{},
 		ctAutName:                  ctAutName,
 		ctAutSymbol:                ctAutSymbol,
@@ -613,7 +613,7 @@ func (script *RegistrationScript) Deserialize(r io.Reader) error {
 
 	// todo: not necessary for define a function readPrefix,
 	// todo: even do this, the expected Type should be used inside the function
-	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, Registration); err != nil {
+	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeRegistration); err != nil {
 		return err
 	}
 
@@ -670,7 +670,7 @@ func (script *RegistrationScript) Deserialize(r io.Reader) error {
 
 func (script *RegistrationScript) SanityCheck() error {
 	// todo(ctaut): check version
-	if script.scriptType != Registration {
+	if script.scriptType != AutScriptTypeRegistration {
 		return errors.New("unexpected type for registration script")
 	}
 
@@ -807,7 +807,7 @@ func NewReRegistrationScript(
 ) *ReRegistrationScript {
 	return &ReRegistrationScript{
 		version:                    version,
-		scriptType:                 ReRegistration,
+		scriptType:                 AutScriptTypeReRegistration,
 		ctAutIdentifier:            ctAutIdentifier,
 		ctAutMemo:                  ctAutMemo,
 		plannedTotalAmount:         plannedTotalAmount,
@@ -833,7 +833,7 @@ func (script *ReRegistrationScript) Version() uint32 {
 	return script.version
 }
 func (script *ReRegistrationScript) Type() AutScriptType {
-	return ReRegistration
+	return AutScriptTypeReRegistration
 }
 
 func (script *ReRegistrationScript) Identifier() [CTAUTIdentifierLength]byte {
@@ -893,7 +893,7 @@ func (script *ReRegistrationScript) Deserialize(r io.Reader) error {
 	var err error
 
 	// todo: necessary to use a function?
-	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, ReRegistration); err != nil {
+	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeReRegistration); err != nil {
 		return err
 	}
 
@@ -947,7 +947,7 @@ func (script *ReRegistrationScript) Deserialize(r io.Reader) error {
 func (script *ReRegistrationScript) SanityCheck() error {
 	// todo(ctaut): check version
 
-	if script.scriptType != ReRegistration {
+	if script.scriptType != AutScriptTypeReRegistration {
 		return errors.New("unexpected type for re-registration script")
 	}
 
@@ -1045,7 +1045,7 @@ func NewMintScript(version uint32,
 	witnessHash chainhash.Hash, memo []byte) *MintScript {
 	return &MintScript{
 		version:             version,
-		scriptType:          Mint,
+		scriptType:          AutScriptTypeMint,
 		ctAutIdentifier:     ctAutIdentifier,
 		vin:                 vin,
 		inAutRootTokenNum:   inAutRootTokenNum,
@@ -1111,7 +1111,7 @@ func (script *MintScript) Deserialize(r io.Reader) error {
 	var err error
 
 	// todo: necessary to use a function?
-	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, Mint); err != nil {
+	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeMint); err != nil {
 		return err
 	}
 
@@ -1154,7 +1154,7 @@ func (script *MintScript) Deserialize(r io.Reader) error {
 func (script *MintScript) SanityCheck() error {
 	// todo(ctaut): check version
 
-	if script.scriptType != Mint {
+	if script.scriptType != AutScriptTypeMint {
 		return errors.New("unexpected type for mint script")
 	}
 
@@ -1264,7 +1264,7 @@ func NewTransferScript(
 ) *TransferScript {
 	return &TransferScript{
 		version:             version,
-		scriptType:          Transfer,
+		scriptType:          AutScriptTypeTransfer,
 		ctAutIdentifier:     ctAutIdentifier,
 		inCTAutTokenNum:     inCTAutTokenNum,
 		inPlainAutTokenNum:  inPlainAutTokenNum,
@@ -1328,7 +1328,7 @@ func (script *TransferScript) Deserialize(r io.Reader) error {
 	var err error
 
 	// todo: necessary to use a function?
-	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, Transfer); err != nil {
+	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeTransfer); err != nil {
 		return err
 	}
 
@@ -1371,7 +1371,7 @@ func (script *TransferScript) Deserialize(r io.Reader) error {
 func (script *TransferScript) SanityCheck() error {
 	// todo(ctaut): check version
 
-	if script.scriptType != Transfer {
+	if script.scriptType != AutScriptTypeTransfer {
 		return errors.New("unexpected type for transfer script")
 	}
 
@@ -1481,7 +1481,7 @@ func NewBurnScript(
 ) *BurnScript {
 	return &BurnScript{
 		version:             version,
-		scriptType:          Burn,
+		scriptType:          AutScriptTypeBurn,
 		ctAutIdentifier:     ctAutIdentifier,
 		inCTAutTokenNum:     inCTAutTokenNum,
 		inPlainAutTokenNum:  inPlainAutTokenNum,
@@ -1546,7 +1546,7 @@ func (script *BurnScript) Serialize() ([]byte, error) {
 func (script *BurnScript) Deserialize(r io.Reader) error {
 	var err error
 	// todo: necessary to use a function?
-	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, Burn); err != nil {
+	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeBurn); err != nil {
 		return err
 	}
 
@@ -1589,7 +1589,7 @@ func (script *BurnScript) Deserialize(r io.Reader) error {
 func (script *BurnScript) SanityCheck() error {
 	// todo(ctaut): check version
 
-	if script.scriptType != Burn {
+	if script.scriptType != AutScriptTypeBurn {
 		return errors.New("unexpected type for burn script")
 	}
 
@@ -1692,15 +1692,15 @@ func ParseAutScript(txVersion uint32, txHash chainhash.Hash, memo []byte) (scrip
 	}
 
 	switch scriptType {
-	case Registration:
+	case AutScriptTypeRegistration:
 		script = &RegistrationScript{}
-	case Mint:
+	case AutScriptTypeMint:
 		script = &MintScript{}
-	case ReRegistration:
+	case AutScriptTypeReRegistration:
 		script = &ReRegistrationScript{}
-	case Transfer:
+	case AutScriptTypeTransfer:
 		script = &TransferScript{}
-	case Burn:
+	case AutScriptTypeBurn:
 		script = &BurnScript{}
 	default:
 		return nil, ErrInValidAUTTx
@@ -1721,7 +1721,7 @@ func ParseAutScript(txVersion uint32, txHash chainhash.Hash, memo []byte) (scrip
 	}
 
 	// populate the identifier for registration script
-	if script.Type() == Registration {
+	if script.Type() == AutScriptTypeRegistration {
 		ctAUTScript, ok := script.(*RegistrationScript)
 		if !ok {
 			return nil, ErrInValidAUTTx
@@ -1797,7 +1797,7 @@ func (script *EnhancedCTAUTScript) setGeneratedTokens(generatedTokens []*CTAUTTo
 
 // todo: AutMetadata
 func (script *EnhancedCTAUTScript) Metadata() (*AutMetadata, error) {
-	if script.Type() != Registration {
+	if script.Type() != AutScriptTypeRegistration {
 		return nil, errors.New("metadata only available for registration script")
 	}
 	if script.generatedTokens == nil {
@@ -1838,7 +1838,7 @@ func (script *EnhancedCTAUTScript) Metadata() (*AutMetadata, error) {
 // todo: AutMetadata
 func (script *EnhancedCTAUTScript) UpdateMetadata(metadata *AutMetadata) error {
 	// assert
-	if script.Type() != ReRegistration {
+	if script.Type() != AutScriptTypeReRegistration {
 		return errors.New("update metadata only available for re-registration script")
 	}
 	identifier := script.Identifier()
@@ -2015,7 +2015,7 @@ func PresetHostOutpointForCTAUT(script *EnhancedCTAUTScript, msgTx *wire.MsgTxAb
 	if script == nil || script.AutScript == nil {
 		return nil
 	}
-	if script.Type() == Registration {
+	if script.Type() == AutScriptTypeRegistration {
 		return script.setConsumedTokens([]*CTAUTToken{})
 	}
 	txHash := msgTx.TxHash()

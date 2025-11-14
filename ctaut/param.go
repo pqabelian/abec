@@ -12,11 +12,11 @@ const commonPrefix = "AUTSCRIPT"
 type AutScriptType = uint8
 
 const (
-	Registration   AutScriptType = 0
-	ReRegistration AutScriptType = 1
-	Mint           AutScriptType = 2
-	Transfer       AutScriptType = 3
-	Burn           AutScriptType = 4
+	AutScriptTypeRegistration   AutScriptType = 0
+	AutScriptTypeReRegistration AutScriptType = 1
+	AutScriptTypeMint           AutScriptType = 2
+	AutScriptTypeTransfer       AutScriptType = 3
+	AutScriptTypeBurn           AutScriptType = 4
 )
 
 const CTAUTIdentifierLength = chainhash.HashSize
