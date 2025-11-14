@@ -91,44 +91,44 @@ type AutMetadata struct {
 }
 
 // todo: if only used locally, define as not-exported
-func (info *AutMetadata) SerializedSize() int {
+func (autMetadata *AutMetadata) SerializeSize() int {
 	n :=
-		/*version, fixed length */ wire.VarIntSerializeSize(uint64(info.Version)) +
-			/*identifier, actually fixed length */ wire.VarIntSerializeSize(uint64(len(info.AutIdentifier))) + len(info.AutIdentifier) +
-			/* name, variable length */ wire.VarIntSerializeSize(uint64(len(info.AutName))) + len(info.AutName) +
-			/* symbol, variable length */ wire.VarIntSerializeSize(uint64(len(info.AutSymbol))) + len(info.AutSymbol) +
-			/* base unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.BaseUnitName))) + len(info.BaseUnitName) +
-			/* sub unit, variable length */ wire.VarIntSerializeSize(uint64(len(info.SubUnitName))) + len(info.SubUnitName) +
-			/* scale, variable length */ wire.VarIntSerializeSize(info.UnitScale) +
-			/* memo, variable length */ wire.VarIntSerializeSize(uint64(len(info.AutMemo))) + len(info.AutMemo)
+	/*version, fixed length */ wire.VarIntSerializeSize(uint64(autMetadata.Version)) +
+		/*identifier, actually fixed length */ wire.VarIntSerializeSize(uint64(len(autMetadata.AutIdentifier))) + len(autMetadata.AutIdentifier) +
+		/* name, variable length */ wire.VarIntSerializeSize(uint64(len(autMetadata.AutName))) + len(autMetadata.AutName) +
+		/* symbol, variable length */ wire.VarIntSerializeSize(uint64(len(autMetadata.AutSymbol))) + len(autMetadata.AutSymbol) +
+		/* base unit, variable length */ wire.VarIntSerializeSize(uint64(len(autMetadata.BaseUnitName))) + len(autMetadata.BaseUnitName) +
+		/* sub unit, variable length */ wire.VarIntSerializeSize(uint64(len(autMetadata.SubUnitName))) + len(autMetadata.SubUnitName) +
+		/* scale, variable length */ wire.VarIntSerializeSize(autMetadata.UnitScale) +
+		/* memo, variable length */ wire.VarIntSerializeSize(uint64(len(autMetadata.AutMemo))) + len(autMetadata.AutMemo)
 
-	n += /* planned amount */ wire.VarIntSerializeSize(info.PlannedTotalSupply)
+	n += /* planned amount */ wire.VarIntSerializeSize(autMetadata.PlannedTotalSupply)
 
-	n += /* number of issuer tokens */ wire.VarIntSerializeSize(uint64(len(info.IssuerTokens)))
-	for i := 0; i < len(info.IssuerTokens); i++ {
+	n += /* number of issuer tokens */ wire.VarIntSerializeSize(uint64(len(autMetadata.IssuerTokens)))
+	for i := 0; i < len(autMetadata.IssuerTokens); i++ {
 		/* actually fixed length */
-		n += wire.VarIntSerializeSize(uint64(len(info.IssuerTokens[i]))) + len(info.IssuerTokens[i])
+		n += wire.VarIntSerializeSize(uint64(len(autMetadata.IssuerTokens[i]))) + len(autMetadata.IssuerTokens[i])
 	}
 
 	n +=
-		/* update threshold */ 1 +
-			/* issue threshold */ 1 +
-			/* expire height */ wire.VarIntSerializeSize(uint64(info.ExpireHeight))
+	/* update threshold */ 1 +
+		/* issue threshold */ 1 +
+		/* expire height */ wire.VarIntSerializeSize(uint64(autMetadata.ExpireHeight))
 
-	n += /* minted amount,variable length */ wire.VarIntSerializeSize(info.MintedAmount) +
-		/* minted amount,variable length */ wire.VarIntSerializeSize(info.BurnedAmount) +
-		/* number of issuer tokens */ wire.VarIntSerializeSize(uint64(len(info.ActiveRootTokenSet)))
+	n += /* minted amount,variable length */ wire.VarIntSerializeSize(autMetadata.MintedAmount) +
+		/* minted amount,variable length */ wire.VarIntSerializeSize(autMetadata.BurnedAmount) +
+		/* number of issuer tokens */ wire.VarIntSerializeSize(uint64(len(autMetadata.ActiveRootTokenSet)))
 
-	for point := range info.ActiveRootTokenSet {
+	for point := range autMetadata.ActiveRootTokenSet {
 		// todo: why use the key rather than the value?
 		// todo: call HostOutPoint's serialize size, which use a fixed bytes for Hash
 		// todo: the name should give clear meanings
 		n += wire.VarIntSerializeSize(uint64(len(point.TxHash))) + len(point.TxHash)
 		n += 1
 	}
-	for i := 0; i < len(info.IssuerTokens); i++ {
+	for i := 0; i < len(autMetadata.IssuerTokens); i++ {
 		/* actually fixed length */
-		n += wire.VarIntSerializeSize(uint64(len(info.IssuerTokens[i]))) + len(info.IssuerTokens[i])
+		n += wire.VarIntSerializeSize(uint64(len(autMetadata.IssuerTokens[i]))) + len(autMetadata.IssuerTokens[i])
 		n += 1
 	}
 
@@ -136,84 +136,84 @@ func (info *AutMetadata) SerializedSize() int {
 }
 
 // call abec.wire.WriteVarInt or call locally WriteVarInt?
-func (info *AutMetadata) Serialize() ([]byte, error) {
-	if info == nil {
+func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
+	if autMetadata == nil {
 		return nil, nil
 	}
-	// Calculate the size needed to serialize AUT info.
+	// Calculate the size needed to serialize AUT autMetadata.
 	var err error
-	size := info.SerializedSize()
+	size := autMetadata.SerializeSize()
 	// Serialize the header code followed by the compressed unspent
 	// transaction output.
 	buff := bytes.NewBuffer(make([]byte, 0, size))
-	if err = wire.WriteVarInt(buff, 0, uint64(info.Version)); err != nil {
+	if err = wire.WriteVarInt(buff, 0, uint64(autMetadata.Version)); err != nil {
 		return nil, err
 	}
-	if err = wire.WriteVarBytes(buff, 0, info.AutIdentifier[:]); err != nil {
-		return nil, err
-	}
-
-	if err = wire.WriteVarBytes(buff, 0, info.AutName); err != nil {
-		return nil, err
-	}
-	if err = wire.WriteVarBytes(buff, 0, info.AutSymbol); err != nil {
+	if err = wire.WriteVarBytes(buff, 0, autMetadata.AutIdentifier[:]); err != nil {
 		return nil, err
 	}
 
-	if err = wire.WriteVarBytes(buff, 0, info.BaseUnitName); err != nil {
+	if err = wire.WriteVarBytes(buff, 0, autMetadata.AutName); err != nil {
 		return nil, err
 	}
-	if err = wire.WriteVarBytes(buff, 0, info.SubUnitName); err != nil {
-		return nil, err
-	}
-	if err = wire.WriteVarInt(buff, 0, info.UnitScale); err != nil {
+	if err = wire.WriteVarBytes(buff, 0, autMetadata.AutSymbol); err != nil {
 		return nil, err
 	}
 
-	if err = wire.WriteVarBytes(buff, 0, info.AutMemo); err != nil {
+	if err = wire.WriteVarBytes(buff, 0, autMetadata.BaseUnitName); err != nil {
+		return nil, err
+	}
+	if err = wire.WriteVarBytes(buff, 0, autMetadata.SubUnitName); err != nil {
+		return nil, err
+	}
+	if err = wire.WriteVarInt(buff, 0, autMetadata.UnitScale); err != nil {
 		return nil, err
 	}
 
-	if err = wire.WriteVarInt(buff, 0, info.PlannedTotalSupply); err != nil {
+	if err = wire.WriteVarBytes(buff, 0, autMetadata.AutMemo); err != nil {
 		return nil, err
 	}
 
-	err = wire.WriteVarInt(buff, 0, uint64(len(info.IssuerTokens)))
+	if err = wire.WriteVarInt(buff, 0, autMetadata.PlannedTotalSupply); err != nil {
+		return nil, err
+	}
+
+	err = wire.WriteVarInt(buff, 0, uint64(len(autMetadata.IssuerTokens)))
 	if err != nil {
 		return nil, err
 	}
-	for i := 0; i < len(info.IssuerTokens); i++ {
-		err = wire.WriteVarBytes(buff, 0, info.IssuerTokens[i])
+	for i := 0; i < len(autMetadata.IssuerTokens); i++ {
+		err = wire.WriteVarBytes(buff, 0, autMetadata.IssuerTokens[i])
 		if err != nil {
 			return nil, errors.New("error to write issuer token")
 		}
 	}
 
-	if err = buff.WriteByte(info.ReregistrationThreshold); err != nil {
+	if err = buff.WriteByte(autMetadata.ReregistrationThreshold); err != nil {
 		return nil, err
 	}
-	if err = buff.WriteByte(info.MintThreshold); err != nil {
+	if err = buff.WriteByte(autMetadata.MintThreshold); err != nil {
 		return nil, err
 	}
-	if err = wire.WriteVarInt(buff, 0, uint64(info.ExpireHeight)); err != nil {
+	if err = wire.WriteVarInt(buff, 0, uint64(autMetadata.ExpireHeight)); err != nil {
 		return nil, err
 	}
 
-	err = wire.WriteVarInt(buff, 0, info.MintedAmount)
+	err = wire.WriteVarInt(buff, 0, autMetadata.MintedAmount)
 	if err != nil {
 		return nil, err
 	}
 
-	err = wire.WriteVarInt(buff, 0, info.BurnedAmount)
+	err = wire.WriteVarInt(buff, 0, autMetadata.BurnedAmount)
 	if err != nil {
 		return nil, err
 	}
 
-	err = wire.WriteVarInt(buff, 0, uint64(len(info.ActiveRootTokenSet)))
+	err = wire.WriteVarInt(buff, 0, uint64(len(autMetadata.ActiveRootTokenSet)))
 	if err != nil {
 		return nil, err
 	}
-	for point := range info.ActiveRootTokenSet {
+	for point := range autMetadata.ActiveRootTokenSet {
 		// todo: use fix length buff.Write(), and package it
 		err = wire.WriteVarBytes(buff, 0, point.TxHash[:])
 		if err != nil {
@@ -233,13 +233,13 @@ func (info *AutMetadata) Serialize() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !reflect.DeepEqual(info, tmpMetadata) {
+	if !reflect.DeepEqual(autMetadata, tmpMetadata) {
 		return nil, errors.New("metadata not match after serialization")
 	}
 
 	return serializedMetadata, nil
 }
-func (info *AutMetadata) Deserialize(r io.Reader) error {
+func (autMetadata *AutMetadata) Deserialize(r io.Reader) error {
 	// Serialize the header code followed by the compressed unspent
 	// transaction output.
 	var err error
@@ -248,7 +248,7 @@ func (info *AutMetadata) Deserialize(r io.Reader) error {
 		return err
 	}
 	// todo: need some check? whether version is in the expected scope
-	info.Version = uint32(version)
+	autMetadata.Version = uint32(version)
 
 	identifier, err := wire.ReadVarBytes(r, 0, CTAUTIdentifierLength, "identifier")
 	if err != nil {
@@ -258,28 +258,28 @@ func (info *AutMetadata) Deserialize(r io.Reader) error {
 	if len(identifier) != CTAUTIdentifierLength {
 		return errors.New("unexpected identifier length")
 	}
-	copy(info.AutIdentifier[:], identifier)
+	copy(autMetadata.AutIdentifier[:], identifier)
 
-	if info.AutName, err = wire.ReadVarBytes(r, 0, MaxCTAUTNameLength, "name"); err != nil {
+	if autMetadata.AutName, err = wire.ReadVarBytes(r, 0, MaxCTAUTNameLength, "name"); err != nil {
 		return err
 	}
-	if info.AutSymbol, err = wire.ReadVarBytes(r, 0, MaxCTAUTSymbolLength, "symbol"); err != nil {
+	if autMetadata.AutSymbol, err = wire.ReadVarBytes(r, 0, MaxCTAUTSymbolLength, "symbol"); err != nil {
 		return err
 	}
-	if info.BaseUnitName, err = wire.ReadVarBytes(r, 0, MaxBaseUnitLength, "unit"); err != nil {
+	if autMetadata.BaseUnitName, err = wire.ReadVarBytes(r, 0, MaxBaseUnitLength, "unit"); err != nil {
 		return err
 	}
-	if info.SubUnitName, err = wire.ReadVarBytes(r, 0, MaxSubUnitLength, "subunit"); err != nil {
+	if autMetadata.SubUnitName, err = wire.ReadVarBytes(r, 0, MaxSubUnitLength, "subunit"); err != nil {
 		return err
 	}
-	if info.UnitScale, err = wire.ReadVarInt(r, 0); err != nil {
+	if autMetadata.UnitScale, err = wire.ReadVarInt(r, 0); err != nil {
 		return err
 	}
-	if info.AutMemo, err = wire.ReadVarBytes(r, 0, MaxCTAUTMemoLength, "AutMemo"); err != nil {
+	if autMetadata.AutMemo, err = wire.ReadVarBytes(r, 0, MaxCTAUTMemoLength, "AutMemo"); err != nil {
 		return err
 	}
 
-	if info.PlannedTotalSupply, err = wire.ReadVarInt(r, 0); err != nil {
+	if autMetadata.PlannedTotalSupply, err = wire.ReadVarInt(r, 0); err != nil {
 		return err
 	}
 
@@ -287,18 +287,18 @@ func (info *AutMetadata) Deserialize(r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	info.IssuerTokens = make([][]byte, issuerNum)
+	autMetadata.IssuerTokens = make([][]byte, issuerNum)
 	for i := uint64(0); i < issuerNum; i++ {
-		info.IssuerTokens[i], err = wire.ReadVarBytes(r, 0, issuerTokenLength, "issuerToken")
+		autMetadata.IssuerTokens[i], err = wire.ReadVarBytes(r, 0, issuerTokenLength, "issuerToken")
 		if err != nil {
 			return errors.New("error to write issuer token")
 		}
 	}
 
-	if info.ReregistrationThreshold, err = ReadByte(r); err != nil {
+	if autMetadata.ReregistrationThreshold, err = ReadByte(r); err != nil {
 		return err
 	}
-	if info.MintThreshold, err = ReadByte(r); err != nil {
+	if autMetadata.MintThreshold, err = ReadByte(r); err != nil {
 		return err
 	}
 
@@ -306,13 +306,13 @@ func (info *AutMetadata) Deserialize(r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	info.ExpireHeight = int32(expiredHeight)
+	autMetadata.ExpireHeight = int32(expiredHeight)
 
-	info.MintedAmount, err = wire.ReadVarInt(r, 0)
+	autMetadata.MintedAmount, err = wire.ReadVarInt(r, 0)
 	if err != nil {
 		return err
 	}
-	info.BurnedAmount, err = wire.ReadVarInt(r, 0)
+	autMetadata.BurnedAmount, err = wire.ReadVarInt(r, 0)
 	if err != nil {
 		return err
 	}
@@ -321,7 +321,7 @@ func (info *AutMetadata) Deserialize(r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	info.ActiveRootTokenSet = make(map[HostOutPoint]struct{}, rootCoinNum)
+	autMetadata.ActiveRootTokenSet = make(map[HostOutPoint]struct{}, rootCoinNum)
 	for i := uint64(0); i < rootCoinNum; i++ {
 		txHashBytes, err := wire.ReadVarBytes(r, 0, chainhash.HashSize, "hash")
 		if err != nil {
@@ -340,55 +340,55 @@ func (info *AutMetadata) Deserialize(r io.Reader) error {
 			TxHash: *txHash,
 			Index:  index,
 		}
-		info.ActiveRootTokenSet[point] = struct{}{}
+		autMetadata.ActiveRootTokenSet[point] = struct{}{}
 	}
 
 	return nil
 }
 
 // Clone returns a shallow copy of the utxo entry.
-func (info *AutMetadata) Clone() *AutMetadata {
-	if info == nil {
+func (autMetadata *AutMetadata) Clone() *AutMetadata {
+	if autMetadata == nil {
 		return nil
 	}
 
 	// ToDo(Alice): by the same order as the definition?
 	cloned := &AutMetadata{
-		Version:       info.Version,
+		Version:       autMetadata.Version,
 		AutIdentifier: [CTAUTIdentifierLength]byte{},
 
-		AutName:      make([]byte, len(info.AutName)),
-		AutSymbol:    make([]byte, len(info.AutSymbol)),
-		BaseUnitName: make([]byte, len(info.BaseUnitName)),
-		SubUnitName:  make([]byte, len(info.SubUnitName)),
-		UnitScale:    info.UnitScale,
-		AutMemo:      make([]byte, len(info.AutMemo)),
+		AutName:      make([]byte, len(autMetadata.AutName)),
+		AutSymbol:    make([]byte, len(autMetadata.AutSymbol)),
+		BaseUnitName: make([]byte, len(autMetadata.BaseUnitName)),
+		SubUnitName:  make([]byte, len(autMetadata.SubUnitName)),
+		UnitScale:    autMetadata.UnitScale,
+		AutMemo:      make([]byte, len(autMetadata.AutMemo)),
 
-		IssuerTokens:            make([][]byte, len(info.IssuerTokens)),
-		ReregistrationThreshold: info.ReregistrationThreshold,
-		MintThreshold:           info.MintThreshold,
-		PlannedTotalSupply:      info.PlannedTotalSupply,
-		ExpireHeight:            info.ExpireHeight,
+		IssuerTokens:            make([][]byte, len(autMetadata.IssuerTokens)),
+		ReregistrationThreshold: autMetadata.ReregistrationThreshold,
+		MintThreshold:           autMetadata.MintThreshold,
+		PlannedTotalSupply:      autMetadata.PlannedTotalSupply,
+		ExpireHeight:            autMetadata.ExpireHeight,
 
-		MintedAmount:       info.MintedAmount,
-		BurnedAmount:       info.BurnedAmount,
-		ActiveRootTokenSet: make(map[HostOutPoint]struct{}, len(info.ActiveRootTokenSet)),
+		MintedAmount:       autMetadata.MintedAmount,
+		BurnedAmount:       autMetadata.BurnedAmount,
+		ActiveRootTokenSet: make(map[HostOutPoint]struct{}, len(autMetadata.ActiveRootTokenSet)),
 	}
 
-	copy(cloned.AutIdentifier[:], info.AutIdentifier[:])
+	copy(cloned.AutIdentifier[:], autMetadata.AutIdentifier[:])
 
-	copy(cloned.AutSymbol, info.AutSymbol)
-	copy(cloned.AutName, info.AutName)
-	copy(cloned.BaseUnitName, info.BaseUnitName)
-	copy(cloned.SubUnitName, info.SubUnitName)
-	copy(cloned.AutMemo, info.AutMemo)
+	copy(cloned.AutSymbol, autMetadata.AutSymbol)
+	copy(cloned.AutName, autMetadata.AutName)
+	copy(cloned.BaseUnitName, autMetadata.BaseUnitName)
+	copy(cloned.SubUnitName, autMetadata.SubUnitName)
+	copy(cloned.AutMemo, autMetadata.AutMemo)
 
-	for i := 0; i < len(info.IssuerTokens); i++ {
-		cloned.IssuerTokens[i] = make([]byte, len(info.IssuerTokens[i]))
-		copy(cloned.IssuerTokens[i][:], info.IssuerTokens[i][:])
+	for i := 0; i < len(autMetadata.IssuerTokens); i++ {
+		cloned.IssuerTokens[i] = make([]byte, len(autMetadata.IssuerTokens[i]))
+		copy(cloned.IssuerTokens[i][:], autMetadata.IssuerTokens[i][:])
 	}
 
-	for outpoint := range info.ActiveRootTokenSet {
+	for outpoint := range autMetadata.ActiveRootTokenSet {
 		newOutpoint := HostOutPoint{}
 		copy(newOutpoint.TxHash[:], outpoint.TxHash[:])
 		newOutpoint.Index = outpoint.Index
