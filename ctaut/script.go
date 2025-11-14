@@ -259,10 +259,10 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 	}
 	copy(autMetadata.AutIdentifier[:], identifier)
 
-	if autMetadata.AutName, err = wire.ReadVarBytes(r, 0, MaxCTAUTNameLength, "name"); err != nil {
+	if autMetadata.AutName, err = wire.ReadVarBytes(r, 0, MaxAutNameLength, "name"); err != nil {
 		return err
 	}
-	if autMetadata.AutSymbol, err = wire.ReadVarBytes(r, 0, MaxCTAUTSymbolLength, "symbol"); err != nil {
+	if autMetadata.AutSymbol, err = wire.ReadVarBytes(r, 0, MaxAutSymbolLength, "symbol"); err != nil {
 		return err
 	}
 	if autMetadata.BaseUnitName, err = wire.ReadVarBytes(r, 0, MaxBaseUnitLength, "unit"); err != nil {
@@ -617,10 +617,10 @@ func (script *RegistrationScript) Deserialize(r io.Reader) error {
 		return err
 	}
 
-	if script.ctAutName, err = ReadVarBytes(r, MaxCTAUTNameLength, "name"); err != nil {
+	if script.ctAutName, err = ReadVarBytes(r, MaxAutNameLength, "name"); err != nil {
 		return err
 	}
-	if script.ctAutSymbol, err = ReadVarBytes(r, MaxCTAUTSymbolLength, "symbol"); err != nil {
+	if script.ctAutSymbol, err = ReadVarBytes(r, MaxAutSymbolLength, "symbol"); err != nil {
 		return err
 	}
 	if script.baseUnitName, err = ReadVarBytes(r, MaxBaseUnitLength, "baseUnit"); err != nil {
@@ -677,10 +677,10 @@ func (script *RegistrationScript) SanityCheck() error {
 	if !bytes.Equal(script.ctAutIdentifier[:], zeroIdentifier[:]) {
 		return ErrInValidAUTTx
 	}
-	if len(script.ctAutName) == 0 || len(script.ctAutName) > MaxCTAUTNameLength {
+	if len(script.ctAutName) == 0 || len(script.ctAutName) > MaxAutNameLength {
 		return ErrInValidAUTTx
 	}
-	if len(script.ctAutSymbol) == 0 || len(script.ctAutSymbol) > MaxCTAUTSymbolLength {
+	if len(script.ctAutSymbol) == 0 || len(script.ctAutSymbol) > MaxAutSymbolLength {
 		return ErrInValidAUTTx
 	}
 

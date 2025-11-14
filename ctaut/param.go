@@ -26,11 +26,14 @@ const AutIdentifierLength = chainhash.HashSize
 // 2. https://eips.ethereum.org/EIPS/eip-20
 // 3. https://medium.com/sphere-audits/in-depth-guide-on-how-to-write-an-erc20-token-contract-in-yul-b521b6d268f5
 // The full, descriptive and human-readable name of the token
-const MaxCTAUTNameLength = 64
+
+const MaxAutNameLength = 64
 
 // A short, human-readable string that acts as a ticker for the token.
 // The best practice in ERC-20 in length is on is 3~5 letters.
+
 const MaxCTAUTSymbolLength = 32
+const MaxAutSymbolLength = 32
 
 const MaxBaseUnitLength = 32
 const MaxSubUnitLength = 32
