@@ -90,8 +90,7 @@ type AutMetadata struct {
 	ActiveRootTokenSet map[HostOutPoint]struct{}
 }
 
-// todo: if only used locally, define as not-exported
-func (autMetadata *AutMetadata) SerializeSize() int {
+func (autMetadata *AutMetadata) serializeSize() int {
 	n :=
 	/*version, fixed length */ wire.VarIntSerializeSize(uint64(autMetadata.Version)) +
 		/*identifier, actually fixed length */ wire.VarIntSerializeSize(uint64(len(autMetadata.AutIdentifier))) + len(autMetadata.AutIdentifier) +
@@ -142,7 +141,7 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 	}
 	// Calculate the size needed to serialize AUT autMetadata.
 	var err error
-	size := autMetadata.SerializeSize()
+	size := autMetadata.serializeSize()
 	// Serialize the header code followed by the compressed unspent
 	// transaction output.
 	buff := bytes.NewBuffer(make([]byte, 0, size))
