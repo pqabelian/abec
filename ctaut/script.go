@@ -210,15 +210,10 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	for point := range autMetadata.ActiveRootTokenSet {
-		// todo: use fix length buff.Write(), and package it
-		err = wire.WriteVarBytes(buff, 0, point.TxHash[:])
+	for hostOutPoint := range autMetadata.ActiveRootTokenSet {
+		err = wire.WriteOutPointAbe(buff, 0, 0, &hostOutPoint)
 		if err != nil {
-			return nil, errors.New("error to write point")
-		}
-		err = buff.WriteByte(uint8(point.Index))
-		if err != nil {
-			return nil, errors.New("error to write point index")
+			return nil, fmt.Errorf("error to write active root token: %v", err)
 		}
 	}
 
@@ -328,24 +323,16 @@ func (autMetadata *AutMetadata) Deserialize(r io.Reader) error {
 	}
 	autMetadata.ActiveRootTokenSet = make(map[HostOutPoint]struct{}, rootCoinNum)
 	for i := uint64(0); i < rootCoinNum; i++ {
-		txHashBytes, err := wire.ReadVarBytes(r, 0, chainhash.HashSize, "hash")
+		hostOutPoint := HostOutPoint{}
+		err = wire.ReadOutPointAbe(r, 0, 0, &hostOutPoint)
 		if err != nil {
-			return errors.New("error to write issuer token")
+			return fmt.Errorf("error when reading active root token: %v", err)
 		}
-		txHash, err := chainhash.NewHash(txHashBytes)
-		if err != nil {
-			return errors.New("invalid hash for ctaut point")
-		}
-
-		index, err := ReadByte(r)
-		if err != nil {
-			return err
-		}
-		point := HostOutPoint{
-			TxHash: *txHash,
-			Index:  index,
-		}
-		autMetadata.ActiveRootTokenSet[point] = struct{}{}
+		autMetadata.ActiveRootTokenSet[hostOutPoint] = struct{}{}
+	}
+	if uint64(len(autMetadata.ActiveRootTokenSet)) != rootCoinNum {
+		return fmt.Errorf("the number of read active root token (%d) does not match the read number (%d)",
+			len(autMetadata.ActiveRootTokenSet), rootCoinNum)
 	}
 
 	return nil

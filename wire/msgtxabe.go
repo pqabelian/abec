@@ -305,6 +305,14 @@ func ReadOutPointRing(r io.Reader, pver uint32, version uint32, opr *OutPointRin
 	return nil
 }
 
+func WriteOutPointAbe(w io.Writer, pver uint32, version uint32, op *OutPointAbe) error {
+	return writeOutPointAbe(w, pver, version, op)
+}
+
+func ReadOutPointAbe(r io.Reader, pver uint32, version uint32, op *OutPointAbe) error {
+	return readOutPointAbe(r, pver, version, op)
+}
+
 func writeOutPointAbe(w io.Writer, pver uint32, version uint32, op *OutPointAbe) error {
 	_, err := w.Write(op.TxHash[:])
 	if err != nil {
