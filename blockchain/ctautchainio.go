@@ -288,7 +288,7 @@ func decodeSpentCTAUT(serialized []byte) (SpentCTAUT, int, error) {
 					"after reserved")
 			}
 
-			err = res.Before.Deserialize(bytes.NewReader(serialized[offset : offset+int(sizeOfInfo)]))
+			err = res.Before.Deserialize(serialized[offset : offset+int(sizeOfInfo)])
 			if err != nil {
 				return nil, offset, errDeserialize("unexpected end of data " +
 					"after reserved")
@@ -307,7 +307,7 @@ func decodeSpentCTAUT(serialized []byte) (SpentCTAUT, int, error) {
 				return nil, offset, errDeserialize("unexpected end of data " +
 					"after reserved")
 			}
-			err = res.After.Deserialize(bytes.NewReader(serialized[offset : offset+int(sizeOfInfo)]))
+			err = res.After.Deserialize(serialized[offset : offset+int(sizeOfInfo)])
 			if err != nil {
 				return nil, offset, errDeserialize("unexpected end of data " +
 					"after reserved")
@@ -545,7 +545,7 @@ func dbFetchCTAUTMetadata(dbTx database.Tx, key []byte) (*ctaut.AutMetadata, err
 
 	// Deserialize the utxo entry and return it.
 	var metadata ctaut.AutMetadata
-	err := metadata.Deserialize(bytes.NewReader(serializedAUTInfo))
+	err := metadata.Deserialize(serializedAUTInfo)
 	if err != nil {
 		// Ensure any deserialization errors are returned as database
 		// corruption errors.

@@ -221,7 +221,7 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 
 	// todo: the following codes are necessary or only for test?
 	tmpMetadata := &AutMetadata{}
-	err = tmpMetadata.Deserialize(bytes.NewReader(serializedMetadata))
+	err = tmpMetadata.Deserialize(serializedMetadata)
 	if err != nil {
 		return nil, err
 	}
@@ -232,9 +232,12 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 	return serializedMetadata, nil
 }
 
-func (autMetadata *AutMetadata) Deserialize(r io.Reader) error {
+// Deserialize deserializes serializedMetadata to an AutMetadata.
+func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 	// Serialize the header code followed by the compressed unspent
 	// transaction output.
+	r := bytes.NewReader(serializedMetadata)
+
 	var err error
 	version, err := wire.ReadVarInt(r, 0)
 	if err != nil {
@@ -334,6 +337,8 @@ func (autMetadata *AutMetadata) Deserialize(r io.Reader) error {
 		return fmt.Errorf("the number of read active root token (%d) does not match the read number (%d)",
 			len(autMetadata.ActiveRootTokenSet), rootCoinNum)
 	}
+
+	// todo: call sanity check
 
 	return nil
 }
