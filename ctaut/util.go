@@ -206,7 +206,7 @@ func readCTAUTTxoScript(r io.Reader, expectedCTTokenLength int, expectedPlainTok
 
 	valueScripts := make([][]byte, numAutCoins)
 	for i := uint64(0); i < numAutCoins; i++ {
-		valueScripts[i], err = ReadVarBytes(r, MaxAUTValueScriptLength, "valueScript")
+		valueScripts[i], err = ReadVarBytes(r, MaxAutValueScriptLength, "valueScript")
 		if err != nil {
 			return nil, err
 		}

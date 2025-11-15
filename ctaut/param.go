@@ -45,6 +45,7 @@ const MaxAutMemoLength = 1024 // 1K
 //  3. Each host transaction allows up to 100 pseudonym inputs but up to 50 different addresses are allowed,
 //     it means that up to 50 for mint/reregistration threshold
 //  4. the CT-Token would be generated up to 5 at a time
+
 const MaxAmount = uint64(1)<<51 - 1 // TODO get the value from abecryptoxparam.???
 const MaxNumCTToken = 5             // TODO get the value from abecryptoxparam.???
 const MaxNumToken = 100             // TODO get the value from abecryptoxparam.GetTxOutputMaxNumForSingle(wire.TxVersion)
@@ -54,7 +55,7 @@ const issuerTokenLength = 193 // todo(ctaut): confirm to use coin address?
 
 // The ValueScript in wire.AutTxo would be 10959 bytes (for hidden one) or 9 bytes (for public one)
 // At this moment, there may be up to 5 hidden one and 95 public one, i.e. 10959*5 + 95*9 = 55650
-const MaxAUTValueScriptLength = 10963
+const MaxAutValueScriptLength = 10963
 
 const MaxMemoLength = 1024 // 1K
 

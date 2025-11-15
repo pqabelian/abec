@@ -486,7 +486,7 @@ func deserializeCTAUTCoin(serialized []byte) (*CTAUTCoin, error) {
 		return nil, errors.New("invalid identifier")
 	}
 
-	script, err := wire.ReadVarBytes(reader, 0, ctaut.MaxAUTValueScriptLength, "script")
+	script, err := wire.ReadVarBytes(reader, 0, ctaut.MaxAutValueScriptLength, "script")
 	if err != nil {
 		return nil, err
 	}
