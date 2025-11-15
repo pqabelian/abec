@@ -52,7 +52,7 @@ type BlockAbe struct {
 	autTransactions  []aut.Transaction
 	autTxnsGenerated bool
 
-	ctAutScripts          []*CTAUTScript
+	ctAutScripts          []*AutScript
 	ctAutScriptsGenerated bool
 }
 
@@ -383,7 +383,7 @@ func (b *BlockAbe) AUTTransactions() []aut.Transaction {
 	b.autTxnsGenerated = true
 	return b.autTransactions
 }
-func (b *BlockAbe) CTAUTScripts() []*CTAUTScript {
+func (b *BlockAbe) CTAUTScripts() []*AutScript {
 	// Return transactions if they have ALL already been generated.  This
 	// flag is necessary because the wrapped transactions are lazily
 	// generated in a sparse fashion.
@@ -393,7 +393,7 @@ func (b *BlockAbe) CTAUTScripts() []*CTAUTScript {
 
 	// Generate slice to hold all of the wrapped transactions if needed.
 	if len(b.ctAutScripts) == 0 {
-		b.ctAutScripts = make([]*CTAUTScript, 0, len(b.msgBlock.Transactions))
+		b.ctAutScripts = make([]*AutScript, 0, len(b.msgBlock.Transactions))
 	}
 
 	// Generate and cache the wrapped autTransactions for all that haven't
@@ -419,7 +419,7 @@ func (b *BlockAbe) CTAUTScripts() []*CTAUTScript {
 			log.Debugf("AUTTransactions: skip non-AUT transaction %s", txAbe.Hash())
 			continue
 		}
-		b.ctAutScripts = append(b.ctAutScripts, &CTAUTScript{
+		b.ctAutScripts = append(b.ctAutScripts, &AutScript{
 			HostTx: txAbe.msgTx,
 			Script: script,
 		})

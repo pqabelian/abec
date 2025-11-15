@@ -5,7 +5,7 @@ import (
 	"github.com/abesuite/abec/wire"
 )
 
-type CTAUTScript struct {
+type AutScript struct {
 	HostTx *wire.MsgTxAbe
 	Script *ctaut.EnhancedAutScript
 }

@@ -351,7 +351,7 @@ func serializeSpendJournalEntryCTAUT(stxos []SpentCTAUT) ([]byte, error) {
 	return serialized, nil
 
 }
-func deserializeSpendJournalEntryCTAUT(serialized []byte, scripts []*abeutil.CTAUTScript) ([]SpentCTAUT, error) {
+func deserializeSpendJournalEntryCTAUT(serialized []byte, scripts []*abeutil.AutScript) ([]SpentCTAUT, error) {
 	// Calculate the total number of stxos.
 	numStxos := len(scripts)
 
