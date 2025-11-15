@@ -88,7 +88,7 @@ func (tx *TxAbe) CTAUTTScript() (*ctaut.EnhancedCTAUTScript, error) {
 	}
 	tx.ctAutScriptDone = true
 
-	tx.ctAutScript, tx.errCTAUTScript = ctaut.ExtractCTAUTScript(tx.MsgTx())
+	tx.ctAutScript, tx.errCTAUTScript = ctaut.ExtractAutScript(tx.MsgTx())
 
 	return tx.ctAutScript, tx.errCTAUTScript
 }

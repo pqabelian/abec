@@ -660,7 +660,7 @@ func GetConsumedOutpoints(serializedTx []byte, rings map[string]*TxoRing) ([]*Ou
 	if err != nil {
 		return nil, err
 	}
-	ctAutScript, err := ctaut.ExtractCTAUTScript(tx.MsgTx())
+	ctAutScript, err := ctaut.ExtractAutScript(tx.MsgTx())
 	if err != nil {
 		return nil, err
 	}

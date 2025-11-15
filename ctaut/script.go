@@ -1934,7 +1934,7 @@ func (script *EnhancedCTAUTScript) UpdateMetadata(metadata *AutMetadata) error {
 	return nil
 }
 
-// ExtractCTAUTScript try to deserialize CTAUT script from transaction memo
+// ExtractAutScript try to deserialize CTAUT script from transaction memo
 // if success, it would :
 // - extract the well-formed script from memo with sanity check:
 //   - no conflict configuration
@@ -1954,7 +1954,7 @@ func (script *EnhancedCTAUTScript) UpdateMetadata(metadata *AutMetadata) error {
 // todo: CTAUT to Aut?
 // todo: what is the relation with Parse
 // todo: rename to Aut
-func ExtractCTAUTScript(tx *wire.MsgTxAbe) (enhancedScript *EnhancedCTAUTScript, err error) {
+func ExtractAutScript(tx *wire.MsgTxAbe) (enhancedScript *EnhancedCTAUTScript, err error) {
 	if tx.Version < wire.TxVersion_Height_464000_Aconcagua {
 		return nil, nil
 	}
