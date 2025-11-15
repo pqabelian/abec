@@ -248,7 +248,7 @@ func (view *CTAUTViewpoint) addCTAUTCoin(identifier []byte, outpoint ctaut.HostO
 	instance.coins[outpoint] = NewCTAUTCoin(identifier, script, blockHeight)
 }
 
-func (view *CTAUTViewpoint) connectRegistrationScript(script *ctaut.EnhancedCTAUTScript, txHash chainhash.Hash,
+func (view *CTAUTViewpoint) connectRegistrationScript(script *ctaut.EnhancedAutScript, txHash chainhash.Hash,
 	blockHeight int32, sctauts *[]SpentCTAUT) error {
 	if script.Type() != ctaut.AutScriptTypeRegistration {
 		return fmt.Errorf("expected registration script, but got %d", script.Type())
@@ -301,7 +301,7 @@ func (view *CTAUTViewpoint) connectRegistrationScript(script *ctaut.EnhancedCTAU
 	}
 	return nil
 }
-func (view *CTAUTViewpoint) connectReRegistrationScript(script *ctaut.EnhancedCTAUTScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
+func (view *CTAUTViewpoint) connectReRegistrationScript(script *ctaut.EnhancedAutScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
 	if script.Type() != ctaut.AutScriptTypeReRegistration {
 		return fmt.Errorf("expected re-registration script, but got %d", script.Type())
 	}
@@ -360,7 +360,7 @@ func (view *CTAUTViewpoint) connectReRegistrationScript(script *ctaut.EnhancedCT
 	}
 	return nil
 }
-func (view *CTAUTViewpoint) connectMintScript(script *ctaut.EnhancedCTAUTScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
+func (view *CTAUTViewpoint) connectMintScript(script *ctaut.EnhancedAutScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
 	if script.Type() != ctaut.AutScriptTypeMint {
 		return fmt.Errorf("expected mint script, but got %d")
 	}
@@ -436,7 +436,7 @@ func (view *CTAUTViewpoint) connectMintScript(script *ctaut.EnhancedCTAUTScript,
 	return nil
 }
 
-func (view *CTAUTViewpoint) connectTransferScript(script *ctaut.EnhancedCTAUTScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
+func (view *CTAUTViewpoint) connectTransferScript(script *ctaut.EnhancedAutScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
 	if script.Type() != ctaut.AutScriptTypeTransfer {
 		return fmt.Errorf("expected transfer script, but got %d", script.Type())
 	}
@@ -490,7 +490,7 @@ func (view *CTAUTViewpoint) connectTransferScript(script *ctaut.EnhancedCTAUTScr
 
 	return nil
 }
-func (view *CTAUTViewpoint) connectBurnScript(script *ctaut.EnhancedCTAUTScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
+func (view *CTAUTViewpoint) connectBurnScript(script *ctaut.EnhancedAutScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
 	if script.Type() != ctaut.AutScriptTypeBurn {
 		return fmt.Errorf("expected burn script, but got %d", script.Type())
 	}
@@ -640,7 +640,7 @@ func (view *CTAUTViewpoint) connectTransactions(block *abeutil.BlockAbe, sctauts
 	view.SetBestHash(block.Hash())
 	return nil
 }
-func (view *CTAUTViewpoint) disconnectRegistrationTransaction(db database.DB, script *ctaut.EnhancedCTAUTScript,
+func (view *CTAUTViewpoint) disconnectRegistrationTransaction(db database.DB, script *ctaut.EnhancedAutScript,
 	blockHeight int32, sctaut SpentCTAUT) (map[string]struct{}, error) {
 	if script.Type() != ctaut.AutScriptTypeRegistration {
 		return nil, fmt.Errorf("expected registration script, but got %d", script.Type())
@@ -681,7 +681,7 @@ func (view *CTAUTViewpoint) disconnectRegistrationTransaction(db database.DB, sc
 	return unregisteredCTAUT, nil
 }
 
-func (view *CTAUTViewpoint) disconnectReRegistrationTransaction(db database.DB, script *ctaut.EnhancedCTAUTScript,
+func (view *CTAUTViewpoint) disconnectReRegistrationTransaction(db database.DB, script *ctaut.EnhancedAutScript,
 	blockHeight int32, sctaut SpentCTAUT) (map[string]struct{}, error) {
 	if script.Type() != ctaut.AutScriptTypeReRegistration {
 		return nil, fmt.Errorf("expected re-registration script, but got %d", script.Type())
@@ -719,7 +719,7 @@ func (view *CTAUTViewpoint) disconnectReRegistrationTransaction(db database.DB, 
 	return nil, nil
 }
 
-func (view *CTAUTViewpoint) disconnectMintTransaction(db database.DB, script *ctaut.EnhancedCTAUTScript,
+func (view *CTAUTViewpoint) disconnectMintTransaction(db database.DB, script *ctaut.EnhancedAutScript,
 	blockHeight int32, sctaut SpentCTAUT) (map[string]struct{}, error) {
 	if script.Type() != ctaut.AutScriptTypeMint {
 		return nil, fmt.Errorf("expected mint script, but got %d", script.Type())
@@ -774,7 +774,7 @@ func (view *CTAUTViewpoint) disconnectMintTransaction(db database.DB, script *ct
 
 	return nil, nil
 }
-func (view *CTAUTViewpoint) disconnectTransferTransaction(db database.DB, script *ctaut.EnhancedCTAUTScript,
+func (view *CTAUTViewpoint) disconnectTransferTransaction(db database.DB, script *ctaut.EnhancedAutScript,
 	blockHeight int32, sctaut SpentCTAUT) (map[string]struct{}, error) {
 	if script.Type() != ctaut.AutScriptTypeTransfer {
 		return nil, fmt.Errorf("expected transfer script, but got %d", script.Type())
@@ -832,7 +832,7 @@ func (view *CTAUTViewpoint) disconnectTransferTransaction(db database.DB, script
 
 	return nil, nil
 }
-func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, script *ctaut.EnhancedCTAUTScript,
+func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, script *ctaut.EnhancedAutScript,
 	blockHeight int32, sctaut SpentCTAUT) (map[string]struct{}, error) {
 	if script.Type() != ctaut.AutScriptTypeBurn {
 		return nil, fmt.Errorf("expected burn script, but got %d", script.Type())
@@ -1136,7 +1136,7 @@ func (view *CTAUTViewpoint) fetchConsumedCTAUTTokens(db database.DB, block *abeu
 	return nil
 }
 
-func (view *CTAUTViewpoint) SpendCTAutScript(script *ctaut.EnhancedCTAUTScript, txHash *chainhash.Hash, blockHeight int32) error {
+func (view *CTAUTViewpoint) SpendCTAutScript(script *ctaut.EnhancedAutScript, txHash *chainhash.Hash, blockHeight int32) error {
 	var err error
 	switch script.AutScript.(type) {
 	case *ctaut.RegistrationScript:
@@ -1185,7 +1185,7 @@ func NewCTAUTViewpoint() *CTAUTViewpoint {
 //
 // This function is safe for concurrent access however the returned view is NOT.
 // refactored by Alice 2024.03.01
-func (b *BlockChain) FetchCTAUTView(script *ctaut.EnhancedCTAUTScript) (*CTAUTViewpoint, error) {
+func (b *BlockChain) FetchCTAUTView(script *ctaut.EnhancedAutScript) (*CTAUTViewpoint, error) {
 	// Create a set of needed outputs based on those referenced by the
 	// inputs of the passed transaction and the outputs of the transaction
 	// itself.

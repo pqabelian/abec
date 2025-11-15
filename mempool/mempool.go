@@ -79,7 +79,7 @@ type Config struct {
 
 	FetchUtxoRingView func(*abeutil.TxAbe) (*blockchain.UtxoRingViewpoint, error)
 	//FetchAUTView      func(*abeutil.TxAbe) (*blockchain.AUTViewpoint, error)
-	FetchCTAUTView func(ctAutScript *ctaut.EnhancedCTAUTScript) (*blockchain.CTAUTViewpoint, error)
+	FetchCTAUTView func(ctAutScript *ctaut.EnhancedAutScript) (*blockchain.CTAUTViewpoint, error)
 
 	// BestHeight defines the function to use to access the block height of
 	// the current best chain.
@@ -1359,7 +1359,7 @@ func (mp *TxPool) fetchInputAUT(tx *abeutil.TxAbe) (*blockchain.AUTViewpoint, er
 	//return autView, nil
 	return nil, errors.New("AUT is not supported")
 }
-func (mp *TxPool) fetchInputCTAUT(ctAutScript *ctaut.EnhancedCTAUTScript) (*blockchain.CTAUTViewpoint, error) {
+func (mp *TxPool) fetchInputCTAUT(ctAutScript *ctaut.EnhancedAutScript) (*blockchain.CTAUTViewpoint, error) {
 	ctAutView, err := mp.cfg.FetchCTAUTView(ctAutScript)
 	if err != nil {
 		return nil, err

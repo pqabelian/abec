@@ -1805,7 +1805,7 @@ type CTAUTToken struct {
 
 // todo: what is this?
 // todo: rename
-type EnhancedCTAUTScript struct {
+type EnhancedAutScript struct {
 	AutScript
 
 	// Note that for following 2 fields:
@@ -1815,14 +1815,14 @@ type EnhancedCTAUTScript struct {
 	generatedTokens []*CTAUTToken
 }
 
-func (script *EnhancedCTAUTScript) ConsumedTokens() ([]*CTAUTToken, error) {
+func (script *EnhancedAutScript) ConsumedTokens() ([]*CTAUTToken, error) {
 	if script.consumedTokens == nil {
 		return nil, errors.New("consumed tokens not set")
 	}
 
 	return script.consumedTokens, nil
 }
-func (script *EnhancedCTAUTScript) setConsumedTokens(consumedTokens []*CTAUTToken) error {
+func (script *EnhancedAutScript) setConsumedTokens(consumedTokens []*CTAUTToken) error {
 	if len(consumedTokens) != script.NumConsumedTokens() {
 		return errors.New("mismatched number of consumed tokens")
 	}
@@ -1831,14 +1831,14 @@ func (script *EnhancedCTAUTScript) setConsumedTokens(consumedTokens []*CTAUTToke
 	return nil
 }
 
-func (script *EnhancedCTAUTScript) GeneratedTokens() ([]*CTAUTToken, error) {
+func (script *EnhancedAutScript) GeneratedTokens() ([]*CTAUTToken, error) {
 	if script.generatedTokens == nil {
 		return nil, errors.New("generated tokens not set")
 	}
 
 	return script.generatedTokens, nil
 }
-func (script *EnhancedCTAUTScript) setGeneratedTokens(generatedTokens []*CTAUTToken) error {
+func (script *EnhancedAutScript) setGeneratedTokens(generatedTokens []*CTAUTToken) error {
 	if len(generatedTokens) != script.NumGeneratedTokens() {
 		return errors.New("mismatched number of consumed tokens")
 	}
@@ -1849,7 +1849,7 @@ func (script *EnhancedCTAUTScript) setGeneratedTokens(generatedTokens []*CTAUTTo
 }
 
 // todo: AutMetadata
-func (script *EnhancedCTAUTScript) Metadata() (*AutMetadata, error) {
+func (script *EnhancedAutScript) Metadata() (*AutMetadata, error) {
 	if script.Type() != AutScriptTypeRegistration {
 		return nil, errors.New("metadata only available for registration script")
 	}
@@ -1889,7 +1889,7 @@ func (script *EnhancedCTAUTScript) Metadata() (*AutMetadata, error) {
 }
 
 // todo: AutMetadata
-func (script *EnhancedCTAUTScript) UpdateMetadata(metadata *AutMetadata) error {
+func (script *EnhancedAutScript) UpdateMetadata(metadata *AutMetadata) error {
 	// assert
 	if script.Type() != AutScriptTypeReRegistration {
 		return errors.New("update metadata only available for re-registration script")
@@ -1954,7 +1954,7 @@ func (script *EnhancedCTAUTScript) UpdateMetadata(metadata *AutMetadata) error {
 // todo: CTAUT to Aut?
 // todo: what is the relation with Parse
 // todo: rename to Aut
-func ExtractAutScript(tx *wire.MsgTxAbe) (enhancedScript *EnhancedCTAUTScript, err error) {
+func ExtractAutScript(tx *wire.MsgTxAbe) (enhancedScript *EnhancedAutScript, err error) {
 	if tx.Version < wire.TxVersion_Height_464000_Aconcagua {
 		return nil, nil
 	}
@@ -1968,7 +1968,7 @@ func ExtractAutScript(tx *wire.MsgTxAbe) (enhancedScript *EnhancedCTAUTScript, e
 	}
 
 	// populate the generated tokens with host transaction outputs
-	enhancedScript = &EnhancedCTAUTScript{
+	enhancedScript = &EnhancedAutScript{
 		AutScript:       autScript,
 		consumedTokens:  nil,
 		generatedTokens: nil,
@@ -2062,7 +2062,7 @@ func ExtractAutScript(tx *wire.MsgTxAbe) (enhancedScript *EnhancedCTAUTScript, e
 // PresetHostOutpointForCTAUT would preset the host outpoint for consumed tokens with the help of
 // host transaction and ring
 // todo: use the correcy HostOutPoint
-func PresetHostOutpointForCTAUT(script *EnhancedCTAUTScript, msgTx *wire.MsgTxAbe,
+func PresetHostOutpointForCTAUT(script *EnhancedAutScript, msgTx *wire.MsgTxAbe,
 	lookupHostOutput func(ringHash chainhash.Hash) (*wire.TxOutAbe, error),
 ) error {
 	if script == nil || script.AutScript == nil {

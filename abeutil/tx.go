@@ -44,7 +44,7 @@ type TxAbe struct {
 	errAUTTx  error
 
 	ctAutScriptDone bool
-	ctAutScript     *ctaut.EnhancedCTAUTScript
+	ctAutScript     *ctaut.EnhancedAutScript
 	errCTAUTScript  error
 }
 
@@ -77,7 +77,7 @@ func (tx *TxAbe) AUTTransaction() (aut.Transaction, error) {
 }
 
 // CTAUTTScript would extract the AUT script from memo in transaction
-func (tx *TxAbe) CTAUTTScript() (*ctaut.EnhancedCTAUTScript, error) {
+func (tx *TxAbe) CTAUTTScript() (*ctaut.EnhancedAutScript, error) {
 	if tx.MsgTx().Version <= wire.TxVersion_Height_464000_Aconcagua {
 		// The transactions with lower version do not support CTAUT
 		return nil, nil
