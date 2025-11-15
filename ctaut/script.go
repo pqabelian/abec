@@ -118,13 +118,11 @@ func (autMetadata *AutMetadata) serializeSize() int {
 		1 // mint threshold
 
 	n += wire.VarIntSerializeSize(autMetadata.MintedAmount) + // minted amount,variable length
-		wire.VarIntSerializeSize(autMetadata.BurnedAmount) + // minted amount,variable length
-		wire.VarIntSerializeSize(uint64(len(autMetadata.ActiveRootTokenSet))) // number of issuer tokens
+		wire.VarIntSerializeSize(autMetadata.BurnedAmount) // burned amount,variable length
 
-	for point := range autMetadata.ActiveRootTokenSet {
-		// todo: call HostOutPoint's serialize size, which use a fixed bytes for Hash
-		n += wire.VarIntSerializeSize(uint64(len(point.TxHash))) + len(point.TxHash)
-		n += 1
+	n += wire.VarIntSerializeSize(uint64(len(autMetadata.ActiveRootTokenSet))) // number of issuer tokens
+	for hostOutPoint := range autMetadata.ActiveRootTokenSet {
+		n += hostOutPoint.SerializeSize()
 	}
 
 	return n
@@ -254,6 +252,7 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 		return err
 	}
 	// todo: add sanity check, and remove these checks
+	// todo: remove
 	// assert
 	if len(identifier) != AutIdentifierLength {
 		return errors.New("unexpected identifier length")
@@ -339,10 +338,12 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 			len(autMetadata.ActiveRootTokenSet), rootCoinNum)
 	}
 
-	// todo: call sanity check
 	return autMetadata.SanityCheck()
 }
+
 func (autMetadata *AutMetadata) SanityCheck() error {
+	// todo: add version check
+	// todo: add identifier check
 	if len(autMetadata.AutName) > MaxAutNameLength {
 		return fmt.Errorf("invalid length (%d) for aut name", len(autMetadata.AutName))
 	}

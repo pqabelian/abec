@@ -79,7 +79,7 @@ func (outPoint *OutPointAbe) OutPointId() OutPointId {
 }
 
 // String returns the OutPoint in the human-readable form "hash:index".
-func (op OutPointAbe) String() string {
+func (outPoint *OutPointAbe) String() string {
 	// Allocate enough for hash string, colon, and 10 digits.  Although
 	// at the time of writing, the number of digits can be no greater than
 	// the length of the decimal representation of maxTxOutPerMessage, the
@@ -87,9 +87,9 @@ func (op OutPointAbe) String() string {
 	// optimization may go unnoticed, so allocate space for 10 decimal
 	// digits, which will fit any uint32.
 	buf := make([]byte, 2*chainhash.HashSize+1, 2*chainhash.HashSize+1+10)
-	copy(buf, op.TxHash.String())
+	copy(buf, outPoint.TxHash.String())
 	buf[2*chainhash.HashSize] = ':'
-	buf = strconv.AppendUint(buf, uint64(op.Index), 10)
+	buf = strconv.AppendUint(buf, uint64(outPoint.Index), 10)
 	return string(buf)
 }
 
@@ -303,6 +303,10 @@ func ReadOutPointRing(r io.Reader, pver uint32, version uint32, opr *OutPointRin
 	}
 
 	return nil
+}
+
+func (outPoint *OutPointAbe) SerializeSize() int {
+	return chainhash.HashSize + 1
 }
 
 func WriteOutPointAbe(w io.Writer, pver uint32, version uint32, op *OutPointAbe) error {
