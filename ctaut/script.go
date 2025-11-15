@@ -2,6 +2,7 @@ package ctaut
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -339,6 +340,54 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 	}
 
 	// todo: call sanity check
+	return autMetadata.SanityCheck()
+}
+func (autMetadata *AutMetadata) SanityCheck() error {
+	if len(autMetadata.AutName) > MaxAutNameLength {
+		return fmt.Errorf("invalid length (%d) for aut name", len(autMetadata.AutName))
+	}
+	if len(autMetadata.AutSymbol) > MaxAutSymbolLength {
+		return fmt.Errorf("invalid length (%d) for aut symbol", len(autMetadata.AutSymbol))
+	}
+	if len(autMetadata.BaseUnitName) > MaxBaseUnitLength {
+		return fmt.Errorf("invalid length (%d) for base unit name", len(autMetadata.BaseUnitName))
+	}
+	if len(autMetadata.SubUnitName) > MaxSubUnitLength {
+		return fmt.Errorf("invalid length (%d) for sub unit name", len(autMetadata.SubUnitName))
+	}
+	if len(autMetadata.AutMemo) > MaxAutMemoLength {
+		return fmt.Errorf("invalid length (%d) for aut memo", len(autMetadata.AutMemo))
+	}
+	if autMetadata.PlannedTotalSupply > MaxAmount {
+		return fmt.Errorf("invalid planned total supply (%d)", autMetadata.PlannedTotalSupply)
+	}
+
+	issuerTokenMapping := map[string]struct{}{}
+	for _, issuerToken := range autMetadata.IssuerTokens {
+		key := hex.EncodeToString(issuerToken)
+		if _, ok := issuerTokenMapping[key]; ok {
+			return fmt.Errorf("repeated issuer token")
+		}
+		issuerTokenMapping[key] = struct{}{}
+	}
+
+	if autMetadata.ReregistrationExpireHeight < InfiniteExpireHeight {
+		return fmt.Errorf("invalid reregistration expire height (%d)", autMetadata.ReregistrationExpireHeight)
+	}
+
+	if autMetadata.ReregistrationThreshold > uint8(len(autMetadata.IssuerTokens)) {
+		return fmt.Errorf("invalid reregistration threshold (%d) for %d issuer tokens", autMetadata.ReregistrationThreshold, len(autMetadata.IssuerTokens))
+	}
+	if autMetadata.MintThreshold > uint8(len(autMetadata.IssuerTokens)) {
+		return fmt.Errorf("invalid mint threshold (%d) for %d issuer tokens", autMetadata.MintThreshold, len(autMetadata.IssuerTokens))
+	}
+
+	if autMetadata.MintedAmount > autMetadata.PlannedTotalSupply {
+		return fmt.Errorf("invalid minted amount (%d) for planned total supply (%d)", autMetadata.MintedAmount, autMetadata.PlannedTotalSupply)
+	}
+	if autMetadata.BurnedAmount > autMetadata.MintedAmount {
+		return fmt.Errorf("invalid burned amount (%d) for minted amount (%d)", autMetadata.BurnedAmount, autMetadata.MintedAmount)
+	}
 
 	return nil
 }
@@ -709,7 +758,7 @@ func (script *RegistrationScript) SanityCheck() error {
 	if int(script.reregisterThreshold) == 0 || int(script.reregisterThreshold) > len(script.issuerTokens) {
 		return ErrInValidAUTTx
 	}
-	if script.reregistrationExpireHeight <= 0 || script.reregistrationExpireHeight > math.MaxInt32 {
+	if script.reregistrationExpireHeight < InfiniteExpireHeight || script.reregistrationExpireHeight > math.MaxInt32 {
 		return ErrInValidAUTTx
 	}
 
@@ -923,6 +972,10 @@ func (script *ReRegistrationScript) Deserialize(r io.Reader) error {
 	if expireHeight, err = ReadVarInt(r); err != nil {
 		return err
 	}
+	tmp := int64(expireHeight)
+	if tmp < -1 {
+		return ErrInValidAUTTx
+	}
 	if expireHeight > math.MaxInt32 {
 		return ErrInValidAUTTx
 	}
@@ -967,7 +1020,7 @@ func (script *ReRegistrationScript) SanityCheck() error {
 	if int(script.reregisterThreshold) == 0 || int(script.reregisterThreshold) > len(script.issuerTokens) {
 		return ErrInValidAUTTx
 	}
-	if script.reregistrationExpireHeight <= 0 || script.reregistrationExpireHeight > math.MaxInt32 {
+	if script.reregistrationExpireHeight < InfiniteExpireHeight || script.reregistrationExpireHeight > math.MaxInt32 {
 		return ErrInValidAUTTx
 	}
 

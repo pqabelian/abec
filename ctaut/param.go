@@ -57,3 +57,5 @@ const issuerTokenLength = 193 // todo(ctaut): confirm to use coin address?
 const MaxAUTValueScriptLength = 10963
 
 const MaxMemoLength = 1024 // 1K
+
+const InfiniteExpireHeight = int32(-1)

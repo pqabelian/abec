@@ -2132,7 +2132,7 @@ func checkCTAUTReRegistrationTransactionInputs(script *ctaut.EnhancedCTAUTScript
 	}
 
 	// sanity check: expiry
-	if instance.metadata.ReregistrationExpireHeight < txHeight {
+	if instance.metadata.ReregistrationExpireHeight != ctaut.InfiniteExpireHeight && instance.metadata.ReregistrationExpireHeight < txHeight {
 		return fmt.Errorf("transaction %s try to re-register at height %d but "+
 			"the AUT entry claim its expire height %d when last registered", tx.Hash(), txHeight, instance.metadata.ReregistrationExpireHeight)
 	}
