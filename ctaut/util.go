@@ -127,20 +127,29 @@ func readIssuerTokens(r io.Reader) ([][]byte, error) {
 // todo: discuss to make a simple and symmetric; seems to package the read and write too much, so that the logic is a little strange.
 // todo: e.g., the serialize and deserialize Hash does not need package.
 func writeWitnessHash(b *bytes.Buffer, witnessHash chainhash.Hash) error {
-	return WriteVarBytes(b, witnessHash[:])
+	//return WriteVarBytes(b, witnessHash[:])
+	_, err := b.Write(witnessHash[:])
+	return err
 }
+
 func readWitnessHash(r io.Reader) (chainhash.Hash, error) {
 	// todo(ctaut): why use var bytes? it increases the NewHash() part.
 	// todo(ctaut): "memo" is not correct.
-	witnessHashBytes, err := ReadVarBytes(r, chainhash.HashSize, "memo")
-	if err != nil {
-		return chainhash.InvalidHash, err
-	}
-	witnessHash, err := chainhash.NewHash(witnessHashBytes)
-	if err != nil {
-		return chainhash.InvalidHash, err
-	}
-	return *witnessHash, nil
+	//witnessHashBytes, err := ReadVarBytes(r, chainhash.HashSize, "memo")
+	//if err != nil {
+	//	return chainhash.InvalidHash, err
+	//}
+	//witnessHash, err := chainhash.NewHash(witnessHashBytes)
+	//if err != nil {
+	//	return chainhash.InvalidHash, err
+	//}
+	//return *witnessHash, nil
+
+	rstHash := chainhash.Hash{}
+	// todo: why ReadFull is not symmetric with b.Write
+	_, err := io.ReadFull(r, rstHash[:])
+	return rstHash, err
+
 }
 
 // todo(ctaut): why define this function?
