@@ -79,7 +79,7 @@ func NewRegistrationScript(
 		unitScale,
 		ctAutMemo,
 		plannedTotalAmount,
-		issuerTokens,
+		//issuerTokens,
 		mintThreshold,
 		reregisterThreshold,
 		expireHeight,
@@ -113,7 +113,7 @@ func NewReRegistrationScript(
 		ctAutIdentifier,
 		ctAutMemo,
 		plannedTotalAmount,
-		issuerTokens,
+		//issuerTokens,
 		mintThreshold,
 		reregisterThreshold,
 		expireHeight,
@@ -473,6 +473,12 @@ func RegisteredAutMetadata(autScript AutScript, txVersion uint32, txID string, s
 	if autScript.Type() != ctaut.AutScriptTypeRegistration {
 		return nil, errors.New("aut script type is not Registration")
 	}
+
+	txHash, err := chainhash.NewHashFromStr(txID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid txid")
+	}
+
 	abeTxos := make([]*wire.TxOutAbe, len(serializedTxOuts))
 	for i := 0; i < len(serializedTxOuts); i++ {
 		abeTxo := &wire.TxOutAbe{}
@@ -482,23 +488,24 @@ func RegisteredAutMetadata(autScript AutScript, txVersion uint32, txID string, s
 		}
 		abeTxos[i] = abeTxo
 	}
-	//txHash, err := chainhash.NewHashFromStr(txID)
-	//if err != nil {
-	//	return nil, err
-	//}
-
-	//rootTokens, err := ctaut.GetGeneratedCTAUTTokens(autScript, *txHash, abeTxos)
-	//if err != nil {
-	//	return nil, err
-	//}
 
 	registerScript := autScript.(*ctaut.RegistrationScript)
 	identifier := registerScript.Identifier()
-	issuerTokens := registerScript.IssuerTokens()
-	issuerTokenStrs := make([]string, len(issuerTokens))
-	for i := 0; i < len(issuerTokens); i++ {
-		issuerTokenStrs[i] = hex.EncodeToString(issuerTokens[i])
+
+	rootTokens, err := ctaut.GetGeneratedAutTokens(autScript, *txHash, abeTxos)
+	if err != nil {
+		return nil, fmt.Errorf("fail to get root token: %s", err)
 	}
+	issuers := make([]string, 0, len(serializedTxOuts))
+	issuerMapping := map[string]struct{}{}
+	for i := 0; i < len(rootTokens); i++ {
+		key := hex.EncodeToString(rootTokens[i].CoinAddress)
+		if _, ok := issuerMapping[key]; !ok {
+			issuerMapping[key] = struct{}{}
+			issuers = append(issuers, key)
+		}
+	}
+
 	metadata := &Metadata{
 		Version:                 registerScript.Version(),
 		CTAutIdentifier:         hex.EncodeToString(identifier[:]),
@@ -509,7 +516,7 @@ func RegisteredAutMetadata(autScript AutScript, txVersion uint32, txID string, s
 		UnitScale:               registerScript.UnitScale(),
 		CTAutMemo:               hex.EncodeToString(registerScript.CtAutMemo()),
 		PlannedTotalSupply:      registerScript.PlannedTotalAmount(),
-		IssuerTokens:            issuerTokenStrs,
+		IssuerTokens:            issuers,
 		MintThreshold:           registerScript.MintThreshold(),
 		ReregistrationThreshold: registerScript.ReregisterThreshold(),
 		ExpireHeight:            registerScript.ReregistrationExpireHeight(),
@@ -552,18 +559,21 @@ func UpdateAutMetadata(autScript AutScript, txVersion uint32, txID string, seria
 	case *ctaut.RegistrationScript:
 		return errors.New("ctaut script type is Registration")
 	case *ctaut.ReRegistrationScript:
-		//rootTokens, err := ctaut.GetGeneratedCTAUTTokens(ctAutScript, *txHash, abeTxos)
-		//if err != nil {
-		//	return err
-		//}
-
 		metadata.CTAutMemo = hex.EncodeToString(ctAutScript.CtAutMemo())
 		metadata.PlannedTotalSupply = ctAutScript.PlannedTotalAmount()
 
-		issuerTokens := ctAutScript.IssuerTokens()
-		metadata.IssuerTokens = make([]string, len(issuerTokens))
-		for i := 0; i < len(issuerTokens); i++ {
-			metadata.IssuerTokens[i] = hex.EncodeToString(issuerTokens[i])
+		rootTokens, err := ctaut.GetGeneratedAutTokens(autScript, *txHash, abeTxos)
+		if err != nil {
+			return fmt.Errorf("fail to get root token: %s", err)
+		}
+		metadata.IssuerTokens = make([]string, 0, len(serializedTxOuts))
+		issuerMapping := map[string]struct{}{}
+		for i := 0; i < len(rootTokens); i++ {
+			key := hex.EncodeToString(rootTokens[i].CoinAddress)
+			if _, ok := issuerMapping[key]; !ok {
+				issuerMapping[key] = struct{}{}
+				metadata.IssuerTokens = append(metadata.IssuerTokens, key)
+			}
 		}
 
 		metadata.MintThreshold = ctAutScript.MintThreshold()

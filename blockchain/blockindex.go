@@ -7,15 +7,16 @@ package blockchain
 */
 import (
 	"fmt"
+	"math/big"
+	"sort"
+	"sync"
+	"time"
+
 	"github.com/abesuite/abec/blockchain/ruleerror"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/wire"
-	"math/big"
-	"sort"
-	"sync"
-	"time"
 )
 
 // blockStatus is a bit field representing the validation state of the block.
