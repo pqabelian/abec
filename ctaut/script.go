@@ -502,8 +502,8 @@ type RegistrationScript struct {
 	unitScale    uint64
 	ctAutMemo    []byte
 
-	plannedTotalAmount         uint64
-	issuerTokens               [][]byte
+	plannedTotalAmount uint64
+	//issuerTokens               [][]byte
 	mintThreshold              uint8
 	reregisterThreshold        uint8
 	reregistrationExpireHeight int32
@@ -540,9 +540,9 @@ func (script *RegistrationScript) PlannedTotalAmount() uint64 {
 	return script.plannedTotalAmount
 }
 
-func (script *RegistrationScript) IssuerTokens() [][]byte {
-	return script.issuerTokens
-}
+//func (script *RegistrationScript) IssuerTokens() [][]byte {
+//	return script.issuerTokens
+//}
 
 func (script *RegistrationScript) MintThreshold() uint8 {
 	return script.mintThreshold
@@ -565,7 +565,7 @@ func NewRegistrationScript(
 	unitScale uint64,
 	ctAutMemo []byte,
 	plannedTotalAmount uint64,
-	issuerTokens [][]byte,
+	//issuerTokens [][]byte,
 	mintThreshold uint8,
 	reregisterThreshold uint8,
 	reregistrationExpireHeight int32,
@@ -573,17 +573,17 @@ func NewRegistrationScript(
 	memo []byte,
 ) *RegistrationScript {
 	return &RegistrationScript{
-		version:                    version,
-		scriptType:                 AutScriptTypeRegistration,
-		ctAutIdentifier:            [AutIdentifierLength]byte{},
-		ctAutName:                  ctAutName,
-		ctAutSymbol:                ctAutSymbol,
-		baseUnitName:               baseUnitName,
-		subUnitName:                subUnitName,
-		unitScale:                  unitScale,
-		ctAutMemo:                  ctAutMemo,
-		plannedTotalAmount:         plannedTotalAmount,
-		issuerTokens:               issuerTokens,
+		version:            version,
+		scriptType:         AutScriptTypeRegistration,
+		ctAutIdentifier:    [AutIdentifierLength]byte{},
+		ctAutName:          ctAutName,
+		ctAutSymbol:        ctAutSymbol,
+		baseUnitName:       baseUnitName,
+		subUnitName:        subUnitName,
+		unitScale:          unitScale,
+		ctAutMemo:          ctAutMemo,
+		plannedTotalAmount: plannedTotalAmount,
+		//issuerTokens:               issuerTokens,
 		mintThreshold:              mintThreshold,
 		reregisterThreshold:        reregisterThreshold,
 		reregistrationExpireHeight: reregistrationExpireHeight,
@@ -634,9 +634,9 @@ func (script *RegistrationScript) Serialize() ([]byte, error) {
 		return nil, err
 	}
 	// todo: not necessary to define a function for writeIssuerTokens
-	if err = writeIssuerTokens(&b, script.issuerTokens); err != nil {
-		return nil, err
-	}
+	//if err = writeIssuerTokens(&b, script.issuerTokens); err != nil {
+	//	return nil, err
+	//}
 	if err = b.WriteByte(script.mintThreshold); err != nil {
 		return nil, err
 	}
@@ -690,9 +690,9 @@ func (script *RegistrationScript) Deserialize(r io.Reader) error {
 		return err
 	}
 	// todo: not necessary define this function, since this function hides the details, but it is not a structure
-	if script.issuerTokens, err = readIssuerTokens(r); err != nil {
-		return err
-	}
+	//if script.issuerTokens, err = readIssuerTokens(r); err != nil {
+	//	return err
+	//}
 	if script.mintThreshold, err = ReadByte(r); err != nil {
 		return err
 	}
@@ -750,15 +750,16 @@ func (script *RegistrationScript) SanityCheck() error {
 	if script.plannedTotalAmount == 0 || script.plannedTotalAmount > MaxAmount {
 		return ErrInValidAUTTx
 	}
-	if len(script.issuerTokens) == 0 || len(script.issuerTokens) > MaxIssuerNum {
-		return ErrInValidAUTTx
-	}
-	if int(script.mintThreshold) == 0 || int(script.mintThreshold) > len(script.issuerTokens) {
-		return ErrInValidAUTTx
-	}
-	if int(script.reregisterThreshold) == 0 || int(script.reregisterThreshold) > len(script.issuerTokens) {
-		return ErrInValidAUTTx
-	}
+	// TODO: check the threshold later
+	//if len(script.issuerTokens) == 0 || len(script.issuerTokens) > MaxIssuerNum {
+	//	return ErrInValidAUTTx
+	//}
+	//if int(script.mintThreshold) == 0 || int(script.mintThreshold) > len(script.issuerTokens) {
+	//	return ErrInValidAUTTx
+	//}
+	//if int(script.reregisterThreshold) == 0 || int(script.reregisterThreshold) > len(script.issuerTokens) {
+	//	return ErrInValidAUTTx
+	//}
 	if script.reregistrationExpireHeight < InfiniteExpireHeight || script.reregistrationExpireHeight > math.MaxInt32 {
 		return ErrInValidAUTTx
 	}
@@ -811,8 +812,8 @@ type ReRegistrationScript struct {
 
 	ctAutMemo []byte
 
-	plannedTotalAmount         uint64
-	issuerTokens               [][]byte
+	plannedTotalAmount uint64
+	//issuerTokens               [][]byte
 	mintThreshold              uint8
 	reregisterThreshold        uint8
 	reregistrationExpireHeight int32
@@ -830,9 +831,9 @@ func (script *ReRegistrationScript) PlannedTotalAmount() uint64 {
 	return script.plannedTotalAmount
 }
 
-func (script *ReRegistrationScript) IssuerTokens() [][]byte {
-	return script.issuerTokens
-}
+//func (script *ReRegistrationScript) IssuerTokens() [][]byte {
+//	return script.issuerTokens
+//}
 
 func (script *ReRegistrationScript) MintThreshold() uint8 {
 	return script.mintThreshold
@@ -847,7 +848,7 @@ func NewReRegistrationScript(
 	ctAutIdentifier [AutIdentifierLength]byte,
 	ctAutMemo []byte,
 	plannedTotalAmount uint64,
-	issuerTokens [][]byte,
+	//issuerTokens [][]byte,
 	mintThreshold uint8,
 	reregisterThreshold uint8,
 	reregistrationExpireHeight int32,
@@ -856,12 +857,12 @@ func NewReRegistrationScript(
 	memo []byte,
 ) *ReRegistrationScript {
 	return &ReRegistrationScript{
-		version:                    version,
-		scriptType:                 AutScriptTypeReRegistration,
-		ctAutIdentifier:            ctAutIdentifier,
-		ctAutMemo:                  ctAutMemo,
-		plannedTotalAmount:         plannedTotalAmount,
-		issuerTokens:               issuerTokens,
+		version:            version,
+		scriptType:         AutScriptTypeReRegistration,
+		ctAutIdentifier:    ctAutIdentifier,
+		ctAutMemo:          ctAutMemo,
+		plannedTotalAmount: plannedTotalAmount,
+		//issuerTokens:               issuerTokens,
 		mintThreshold:              mintThreshold,
 		reregisterThreshold:        reregisterThreshold,
 		reregistrationExpireHeight: reregistrationExpireHeight,
@@ -908,9 +909,9 @@ func (script *ReRegistrationScript) Serialize() ([]byte, error) {
 	}
 
 	// todo: unnecessary use a function
-	if err = writeIssuerTokens(&b, script.issuerTokens); err != nil {
-		return nil, err
-	}
+	//if err = writeIssuerTokens(&b, script.issuerTokens); err != nil {
+	//	return nil, err
+	//}
 
 	if err = b.WriteByte(script.mintThreshold); err != nil {
 		return nil, err
@@ -957,9 +958,9 @@ func (script *ReRegistrationScript) Deserialize(r io.Reader) error {
 	}
 
 	// todo: necessary to use a function?
-	if script.issuerTokens, err = readIssuerTokens(r); err != nil {
-		return err
-	}
+	//if script.issuerTokens, err = readIssuerTokens(r); err != nil {
+	//	return err
+	//}
 
 	if script.mintThreshold, err = ReadByte(r); err != nil {
 		return err
@@ -1012,15 +1013,15 @@ func (script *ReRegistrationScript) SanityCheck() error {
 	if script.plannedTotalAmount == 0 || script.plannedTotalAmount > MaxAmount {
 		return ErrInValidAUTTx
 	}
-	if len(script.issuerTokens) == 0 || len(script.issuerTokens) > MaxIssuerNum {
-		return ErrInValidAUTTx
-	}
-	if int(script.mintThreshold) == 0 || int(script.mintThreshold) > len(script.issuerTokens) {
-		return ErrInValidAUTTx
-	}
-	if int(script.reregisterThreshold) == 0 || int(script.reregisterThreshold) > len(script.issuerTokens) {
-		return ErrInValidAUTTx
-	}
+	//if len(script.issuerTokens) == 0 || len(script.issuerTokens) > MaxIssuerNum {
+	//	return ErrInValidAUTTx
+	//}
+	//if int(script.mintThreshold) == 0 || int(script.mintThreshold) > len(script.issuerTokens) {
+	//	return ErrInValidAUTTx
+	//}
+	//if int(script.reregisterThreshold) == 0 || int(script.reregisterThreshold) > len(script.issuerTokens) {
+	//	return ErrInValidAUTTx
+	//}
 	if script.reregistrationExpireHeight < InfiniteExpireHeight || script.reregistrationExpireHeight > math.MaxInt32 {
 		return ErrInValidAUTTx
 	}
@@ -1863,6 +1864,26 @@ func (script *EnhancedAutScript) Metadata() (*AutMetadata, error) {
 		return nil, errors.New("metadata only available for registration script")
 	}
 
+	issuers := make([][]byte, 0, len(script.generatedTokens))
+	issuerMapping := map[string]struct{}{}
+	for i := 0; i < len(script.generatedTokens); i++ {
+		key := hex.EncodeToString(script.generatedTokens[i].CoinAddress)
+		if _, ok := issuerMapping[key]; ok {
+			continue
+		}
+		issuerMapping[key] = struct{}{}
+		issuers = append(issuers, script.generatedTokens[i].CoinAddress)
+	}
+	if len(issuers) == 0 || len(issuers) > MaxIssuerNum {
+		return nil, ErrInValidAUTTx
+	}
+	if int(registerScript.mintThreshold) == 0 || int(registerScript.mintThreshold) > len(issuers) {
+		return nil, ErrInValidAUTTx
+	}
+	if int(registerScript.reregisterThreshold) == 0 || int(registerScript.reregisterThreshold) > len(issuers) {
+		return nil, ErrInValidAUTTx
+	}
+
 	rootTokenSet := map[HostOutPoint]struct{}{}
 	for i := 0; i < len(script.generatedTokens); i++ {
 		rootTokenSet[script.generatedTokens[i].HostOutPoint] = struct{}{}
@@ -1877,7 +1898,7 @@ func (script *EnhancedAutScript) Metadata() (*AutMetadata, error) {
 		UnitScale:                  registerScript.unitScale,
 		AutMemo:                    registerScript.ctAutMemo,
 		PlannedTotalSupply:         registerScript.plannedTotalAmount,
-		IssuerTokens:               registerScript.issuerTokens,
+		IssuerTokens:               issuers, // registerScript.issuerTokens,
 		MintThreshold:              registerScript.mintThreshold,
 		ReregistrationThreshold:    registerScript.reregisterThreshold,
 		ReregistrationExpireHeight: registerScript.reregistrationExpireHeight,
@@ -1915,13 +1936,34 @@ func (script *EnhancedAutScript) UpdateMetadata(metadata *AutMetadata) error {
 		return errors.New("update metadata only available for re-registration script")
 	}
 	metadata.AutMemo = reregisterScript.ctAutMemo
+
+	issuers := make([][]byte, 0, len(script.generatedTokens))
+	issuerMapping := map[string]struct{}{}
+	for i := 0; i < len(script.generatedTokens); i++ {
+		key := hex.EncodeToString(script.generatedTokens[i].CoinAddress)
+		if _, ok := issuerMapping[key]; ok {
+			continue
+		}
+		issuerMapping[key] = struct{}{}
+		issuers = append(issuers, script.generatedTokens[i].CoinAddress)
+	}
+	if len(issuers) == 0 || len(issuers) > MaxIssuerNum {
+		return ErrInValidAUTTx
+	}
+	if int(reregisterScript.mintThreshold) == 0 || int(reregisterScript.mintThreshold) > len(issuers) {
+		return ErrInValidAUTTx
+	}
+	if int(reregisterScript.reregisterThreshold) == 0 || int(reregisterScript.reregisterThreshold) > len(issuers) {
+		return ErrInValidAUTTx
+	}
+
 	// assert here?
 	if metadata.MintedAmount > reregisterScript.plannedTotalAmount {
 		return errors.New("re-registration transaction try to make planned amount less than minted amount")
 	}
 	metadata.PlannedTotalSupply = reregisterScript.plannedTotalAmount
 
-	metadata.IssuerTokens = reregisterScript.issuerTokens
+	metadata.IssuerTokens = issuers
 	metadata.MintThreshold = reregisterScript.mintThreshold
 	metadata.ReregistrationThreshold = reregisterScript.reregisterThreshold
 	metadata.ReregistrationExpireHeight = reregisterScript.reregistrationExpireHeight
@@ -1990,9 +2032,9 @@ func ExtractAutScript(tx *wire.MsgTxAbe) (enhancedScript *EnhancedAutScript, err
 		// for outputs, the claimed issuer tokens must match the generated tokens exactly
 		// - all issuer tokens must appear
 		// - no unclaimed issuer token appear
-		if err = matchIssuerTokens(script.issuerTokens, tokens); err != nil {
-			return nil, err
-		}
+		//if err = matchIssuerTokens(script.issuerTokens, tokens); err != nil {
+		//	return nil, err
+		//}
 	case *ReRegistrationScript:
 		// for inputs, note that here is no enough information to
 		// 1. check the legality of token
@@ -2000,9 +2042,9 @@ func ExtractAutScript(tx *wire.MsgTxAbe) (enhancedScript *EnhancedAutScript, err
 		// Above checks have to be delayed until the instance could be seen
 
 		// for outputs, the claimed issuer tokens must match the outputs exactly
-		if err = matchIssuerTokens(script.issuerTokens, tokens); err != nil {
-			return nil, err
-		}
+		//if err = matchIssuerTokens(script.issuerTokens, tokens); err != nil {
+		//	return nil, err
+		//}
 	case *MintScript:
 		// for inputs, note that here is no enough information to
 		// 1. check the legality of token
