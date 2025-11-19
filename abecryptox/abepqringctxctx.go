@@ -440,6 +440,7 @@ func pqringctxGetAutTransferTxWitnessSizeByDesc(pp *pqringctxapi.PublicParameter
 // pqringctxRuleCheckOnTxoVersionPrivacyLevel checks the match between Txo's Version and PrivacyLevel.
 //
 // When new TxVersion is added, rules need to be added here.
+// todo: change hostTxoVersion to AutScriptVersion
 func pqringctxAutRuleCheckOnTxoVersionType(pp *pqringctxapi.PublicParameter, hostTxoVersion uint32, autType AutTxoType) error {
 	switch hostTxoVersion {
 	case hostwire.TxVersion_Height_464000_Aconcagua:

@@ -8,7 +8,7 @@ import (
 )
 
 type AutTxo struct {
-	Version   uint32
+	Version   uint32 // Inherit the AutScriptVersion
 	TxoScript []byte
 }
 
@@ -57,7 +57,7 @@ func (txo *AutTxo) Deserialize(serializedAutTxo []byte) error {
 }
 
 type AutCoinbaseTx struct {
-	Version   uint32
+	Version   uint32 // AutScriptVersion
 	Vin       uint64
 	TxOuts    []*AutTxo
 	TxWitness []byte
