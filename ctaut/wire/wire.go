@@ -36,7 +36,7 @@ func (txo *AutTxo) Serialize() ([]byte, error) {
 // - hidden value script is 10959
 // - publuc value script is 9
 // todo:
-const MaxAUTValueScriptLength = 16 * 1024
+const MaxAutTxoScriptLength = 16 * 1024
 
 func (txo *AutTxo) Deserialize(serializedAutTxo []byte) error {
 	r := bytes.NewBuffer(serializedAutTxo)
@@ -50,7 +50,7 @@ func (txo *AutTxo) Deserialize(serializedAutTxo []byte) error {
 	}
 	txo.Version = uint32(version)
 
-	if txo.TxoScript, err = wire.ReadVarBytes(r, 0, MaxAUTValueScriptLength, "autTxo.TxoScript"); err != nil {
+	if txo.TxoScript, err = wire.ReadVarBytes(r, 0, MaxAutTxoScriptLength, "autTxo.TxoScript"); err != nil {
 		return err
 	}
 	return nil
