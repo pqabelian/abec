@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"reflect"
 
@@ -39,8 +38,6 @@ type HostOutPoint = wire.OutPointAbe
 // # TransferScript would be used to transfer tokens between users, it would not affect any of the fields in Metadata
 //
 // BurnScript would be used to burn some tokens, it would not affect any of the fields in Metadata
-// todo: discuss use AutXXX, rather than CTAut ? affect too much?
-// todo: rename to AutMetadata?
 type AutMetadata struct {
 	Version uint32
 	// The TxHash of the host transaction (i.e. txid) where the registration script is located would be used as its instance identifier
@@ -452,10 +449,10 @@ func (autMetadata *AutMetadata) Clone() *AutMetadata {
 type AutScript interface {
 	Version() uint32
 	Type() AutScriptType
-	Identifier() [AutIdentifierLength]byte
+	Identifier() [AutIdentifierLength]byte // todo: Hash? AutIdentifier is not specifiable, so we explicitly define it to be Hash.
 
 	Serialize() ([]byte, error)
-	Deserialize(io.Reader) error // todo: make it to be symmetric? say, take []byte as input?
+	Deserialize([]byte) error
 
 	NumConsumedTokens() int // todo: why not directly uint8? if leave it to be int, need to check when set this value.
 	NumGeneratedTokens() int
@@ -567,7 +564,7 @@ func NewRegistrationScript(
 	unitScale uint64,
 	ctAutMemo []byte,
 	plannedTotalAmount uint64,
-	//issuerTokens [][]byte,
+//issuerTokens [][]byte,
 	mintThreshold uint8,
 	reregisterThreshold uint8,
 	reregistrationExpireHeight int32,
@@ -660,8 +657,10 @@ func (script *RegistrationScript) Serialize() ([]byte, error) {
 
 	return b.Bytes(), nil
 }
-func (script *RegistrationScript) Deserialize(r io.Reader) error {
+func (script *RegistrationScript) Deserialize(serializedScript []byte) error {
 	var err error
+
+	r := bytes.NewReader(serializedScript)
 
 	// todo: not necessary for define a function readPrefix,
 	// todo: even do this, the expected Type should be used inside the function
@@ -850,7 +849,7 @@ func NewReRegistrationScript(
 	ctAutIdentifier [AutIdentifierLength]byte,
 	ctAutMemo []byte,
 	plannedTotalAmount uint64,
-	//issuerTokens [][]byte,
+//issuerTokens [][]byte,
 	mintThreshold uint8,
 	reregisterThreshold uint8,
 	reregistrationExpireHeight int32,
@@ -942,8 +941,10 @@ func (script *ReRegistrationScript) Serialize() ([]byte, error) {
 
 	return b.Bytes(), nil
 }
-func (script *ReRegistrationScript) Deserialize(r io.Reader) error {
+func (script *ReRegistrationScript) Deserialize(serializedScript []byte) error {
 	var err error
+
+	r := bytes.NewReader(serializedScript)
 
 	// todo: necessary to use a function?
 	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeReRegistration); err != nil {
@@ -1164,8 +1165,10 @@ func (script *MintScript) Serialize() ([]byte, error) {
 	return b.Bytes(), nil
 
 }
-func (script *MintScript) Deserialize(r io.Reader) error {
+func (script *MintScript) Deserialize(serializedScript []byte) error {
 	var err error
+
+	r := bytes.NewReader(serializedScript)
 
 	// todo: necessary to use a function?
 	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeMint); err != nil {
@@ -1381,8 +1384,10 @@ func (script *TransferScript) Serialize() ([]byte, error) {
 
 	return b.Bytes(), nil
 }
-func (script *TransferScript) Deserialize(r io.Reader) error {
+func (script *TransferScript) Deserialize(serializedScript []byte) error {
 	var err error
+
+	r := bytes.NewReader(serializedScript)
 
 	// todo: necessary to use a function?
 	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeTransfer); err != nil {
@@ -1600,8 +1605,11 @@ func (script *BurnScript) Serialize() ([]byte, error) {
 }
 
 // todo(ctaut): add a standalone sanity-check function, and call it at the end of deserialize
-func (script *BurnScript) Deserialize(r io.Reader) error {
+func (script *BurnScript) Deserialize(serializedScript []byte) error {
 	var err error
+
+	r := bytes.NewReader(serializedScript)
+
 	// todo: necessary to use a function?
 	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeBurn); err != nil {
 		return err
@@ -1764,10 +1772,9 @@ func ParseAutScript(txVersion uint32, txHash chainhash.Hash, memo []byte) (scrip
 	}
 
 	// reset the reader to deserialize the complete script
-	reader := bytes.NewBuffer(memo)
 	// todo: here use read; separate Write/Read and Serialize/Deserialize
 	// todo: using Deserialize is also fine. [:]
-	err = script.Deserialize(reader)
+	err = script.Deserialize(memo)
 	if err != nil {
 		return nil, err
 	}
