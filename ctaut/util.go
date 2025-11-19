@@ -177,11 +177,11 @@ func writeMemo(b *bytes.Buffer, memo []byte) error {
 
 // todo(ctaut): the length check does not make sense, since it is checked in ReadVarBytes.
 func readMemo(r io.Reader) ([]byte, error) {
-	memo, err := ReadVarBytes(r, MaxMemoLength, "memo")
+	memo, err := ReadVarBytes(r, MaxScriptMemoLength, "memo")
 	if err != nil {
 		return nil, err
 	}
-	if len(memo) > MaxMemoLength {
+	if len(memo) > MaxScriptMemoLength {
 		return nil, ErrInValidAUTTx
 	}
 	return memo, nil

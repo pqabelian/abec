@@ -564,7 +564,7 @@ func NewRegistrationScript(
 	unitScale uint64,
 	ctAutMemo []byte,
 	plannedTotalAmount uint64,
-//issuerTokens [][]byte,
+	//issuerTokens [][]byte,
 	mintThreshold uint8,
 	reregisterThreshold uint8,
 	reregistrationExpireHeight int32,
@@ -768,7 +768,7 @@ func (script *RegistrationScript) SanityCheck() error {
 	if script.outAutRootTokenNum == 0 {
 		return ErrInValidAUTTx
 	}
-	if len(script.memo) > MaxMemoLength {
+	if len(script.memo) > MaxScriptMemoLength {
 		return ErrInValidAUTTx
 	}
 
@@ -849,7 +849,7 @@ func NewReRegistrationScript(
 	ctAutIdentifier [AutIdentifierLength]byte,
 	ctAutMemo []byte,
 	plannedTotalAmount uint64,
-//issuerTokens [][]byte,
+	//issuerTokens [][]byte,
 	mintThreshold uint8,
 	reregisterThreshold uint8,
 	reregistrationExpireHeight int32,
@@ -1035,7 +1035,7 @@ func (script *ReRegistrationScript) SanityCheck() error {
 	if script.outAutRootTokenNum == 0 {
 		return ErrInValidAUTTx
 	}
-	if len(script.memo) > MaxMemoLength {
+	if len(script.memo) > MaxScriptMemoLength {
 		return ErrInValidAUTTx
 	}
 
@@ -1254,7 +1254,7 @@ func (script *MintScript) SanityCheck() error {
 		}
 	}
 
-	if len(script.memo) > MaxMemoLength {
+	if len(script.memo) > MaxScriptMemoLength {
 		return ErrInValidAUTTx
 	}
 
@@ -1473,7 +1473,7 @@ func (script *TransferScript) SanityCheck() error {
 		}
 	}
 
-	if len(script.memo) > MaxMemoLength {
+	if len(script.memo) > MaxScriptMemoLength {
 		return ErrInValidAUTTx
 	}
 
@@ -1695,7 +1695,7 @@ func (script *BurnScript) SanityCheck() error {
 
 	// todo: the burned one must be plainAut
 
-	if len(script.memo) > MaxMemoLength {
+	if len(script.memo) > MaxScriptMemoLength {
 		return ErrInValidAUTTx
 	}
 

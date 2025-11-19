@@ -47,8 +47,8 @@ const MaxAutMemoLength = 1024 // 1K
 //  4. the CT-Token would be generated up to 5 at a time
 
 const MaxAmount = uint64(1)<<51 - 1 // TODO get the value from abecryptoxparam.???
+const MaxNumToken = 100             // The allowed total number of output AutTokens in one AutTransaction.
 const MaxNumCTToken = 5             // TODO get the value from abecryptoxparam.???
-const MaxNumToken = 100             // TODO get the value from abecryptoxparam.GetTxOutputMaxNumForSingle(wire.TxVersion)
 const MaxIssuerNum = 100            // TODO get the value from abecryptoxparam.GetTxOutputMaxNumForSingle(wire.TxVersion)
 
 const issuerTokenLength = 193 // todo(ctaut): confirm to use coin address?
@@ -57,6 +57,6 @@ const issuerTokenLength = 193 // todo(ctaut): confirm to use coin address?
 // At this moment, there may be up to 5 hidden one and 95 public one, i.e. 10959*5 + 95*9 = 55650
 const MaxAutValueScriptLength = 10963
 
-const MaxMemoLength = 1024 // 1K
+const MaxScriptMemoLength = 1024 // 1K
 
 const InfiniteExpireHeight = int32(-1)
