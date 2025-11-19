@@ -90,6 +90,7 @@ type AutMetadata struct {
 	// Each RootToken is an unspent host-OutPoint.
 	// todo: discuss, use a key-value format? to be more more safe.
 	ActiveRootTokenSet map[HostOutPoint]struct{}
+	//ActiveRootTokenSet map[string]*HostOutPoint
 }
 
 func (autMetadata *AutMetadata) serializeSize() int {
@@ -564,7 +565,7 @@ func NewRegistrationScript(
 	unitScale uint64,
 	ctAutMemo []byte,
 	plannedTotalAmount uint64,
-	//issuerTokens [][]byte,
+//issuerTokens [][]byte,
 	mintThreshold uint8,
 	reregisterThreshold uint8,
 	reregistrationExpireHeight int32,
@@ -849,7 +850,7 @@ func NewReRegistrationScript(
 	ctAutIdentifier [AutIdentifierLength]byte,
 	ctAutMemo []byte,
 	plannedTotalAmount uint64,
-	//issuerTokens [][]byte,
+//issuerTokens [][]byte,
 	mintThreshold uint8,
 	reregisterThreshold uint8,
 	reregistrationExpireHeight int32,
