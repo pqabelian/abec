@@ -19,6 +19,8 @@ import (
 // HostOutPoint defines the host of aut token, it could be used to track previous tokens.
 type HostOutPoint = wire.OutPointAbe
 
+type AutId = chainhash.Hash
+
 // AutMetadata maintains the metadata information of Abelian User Token (AUT) instance on Abelian
 // 1. The identifier of AUT instance are UNIQUE
 // 2. Each instance has its own name, symbol, and unit name
@@ -43,7 +45,7 @@ type AutMetadata struct {
 	Version uint32
 	// The TxHash of the host transaction (i.e. txid) where the registration script is located would be used as its instance identifier
 	// identifiers for different instances are unique
-	AutIdentifier chainhash.Hash // use chainhash.Hash directly
+	AutIdentifier AutId // use chainhash.Hash directly
 	// The name of token could be used to improve usability, but MUST NOT be assumed that the value must be present
 	// The full, descriptive and human-readable name of the token
 	// e.g. "Post-Quantum USD"
@@ -394,7 +396,7 @@ func (autMetadata *AutMetadata) Clone() *AutMetadata {
 
 	cloned := &AutMetadata{
 		Version:       autMetadata.Version,
-		AutIdentifier: chainhash.Hash{},
+		AutIdentifier: AutId{},
 
 		AutName:            make([]byte, len(autMetadata.AutName)),
 		AutSymbol:          make([]byte, len(autMetadata.AutSymbol)),
@@ -443,7 +445,6 @@ type AutScript interface {
 	Version() uint32
 	Type() AutScriptType
 	Identifier() [AutIdentifierLength]byte // todo: Hash? AutIdentifier is not specifiable, so we explicitly define it to be Hash.
-
 	Serialize() ([]byte, error)
 	Deserialize([]byte) error
 
