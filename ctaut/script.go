@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"reflect"
 
@@ -95,7 +96,7 @@ type AutMetadata struct {
 
 func (autMetadata *AutMetadata) serializeSize() int {
 	n := wire.VarIntSerializeSize(uint64(autMetadata.Version)) + //version
-		wire.VarIntSerializeSize(uint64(len(autMetadata.AutIdentifier))) + len(autMetadata.AutIdentifier) + // identifier, actually fixed length
+		chainhash.HashSize + // identifier, fixed length
 		wire.VarIntSerializeSize(uint64(len(autMetadata.AutName))) + len(autMetadata.AutName) + // name, variable length
 		wire.VarIntSerializeSize(uint64(len(autMetadata.AutSymbol))) + len(autMetadata.AutSymbol) + // symbol, variable length
 		wire.VarIntSerializeSize(uint64(len(autMetadata.BaseUnitName))) + len(autMetadata.BaseUnitName) + // base unit, variable length
@@ -144,9 +145,7 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	// to be extensible, here use VarBytes rather than fixed-length bytes.
-	// todo: discuss, how about use fixed bytes. It is unnecessary to leave space extension here.
-	if err = wire.WriteVarBytes(w, 0, autMetadata.AutIdentifier[:]); err != nil {
+	if _, err = w.Write(autMetadata.AutIdentifier[:]); err != nil {
 		return nil, err
 	}
 
@@ -249,15 +248,9 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 	}
 	autMetadata.Version = uint32(version)
 
-	identifier, err := wire.ReadVarBytes(r, 0, AutIdentifierLength, "identifier")
-	if err != nil {
+	if _, err = io.ReadFull(r, autMetadata.AutIdentifier[:]); err != nil {
 		return err
 	}
-	// This check-fail could not be detected in sanity-check, has to be conducted here.
-	if len(identifier) != AutIdentifierLength {
-		return errors.New("unexpected identifier length")
-	}
-	copy(autMetadata.AutIdentifier[:], identifier)
 
 	if autMetadata.AutName, err = wire.ReadVarBytes(r, 0, MaxAutNameLength, "name"); err != nil {
 		return err
@@ -344,7 +337,6 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 // SanityCheck checks whether the AutMetadata is well-formed, and return a non-nil error if it is not well-formed.
 func (autMetadata *AutMetadata) SanityCheck() error {
 	// todo: add version check
-	// todo: add identifier check
 	if len(autMetadata.AutName) > MaxAutNameLength {
 		return fmt.Errorf("invalid length (%d) for aut name", len(autMetadata.AutName))
 	}
