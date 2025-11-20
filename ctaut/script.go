@@ -511,7 +511,7 @@ type RegistrationScript struct {
 	reregistrationExpireHeight int32
 
 	outAutRootTokenNum uint8  // value is set in deserialize, so, do not provide set function, but provide get function.
-	memo               []byte // todo: TODO memo -> scriptMemo
+	scriptMemo         []byte // todo: TODO memo -> scriptMemo
 }
 
 func (script *RegistrationScript) AutName() []byte {
@@ -554,8 +554,8 @@ func (script *RegistrationScript) ReregisterThreshold() uint8 {
 	return script.reregisterThreshold
 }
 
-func (script *RegistrationScript) Memo() []byte {
-	return script.memo
+func (script *RegistrationScript) ScriptMemo() []byte {
+	return script.scriptMemo
 }
 
 func NewRegistrationScript(
@@ -572,7 +572,7 @@ func NewRegistrationScript(
 	reregisterThreshold uint8,
 	reregistrationExpireHeight int32,
 	outAutRootTokenNum uint8,
-	memo []byte,
+	scriptMemo []byte,
 ) *RegistrationScript {
 	return &RegistrationScript{
 		version:            version,
@@ -590,7 +590,7 @@ func NewRegistrationScript(
 		reregisterThreshold:        reregisterThreshold,
 		reregistrationExpireHeight: reregistrationExpireHeight,
 		outAutRootTokenNum:         outAutRootTokenNum,
-		memo:                       memo,
+		scriptMemo:                 scriptMemo,
 	}
 }
 func (script *RegistrationScript) Version() uint32 {
@@ -653,7 +653,7 @@ func (script *RegistrationScript) Serialize() ([]byte, error) {
 		return nil, err
 	}
 	// todo: not necessary to define a function for writeMemo
-	if err = writeMemo(&b, script.memo); err != nil {
+	if err = writeMemo(&b, script.scriptMemo); err != nil {
 		return nil, err
 	}
 	fmt.Printf("%d\n", b.Len())
@@ -715,7 +715,7 @@ func (script *RegistrationScript) Deserialize(serializedScript []byte) error {
 	}
 
 	// todo: not necessary to define this function.
-	if script.memo, err = readMemo(r); err != nil {
+	if script.scriptMemo, err = readMemo(r); err != nil {
 		return err
 	}
 
@@ -771,7 +771,7 @@ func (script *RegistrationScript) SanityCheck() error {
 	if script.outAutRootTokenNum == 0 {
 		return ErrInValidAUTTx
 	}
-	if len(script.memo) > MaxScriptMemoLength {
+	if len(script.scriptMemo) > MaxScriptMemoLength {
 		return ErrInValidAUTTx
 	}
 
@@ -824,7 +824,7 @@ type ReRegistrationScript struct {
 
 	inAutRootTokenNum  uint8
 	outAutRootTokenNum uint8
-	memo               []byte // todo: scriptMemo
+	scriptMemo         []byte // todo: scriptMemo
 }
 
 func (script *ReRegistrationScript) AutMemo() []byte {
@@ -858,7 +858,7 @@ func NewReRegistrationScript(
 	reregistrationExpireHeight int32,
 	inAutRootTokenNum uint8,
 	outAutRootTokenNum uint8,
-	memo []byte,
+	scriptMemo []byte,
 ) *ReRegistrationScript {
 	return &ReRegistrationScript{
 		version:            version,
@@ -872,7 +872,7 @@ func NewReRegistrationScript(
 		reregistrationExpireHeight: reregistrationExpireHeight,
 		inAutRootTokenNum:          inAutRootTokenNum,
 		outAutRootTokenNum:         outAutRootTokenNum,
-		memo:                       memo,
+		scriptMemo:                 scriptMemo,
 	}
 }
 
@@ -938,7 +938,7 @@ func (script *ReRegistrationScript) Serialize() ([]byte, error) {
 	}
 
 	// todo: necessary use a function?
-	if err = writeMemo(&b, script.memo); err != nil {
+	if err = writeMemo(&b, script.scriptMemo); err != nil {
 		return nil, err
 	}
 
@@ -998,7 +998,7 @@ func (script *ReRegistrationScript) Deserialize(serializedScript []byte) error {
 	}
 
 	// todo: necessary to use a function?
-	if script.memo, err = readMemo(r); err != nil {
+	if script.scriptMemo, err = readMemo(r); err != nil {
 		return err
 	}
 
@@ -1038,7 +1038,7 @@ func (script *ReRegistrationScript) SanityCheck() error {
 	if script.outAutRootTokenNum == 0 {
 		return ErrInValidAUTTx
 	}
-	if len(script.memo) > MaxScriptMemoLength {
+	if len(script.scriptMemo) > MaxScriptMemoLength {
 		return ErrInValidAUTTx
 	}
 
@@ -1088,7 +1088,7 @@ type MintScript struct {
 	outPlainAutTokenNum uint8          // todo(ctaut): explicitly specify the number of plain-aut and the number of ct-aut? not specified, will call underlying API to extract AutTxoType?
 	valueScripts        [][]byte       // todo: limited to value? // todo: defined as serializedAutTxos? why not autTxos
 	witnessHash         chainhash.Hash // todo(ctaut): move to the last position
-	memo                []byte         // todo: scriptMemo
+	scriptMemo          []byte         // todo: scriptMemo
 }
 
 func (script *MintScript) WitnessHash() chainhash.Hash {
@@ -1103,7 +1103,7 @@ func NewMintScript(version uint32,
 	autIdentifier AutId,
 	vin uint64, inAutRootTokenNum uint8,
 	outCTAutTokenNum uint8, outPlainAutTokenNum uint8, valueScripts [][]byte,
-	witnessHash chainhash.Hash, memo []byte) *MintScript {
+	witnessHash chainhash.Hash, scriptMemo []byte) *MintScript {
 	return &MintScript{
 		version:             version,
 		scriptType:          AutScriptTypeMint,
@@ -1114,7 +1114,7 @@ func NewMintScript(version uint32,
 		outPlainAutTokenNum: outPlainAutTokenNum,
 		valueScripts:        valueScripts,
 		witnessHash:         witnessHash,
-		memo:                memo,
+		scriptMemo:          scriptMemo,
 	}
 }
 
@@ -1161,7 +1161,7 @@ func (script *MintScript) Serialize() ([]byte, error) {
 	}
 
 	// todo: necessary to use a function?
-	if err = writeMemo(&b, script.memo); err != nil {
+	if err = writeMemo(&b, script.scriptMemo); err != nil {
 		return nil, err
 	}
 
@@ -1202,7 +1202,7 @@ func (script *MintScript) Deserialize(serializedScript []byte) error {
 	}
 
 	// todo: necessary to use a function?
-	if script.memo, err = readMemo(r); err != nil {
+	if script.scriptMemo, err = readMemo(r); err != nil {
 		return err
 	}
 
@@ -1257,7 +1257,7 @@ func (script *MintScript) SanityCheck() error {
 		}
 	}
 
-	if len(script.memo) > MaxScriptMemoLength {
+	if len(script.scriptMemo) > MaxScriptMemoLength {
 		return ErrInValidAUTTx
 	}
 
@@ -1303,7 +1303,7 @@ type TransferScript struct {
 	valueScripts        [][]byte // todo: defined as serializedAutTxos? why not autTxos
 
 	witnessHash chainhash.Hash
-	memo        []byte // todo: scriptMemo
+	scriptMemo  []byte // todo: scriptMemo
 }
 
 func (script *TransferScript) WitnessHash() chainhash.Hash {
@@ -1323,7 +1323,7 @@ func NewTransferScript(
 	outPlainAutTokenNum uint8,
 	autTxoScripts [][]byte,
 	witnessHash chainhash.Hash,
-	memo []byte,
+	scriptMemo []byte,
 ) *TransferScript {
 	return &TransferScript{
 		version:             version,
@@ -1335,7 +1335,7 @@ func NewTransferScript(
 		outPlainAutTokenNum: outPlainAutTokenNum,
 		valueScripts:        autTxoScripts,
 		witnessHash:         witnessHash,
-		memo:                memo,
+		scriptMemo:          scriptMemo,
 	}
 }
 
@@ -1381,7 +1381,7 @@ func (script *TransferScript) Serialize() ([]byte, error) {
 	}
 
 	// todo: necessary to use a function?
-	if err = writeMemo(&b, script.memo); err != nil {
+	if err = writeMemo(&b, script.scriptMemo); err != nil {
 		return nil, err
 	}
 
@@ -1422,7 +1422,7 @@ func (script *TransferScript) Deserialize(serializedScript []byte) error {
 	}
 
 	// todo: necessary to use a function?
-	if script.memo, err = readMemo(r); err != nil {
+	if script.scriptMemo, err = readMemo(r); err != nil {
 		return err
 	}
 
@@ -1476,7 +1476,7 @@ func (script *TransferScript) SanityCheck() error {
 		}
 	}
 
-	if len(script.memo) > MaxScriptMemoLength {
+	if len(script.scriptMemo) > MaxScriptMemoLength {
 		return ErrInValidAUTTx
 	}
 
@@ -1522,7 +1522,7 @@ type BurnScript struct {
 	valueScripts        [][]byte // todo: defined as serializedAutTxos? why not autTxos
 
 	witnessHash chainhash.Hash
-	memo        []byte // todo: scriptMemo
+	scriptMemo  []byte // todo: scriptMemo
 }
 
 func (script *BurnScript) WitnessHash() chainhash.Hash {
@@ -1542,7 +1542,7 @@ func NewBurnScript(
 	outPlainAutTokenNum uint8,
 	valueScripts [][]byte,
 	witnessHash chainhash.Hash,
-	memo []byte,
+	scriptMemo []byte,
 ) *BurnScript {
 	return &BurnScript{
 		version:             version,
@@ -1554,7 +1554,7 @@ func NewBurnScript(
 		outPlainAutTokenNum: outPlainAutTokenNum,
 		valueScripts:        valueScripts,
 		witnessHash:         witnessHash,
-		memo:                memo,
+		scriptMemo:          scriptMemo,
 	}
 }
 
@@ -1600,7 +1600,7 @@ func (script *BurnScript) Serialize() ([]byte, error) {
 	}
 
 	// todo: necessary to use a function?
-	if err = writeMemo(&b, script.memo); err != nil {
+	if err = writeMemo(&b, script.scriptMemo); err != nil {
 		return nil, err
 	}
 
@@ -1643,7 +1643,7 @@ func (script *BurnScript) Deserialize(serializedScript []byte) error {
 	}
 
 	// todo: necessary to use a function?
-	if script.memo, err = readMemo(r); err != nil {
+	if script.scriptMemo, err = readMemo(r); err != nil {
 		return err
 	}
 
@@ -1698,7 +1698,7 @@ func (script *BurnScript) SanityCheck() error {
 
 	// todo: the burned one must be plainAut
 
-	if len(script.memo) > MaxScriptMemoLength {
+	if len(script.scriptMemo) > MaxScriptMemoLength {
 		return ErrInValidAUTTx
 	}
 
