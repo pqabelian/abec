@@ -2095,7 +2095,7 @@ func checkCTAUTRegistrationTransactionInputs(ctAutScript *ctaut.EnhancedAutScrip
 	}
 
 	identifier := ctAutScript.Identifier()
-	identifierKey := CTAUTIdentifierKey(identifier[:])
+	identifierKey := identifier.String()
 
 	// ensure no the same identifier is registered
 	instance, exist := ctautView.instances[identifierKey]
@@ -2124,7 +2124,7 @@ func checkCTAUTReRegistrationTransactionInputs(script *ctaut.EnhancedAutScript, 
 	}
 
 	identifier := script.Identifier()
-	identifierKey := CTAUTIdentifierKey(identifier[:])
+	identifierKey := identifier.String()
 
 	instance, exist := ctautView.instances[identifierKey]
 	if !exist || instance == nil || instance.metadata == nil {
@@ -2215,7 +2215,7 @@ func checkCTAUTMintTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, tx *a
 	}
 
 	identifier := ctAutScript.Identifier()
-	identifierKey := CTAUTIdentifierKey(identifier[:])
+	identifierKey := identifier.String()
 
 	instance, exist := ctautView.instances[identifierKey]
 	if !exist || instance == nil || instance.metadata == nil {
@@ -2322,7 +2322,7 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, t
 	}
 
 	identifier := ctAutScript.Identifier()
-	identifierKey := CTAUTIdentifierKey(identifier[:])
+	identifierKey := identifier.String()
 
 	instance, exist := ctautView.instances[identifierKey]
 	if !exist || instance == nil || instance.metadata == nil {
@@ -2344,7 +2344,7 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, t
 				tx.Hash(), outpoint.TxHash, outpoint.Index)
 		}
 
-		coin := ctautView.LookupCTAUTCoin(identifier[:], outpoint)
+		coin := ctautView.LookupCTAUTCoin(identifier, outpoint)
 		if coin == nil {
 			return fmt.Errorf("transaction %s at %d try to tranfer tokens with invalid CTAUT coin",
 				tx.Hash(), txHeight)
@@ -2413,7 +2413,7 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, tx *a
 	}
 
 	identifier := ctAutScript.Identifier()
-	identifierKey := CTAUTIdentifierKey(identifier[:])
+	identifierKey := identifier.String()
 
 	instance, exist := ctautView.instances[identifierKey]
 	if !exist || instance == nil || instance.metadata == nil {
@@ -2435,7 +2435,7 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, tx *a
 				tx.Hash(), outpoint.TxHash, outpoint.Index)
 		}
 
-		coin := ctautView.LookupCTAUTCoin(identifier[:], outpoint)
+		coin := ctautView.LookupCTAUTCoin(identifier, outpoint)
 		if coin == nil {
 			return fmt.Errorf("transaction %s at %d try to tranfer tokens with invalid CTAUT coin",
 				tx.Hash(), txHeight)
@@ -2532,7 +2532,7 @@ func ValidateCTAUTScript(script *ctaut.EnhancedAutScript, tx *abeutil.TxAbe, txH
 		identifier := script.Identifier()
 		for i := 0; i < len(presetConsumedTokens); i++ {
 			outpoint := presetConsumedTokens[i].HostOutPoint
-			coin := ctautView.LookupCTAUTCoin(identifier[:], outpoint)
+			coin := ctautView.LookupCTAUTCoin(identifier, outpoint)
 			if coin == nil {
 				return fmt.Errorf("no such CTAUT coin found")
 			}
@@ -2553,7 +2553,7 @@ func ValidateCTAUTScript(script *ctaut.EnhancedAutScript, tx *abeutil.TxAbe, txH
 		identifier := script.Identifier()
 		for i := 0; i < len(presetConsumedTokens); i++ {
 			outpoint := presetConsumedTokens[i].HostOutPoint
-			coin := ctautView.LookupCTAUTCoin(identifier[:], outpoint)
+			coin := ctautView.LookupCTAUTCoin(identifier, outpoint)
 			if coin == nil {
 				return fmt.Errorf("no such CTAUT coin found")
 			}

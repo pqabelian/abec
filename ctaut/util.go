@@ -21,7 +21,7 @@ func init() {
 	}
 }
 
-func writePrefix(b *bytes.Buffer, scriptVersion uint32, autScriptType AutScriptType, autIdentifier [AutIdentifierLength]byte) error {
+func writePrefix(b *bytes.Buffer, scriptVersion uint32, autScriptType AutScriptType, autIdentifier AutId) error {
 	err := WriteFixedBytes(b, []byte(commonPrefix))
 	if err != nil {
 		return err
@@ -41,7 +41,7 @@ func writePrefix(b *bytes.Buffer, scriptVersion uint32, autScriptType AutScriptT
 }
 
 // todo: discuss: shall remove expectedCtAutTxType? leave the check to the caller
-func readPrefix(r io.Reader, expectedAutScriptType AutScriptType) (uint32, [AutIdentifierLength]byte, AutScriptType, error) {
+func readPrefix(r io.Reader, expectedAutScriptType AutScriptType) (uint32, AutId, AutScriptType, error) {
 	var res [AutIdentifierLength]byte
 
 	commprefix, err := ReadFixedBytes(r, len(commonPrefix))

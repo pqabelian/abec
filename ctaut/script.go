@@ -21,6 +21,14 @@ type HostOutPoint = wire.OutPointAbe
 
 type AutId = chainhash.Hash
 
+func NewAUTIdFromStr(identifierStr string) (AutId, error) {
+	identifier, err := chainhash.NewHashFromStr(identifierStr)
+	if err != nil {
+		return chainhash.InvalidHash, err
+	}
+	return AutId(*identifier), nil
+}
+
 // AutMetadata maintains the metadata information of Abelian User Token (AUT) instance on Abelian
 // 1. The identifier of AUT instance are UNIQUE
 // 2. Each instance has its own name, symbol, and unit name
@@ -445,7 +453,7 @@ func (autMetadata *AutMetadata) Clone() *AutMetadata {
 type AutScript interface {
 	Version() uint32
 	Type() AutScriptType
-	Identifier() [AutIdentifierLength]byte // todo: Hash? AutIdentifier is not specifiable, so we explicitly define it to be Hash.
+	Identifier() AutId // todo: Hash? AutIdentifier is not specifiable, so we explicitly define it to be Hash.
 	Serialize() ([]byte, error)
 	Deserialize([]byte) error
 
@@ -487,7 +495,7 @@ type RegistrationScript struct {
 	scriptType AutScriptType
 
 	// populate with txid of host transaction
-	ctAutIdentifier [AutIdentifierLength]byte
+	ctAutIdentifier AutId
 
 	ctAutName    []byte
 	ctAutSymbol  []byte
@@ -569,7 +577,7 @@ func NewRegistrationScript(
 	return &RegistrationScript{
 		version:            version,
 		scriptType:         AutScriptTypeRegistration,
-		ctAutIdentifier:    [AutIdentifierLength]byte{},
+		ctAutIdentifier:    AutId{},
 		ctAutName:          ctAutName,
 		ctAutSymbol:        ctAutSymbol,
 		baseUnitName:       baseUnitName,
@@ -591,7 +599,7 @@ func (script *RegistrationScript) Version() uint32 {
 func (script *RegistrationScript) Type() AutScriptType {
 	return script.scriptType
 }
-func (script *RegistrationScript) Identifier() [AutIdentifierLength]byte {
+func (script *RegistrationScript) Identifier() AutId {
 	return script.ctAutIdentifier
 }
 
@@ -804,7 +812,7 @@ var _ AutScript = &RegistrationScript{}
 type ReRegistrationScript struct {
 	version         uint32
 	scriptType      AutScriptType
-	ctAutIdentifier [AutIdentifierLength]byte
+	ctAutIdentifier AutId
 
 	ctAutMemo []byte
 
@@ -841,7 +849,7 @@ func (script *ReRegistrationScript) ReregisterThreshold() uint8 {
 
 func NewReRegistrationScript(
 	version uint32,
-	ctAutIdentifier [AutIdentifierLength]byte,
+	ctAutIdentifier AutId,
 	ctAutMemo []byte,
 	plannedTotalAmount uint64,
 	//issuerTokens [][]byte,
@@ -883,7 +891,7 @@ func (script *ReRegistrationScript) Type() AutScriptType {
 	return AutScriptTypeReRegistration
 }
 
-func (script *ReRegistrationScript) Identifier() [AutIdentifierLength]byte {
+func (script *ReRegistrationScript) Identifier() AutId {
 	return script.ctAutIdentifier
 }
 
@@ -1066,7 +1074,7 @@ var _ AutScript = &ReRegistrationScript{}
 type MintScript struct {
 	version         uint32
 	scriptType      AutScriptType
-	ctAutIdentifier [AutIdentifierLength]byte
+	ctAutIdentifier AutId
 
 	vin uint64
 	// TODO specify the start index?
@@ -1092,7 +1100,7 @@ func (script *MintScript) Vin() uint64 {
 }
 
 func NewMintScript(version uint32,
-	ctAutIdentifier [AutIdentifierLength]byte,
+	ctAutIdentifier AutId,
 	vin uint64, inAutRootTokenNum uint8,
 	outCTAutTokenNum uint8, outPlainAutTokenNum uint8, valueScripts [][]byte,
 	witnessHash chainhash.Hash, memo []byte) *MintScript {
@@ -1116,7 +1124,7 @@ func (script *MintScript) Version() uint32 {
 func (script *MintScript) Type() AutScriptType {
 	return script.scriptType
 }
-func (script *MintScript) Identifier() [AutIdentifierLength]byte {
+func (script *MintScript) Identifier() AutId {
 	return script.ctAutIdentifier
 }
 
@@ -1285,7 +1293,7 @@ var _ AutScript = &MintScript{}
 type TransferScript struct {
 	version         uint32
 	scriptType      AutScriptType
-	ctAutIdentifier [AutIdentifierLength]byte
+	ctAutIdentifier AutId
 
 	inCTAutTokenNum    uint8
 	inPlainAutTokenNum uint8
@@ -1308,7 +1316,7 @@ func (script *TransferScript) Version() uint32 {
 
 func NewTransferScript(
 	version uint32,
-	ctAutIdentifier [AutIdentifierLength]byte,
+	ctAutIdentifier AutId,
 	inCTAutTokenNum uint8,
 	inPlainAutTokenNum uint8,
 	outCTAutTokenNum uint8,
@@ -1335,7 +1343,7 @@ func (script *TransferScript) Type() AutScriptType {
 	return script.scriptType
 }
 
-func (script *TransferScript) Identifier() [AutIdentifierLength]byte {
+func (script *TransferScript) Identifier() AutId {
 	return script.ctAutIdentifier
 }
 
@@ -1505,7 +1513,7 @@ var _ AutScript = &TransferScript{}
 type BurnScript struct {
 	version         uint32
 	scriptType      AutScriptType
-	ctAutIdentifier [AutIdentifierLength]byte
+	ctAutIdentifier AutId
 
 	inCTAutTokenNum     uint8
 	inPlainAutTokenNum  uint8
@@ -1527,7 +1535,7 @@ func (script *BurnScript) Version() uint32 {
 
 func NewBurnScript(
 	version uint32,
-	ctAutIdentifier [AutIdentifierLength]byte,
+	ctAutIdentifier AutId,
 	inCTAutTokenNum uint8,
 	inPlainAutTokenNum uint8,
 	outCTAutTokenNum uint8,
@@ -1554,7 +1562,7 @@ func (script *BurnScript) Type() AutScriptType {
 	return script.scriptType
 }
 
-func (script *BurnScript) Identifier() [AutIdentifierLength]byte {
+func (script *BurnScript) Identifier() AutId {
 	return script.ctAutIdentifier
 }
 

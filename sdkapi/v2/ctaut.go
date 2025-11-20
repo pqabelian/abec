@@ -508,7 +508,7 @@ func RegisteredAutMetadata(autScript AutScript, txVersion uint32, txID string, s
 
 	metadata := &Metadata{
 		Version:                 registerScript.Version(),
-		CTAutIdentifier:         hex.EncodeToString(identifier[:]),
+		CTAutIdentifier:         identifier.String(),
 		CTAutName:               hex.EncodeToString(registerScript.CtAutName()),
 		CTAutSymbol:             hex.EncodeToString(registerScript.CtAutSymbol()),
 		BaseUnitName:            hex.EncodeToString(registerScript.BaseUnitName()),
@@ -537,7 +537,7 @@ func UpdateAutMetadata(autScript AutScript, txVersion uint32, txID string, seria
 	}
 
 	identifier := autScript.Identifier()
-	if hex.EncodeToString(identifier[:]) != metadata.CTAutIdentifier {
+	if identifier.String() != metadata.CTAutIdentifier {
 		return errors.New("ctaut script identifier is not equal to metadata identifier")
 	}
 

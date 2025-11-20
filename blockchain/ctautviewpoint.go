@@ -86,7 +86,7 @@ func (instance *CTAUTInstance) SpendCoin(point ctaut.HostOutPoint) (*CTAUTCoin, 
 }
 
 type CTAUTCoin struct {
-	identifier []byte
+	identifier ctaut.AutId
 	// NOTE: Additions, deletions, or modifications to the order of the
 	// definitions in this struct should not be changed without considering
 	// how it affects alignment on 64-bit platforms.  The current order is
@@ -154,7 +154,7 @@ func (coin *CTAUTCoin) Clone() *CTAUTCoin {
 
 // todo: function name
 // NewAUTCoin returns a new AUTCoin built from the arguments.
-func NewCTAUTCoin(identifier []byte, script []byte, blockHeight int32) *CTAUTCoin {
+func NewCTAUTCoin(identifier ctaut.AutId, script []byte, blockHeight int32) *CTAUTCoin {
 
 	return &CTAUTCoin{
 		identifier:  identifier,
@@ -176,10 +176,6 @@ func NewCTAUTCoin(identifier []byte, script []byte, blockHeight int32) *CTAUTCoi
 type CTAUTViewpoint struct {
 	instances map[string]*CTAUTInstance
 	bestHash  chainhash.Hash
-}
-
-func CTAUTIdentifierKey(identifier []byte) string {
-	return hex.EncodeToString(identifier)
 }
 
 // BestHash returns the hash of the best block in the chain the view currently
@@ -207,11 +203,11 @@ func (view *CTAUTViewpoint) SetInstances(instances map[string]*CTAUTInstance) {
 // not exist in the view or is otherwise not available such as when it has been
 // disconnected during a reorg.
 // todo: function name LookupAutCoin
-func (view *CTAUTViewpoint) LookupCTAUTCoin(identifier []byte, outpoint ctaut.HostOutPoint) *CTAUTCoin {
+func (view *CTAUTViewpoint) LookupCTAUTCoin(identifier ctaut.AutId, outpoint ctaut.HostOutPoint) *CTAUTCoin {
 	if view.instances == nil {
 		return nil
 	}
-	instance, ok := view.instances[CTAUTIdentifierKey(identifier)]
+	instance, ok := view.instances[identifier.String()]
 	if !ok {
 		return nil
 	}
@@ -219,11 +215,11 @@ func (view *CTAUTViewpoint) LookupCTAUTCoin(identifier []byte, outpoint ctaut.Ho
 }
 
 // todo: function name LookupAutDesc
-func (view *CTAUTViewpoint) LookupCTAUTMetaInfo(identifier []byte) *ctaut.AutMetadata {
+func (view *CTAUTViewpoint) LookupCTAUTMetaInfo(identifier ctaut.AutId) *ctaut.AutMetadata {
 	if view.instances == nil {
 		return nil
 	}
-	instance, ok := view.instances[CTAUTIdentifierKey(identifier)]
+	instance, ok := view.instances[identifier.String()]
 	if !ok {
 		return nil
 	}
@@ -234,13 +230,13 @@ func (view *CTAUTViewpoint) LookupCTAUTMetaInfo(identifier []byte) *ctaut.AutMet
 // unspendable.  When the view already has an entry for the output, it will be
 // marked unspent.  All fields will be updated for existing entries since it's
 // possible it has changed during a reorg.
-func (view *CTAUTViewpoint) addCTAUTCoin(identifier []byte, outpoint ctaut.HostOutPoint, script []byte, blockHeight int32) {
+func (view *CTAUTViewpoint) addCTAUTCoin(identifier ctaut.AutId, outpoint ctaut.HostOutPoint, script []byte, blockHeight int32) {
 	// if the tx is not existing in the utxoentry, create a new one. otherwise update the height of view
 	// Update existing entries.  All fields are updated because it's
 	// possible (although extremely unlikely) that the existing entry is
 	// being replaced by a different transaction with the same hash.  This
 	// is allowed so long as the previous transaction is fully spent.
-	instance, ok := view.instances[CTAUTIdentifierKey(identifier)]
+	instance, ok := view.instances[identifier.String()]
 	if !ok {
 		log.Errorf("unreachable, invalid addAUTToken is called")
 		return
@@ -255,7 +251,7 @@ func (view *CTAUTViewpoint) connectRegistrationScript(script *ctaut.EnhancedAutS
 	}
 
 	identifier := script.Identifier()
-	identifierKey := CTAUTIdentifierKey(identifier[:])
+	identifierKey := identifier.String()
 	instance, exist := view.instances[identifierKey]
 	// TODO(CTAUT) assert rule need match the initialization
 	if exist && instance != nil && instance.metadata != nil {
@@ -307,7 +303,7 @@ func (view *CTAUTViewpoint) connectReRegistrationScript(script *ctaut.EnhancedAu
 	}
 
 	identifier := script.Identifier()
-	identifierKey := CTAUTIdentifierKey(identifier[:])
+	identifierKey := identifier.String()
 	instance, exist := view.instances[identifierKey]
 	// TODO(CTAUT) assert rule need match the initialization
 	if !exist || instance == nil || instance.metadata == nil {
@@ -370,7 +366,7 @@ func (view *CTAUTViewpoint) connectMintScript(script *ctaut.EnhancedAutScript, t
 	}
 
 	identifier := script.Identifier()
-	identifierKey := CTAUTIdentifierKey(identifier[:])
+	identifierKey := identifier.String()
 	instance, exist := view.instances[identifierKey]
 	// TODO(CTAUT) assert rule need match the initialization
 	if !exist || instance == nil || instance.metadata == nil {
@@ -425,7 +421,7 @@ func (view *CTAUTViewpoint) connectMintScript(script *ctaut.EnhancedAutScript, t
 	for _, token := range generatedTokens {
 		view.instances[identifierKey].Add(
 			token.HostOutPoint,
-			NewCTAUTCoin(identifier[:], token.ValueScript, blockHeight),
+			NewCTAUTCoin(identifier, token.ValueScript, blockHeight),
 		)
 	}
 
@@ -442,7 +438,7 @@ func (view *CTAUTViewpoint) connectTransferScript(script *ctaut.EnhancedAutScrip
 	}
 
 	identifier := script.Identifier()
-	identifierKey := CTAUTIdentifierKey(identifier[:])
+	identifierKey := identifier.String()
 	instance, exist := view.instances[identifierKey]
 	// TODO(CTAUT) assert rule need match the initialization
 	if !exist || instance == nil || instance.metadata == nil {
@@ -484,7 +480,7 @@ func (view *CTAUTViewpoint) connectTransferScript(script *ctaut.EnhancedAutScrip
 		return err
 	}
 	for i := 0; i < len(generatedTokens); i++ {
-		coin := NewCTAUTCoin(identifier[:], generatedTokens[i].ValueScript, blockHeight)
+		coin := NewCTAUTCoin(identifier, generatedTokens[i].ValueScript, blockHeight)
 		view.instances[identifierKey].Add(generatedTokens[i].HostOutPoint, coin)
 	}
 
@@ -496,7 +492,7 @@ func (view *CTAUTViewpoint) connectBurnScript(script *ctaut.EnhancedAutScript, t
 	}
 
 	identifier := script.Identifier()
-	identifierKey := CTAUTIdentifierKey(identifier[:])
+	identifierKey := identifier.String()
 	instance, exist := view.instances[identifierKey]
 	// TODO(CTAUT) assert rule need match the initialization
 	if !exist || instance == nil || instance.metadata == nil {
@@ -540,7 +536,7 @@ func (view *CTAUTViewpoint) connectBurnScript(script *ctaut.EnhancedAutScript, t
 
 	// Rule: the last output would be viewed as destroyed/burned
 	for i := 0; i < len(generatedToken)-1; i++ {
-		coin := NewCTAUTCoin(identifier[:], generatedToken[i].ValueScript, blockHeight)
+		coin := NewCTAUTCoin(identifier, generatedToken[i].ValueScript, blockHeight)
 		view.instances[identifierKey].Add(generatedToken[i].HostOutPoint, coin)
 	}
 	burnedToken := generatedToken[len(generatedToken)-1]
@@ -647,9 +643,9 @@ func (view *CTAUTViewpoint) disconnectRegistrationTransaction(db database.DB, sc
 	}
 
 	identifier := script.Identifier()
-	identifierKey := CTAUTIdentifierKey(identifier[:])
+	identifierKey := identifier.String()
 
-	err := view.fetchCTAUTMain(db, nil, identifier[:])
+	err := view.fetchCTAUTMain(db, nil, identifier)
 	if err != nil {
 		return nil, err
 	}
@@ -688,9 +684,9 @@ func (view *CTAUTViewpoint) disconnectReRegistrationTransaction(db database.DB, 
 	}
 
 	identifier := script.Identifier()
-	identifierKey := CTAUTIdentifierKey(identifier[:])
+	identifierKey := identifier.String()
 
-	err := view.fetchCTAUTMain(db, nil, identifier[:])
+	err := view.fetchCTAUTMain(db, nil, identifier)
 	if err != nil {
 		return nil, err
 	}
@@ -726,7 +722,7 @@ func (view *CTAUTViewpoint) disconnectMintTransaction(db database.DB, script *ct
 	}
 
 	identifier := script.Identifier()
-	identifierKey := CTAUTIdentifierKey(identifier[:])
+	identifierKey := identifier.String()
 
 	// fetch outpoint from database if not exist with instance in batch
 	outpoints := map[ctaut.HostOutPoint]struct{}{}
@@ -737,7 +733,7 @@ func (view *CTAUTViewpoint) disconnectMintTransaction(db database.DB, script *ct
 	for _, token := range generatedTokens {
 		outpoints[token.HostOutPoint] = struct{}{}
 	}
-	err = view.fetchCTAUTMain(db, outpoints, identifier[:])
+	err = view.fetchCTAUTMain(db, outpoints, identifier)
 	if err != nil {
 		return nil, err
 	}
@@ -781,7 +777,7 @@ func (view *CTAUTViewpoint) disconnectTransferTransaction(db database.DB, script
 	}
 
 	identifier := script.Identifier()
-	identifierKey := CTAUTIdentifierKey(identifier[:])
+	identifierKey := identifier.String()
 
 	// fetch generate outpoint from database if not exist with instance in batch
 	outpoints := map[ctaut.HostOutPoint]struct{}{}
@@ -789,7 +785,7 @@ func (view *CTAUTViewpoint) disconnectTransferTransaction(db database.DB, script
 	for _, token := range generatedTokens {
 		outpoints[token.HostOutPoint] = struct{}{}
 	}
-	err = view.fetchCTAUTMain(db, outpoints, identifier[:])
+	err = view.fetchCTAUTMain(db, outpoints, identifier)
 	if err != nil {
 		return nil, err
 	}
@@ -827,7 +823,7 @@ func (view *CTAUTViewpoint) disconnectTransferTransaction(db database.DB, script
 		if _, ok := instance.coins[coin.HostOutPoint]; ok {
 			return nil, fmt.Errorf("duplicate coins %s for AUT instance %s", coin.HostOutPoint, identifierKey)
 		}
-		instance.coins[coin.HostOutPoint] = NewCTAUTCoin(identifier[:], token.Script, blockHeight)
+		instance.coins[coin.HostOutPoint] = NewCTAUTCoin(identifier, token.Script, blockHeight)
 	}
 
 	return nil, nil
@@ -839,7 +835,7 @@ func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, script *ct
 	}
 
 	identifier := script.Identifier()
-	identifierKey := CTAUTIdentifierKey(identifier[:])
+	identifierKey := identifier.String()
 
 	// fetch outpoint from database if not exist with instance in batch
 	outpoints := map[ctaut.HostOutPoint]struct{}{}
@@ -849,7 +845,7 @@ func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, script *ct
 		token := generatedTokens[i]
 		outpoints[token.HostOutPoint] = struct{}{}
 	}
-	err = view.fetchCTAUTMain(db, outpoints, identifier[:])
+	err = view.fetchCTAUTMain(db, outpoints, identifier)
 	if err != nil {
 		return nil, err
 	}
@@ -905,7 +901,7 @@ func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, script *ct
 		if _, ok := instance.coins[claimedToken.HostOutPoint]; ok {
 			return nil, fmt.Errorf("duplicate coins %s for AUT instance %s", claimedToken.HostOutPoint, identifierKey)
 		}
-		instance.coins[claimedToken.HostOutPoint] = NewCTAUTCoin(identifier[:], token.Script, blockHeight)
+		instance.coins[claimedToken.HostOutPoint] = NewCTAUTCoin(identifier, token.Script, blockHeight)
 	}
 
 	return nil, nil
@@ -1020,10 +1016,10 @@ func (view *CTAUTViewpoint) commit() {
 // Upon completion of this function, the view will contain an entry for each
 // requested outpoint.  Spent outputs, or those which otherwise don't exist,
 // will result in a nil entry in the view.
-func (view *CTAUTViewpoint) fetchCTAUTMain(db database.DB, outpoints map[ctaut.HostOutPoint]struct{}, identifier []byte) error {
-	if len(identifier) != ctaut.AutIdentifierLength {
-		return fmt.Errorf("invalid aut identifier:%v", identifier)
-	}
+func (view *CTAUTViewpoint) fetchCTAUTMain(db database.DB, outpoints map[ctaut.HostOutPoint]struct{}, identifier ctaut.AutId) error {
+	//if len(identifier) != ctaut.AutIdentifierLength {
+	//	return fmt.Errorf("invalid aut identifier:%v", identifier)
+	//}
 
 	// Load the requested set of unspent aut transaction outputs from the point
 	// of view of the end of the main chain.
@@ -1032,7 +1028,7 @@ func (view *CTAUTViewpoint) fetchCTAUTMain(db database.DB, outpoints map[ctaut.H
 	// will result in nil entries in the view.  This is intentionally done
 	// so other code can use the presence of an entry in the store as a way
 	// to unnecessarily avoid attempting to reload it from the database.
-	autIdentifierKey := CTAUTIdentifierKey(identifier)
+	autIdentifierKey := identifier.String()
 	return db.View(func(dbTx database.Tx) error {
 		// firstly, fetch the meta information for specified identifier
 		if _, ok := view.instances[autIdentifierKey]; !ok {
@@ -1068,7 +1064,7 @@ func (view *CTAUTViewpoint) fetchCTAUTMain(db database.DB, outpoints map[ctaut.H
 					return fmt.Errorf("invalid fetch for point (%s, %d) for CTAUT instance %s",
 						outpoint.TxHash, outpoint.Index, autIdentifierKey)
 				}
-				if !bytes.Equal(coin.identifier, identifier) {
+				if !bytes.Equal(coin.identifier[:], identifier[:]) {
 					return fmt.Errorf("invalid fetch for point (%s, %d) for CTAUT instance %s",
 						outpoint.TxHash, outpoint.Index, autIdentifierKey)
 				}
@@ -1118,7 +1114,7 @@ func (view *CTAUTViewpoint) fetchConsumedCTAUTTokens(db database.DB, block *abeu
 			}
 			if ctAutScript.Type() == ctaut.AutScriptTypeTransfer || ctAutScript.Type() == ctaut.AutScriptTypeBurn {
 				for _, consumedToken := range consumedTokens {
-					token := view.LookupCTAUTCoin(identifier[:], consumedToken.HostOutPoint)
+					token := view.LookupCTAUTCoin(identifier, consumedToken.HostOutPoint)
 					if token == nil {
 						neededSet[consumedToken.HostOutPoint] = struct{}{}
 					}
@@ -1126,7 +1122,7 @@ func (view *CTAUTViewpoint) fetchConsumedCTAUTTokens(db database.DB, block *abeu
 			}
 
 			// Request the input utxos from the database.
-			err = view.fetchCTAUTMain(db, neededSet, identifier[:])
+			err = view.fetchCTAUTMain(db, neededSet, identifier)
 			if err != nil {
 				return err
 			}
@@ -1234,7 +1230,7 @@ func (b *BlockChain) FetchCTAUTView(script *ctaut.EnhancedAutScript) (*CTAUTView
 		defer b.chainLock.RUnlock()
 
 		identifier := script.Identifier()
-		err = view.fetchCTAUTMain(b.db, neededSet, identifier[:])
+		err = view.fetchCTAUTMain(b.db, neededSet, identifier)
 	}()
 	if err != nil {
 		return nil, err

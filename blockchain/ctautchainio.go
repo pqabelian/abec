@@ -3,9 +3,10 @@ package blockchain
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
+
 	//"reflect"
 	"sync"
 
@@ -435,7 +436,7 @@ func serializeCTAUTCoin(coin *CTAUTCoin) ([]byte, error) {
 	}
 
 	size := /* header code : [reserved] [height]*/ 8 +
-		wire.VarIntSerializeSize(uint64(len(coin.identifier))) + len(coin.identifier) +
+		len(coin.identifier) +
 		wire.VarIntSerializeSize(uint64(len(coin.script))) + len(coin.script)
 
 	buff := bytes.NewBuffer(make([]byte, 0, size))
@@ -448,7 +449,7 @@ func serializeCTAUTCoin(coin *CTAUTCoin) ([]byte, error) {
 		return nil, err
 	}
 
-	err = wire.WriteVarBytes(buff, 0, coin.identifier)
+	_, err = buff.Write(coin.identifier[:])
 	if err != nil {
 		return nil, err
 	}
@@ -478,12 +479,10 @@ func deserializeCTAUTCoin(serialized []byte) (*CTAUTCoin, error) {
 
 	reader := bytes.NewReader(serialized[8:])
 
-	identifier, err := wire.ReadVarBytes(reader, 0, ctaut.AutIdentifierLength, "identifier")
+	var identifier ctaut.AutId
+	_, err := io.ReadFull(reader, identifier[:])
 	if err != nil {
 		return nil, err
-	}
-	if len(identifier) != ctaut.AutIdentifierLength {
-		return nil, errors.New("invalid identifier")
 	}
 
 	script, err := wire.ReadVarBytes(reader, 0, ctaut.MaxAutValueScriptLength, "script")
@@ -534,11 +533,11 @@ func dbFetchCTAUTCoin(dbTx database.Tx, outpoint ctaut.HostOutPoint) (*CTAUTCoin
 	return coin, nil
 }
 
-func dbFetchCTAUTMetadata(dbTx database.Tx, key []byte) (*ctaut.AutMetadata, error) {
+func dbFetchCTAUTMetadata(dbTx database.Tx, key ctaut.AutId) (*ctaut.AutMetadata, error) {
 	// Fetch the unspent transaction output information for the passed
 	// transaction output.  Return now when there is no entry.
 	autInfoBucket := dbTx.Metadata().Bucket(ctAutInstanceBucketName)
-	serializedAUTInfo := autInfoBucket.Get(key)
+	serializedAUTInfo := autInfoBucket.Get(key[:])
 	if serializedAUTInfo == nil {
 		return nil, nil
 	}
@@ -567,18 +566,22 @@ func dbRemoveCTAUTInstance(dbTx database.Tx, instanceToDel map[string]struct{}, 
 	ctAutTokenBucket := dbTx.Metadata().Bucket(ctAutTokenBucketName)
 
 	for autIdentifierKey, _ := range instanceToDel {
-		autIdentifier, _ := hex.DecodeString(autIdentifierKey)
-		err := ctautInstanceBucket.Delete(autIdentifier)
+		autIdentifier, err := ctaut.NewAUTIdFromStr(autIdentifierKey)
+		if err != nil {
+			return fmt.Errorf("invalid identifier key")
+		}
+
+		err = ctautInstanceBucket.Delete(autIdentifier[:])
 		if err != nil {
 			return err
 		}
 
-		err = ctAutTokenBucket.Delete(autIdentifier)
+		err = ctAutTokenBucket.Delete(autIdentifier[:])
 		if err != nil {
 			return err
 		}
 		log.Debugf(`AUT identified by %s would be deleted at height %d (block hash %s)`,
-			string(autIdentifier), blockHeight, blockHash.String())
+			autIdentifierKey, blockHeight, blockHash.String())
 	}
 
 	return nil
