@@ -1511,9 +1511,9 @@ var _ AutScript = &TransferScript{}
 // <WitnessHash> a byte array with fixed length
 // <Memo> a byte array with max length, for this transaction
 type BurnScript struct {
-	version         uint32
-	scriptType      AutScriptType
-	ctAutIdentifier AutId
+	version       uint32
+	scriptType    AutScriptType
+	autIdentifier AutId
 
 	inCTAutTokenNum     uint8
 	inPlainAutTokenNum  uint8
@@ -1535,7 +1535,7 @@ func (script *BurnScript) Version() uint32 {
 
 func NewBurnScript(
 	version uint32,
-	ctAutIdentifier AutId,
+	autIdentifier AutId,
 	inCTAutTokenNum uint8,
 	inPlainAutTokenNum uint8,
 	outCTAutTokenNum uint8,
@@ -1547,7 +1547,7 @@ func NewBurnScript(
 	return &BurnScript{
 		version:             version,
 		scriptType:          AutScriptTypeBurn,
-		ctAutIdentifier:     ctAutIdentifier,
+		autIdentifier:       autIdentifier,
 		inCTAutTokenNum:     inCTAutTokenNum,
 		inPlainAutTokenNum:  inPlainAutTokenNum,
 		outCTAutTokenNum:    outCTAutTokenNum,
@@ -1563,7 +1563,7 @@ func (script *BurnScript) Type() AutScriptType {
 }
 
 func (script *BurnScript) Identifier() AutId {
-	return script.ctAutIdentifier
+	return script.autIdentifier
 }
 
 func (script *BurnScript) Serialize() ([]byte, error) {
@@ -1571,7 +1571,7 @@ func (script *BurnScript) Serialize() ([]byte, error) {
 	var err error
 
 	// todo: necessary to use a function?
-	if err = writePrefix(&b, script.version, script.scriptType, script.ctAutIdentifier); err != nil {
+	if err = writePrefix(&b, script.version, script.scriptType, script.autIdentifier); err != nil {
 		return nil, err
 	}
 
@@ -1614,7 +1614,7 @@ func (script *BurnScript) Deserialize(serializedScript []byte) error {
 	r := bytes.NewReader(serializedScript)
 
 	// todo: necessary to use a function?
-	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeBurn); err != nil {
+	if script.version, script.autIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeBurn); err != nil {
 		return err
 	}
 
