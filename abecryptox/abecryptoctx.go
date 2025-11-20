@@ -2,6 +2,7 @@ package abecryptox
 
 import (
 	"fmt"
+
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/ctaut/wire"
 )
@@ -96,6 +97,8 @@ func AutTransferTxVerify(autTransferTx *wire.AutTransferTx) error {
 
 // GetAutTxoType returns the AutTxoType of the input *wire.AutTxo.
 func GetAutTxoType(autTxo *wire.AutTxo) (AutTxoType, error) {
+	// TODO: add map aut script version to crypto scheme
+	// or aut script version -> tx version -> crypto scheme?
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(autTxo.Version)
 	if err != nil {
 		return 0, err
@@ -130,6 +133,8 @@ func GetAutTxoScriptSize(txVersion uint32, autTxoType AutTxoType) (int, error) {
 
 // ExtractAutTxoValue extracts the value of the input AutTxo.
 func ExtractAutTxoValue(autTxo *wire.AutTxo, cryptoValuePublicKey []byte, cryptoValueSecretKey []byte) (uint64, error) {
+	// TODO: add map aut script version to crypto scheme
+	// or aut script version -> tx version -> crypto scheme?
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(autTxo.Version)
 	if err != nil {
 		return 0, err

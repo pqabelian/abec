@@ -6,6 +6,7 @@ import (
 	"github.com/abesuite/abec/wire"
 )
 
+// TODO move to ctaut.wire
 // These version-constants are used to maintain the history AutScriptVersion.
 // The main principles are following
 // 1. the script version must be upgraded when it undergoes the transaction version upgrade.
