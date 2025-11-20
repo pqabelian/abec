@@ -495,14 +495,14 @@ type RegistrationScript struct {
 	scriptType AutScriptType
 
 	// populate with txid of host transaction
-	ctAutIdentifier AutId
+	autIdentifier AutId
 
-	ctAutName    []byte
-	ctAutSymbol  []byte
+	autName      []byte
+	autSymbol    []byte
 	baseUnitName []byte
 	subUnitName  []byte
 	unitScale    uint64
-	ctAutMemo    []byte
+	autMemo      []byte
 
 	plannedTotalAmount uint64
 	//issuerTokens               [][]byte
@@ -514,12 +514,12 @@ type RegistrationScript struct {
 	memo               []byte // todo: TODO memo -> scriptMemo
 }
 
-func (script *RegistrationScript) CtAutName() []byte {
-	return script.ctAutName
+func (script *RegistrationScript) AutName() []byte {
+	return script.autName
 }
 
-func (script *RegistrationScript) CtAutSymbol() []byte {
-	return script.ctAutSymbol
+func (script *RegistrationScript) AutSymbol() []byte {
+	return script.autSymbol
 }
 
 func (script *RegistrationScript) BaseUnitName() []byte {
@@ -534,8 +534,8 @@ func (script *RegistrationScript) UnitScale() uint64 {
 	return script.unitScale
 }
 
-func (script *RegistrationScript) CtAutMemo() []byte {
-	return script.ctAutMemo
+func (script *RegistrationScript) AutMemo() []byte {
+	return script.autMemo
 }
 
 func (script *RegistrationScript) PlannedTotalAmount() uint64 {
@@ -560,12 +560,12 @@ func (script *RegistrationScript) Memo() []byte {
 
 func NewRegistrationScript(
 	version uint32,
-	ctAutName []byte,
-	ctAutSymbol []byte,
+	autName []byte,
+	autSymbol []byte,
 	baseUnitName []byte,
 	subUnitName []byte,
 	unitScale uint64,
-	ctAutMemo []byte,
+	autMemo []byte,
 	plannedTotalAmount uint64,
 	//issuerTokens [][]byte,
 	mintThreshold uint8,
@@ -577,13 +577,13 @@ func NewRegistrationScript(
 	return &RegistrationScript{
 		version:            version,
 		scriptType:         AutScriptTypeRegistration,
-		ctAutIdentifier:    AutId{},
-		ctAutName:          ctAutName,
-		ctAutSymbol:        ctAutSymbol,
+		autIdentifier:      AutId{},
+		autName:            autName,
+		autSymbol:          autSymbol,
 		baseUnitName:       baseUnitName,
 		subUnitName:        subUnitName,
 		unitScale:          unitScale,
-		ctAutMemo:          ctAutMemo,
+		autMemo:            autMemo,
 		plannedTotalAmount: plannedTotalAmount,
 		//issuerTokens:               issuerTokens,
 		mintThreshold:              mintThreshold,
@@ -600,7 +600,7 @@ func (script *RegistrationScript) Type() AutScriptType {
 	return script.scriptType
 }
 func (script *RegistrationScript) Identifier() AutId {
-	return script.ctAutIdentifier
+	return script.autIdentifier
 }
 
 func (script *RegistrationScript) Serialize() ([]byte, error) {
@@ -609,13 +609,13 @@ func (script *RegistrationScript) Serialize() ([]byte, error) {
 	var b bytes.Buffer
 	var err error
 
-	if err = writePrefix(&b, script.version, script.scriptType, script.ctAutIdentifier); err != nil {
+	if err = writePrefix(&b, script.version, script.scriptType, script.autIdentifier); err != nil {
 		return nil, err
 	}
-	if err = WriteVarBytes(&b, script.ctAutName); err != nil {
+	if err = WriteVarBytes(&b, script.autName); err != nil {
 		return nil, err
 	}
-	if err = WriteVarBytes(&b, script.ctAutSymbol); err != nil {
+	if err = WriteVarBytes(&b, script.autSymbol); err != nil {
 		return nil, err
 	}
 	if err = WriteVarBytes(&b, script.baseUnitName); err != nil {
@@ -628,7 +628,7 @@ func (script *RegistrationScript) Serialize() ([]byte, error) {
 		return nil, err
 	}
 	// todo: not necessary to define a function for AutMemo
-	if err = writeAutMemo(&b, script.ctAutMemo); err != nil {
+	if err = writeAutMemo(&b, script.autMemo); err != nil {
 		return nil, err
 	}
 
@@ -667,14 +667,14 @@ func (script *RegistrationScript) Deserialize(serializedScript []byte) error {
 
 	// todo: not necessary for define a function readPrefix,
 	// todo: even do this, the expected Type should be used inside the function
-	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeRegistration); err != nil {
+	if script.version, script.autIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeRegistration); err != nil {
 		return err
 	}
 
-	if script.ctAutName, err = ReadVarBytes(r, MaxAutNameLength, "name"); err != nil {
+	if script.autName, err = ReadVarBytes(r, MaxAutNameLength, "name"); err != nil {
 		return err
 	}
-	if script.ctAutSymbol, err = ReadVarBytes(r, MaxAutSymbolLength, "symbol"); err != nil {
+	if script.autSymbol, err = ReadVarBytes(r, MaxAutSymbolLength, "symbol"); err != nil {
 		return err
 	}
 	if script.baseUnitName, err = ReadVarBytes(r, MaxBaseUnitLength, "baseUnit"); err != nil {
@@ -686,7 +686,7 @@ func (script *RegistrationScript) Deserialize(serializedScript []byte) error {
 	if script.unitScale, err = ReadVarInt(r); err != nil {
 		return err
 	}
-	if script.ctAutMemo, err = readAutMemo(r); err != nil {
+	if script.autMemo, err = readAutMemo(r); err != nil {
 		return err
 	}
 
@@ -728,13 +728,13 @@ func (script *RegistrationScript) SanityCheck() error {
 		return errors.New("unexpected type for registration script")
 	}
 
-	if !bytes.Equal(script.ctAutIdentifier[:], zeroIdentifier[:]) {
+	if !bytes.Equal(script.autIdentifier[:], zeroIdentifier[:]) {
 		return ErrInValidAUTTx
 	}
-	if len(script.ctAutName) == 0 || len(script.ctAutName) > MaxAutNameLength {
+	if len(script.autName) == 0 || len(script.autName) > MaxAutNameLength {
 		return ErrInValidAUTTx
 	}
-	if len(script.ctAutSymbol) == 0 || len(script.ctAutSymbol) > MaxAutSymbolLength {
+	if len(script.autSymbol) == 0 || len(script.autSymbol) > MaxAutSymbolLength {
 		return ErrInValidAUTTx
 	}
 
@@ -747,7 +747,7 @@ func (script *RegistrationScript) SanityCheck() error {
 	if script.unitScale == 0 || script.unitScale > MaxAmount || script.unitScale > script.plannedTotalAmount {
 		return ErrInValidAUTTx
 	}
-	if len(script.ctAutMemo) > MaxAutMemoLength {
+	if len(script.autMemo) > MaxAutMemoLength {
 		return ErrInValidAUTTx
 	}
 
@@ -1793,7 +1793,7 @@ func ParseAutScript(txVersion uint32, txHash chainhash.Hash, memo []byte) (scrip
 		if !ok {
 			return nil, ErrInValidAUTTx
 		}
-		ctAUTScript.ctAutIdentifier = txHash
+		ctAUTScript.autIdentifier = txHash
 	}
 
 	return script, nil
@@ -1902,13 +1902,13 @@ func (script *EnhancedAutScript) Metadata() (*AutMetadata, error) {
 	}
 	metadata := &AutMetadata{
 		Version:                    registerScript.version,
-		AutIdentifier:              registerScript.ctAutIdentifier,
-		AutName:                    registerScript.ctAutName,
-		AutSymbol:                  registerScript.ctAutSymbol,
+		AutIdentifier:              registerScript.autIdentifier,
+		AutName:                    registerScript.autName,
+		AutSymbol:                  registerScript.autSymbol,
 		BaseUnitName:               registerScript.baseUnitName,
 		SubUnitName:                registerScript.subUnitName,
 		UnitScale:                  registerScript.unitScale,
-		AutMemo:                    registerScript.ctAutMemo,
+		AutMemo:                    registerScript.autMemo,
 		PlannedTotalSupply:         registerScript.plannedTotalAmount,
 		IssuerTokens:               issuers, // registerScript.issuerTokens,
 		MintThreshold:              registerScript.mintThreshold,
