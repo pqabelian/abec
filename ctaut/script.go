@@ -1817,7 +1817,8 @@ func ParseAutScript(txVersion uint32, txHash chainhash.Hash, memo []byte) (scrip
 	}
 
 	// check the script version with the host version
-	if script.Version() != txVersion {
+	expectedTxVersion, err := GetTxoVersionFromAutScriptVersion(script.Version())
+	if expectedTxVersion != txVersion {
 		return nil, ErrInValidAUTTx
 	}
 
