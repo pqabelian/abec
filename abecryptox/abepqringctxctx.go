@@ -466,6 +466,7 @@ func pqringctxAutRuleCheckOnTxoVersionType(pp *pqringctxapi.PublicParameter, aut
 // pqringctxRuleCheckOnTxInputVersion checks the match between TxInput's Version and Tx's Version.
 //
 // When new TxVersion is added, rules need to be added here.
+// todo: change txVersion to AutScriptVersion
 func pqringctxAutRuleCheckOnTxInputVersion(pp *pqringctxapi.PublicParameter, autTxInputVersion uint32, txVersion uint32) error {
 
 	switch txVersion {
