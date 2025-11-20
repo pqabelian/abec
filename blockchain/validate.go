@@ -2153,7 +2153,7 @@ func checkCTAUTReRegistrationTransactionInputs(script *ctaut.EnhancedAutScript, 
 	for i := 0; i < len(consumedTokens); i++ {
 		outpoint := consumedTokens[i].HostOutPoint
 
-		if _, existOutpoint := instance.metadata.ActiveRootTokenSet[outpoint]; !existOutpoint {
+		if _, existOutpoint := instance.metadata.ActiveRootTokenSet[outpoint.String()]; !existOutpoint {
 			return fmt.Errorf("transaction %s try to re-register with unknown root coin <%s:%d>",
 				tx.Hash(), outpoint.TxHash, outpoint.Index)
 		}
@@ -2237,7 +2237,7 @@ func checkCTAUTMintTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, tx *a
 	}
 	for i := 0; i < len(consumedTokens); i++ {
 		outpoint := consumedTokens[i].HostOutPoint
-		if _, existOutpoint := instance.metadata.ActiveRootTokenSet[outpoint]; !existOutpoint {
+		if _, existOutpoint := instance.metadata.ActiveRootTokenSet[outpoint.String()]; !existOutpoint {
 			return fmt.Errorf("transaction %s try to mint with unknown root coin <%s:%d>",
 				tx.Hash(), outpoint.TxHash, outpoint.Index)
 		}

@@ -385,13 +385,13 @@ func (view *CTAUTViewpoint) connectMintScript(script *ctaut.EnhancedAutScript, t
 	}
 	currentSctauts := make([]SpentCTAUTToken, 0, len(consumedTokens))
 	for i := 0; i < len(consumedTokens); i++ {
-		if _, ok := info.ActiveRootTokenSet[consumedTokens[i].HostOutPoint]; !ok {
+		if _, ok := info.ActiveRootTokenSet[consumedTokens[i].HostOutPoint.String()]; !ok {
 			return fmt.Errorf(`an mint AUT transaction %s try to mint AUT with 
 				"non-existing/spent root coin (%s,%d) for AUT identified by %s`,
 				txHash, consumedTokens[i].HostOutPoint.TxHash, consumedTokens[i].HostOutPoint.Index,
 				identifierKey)
 		}
-		delete(info.ActiveRootTokenSet, consumedTokens[i].HostOutPoint)
+		delete(info.ActiveRootTokenSet, consumedTokens[i].HostOutPoint.String())
 
 		if sctauts != nil {
 			var stxo = SpentCTAUTToken{
@@ -763,11 +763,11 @@ func (view *CTAUTViewpoint) disconnectMintTransaction(db database.DB, script *ct
 		return nil, err
 	}
 	for _, rootToken := range consumedTokens {
-		copiedAUTPoint := ctaut.HostOutPoint{}
+		copiedAUTPoint := &ctaut.HostOutPoint{}
 		copy(copiedAUTPoint.TxHash[:], rootToken.HostOutPoint.TxHash[:])
 		copiedAUTPoint.Index = rootToken.HostOutPoint.Index
 
-		instance.metadata.ActiveRootTokenSet[copiedAUTPoint] = struct{}{}
+		instance.metadata.ActiveRootTokenSet[copiedAUTPoint.String()] = copiedAUTPoint
 		log.Debugf("try to resume consumed root coin (%s,%d) for AUT identified by %s",
 			rootToken.HostOutPoint.TxHash.String(), rootToken.HostOutPoint.Index, identifierKey)
 	}
