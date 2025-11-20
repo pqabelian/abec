@@ -102,7 +102,7 @@ type AutMetadata struct {
 	// todo: discuss, use a key-value format? to be more more safe.
 	//ActiveRootTokenSet map[HostOutPoint]struct{}
 	ActiveRootTokenSet map[string]*HostOutPoint
-	// HistoryVersions []uint32
+	HistoryVersions    []uint32
 }
 
 func (autMetadata *AutMetadata) serializeSize() int {
@@ -134,6 +134,11 @@ func (autMetadata *AutMetadata) serializeSize() int {
 	n += wire.VarIntSerializeSize(uint64(len(autMetadata.ActiveRootTokenSet))) // number of issuer tokens
 	for _, hostOutPoint := range autMetadata.ActiveRootTokenSet {
 		n += hostOutPoint.SerializeSize()
+	}
+
+	n += wire.VarIntSerializeSize(uint64(len(autMetadata.HistoryVersions)))
+	for _, version := range autMetadata.HistoryVersions {
+		n += wire.VarIntSerializeSize(uint64(version))
 	}
 
 	return n
@@ -225,6 +230,14 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 		err = wire.WriteOutPointAbe(w, 0, 0, hostOutPoint)
 		if err != nil {
 			return nil, fmt.Errorf("error to write active root token: %v", err)
+		}
+	}
+
+	err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.HistoryVersions)))
+	for _, version := range autMetadata.HistoryVersions {
+		err = wire.WriteVarInt(w, 0, uint64(version))
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -340,6 +353,19 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 	if uint64(len(autMetadata.ActiveRootTokenSet)) != rootCoinNum {
 		return fmt.Errorf("the number of read active root token (%d) does not match the read number (%d)",
 			len(autMetadata.ActiveRootTokenSet), rootCoinNum)
+	}
+
+	historyVersionNum, err := wire.ReadVarInt(r, 0)
+	autMetadata.HistoryVersions = make([]uint32, historyVersionNum)
+	for i := 0; i < len(autMetadata.HistoryVersions); i++ {
+		version, err = wire.ReadVarInt(r, 0)
+		if err != nil {
+			return err
+		}
+		if version > math.MaxUint32 {
+			return fmt.Errorf("readed history version (%d) is too large", version)
+		}
+		autMetadata.HistoryVersions[i] = uint32(version)
 	}
 
 	return autMetadata.SanityCheck()
@@ -1984,6 +2010,12 @@ func (script *EnhancedAutScript) UpdateMetadata(metadata *AutMetadata) error {
 	metadata.ActiveRootTokenSet = make(map[string]*HostOutPoint, len(script.generatedTokens))
 	for i := 0; i < len(script.generatedTokens); i++ {
 		metadata.ActiveRootTokenSet[script.generatedTokens[i].HostOutPoint.String()] = &script.generatedTokens[i].HostOutPoint
+	}
+
+	if metadata.Version != reregisterScript.version {
+		metadata.Version = reregisterScript.version
+
+		metadata.HistoryVersions = append(metadata.HistoryVersions, metadata.Version)
 	}
 
 	return nil
