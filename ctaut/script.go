@@ -102,7 +102,10 @@ type AutMetadata struct {
 	// todo: discuss, use a key-value format? to be more more safe.
 	//ActiveRootTokenSet map[HostOutPoint]struct{}
 	ActiveRootTokenSet map[string]*HostOutPoint
-	HistoryVersions    []uint32
+	// HistoryVersion would record all version for the instance
+	// Currently, there is no rules
+	// Future, this field could be used to as conditions for upgrading script
+	HistoryVersions []uint32
 }
 
 func (autMetadata *AutMetadata) serializeSize() int {
