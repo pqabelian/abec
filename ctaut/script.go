@@ -453,6 +453,7 @@ func (autMetadata *AutMetadata) Clone() *AutMetadata {
 		MintedAmount:       autMetadata.MintedAmount,
 		BurnedAmount:       autMetadata.BurnedAmount,
 		ActiveRootTokenSet: make(map[string]*HostOutPoint, len(autMetadata.ActiveRootTokenSet)),
+		HistoryVersions:    make([]uint32, len(autMetadata.HistoryVersions)),
 	}
 
 	copy(cloned.AutIdentifier[:], autMetadata.AutIdentifier[:])
@@ -474,6 +475,10 @@ func (autMetadata *AutMetadata) Clone() *AutMetadata {
 		newHosOutpoint.Index = hostOutpoint.Index
 
 		cloned.ActiveRootTokenSet[newHosOutpoint.String()] = newHosOutpoint
+	}
+
+	for i := 0; i < len(autMetadata.HistoryVersions); i++ {
+		cloned.HistoryVersions[i] = autMetadata.HistoryVersions[i]
 	}
 
 	return cloned
