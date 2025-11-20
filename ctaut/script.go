@@ -810,11 +810,11 @@ var _ AutScript = &RegistrationScript{}
 // <Number of generated RootTokens> A number n, Explicitly specify the 0~(n-1)-th pseudonym TXO of outputs in host transaction as RootToken
 // <Memo> a byte array with max length, for this transaction
 type ReRegistrationScript struct {
-	version         uint32
-	scriptType      AutScriptType
-	ctAutIdentifier AutId
+	version       uint32
+	scriptType    AutScriptType
+	autIdentifier AutId
 
-	ctAutMemo []byte
+	autMemo []byte
 
 	plannedTotalAmount uint64
 	//issuerTokens               [][]byte
@@ -827,8 +827,8 @@ type ReRegistrationScript struct {
 	memo               []byte // todo: scriptMemo
 }
 
-func (script *ReRegistrationScript) CtAutMemo() []byte {
-	return script.ctAutMemo
+func (script *ReRegistrationScript) AutMemo() []byte {
+	return script.autMemo
 }
 
 func (script *ReRegistrationScript) PlannedTotalAmount() uint64 {
@@ -849,8 +849,8 @@ func (script *ReRegistrationScript) ReregisterThreshold() uint8 {
 
 func NewReRegistrationScript(
 	version uint32,
-	ctAutIdentifier AutId,
-	ctAutMemo []byte,
+	autIdentifier AutId,
+	autMemo []byte,
 	plannedTotalAmount uint64,
 	//issuerTokens [][]byte,
 	mintThreshold uint8,
@@ -863,8 +863,8 @@ func NewReRegistrationScript(
 	return &ReRegistrationScript{
 		version:            version,
 		scriptType:         AutScriptTypeReRegistration,
-		ctAutIdentifier:    ctAutIdentifier,
-		ctAutMemo:          ctAutMemo,
+		autIdentifier:      autIdentifier,
+		autMemo:            autMemo,
 		plannedTotalAmount: plannedTotalAmount,
 		//issuerTokens:               issuerTokens,
 		mintThreshold:              mintThreshold,
@@ -892,7 +892,7 @@ func (script *ReRegistrationScript) Type() AutScriptType {
 }
 
 func (script *ReRegistrationScript) Identifier() AutId {
-	return script.ctAutIdentifier
+	return script.autIdentifier
 }
 
 func (script *ReRegistrationScript) Serialize() ([]byte, error) {
@@ -900,11 +900,11 @@ func (script *ReRegistrationScript) Serialize() ([]byte, error) {
 	var err error
 
 	// todo: necessary to use a function?
-	if err = writePrefix(&b, script.version, script.scriptType, script.ctAutIdentifier); err != nil {
+	if err = writePrefix(&b, script.version, script.scriptType, script.autIdentifier); err != nil {
 		return nil, err
 	}
 
-	if err = writeAutMemo(&b, script.ctAutMemo); err != nil {
+	if err = writeAutMemo(&b, script.autMemo); err != nil {
 		return nil, err
 	}
 
@@ -950,12 +950,12 @@ func (script *ReRegistrationScript) Deserialize(serializedScript []byte) error {
 	r := bytes.NewReader(serializedScript)
 
 	// todo: necessary to use a function?
-	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeReRegistration); err != nil {
+	if script.version, script.autIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeReRegistration); err != nil {
 		return err
 	}
 
 	// todo: necessary to use a function?
-	if script.ctAutMemo, err = readAutMemo(r); err != nil {
+	if script.autMemo, err = readAutMemo(r); err != nil {
 		return err
 	}
 
@@ -1012,7 +1012,7 @@ func (script *ReRegistrationScript) SanityCheck() error {
 		return errors.New("unexpected type for re-registration script")
 	}
 
-	if len(script.ctAutMemo) > MaxAutMemoLength {
+	if len(script.autMemo) > MaxAutMemoLength {
 		return ErrInValidAUTTx
 	}
 
@@ -1947,7 +1947,7 @@ func (script *EnhancedAutScript) UpdateMetadata(metadata *AutMetadata) error {
 	if !ok {
 		return errors.New("update metadata only available for re-registration script")
 	}
-	metadata.AutMemo = reregisterScript.ctAutMemo
+	metadata.AutMemo = reregisterScript.autMemo
 
 	issuers := make([][]byte, 0, len(script.generatedTokens))
 	issuerMapping := map[string]struct{}{}

@@ -559,7 +559,7 @@ func UpdateAutMetadata(autScript AutScript, txVersion uint32, txID string, seria
 	case *ctaut.RegistrationScript:
 		return errors.New("ctaut script type is Registration")
 	case *ctaut.ReRegistrationScript:
-		metadata.CTAutMemo = hex.EncodeToString(ctAutScript.CtAutMemo())
+		metadata.CTAutMemo = hex.EncodeToString(ctAutScript.AutMemo())
 		metadata.PlannedTotalSupply = ctAutScript.PlannedTotalAmount()
 
 		rootTokens, err := ctaut.GetGeneratedAutTokens(autScript, *txHash, abeTxos)
