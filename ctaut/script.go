@@ -1291,9 +1291,9 @@ var _ AutScript = &MintScript{}
 // <WitnessHash> a byte array with fixed length
 // <Memo> a byte array with max length, for this transaction
 type TransferScript struct {
-	version         uint32
-	scriptType      AutScriptType
-	ctAutIdentifier AutId
+	version       uint32
+	scriptType    AutScriptType
+	autIdentifier AutId
 
 	inCTAutTokenNum    uint8
 	inPlainAutTokenNum uint8
@@ -1316,7 +1316,7 @@ func (script *TransferScript) Version() uint32 {
 
 func NewTransferScript(
 	version uint32,
-	ctAutIdentifier AutId,
+	autIdentifier AutId,
 	inCTAutTokenNum uint8,
 	inPlainAutTokenNum uint8,
 	outCTAutTokenNum uint8,
@@ -1328,7 +1328,7 @@ func NewTransferScript(
 	return &TransferScript{
 		version:             version,
 		scriptType:          AutScriptTypeTransfer,
-		ctAutIdentifier:     ctAutIdentifier,
+		autIdentifier:       autIdentifier,
 		inCTAutTokenNum:     inCTAutTokenNum,
 		inPlainAutTokenNum:  inPlainAutTokenNum,
 		outCTAutTokenNum:    outCTAutTokenNum,
@@ -1344,7 +1344,7 @@ func (script *TransferScript) Type() AutScriptType {
 }
 
 func (script *TransferScript) Identifier() AutId {
-	return script.ctAutIdentifier
+	return script.autIdentifier
 }
 
 func (script *TransferScript) Serialize() ([]byte, error) {
@@ -1352,7 +1352,7 @@ func (script *TransferScript) Serialize() ([]byte, error) {
 	var err error
 
 	// todo: necessary to use a function?
-	if err = writePrefix(&b, script.version, script.scriptType, script.ctAutIdentifier); err != nil {
+	if err = writePrefix(&b, script.version, script.scriptType, script.autIdentifier); err != nil {
 		return nil, err
 	}
 
@@ -1393,7 +1393,7 @@ func (script *TransferScript) Deserialize(serializedScript []byte) error {
 	r := bytes.NewReader(serializedScript)
 
 	// todo: necessary to use a function?
-	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeTransfer); err != nil {
+	if script.version, script.autIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeTransfer); err != nil {
 		return err
 	}
 
