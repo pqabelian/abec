@@ -1072,9 +1072,9 @@ var _ AutScript = &ReRegistrationScript{}
 // <WitnessHash> a byte array with fixed length
 // <Memo> a byte array with max length, for this transaction
 type MintScript struct {
-	version         uint32
-	scriptType      AutScriptType
-	ctAutIdentifier AutId
+	version       uint32
+	scriptType    AutScriptType
+	autIdentifier AutId
 
 	vin uint64
 	// TODO specify the start index?
@@ -1100,14 +1100,14 @@ func (script *MintScript) Vin() uint64 {
 }
 
 func NewMintScript(version uint32,
-	ctAutIdentifier AutId,
+	autIdentifier AutId,
 	vin uint64, inAutRootTokenNum uint8,
 	outCTAutTokenNum uint8, outPlainAutTokenNum uint8, valueScripts [][]byte,
 	witnessHash chainhash.Hash, memo []byte) *MintScript {
 	return &MintScript{
 		version:             version,
 		scriptType:          AutScriptTypeMint,
-		ctAutIdentifier:     ctAutIdentifier,
+		autIdentifier:       autIdentifier,
 		vin:                 vin,
 		inAutRootTokenNum:   inAutRootTokenNum,
 		outCTAutTokenNum:    outCTAutTokenNum,
@@ -1125,7 +1125,7 @@ func (script *MintScript) Type() AutScriptType {
 	return script.scriptType
 }
 func (script *MintScript) Identifier() AutId {
-	return script.ctAutIdentifier
+	return script.autIdentifier
 }
 
 func (script *MintScript) Serialize() ([]byte, error) {
@@ -1133,7 +1133,7 @@ func (script *MintScript) Serialize() ([]byte, error) {
 	var err error
 
 	// todo: necessary to use a function?
-	if err = writePrefix(&b, script.version, script.scriptType, script.ctAutIdentifier); err != nil {
+	if err = writePrefix(&b, script.version, script.scriptType, script.autIdentifier); err != nil {
 		return nil, err
 	}
 
@@ -1174,7 +1174,7 @@ func (script *MintScript) Deserialize(serializedScript []byte) error {
 	r := bytes.NewReader(serializedScript)
 
 	// todo: necessary to use a function?
-	if script.version, script.ctAutIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeMint); err != nil {
+	if script.version, script.autIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeMint); err != nil {
 		return err
 	}
 
