@@ -2503,7 +2503,18 @@ func ValidateCTAUTScript(script *ctaut.EnhancedAutScript, tx *abeutil.TxAbe, txH
 		return fmt.Errorf("ValidateCTAUTScript: a nil ctaut transaction")
 	}
 
-	var err error
+	// check whether the version of host transaction match the rule for script
+	autScriptVersion := script.Version()
+	txVersion, err := ctaut.GetTxVersionFromAutScriptVersion(autScriptVersion)
+	if err != nil {
+		return fmt.Errorf("ValidateCTAUTScript: fail to get tx version from aut script version %d: %s",
+			autScriptVersion, err)
+	}
+	if txVersion != tx.MsgTx().Version {
+		return fmt.Errorf("ValidateCTAUTScript: the version (%d) of aut script failed to match the version (%d) of host transcation",
+			autScriptVersion, tx.MsgTx().Version)
+	}
+
 	switch script.AutScript.(type) {
 	case *ctaut.RegistrationScript:
 		err = checkCTAUTRegistrationTransactionInputs(script, tx, txHeight, ctautView, chainParams)
@@ -2536,6 +2547,14 @@ func ValidateCTAUTScript(script *ctaut.EnhancedAutScript, tx *abeutil.TxAbe, txH
 			if coin == nil {
 				return fmt.Errorf("no such CTAUT coin found")
 			}
+
+			err = abecryptox.AutRuleCheckOnTxInputVersion(coin.version, autScriptVersion)
+			if err != nil {
+				return fmt.Errorf("script with version %d failed to consume the token with version %d",
+					autScriptVersion, coin.version)
+			}
+
+			presetConsumedTokens[i].Version = coin.version
 			presetConsumedTokens[i].ValueScript = coin.Script()
 		}
 
@@ -2557,6 +2576,14 @@ func ValidateCTAUTScript(script *ctaut.EnhancedAutScript, tx *abeutil.TxAbe, txH
 			if coin == nil {
 				return fmt.Errorf("no such CTAUT coin found")
 			}
+
+			err = abecryptox.AutRuleCheckOnTxInputVersion(coin.version, autScriptVersion)
+			if err != nil {
+				return fmt.Errorf("script with version %d failed to consume the token with version %d",
+					autScriptVersion, coin.version)
+			}
+
+			presetConsumedTokens[i].Version = coin.version
 			presetConsumedTokens[i].ValueScript = coin.Script()
 		}
 

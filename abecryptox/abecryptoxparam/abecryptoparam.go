@@ -3,6 +3,7 @@ package abecryptoxparam
 import (
 	"encoding/binary"
 	"fmt"
+
 	"github.com/abesuite/abec/abecrypto/abecryptoparam"
 	"github.com/cryptosuite/pqringctx/pqringctxapi"
 )

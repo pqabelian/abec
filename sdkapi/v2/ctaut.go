@@ -16,7 +16,7 @@ import (
 	"github.com/abesuite/abec/wire"
 )
 
-const TxVersionCTAUT = wire.TxVersion_Height_464000_Aconcagua
+const AutScriptVersion = ctautwire.AutScriptVersion_1
 const AutIdentifierLength = ctaut.AutIdentifierLength
 
 type AutScriptType = ctaut.AutScriptType
@@ -158,7 +158,7 @@ func NewMintScript(
 
 	}
 
-	autCoinbaseTx, err := abecryptox.AutCoinbaseTxGen(TxVersionCTAUT, vin, outputDescs)
+	autCoinbaseTx, err := abecryptox.AutCoinbaseTxGen(AutScriptVersion, vin, outputDescs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -249,7 +249,7 @@ func NewTransferScript(
 
 	}
 
-	autTransferTx, err := abecryptox.AutTransferTxGen(TxVersionCTAUT, inputDescs, outputDescs)
+	autTransferTx, err := abecryptox.AutTransferTxGen(AutScriptVersion, inputDescs, outputDescs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -340,7 +340,7 @@ func NewBurnScript(
 
 	}
 
-	autTransferTx, err := abecryptox.AutTransferTxGen(TxVersionCTAUT, inputDescs, outputDescs)
+	autTransferTx, err := abecryptox.AutTransferTxGen(AutScriptVersion, inputDescs, outputDescs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -786,7 +786,7 @@ func CreateTransferTxByRootSeedForCTAUT(serializedTransferTxRequestDesc []byte, 
 		return false
 	})
 
-	transferTxMsgTemplate, err := abecryptox.CreateTransferTxMsgTemplateByRootSeeds(TxVersionCTAUT, abeTxInputDescs, abeTxOutputDescs, txRequestDesc.TxFee, txRequestDesc.TxMemo)
+	transferTxMsgTemplate, err := abecryptox.CreateTransferTxMsgTemplateByRootSeeds(AutScriptVersion, abeTxInputDescs, abeTxOutputDescs, txRequestDesc.TxFee, txRequestDesc.TxMemo)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -902,7 +902,7 @@ func CreateTransferTxByCryptoKeysForCTAUT(serializedTransferTxRequestDesc []byte
 		return false
 	})
 
-	transferTxMsgTemplate, err := abecryptox.CreateTransferTxMsgTemplateByKeys(TxVersionCTAUT, abeTxInputDescs, abeTxOutputDescs, txRequestDesc.TxFee, txRequestDesc.TxMemo)
+	transferTxMsgTemplate, err := abecryptox.CreateTransferTxMsgTemplateByKeys(AutScriptVersion, abeTxInputDescs, abeTxOutputDescs, txRequestDesc.TxFee, txRequestDesc.TxMemo)
 	if err != nil {
 		return nil, nil, err
 	}

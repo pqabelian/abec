@@ -3,18 +3,8 @@ package ctaut
 import (
 	"fmt"
 
-	"github.com/abesuite/abec/wire"
-)
-
-// TODO move to ctaut.wire
-// These version-constants are used to maintain the history AutScriptVersion.
-// The main principles are following
-// 1. the script version must be upgraded when it undergoes the transaction version upgrade.
-// 2. The version of the generated token will be inherited from the script version
-// 3. the version of the metadata would be inherited from the version of register or re-register script
-const (
-	AutScriptVersion_Unknown uint32 = 0 // reserved
-	AutScriptVersion_1       uint32 = 1
+	ctautwire "github.com/abesuite/abec/ctaut/wire"
+	hostwire "github.com/abesuite/abec/wire"
 )
 
 // When TxoVersion upgrade happens, need
@@ -24,12 +14,12 @@ const (
 // todo：define a map between TxVersion and AutScriptVersion
 // host-Txo-Version supports which AutScriptVersion?
 // allowed cases of (AutScriptVersion, Input AutScriptVersion)
-func GetTxoVersionFromAutScriptVersion(autScriptVersion uint32) (uint32, error) {
+func GetTxVersionFromAutScriptVersion(autScriptVersion uint32) (uint32, error) {
 	switch autScriptVersion {
-	case AutScriptVersion_1:
-		return wire.TxVersion_Height_464000_Aconcagua, nil
+	case ctautwire.AutScriptVersion_1:
+		return hostwire.TxVersion_Height_464000_Aconcagua, nil
 	default:
-		return 0, fmt.Errorf("GetTxoVersionFromAutScriptVersion: autScriptVersion is %d, ", autScriptVersion)
+		return 0, fmt.Errorf("GetTxVersionFromAutScriptVersion: autScriptVersion is %d, ", autScriptVersion)
 	}
 }
 

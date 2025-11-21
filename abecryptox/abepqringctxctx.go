@@ -5,8 +5,8 @@ import (
 
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
+	"github.com/abesuite/abec/abecryptox/abecryptoxparamctx"
 	"github.com/abesuite/abec/ctaut/wire"
-	hostwire "github.com/abesuite/abec/wire"
 	"github.com/cryptosuite/pqringctx/pqringctxapi"
 )
 
@@ -23,15 +23,14 @@ const (
 
 // pqringctxAutCoinbaseTxGen generates a new AutCoinbaseTx,
 // for the input (txVersion uint32, vin uint64, autTxOutputDescs []*AutTxOutputDesc).
-// todo: change hostTxoVersion to AutScriptVersion
 func pqringctxAutCoinbaseTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
-	txVersion uint32, vin uint64, autTxOutputDescs []*AutTxOutputDesc) (*wire.AutCoinbaseTx, error) {
+	autScriptVersion uint32, vin uint64, autTxOutputDescs []*AutTxOutputDesc) (*wire.AutCoinbaseTx, error) {
 	// just redundant double check
-	cryptoSchemeFromTxVersion, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
+	cryptoSchemeFromAutScriptVersion, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autScriptVersion)
 	if err != nil {
 		return nil, err
 	}
-	if cryptoSchemeFromTxVersion != cryptoScheme {
+	if cryptoSchemeFromAutScriptVersion != cryptoScheme {
 		return nil, fmt.Errorf("pqringctxAutCoinbaseTxGen: the input cryptoScheme is different from that implied by txVersion")
 	}
 
@@ -40,11 +39,11 @@ func pqringctxAutCoinbaseTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 	for j := 0; j < len(autTxOutputDescs); j++ {
 
 		// The rules of (txoVersion, autTxoType) need to be checked, since the ring-rules need this.
-		err = pqringctxAutRuleCheckOnTxoVersionType(pp, txVersion, autTxOutputDescs[j].AutTxoType())
+		err = pqringctxAutRuleCheckOnTxoVersionType(pp, autScriptVersion, autTxOutputDescs[j].AutTxoType())
 		if err != nil {
 			return nil, fmt.Errorf("pqringctxAutCoinbaseTxGen: (txVersion, autTxOutputDescs[%d].AutTxoType()) (%d, %d) "+
 				"fail to pass the AutRuleCheckOnTxoVersionType: %v",
-				txVersion, j, autTxOutputDescs[j].AutTxoType(), err)
+				autScriptVersion, j, autTxOutputDescs[j].AutTxoType(), err)
 		}
 
 		ctxTxOutputDesc[j] = pqringctxapi.NewCtxTxOutputDesc(autTxOutputDescs[j].AutTxoType(), autTxOutputDescs[j].coinValuePublicKey, autTxOutputDescs[j].value)
@@ -65,7 +64,7 @@ func pqringctxAutCoinbaseTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 			return nil, err
 		}
 		autTxos[i] = &wire.AutTxo{
-			Version:   txVersion,
+			Version:   autScriptVersion,
 			TxoScript: serializedCtxTxo,
 		}
 	}
@@ -78,7 +77,7 @@ func pqringctxAutCoinbaseTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 	}
 
 	autCoinbaseTx := &wire.AutCoinbaseTx{
-		Version:   txVersion,
+		Version:   autScriptVersion,
 		Vin:       vin,
 		TxOuts:    autTxos,
 		TxWitness: autTxWitness,
@@ -152,10 +151,10 @@ func pqringctxAutCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, autCoinbaseT
 // Now it is redundant at this moment and works for ony double-check.
 // todo: change hostTxoVersion to AutScriptVersion
 func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
-	txVersion uint32, autTxInputDescs []*AutTxInputDesc, autTxOutputDescs []*AutTxOutputDesc) (*wire.AutTransferTx, error) {
+	autScriptVersion uint32, autTxInputDescs []*AutTxInputDesc, autTxOutputDescs []*AutTxOutputDesc) (*wire.AutTransferTx, error) {
 
 	// just redundant double check
-	cryptoSchemeFromTxVersion, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
+	cryptoSchemeFromTxVersion, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autScriptVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -174,11 +173,11 @@ func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 	ctxTxInputDescs := make([]*pqringctxapi.CtxTxInputDesc, inputNum)
 	for i := 0; i < inputNum; i++ {
 
-		err = pqringctxAutRuleCheckOnTxInputVersion(pp, autTxInputDescs[i].autTxo.Version, txVersion)
+		err = pqringctxAutRuleCheckOnTxInputVersion(pp, autTxInputDescs[i].autTxo.Version, autScriptVersion)
 		if err != nil {
-			return nil, fmt.Errorf("pqringctxAutTransferTxGen: the txVersion is %d, "+
+			return nil, fmt.Errorf("pqringctxAutTransferTxGen: the autScriptVersion is %d, "+
 				"but autTxInputDescs[%d].autTxo.Version is %d, which is out of the allowed ones",
-				txVersion, i, autTxInputDescs[i].autTxo.Version)
+				autScriptVersion, i, autTxInputDescs[i].autTxo.Version)
 		}
 
 		// ctxTxo
@@ -214,11 +213,11 @@ func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 		}
 
 		// The rules of (txoVersion, autTxoType) need to be checked, since the ring-rules need this.
-		err = pqringctxAutRuleCheckOnTxoVersionType(pp, txVersion, autTxOutputDescs[j].AutTxoType())
+		err = pqringctxAutRuleCheckOnTxoVersionType(pp, autScriptVersion, autTxOutputDescs[j].AutTxoType())
 		if err != nil {
-			return nil, fmt.Errorf("pqringctxAutTransferTxGen: (txVersion, autTxOutputDescs[%d].AutTxoType()) (%d, %d) "+
+			return nil, fmt.Errorf("pqringctxAutTransferTxGen: (autScriptVersion, autTxOutputDescs[%d].AutTxoType()) (%d, %d) "+
 				"fail to pass the AutRuleCheckOnTxoVersionType: %v",
-				txVersion, j, autTxOutputDescs[j].AutTxoType(), err)
+				autScriptVersion, j, autTxOutputDescs[j].AutTxoType(), err)
 		}
 
 		ctxTxOutputDescs[j] = pqringctxapi.NewCtxTxOutputDesc(autTxOutputDescs[j].autTxoType, autTxOutputDescs[j].coinValuePublicKey, autTxOutputDescs[j].value)
@@ -246,7 +245,7 @@ func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 			return nil, err
 		}
 		autTxos[j] = &wire.AutTxo{
-			Version:   txVersion,
+			Version:   autScriptVersion,
 			TxoScript: serializedCtxTxo,
 		}
 	}
@@ -259,7 +258,7 @@ func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 	}
 
 	autTransferTx := &wire.AutTransferTx{
-		Version:   txVersion,
+		Version:   autScriptVersion,
 		TxIns:     autTxIns,
 		TxOuts:    autTxos,
 		TxWitness: autTxWitness,
@@ -375,8 +374,7 @@ func pqringctxGetAutTxoScriptSize(pp *pqringctxapi.PublicParameter, autTxoType A
 // using the input (coinValuePublicKey, coinValueSecretKey).
 func pqringctxExtractValueFromAutTxo(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
 	autTxo *wire.AutTxo, cryptoValuePublicKey []byte, cryptoValueSecretKey []byte) (value uint64, err error) {
-	// todo: assure AutScriptVersion not TxInputVersion
-	cryptoSchemeInTxo, err := abecryptoxparam.GetCryptoSchemeByTxVersion(autTxo.Version)
+	cryptoSchemeInTxo, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autTxo.Version)
 	if err != nil {
 		return 0, err
 	}
@@ -446,7 +444,7 @@ func pqringctxGetAutTransferTxWitnessSizeByDesc(pp *pqringctxapi.PublicParameter
 // todo: change hostTxoVersion to AutScriptVersion
 func pqringctxAutRuleCheckOnTxoVersionType(pp *pqringctxapi.PublicParameter, autScriptVersion uint32, autType AutTxoType) error {
 	switch autScriptVersion {
-	case hostwire.TxVersion_Height_464000_Aconcagua:
+	case wire.AutScriptVersion_1:
 		if autType == AutTxoTypeHidden || autType == AutTxoTypePublic {
 			// allowed cases
 		} else {
@@ -467,20 +465,20 @@ func pqringctxAutRuleCheckOnTxoVersionType(pp *pqringctxapi.PublicParameter, aut
 //
 // When new TxVersion is added, rules need to be added here.
 // todo: change txVersion to AutScriptVersion
-func pqringctxAutRuleCheckOnTxInputVersion(pp *pqringctxapi.PublicParameter, autTxInputVersion uint32, txVersion uint32) error {
+func pqringctxAutRuleCheckOnTxInputVersion(pp *pqringctxapi.PublicParameter, autTxInputVersion uint32, autScriptVersion uint32) error {
 
-	switch txVersion {
-	case hostwire.TxVersion_Height_464000_Aconcagua:
-		if autTxInputVersion == hostwire.TxVersion_Height_464000_Aconcagua {
+	switch autScriptVersion {
+	case wire.AutScriptVersion_1:
+		if autTxInputVersion == wire.AutScriptVersion_1 {
 			// allowed cases
 		} else {
-			return fmt.Errorf("pqringctxAutRuleCheckOnTxInputVersion: (autTxInputVersion, txVersion) (%d, %d), "+
+			return fmt.Errorf("pqringctxAutRuleCheckOnTxInputVersion: (autTxInputVersion, autScriptVersion) (%d, %d), "+
 				"is not allowed/supported",
-				autTxInputVersion, txVersion)
+				autTxInputVersion, autScriptVersion)
 		}
 	default:
-		return fmt.Errorf("pqringctxAutRuleCheckOnTxInputVersion: txVersion (%d) is not supported",
-			txVersion)
+		return fmt.Errorf("pqringctxAutRuleCheckOnTxInputVersion: autScriptVersion (%d) is not supported",
+			autScriptVersion)
 	}
 
 	return nil

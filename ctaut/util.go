@@ -324,7 +324,7 @@ func GetGeneratedAutTokens(script AutScript, txHash chainhash.Hash, txOuts []*wi
 		}
 
 		generatedTokens[i] = &CTAUTToken{
-			Version: txOut.Version,
+			Version: script.Version(),
 			HostOutPoint: HostOutPoint{
 				TxHash: txHash,
 				Index:  index,
@@ -413,7 +413,7 @@ func GetGeneratedAutTokens(script AutScript, txHash chainhash.Hash, txOuts []*wi
 //	return nil
 //}
 
-func RuleCheckOnTxoVersionType(hostTxoVersion uint32, valueScript []byte) error {
+func RuleCheckOnTxoVersionType(autScriptVersion uint32, valueScript []byte) error {
 	autTxo := &ctautwire.AutTxo{}
 	err := autTxo.Deserialize(valueScript)
 	if err != nil {
@@ -424,7 +424,7 @@ func RuleCheckOnTxoVersionType(hostTxoVersion uint32, valueScript []byte) error 
 		return fmt.Errorf("fail to get last aut txo type from burn script: %v")
 	}
 
-	err = abecryptox.AutRuleCheckOnTxoVersionType(hostTxoVersion, autTxoType)
+	err = abecryptox.AutRuleCheckOnTxoVersionType(autScriptVersion, autTxoType)
 	if err != nil {
 		return fmt.Errorf("fail to pass the AutRuleCheckOnTxoVersionType: %v", err)
 	}

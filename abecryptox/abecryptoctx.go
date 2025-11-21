@@ -4,21 +4,23 @@ import (
 	"fmt"
 
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
+	"github.com/abesuite/abec/abecryptox/abecryptoxparamctx"
 	"github.com/abesuite/abec/ctaut/wire"
 )
 
 // APIs for Transactions	begin
 
 // AutCoinbaseTxGen takes as input the transaction material and outputs a *wire.AutCoinbaseTx.
-func AutCoinbaseTxGen(txVersion uint32, vin uint64, autTxOutputDescs []*AutTxOutputDesc) (*wire.AutCoinbaseTx, error) {
-	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
+func AutCoinbaseTxGen(autScriptVersion uint32, vin uint64, autTxOutputDescs []*AutTxOutputDesc) (*wire.AutCoinbaseTx, error) {
+	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autScriptVersion)
 	if err != nil {
 		return nil, err
 	}
 
 	switch cryptoScheme {
 	case abecryptoxparam.CryptoSchemePQRingCTX:
-		cbTx, err := pqringctxAutCoinbaseTxGen(abecryptoxparam.PQRingCTXPP, cryptoScheme, txVersion, vin, autTxOutputDescs)
+		cbTx, err := pqringctxAutCoinbaseTxGen(abecryptoxparam.PQRingCTXPP, cryptoScheme,
+			autScriptVersion, vin, autTxOutputDescs)
 		if err != nil {
 			return nil, err
 		}
@@ -32,7 +34,7 @@ func AutCoinbaseTxGen(txVersion uint32, vin uint64, autTxOutputDescs []*AutTxOut
 
 // AutCoinbaseTxVerify verifies whether the input autCoinbaseTx *wire.AutCoinbaseTx is valid.
 func AutCoinbaseTxVerify(autCoinbaseTx *wire.AutCoinbaseTx) error {
-	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(autCoinbaseTx.Version)
+	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autCoinbaseTx.Version)
 	if err != nil {
 		return err
 	}
@@ -48,9 +50,8 @@ func AutCoinbaseTxVerify(autCoinbaseTx *wire.AutCoinbaseTx) error {
 }
 
 // AutTransferTxGen takes as input the transaction material and outputs a *wire.AutTransferTx.
-func AutTransferTxGen(txVersion uint32, autTxInputDescs []*AutTxInputDesc, autTxOutputDescs []*AutTxOutputDesc) (*wire.AutTransferTx, error) {
-
-	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
+func AutTransferTxGen(autScriptVersion uint32, autTxInputDescs []*AutTxInputDesc, autTxOutputDescs []*AutTxOutputDesc) (*wire.AutTransferTx, error) {
+	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autScriptVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +60,7 @@ func AutTransferTxGen(txVersion uint32, autTxInputDescs []*AutTxInputDesc, autTx
 	switch cryptoScheme {
 
 	case abecryptoxparam.CryptoSchemePQRingCTX:
-		trTx, err := pqringctxAutTransferTxGen(abecryptoxparam.PQRingCTXPP, cryptoScheme, txVersion, autTxInputDescs, autTxOutputDescs)
+		trTx, err := pqringctxAutTransferTxGen(abecryptoxparam.PQRingCTXPP, cryptoScheme, autScriptVersion, autTxInputDescs, autTxOutputDescs)
 		if err != nil {
 			return nil, err
 		}
@@ -73,7 +74,7 @@ func AutTransferTxGen(txVersion uint32, autTxInputDescs []*AutTxInputDesc, autTx
 
 // AutTransferTxVerify verifies the input AutTransferTx.
 func AutTransferTxVerify(autTransferTx *wire.AutTransferTx) error {
-	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(autTransferTx.Version)
+	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autTransferTx.Version)
 	if err != nil {
 		return err
 	}
@@ -99,7 +100,7 @@ func AutTransferTxVerify(autTransferTx *wire.AutTransferTx) error {
 func GetAutTxoType(autTxo *wire.AutTxo) (AutTxoType, error) {
 	// TODO: add map aut script version to crypto scheme
 	// or aut script version -> tx version -> crypto scheme?
-	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(autTxo.Version)
+	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autTxo.Version)
 	if err != nil {
 		return 0, err
 	}
@@ -118,8 +119,8 @@ func GetAutTxoType(autTxo *wire.AutTxo) (AutTxoType, error) {
 // Note that the transactions are generated and verified by the underlying crypto-scheme,
 // the TxoScript size for AutTxo actually depends on the underlying crypto-scheme.
 // That's why txVersion is required as the input for this function.
-func GetAutTxoScriptSize(txVersion uint32, autTxoType AutTxoType) (int, error) {
-	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
+func GetAutTxoScriptSize(autScriptVersion uint32, autTxoType AutTxoType) (int, error) {
+	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autScriptVersion)
 	if err != nil {
 		return 0, err
 	}
@@ -133,9 +134,7 @@ func GetAutTxoScriptSize(txVersion uint32, autTxoType AutTxoType) (int, error) {
 
 // ExtractAutTxoValue extracts the value of the input AutTxo.
 func ExtractAutTxoValue(autTxo *wire.AutTxo, cryptoValuePublicKey []byte, cryptoValueSecretKey []byte) (uint64, error) {
-	// TODO: add map aut script version to crypto scheme
-	// or aut script version -> tx version -> crypto scheme?
-	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(autTxo.Version)
+	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autTxo.Version)
 	if err != nil {
 		return 0, err
 	}
@@ -156,8 +155,8 @@ func ExtractAutTxoValue(autTxo *wire.AutTxo, cryptoValuePublicKey []byte, crypto
 
 // GetAutCoinbaseTxWitnessSizeByDesc returns the size of AutCoinbaseTxWitness,
 // which depends on the TxVersion and the number of AutTxoHidden on the output side.
-func GetAutCoinbaseTxWitnessSizeByDesc(txVersion uint32, outNumForHidden uint8) (int, error) {
-	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
+func GetAutCoinbaseTxWitnessSizeByDesc(autScriptVersion uint32, outNumForHidden uint8) (int, error) {
+	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autScriptVersion)
 	if err != nil {
 		return 0, err
 	}
@@ -173,9 +172,9 @@ func GetAutCoinbaseTxWitnessSizeByDesc(txVersion uint32, outNumForHidden uint8) 
 // GetAutTransferTxWitnessSizeByDesc returns the size of AutTransferTxWitness,
 // which depends on the TxVersion and description information (inNumForHidden uint8, outNumForHidden uint8, vPublic int64),
 // where vPublic = (sum of public value for out) - (sum of public value for in).
-func GetAutTransferTxWitnessSizeByDesc(txVersion uint32,
+func GetAutTransferTxWitnessSizeByDesc(autScriptVersion uint32,
 	inNumForHidden uint8, outNumForHidden uint8, vPublic int64) (int, error) {
-	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
+	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autScriptVersion)
 	if err != nil {
 		return 0, err
 	}
@@ -186,7 +185,7 @@ func GetAutTransferTxWitnessSizeByDesc(txVersion uint32,
 		return pqringctxGetAutTransferTxWitnessSizeByDesc(abecryptoxparam.PQRingCTXPP, inNumForHidden, outNumForHidden, vPublic)
 
 	default:
-		return 0, fmt.Errorf("GetAutTransferTxWitnessSizeByDesc: the input txVersion (%d) is not supported", txVersion)
+		return 0, fmt.Errorf("GetAutTransferTxWitnessSizeByDesc: the input txVersion (%d) is not supported", autScriptVersion)
 	}
 }
 
@@ -198,7 +197,7 @@ func GetAutTransferTxWitnessSizeByDesc(txVersion uint32,
 //
 // When new TxVersion is added, rules need to be added here.
 func AutRuleCheckOnTxoVersionType(hostTxoVersion uint32, autTxoType AutTxoType) error {
-	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(hostTxoVersion)
+	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(hostTxoVersion)
 	if err != nil {
 		return err
 	}
@@ -215,17 +214,17 @@ func AutRuleCheckOnTxoVersionType(hostTxoVersion uint32, autTxoType AutTxoType) 
 // AutRuleCheckOnTxInputVersion checks the match between TxInput's Version and Tx's Version.
 //
 // When new TxVersion is added, rules need to be added here.
-func AutRuleCheckOnTxInputVersion(txInputVersion uint32, txVersion uint32) error {
-	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
+func AutRuleCheckOnTxInputVersion(txInputVersion uint32, autScriptVersion uint32) error {
+	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autScriptVersion)
 	if err != nil {
 		return err
 	}
 	switch cryptoScheme {
 	case abecryptoxparam.CryptoSchemePQRingCTX:
-		return pqringctxAutRuleCheckOnTxInputVersion(abecryptoxparam.PQRingCTXPP, txInputVersion, txVersion)
+		return pqringctxAutRuleCheckOnTxInputVersion(abecryptoxparam.PQRingCTXPP, txInputVersion, autScriptVersion)
 
 	default:
-		return fmt.Errorf("AutRuleCheckOnTxInputVersion: Unsupported txVersion (%d)", txVersion)
+		return fmt.Errorf("AutRuleCheckOnTxInputVersion: Unsupported autScriptVersion (%d)", autScriptVersion)
 	}
 }
 

@@ -1817,7 +1817,7 @@ func ParseAutScript(txVersion uint32, txHash chainhash.Hash, memo []byte) (scrip
 	}
 
 	// check the script version with the host version
-	expectedTxVersion, err := GetTxoVersionFromAutScriptVersion(script.Version())
+	expectedTxVersion, err := GetTxVersionFromAutScriptVersion(script.Version())
 	if expectedTxVersion != txVersion {
 		return nil, ErrInValidAUTTx
 	}
@@ -1838,7 +1838,7 @@ func ParseAutScript(txVersion uint32, txHash chainhash.Hash, memo []byte) (scrip
 // todo(ctaut): define an interface? only a case needs coinAddress.
 // CTAUTToken holds the main information of token in memory, it would be used to check all rules
 type CTAUTToken struct {
-	// inheritance from host transaction output
+	// inherit from script
 	Version uint32
 	// used to track the host location on blockchain
 	HostOutPoint HostOutPoint
@@ -2235,16 +2235,17 @@ func PresetHostOutpointForCTAUT(script *EnhancedAutScript, msgTx *wire.MsgTxAbe,
 				hostedTxIns[hostIndex].PreviousOutPointRing.Hash())
 		}
 
-		err = abecryptox.AutRuleCheckOnTxInputVersion(hostedTxIns[hostIndex].PreviousOutPointRing.Version, msgTx.Version)
-		if err != nil {
-			return fmt.Errorf("transaction %s try to consume CT-AUT token %s with version %d, but tx version is %d",
-				txHash, outpoint,
-				hostedTxIns[hostIndex].PreviousOutPointRing.Version, msgTx.Version)
-		}
+		// TODO would be check with populated version
+		//err = abecryptox.AutRuleCheckOnTxInputVersion(hostedTxIns[hostIndex].PreviousOutPointRing.Version, msgTx.Version)
+		//if err != nil {
+		//	return fmt.Errorf("transaction %s try to consume CT-AUT token %s with version %d, but tx version is %d",
+		//		txHash, outpoint,
+		//		hostedTxIns[hostIndex].PreviousOutPointRing.Version, msgTx.Version)
+		//}
 
 		consumedTokens[i] = &CTAUTToken{
-			HostOutPoint: outpoint,
-			Version:      hostedTxIns[hostIndex].PreviousOutPointRing.Version,
+			Version:      ctautwire.AutScriptVersion_Unknown,
+			HostOutPoint: outpoint,    // will be populated later with CTAUTViewpoint
 			ValueScript:  nil,         // will be populated later with CTAUTViewpoint
 			CoinAddress:  coinAddress, // required by root coin while optional for coin
 		}
