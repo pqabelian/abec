@@ -119,7 +119,6 @@ type AutMetadata struct {
 	// The size of UpdateScriptVersions "equal" Metadata.Version.
 	// Currently, there is no rules
 	// Future, this field could be used to as conditions for upgrading script.
-	HistoryVersions      []uint32
 	UpdateScriptVersions []uint32
 }
 
@@ -154,8 +153,8 @@ func (autMetadata *AutMetadata) serializeSize() int {
 		n += hostOutPoint.SerializeSize()
 	}
 
-	n += wire.VarIntSerializeSize(uint64(len(autMetadata.HistoryVersions)))
-	for _, version := range autMetadata.HistoryVersions {
+	n += wire.VarIntSerializeSize(uint64(len(autMetadata.UpdateScriptVersions)))
+	for _, version := range autMetadata.UpdateScriptVersions {
 		n += wire.VarIntSerializeSize(uint64(version))
 	}
 
@@ -272,9 +271,9 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 		}
 	}
 
-	// HistoryVersions            []uint32
-	err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.HistoryVersions)))
-	for _, version := range autMetadata.HistoryVersions {
+	// UpdateScriptVersions            []uint32
+	err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.UpdateScriptVersions)))
+	for _, version := range autMetadata.UpdateScriptVersions {
 		err = wire.WriteVarInt(w, 0, uint64(version))
 		if err != nil {
 			return nil, err
@@ -419,8 +418,8 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 	}
 
 	historyVersionNum, err := wire.ReadVarInt(r, 0)
-	autMetadata.HistoryVersions = make([]uint32, historyVersionNum)
-	for i := 0; i < len(autMetadata.HistoryVersions); i++ {
+	autMetadata.UpdateScriptVersions = make([]uint32, historyVersionNum)
+	for i := 0; i < len(autMetadata.UpdateScriptVersions); i++ {
 		version, err = wire.ReadVarInt(r, 0)
 		if err != nil {
 			return err
@@ -428,7 +427,7 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 		if version > math.MaxUint32 {
 			return fmt.Errorf("readed history version (%d) is too large", version)
 		}
-		autMetadata.HistoryVersions[i] = uint32(version)
+		autMetadata.UpdateScriptVersions[i] = uint32(version)
 	}
 
 	return autMetadata.SanityCheck()
@@ -436,6 +435,10 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 
 // SanityCheck checks whether the AutMetadata is well-formed, and return a non-nil error if it is not well-formed.
 func (autMetadata *AutMetadata) SanityCheck() error {
+
+	if autMetadata.Version < ctautwire.AutMetadataVersionInitValue {
+		return fmt.Errorf("invalid autMetadata.Version (%d)", autMetadata.Version)
+	}
 
 	if len(autMetadata.AutName) > MaxAutNameLength {
 		return fmt.Errorf("invalid length (%d) for aut name", len(autMetadata.AutName))
@@ -501,24 +504,27 @@ func (autMetadata *AutMetadata) SanityCheck() error {
 		}
 	}
 
-	if len(autMetadata.HistoryVersions) != 0 {
-		if autMetadata.HistoryVersions[0] >= autMetadata.Version {
-			return fmt.Errorf("invalid history version (%d) at position %d : not samller than current version %d",
-				autMetadata.HistoryVersions[0], 0, autMetadata.Version)
+	if uint64(len(autMetadata.UpdateScriptVersions)) != uint64(autMetadata.Version) {
+		return fmt.Errorf("len(autMetadata.UpdateScriptVersions) (%d) != autMetadata.Version (%d)",
+			len(autMetadata.UpdateScriptVersions), autMetadata.Version)
+	}
+	// now len(autMetadata.UpdateScriptVersions) >= 1
+	if autMetadata.UpdateScriptVersions[0] > ctautwire.AutScriptVersion {
+		return fmt.Errorf("invalid UpdateScriptVersion (%d) at position %d : larger than the latest version %d",
+			autMetadata.UpdateScriptVersions[0], 0, ctautwire.AutScriptVersion)
+	}
+
+	for i := 1; i < len(autMetadata.UpdateScriptVersions); i++ {
+		if autMetadata.UpdateScriptVersions[i] < autMetadata.UpdateScriptVersions[i-1] {
+			return fmt.Errorf("invalid UpdateScriptVersion version (%d) at position %d : "+
+				"smaller than the UpdateScriptVersion (%d) at position %d",
+				autMetadata.UpdateScriptVersions[i], i, autMetadata.UpdateScriptVersions[i-1], i)
 		}
 
-		for i := 1; i < len(autMetadata.HistoryVersions); i++ {
-			if autMetadata.HistoryVersions[i] <= autMetadata.HistoryVersions[i-1] {
-				return fmt.Errorf("invalid history version (%d) at position %d : not larger than the histroy version (%d) at position %d",
-					autMetadata.HistoryVersions[i], i, autMetadata.HistoryVersions[i-1], i)
-			}
-
-			if autMetadata.HistoryVersions[i] >= autMetadata.Version {
-				return fmt.Errorf("invalid history version (%d) at position %d : not samller than current version %d",
-					autMetadata.HistoryVersions[i], i, autMetadata.Version)
-			}
+		if autMetadata.UpdateScriptVersions[i] > ctautwire.AutScriptVersion {
+			return fmt.Errorf("invalid UpdateScriptVersion (%d) at position %d : larger than the latest version %d",
+				autMetadata.UpdateScriptVersions[i], i, ctautwire.AutScriptVersion)
 		}
-
 	}
 
 	return nil
@@ -548,10 +554,10 @@ func (autMetadata *AutMetadata) Clone() *AutMetadata {
 		ReregistrationThreshold:    autMetadata.ReregistrationThreshold,
 		MintThreshold:              autMetadata.MintThreshold,
 
-		MintedAmount:       autMetadata.MintedAmount,
-		BurnedAmount:       autMetadata.BurnedAmount,
-		ActiveRootTokenSet: make(map[string]*HostOutPoint, len(autMetadata.ActiveRootTokenSet)),
-		HistoryVersions:    make([]uint32, len(autMetadata.HistoryVersions)),
+		MintedAmount:         autMetadata.MintedAmount,
+		BurnedAmount:         autMetadata.BurnedAmount,
+		ActiveRootTokenSet:   make(map[string]*HostOutPoint, len(autMetadata.ActiveRootTokenSet)),
+		UpdateScriptVersions: make([]uint32, len(autMetadata.UpdateScriptVersions)),
 	}
 
 	copy(cloned.AutIdentifier[:], autMetadata.AutIdentifier[:])
@@ -575,8 +581,8 @@ func (autMetadata *AutMetadata) Clone() *AutMetadata {
 		cloned.ActiveRootTokenSet[newHosOutpoint.String()] = newHosOutpoint
 	}
 
-	for i := 0; i < len(autMetadata.HistoryVersions); i++ {
-		cloned.HistoryVersions[i] = autMetadata.HistoryVersions[i]
+	for i := 0; i < len(autMetadata.UpdateScriptVersions); i++ {
+		cloned.UpdateScriptVersions[i] = autMetadata.UpdateScriptVersions[i]
 	}
 
 	return cloned
@@ -2133,7 +2139,7 @@ func (script *EnhancedAutScript) UpdateMetadata(metadata *AutMetadata) error {
 	if metadata.Version != reregisterScript.version {
 		metadata.Version = reregisterScript.version
 
-		metadata.HistoryVersions = append(metadata.HistoryVersions, metadata.Version)
+		metadata.UpdateScriptVersions = append(metadata.UpdateScriptVersions, metadata.Version)
 	}
 
 	return nil
