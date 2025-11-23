@@ -421,7 +421,7 @@ func RuleCheckOnTxoVersionType(autScriptVersion uint32, valueScript []byte) erro
 	}
 	autTxoType, err := abecryptox.GetAutTxoType(autTxo)
 	if err != nil {
-		return fmt.Errorf("fail to get last aut txo type from burn script: %v")
+		return fmt.Errorf("fail to get last aut txo type from burn script: %v", err)
 	}
 
 	err = abecryptox.AutRuleCheckOnTxoVersionType(autScriptVersion, autTxoType)
