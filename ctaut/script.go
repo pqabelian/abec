@@ -2246,7 +2246,7 @@ func ExtractAutScript(tx *wire.MsgTxAbe) (enhancedScript *EnhancedAutScript, err
 		}
 		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
 		if err != nil {
-			return nil, fmt.Errorf("fail to get last aut txo type from burn script: %v")
+			return nil, fmt.Errorf("fail to get last aut txo type from burn script: %v", err)
 		}
 		// assert the last aut txo is public
 		if autTxoType != abecryptox.AutTxoTypePublic {
