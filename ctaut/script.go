@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"reflect"
+	"strings"
 
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
@@ -20,14 +21,6 @@ import (
 type HostOutPoint = wire.OutPointAbe
 
 type AutId = chainhash.Hash
-
-func NewAUTIdFromStr(identifierStr string) (AutId, error) {
-	identifier, err := chainhash.NewHashFromStr(identifierStr)
-	if err != nil {
-		return chainhash.InvalidHash, err
-	}
-	return AutId(*identifier), nil
-}
 
 // AutMetadata maintains the metadata information of Abelian User Token (AUT) instance on Abelian
 // 1. The identifier of AUT instance are UNIQUE
@@ -50,62 +43,84 @@ func NewAUTIdFromStr(identifierStr string) (AutId, error) {
 //
 // BurnScript would be used to burn some tokens, it would not affect any of the fields in Metadata
 type AutMetadata struct {
+	// Version rule is referred to the ctaut.wire.
 	Version uint32
-	// The TxHash of the host transaction (i.e. txid) where the registration script is located would be used as its instance identifier
-	// identifiers for different instances are unique
+
+	// AutIdentifier is the unique identifier for an Aut Instance.
+	// TxHash of the host transaction (i.e. txid) where the registration script is located
+	// is used as the Aut Instance identifier.
 	AutIdentifier AutId // use chainhash.Hash directly
-	// The name of token could be used to improve usability, but MUST NOT be assumed that the value must be present
-	// The full, descriptive and human-readable name of the token
-	// e.g. "Post-Quantum USD"
+
+	// AutName, the name of the Aut Instance, gives
+	// the full, descriptive and human-readable name of the token ,e.g. "Post-Quantum USD".
+	// It could be used to improve usability, but MUST NOT be assumed that the value must be present.
 	AutName []byte
-	// The symbol of token could be used to improve usability, but MUST NOT be assumed that the value must be present.
-	// A short, human-readable string that acts as a ticker for the token.
-	// e.g. "PQUSD"
+
+	// AutSymbol, the symbol of the Aut Instance, gives
+	// a short, human-readable string that acts as a ticker for the token, e.g. "PQUSD".
+	// could be used to improve usability, but MUST NOT be assumed that the value must be present.
 	AutSymbol []byte
-	// The name he commonly used units of tokens, could be used to user representation,
-	// but MUST NOT be assumed that the value must be present
-	// e.g. "USD"
+
+	// BaseUnitName is the name he commonly used units of tokens, e.g. "USD".
+	// It could be used to user representation, but MUST NOT be assumed that the value must be present
 	BaseUnitName []byte
-	// The name of the token used for counting
-	// but MUST NOT be assumed that the value must be present
-	// e.g. "Cent"
+
+	// SubUnitName is the name of the token used for counting, e.g. "Cent".
+	// It MUST NOT be assumed that the value must be present.
 	SubUnitName []byte
-	// The scale between BaseUnit and SubUnit
-	// e.g. 100
+
+	// UnitScale, is used to store the scale between BaseUnit and SubUnit, e.g. 100.
 	UnitScale uint64
-	// The memo for AUT instance
+
+	// AutMemo stores the memo of the AUT instance.
 	AutMemo []byte
 
-	// The total amount of token would be issued, this means total limit for all MintScript
-	// Note that the amount would be counted in terms of subunit
+	// PlannedTotalSupply stores the total amount of token of the Aut Instance would be issued,
+	// which implies the total limit for all MintScript.
+	// Note that the amount would be counted in terms of subunit.
 	PlannedTotalSupply uint64
-	// The issuers of CT-AUT instance, currently, identified by its coin address on Abelian
+
+	// The issuers of CT-AUT instance, currently, identified by its coin address on Abelian.
+	// Using coinAddress, rather than (for example) the hash of coinAddress, as the IssuerTokens provide some potential
+	// advantages, for example, a user could check which wallet (in his multiple wallets) should be used to mint/reregister
+	// this Aut-Instance.
 	IssuerTokens [][]byte
 
-	// The next ReRegistrationScript must be recorded before this height, otherwise the instance would not update anymore
-	// todo: consider never expiring with -1(confirmed: use const)?
+	// ReregistrationExpireHeight specifies a height, after which the ReRegistrationScript could be not be applied any more.
+	// Using int32 is to allow -1 to be used as infinite height.
 	ReregistrationExpireHeight int32 // ReregistrationExpireHeight
 
-	// The number of different issuers in a ReRegistrationScript must meet this threshold to make it valid
+	// ReregistrationThreshold specifies the size of an authorized set for ReRegistrationScript.
 	ReregistrationThreshold uint8
 
-	// The number of different issuers in a MintScript must meet this threshold to make it valid
+	// MintThreshold specifies the size of an authorized set for MintScript.
 	MintThreshold uint8
 
-	// The minted amount of token
+	// MintedAmount records the total minted amount of this Aut Instance.
 	MintedAmount uint64
-	// The burned amount of token
-	BurnedAmount uint64 // TODO add this field and logic
-	// The following fields hold the currently available root tokens, held by Issuers
-	// generated by RegistrationScript or ReRegistrationScript and consumed by MintScript
-	// Each RootToken is an unspent host-OutPoint.
-	// todo: discuss, use a key-value format? to be more more safe.
-	//ActiveRootTokenSet map[HostOutPoint]struct{}
+
+	// BurnedAmount records the total burned amount of this Aut Instance.
+	BurnedAmount uint64
+
+	// ActiveRootTokenSet stores the currently available root tokens.
+	// When a RegistrationScript or ReRegistrationScript is executed, some RootTokens are created and host on HostOutPoints,
+	// and they are recorded as ActiveRootTokens.
+	// When a ReRegistrationScript or MintScript is executed, it must consume/spend some ActiveRootTokens,
+	// and those unspent RootTokens keep be active. That is, each time ReRegistrationScript or MintScript is executed,
+	// some RootTokens are removed from ActiveRootTokenSet
 	ActiveRootTokenSet map[string]*HostOutPoint
-	// HistoryVersion would record all version for the instance
+
+	// UpdateScriptVersions records all version of the scripts that creates/updates the metadata,
+	// say RegistrationScript and ReRegistrationScript.
+	// More specifically, when RegistrationScript creates the metadata,
+	// RegistrationScript's version is put into UpdateScriptVersions as the first one;
+	// Each time ReRegistrationScript update the metadata, the ReRegistrationScript's version is appended to UpdateScriptVersions.
+	// The versions in UpdateScriptVersions are sequenced from small to large.
+	// The size of UpdateScriptVersions "equal" Metadata.Version.
 	// Currently, there is no rules
-	// Future, this field could be used to as conditions for upgrading script
-	HistoryVersions []uint32
+	// Future, this field could be used to as conditions for upgrading script.
+	HistoryVersions      []uint32
+	UpdateScriptVersions []uint32
 }
 
 func (autMetadata *AutMetadata) serializeSize() int {
@@ -116,7 +131,7 @@ func (autMetadata *AutMetadata) serializeSize() int {
 		wire.VarIntSerializeSize(uint64(len(autMetadata.BaseUnitName))) + len(autMetadata.BaseUnitName) + // base unit, variable length
 		wire.VarIntSerializeSize(uint64(len(autMetadata.SubUnitName))) + len(autMetadata.SubUnitName) + // sub unit, variable length
 		wire.VarIntSerializeSize(autMetadata.UnitScale) + // scale, variable length
-		wire.VarIntSerializeSize(uint64(len(autMetadata.AutMemo))) + len(autMetadata.AutMemo) // memo, variable length
+		wire.VarIntSerializeSize(uint64(len(autMetadata.AutMemo))) + len(autMetadata.AutMemo) // autMemo, variable length
 
 	n += wire.VarIntSerializeSize(autMetadata.PlannedTotalSupply) // planned amount
 
@@ -153,6 +168,7 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 	if autMetadata == nil {
 		return nil, nil
 	}
+
 	// Calculate the size needed to serialize AUT autMetadata.
 	var err error
 	size := autMetadata.serializeSize()
@@ -160,39 +176,52 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 	// transaction output.
 	w := bytes.NewBuffer(make([]byte, 0, size))
 
+	// Version                    uint32
 	if err = wire.WriteVarInt(w, 0, uint64(autMetadata.Version)); err != nil {
 		return nil, err
 	}
 
+	// AutIdentifier              AutId
 	if _, err = w.Write(autMetadata.AutIdentifier[:]); err != nil {
 		return nil, err
 	}
 
+	// AutName                    []byte
 	if err = wire.WriteVarBytes(w, 0, autMetadata.AutName); err != nil {
 		return nil, err
 	}
+
+	// AutSymbol                  []byte
 	if err = wire.WriteVarBytes(w, 0, autMetadata.AutSymbol); err != nil {
 		return nil, err
 	}
 
+	// BaseUnitName               []byte
 	if err = wire.WriteVarBytes(w, 0, autMetadata.BaseUnitName); err != nil {
 		return nil, err
 	}
+
+	// SubUnitName                []byte
 	if err = wire.WriteVarBytes(w, 0, autMetadata.SubUnitName); err != nil {
 		return nil, err
 	}
+
+	// UnitScale                  uint64
 	if err = wire.WriteVarInt(w, 0, autMetadata.UnitScale); err != nil {
 		return nil, err
 	}
 
+	// AutMemo                    []byte
 	if err = wire.WriteVarBytes(w, 0, autMetadata.AutMemo); err != nil {
 		return nil, err
 	}
 
+	// PlannedTotalSupply         uint64
 	if err = wire.WriteVarInt(w, 0, autMetadata.PlannedTotalSupply); err != nil {
 		return nil, err
 	}
 
+	// IssuerTokens               [][]byte
 	err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.IssuerTokens)))
 	if err != nil {
 		return nil, err
@@ -200,31 +229,38 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 	for i := 0; i < len(autMetadata.IssuerTokens); i++ {
 		err = wire.WriteVarBytes(w, 0, autMetadata.IssuerTokens[i])
 		if err != nil {
-			return nil, fmt.Errorf("error to write issuer token: %v", err)
+			return nil, fmt.Errorf("error happens when writing issuer token: %v", err)
 		}
 	}
 
+	// ReregistrationExpireHeight int32
 	if err = wire.WriteVarInt(w, 0, uint64(autMetadata.ReregistrationExpireHeight)); err != nil {
 		return nil, err
 	}
 
+	// ReregistrationThreshold    uint8
 	if err = w.WriteByte(autMetadata.ReregistrationThreshold); err != nil {
 		return nil, err
 	}
+
+	// MintThreshold              uint8
 	if err = w.WriteByte(autMetadata.MintThreshold); err != nil {
 		return nil, err
 	}
 
+	// MintedAmount               uint64
 	err = wire.WriteVarInt(w, 0, autMetadata.MintedAmount)
 	if err != nil {
 		return nil, err
 	}
 
+	// BurnedAmount               uint64
 	err = wire.WriteVarInt(w, 0, autMetadata.BurnedAmount)
 	if err != nil {
 		return nil, err
 	}
 
+	// ActiveRootTokenSet         map[string]*HostOutPoint
 	err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.ActiveRootTokenSet)))
 	if err != nil {
 		return nil, err
@@ -232,10 +268,11 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 	for _, hostOutPoint := range autMetadata.ActiveRootTokenSet {
 		err = wire.WriteOutPointAbe(w, 0, 0, hostOutPoint)
 		if err != nil {
-			return nil, fmt.Errorf("error to write active root token: %v", err)
+			return nil, fmt.Errorf("error happens when writing active root token: %v", err)
 		}
 	}
 
+	// HistoryVersions            []uint32
 	err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.HistoryVersions)))
 	for _, version := range autMetadata.HistoryVersions {
 		err = wire.WriteVarInt(w, 0, uint64(version))
@@ -261,11 +298,11 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 
 // Deserialize deserializes serializedMetadata to an AutMetadata.
 func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
-	// Serialize the header code followed by the compressed unspent
-	// transaction output.
 	r := bytes.NewReader(serializedMetadata)
 
 	var err error
+
+	// Version                    uint32
 	version, err := wire.ReadVarInt(r, 0)
 	if err != nil {
 		return err
@@ -275,33 +312,47 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 	}
 	autMetadata.Version = uint32(version)
 
+	// AutIdentifier              AutId
 	if _, err = io.ReadFull(r, autMetadata.AutIdentifier[:]); err != nil {
 		return err
 	}
 
-	if autMetadata.AutName, err = wire.ReadVarBytes(r, 0, MaxAutNameLength, "name"); err != nil {
+	// AutName                    []byte
+	if autMetadata.AutName, err = wire.ReadVarBytes(r, 0, MaxAutNameLength, "autName"); err != nil {
 		return err
 	}
-	if autMetadata.AutSymbol, err = wire.ReadVarBytes(r, 0, MaxAutSymbolLength, "symbol"); err != nil {
+
+	// AutSymbol                  []byte
+	if autMetadata.AutSymbol, err = wire.ReadVarBytes(r, 0, MaxAutSymbolLength, "autSymbol"); err != nil {
 		return err
 	}
-	if autMetadata.BaseUnitName, err = wire.ReadVarBytes(r, 0, MaxBaseUnitLength, "unit"); err != nil {
+
+	// BaseUnitName               []byte
+	if autMetadata.BaseUnitName, err = wire.ReadVarBytes(r, 0, MaxBaseUnitLength, "baseUnitName"); err != nil {
 		return err
 	}
-	if autMetadata.SubUnitName, err = wire.ReadVarBytes(r, 0, MaxSubUnitLength, "subunit"); err != nil {
+
+	// SubUnitName                []byte
+	if autMetadata.SubUnitName, err = wire.ReadVarBytes(r, 0, MaxSubUnitLength, "subUnitName"); err != nil {
 		return err
 	}
+
+	// UnitScale                  uint64
 	if autMetadata.UnitScale, err = wire.ReadVarInt(r, 0); err != nil {
 		return err
 	}
+
+	// AutMemo                    []byte
 	if autMetadata.AutMemo, err = wire.ReadVarBytes(r, 0, MaxAutMemoLength, "AutMemo"); err != nil {
 		return err
 	}
 
+	// PlannedTotalSupply         uint64
 	if autMetadata.PlannedTotalSupply, err = wire.ReadVarInt(r, 0); err != nil {
 		return err
 	}
 
+	// IssuerTokens               [][]byte
 	issuerNum, err := wire.ReadVarInt(r, 0)
 	if err != nil {
 		return err
@@ -310,36 +361,44 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 	for i := uint64(0); i < issuerNum; i++ {
 		autMetadata.IssuerTokens[i], err = wire.ReadVarBytes(r, 0, issuerTokenLength, "issuerToken")
 		if err != nil {
-			return fmt.Errorf("error when reading issuer token: %v", err)
+			return fmt.Errorf("error happens when reading issuer token: %v", err)
 		}
 	}
 
+	// ReregistrationExpireHeight int32
 	expiredHeightRead, err := wire.ReadVarInt(r, 0)
 	if err != nil {
 		return err
 	}
 	temp := int64(expiredHeightRead)
 	if temp > math.MaxInt32 || temp < -1 {
-		return fmt.Errorf("the read ReregistrationExpireHeight (%d) is not in the scope [-1, %d]", temp, math.MaxInt32)
+		return fmt.Errorf("the readed ReregistrationExpireHeight (%d) is not in the scope [-1, %d]", temp, math.MaxInt32)
 	}
 	autMetadata.ReregistrationExpireHeight = int32(temp)
 
+	// ReregistrationThreshold    uint8
 	if autMetadata.ReregistrationThreshold, err = ReadByte(r); err != nil {
 		return err
 	}
+
+	// MintThreshold              uint8
 	if autMetadata.MintThreshold, err = ReadByte(r); err != nil {
 		return err
 	}
 
+	// MintedAmount               uint64
 	autMetadata.MintedAmount, err = wire.ReadVarInt(r, 0)
 	if err != nil {
 		return err
 	}
+
+	// BurnedAmount               uint64
 	autMetadata.BurnedAmount, err = wire.ReadVarInt(r, 0)
 	if err != nil {
 		return err
 	}
 
+	// ActiveRootTokenSet         map[string]*HostOutPoint
 	rootCoinNum, err := wire.ReadVarInt(r, 0)
 	if err != nil {
 		return err
@@ -349,13 +408,14 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 		hostOutPoint := &HostOutPoint{}
 		err = wire.ReadOutPointAbe(r, 0, 0, hostOutPoint)
 		if err != nil {
-			return fmt.Errorf("error when reading active root token: %v", err)
+			return fmt.Errorf("error happens when reading active root token: %v", err)
 		}
-		autMetadata.ActiveRootTokenSet[hostOutPoint.String()] = hostOutPoint
-	}
-	if uint64(len(autMetadata.ActiveRootTokenSet)) != rootCoinNum {
-		return fmt.Errorf("the number of read active root token (%d) does not match the read number (%d)",
-			len(autMetadata.ActiveRootTokenSet), rootCoinNum)
+
+		opStr := hostOutPoint.String()
+		if _, ok := autMetadata.ActiveRootTokenSet[opStr]; ok {
+			return fmt.Errorf("duplicate active root token for %s", opStr)
+		}
+		autMetadata.ActiveRootTokenSet[opStr] = hostOutPoint
 	}
 
 	historyVersionNum, err := wire.ReadVarInt(r, 0)
@@ -376,26 +436,37 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 
 // SanityCheck checks whether the AutMetadata is well-formed, and return a non-nil error if it is not well-formed.
 func (autMetadata *AutMetadata) SanityCheck() error {
-	// todo: add version check
+
 	if len(autMetadata.AutName) > MaxAutNameLength {
 		return fmt.Errorf("invalid length (%d) for aut name", len(autMetadata.AutName))
 	}
+
 	if len(autMetadata.AutSymbol) > MaxAutSymbolLength {
 		return fmt.Errorf("invalid length (%d) for aut symbol", len(autMetadata.AutSymbol))
 	}
+
 	if len(autMetadata.BaseUnitName) > MaxBaseUnitLength {
 		return fmt.Errorf("invalid length (%d) for base unit name", len(autMetadata.BaseUnitName))
 	}
+
 	if len(autMetadata.SubUnitName) > MaxSubUnitLength {
 		return fmt.Errorf("invalid length (%d) for sub unit name", len(autMetadata.SubUnitName))
 	}
+
+	if autMetadata.UnitScale > MaxAmount {
+		return fmt.Errorf("invalid UnitScale (%d)", autMetadata.UnitScale)
+	}
+
 	if len(autMetadata.AutMemo) > MaxAutMemoLength {
 		return fmt.Errorf("invalid length (%d) for aut memo", len(autMetadata.AutMemo))
 	}
+
 	if autMetadata.PlannedTotalSupply > MaxAmount {
 		return fmt.Errorf("invalid planned total supply (%d)", autMetadata.PlannedTotalSupply)
 	}
 
+	// here we do not check the max allowed number of IssuerTokens,
+	// since it is limited by the host-Abelian-Tx.
 	issuerTokenMapping := map[string]struct{}{}
 	for _, issuerToken := range autMetadata.IssuerTokens {
 		key := hex.EncodeToString(issuerToken)
@@ -409,10 +480,10 @@ func (autMetadata *AutMetadata) SanityCheck() error {
 		return fmt.Errorf("invalid reregistration expire height (%d)", autMetadata.ReregistrationExpireHeight)
 	}
 
-	if autMetadata.ReregistrationThreshold > uint8(len(autMetadata.IssuerTokens)) {
+	if int(autMetadata.ReregistrationThreshold) > len(autMetadata.IssuerTokens) {
 		return fmt.Errorf("invalid reregistration threshold (%d) for %d issuer tokens", autMetadata.ReregistrationThreshold, len(autMetadata.IssuerTokens))
 	}
-	if autMetadata.MintThreshold > uint8(len(autMetadata.IssuerTokens)) {
+	if int(autMetadata.MintThreshold) > len(autMetadata.IssuerTokens) {
 		return fmt.Errorf("invalid mint threshold (%d) for %d issuer tokens", autMetadata.MintThreshold, len(autMetadata.IssuerTokens))
 	}
 
@@ -423,10 +494,37 @@ func (autMetadata *AutMetadata) SanityCheck() error {
 		return fmt.Errorf("invalid burned amount (%d) for minted amount (%d)", autMetadata.BurnedAmount, autMetadata.MintedAmount)
 	}
 
+	for opStr, hostOutPoint := range autMetadata.ActiveRootTokenSet {
+		valueKey := hostOutPoint.String()
+		if strings.Compare(opStr, valueKey) != 0 {
+			return fmt.Errorf("invalid active root token for %s, having key from value %s", opStr, valueKey)
+		}
+	}
+
+	if len(autMetadata.HistoryVersions) != 0 {
+		if autMetadata.HistoryVersions[0] >= autMetadata.Version {
+			return fmt.Errorf("invalid history version (%d) at position %d : not samller than current version %d",
+				autMetadata.HistoryVersions[0], 0, autMetadata.Version)
+		}
+
+		for i := 1; i < len(autMetadata.HistoryVersions); i++ {
+			if autMetadata.HistoryVersions[i] <= autMetadata.HistoryVersions[i-1] {
+				return fmt.Errorf("invalid history version (%d) at position %d : not larger than the histroy version (%d) at position %d",
+					autMetadata.HistoryVersions[i], i, autMetadata.HistoryVersions[i-1], i)
+			}
+
+			if autMetadata.HistoryVersions[i] >= autMetadata.Version {
+				return fmt.Errorf("invalid history version (%d) at position %d : not samller than current version %d",
+					autMetadata.HistoryVersions[i], i, autMetadata.Version)
+			}
+		}
+
+	}
+
 	return nil
 }
 
-// Clone returns a shallow copy of the utxo entry.
+// Clone returns a shallow copy of the AutMetadata entry.
 func (autMetadata *AutMetadata) Clone() *AutMetadata {
 	if autMetadata == nil {
 		return nil
@@ -484,11 +582,22 @@ func (autMetadata *AutMetadata) Clone() *AutMetadata {
 	return cloned
 }
 
+// AutScript defines the interface for Aut Scripts.
 type AutScript interface {
+
+	// Version returns the AutScriptVersion.
 	Version() uint32
+
+	// Type returns the AutScriptType, which could be {Registration, Reregistration, Mint, Transfer, Burn}.
 	Type() AutScriptType
-	Identifier() AutId // todo: Hash? AutIdentifier is not specifiable, so we explicitly define it to be Hash.
+
+	// todo: AutIdentifier?
+	Identifier() AutId
+
+	// Serialize serializes AutScript to []byte.
 	Serialize() ([]byte, error)
+
+	// Deserialize deserializes []byte to AutScript.
 	Deserialize([]byte) error
 
 	NumConsumedTokens() int // todo: why not directly uint8? if leave it to be int, need to check when set this value.
@@ -601,7 +710,7 @@ func NewRegistrationScript(
 	unitScale uint64,
 	autMemo []byte,
 	plannedTotalAmount uint64,
-	//issuerTokens [][]byte,
+//issuerTokens [][]byte,
 	mintThreshold uint8,
 	reregisterThreshold uint8,
 	reregistrationExpireHeight int32,
@@ -886,7 +995,7 @@ func NewReRegistrationScript(
 	autIdentifier AutId,
 	autMemo []byte,
 	plannedTotalAmount uint64,
-	//issuerTokens [][]byte,
+//issuerTokens [][]byte,
 	mintThreshold uint8,
 	reregisterThreshold uint8,
 	reregistrationExpireHeight int32,

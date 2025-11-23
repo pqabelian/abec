@@ -34,8 +34,8 @@ func (txo *AutTxo) Serialize() ([]byte, error) {
 
 // For aconcagua:
 // - hidden value script is 10959
-// - publuc value script is 9
-// todo:
+// - public value script is 9
+
 const MaxAutTxoScriptLength = 16 * 1024
 
 func (txo *AutTxo) Deserialize(serializedAutTxo []byte) error {
