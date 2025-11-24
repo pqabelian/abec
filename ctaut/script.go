@@ -715,7 +715,6 @@ func NewRegistrationScript(
 	unitScale uint64,
 	autMemo []byte,
 	plannedTotalAmount uint64,
-	//issuerTokens [][]byte,
 	mintThreshold uint8,
 	reregisterThreshold uint8,
 	reregistrationExpireHeight int32,
@@ -1000,7 +999,6 @@ func NewReRegistrationScript(
 	autIdentifier AutId,
 	autMemo []byte,
 	plannedTotalAmount uint64,
-	//issuerTokens [][]byte,
 	mintThreshold uint8,
 	reregisterThreshold uint8,
 	reregistrationExpireHeight int32,
@@ -2261,7 +2259,7 @@ func ExtractAutScript(tx *wire.MsgTxAbe) (enhancedScript *EnhancedAutScript, err
 		if err != nil {
 			return nil, fmt.Errorf("fail to get last aut txo type from burn script: %v", err)
 		}
-		// assert the last aut txo is public
+		// assert the last aut txo must be public
 		if autTxoType != abecryptox.AutTxoTypePublic {
 			return nil, fmt.Errorf("last aut txo type must not public")
 		}
