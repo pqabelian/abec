@@ -317,7 +317,7 @@ func (view *CTAUTViewpoint) connectReRegistrationScript(script *ctaut.EnhancedAu
 	metadata := instance.metadata
 	previousMetadata := metadata.Clone()
 
-	err := script.UpdateMetadata(metadata)
+	err := script.UpdateAutMetadata(metadata)
 	if err != nil {
 		return err
 	}

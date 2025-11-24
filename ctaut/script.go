@@ -938,7 +938,7 @@ func (script *RegistrationScript) ReregistrationExpireHeight() int32 {
 var _ AutScript = &RegistrationScript{}
 
 // ReRegistrationScript would be the structured script parsed from memo in host transaction,
-// 1. The field values used to update the metadata will be extracted from the scripts with ReRegistrationScript.UpdateMetadata()
+// 1. The field values used to update the metadata will be extracted from the scripts with ReRegistrationScript.UpdateAutMetadata()
 // 2. consumedTokens would be populated with the help of host transaction and corresponding wire.TxoRing
 // 3. generatedTokens would be populated with the function populateGeneratedCTAUTTokens with the help of host transaction
 //
@@ -2050,7 +2050,7 @@ func (script *EnhancedAutScript) Metadata() (*AutMetadata, error) {
 		rootTokenSet[script.generatedTokens[i].HostOutPoint.String()] = &script.generatedTokens[i].HostOutPoint
 	}
 	metadata := &AutMetadata{
-		Version:                    registerScript.version,
+		Version:                    ctautwire.AutMetadataVersionInitValue,
 		AutIdentifier:              registerScript.autIdentifier,
 		AutName:                    registerScript.autName,
 		AutSymbol:                  registerScript.autSymbol,
@@ -2064,15 +2064,16 @@ func (script *EnhancedAutScript) Metadata() (*AutMetadata, error) {
 		ReregistrationThreshold:    registerScript.reregisterThreshold,
 		ReregistrationExpireHeight: registerScript.reregistrationExpireHeight,
 
-		MintedAmount:       0,
-		BurnedAmount:       0,
-		ActiveRootTokenSet: rootTokenSet,
+		MintedAmount:         0,
+		BurnedAmount:         0,
+		ActiveRootTokenSet:   rootTokenSet,
+		UpdateScriptVersions: []uint32{registerScript.version},
 	}
 	return metadata, nil
 }
 
 // todo: AutMetadata
-func (script *EnhancedAutScript) UpdateMetadata(metadata *AutMetadata) error {
+func (script *EnhancedAutScript) UpdateAutMetadata(metadata *AutMetadata) error {
 	// assert
 	if script.Type() != AutScriptTypeReRegistration {
 		return errors.New("update metadata only available for re-registration script")
@@ -2091,6 +2092,9 @@ func (script *EnhancedAutScript) UpdateMetadata(metadata *AutMetadata) error {
 		}
 		delete(metadata.ActiveRootTokenSet, consumedTokens[i].HostOutPoint.String())
 	}
+
+	// follow defined rules in AutScriptVersion
+	metadata.Version += 1
 
 	reregisterScript, ok := script.AutScript.(*ReRegistrationScript)
 	if !ok {
@@ -2135,11 +2139,14 @@ func (script *EnhancedAutScript) UpdateMetadata(metadata *AutMetadata) error {
 		metadata.ActiveRootTokenSet[script.generatedTokens[i].HostOutPoint.String()] = &script.generatedTokens[i].HostOutPoint
 	}
 
-	if metadata.Version != reregisterScript.version {
-		metadata.Version = reregisterScript.version
-
-		metadata.UpdateScriptVersions = append(metadata.UpdateScriptVersions, metadata.Version)
+	// check
+	if reregisterScript.version < metadata.UpdateScriptVersions[len(metadata.UpdateScriptVersions)-1] {
+		return fmt.Errorf("the version of re-register script %d should not less than the largest version (%d) in UpdateScriptVersions",
+			reregisterScript.version,
+			metadata.UpdateScriptVersions[len(metadata.UpdateScriptVersions)-1],
+		)
 	}
+	metadata.UpdateScriptVersions = append(metadata.UpdateScriptVersions, reregisterScript.version)
 
 	return nil
 }
