@@ -251,7 +251,7 @@ func (view *CTAUTViewpoint) connectRegistrationScript(script *ctaut.EnhancedAutS
 		return fmt.Errorf("expected registration script, but got %d", script.Type())
 	}
 
-	identifier := script.Identifier()
+	identifier := script.AutIdentifier()
 	identifierKey := identifier.String()
 	instance, exist := view.instances[identifierKey]
 	// TODO(CTAUT) assert rule need match the initialization
@@ -304,7 +304,7 @@ func (view *CTAUTViewpoint) connectReRegistrationScript(script *ctaut.EnhancedAu
 		return fmt.Errorf("expected re-registration script, but got %d", script.Type())
 	}
 
-	identifier := script.Identifier()
+	identifier := script.AutIdentifier()
 	identifierKey := identifier.String()
 	instance, exist := view.instances[identifierKey]
 	// TODO(CTAUT) assert rule need match the initialization
@@ -368,7 +368,7 @@ func (view *CTAUTViewpoint) connectMintScript(script *ctaut.EnhancedAutScript, t
 		return fmt.Errorf("invalid script type for mint transaction")
 	}
 
-	identifier := script.Identifier()
+	identifier := script.AutIdentifier()
 	identifierKey := identifier.String()
 	instance, exist := view.instances[identifierKey]
 	// TODO(CTAUT) assert rule need match the initialization
@@ -441,7 +441,7 @@ func (view *CTAUTViewpoint) connectTransferScript(script *ctaut.EnhancedAutScrip
 		return fmt.Errorf("expected transfer script, but got %d", script.Type())
 	}
 
-	identifier := script.Identifier()
+	identifier := script.AutIdentifier()
 	identifierKey := identifier.String()
 	instance, exist := view.instances[identifierKey]
 	// TODO(CTAUT) assert rule need match the initialization
@@ -496,7 +496,7 @@ func (view *CTAUTViewpoint) connectBurnScript(script *ctaut.EnhancedAutScript, t
 		return fmt.Errorf("expected burn script, but got %d", script.Type())
 	}
 
-	identifier := script.Identifier()
+	identifier := script.AutIdentifier()
 	identifierKey := identifier.String()
 	instance, exist := view.instances[identifierKey]
 	// TODO(CTAUT) assert rule need match the initialization
@@ -648,7 +648,7 @@ func (view *CTAUTViewpoint) disconnectRegistrationTransaction(db database.DB, sc
 		return nil, fmt.Errorf("expected registration script, but got %d", script.Type())
 	}
 
-	identifier := script.Identifier()
+	identifier := script.AutIdentifier()
 	identifierKey := identifier.String()
 
 	err := view.fetchCTAUTMain(db, nil, identifier)
@@ -689,7 +689,7 @@ func (view *CTAUTViewpoint) disconnectReRegistrationTransaction(db database.DB, 
 		return nil, fmt.Errorf("expected re-registration script, but got %d", script.Type())
 	}
 
-	identifier := script.Identifier()
+	identifier := script.AutIdentifier()
 	identifierKey := identifier.String()
 
 	err := view.fetchCTAUTMain(db, nil, identifier)
@@ -727,7 +727,7 @@ func (view *CTAUTViewpoint) disconnectMintTransaction(db database.DB, script *ct
 		return nil, fmt.Errorf("expected mint script, but got %d", script.Type())
 	}
 
-	identifier := script.Identifier()
+	identifier := script.AutIdentifier()
 	identifierKey := identifier.String()
 
 	// fetch outpoint from database if not exist with instance in batch
@@ -782,7 +782,7 @@ func (view *CTAUTViewpoint) disconnectTransferTransaction(db database.DB, script
 		return nil, fmt.Errorf("expected transfer script, but got %d", script.Type())
 	}
 
-	identifier := script.Identifier()
+	identifier := script.AutIdentifier()
 	identifierKey := identifier.String()
 
 	// fetch generate outpoint from database if not exist with instance in batch
@@ -840,7 +840,7 @@ func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, script *ct
 		return nil, fmt.Errorf("expected burn script, but got %d", script.Type())
 	}
 
-	identifier := script.Identifier()
+	identifier := script.AutIdentifier()
 	identifierKey := identifier.String()
 
 	// fetch outpoint from database if not exist with instance in batch
@@ -1113,7 +1113,7 @@ func (view *CTAUTViewpoint) fetchConsumedCTAUTTokens(db database.DB, block *abeu
 				return err
 			}
 
-			identifier := ctAutScript.Identifier()
+			identifier := ctAutScript.AutIdentifier()
 			consumedTokens, err := ctAutScript.ConsumedTokens()
 			if err != nil {
 				return err
@@ -1235,7 +1235,7 @@ func (b *BlockChain) FetchCTAUTView(script *ctaut.EnhancedAutScript) (*CTAUTView
 		b.chainLock.RLock()
 		defer b.chainLock.RUnlock()
 
-		identifier := script.Identifier()
+		identifier := script.AutIdentifier()
 		err = view.fetchCTAUTMain(b.db, neededSet, identifier)
 	}()
 	if err != nil {

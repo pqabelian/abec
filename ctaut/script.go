@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"strings"
 
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
@@ -595,8 +596,7 @@ type AutScript interface {
 	// Type returns the AutScriptType, which could be {Registration, Reregistration, Mint, Transfer, Burn}.
 	Type() AutScriptType
 
-	// todo: AutIdentifier?
-	Identifier() AutId
+	AutIdentifier() AutId
 
 	// Serialize serializes AutScript to []byte.
 	Serialize() ([]byte, error)
@@ -714,7 +714,7 @@ func NewRegistrationScript(
 	unitScale uint64,
 	autMemo []byte,
 	plannedTotalAmount uint64,
-//issuerTokens [][]byte,
+	//issuerTokens [][]byte,
 	mintThreshold uint8,
 	reregisterThreshold uint8,
 	reregistrationExpireHeight int32,
@@ -746,7 +746,7 @@ func (script *RegistrationScript) Version() uint32 {
 func (script *RegistrationScript) Type() AutScriptType {
 	return script.scriptType
 }
-func (script *RegistrationScript) Identifier() AutId {
+func (script *RegistrationScript) AutIdentifier() AutId {
 	return script.autIdentifier
 }
 
@@ -999,7 +999,7 @@ func NewReRegistrationScript(
 	autIdentifier AutId,
 	autMemo []byte,
 	plannedTotalAmount uint64,
-//issuerTokens [][]byte,
+	//issuerTokens [][]byte,
 	mintThreshold uint8,
 	reregisterThreshold uint8,
 	reregistrationExpireHeight int32,
@@ -1038,7 +1038,7 @@ func (script *ReRegistrationScript) Type() AutScriptType {
 	return AutScriptTypeReRegistration
 }
 
-func (script *ReRegistrationScript) Identifier() AutId {
+func (script *ReRegistrationScript) AutIdentifier() AutId {
 	return script.autIdentifier
 }
 
@@ -1271,7 +1271,7 @@ func (script *MintScript) Version() uint32 {
 func (script *MintScript) Type() AutScriptType {
 	return script.scriptType
 }
-func (script *MintScript) Identifier() AutId {
+func (script *MintScript) AutIdentifier() AutId {
 	return script.autIdentifier
 }
 
@@ -1490,7 +1490,7 @@ func (script *TransferScript) Type() AutScriptType {
 	return script.scriptType
 }
 
-func (script *TransferScript) Identifier() AutId {
+func (script *TransferScript) AutIdentifier() AutId {
 	return script.autIdentifier
 }
 
@@ -1709,7 +1709,7 @@ func (script *BurnScript) Type() AutScriptType {
 	return script.scriptType
 }
 
-func (script *BurnScript) Identifier() AutId {
+func (script *BurnScript) AutIdentifier() AutId {
 	return script.autIdentifier
 }
 
@@ -2077,7 +2077,7 @@ func (script *EnhancedAutScript) UpdateMetadata(metadata *AutMetadata) error {
 	if script.Type() != AutScriptTypeReRegistration {
 		return errors.New("update metadata only available for re-registration script")
 	}
-	identifier := script.Identifier()
+	identifier := script.AutIdentifier()
 	if !bytes.Equal(identifier[:], metadata.AutIdentifier[:]) {
 		return ErrInValidAUTTx
 	}

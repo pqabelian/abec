@@ -2094,7 +2094,7 @@ func checkCTAUTRegistrationTransactionInputs(ctAutScript *ctaut.EnhancedAutScrip
 		return fmt.Errorf("expected registration script, but got %d", ctAutScript.Type())
 	}
 
-	identifier := ctAutScript.Identifier()
+	identifier := ctAutScript.AutIdentifier()
 	identifierKey := identifier.String()
 
 	// ensure no the same identifier is registered
@@ -2123,7 +2123,7 @@ func checkCTAUTReRegistrationTransactionInputs(script *ctaut.EnhancedAutScript, 
 		return fmt.Errorf("expected re-registration script, but got %d", script.Type())
 	}
 
-	identifier := script.Identifier()
+	identifier := script.AutIdentifier()
 	identifierKey := identifier.String()
 
 	instance, exist := ctautView.instances[identifierKey]
@@ -2214,7 +2214,7 @@ func checkCTAUTMintTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, tx *a
 		return fmt.Errorf("expected mint script, but got %d", ctAutScript.Type())
 	}
 
-	identifier := ctAutScript.Identifier()
+	identifier := ctAutScript.AutIdentifier()
 	identifierKey := identifier.String()
 
 	instance, exist := ctautView.instances[identifierKey]
@@ -2321,7 +2321,7 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, t
 		return fmt.Errorf("expected transfer script, but got %d", ctAutScript.Type())
 	}
 
-	identifier := ctAutScript.Identifier()
+	identifier := ctAutScript.AutIdentifier()
 	identifierKey := identifier.String()
 
 	instance, exist := ctautView.instances[identifierKey]
@@ -2412,7 +2412,7 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, tx *a
 		return fmt.Errorf("expected burn script, but got %d", ctAutScript.Type())
 	}
 
-	identifier := ctAutScript.Identifier()
+	identifier := ctAutScript.AutIdentifier()
 	identifierKey := identifier.String()
 
 	instance, exist := ctautView.instances[identifierKey]
@@ -2540,7 +2540,7 @@ func ValidateCTAUTScript(script *ctaut.EnhancedAutScript, tx *abeutil.TxAbe, txH
 		if err != nil {
 			return err
 		}
-		identifier := script.Identifier()
+		identifier := script.AutIdentifier()
 		for i := 0; i < len(presetConsumedTokens); i++ {
 			outpoint := presetConsumedTokens[i].HostOutPoint
 			coin := ctautView.LookupCTAUTCoin(identifier, outpoint)
@@ -2569,7 +2569,7 @@ func ValidateCTAUTScript(script *ctaut.EnhancedAutScript, tx *abeutil.TxAbe, txH
 		if err != nil {
 			return err
 		}
-		identifier := script.Identifier()
+		identifier := script.AutIdentifier()
 		for i := 0; i < len(presetConsumedTokens); i++ {
 			outpoint := presetConsumedTokens[i].HostOutPoint
 			coin := ctautView.LookupCTAUTCoin(identifier, outpoint)
