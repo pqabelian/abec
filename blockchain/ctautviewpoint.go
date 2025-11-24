@@ -154,9 +154,10 @@ func (coin *CTAUTCoin) Clone() *CTAUTCoin {
 
 // todo: function name
 // NewAUTCoin returns a new AUTCoin built from the arguments.
-func NewCTAUTCoin(identifier ctaut.AutId, script []byte, blockHeight int32) *CTAUTCoin {
+func NewCTAUTCoin(version uint32, identifier ctaut.AutId, script []byte, blockHeight int32) *CTAUTCoin {
 
 	return &CTAUTCoin{
+		version:     version,
 		identifier:  identifier,
 		script:      script,
 		blockHeight: blockHeight,
@@ -230,7 +231,7 @@ func (view *CTAUTViewpoint) LookupCTAUTMetaInfo(identifier ctaut.AutId) *ctaut.A
 // unspendable.  When the view already has an entry for the output, it will be
 // marked unspent.  All fields will be updated for existing entries since it's
 // possible it has changed during a reorg.
-func (view *CTAUTViewpoint) addCTAUTCoin(identifier ctaut.AutId, outpoint ctaut.HostOutPoint, script []byte, blockHeight int32) {
+func (view *CTAUTViewpoint) addCTAUTCoin(version uint32, identifier ctaut.AutId, outpoint ctaut.HostOutPoint, script []byte, blockHeight int32) {
 	// if the tx is not existing in the utxoentry, create a new one. otherwise update the height of view
 	// Update existing entries.  All fields are updated because it's
 	// possible (although extremely unlikely) that the existing entry is
@@ -241,7 +242,7 @@ func (view *CTAUTViewpoint) addCTAUTCoin(identifier ctaut.AutId, outpoint ctaut.
 		log.Errorf("unreachable, invalid addAUTToken is called")
 		return
 	}
-	instance.coins[outpoint] = NewCTAUTCoin(identifier, script, blockHeight)
+	instance.coins[outpoint] = NewCTAUTCoin(version, identifier, script, blockHeight)
 }
 
 func (view *CTAUTViewpoint) connectRegistrationScript(script *ctaut.EnhancedAutScript, txHash chainhash.Hash,
@@ -280,13 +281,14 @@ func (view *CTAUTViewpoint) connectRegistrationScript(script *ctaut.EnhancedAutS
 	log.Debugf("In transaction %s, CT-AUT with identifier %s with following configuration is registered:", txHash, identifierKey)
 	log.Debugf("\t Name: %v:", hex.EncodeToString(metadata.AutName))
 	log.Debugf("\t Symbol: %v", hex.EncodeToString(metadata.AutSymbol))
-	log.Debugf("\t ReregistrationExpireHeight: %v", metadata.ReregistrationExpireHeight)
 	log.Debugf("\t BaseUnitName: %v", hex.EncodeToString(metadata.BaseUnitName))
 	log.Debugf("\t SubUnitName: %v", hex.EncodeToString(metadata.SubUnitName))
 	log.Debugf("\t UnitScale: %v", metadata.UnitScale)
+	log.Debugf("\t Memo: %v", metadata.AutMemo)
+	log.Debugf("\t PlannedTotalSupply: %v", metadata.PlannedTotalSupply)
+	log.Debugf("\t ReregistrationExpireHeight: %v", metadata.ReregistrationExpireHeight)
 	log.Debugf("\t ReregistrationThreshold: %v", metadata.ReregistrationThreshold)
 	log.Debugf("\t MintThreshold: %v", metadata.MintThreshold)
-	log.Debugf("\t PlannedTotalSupply: %v", metadata.PlannedTotalSupply)
 	log.Debugf("\t Totoal %d issuers", len(metadata.IssuerTokens))
 	for i := 0; i < len(metadata.IssuerTokens); i++ {
 		log.Debugf("\t\t [%d] %s", i, hex.EncodeToString(metadata.IssuerTokens[i]))
@@ -333,10 +335,11 @@ func (view *CTAUTViewpoint) connectReRegistrationScript(script *ctaut.EnhancedAu
 		*sctauts = append(*sctauts, stxo)
 	}
 	log.Debugf("Re-register AUT with identifier %s with following configuration:", identifierKey)
+	log.Debugf("\t Memo: %v -> %v", previousMetadata.AutMemo, metadata.AutMemo)
 	log.Debugf("\t PlannedTotalSupply: %v -> %v", previousMetadata.PlannedTotalSupply, metadata.PlannedTotalSupply)
-	log.Debugf("\t MintThreshold: %v -> %v", previousMetadata.MintThreshold, metadata.MintThreshold)
-	log.Debugf("\t ReregistrationThreshold: %v -> %v", previousMetadata.ReregistrationThreshold, metadata.ReregistrationThreshold)
 	log.Debugf("\t ReregistrationExpireHeight: %v -> %v", previousMetadata.ReregistrationExpireHeight, metadata.ReregistrationExpireHeight)
+	log.Debugf("\t ReregistrationThreshold: %v -> %v", previousMetadata.ReregistrationThreshold, metadata.ReregistrationThreshold)
+	log.Debugf("\t MintThreshold: %v -> %v", previousMetadata.MintThreshold, metadata.MintThreshold)
 	log.Debugf("\t UnitScale: %v -> %v", previousMetadata.UnitScale, metadata.UnitScale)
 	log.Debugf("\t Previous IssuerTokens: len = %d", len(previousMetadata.IssuerTokens))
 	for i := 0; i < len(previousMetadata.IssuerTokens); i++ {
@@ -391,8 +394,9 @@ func (view *CTAUTViewpoint) connectMintScript(script *ctaut.EnhancedAutScript, t
 
 		if sctauts != nil {
 			var stxo = SpentCTAUTToken{
-				Script: nil,
-				Height: blockHeight,
+				Version: consumedTokens[i].Version,
+				Script:  nil,
+				Height:  blockHeight,
 			}
 			currentSctauts = append(currentSctauts, stxo)
 		}
@@ -421,7 +425,7 @@ func (view *CTAUTViewpoint) connectMintScript(script *ctaut.EnhancedAutScript, t
 	for _, token := range generatedTokens {
 		view.instances[identifierKey].Add(
 			token.HostOutPoint,
-			NewCTAUTCoin(identifier, token.ValueScript, blockHeight),
+			NewCTAUTCoin(token.Version, identifier, token.ValueScript, blockHeight),
 		)
 	}
 
@@ -463,8 +467,9 @@ func (view *CTAUTViewpoint) connectTransferScript(script *ctaut.EnhancedAutScrip
 		if sctauts != nil {
 			// Populate the stxo details using the utxo entry.
 			var stxo = SpentCTAUTToken{
-				Script: token.script,
-				Height: blockHeight,
+				Version: token.version,
+				Script:  token.script,
+				Height:  blockHeight,
 			}
 			currentSctauts = append(currentSctauts, stxo)
 		}
@@ -480,7 +485,7 @@ func (view *CTAUTViewpoint) connectTransferScript(script *ctaut.EnhancedAutScrip
 		return err
 	}
 	for i := 0; i < len(generatedTokens); i++ {
-		coin := NewCTAUTCoin(identifier, generatedTokens[i].ValueScript, blockHeight)
+		coin := NewCTAUTCoin(generatedTokens[i].Version, identifier, generatedTokens[i].ValueScript, blockHeight)
 		view.instances[identifierKey].Add(generatedTokens[i].HostOutPoint, coin)
 	}
 
@@ -517,8 +522,9 @@ func (view *CTAUTViewpoint) connectBurnScript(script *ctaut.EnhancedAutScript, t
 		if sctauts != nil {
 			// Populate the stxo details using the utxo entry.
 			var stxo = SpentCTAUTToken{
-				Script: token.script,
-				Height: blockHeight,
+				Version: token.version,
+				Script:  token.script,
+				Height:  blockHeight,
 			}
 			currentSctauts = append(currentSctauts, stxo)
 		}
@@ -536,7 +542,7 @@ func (view *CTAUTViewpoint) connectBurnScript(script *ctaut.EnhancedAutScript, t
 
 	// Rule: the last output would be viewed as destroyed/burned
 	for i := 0; i < len(generatedToken)-1; i++ {
-		coin := NewCTAUTCoin(identifier, generatedToken[i].ValueScript, blockHeight)
+		coin := NewCTAUTCoin(generatedToken[i].Version, identifier, generatedToken[i].ValueScript, blockHeight)
 		view.instances[identifierKey].Add(generatedToken[i].HostOutPoint, coin)
 	}
 	burnedToken := generatedToken[len(generatedToken)-1]
@@ -821,9 +827,9 @@ func (view *CTAUTViewpoint) disconnectTransferTransaction(db database.DB, script
 		token := (*consumedAutTokens)[i]
 		coin := consumedTokens[i]
 		if _, ok := instance.coins[coin.HostOutPoint]; ok {
-			return nil, fmt.Errorf("duplicate coins %s for AUT instance %s", coin.HostOutPoint, identifierKey)
+			return nil, fmt.Errorf("duplicate coins %s for AUT instance %s", coin.HostOutPoint.String(), identifierKey)
 		}
-		instance.coins[coin.HostOutPoint] = NewCTAUTCoin(identifier, token.Script, blockHeight)
+		instance.coins[coin.HostOutPoint] = NewCTAUTCoin(token.Version, identifier, token.Script, blockHeight)
 	}
 
 	return nil, nil
@@ -899,9 +905,9 @@ func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, script *ct
 		token := (*consumedAutTokens)[i]
 		claimedToken := claimedConsumedTokens[i]
 		if _, ok := instance.coins[claimedToken.HostOutPoint]; ok {
-			return nil, fmt.Errorf("duplicate coins %s for AUT instance %s", claimedToken.HostOutPoint, identifierKey)
+			return nil, fmt.Errorf("duplicate coins %s for AUT instance %s", claimedToken.HostOutPoint.String(), identifierKey)
 		}
-		instance.coins[claimedToken.HostOutPoint] = NewCTAUTCoin(identifier, token.Script, blockHeight)
+		instance.coins[claimedToken.HostOutPoint] = NewCTAUTCoin(token.Version, identifier, token.Script, blockHeight)
 	}
 
 	return nil, nil

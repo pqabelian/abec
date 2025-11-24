@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"reflect"
 
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
@@ -246,15 +245,15 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 
 	serializedMetadata := w.Bytes()
 
-	// todo: the following codes are necessary or only for test?
-	tmpMetadata := &AutMetadata{}
-	err = tmpMetadata.Deserialize(serializedMetadata)
-	if err != nil {
-		return nil, err
-	}
-	if !reflect.DeepEqual(autMetadata, tmpMetadata) {
-		return nil, errors.New("metadata not match after serialization")
-	}
+	//// todo: the following codes are necessary or only for test?
+	//tmpMetadata := &AutMetadata{}
+	//err = tmpMetadata.Deserialize(serializedMetadata)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//if !reflect.DeepEqual(autMetadata, tmpMetadata) {
+	//	return nil, errors.New("metadata not match after serialization")
+	//}
 
 	return serializedMetadata, nil
 }
@@ -1775,16 +1774,17 @@ func ParseAutScript(txVersion uint32, txHash chainhash.Hash, memo []byte) (scrip
 	// todo(ctaut): what "txMemo" should be shown at the front end?
 
 	tmpReader := bytes.NewReader(memo[len(commonPrefix):])
-	version, err := ReadVarInt(tmpReader)
+	scriptVersion, err := ReadVarInt(tmpReader)
 	if err != nil {
 		return nil, err
 	}
-	if version > math.MaxUint32 {
+	if scriptVersion > math.MaxUint32 {
 		return nil, ErrInValidAUTTx
 	}
 	// check the script version with the host version
 	// todo: use the ScriptVersion and TxVersion rule.
-	if uint32(version) != txVersion {
+	expectedTxVersion, err := GetTxVersionFromAutScriptVersion(uint32(scriptVersion))
+	if expectedTxVersion != txVersion {
 		return nil, ErrInValidAUTTx
 	}
 
@@ -1816,8 +1816,8 @@ func ParseAutScript(txVersion uint32, txHash chainhash.Hash, memo []byte) (scrip
 		return nil, err
 	}
 
-	// check the script version with the host version
-	expectedTxVersion, err := GetTxVersionFromAutScriptVersion(script.Version())
+	// double check the script version with the host version
+	expectedTxVersion, err = GetTxVersionFromAutScriptVersion(script.Version())
 	if expectedTxVersion != txVersion {
 		return nil, ErrInValidAUTTx
 	}

@@ -95,6 +95,7 @@ func (s *SpentCTAUTTokens) Type() SpentCTAUTType {
 }
 
 type SpentCTAUTToken struct {
+	Version uint32
 	// Amount is the amount of the output.
 	Script []byte
 
@@ -111,6 +112,8 @@ func spentCTAUTSerializeSize(stxo SpentCTAUT) (int, error) {
 		for _, token := range tokens {
 			headerCode := uint64(token.Height)
 			size += serializeSizeVLQ(headerCode)
+
+			size += serializeSizeVLQ(uint64(token.Version))
 
 			size += serializeSizeVLQ(uint64(len(token.Script)))
 			size += len(token.Script)
@@ -161,6 +164,8 @@ func putSpentCTAUT(target []byte, stxo SpentCTAUT) (int, error) {
 
 			headerCode := uint64(token.Height)
 			offset += putVLQ(target[offset:], headerCode)
+
+			offset += putVLQ(target[offset:], uint64(token.Version))
 
 			vlqSizeLen := putVLQ(target[offset:], uint64(len(token.Script)))
 			offset += vlqSizeLen
@@ -247,6 +252,14 @@ func decodeSpentCTAUT(serialized []byte) (SpentCTAUT, int, error) {
 					"header code")
 			}
 			res[i].Height = int32(headerCode)
+
+			version, bytesRead := deserializeVLQ(serialized[offset:])
+			offset += bytesRead
+			if offset >= len(serialized) {
+				return nil, offset, errDeserialize("unexpected end of data after " +
+					"header code")
+			}
+			res[i].Version = uint32(version)
 
 			scriptSize, bytesRead := deserializeVLQ(serialized[offset:])
 			offset += bytesRead
@@ -449,6 +462,13 @@ func serializeCTAUTCoin(coin *CTAUTCoin) ([]byte, error) {
 		return nil, err
 	}
 
+	tmp = make([]byte, 4)
+	binary.LittleEndian.PutUint32(tmp, coin.version)
+	_, err = buff.Write(tmp)
+	if err != nil {
+		return nil, err
+	}
+
 	_, err = buff.Write(coin.identifier[:])
 	if err != nil {
 		return nil, err
@@ -479,8 +499,15 @@ func deserializeCTAUTCoin(serialized []byte) (*CTAUTCoin, error) {
 
 	reader := bytes.NewReader(serialized[8:])
 
+	tmp := make([]byte, 4)
+	_, err := io.ReadFull(reader, tmp[:])
+	if err != nil {
+		return nil, err
+	}
+	version := binary.LittleEndian.Uint32(tmp)
+
 	var identifier ctaut.AutId
-	_, err := io.ReadFull(reader, identifier[:])
+	_, err = io.ReadFull(reader, identifier[:])
 	if err != nil {
 		return nil, err
 	}
@@ -490,7 +517,7 @@ func deserializeCTAUTCoin(serialized []byte) (*CTAUTCoin, error) {
 		return nil, err
 	}
 
-	return NewCTAUTCoin(identifier, script, blockHeight), nil
+	return NewCTAUTCoin(version, identifier, script, blockHeight), nil
 }
 
 func dbFetchCTAUTCoin(dbTx database.Tx, outpoint ctaut.HostOutPoint) (*CTAUTCoin, error) {
