@@ -80,6 +80,15 @@ const (
 	// todo: when new versions added, add here and update AutScriptVersion.
 )
 
+// AutScriptVersionSet collects all defined AutScriptVersions.
+var AutScriptVersionSet = make(map[uint32]uint32)
+
+// init put all defined AutScriptVersion into AutScriptVersionSet.
+// When a new AutScriptVersion is defined, code here.
+func init() {
+	AutScriptVersionSet[AutScriptVersion_1] = AutScriptVersion_1
+}
+
 // AutScriptVersion is the current latest version of AutScript.
 const AutScriptVersion = AutScriptVersion_1
 

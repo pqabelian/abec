@@ -46,9 +46,9 @@ type AutMetadata struct {
 	Version uint32
 
 	// AutIdentifier is the unique identifier for an Aut Instance.
-	// TxHash of the host transaction (i.e. txid) where the registration script is located
+	// TxHash of the host transaction (i.e. txId) where the registration script is located
 	// is used as the Aut Instance identifier.
-	AutIdentifier AutId // use chainhash.Hash directly
+	AutIdentifier AutId
 
 	// AutName, the name of the Aut Instance, gives
 	// the full, descriptive and human-readable name of the token ,e.g. "Post-Quantum USD".
@@ -79,15 +79,15 @@ type AutMetadata struct {
 	// Note that the amount would be counted in terms of subunit.
 	PlannedTotalSupply uint64
 
-	// The issuers of CT-AUT instance, currently, identified by its coin address on Abelian.
+	// The issuers of AUT Instance, currently, identified by its coin address on Abelian.
 	// Using coinAddress, rather than (for example) the hash of coinAddress, as the IssuerTokens provide some potential
 	// advantages, for example, a user could check which wallet (in his multiple wallets) should be used to mint/reregister
-	// this Aut-Instance.
+	// this Aut Instance.
 	IssuerTokens [][]byte
 
-	// ReregistrationExpireHeight specifies a height, after which the ReRegistrationScript could be not be applied any more.
-	// Using int32 is to allow -1 to be used as infinite height.
-	ReregistrationExpireHeight int32 // ReregistrationExpireHeight
+	// ReregistrationExpireHeight specifies a height, after which the ReRegistrationScript could not be applied any more.
+	// Using int32 is to allow -1 to be used as the infinite height.
+	ReregistrationExpireHeight int32
 
 	// ReregistrationThreshold specifies the size of an authorized set for ReRegistrationScript.
 	ReregistrationThreshold uint8
@@ -102,18 +102,20 @@ type AutMetadata struct {
 	BurnedAmount uint64
 
 	// ActiveRootTokenSet stores the currently available root tokens.
-	// When a RegistrationScript or ReRegistrationScript is executed, some RootTokens are created and host on HostOutPoints,
+	// When a RegistrationScript or ReRegistrationScript is executed, some AutRootTokens are created and host on HostOutPoints,
 	// and they are recorded as ActiveRootTokens.
-	// When a ReRegistrationScript or MintScript is executed, it must consume/spend some ActiveRootTokens,
-	// and those unspent RootTokens keep be active. That is, each time ReRegistrationScript or MintScript is executed,
-	// some RootTokens are removed from ActiveRootTokenSet
+	// When a ReRegistrationScript or MintScript is executed, it must consume/spend some ActiveRootTokens.
+	// When a ReRegistrationScript is executed, some ActiveRootTokens are consumed, and the remaining ActiveRootTokens are set to inactive,
+	// and the new generated AutRootTokens are set to be the ActiveRootTokens.
+	// When a MintScript is executed, some ActiveRootTokens are consumed, and the remaining ActiveRootTokens keep active,
+	// that is, each time a MintScript is executed, some RootTokens are removed from ActiveRootTokenSet
 	ActiveRootTokenSet map[string]*HostOutPoint
 
-	// UpdateScriptVersions records all version of the scripts that creates/updates the metadata,
+	// UpdateScriptVersions records all versions of the scripts that creates/updates the metadata,
 	// say RegistrationScript and ReRegistrationScript.
 	// More specifically, when RegistrationScript creates the metadata,
 	// RegistrationScript's version is put into UpdateScriptVersions as the first one;
-	// Each time ReRegistrationScript update the metadata, the ReRegistrationScript's version is appended to UpdateScriptVersions.
+	// Each time ReRegistrationScript updates the metadata, the ReRegistrationScript's version is appended to UpdateScriptVersions.
 	// The versions in UpdateScriptVersions are sequenced from small to large.
 	// The size of UpdateScriptVersions "equal" Metadata.Version.
 	// Currently, there is no rules
@@ -161,7 +163,6 @@ func (autMetadata *AutMetadata) serializeSize() int {
 }
 
 // Serialize serializes AutMetadata to []byte.
-// call abec.wire.WriteVarInt or call locally WriteVarInt?
 func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 	if autMetadata == nil {
 		return nil, nil
@@ -424,7 +425,7 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 			return err
 		}
 		if version > math.MaxUint32 {
-			return fmt.Errorf("readed history version (%d) is too large", version)
+			return fmt.Errorf("readed update script version (%d) is too large", version)
 		}
 		autMetadata.UpdateScriptVersions[i] = uint32(version)
 	}
@@ -508,21 +509,21 @@ func (autMetadata *AutMetadata) SanityCheck() error {
 			len(autMetadata.UpdateScriptVersions), autMetadata.Version)
 	}
 	// now len(autMetadata.UpdateScriptVersions) >= 1
-	if autMetadata.UpdateScriptVersions[0] > ctautwire.AutScriptVersion {
-		return fmt.Errorf("invalid UpdateScriptVersion (%d) at position %d : larger than the latest version %d",
-			autMetadata.UpdateScriptVersions[0], 0, ctautwire.AutScriptVersion)
+	if _, ok := ctautwire.AutScriptVersionSet[autMetadata.UpdateScriptVersions[0]]; !ok {
+		return fmt.Errorf("invalid UpdateScriptVersion (%d) at position %d: not in the AutScriptVersionSet",
+			autMetadata.UpdateScriptVersions[0], 0)
 	}
 
 	for i := 1; i < len(autMetadata.UpdateScriptVersions); i++ {
+		if _, ok := ctautwire.AutScriptVersionSet[autMetadata.UpdateScriptVersions[i]]; !ok {
+			return fmt.Errorf("invalid UpdateScriptVersion (%d) at position %d: not in the AutScriptVersionSet",
+				autMetadata.UpdateScriptVersions[i], i)
+		}
+
 		if autMetadata.UpdateScriptVersions[i] < autMetadata.UpdateScriptVersions[i-1] {
 			return fmt.Errorf("invalid UpdateScriptVersion version (%d) at position %d : "+
 				"smaller than the UpdateScriptVersion (%d) at position %d",
-				autMetadata.UpdateScriptVersions[i], i, autMetadata.UpdateScriptVersions[i-1], i)
-		}
-
-		if autMetadata.UpdateScriptVersions[i] > ctautwire.AutScriptVersion {
-			return fmt.Errorf("invalid UpdateScriptVersion (%d) at position %d : larger than the latest version %d",
-				autMetadata.UpdateScriptVersions[i], i, ctautwire.AutScriptVersion)
+				autMetadata.UpdateScriptVersions[i], i, autMetadata.UpdateScriptVersions[i-1], i-1)
 		}
 	}
 
