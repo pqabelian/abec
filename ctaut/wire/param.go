@@ -2,7 +2,7 @@ package wire
 
 // Upgrade/Fork design:
 // How a client obtains an AutScriptVersion?
-// 1. Client has a local AutScriptVersion (aka. hard coded when the client is developed)
+// 1. Client has a local AutScriptVersion (aka. hardcoded when the client is developed)
 // 2. Client queries AutScriptVersion from blockchain through API GetSupportedAutScriptVersions,
 // and blockchain returns the current supported version-list.
 // 3. If client's local version is not in the list, the client is forced to upgrade.
@@ -15,17 +15,17 @@ package wire
 // which uses the set of defined AutScriptVersions as the domain.
 //
 // 2. How a RegistrationScript is created and handled:
-// 2.1 The client query supportedAutScriptVersions by blockchain through GetSupportedAutScriptVersions().
+// 2.1 The client queries supportedAutScriptVersions by blockchain through GetSupportedAutScriptVersions().
 // 2.2 If the client local AutScriptVersion is not in supportedAutScriptVersions, the client is forced to upgrade;
 // otherwise, the client use the local AutScriptVersion to set the RegistrationScript's Version.
 // 2.3 On the blockchain side,
 // 2.3.1 RegistrationScript causes an AutInstance's metadata record to be added into blockchain,
 // where metadata's version is set to 1 and RegistrationScript's version is added into metadata's updateScriptVersion list (as the first one).
-// 2.3.2 RegistrationScript generated some AutRootTokens for the corresponding AutInstance, and
+// 2.3.2 RegistrationScript generates some AutRootTokens for the corresponding AutInstance, and
 // these AutRootTokens has the same version as the RegistrationScript's version.
 //
 // 3. How a ReRegistrationScript is created and handled:
-// 3.1 The client query supportedAutScriptVersions by blockchain through GetSupportedAutScriptVersions().
+// 3.1 The client queries supportedAutScriptVersions by blockchain through GetSupportedAutScriptVersions().
 // 3.2 If the client local AutScriptVersion is not in supportedAutScriptVersions, the client is forced to upgrade;
 // otherwise, the client use the local AutScriptVersion to set the ReRegistrationScript's Version.
 // 3.3 On the blockchain side,
@@ -43,7 +43,7 @@ package wire
 // where the new generated AutRootTokens have the same version as the ReRegistrationScript's version.
 //
 // 4. How a MintScript is created and handled:
-// 4.1 The client query supportedAutScriptVersions by blockchain through GetSupportedAutScriptVersions().
+// 4.1 The client queries supportedAutScriptVersions by blockchain through GetSupportedAutScriptVersions().
 // 4.2 If the client local AutScriptVersion is not in supportedAutScriptVersions, the client is forced to upgrade;
 // otherwise, the client use the local AutScriptVersion to set the MintScript's Version.
 // 4.3 On the blockchain side,
@@ -53,12 +53,12 @@ package wire
 // the blockchain side will check the MintScript's version to make sure it is in the supportedAutScriptVersions, and
 // the blockchain side will call the corresponding logic codes.
 // Note that the generated AutTokens will have version not smaller than that of the consumed AutRootTokens
-// (this is a result of the Reregister logic, since Reregister will invalid all old AutRootTokens)
+// (this is a result of the Reregistration logic, since Reregistration will invalid all old AutRootTokens)
 // (the verification of MintScript should check whether the MintScript's version is not smaller than that of AutRootTokens,
 // which is actually the latest version in the metadata's updateScriptVersion).
 //
 // 5. How a TransferScript is created and handled:
-// 5.1 The client query supportedAutScriptVersions by blockchain through GetSupportedAutScriptVersions().
+// 5.1 The client queries supportedAutScriptVersions by blockchain through GetSupportedAutScriptVersions().
 // 5.2 If the client local AutScriptVersion is not in supportedAutScriptVersions, the client is forced to upgrade;
 // otherwise, the client use the local AutScriptVersion to set the TransferScript's Version.
 // 5.3 On the blockchain side,

@@ -67,7 +67,7 @@ type AutCoinbaseTx struct {
 //
 // As a result, TxIns directly and only contain AutTxo.
 type AutTransferTx struct {
-	Version   uint32
+	Version   uint32 // AutScriptVersion
 	TxIns     []*AutTxo
 	TxOuts    []*AutTxo
 	TxWitness []byte
