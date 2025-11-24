@@ -16,6 +16,7 @@ import (
 	"github.com/abesuite/abec/wire"
 )
 
+const TxVersionForCTAUT = wire.TxVersion_Height_464000_Aconcagua
 const AutScriptVersion = ctautwire.AutScriptVersion_1
 const AutIdentifierLength = ctaut.AutIdentifierLength
 
@@ -29,6 +30,7 @@ const (
 	AutScriptTypeBurn           AutScriptType = ctaut.AutScriptTypeBurn
 )
 
+type AutId = ctaut.AutId
 type AutScript = ctaut.AutScript
 type HostOutPoint = ctaut.HostOutPoint
 type Metadata struct {
@@ -466,7 +468,7 @@ func ParseAutScript(txVersion uint32, txID string, memo []byte) (AutScript, erro
 	}
 	return ctaut.ParseAutScript(txVersion, *txHash, memo)
 }
-func RegisteredAutMetadata(autScript AutScript, txVersion uint32, txID string, serializedTxOuts [][]byte) (*Metadata, error) {
+func RegisteredAutMetadata(autScript AutScript, scriptVersion uint32, txID string, serializedTxOuts [][]byte) (*Metadata, error) {
 	if autScript == nil {
 		return nil, errors.New("aut script is nil")
 	}
@@ -482,7 +484,7 @@ func RegisteredAutMetadata(autScript AutScript, txVersion uint32, txID string, s
 	abeTxos := make([]*wire.TxOutAbe, len(serializedTxOuts))
 	for i := 0; i < len(serializedTxOuts); i++ {
 		abeTxo := &wire.TxOutAbe{}
-		err := wire.ReadTxOutAbe(bytes.NewReader(serializedTxOuts[i]), 0, txVersion, abeTxo)
+		err := wire.ReadTxOutAbe(bytes.NewReader(serializedTxOuts[i]), 0, scriptVersion, abeTxo)
 		if err != nil {
 			return nil, err
 		}
@@ -490,7 +492,7 @@ func RegisteredAutMetadata(autScript AutScript, txVersion uint32, txID string, s
 	}
 
 	registerScript := autScript.(*ctaut.RegistrationScript)
-	identifier := registerScript.Identifier()
+	identifier := registerScript.AutIdentifier()
 
 	rootTokens, err := ctaut.GetGeneratedAutTokens(autScript, *txHash, abeTxos)
 	if err != nil {
@@ -536,7 +538,7 @@ func UpdateAutMetadata(autScript AutScript, txVersion uint32, txID string, seria
 		return errors.New("metadata is nil")
 	}
 
-	identifier := autScript.Identifier()
+	identifier := autScript.AutIdentifier()
 	if identifier.String() != metadata.CTAutIdentifier {
 		return errors.New("ctaut script identifier is not equal to metadata identifier")
 	}
@@ -786,7 +788,7 @@ func CreateTransferTxByRootSeedForCTAUT(serializedTransferTxRequestDesc []byte, 
 		return false
 	})
 
-	transferTxMsgTemplate, err := abecryptox.CreateTransferTxMsgTemplateByRootSeeds(AutScriptVersion, abeTxInputDescs, abeTxOutputDescs, txRequestDesc.TxFee, txRequestDesc.TxMemo)
+	transferTxMsgTemplate, err := abecryptox.CreateTransferTxMsgTemplateByRootSeeds(TxVersionForCTAUT, abeTxInputDescs, abeTxOutputDescs, txRequestDesc.TxFee, txRequestDesc.TxMemo)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -902,7 +904,7 @@ func CreateTransferTxByCryptoKeysForCTAUT(serializedTransferTxRequestDesc []byte
 		return false
 	})
 
-	transferTxMsgTemplate, err := abecryptox.CreateTransferTxMsgTemplateByKeys(AutScriptVersion, abeTxInputDescs, abeTxOutputDescs, txRequestDesc.TxFee, txRequestDesc.TxMemo)
+	transferTxMsgTemplate, err := abecryptox.CreateTransferTxMsgTemplateByKeys(TxVersionForCTAUT, abeTxInputDescs, abeTxOutputDescs, txRequestDesc.TxFee, txRequestDesc.TxMemo)
 	if err != nil {
 		return nil, nil, err
 	}
