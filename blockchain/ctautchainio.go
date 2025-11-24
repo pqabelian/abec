@@ -593,7 +593,7 @@ func dbRemoveCTAUTInstance(dbTx database.Tx, instanceToDel map[string]struct{}, 
 	ctAutTokenBucket := dbTx.Metadata().Bucket(ctAutTokenBucketName)
 
 	for autIdentifierKey, _ := range instanceToDel {
-		autIdentifier, err := ctaut.NewAUTIdFromStr(autIdentifierKey)
+		autIdentifier, err := chainhash.NewHashFromStr(autIdentifierKey)
 		if err != nil {
 			return fmt.Errorf("invalid identifier key")
 		}
