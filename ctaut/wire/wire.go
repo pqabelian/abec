@@ -3,6 +3,7 @@ package wire
 import (
 	"bytes"
 	"fmt"
+	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 	"math"
 )
@@ -71,4 +72,9 @@ type AutTransferTx struct {
 	TxIns     []*AutTxo
 	TxOuts    []*AutTxo
 	TxWitness []byte
+}
+
+// AutWitnessHash returns tha hash of autWitness.
+func AutWitnessHash(autWitness []byte) chainhash.Hash {
+	return chainhash.ChainHash(autWitness)
 }
