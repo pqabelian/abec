@@ -1074,12 +1074,11 @@ func (script *ReRegistrationScript) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	if err = WriteVarInt(&b, uint64(script.reregistrationExpireHeight)); err != nil {
-		return nil, err
-	}
-
 	// todo: unnecessary use a function
 	if err = writeIssuers(&b, script.issuers); err != nil {
+		return nil, err
+	}
+	if err = WriteVarInt(&b, uint64(script.reregistrationExpireHeight)); err != nil {
 		return nil, err
 	}
 
