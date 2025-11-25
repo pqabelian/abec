@@ -53,11 +53,11 @@ type Metadata struct {
 	UnitScale       uint64
 	CTAutMemo       string
 
-	PlannedTotalSupply      uint64
-	IssuerTokens            []string
-	MintThreshold           uint8
-	ReregistrationThreshold uint8
-	ExpireHeight            int32 // ReregistrationExpireHeight // todo: ReregistrationExpireHeight
+	PlannedTotalSupply         uint64
+	Issuers                    []string
+	ReregistrationExpireHeight int32
+	ReregistrationThreshold    uint8
+	MintThreshold              uint8
 
 	MintedAmount uint64
 	BurnedAmount uint64
@@ -74,11 +74,11 @@ func NewRegistrationScript(
 	subUnitName []byte,
 	unitScale uint64,
 	ctAutMemo []byte,
-	plannedTotalAmount uint64,
-	issuerTokens [][]byte,
-	mintThreshold uint8,
+	plannedTotalSupply uint64,
+	issuers [][]byte,
+	reregistrationExpireHeight int32,
 	reregisterThreshold uint8,
-	expireHeight int32,
+	mintThreshold uint8,
 	outAutRootTokenNum uint8,
 	memo []byte,
 ) ([]byte, []byte, error) {
@@ -90,11 +90,11 @@ func NewRegistrationScript(
 		subUnitName,
 		unitScale,
 		ctAutMemo,
-		plannedTotalAmount,
-		issuerTokens,
-		mintThreshold,
+		plannedTotalSupply,
+		issuers,
+		reregistrationExpireHeight,
 		reregisterThreshold,
-		expireHeight,
+		mintThreshold,
 		outAutRootTokenNum,
 		memo)
 	registerScript, err := script.Serialize()
@@ -111,11 +111,11 @@ func NewReRegistrationScript(
 	version uint32,
 	ctAutIdentifier AutId,
 	ctAutMemo []byte,
-	plannedTotalAmount uint64,
-	issuerTokens [][]byte,
-	mintThreshold uint8,
+	plannedTotalSupply uint64,
+	issuers [][]byte,
+	reregistrationExpireHeight int32,
 	reregisterThreshold uint8,
-	expireHeight int32,
+	mintThreshold uint8,
 	inAutRootTokenNum uint8,
 	outAutRootTokenNum uint8,
 	memo []byte,
@@ -124,11 +124,11 @@ func NewReRegistrationScript(
 		version,
 		ctAutIdentifier,
 		ctAutMemo,
-		plannedTotalAmount,
-		issuerTokens,
-		mintThreshold,
+		plannedTotalSupply,
+		issuers,
+		reregistrationExpireHeight,
 		reregisterThreshold,
-		expireHeight,
+		mintThreshold,
 		inAutRootTokenNum,
 		outAutRootTokenNum,
 		memo,
@@ -543,21 +543,21 @@ func RegisteredAutMetadata(autScript AutScript, scriptVersion uint32, txID strin
 	//}
 
 	metadata := &Metadata{
-		Version:                 registerScript.Version(),
-		CTAutIdentifier:         identifier.String(),
-		CTAutName:               hex.EncodeToString(registerScript.AutName()),
-		CTAutSymbol:             hex.EncodeToString(registerScript.AutSymbol()),
-		BaseUnitName:            hex.EncodeToString(registerScript.BaseUnitName()),
-		SubUnitName:             hex.EncodeToString(registerScript.SubUnitName()),
-		UnitScale:               registerScript.UnitScale(),
-		CTAutMemo:               hex.EncodeToString(registerScript.AutMemo()),
-		PlannedTotalSupply:      registerScript.PlannedTotalSupply(),
-		IssuerTokens:            issuerStrs,
-		MintThreshold:           registerScript.MintThreshold(),
-		ReregistrationThreshold: registerScript.ReregisterThreshold(),
-		ExpireHeight:            registerScript.ReregistrationExpireHeight(),
-		MintedAmount:            0,
-		BurnedAmount:            0,
+		Version:                    registerScript.Version(),
+		CTAutIdentifier:            identifier.String(),
+		CTAutName:                  hex.EncodeToString(registerScript.AutName()),
+		CTAutSymbol:                hex.EncodeToString(registerScript.AutSymbol()),
+		BaseUnitName:               hex.EncodeToString(registerScript.BaseUnitName()),
+		SubUnitName:                hex.EncodeToString(registerScript.SubUnitName()),
+		UnitScale:                  registerScript.UnitScale(),
+		CTAutMemo:                  hex.EncodeToString(registerScript.AutMemo()),
+		PlannedTotalSupply:         registerScript.PlannedTotalSupply(),
+		Issuers:                    issuerStrs,
+		ReregistrationExpireHeight: registerScript.ReregistrationExpireHeight(),
+		MintThreshold:              registerScript.MintThreshold(),
+		ReregistrationThreshold:    registerScript.ReregisterThreshold(),
+		MintedAmount:               0,
+		BurnedAmount:               0,
 		//RootTokenSet:            make(map[HostOutPoint]struct{}, len(rootTokens)),
 	}
 
@@ -611,15 +611,15 @@ func UpdateAutMetadata(autScript AutScript, txVersion uint32, txID string, seria
 		//		metadata.IssuerTokens = append(metadata.IssuerTokens, key)
 		//	}
 		//}
-		issuerTokens := ctAutScript.Issuers()
-		metadata.IssuerTokens = make([]string, len(issuerTokens))
-		for i := 0; i < len(issuerTokens); i++ {
-			metadata.IssuerTokens[i] = hex.EncodeToString(issuerTokens[i])
+		issuers := ctAutScript.Issuers()
+		metadata.Issuers = make([]string, len(issuers))
+		for i := 0; i < len(issuers); i++ {
+			metadata.Issuers[i] = hex.EncodeToString(issuers[i])
 		}
 
 		metadata.MintThreshold = ctAutScript.MintThreshold()
 		metadata.ReregistrationThreshold = ctAutScript.ReregisterThreshold()
-		metadata.ExpireHeight = ctAutScript.ReregistrationExpireHeight()
+		metadata.ReregistrationExpireHeight = ctAutScript.ReregistrationExpireHeight()
 
 		//metadata.RootTokenSet = make(map[HostOutPoint]struct{}, len(rootTokens))
 		//for i := 0; i < len(rootTokens); i++ {

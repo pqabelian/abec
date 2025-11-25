@@ -660,8 +660,8 @@ type RegistrationScript struct {
 	plannedTotalSupply         uint64
 	issuers                    [][]byte
 	reregistrationExpireHeight int32
-	mintThreshold              uint8
 	reregisterThreshold        uint8
+	mintThreshold              uint8
 
 	outAutRootTokenNum uint8  // value is set in deserialize, so, do not provide set function, but provide get function.
 	scriptMemo         []byte // todo: TODO memo -> scriptMemo
@@ -719,11 +719,11 @@ func NewRegistrationScript(
 	subUnitName []byte,
 	unitScale uint64,
 	autMemo []byte,
-	plannedTotalAmount uint64,
+	plannedTotalSupply uint64,
 	issuers [][]byte,
-	mintThreshold uint8,
-	reregisterThreshold uint8,
 	reregistrationExpireHeight int32,
+	reregisterThreshold uint8,
+	mintThreshold uint8,
 	outAutRootTokenNum uint8,
 	scriptMemo []byte,
 ) *RegistrationScript {
@@ -737,11 +737,11 @@ func NewRegistrationScript(
 		subUnitName:                subUnitName,
 		unitScale:                  unitScale,
 		autMemo:                    autMemo,
-		plannedTotalSupply:         plannedTotalAmount,
+		plannedTotalSupply:         plannedTotalSupply,
 		issuers:                    issuers,
 		reregistrationExpireHeight: reregistrationExpireHeight,
-		mintThreshold:              mintThreshold,
 		reregisterThreshold:        reregisterThreshold,
+		mintThreshold:              mintThreshold,
 		outAutRootTokenNum:         outAutRootTokenNum,
 		scriptMemo:                 scriptMemo,
 	}
@@ -796,10 +796,10 @@ func (script *RegistrationScript) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	if err = b.WriteByte(script.mintThreshold); err != nil {
+	if err = b.WriteByte(script.reregisterThreshold); err != nil {
 		return nil, err
 	}
-	if err = b.WriteByte(script.reregisterThreshold); err != nil {
+	if err = b.WriteByte(script.mintThreshold); err != nil {
 		return nil, err
 	}
 
@@ -865,10 +865,10 @@ func (script *RegistrationScript) Deserialize(serializedScript []byte) error {
 	}
 	script.reregistrationExpireHeight = int32(expireHeight)
 
-	if script.mintThreshold, err = ReadByte(r); err != nil {
+	if script.reregisterThreshold, err = ReadByte(r); err != nil {
 		return err
 	}
-	if script.reregisterThreshold, err = ReadByte(r); err != nil {
+	if script.mintThreshold, err = ReadByte(r); err != nil {
 		return err
 	}
 
@@ -920,13 +920,13 @@ func (script *RegistrationScript) SanityCheck() error {
 	if len(script.issuers) == 0 || len(script.issuers) > MaxIssuerNum {
 		return ErrInValidAUTTx
 	}
-	if int(script.mintThreshold) == 0 || int(script.mintThreshold) > len(script.issuers) {
+	if script.reregistrationExpireHeight < InfiniteExpireHeight || script.reregistrationExpireHeight > math.MaxInt32 {
 		return ErrInValidAUTTx
 	}
 	if int(script.reregisterThreshold) == 0 || int(script.reregisterThreshold) > len(script.issuers) {
 		return ErrInValidAUTTx
 	}
-	if script.reregistrationExpireHeight < InfiniteExpireHeight || script.reregistrationExpireHeight > math.MaxInt32 {
+	if int(script.mintThreshold) == 0 || int(script.mintThreshold) > len(script.issuers) {
 		return ErrInValidAUTTx
 	}
 
@@ -978,12 +978,12 @@ type ReRegistrationScript struct {
 
 	autMemo []byte
 
-	plannedTotalAmount         uint64
+	plannedTotalSupply         uint64
 	issuers                    [][]byte
 	reregistrationExpireHeight int32
 
-	mintThreshold       uint8
 	reregisterThreshold uint8
+	mintThreshold       uint8
 
 	inAutRootTokenNum  uint8
 	outAutRootTokenNum uint8
@@ -995,7 +995,7 @@ func (script *ReRegistrationScript) AutMemo() []byte {
 }
 
 func (script *ReRegistrationScript) PlannedTotalAmount() uint64 {
-	return script.plannedTotalAmount
+	return script.plannedTotalSupply
 }
 
 func (script *ReRegistrationScript) Issuers() [][]byte {
@@ -1014,11 +1014,11 @@ func NewReRegistrationScript(
 	version uint32,
 	autIdentifier AutId,
 	autMemo []byte,
-	plannedTotalAmount uint64,
+	plannedTotalSupply uint64,
 	issuers [][]byte,
-	mintThreshold uint8,
-	reregisterThreshold uint8,
 	reregistrationExpireHeight int32,
+	reregisterThreshold uint8,
+	mintThreshold uint8,
 	inAutRootTokenNum uint8,
 	outAutRootTokenNum uint8,
 	scriptMemo []byte,
@@ -1028,11 +1028,11 @@ func NewReRegistrationScript(
 		scriptType:                 AutScriptTypeReRegistration,
 		autIdentifier:              autIdentifier,
 		autMemo:                    autMemo,
-		plannedTotalAmount:         plannedTotalAmount,
+		plannedTotalSupply:         plannedTotalSupply,
 		issuers:                    issuers,
 		reregistrationExpireHeight: reregistrationExpireHeight,
-		mintThreshold:              mintThreshold,
 		reregisterThreshold:        reregisterThreshold,
+		mintThreshold:              mintThreshold,
 		inAutRootTokenNum:          inAutRootTokenNum,
 		outAutRootTokenNum:         outAutRootTokenNum,
 		scriptMemo:                 scriptMemo,
@@ -1040,7 +1040,7 @@ func NewReRegistrationScript(
 }
 
 func (script *ReRegistrationScript) PlannedTotalSupply() uint64 {
-	return script.plannedTotalAmount
+	return script.plannedTotalSupply
 }
 
 func (script *ReRegistrationScript) ReregistrationExpireHeight() int32 {
@@ -1071,7 +1071,7 @@ func (script *ReRegistrationScript) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	if err = WriteVarInt(&b, script.plannedTotalAmount); err != nil {
+	if err = WriteVarInt(&b, script.plannedTotalSupply); err != nil {
 		return nil, err
 	}
 
@@ -1084,11 +1084,10 @@ func (script *ReRegistrationScript) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	if err = b.WriteByte(script.mintThreshold); err != nil {
+	if err = b.WriteByte(script.reregisterThreshold); err != nil {
 		return nil, err
 	}
-
-	if err = b.WriteByte(script.reregisterThreshold); err != nil {
+	if err = b.WriteByte(script.mintThreshold); err != nil {
 		return nil, err
 	}
 
@@ -1122,7 +1121,7 @@ func (script *ReRegistrationScript) Deserialize(serializedScript []byte) error {
 		return err
 	}
 
-	if script.plannedTotalAmount, err = ReadVarInt(r); err != nil {
+	if script.plannedTotalSupply, err = ReadVarInt(r); err != nil {
 		return err
 	}
 
@@ -1144,11 +1143,10 @@ func (script *ReRegistrationScript) Deserialize(serializedScript []byte) error {
 	}
 	script.reregistrationExpireHeight = int32(expireHeight)
 
-	if script.mintThreshold, err = ReadByte(r); err != nil {
+	if script.reregisterThreshold, err = ReadByte(r); err != nil {
 		return err
 	}
-
-	if script.reregisterThreshold, err = ReadByte(r); err != nil {
+	if script.mintThreshold, err = ReadByte(r); err != nil {
 		return err
 	}
 
@@ -1179,19 +1177,20 @@ func (script *ReRegistrationScript) SanityCheck() error {
 		return ErrInValidAUTTx
 	}
 
-	if script.plannedTotalAmount == 0 || script.plannedTotalAmount > MaxAmount {
+	if script.plannedTotalSupply == 0 || script.plannedTotalSupply > MaxAmount {
 		return ErrInValidAUTTx
 	}
 	if len(script.issuers) == 0 || len(script.issuers) > MaxIssuerNum {
 		return ErrInValidAUTTx
 	}
-	if int(script.mintThreshold) == 0 || int(script.mintThreshold) > len(script.issuers) {
+	if script.reregistrationExpireHeight < InfiniteExpireHeight || script.reregistrationExpireHeight > math.MaxInt32 {
 		return ErrInValidAUTTx
 	}
+
 	if int(script.reregisterThreshold) == 0 || int(script.reregisterThreshold) > len(script.issuers) {
 		return ErrInValidAUTTx
 	}
-	if script.reregistrationExpireHeight < InfiniteExpireHeight || script.reregistrationExpireHeight > math.MaxInt32 {
+	if int(script.mintThreshold) == 0 || int(script.mintThreshold) > len(script.issuers) {
 		return ErrInValidAUTTx
 	}
 
@@ -2078,8 +2077,8 @@ func (script *EnhancedAutScript) Metadata() (*AutMetadata, error) {
 		Issuers:                    registerScript.issuers,
 		ReregistrationExpireHeight: registerScript.reregistrationExpireHeight,
 
-		MintThreshold:           registerScript.mintThreshold,
 		ReregistrationThreshold: registerScript.reregisterThreshold,
+		MintThreshold:           registerScript.mintThreshold,
 
 		MintedAmount:         0,
 		BurnedAmount:         0,
@@ -2140,14 +2139,14 @@ func (script *EnhancedAutScript) UpdateAutMetadata(metadata *AutMetadata) error 
 	//}
 
 	// assert here?
-	if metadata.MintedAmount > reregisterScript.plannedTotalAmount {
+	if metadata.MintedAmount > reregisterScript.plannedTotalSupply {
 		return errors.New("re-registration transaction try to make planned amount less than minted amount")
 	}
-	metadata.PlannedTotalSupply = reregisterScript.plannedTotalAmount
+	metadata.PlannedTotalSupply = reregisterScript.plannedTotalSupply
 
 	metadata.Issuers = reregisterScript.issuers
-	metadata.MintThreshold = reregisterScript.mintThreshold
 	metadata.ReregistrationThreshold = reregisterScript.reregisterThreshold
+	metadata.MintThreshold = reregisterScript.mintThreshold
 	metadata.ReregistrationExpireHeight = reregisterScript.reregistrationExpireHeight
 
 	// remove previous root tokens
