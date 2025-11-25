@@ -659,9 +659,9 @@ type RegistrationScript struct {
 
 	plannedTotalSupply         uint64
 	issuers                    [][]byte
+	reregistrationExpireHeight int32
 	mintThreshold              uint8
 	reregisterThreshold        uint8
-	reregistrationExpireHeight int32
 
 	outAutRootTokenNum uint8  // value is set in deserialize, so, do not provide set function, but provide get function.
 	scriptMemo         []byte // todo: TODO memo -> scriptMemo
@@ -792,13 +792,14 @@ func (script *RegistrationScript) Serialize() ([]byte, error) {
 	if err = writeIssuers(&b, script.issuers); err != nil {
 		return nil, err
 	}
+	if err = WriteVarInt(&b, uint64(script.reregistrationExpireHeight)); err != nil {
+		return nil, err
+	}
+
 	if err = b.WriteByte(script.mintThreshold); err != nil {
 		return nil, err
 	}
 	if err = b.WriteByte(script.reregisterThreshold); err != nil {
-		return nil, err
-	}
-	if err = WriteVarInt(&b, uint64(script.reregistrationExpireHeight)); err != nil {
 		return nil, err
 	}
 
@@ -850,18 +851,18 @@ func (script *RegistrationScript) Deserialize(serializedScript []byte) error {
 	if script.issuers, err = readIssuers(r); err != nil {
 		return err
 	}
+	var expireHeight uint64
+	if expireHeight, err = ReadVarInt(r); err != nil {
+		return err
+	}
+	script.reregistrationExpireHeight = int32(expireHeight)
+
 	if script.mintThreshold, err = ReadByte(r); err != nil {
 		return err
 	}
 	if script.reregisterThreshold, err = ReadByte(r); err != nil {
 		return err
 	}
-
-	var expireHeight uint64
-	if expireHeight, err = ReadVarInt(r); err != nil {
-		return err
-	}
-	script.reregistrationExpireHeight = int32(expireHeight)
 
 	if script.outAutRootTokenNum, err = ReadByte(r); err != nil {
 		return err
