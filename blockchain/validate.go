@@ -2137,14 +2137,14 @@ func checkCTAUTReRegistrationTransactionInputs(script *ctaut.EnhancedAutScript, 
 			"the AUT entry claim its expire height %d when last registered", tx.Hash(), txHeight, instance.metadata.ReregistrationExpireHeight)
 	}
 
-	claimedIssuerTokens := map[string]struct{}{}
+	claimedIssuersByCoinAddress := map[string]struct{}{}
 	for i := 0; i < len(instance.metadata.Issuers); i++ {
-		allIssuer := instance.metadata.Issuers[i]
-		claimedIssuerTokens[hex.EncodeToString(allIssuer)] = struct{}{}
+		issuerCoinAddressStr := hex.EncodeToString(instance.metadata.Issuers[i].CoinAddress())
+		claimedIssuersByCoinAddress[issuerCoinAddressStr] = struct{}{}
 	}
 
 	// duplicated input or double spending?
-	willUsedIssueTokens := map[string]struct{}{}
+	consumeTokenIssuersByCoinAddress := map[string]struct{}{}
 	willConsumedRootTokens := map[ctaut.HostOutPoint]struct{}{}
 	consumedTokens, err := script.ConsumedTokens()
 	if err != nil {
@@ -2169,21 +2169,24 @@ func checkCTAUTReRegistrationTransactionInputs(script *ctaut.EnhancedAutScript, 
 			return fmt.Errorf("transaction %s try to mint with root coin <%s:%d>, but it has no coin address",
 				tx.Hash(), outpoint.TxHash, outpoint.Index)
 		}
-		issuerToken := hex.EncodeToString(consumedTokens[i].CoinAddress)
+		consumedTokenCoinAddressStr := hex.EncodeToString(consumedTokens[i].CoinAddress)
 
-		if _, ok := claimedIssuerTokens[issuerToken]; !ok {
+		if _, ok := claimedIssuersByCoinAddress[consumedTokenCoinAddressStr]; !ok {
 			return fmt.Errorf("transaction %s try to mint at height %d with "+
 				"issue token but it do not exist in its registration", tx.Hash(), txHeight)
 		}
-		if _, ok := willUsedIssueTokens[issuerToken]; !ok {
-			willUsedIssueTokens[issuerToken] = struct{}{}
+		if _, ok := consumeTokenIssuersByCoinAddress[consumedTokenCoinAddressStr]; !ok {
+			consumeTokenIssuersByCoinAddress[consumedTokenCoinAddressStr] = struct{}{}
+		} else {
+			// already in, does nothing
+			// repeat consumeTokenIssuers are allowed, just waste some AutRootTokens.
 		}
 	}
 
 	// check the threshold
-	if len(willUsedIssueTokens) < int(instance.metadata.ReregistrationThreshold) {
+	if len(consumeTokenIssuersByCoinAddress) < int(instance.metadata.ReregistrationThreshold) {
 		return fmt.Errorf("transaction %s try to re-register instance but fail to meet the claimed re-registration threshold (%d/%d)",
-			tx.Hash(), len(willUsedIssueTokens), instance.metadata.ReregistrationThreshold)
+			tx.Hash(), len(consumeTokenIssuersByCoinAddress), instance.metadata.ReregistrationThreshold)
 	}
 
 	// check updated AUT info
@@ -2222,14 +2225,14 @@ func checkCTAUTMintTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, tx *a
 		return errors.New("an non-registration AUT transaction try to operate on non-existing AUT entry")
 	}
 
-	claimedIssuerTokens := map[string]struct{}{}
+	claimedIssuersByCoinAddress := map[string]struct{}{}
 	for i := 0; i < len(instance.metadata.Issuers); i++ {
-		issuer := instance.metadata.Issuers[i]
-		claimedIssuerTokens[hex.EncodeToString(issuer)] = struct{}{}
+		issuerCoinAddressStr := hex.EncodeToString(instance.metadata.Issuers[i].CoinAddress())
+		claimedIssuersByCoinAddress[issuerCoinAddressStr] = struct{}{}
 	}
 
 	// duplicated input or double spending?
-	willUsedIssueTokens := map[string]struct{}{}
+	consumedTokenIussersByCoinAddress := map[string]struct{}{}
 	willConsumedRootTokens := map[ctaut.HostOutPoint]struct{}{}
 	consumedTokens, err := ctAutScript.ConsumedTokens()
 	if err != nil {
@@ -2252,21 +2255,24 @@ func checkCTAUTMintTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, tx *a
 			return fmt.Errorf("transaction %s try to mint with root coin <%s:%d>, but it has no coin address",
 				tx.Hash(), outpoint.TxHash, outpoint.Index)
 		}
-		issuerToken := hex.EncodeToString(consumedTokens[i].CoinAddress)
+		consumedTokenCoinAddress := hex.EncodeToString(consumedTokens[i].CoinAddress)
 
-		if _, ok := claimedIssuerTokens[issuerToken]; !ok {
+		if _, ok := claimedIssuersByCoinAddress[consumedTokenCoinAddress]; !ok {
 			return fmt.Errorf("transaction %s try to mint at height %d with "+
 				"issue token but it do not exist in its registration", tx.Hash(), txHeight)
 		}
-		if _, ok := willUsedIssueTokens[issuerToken]; !ok {
-			willUsedIssueTokens[issuerToken] = struct{}{}
+		if _, ok := consumedTokenIussersByCoinAddress[consumedTokenCoinAddress]; !ok {
+			consumedTokenIussersByCoinAddress[consumedTokenCoinAddress] = struct{}{}
+		} else {
+			// already in, does nothing
+			// repeat consumeTokenIssuers are allowed, just waste some AutRootTokens.
 		}
 	}
 
 	// check the threshold
-	if len(willUsedIssueTokens) < int(instance.metadata.MintThreshold) {
+	if len(consumedTokenIussersByCoinAddress) < int(instance.metadata.MintThreshold) {
 		return fmt.Errorf("transaction %s try to mint tokens but fail to meet the claimed mint threshold (%d/%d)",
-			tx.Hash(), len(willUsedIssueTokens), instance.metadata.MintThreshold)
+			tx.Hash(), len(consumedTokenIussersByCoinAddress), instance.metadata.MintThreshold)
 	}
 
 	// check the supply
@@ -2275,6 +2281,7 @@ func checkCTAUTMintTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, tx *a
 			tx.Hash(), instance.metadata.PlannedTotalSupply, mintScript.Vin())
 	}
 
+	// todo: use a AutWitnessHash() function
 	witnessHash := chainhash.HashH(tx.MsgTx().AutWitness)
 	claimedWitnessHash := mintScript.WitnessHash()
 	if !witnessHash.IsEqual(&claimedWitnessHash) {

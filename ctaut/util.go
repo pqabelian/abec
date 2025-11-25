@@ -78,13 +78,13 @@ func readPrefix(r io.Reader, expectedAutScriptType AutScriptType) (uint32, AutId
 	return uint32(scriptVersion), res, autScriptType, nil
 }
 
-func writeIssuers(b *bytes.Buffer, issuers [][]byte) error {
+func writeIssuers(b *bytes.Buffer, issuers []*AutIssuer) error {
 	err := WriteVarInt(b, uint64(len(issuers)))
 	if err != nil {
 		return err
 	}
 	for _, issuer := range issuers {
-		err = WriteVarBytes(b, issuer[:])
+		err = issuer.write(b)
 		if err != nil {
 			return err
 		}
@@ -93,31 +93,30 @@ func writeIssuers(b *bytes.Buffer, issuers [][]byte) error {
 }
 
 // todo(ctaut): numIssuer == 0 should be checked here?
-func readIssuers(r io.Reader) ([][]byte, error) {
+func readIssuers(r io.Reader) ([]*AutIssuer, error) {
 	var numIssuer uint64
 	var err error
 	if numIssuer, err = ReadVarInt(r); err != nil {
 		return nil, err
 	}
 
-	claimedCoinAddresses := map[string]struct{}{}
-	issuers := make([][]byte, numIssuer)
+	claimedIssuers := map[string]struct{}{}
+	issuers := make([]*AutIssuer, numIssuer)
 	for i := 0; i < len(issuers); i++ {
-		issuers[i], err = ReadVarBytes(r, issuerLength, "issuers")
+		autIssuer := &AutIssuer{}
+		err = autIssuer.read(r)
 		if err != nil {
 			return nil, err
 		}
-		if len(issuers[i]) != issuerLength { // todo(ctaut): need to discuss and confirm
-			return nil, ErrInValidAUTTx
-		}
+		issuers[i] = autIssuer
 
-		key := hex.EncodeToString(issuers[i])
-		if _, ok := claimedCoinAddresses[key]; ok { // todo(ctaut): cannot repeat? consistent with the design?
+		issuerStr := issuers[i].String()
+		if _, ok := claimedIssuers[issuerStr]; ok { // todo(ctaut): cannot repeat? consistent with the design?
 			return nil, ErrInValidAUTTx
 		}
-		claimedCoinAddresses[key] = struct{}{}
+		claimedIssuers[issuerStr] = struct{}{}
 	}
-	if len(claimedCoinAddresses) != int(numIssuer) {
+	if len(claimedIssuers) != int(numIssuer) {
 		return nil, ErrInValidAUTTx
 	}
 
@@ -375,40 +374,45 @@ func GetGeneratedAutTokens(script AutScript, txHash chainhash.Hash, txOuts []*wi
 }
 
 // todo(ctaut): define the rules on the mint/update threshold.
-func matchIssuers(issuers [][]byte, outputs []*CTAUTToken) error {
-	claimedIssuers := map[string]struct{}{}
+// todo: confirm, this is only a minimum check, say,
+// each claimed issuer has at least one corresponding CTAUTToken,
+// and each CTAUToken has has corresponding issuer.
+func matchIssuers(issuers []*AutIssuer, outputs []*CTAUTToken) error {
+	claimedIssuersByCoinAddress := map[string]struct{}{}
 	for i := 0; i < len(issuers); i++ {
-		coinAddress := issuers[i]
-		key := hex.EncodeToString(coinAddress)
+		coinAddressStr := hex.EncodeToString(issuers[i].CoinAddress())
 		// ensure no duplicates one
-		if _, ok := claimedIssuers[key]; ok {
-			return fmt.Errorf("claimed repeated issue token")
+		if _, ok := claimedIssuersByCoinAddress[coinAddressStr]; ok {
+			return fmt.Errorf("claimed repeated issuers")
 		}
-		claimedIssuers[key] = struct{}{}
+		claimedIssuersByCoinAddress[coinAddressStr] = struct{}{}
 	}
-	if len(claimedIssuers) != len(issuers) {
+	if len(claimedIssuersByCoinAddress) != len(issuers) {
 		return fmt.Errorf("claimed repeated issue token")
 	}
 
 	//	todo(ctaut): should not have coinAddress at this layer, how to match the token and actual coin address
 	tokenCoinAddresses := map[string]struct{}{}
 	for i := 0; i < len(outputs); i++ {
-		key := hex.EncodeToString(outputs[i].CoinAddress)
-		if _, ok := tokenCoinAddresses[key]; !ok {
-			tokenCoinAddresses[key] = struct{}{}
+		coinAddressStr := hex.EncodeToString(outputs[i].CoinAddress)
+		if _, ok := tokenCoinAddresses[coinAddressStr]; !ok {
+			tokenCoinAddresses[coinAddressStr] = struct{}{}
+		} else {
+			// do nothing
+			// allow repeated, does not matter
 		}
 	}
 	// compare with claimed issueTokens
-	if len(tokenCoinAddresses) != len(claimedIssuers) {
+	if len(tokenCoinAddresses) != len(claimedIssuersByCoinAddress) {
 		return fmt.Errorf("claimed mismatched issue token")
 	}
 	for coinAddress := range tokenCoinAddresses {
-		if _, ok := claimedIssuers[coinAddress]; !ok {
+		if _, ok := claimedIssuersByCoinAddress[coinAddress]; !ok {
 			return fmt.Errorf("use unclaimed issuer token")
 		}
-		delete(claimedIssuers, coinAddress)
+		delete(claimedIssuersByCoinAddress, coinAddress)
 	}
-	if len(claimedIssuers) != 0 {
+	if len(claimedIssuersByCoinAddress) != 0 {
 		return fmt.Errorf("claim unused issuer token")
 	}
 	return nil

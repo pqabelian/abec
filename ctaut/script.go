@@ -21,8 +21,33 @@ type HostOutPoint = wire.OutPointAbe
 
 type AutId = chainhash.Hash
 
+// AutIssuer defines Aut Issuer by IssuerAddress, where IssuerAddress is a wrapper of coinAddress.
+// Each AutIssuer corresponds to a coinAddress,
+// where coinAddress means the address on chain that a coin belongs to,
+// say, each coin on chain has a format (coinAddress, valueScript).
+// Do not limit the coinAddress here to the concept in CryptoAddress in abecryptox package.
+// Note that, as Abelian-Txo belongs to coinAddress, AutToken also belongs to coinAddress.
+// Note that it must keep that each AutIssuer can be identified by its underlying coinAddress.
+// Note that it must keep that each AutIssuer can be identified by its IssuerAddress.
 type AutIssuer struct {
 	IssuerAddress []byte
+}
+
+// NewAutIssuer returns a new AutIssuer for the input issuerAddress.
+func NewAutIssuer(issuerAddress []byte) *AutIssuer {
+	return &AutIssuer{
+		IssuerAddress: issuerAddress,
+	}
+}
+
+// CoinAddress returns the coinAddress contained in autIssuer.IssuerAddress.
+func (autIssuer *AutIssuer) CoinAddress() []byte {
+	// At present, IssuerAddress is exactly the coinAddress.
+	return autIssuer.IssuerAddress
+}
+
+func (autIssuer *AutIssuer) serializeSize() int {
+	return wire.VarIntSerializeSize(uint64(len(autIssuer.IssuerAddress))) + len(autIssuer.IssuerAddress)
 }
 
 func (autIssuer *AutIssuer) write(w io.Writer) error {
@@ -58,6 +83,13 @@ func (autIssuer *AutIssuer) Equal(issuer *AutIssuer) bool {
 	}
 
 	return bytes.Equal(autIssuer.IssuerAddress, issuer.IssuerAddress)
+}
+
+func (autIssuer *AutIssuer) Clone() *AutIssuer {
+	rst := &AutIssuer{}
+	rst.IssuerAddress = make([]byte, len(autIssuer.IssuerAddress))
+	copy(rst.IssuerAddress, autIssuer.IssuerAddress)
+	return rst
 }
 
 // AutMetadata maintains the metadata information of Abelian User Token (AUT) instance on Abelian
@@ -118,13 +150,9 @@ type AutMetadata struct {
 	// Note that the amount would be counted in terms of subUnit.
 	PlannedTotalSupply uint64
 
-	// The issuers of AutInstance, currently, are represented/identified by the issuers' coin-addresses in Abelian.
-	// Using coinAddress, rather than (for example) the hash of coinAddress, as the Issuers provide some potential
-	// advantages, for example, a user could check which wallet (in his multiple wallets) should be used to mint/reregister
-	// this AutInstance.
-	// The []issuers contain DISTINCT coin-addresses for the issuers, and
+	// Issuers contain DISTINCT AutIssuers for corresponding AutInstance.
 	// the ReregistrationThreshold and MintThreshold specify the number of required issuers for Reregistration and Mint respectively.
-	Issuers [][]byte
+	Issuers []*AutIssuer
 
 	// ReregistrationExpireHeight specifies a height, after which the ReRegistrationScript could not be applied any more.
 	// Using int32 is to allow -1 to be used as the infinite height.
@@ -178,10 +206,9 @@ func (autMetadata *AutMetadata) serializeSize() int {
 
 	n += wire.VarIntSerializeSize(autMetadata.PlannedTotalSupply) // planned amount
 
-	n += wire.VarIntSerializeSize(uint64(len(autMetadata.Issuers))) // number of issuer tokens
+	n += wire.VarIntSerializeSize(uint64(len(autMetadata.Issuers))) // number of issuers
 	for i := 0; i < len(autMetadata.Issuers); i++ {
-		// actually fixed length
-		n += wire.VarIntSerializeSize(uint64(len(autMetadata.Issuers[i]))) + len(autMetadata.Issuers[i])
+		n += autMetadata.Issuers[i].serializeSize()
 	}
 
 	n += wire.VarIntSerializeSize(uint64(autMetadata.ReregistrationExpireHeight)) // ReregistrationExpireHeight
@@ -263,13 +290,13 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	// Issuers               [][]byte
+	// Issuers               []*AutIssuer
 	err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.Issuers)))
 	if err != nil {
 		return nil, err
 	}
 	for i := 0; i < len(autMetadata.Issuers); i++ {
-		err = wire.WriteVarBytes(w, 0, autMetadata.Issuers[i])
+		err = autMetadata.Issuers[i].write(w)
 		if err != nil {
 			return nil, fmt.Errorf("error happens when writing issuer: %v", err)
 		}
@@ -399,12 +426,18 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 	if err != nil {
 		return err
 	}
-	autMetadata.Issuers = make([][]byte, issuerNum)
+	if issuerNum > MaxIssuerNum {
+		//	This is necessary here to prevent possible attack.
+		return fmt.Errorf("issuerNum (%d) is too large", issuerNum)
+	}
+	autMetadata.Issuers = make([]*AutIssuer, issuerNum)
 	for i := uint64(0); i < issuerNum; i++ {
-		autMetadata.Issuers[i], err = wire.ReadVarBytes(r, 0, issuerLength, "issuer")
+		issuer := &AutIssuer{}
+		err = issuer.read(r)
 		if err != nil {
 			return fmt.Errorf("error happens when reading issuer: %v", err)
 		}
+		autMetadata.Issuers[i] = issuer
 	}
 
 	// ReregistrationExpireHeight int32
@@ -445,6 +478,9 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 	if err != nil {
 		return err
 	}
+	if rootCoinNum > MaxNumToken {
+		return fmt.Errorf("rootCoinNum (%d) is too large", rootCoinNum)
+	}
 	autMetadata.ActiveRootTokenSet = make(map[string]*HostOutPoint, rootCoinNum)
 	for i := uint64(0); i < rootCoinNum; i++ {
 		hostOutPoint := &HostOutPoint{}
@@ -460,8 +496,16 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 		autMetadata.ActiveRootTokenSet[opStr] = hostOutPoint
 	}
 
-	historyVersionNum, err := wire.ReadVarInt(r, 0)
-	autMetadata.UpdateScriptVersions = make([]uint32, historyVersionNum)
+	updateScriptVersionNum, err := wire.ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	if updateScriptVersionNum != uint64(autMetadata.Version) {
+		// this is a designed rule.
+		return fmt.Errorf("updateScriptVersionNum (%d) is not equla the value of autMetadata.Version (%d)",
+			updateScriptVersionNum, autMetadata.Version)
+	}
+	autMetadata.UpdateScriptVersions = make([]uint32, updateScriptVersionNum)
 	for i := 0; i < len(autMetadata.UpdateScriptVersions); i++ {
 		version, err = wire.ReadVarInt(r, 0)
 		if err != nil {
@@ -511,25 +555,28 @@ func (autMetadata *AutMetadata) SanityCheck() error {
 		return fmt.Errorf("invalid planned total supply (%d)", autMetadata.PlannedTotalSupply)
 	}
 
-	// here we do not check the max allowed number of IssuerTokens,
-	// since it is limited by the host-Abelian-Tx.
-	issuersMapping := map[string]struct{}{}
+	if len(autMetadata.Issuers) > MaxIssuerNum {
+		return fmt.Errorf("the number of issuers (%d) exceeds the allowed maximum (%d)",
+			len(autMetadata.Issuers), MaxIssuerNum)
+	}
+	issuersMap := map[string]struct{}{}
 	for _, issuer := range autMetadata.Issuers {
-		key := hex.EncodeToString(issuer)
-		if _, ok := issuersMapping[key]; ok {
+		issuerStr := issuer.String()
+		if _, ok := issuersMap[issuerStr]; ok {
 			return fmt.Errorf("repeated issuers exist")
 		}
-		issuersMapping[key] = struct{}{}
+		issuersMap[issuerStr] = struct{}{}
 	}
 
 	if autMetadata.ReregistrationExpireHeight < InfiniteExpireHeight {
 		return fmt.Errorf("invalid reregistration expire height (%d)", autMetadata.ReregistrationExpireHeight)
 	}
 
-	if int(autMetadata.ReregistrationThreshold) > len(autMetadata.Issuers) {
-		return fmt.Errorf("invalid reregistration threshold (%d) for %d issuers", autMetadata.ReregistrationThreshold, len(autMetadata.Issuers))
+	if autMetadata.ReregistrationThreshold == 0 || int(autMetadata.ReregistrationThreshold) > len(autMetadata.Issuers) {
+		return fmt.Errorf("invalid reregistration threshold (%d) for %d issuers",
+			autMetadata.ReregistrationThreshold, len(autMetadata.Issuers))
 	}
-	if int(autMetadata.MintThreshold) > len(autMetadata.Issuers) {
+	if autMetadata.MintThreshold == 0 || int(autMetadata.MintThreshold) > len(autMetadata.Issuers) {
 		return fmt.Errorf("invalid mint threshold (%d) for %d issuers", autMetadata.MintThreshold, len(autMetadata.Issuers))
 	}
 
@@ -540,6 +587,9 @@ func (autMetadata *AutMetadata) SanityCheck() error {
 		return fmt.Errorf("invalid burned amount (%d) for minted amount (%d)", autMetadata.BurnedAmount, autMetadata.MintedAmount)
 	}
 
+	if len(autMetadata.ActiveRootTokenSet) > MaxNumToken {
+		return fmt.Errorf("active root token number (%d) is too large", len(autMetadata.ActiveRootTokenSet))
+	}
 	for opStr, hostOutPoint := range autMetadata.ActiveRootTokenSet {
 		valueKey := hostOutPoint.String()
 		if strings.Compare(opStr, valueKey) != 0 {
@@ -591,7 +641,7 @@ func (autMetadata *AutMetadata) Clone() *AutMetadata {
 		AutMemo:            make([]byte, len(autMetadata.AutMemo)),
 		PlannedTotalSupply: autMetadata.PlannedTotalSupply,
 
-		Issuers: make([][]byte, len(autMetadata.Issuers)),
+		Issuers: make([]*AutIssuer, len(autMetadata.Issuers)),
 
 		ReregistrationExpireHeight: autMetadata.ReregistrationExpireHeight,
 		ReregistrationThreshold:    autMetadata.ReregistrationThreshold,
@@ -612,8 +662,7 @@ func (autMetadata *AutMetadata) Clone() *AutMetadata {
 	copy(cloned.AutMemo, autMetadata.AutMemo)
 
 	for i := 0; i < len(autMetadata.Issuers); i++ {
-		cloned.Issuers[i] = make([]byte, len(autMetadata.Issuers[i]))
-		copy(cloned.Issuers[i][:], autMetadata.Issuers[i][:])
+		cloned.Issuers[i] = autMetadata.Issuers[i].Clone()
 	}
 
 	for _, hostOutpoint := range autMetadata.ActiveRootTokenSet {
@@ -696,7 +745,7 @@ type RegistrationScript struct {
 	autMemo      []byte
 
 	plannedTotalSupply         uint64
-	issuers                    [][]byte
+	issuers                    []*AutIssuer
 	reregistrationExpireHeight int32
 	reregisterThreshold        uint8
 	mintThreshold              uint8
@@ -733,7 +782,7 @@ func (script *RegistrationScript) PlannedTotalSupply() uint64 {
 	return script.plannedTotalSupply
 }
 
-func (script *RegistrationScript) Issuers() [][]byte {
+func (script *RegistrationScript) Issuers() []*AutIssuer {
 	return script.issuers
 }
 
@@ -758,7 +807,7 @@ func NewRegistrationScript(
 	unitScale uint64,
 	autMemo []byte,
 	plannedTotalSupply uint64,
-	issuers [][]byte,
+	issuers []*AutIssuer,
 	reregistrationExpireHeight int32,
 	reregisterThreshold uint8,
 	mintThreshold uint8,
@@ -830,6 +879,7 @@ func (script *RegistrationScript) Serialize() ([]byte, error) {
 	if err = writeIssuers(&b, script.issuers); err != nil {
 		return nil, err
 	}
+
 	if err = WriteVarInt(&b, uint64(script.reregistrationExpireHeight)); err != nil {
 		return nil, err
 	}
@@ -1017,7 +1067,7 @@ type ReRegistrationScript struct {
 	autMemo []byte
 
 	plannedTotalSupply         uint64
-	issuers                    [][]byte
+	issuers                    []*AutIssuer
 	reregistrationExpireHeight int32
 
 	reregisterThreshold uint8
@@ -1036,7 +1086,7 @@ func (script *ReRegistrationScript) PlannedTotalAmount() uint64 {
 	return script.plannedTotalSupply
 }
 
-func (script *ReRegistrationScript) Issuers() [][]byte {
+func (script *ReRegistrationScript) Issuers() []*AutIssuer {
 	return script.issuers
 }
 
@@ -1053,7 +1103,7 @@ func NewReRegistrationScript(
 	autIdentifier AutId,
 	autMemo []byte,
 	plannedTotalSupply uint64,
-	issuers [][]byte,
+	issuers []*AutIssuer,
 	reregistrationExpireHeight int32,
 	reregisterThreshold uint8,
 	mintThreshold uint8,
@@ -2015,6 +2065,10 @@ type CTAUTToken struct {
 	ValueScript []byte // todo(ctaut): used to denote AUT value.
 	// For all token, coin address would be used to indicate the ownership of token
 	// For root token, it would be used match the claimed issuers to recognize operational permission
+	// CoinAddress means the address on chain that a coin belongs to,
+	// say, each coin on chain has a format (coinAddress, valueScript).
+	// Do not limit the CoinAddress here to the concept in CryptoAddress in abecryptox package.
+	// As Abelian-Txo belongs to CoinAddress, AutToken also belongs to CoinAddress.
 	CoinAddress []byte
 }
 
