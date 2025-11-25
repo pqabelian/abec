@@ -2282,7 +2282,7 @@ func checkCTAUTMintTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, tx *a
 	}
 
 	// todo: use a AutWitnessHash() function
-	witnessHash := chainhash.HashH(tx.MsgTx().AutWitness)
+	witnessHash := ctautwire.AutWitnessHash(tx.MsgTx().AutWitness)
 	claimedWitnessHash := mintScript.WitnessHash()
 	if !witnessHash.IsEqual(&claimedWitnessHash) {
 		return fmt.Errorf("mismatch witness for script")
@@ -2363,7 +2363,7 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, t
 		willConsumedTokens[outpoint] = struct{}{}
 	}
 
-	witnessHash := chainhash.HashH(tx.MsgTx().AutWitness)
+	witnessHash := ctautwire.AutWitnessHash(tx.MsgTx().AutWitness)
 	claimedWitnessHash := transferScript.WitnessHash()
 	if !witnessHash.IsEqual(&claimedWitnessHash) {
 		return fmt.Errorf("mismatch witness for script")
@@ -2455,7 +2455,7 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, tx *a
 	}
 
 	// todo replace with inner implement
-	witnessHash := chainhash.HashH(tx.MsgTx().AutWitness)
+	witnessHash := ctautwire.AutWitnessHash(tx.MsgTx().AutWitness)
 	claimedWitnessHash := burnScript.WitnessHash()
 	if !witnessHash.IsEqual(&claimedWitnessHash) {
 		return fmt.Errorf("mismatch witness for script")

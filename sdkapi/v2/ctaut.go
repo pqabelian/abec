@@ -183,7 +183,7 @@ func NewMintScript(
 		}
 	}
 
-	witnessHash := chainhash.HashH(autCoinbaseTx.TxWitness)
+	witnessHash := ctautwire.AutWitnessHash(autCoinbaseTx.TxWitness)
 	script := ctaut.NewMintScript(
 		version,
 		ctAutIdentifier,
@@ -292,7 +292,7 @@ func NewTransferScript(
 			return nil, nil, err
 		}
 	}
-	witnessHash := chainhash.HashH(autTransferTx.TxWitness)
+	witnessHash := ctautwire.AutWitnessHash(autTransferTx.TxWitness)
 
 	script := ctaut.NewTransferScript(
 		version,
@@ -387,7 +387,7 @@ func NewBurnScript(
 			return nil, nil, err
 		}
 	}
-	witnessHash := chainhash.HashH(autTransferTx.TxWitness)
+	witnessHash := ctautwire.AutWitnessHash(autTransferTx.TxWitness)
 
 	script := ctaut.NewBurnScript(
 		version,
