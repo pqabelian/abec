@@ -77,7 +77,7 @@ package wire
 const (
 	AutScriptVersion_Unknown uint32 = 0 // reserved
 	AutScriptVersion_1       uint32 = 1
-	// todo: when new versions added, add here and update AutScriptVersion.
+	// todo: when new versions added, add here and update AutScriptVersion and AutScriptVersionSet.
 )
 
 // AutScriptVersionSet collects all defined AutScriptVersions.
