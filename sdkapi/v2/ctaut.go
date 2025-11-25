@@ -16,6 +16,7 @@ import (
 	"github.com/abesuite/abec/wire"
 )
 
+const TxVersionForCTAUT = wire.TxVersion_Height_464000_Aconcagua
 const AutScriptVersion = ctautwire.AutScriptVersion_1
 const AutIdentifierLength = ctaut.AutIdentifierLength
 
@@ -787,7 +788,7 @@ func CreateTransferTxByRootSeedForCTAUT(serializedTransferTxRequestDesc []byte, 
 		return false
 	})
 
-	transferTxMsgTemplate, err := abecryptox.CreateTransferTxMsgTemplateByRootSeeds(AutScriptVersion, abeTxInputDescs, abeTxOutputDescs, txRequestDesc.TxFee, txRequestDesc.TxMemo)
+	transferTxMsgTemplate, err := abecryptox.CreateTransferTxMsgTemplateByRootSeeds(TxVersionForCTAUT, abeTxInputDescs, abeTxOutputDescs, txRequestDesc.TxFee, txRequestDesc.TxMemo)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -903,7 +904,7 @@ func CreateTransferTxByCryptoKeysForCTAUT(serializedTransferTxRequestDesc []byte
 		return false
 	})
 
-	transferTxMsgTemplate, err := abecryptox.CreateTransferTxMsgTemplateByKeys(AutScriptVersion, abeTxInputDescs, abeTxOutputDescs, txRequestDesc.TxFee, txRequestDesc.TxMemo)
+	transferTxMsgTemplate, err := abecryptox.CreateTransferTxMsgTemplateByKeys(TxVersionForCTAUT, abeTxInputDescs, abeTxOutputDescs, txRequestDesc.TxFee, txRequestDesc.TxMemo)
 	if err != nil {
 		return nil, nil, err
 	}
