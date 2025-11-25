@@ -1944,7 +1944,7 @@ func dbPutAUTView(dbTx database.Tx, view *AUTViewpoint, blockHeight int32, block
 	for autNameKey, entry := range view.entries {
 		log.Debugf(`AUT identified by %s with following configuration would be stored at height %d (block hash %s):
 	Symbol: %s, IssuerUpdateThreshold: %v, IssueTokensThreshold: %v,
-	PlannedTotalAmount: %v, ExpireHeight: %v, UnitName: %v, MinUnitName: %v, UnitScale: %v,
+	PlannedTotalSupply: %v, ExpireHeight: %v, UnitName: %v, MinUnitName: %v, UnitScale: %v,
 	Memo: %v, MintedAmount: %v`,
 			string(entry.metadata.AutIdentifier), blockHeight, blockHash,
 			string(entry.metadata.AutSymbol),

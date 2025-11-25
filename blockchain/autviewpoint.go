@@ -314,7 +314,7 @@ func (view *AUTViewpoint) connectTransaction(tx *abeutil.TxAbe, blockHeight int3
 		}
 
 		log.Debugf(`Register AUT with identifier %s with following configuration: Symbol: %v,
-	IssuerUpdateThreshold: %v, IssueTokensThreshold: %v, PlannedTotalAmount: %v,
+	IssuerUpdateThreshold: %v, IssueTokensThreshold: %v, PlannedTotalSupply: %v,
 	ExpireHeight: %v, 
 	UnitName: %v, MinUnitName: %v, UnitScale: %v`, string(autTransaction.AutIdentifier), string(autTransaction.AutSymbol),
 			autTransaction.IssuerUpdateThreshold, autTransaction.IssueTokensThreshold, autTransaction.PlannedTotalAmount,
@@ -415,7 +415,7 @@ func (view *AUTViewpoint) connectTransaction(tx *abeutil.TxAbe, blockHeight int3
 		}
 		log.Debugf(`Re-register AUT with identifier %s with following configuration: Symbol: %s -> %s,
 IssuerUpdateThreshold: %v -> %v, IssueTokensThreshold: %v -> %v,
-PlannedTotalAmount: %v -> %v, ExpireHeight: %v -> %v,
+PlannedTotalSupply: %v -> %v, ExpireHeight: %v -> %v,
 UnitScale: %v -> %v`, string(autTransaction.AutIdentifier),
 			string(originInfo.AutSymbol), string(autTransaction.AutSymbol),
 			originInfo.IssuerUpdateThreshold, autTransaction.IssuerUpdateThreshold,
@@ -653,7 +653,7 @@ func (view *AUTViewpoint) disconnectTransactions(db database.DB, block *abeutil.
 	IssuerTokens: %v -> %v,
 	IssuerUpdateThreshold: %v -> %v,
 	IssueTokensThreshold: %v -> %v,
-	PlannedTotalAmount: %v -> %v,
+	PlannedTotalSupply: %v -> %v,
 	ExpireHeight: %v -> %v,
 	UnitName: %v -> %v,
 	MinUnitName: %v -> %v,

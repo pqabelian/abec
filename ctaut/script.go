@@ -657,7 +657,7 @@ type RegistrationScript struct {
 	unitScale    uint64
 	autMemo      []byte
 
-	plannedTotalAmount         uint64
+	plannedTotalSupply         uint64
 	issuers                    [][]byte
 	mintThreshold              uint8
 	reregisterThreshold        uint8
@@ -691,8 +691,8 @@ func (script *RegistrationScript) AutMemo() []byte {
 	return script.autMemo
 }
 
-func (script *RegistrationScript) PlannedTotalAmount() uint64 {
-	return script.plannedTotalAmount
+func (script *RegistrationScript) PlannedTotalSupply() uint64 {
+	return script.plannedTotalSupply
 }
 
 func (script *RegistrationScript) Issuers() [][]byte {
@@ -737,7 +737,7 @@ func NewRegistrationScript(
 		subUnitName:                subUnitName,
 		unitScale:                  unitScale,
 		autMemo:                    autMemo,
-		plannedTotalAmount:         plannedTotalAmount,
+		plannedTotalSupply:         plannedTotalAmount,
 		issuers:                    issuers,
 		mintThreshold:              mintThreshold,
 		reregisterThreshold:        reregisterThreshold,
@@ -785,7 +785,7 @@ func (script *RegistrationScript) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	if err = WriteVarInt(&b, script.plannedTotalAmount); err != nil {
+	if err = WriteVarInt(&b, script.plannedTotalSupply); err != nil {
 		return nil, err
 	}
 	// todo: not necessary to define a function for writeIssuers
@@ -843,7 +843,7 @@ func (script *RegistrationScript) Deserialize(serializedScript []byte) error {
 		return err
 	}
 
-	if script.plannedTotalAmount, err = ReadVarInt(r); err != nil {
+	if script.plannedTotalSupply, err = ReadVarInt(r); err != nil {
 		return err
 	}
 	// todo: not necessary define this function, since this function hides the details, but it is not a structure
@@ -897,14 +897,14 @@ func (script *RegistrationScript) SanityCheck() error {
 	if len(script.subUnitName) == 0 || len(script.subUnitName) > MaxSubUnitLength {
 		return ErrInValidAUTTx
 	}
-	if script.unitScale == 0 || script.unitScale > MaxAmount || script.unitScale > script.plannedTotalAmount {
+	if script.unitScale == 0 || script.unitScale > MaxAmount || script.unitScale > script.plannedTotalSupply {
 		return ErrInValidAUTTx
 	}
 	if len(script.autMemo) > MaxAutMemoLength {
 		return ErrInValidAUTTx
 	}
 
-	if script.plannedTotalAmount == 0 || script.plannedTotalAmount > MaxAmount {
+	if script.plannedTotalSupply == 0 || script.plannedTotalSupply > MaxAmount {
 		return ErrInValidAUTTx
 	}
 	// TODO: check the threshold later
@@ -1217,7 +1217,7 @@ var _ AutScript = &ReRegistrationScript{}
 // MintScript would be serialized with following format
 // <Common Prefix> "CTAUTSCRIPT" "2"
 // <Identifier> a byte array with fixed length
-// <Vin> an integer, representing the amount of token to be minted, must less than plannedTotalAmount
+// <Vin> an integer, representing the amount of token to be minted, must less than plannedTotalSupply
 // <Number of RootToken> A number n, explicitly specify the 0~(n-1)-th pseudonym TXO of inputs in host transaction as RootToken
 // <Number of CTAUTTokens> A number i, Explicitly specify the 0~(i-1)-th pseudonym TXO of outputs in host transaction as CT-Token
 // <Number of PlainTokens> A number j, Explicitly specify the i~(i+j-1)-th pseudonym TXO of outputs in host transaction as Plain-Token
@@ -2064,7 +2064,7 @@ func (script *EnhancedAutScript) Metadata() (*AutMetadata, error) {
 		SubUnitName:                registerScript.subUnitName,
 		UnitScale:                  registerScript.unitScale,
 		AutMemo:                    registerScript.autMemo,
-		PlannedTotalSupply:         registerScript.plannedTotalAmount,
+		PlannedTotalSupply:         registerScript.plannedTotalSupply,
 		Issuers:                    registerScript.issuers,
 		MintThreshold:              registerScript.mintThreshold,
 		ReregistrationThreshold:    registerScript.reregisterThreshold,
