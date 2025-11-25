@@ -22,89 +22,88 @@ type HostOutPoint = wire.OutPointAbe
 type AutId = chainhash.Hash
 
 // AutMetadata maintains the metadata information of Abelian User Token (AUT) instance on Abelian
-// 1. The identifier of AUT instance are UNIQUE
-// 2. Each instance has its own name, symbol, and unit name
-// 3. Each instance has its planned total issued amount
-// 4. Each instance has issuers, each minting and updating is required to meet the preset threshold
-// 5. Issuers are responsible for maintaining the metadata before the expired height.
+// 1. Each AutInstance has a unique identifier, which is actually a hash of the Abelian-Tx
+// through which the AutInstance is registered.
+// 2. Each instance has its own name, symbol, and unit names (including BaseUnitName and SubUnitName).
+// 3. Each instance has its planned total supply amount.
+// 4. Each instance has issuers, each minting and updating is required to meet the preset threshold.
 //
 // In details:
-// RegistrationScript would register a new instance with unique CTAutIdentifier on Abelian, and generate some special
-// tokens, named 'root token', that would be consumed by MintScript or ReRegistrationScript
+// RegistrationScript would register a new AutInstance with unique AutIdentifier, and generate some special
+// tokens, named 'AutRootToken', that would be consumed by MintScript or ReRegistrationScript
 //
-// MintScript would be used to issue normal tokens (a.k.a token), and it would consume some root tokens in ActiveRootTokenSet,
-// and also update the MintedAmount
+// ReRegistrationScript would update the AutMetadata information of an AutInstance,
+// including fields PlannedTotalSupply / Issuers / MintThreshold / ReregistrationThreshold / ReregistrationExpireHeight.
 //
-// ReRegistrationScript would be used to update the metadata information, including fields PlannedTotalSupply /
-// Issuers / MintThreshold / ReregistrationThreshold / ReregistrationExpireHeight
+// MintScript would consume some AutRootToken of an AutInstance and generate normal tokens for that AutInstance,
+// and also update the MintedAmount of that AutInstance.
 //
-// # TransferScript would be used to transfer tokens between users, it would not affect any of the fields in Metadata
+// TransferScript would transfer tokens between users, it would not affect any of the fields in AutMetadata.
 //
-// BurnScript would be used to burn some tokens, it would not affect any of the fields in Metadata
+// BurnScript would burn some tokens, and update the BurnedAmount of that AutInstance's AutMetadata.
 type AutMetadata struct {
 	// Version rule is referred to the ctaut.wire.
 	Version uint32
 
-	// AutIdentifier is the unique identifier for an Aut Instance.
+	// AutIdentifier is the unique identifier for an AutInstance.
 	// TxHash of the host transaction (i.e. txId) where the registration script is located
-	// is used as the Aut Instance identifier.
+	// is used as the AutInstance identifier.
 	AutIdentifier AutId
 
-	// AutName, the name of the Aut Instance, gives
+	// AutName, the name of the AutInstance, gives
 	// the full, descriptive and human-readable name of the token ,e.g. "Post-Quantum USD".
 	// It could be used to improve usability, but MUST NOT be assumed that the value must be present.
 	AutName []byte
 
-	// AutSymbol, the symbol of the Aut Instance, gives
+	// AutSymbol, the symbol of the AutInstance, gives
 	// a short, human-readable string that acts as a ticker for the token, e.g. "PQUSD".
 	// could be used to improve usability, but MUST NOT be assumed that the value must be present.
 	AutSymbol []byte
 
 	// BaseUnitName is the name he commonly used units of tokens, e.g. "USD".
-	// It could be used to user representation, but MUST NOT be assumed that the value must be present
+	// It could be used to user representation, but MUST NOT be assumed that the value must be present.
 	BaseUnitName []byte
 
 	// SubUnitName is the name of the token used for counting, e.g. "Cent".
 	// It MUST NOT be assumed that the value must be present.
 	SubUnitName []byte
 
-	// UnitScale, is used to store the scale between BaseUnit and SubUnit, e.g. 100.
+	// UnitScale is used to store the scale between BaseUnit and SubUnit, e.g. 100.
 	UnitScale uint64
 
-	// AutMemo stores the memo of the AUT instance.
+	// AutMemo stores the memo of the AutInstance.
 	AutMemo []byte
 
-	// PlannedTotalSupply stores the total amount of token of the Aut Instance would be issued,
+	// PlannedTotalSupply stores the total amount of token of the AutInstance would be issued,
 	// which implies the total limit for all MintScript.
-	// Note that the amount would be counted in terms of subunit.
+	// Note that the amount would be counted in terms of subUnit.
 	PlannedTotalSupply uint64
 
-	// The issuers of AUT Instance, currently, represented/identified by the issuers' coin-address in Abelian.
+	// The issuers of AutInstance, currently, are represented/identified by the issuers' coin-addresses in Abelian.
 	// Using coinAddress, rather than (for example) the hash of coinAddress, as the Issuers provide some potential
 	// advantages, for example, a user could check which wallet (in his multiple wallets) should be used to mint/reregister
-	// this Aut Instance.
+	// this AutInstance.
 	// The []issuers contain DISTINCT coin-addresses for the issuers, and
 	// the ReregistrationThreshold and MintThreshold specify the number of required issuers for Reregistration and Mint respectively.
-	//IssuerTokens [][]byte
 	Issuers [][]byte
 
 	// ReregistrationExpireHeight specifies a height, after which the ReRegistrationScript could not be applied any more.
 	// Using int32 is to allow -1 to be used as the infinite height.
 	ReregistrationExpireHeight int32
 
-	// ReregistrationThreshold specifies the size of an authorized set for ReRegistrationScript.
+	// ReregistrationThreshold specifies the size of authorized issuer set for ReRegistrationScript.
 	ReregistrationThreshold uint8
 
-	// MintThreshold specifies the size of an authorized set for MintScript.
+	// MintThreshold specifies the size of authorized issuer set for MintScript.
 	MintThreshold uint8
 
-	// MintedAmount records the total minted amount of this Aut Instance.
+	// MintedAmount records the total minted amount of this AutInstance.
 	MintedAmount uint64
 
-	// BurnedAmount records the total burned amount of this Aut Instance.
+	// BurnedAmount records the total burned amount of this AutInstance.
 	BurnedAmount uint64
 
-	// ActiveRootTokenSet stores the currently available root tokens.
+	// ActiveRootTokenSet stores the currently available AutRootTokens.
 	// When a RegistrationScript or ReRegistrationScript is executed, some AutRootTokens are created and host on HostOutPoints,
 	// and they are recorded as ActiveRootTokens.
 	// Each AutRootToken is actually an Abelian-Txo owned by an issuer in []issuers.
@@ -116,11 +115,11 @@ type AutMetadata struct {
 	// that is, each time a MintScript is executed, some RootTokens are removed from ActiveRootTokenSet
 	ActiveRootTokenSet map[string]*HostOutPoint
 
-	// UpdateScriptVersions records all versions of the scripts that creates/updates the metadata,
+	// UpdateScriptVersions records all versions of the scripts that creates/updates the AutMetadata,
 	// say RegistrationScript and ReRegistrationScript.
-	// More specifically, when RegistrationScript creates the metadata,
+	// More specifically, when RegistrationScript creates the AutMetadata,
 	// RegistrationScript's version is put into UpdateScriptVersions as the first one;
-	// Each time ReRegistrationScript updates the metadata, the ReRegistrationScript's version is appended to UpdateScriptVersions.
+	// Each time ReRegistrationScript updates the AutMetadata, the ReRegistrationScript's version is appended to UpdateScriptVersions.
 	// The versions in UpdateScriptVersions are sequenced from small to large.
 	// The size of UpdateScriptVersions "equal" Metadata.Version.
 	// Currently, there is no rules
