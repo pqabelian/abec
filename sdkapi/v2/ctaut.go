@@ -807,13 +807,13 @@ func CreateTransferTxByRootSeedForCTAUT(serializedTransferTxRequestDesc []byte, 
 
 		// Part II-I [ (crypto.PrivacyLevelPseudonymCT,1) (crypto.PrivacyLevelPseudonymCT,1) ... ]
 		if outputIAddressPrivacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYMCT &&
-			abeTxOutputDescs[i].Value() == 1 {
-			return true
-		}
-		if outputJAddressPrivacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYMCT &&
-			abeTxOutputDescs[j].Value() == 1 {
+			outputJAddressPrivacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+			if abeTxOutputDescs[i].Value() == 1 && abeTxOutputDescs[j].Value() != 1 {
+				return true
+			}
 			return false
 		}
+
 		// Part II-II [ (crypto.PrivacyLevelPseudonymCT,*) (crypto.PrivacyLevelPseudonym,*) ]
 		if outputIAddressPrivacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYMCT &&
 			outputJAddressPrivacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYM {
@@ -923,13 +923,13 @@ func CreateTransferTxByCryptoKeysForCTAUT(serializedTransferTxRequestDesc []byte
 
 		// Part II-I [ (crypto.PrivacyLevelPseudonymCT,1) (crypto.PrivacyLevelPseudonymCT,1) ... ]
 		if outputIAddressPrivacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYMCT &&
-			abeTxOutputDescs[i].Value() == 1 {
-			return true
-		}
-		if outputJAddressPrivacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYMCT &&
-			abeTxOutputDescs[j].Value() == 1 {
+			outputJAddressPrivacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+			if abeTxOutputDescs[i].Value() == 1 && abeTxOutputDescs[j].Value() != 1 {
+				return true
+			}
 			return false
 		}
+
 		// Part II-II [ (crypto.PrivacyLevelPseudonymCT,*) (crypto.PrivacyLevelPseudonym,*) ]
 		if outputIAddressPrivacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYMCT &&
 			outputJAddressPrivacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYM {
