@@ -289,9 +289,9 @@ func (view *CTAUTViewpoint) connectRegistrationScript(script *ctaut.EnhancedAutS
 	log.Debugf("\t ReregistrationExpireHeight: %v", metadata.ReregistrationExpireHeight)
 	log.Debugf("\t ReregistrationThreshold: %v", metadata.ReregistrationThreshold)
 	log.Debugf("\t MintThreshold: %v", metadata.MintThreshold)
-	log.Debugf("\t Totoal %d issuers", len(metadata.IssuerTokens))
-	for i := 0; i < len(metadata.IssuerTokens); i++ {
-		log.Debugf("\t\t [%d] %s", i, hex.EncodeToString(metadata.IssuerTokens[i]))
+	log.Debugf("\t Totoal %d issuers", len(metadata.Issuers))
+	for i := 0; i < len(metadata.Issuers); i++ {
+		log.Debugf("\t\t [%d] %s", i, hex.EncodeToString(metadata.Issuers[i]))
 	}
 	log.Debugf("\t Enabled RootCoin: len = %d", len(metadata.ActiveRootTokenSet))
 	for point := range metadata.ActiveRootTokenSet {
@@ -341,13 +341,13 @@ func (view *CTAUTViewpoint) connectReRegistrationScript(script *ctaut.EnhancedAu
 	log.Debugf("\t ReregistrationThreshold: %v -> %v", previousMetadata.ReregistrationThreshold, metadata.ReregistrationThreshold)
 	log.Debugf("\t MintThreshold: %v -> %v", previousMetadata.MintThreshold, metadata.MintThreshold)
 	log.Debugf("\t UnitScale: %v -> %v", previousMetadata.UnitScale, metadata.UnitScale)
-	log.Debugf("\t Previous IssuerTokens: len = %d", len(previousMetadata.IssuerTokens))
-	for i := 0; i < len(previousMetadata.IssuerTokens); i++ {
-		log.Debugf("\t\t [%d] %s", i, hex.EncodeToString(previousMetadata.IssuerTokens[i]))
+	log.Debugf("\t Previous Issuers: len = %d", len(previousMetadata.Issuers))
+	for i := 0; i < len(previousMetadata.Issuers); i++ {
+		log.Debugf("\t\t [%d] %s", i, hex.EncodeToString(previousMetadata.Issuers[i]))
 	}
-	log.Debugf("\t Current IssuerTokens: len = %d", len(metadata.IssuerTokens))
-	for i := 0; i < len(metadata.IssuerTokens); i++ {
-		log.Debugf("\t\t [%d] %s", i, hex.EncodeToString(metadata.IssuerTokens[i]))
+	log.Debugf("\t Current IssuerTokens: len = %d", len(metadata.Issuers))
+	for i := 0; i < len(metadata.Issuers); i++ {
+		log.Debugf("\t\t [%d] %s", i, hex.EncodeToString(metadata.Issuers[i]))
 	}
 	log.Debugf("\t Abolished RootCoin: len = %d", len(previousMetadata.ActiveRootTokenSet))
 	for point := range previousMetadata.ActiveRootTokenSet {

@@ -36,7 +36,7 @@ type AutId = chainhash.Hash
 // and also update the MintedAmount
 //
 // ReRegistrationScript would be used to update the metadata information, including fields PlannedTotalSupply /
-// IssuerTokens / MintThreshold / ReregistrationThreshold / ReregistrationExpireHeight
+// Issuers / MintThreshold / ReregistrationThreshold / ReregistrationExpireHeight
 //
 // # TransferScript would be used to transfer tokens between users, it would not affect any of the fields in Metadata
 //
@@ -79,11 +79,14 @@ type AutMetadata struct {
 	// Note that the amount would be counted in terms of subunit.
 	PlannedTotalSupply uint64
 
-	// The issuers of AUT Instance, currently, identified by its coin address on Abelian.
-	// Using coinAddress, rather than (for example) the hash of coinAddress, as the IssuerTokens provide some potential
+	// The issuers of AUT Instance, currently, represented/identified by the issuers' coin-address in Abelian.
+	// Using coinAddress, rather than (for example) the hash of coinAddress, as the Issuers provide some potential
 	// advantages, for example, a user could check which wallet (in his multiple wallets) should be used to mint/reregister
 	// this Aut Instance.
+	// The []issuers contain DISTINCT coin-addresses for the issuers, and
+	// the ReregistrationThreshold and MintThreshold specify the number of required issuers for Reregistration and Mint respectively.
 	IssuerTokens [][]byte
+	Issuers      [][]byte
 
 	// ReregistrationExpireHeight specifies a height, after which the ReRegistrationScript could not be applied any more.
 	// Using int32 is to allow -1 to be used as the infinite height.
@@ -104,6 +107,8 @@ type AutMetadata struct {
 	// ActiveRootTokenSet stores the currently available root tokens.
 	// When a RegistrationScript or ReRegistrationScript is executed, some AutRootTokens are created and host on HostOutPoints,
 	// and they are recorded as ActiveRootTokens.
+	// Each AutRootToken is actually an Abelian-Txo owned by an issuer in []issuers.
+	//
 	// When a ReRegistrationScript or MintScript is executed, it must consume/spend some ActiveRootTokens.
 	// When a ReRegistrationScript is executed, some ActiveRootTokens are consumed, and the remaining ActiveRootTokens are set to inactive,
 	// and the new generated AutRootTokens are set to be the ActiveRootTokens.
@@ -135,10 +140,10 @@ func (autMetadata *AutMetadata) serializeSize() int {
 
 	n += wire.VarIntSerializeSize(autMetadata.PlannedTotalSupply) // planned amount
 
-	n += wire.VarIntSerializeSize(uint64(len(autMetadata.IssuerTokens))) // number of issuer tokens
-	for i := 0; i < len(autMetadata.IssuerTokens); i++ {
+	n += wire.VarIntSerializeSize(uint64(len(autMetadata.Issuers))) // number of issuer tokens
+	for i := 0; i < len(autMetadata.Issuers); i++ {
 		// actually fixed length
-		n += wire.VarIntSerializeSize(uint64(len(autMetadata.IssuerTokens[i]))) + len(autMetadata.IssuerTokens[i])
+		n += wire.VarIntSerializeSize(uint64(len(autMetadata.Issuers[i]))) + len(autMetadata.Issuers[i])
 	}
 
 	n += wire.VarIntSerializeSize(uint64(autMetadata.ReregistrationExpireHeight)) // ReregistrationExpireHeight
@@ -220,15 +225,15 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	// IssuerTokens               [][]byte
-	err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.IssuerTokens)))
+	// Issuers               [][]byte
+	err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.Issuers)))
 	if err != nil {
 		return nil, err
 	}
-	for i := 0; i < len(autMetadata.IssuerTokens); i++ {
-		err = wire.WriteVarBytes(w, 0, autMetadata.IssuerTokens[i])
+	for i := 0; i < len(autMetadata.Issuers); i++ {
+		err = wire.WriteVarBytes(w, 0, autMetadata.Issuers[i])
 		if err != nil {
-			return nil, fmt.Errorf("error happens when writing issuer token: %v", err)
+			return nil, fmt.Errorf("error happens when writing issuer: %v", err)
 		}
 	}
 
@@ -356,11 +361,11 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 	if err != nil {
 		return err
 	}
-	autMetadata.IssuerTokens = make([][]byte, issuerNum)
+	autMetadata.Issuers = make([][]byte, issuerNum)
 	for i := uint64(0); i < issuerNum; i++ {
-		autMetadata.IssuerTokens[i], err = wire.ReadVarBytes(r, 0, issuerTokenLength, "issuerToken")
+		autMetadata.Issuers[i], err = wire.ReadVarBytes(r, 0, issuerTokenLength, "issuerToken")
 		if err != nil {
-			return fmt.Errorf("error happens when reading issuer token: %v", err)
+			return fmt.Errorf("error happens when reading issuer: %v", err)
 		}
 	}
 
@@ -470,24 +475,24 @@ func (autMetadata *AutMetadata) SanityCheck() error {
 
 	// here we do not check the max allowed number of IssuerTokens,
 	// since it is limited by the host-Abelian-Tx.
-	issuerTokenMapping := map[string]struct{}{}
-	for _, issuerToken := range autMetadata.IssuerTokens {
-		key := hex.EncodeToString(issuerToken)
-		if _, ok := issuerTokenMapping[key]; ok {
-			return fmt.Errorf("repeated issuer tokens exist")
+	issuersMapping := map[string]struct{}{}
+	for _, issuer := range autMetadata.Issuers {
+		key := hex.EncodeToString(issuer)
+		if _, ok := issuersMapping[key]; ok {
+			return fmt.Errorf("repeated issuers exist")
 		}
-		issuerTokenMapping[key] = struct{}{}
+		issuersMapping[key] = struct{}{}
 	}
 
 	if autMetadata.ReregistrationExpireHeight < InfiniteExpireHeight {
 		return fmt.Errorf("invalid reregistration expire height (%d)", autMetadata.ReregistrationExpireHeight)
 	}
 
-	if int(autMetadata.ReregistrationThreshold) > len(autMetadata.IssuerTokens) {
-		return fmt.Errorf("invalid reregistration threshold (%d) for %d issuer tokens", autMetadata.ReregistrationThreshold, len(autMetadata.IssuerTokens))
+	if int(autMetadata.ReregistrationThreshold) > len(autMetadata.Issuers) {
+		return fmt.Errorf("invalid reregistration threshold (%d) for %d issuers", autMetadata.ReregistrationThreshold, len(autMetadata.Issuers))
 	}
-	if int(autMetadata.MintThreshold) > len(autMetadata.IssuerTokens) {
-		return fmt.Errorf("invalid mint threshold (%d) for %d issuer tokens", autMetadata.MintThreshold, len(autMetadata.IssuerTokens))
+	if int(autMetadata.MintThreshold) > len(autMetadata.Issuers) {
+		return fmt.Errorf("invalid mint threshold (%d) for %d issuers", autMetadata.MintThreshold, len(autMetadata.Issuers))
 	}
 
 	if autMetadata.MintedAmount > autMetadata.PlannedTotalSupply {
@@ -548,7 +553,7 @@ func (autMetadata *AutMetadata) Clone() *AutMetadata {
 		AutMemo:            make([]byte, len(autMetadata.AutMemo)),
 		PlannedTotalSupply: autMetadata.PlannedTotalSupply,
 
-		IssuerTokens: make([][]byte, len(autMetadata.IssuerTokens)),
+		Issuers: make([][]byte, len(autMetadata.Issuers)),
 
 		ReregistrationExpireHeight: autMetadata.ReregistrationExpireHeight,
 		ReregistrationThreshold:    autMetadata.ReregistrationThreshold,
@@ -568,9 +573,9 @@ func (autMetadata *AutMetadata) Clone() *AutMetadata {
 	copy(cloned.SubUnitName, autMetadata.SubUnitName)
 	copy(cloned.AutMemo, autMetadata.AutMemo)
 
-	for i := 0; i < len(autMetadata.IssuerTokens); i++ {
-		cloned.IssuerTokens[i] = make([]byte, len(autMetadata.IssuerTokens[i]))
-		copy(cloned.IssuerTokens[i][:], autMetadata.IssuerTokens[i][:])
+	for i := 0; i < len(autMetadata.Issuers); i++ {
+		cloned.Issuers[i] = make([]byte, len(autMetadata.Issuers[i]))
+		copy(cloned.Issuers[i][:], autMetadata.Issuers[i][:])
 	}
 
 	for _, hostOutpoint := range autMetadata.ActiveRootTokenSet {
@@ -2058,7 +2063,7 @@ func (script *EnhancedAutScript) Metadata() (*AutMetadata, error) {
 		UnitScale:                  registerScript.unitScale,
 		AutMemo:                    registerScript.autMemo,
 		PlannedTotalSupply:         registerScript.plannedTotalAmount,
-		IssuerTokens:               issuers, // registerScript.issuerTokens,
+		Issuers:                    issuers, // registerScript.issuers,
 		MintThreshold:              registerScript.mintThreshold,
 		ReregistrationThreshold:    registerScript.reregisterThreshold,
 		ReregistrationExpireHeight: registerScript.reregistrationExpireHeight,
@@ -2127,7 +2132,7 @@ func (script *EnhancedAutScript) UpdateAutMetadata(metadata *AutMetadata) error 
 	}
 	metadata.PlannedTotalSupply = reregisterScript.plannedTotalAmount
 
-	metadata.IssuerTokens = issuers
+	metadata.Issuers = issuers
 	metadata.MintThreshold = reregisterScript.mintThreshold
 	metadata.ReregistrationThreshold = reregisterScript.reregisterThreshold
 	metadata.ReregistrationExpireHeight = reregisterScript.reregistrationExpireHeight

@@ -1,15 +1,18 @@
-Here is the information about CT-AUT (Confidential Transaction for Abelian User Token) protocol.
+Here is the information about AUT (Abelian User Token) protocol.
 
 ### Overview
-By embedding the ct-aut script in memo field within an Abelian transfer transaction, and the ct-aut script would be 
-interpreted with the following formats:
+AutScript is embed in TxMemo field of an Abelian transfer transaction, 
+and is interpreted with the following formats:
 
-1. Registration script, it would declare a new CT-AUT instance, as the result, an CT-AUT instance would be initialized with its 
-metadata, including the following fields:
-   - identifier, used as a unique identifier for the instance
-     - a byte array with fixed length (64)
+1. Registration Script, declares a new AutInstance, and as the result, a corresponding 
+AutMetadata record is initialized, including the following fields:
+   - version
+     - uint32, initialized to 1
+   - autIdentifier, used as a unique identifier for the instance
+     - a Hash (aka. [32]byte)
+     - set to be the TxId of the Abelian Tx where the Registration Script is embed in
      - CAN'T be changed anymore
-   - symbol, used as a symbol visible to the user
+   - autSymbol, used as a symbol visible to the user
      - a byte array with max length (64)
      - [#TODO] CAN'T be changed anymore
    - token unit, including 
@@ -26,10 +29,11 @@ metadata, including the following fields:
    - AUT memo, used as a note for instance
        - a byte array with max length (1024)
    - issuers, used to auth for subsequent operations on instances (mint/re-register)
-     - an array with length N of pseudonymous address (193-byte)
-     - N MUST less than or equal to 10, TODO Di
-   - issuance threshold, 
-     - an integer, less than or equal to N
+     - an array with length N distinct pseudonymous (coin-)address (193-byte)
+     - N MUST less than or equal to 100
+   - mint threshold, 
+     - an integer $t$ such that $t \leq N$
+     - imply that a valid Mint Script need provide a proof that at least $t$-out-of-the-$N$ issuers authenticate the operation.   
    - re-registration threshold
      - an integer, less than or equal to N
    - expiry block height

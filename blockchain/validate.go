@@ -2138,9 +2138,9 @@ func checkCTAUTReRegistrationTransactionInputs(script *ctaut.EnhancedAutScript, 
 	}
 
 	claimedIssuerTokens := map[string]struct{}{}
-	for i := 0; i < len(instance.metadata.IssuerTokens); i++ {
-		allIssuerToken := instance.metadata.IssuerTokens[i]
-		claimedIssuerTokens[hex.EncodeToString(allIssuerToken)] = struct{}{}
+	for i := 0; i < len(instance.metadata.Issuers); i++ {
+		allIssuer := instance.metadata.Issuers[i]
+		claimedIssuerTokens[hex.EncodeToString(allIssuer)] = struct{}{}
 	}
 
 	// duplicated input or double spending?
@@ -2223,8 +2223,8 @@ func checkCTAUTMintTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, tx *a
 	}
 
 	claimedIssuerTokens := map[string]struct{}{}
-	for i := 0; i < len(instance.metadata.IssuerTokens); i++ {
-		issuer := instance.metadata.IssuerTokens[i]
+	for i := 0; i < len(instance.metadata.Issuers); i++ {
+		issuer := instance.metadata.Issuers[i]
 		claimedIssuerTokens[hex.EncodeToString(issuer)] = struct{}{}
 	}
 
