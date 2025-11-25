@@ -21,6 +21,45 @@ type HostOutPoint = wire.OutPointAbe
 
 type AutId = chainhash.Hash
 
+type AutIssuer struct {
+	IssuerAddress []byte
+}
+
+func (autIssuer *AutIssuer) write(w io.Writer) error {
+	return wire.WriteVarBytes(w, 0, autIssuer.IssuerAddress)
+}
+
+func (autIssuer *AutIssuer) read(r io.Reader) error {
+	issuerAddress, err := wire.ReadVarBytes(r, 0, MaxIssuerAddressLength, "AutIssuer.IssuerAddress")
+	if err != nil {
+		return err
+	}
+
+	autIssuer.IssuerAddress = issuerAddress
+	return nil
+}
+
+func (autIssuer *AutIssuer) String() string {
+	return hex.EncodeToString(autIssuer.IssuerAddress)
+}
+
+// Equal reports whether autIssuer and issuer have the same IssuerAddress.
+// Equal returns TURE only if
+// autIssuer and issuer are not nil,
+// autIssuer.IssuerAddress and issuer.IssuerAddress are not nil/empty, and
+// autIssuer.IssuerAddress and issuer.IssuerAddress have the same length and contain the same bytes.
+func (autIssuer *AutIssuer) Equal(issuer *AutIssuer) bool {
+	if autIssuer == nil || issuer == nil {
+		return false
+	}
+
+	if len(autIssuer.IssuerAddress) == 0 || len(issuer.IssuerAddress) == 0 {
+		return false
+	}
+
+	return bytes.Equal(autIssuer.IssuerAddress, issuer.IssuerAddress)
+}
+
 // AutMetadata maintains the metadata information of Abelian User Token (AUT) instance on Abelian
 // 1. Each AutInstance has a unique identifier, which is actually a hash of the Abelian-Tx
 // through which the AutInstance is registered.
