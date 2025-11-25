@@ -2,6 +2,7 @@ package ctaut
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"math"
@@ -77,51 +78,51 @@ func readPrefix(r io.Reader, expectedAutScriptType AutScriptType) (uint32, AutId
 	return uint32(scriptVersion), res, autScriptType, nil
 }
 
-//func writeIssuerTokens(b *bytes.Buffer, issuerTokens [][]byte) error {
-//	err := WriteVarInt(b, uint64(len(issuerTokens)))
-//	if err != nil {
-//		return err
-//	}
-//	for _, issuer := range issuerTokens {
-//		err = WriteVarBytes(b, issuer[:])
-//		if err != nil {
-//			return err
-//		}
-//	}
-//	return nil
-//}
+func writeIssuers(b *bytes.Buffer, issuers [][]byte) error {
+	err := WriteVarInt(b, uint64(len(issuers)))
+	if err != nil {
+		return err
+	}
+	for _, issuer := range issuers {
+		err = WriteVarBytes(b, issuer[:])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // todo(ctaut): numIssuer == 0 should be checked here?
-//func readIssuerTokens(r io.Reader) ([][]byte, error) {
-//	var numIssuer uint64
-//	var err error
-//	if numIssuer, err = ReadVarInt(r); err != nil {
-//		return nil, err
-//	}
-//
-//	claimedCoinAddresses := map[string]struct{}{}
-//	issuerTokens := make([][]byte, numIssuer)
-//	for i := 0; i < len(issuerTokens); i++ {
-//		issuerTokens[i], err = ReadVarBytes(r, issuerTokenLength, "issuerToken")
-//		if err != nil {
-//			return nil, err
-//		}
-//		if len(issuerTokens[i]) != issuerTokenLength { // todo(ctaut): need to discuss and confirm
-//			return nil, ErrInValidAUTTx
-//		}
-//
-//		key := hex.EncodeToString(issuerTokens[i])
-//		if _, ok := claimedCoinAddresses[key]; ok { // todo(ctaut): cannot repeat? consistent with the design?
-//			return nil, ErrInValidAUTTx
-//		}
-//		claimedCoinAddresses[key] = struct{}{}
-//	}
-//	if len(claimedCoinAddresses) != int(numIssuer) {
-//		return nil, ErrInValidAUTTx
-//	}
-//
-//	return issuerTokens, nil
-//}
+func readIssuers(r io.Reader) ([][]byte, error) {
+	var numIssuer uint64
+	var err error
+	if numIssuer, err = ReadVarInt(r); err != nil {
+		return nil, err
+	}
+
+	claimedCoinAddresses := map[string]struct{}{}
+	issuers := make([][]byte, numIssuer)
+	for i := 0; i < len(issuers); i++ {
+		issuers[i], err = ReadVarBytes(r, issuerLength, "issuers")
+		if err != nil {
+			return nil, err
+		}
+		if len(issuers[i]) != issuerLength { // todo(ctaut): need to discuss and confirm
+			return nil, ErrInValidAUTTx
+		}
+
+		key := hex.EncodeToString(issuers[i])
+		if _, ok := claimedCoinAddresses[key]; ok { // todo(ctaut): cannot repeat? consistent with the design?
+			return nil, ErrInValidAUTTx
+		}
+		claimedCoinAddresses[key] = struct{}{}
+	}
+	if len(claimedCoinAddresses) != int(numIssuer) {
+		return nil, ErrInValidAUTTx
+	}
+
+	return issuers, nil
+}
 
 // todo: discuss to make a simple and symmetric; seems to package the read and write too much, so that the logic is a little strange.
 // todo: e.g., the serialize and deserialize Hash does not need package.
@@ -374,44 +375,44 @@ func GetGeneratedAutTokens(script AutScript, txHash chainhash.Hash, txOuts []*wi
 }
 
 // todo(ctaut): define the rules on the mint/update threshold.
-//func matchIssuerTokens(issuerTokens [][]byte, outputs []*CTAUTToken) error {
-//	claimedIssuerTokens := map[string]struct{}{}
-//	for i := 0; i < len(issuerTokens); i++ {
-//		coinAddress := issuerTokens[i]
-//		key := hex.EncodeToString(coinAddress)
-//		// ensure no duplicates one
-//		if _, ok := claimedIssuerTokens[key]; ok {
-//			return fmt.Errorf("claimed repeated issue token")
-//		}
-//		claimedIssuerTokens[key] = struct{}{}
-//	}
-//	if len(claimedIssuerTokens) != len(issuerTokens) {
-//		return fmt.Errorf("claimed repeated issue token")
-//	}
-//
-//	//	todo(ctaut): should not have coinAddress at this layer, how to match the token and actual coin address
-//	tokenCoinAddresses := map[string]struct{}{}
-//	for i := 0; i < len(outputs); i++ {
-//		key := hex.EncodeToString(outputs[i].CoinAddress)
-//		if _, ok := tokenCoinAddresses[key]; !ok {
-//			tokenCoinAddresses[key] = struct{}{}
-//		}
-//	}
-//	// compare with claimed issueTokens
-//	if len(tokenCoinAddresses) != len(claimedIssuerTokens) {
-//		return fmt.Errorf("claimed mismatched issue token")
-//	}
-//	for coinAddress := range tokenCoinAddresses {
-//		if _, ok := claimedIssuerTokens[coinAddress]; !ok {
-//			return fmt.Errorf("use unclaimed issuer token")
-//		}
-//		delete(claimedIssuerTokens, coinAddress)
-//	}
-//	if len(claimedIssuerTokens) != 0 {
-//		return fmt.Errorf("claim unused issuer token")
-//	}
-//	return nil
-//}
+func matchIssuers(issuers [][]byte, outputs []*CTAUTToken) error {
+	claimedIssuers := map[string]struct{}{}
+	for i := 0; i < len(issuers); i++ {
+		coinAddress := issuers[i]
+		key := hex.EncodeToString(coinAddress)
+		// ensure no duplicates one
+		if _, ok := claimedIssuers[key]; ok {
+			return fmt.Errorf("claimed repeated issue token")
+		}
+		claimedIssuers[key] = struct{}{}
+	}
+	if len(claimedIssuers) != len(issuers) {
+		return fmt.Errorf("claimed repeated issue token")
+	}
+
+	//	todo(ctaut): should not have coinAddress at this layer, how to match the token and actual coin address
+	tokenCoinAddresses := map[string]struct{}{}
+	for i := 0; i < len(outputs); i++ {
+		key := hex.EncodeToString(outputs[i].CoinAddress)
+		if _, ok := tokenCoinAddresses[key]; !ok {
+			tokenCoinAddresses[key] = struct{}{}
+		}
+	}
+	// compare with claimed issueTokens
+	if len(tokenCoinAddresses) != len(claimedIssuers) {
+		return fmt.Errorf("claimed mismatched issue token")
+	}
+	for coinAddress := range tokenCoinAddresses {
+		if _, ok := claimedIssuers[coinAddress]; !ok {
+			return fmt.Errorf("use unclaimed issuer token")
+		}
+		delete(claimedIssuers, coinAddress)
+	}
+	if len(claimedIssuers) != 0 {
+		return fmt.Errorf("claim unused issuer token")
+	}
+	return nil
+}
 
 func RuleCheckOnTxoVersionType(autScriptVersion uint32, valueScript []byte) error {
 	autTxo := &ctautwire.AutTxo{}
