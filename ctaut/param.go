@@ -61,3 +61,11 @@ const MaxAutValueScriptLength = 10963
 const MaxScriptMemoLength = 1024 // 1K
 
 const InfiniteExpireHeight = int32(-1)
+
+var ZeroHash chainhash.Hash
+
+func init() {
+	for i := 0; i < chainhash.HashSize; i++ {
+		ZeroHash[i] = 0
+	}
+}
