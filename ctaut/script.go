@@ -2356,89 +2356,162 @@ var _ AutScript = &BurnScript{}
 var ErrNonAutTx = errors.New("not a AUT transaction")
 var ErrInValidAUTTx = errors.New("not a valid AUT transaction")
 
+func PackageAutScriptForTxMemo(script AutScript) (packagedAutScript []byte, err error) {
+	serializedScript, err := script.Serialize()
+	if err != nil {
+		return nil, err
+	}
+	length := len([]byte(commonPrefix))
+	length += wire.VarIntSerializeSize(uint64(script.Version()))
+
+	length += wire.VarIntSerializeSize(uint64(len(serializedScript)))
+	length += len(serializedScript)
+
+	w := bytes.NewBuffer(make([]byte, 0, length))
+
+	_, err = w.Write([]byte(commonPrefix))
+	if err != nil {
+		return nil, err
+	}
+
+	err = wire.WriteVarInt(w, 0, uint64(script.Version()))
+	if err != nil {
+		return nil, err
+	}
+
+	err = wire.WriteVarBytes(w, 0, serializedScript)
+	if err != nil {
+		return nil, err
+	}
+
+	return w.Bytes(), nil
+}
+
+func ExtractAutScriptFromTxMemo(txMemo []byte) (AutScript, error) {
+	length := len([]byte(commonPrefix))
+	if len(txMemo) < length {
+		return nil, fmt.Errorf("packaged script too short")
+	}
+
+	r := bytes.NewReader(txMemo[length:])
+	versionReaded, err := wire.ReadVarInt(r, 0)
+	if err != nil {
+		return nil, err
+	}
+	if versionReaded > math.MaxUint32 {
+		return nil, fmt.Errorf("readed script version (%d) is too large", versionReaded)
+	}
+	scriptVersion := uint32(versionReaded)
+	if _, ok := ctautwire.AutScriptVersionSet[scriptVersion]; !ok {
+		return nil, fmt.Errorf("unknown version %d", scriptVersion)
+	}
+
+	serializedScript, err := wire.ReadVarBytes(r, 0, 1000, "AutScript")
+	if err != nil {
+		return nil, err
+	}
+
+	// todo: if multiple versions are supported, may need to code here to run different branch
+	switch scriptVersion {
+	case ctautwire.AutScriptVersion_1:
+
+		return deserializeAutScriptV1(serializedScript)
+	default:
+		return nil, fmt.Errorf("unknown version %d", scriptVersion)
+	}
+}
+
+func deserializeAutScriptV1(serializedAutScript []byte) (AutScript, error) {
+	r := bytes.NewReader(serializedAutScript)
+
+	versionRead, err := wire.ReadVarInt(r, 0)
+	if err != nil {
+		return nil, err
+	}
+	if versionRead > math.MaxUint32 {
+		return nil, fmt.Errorf("readed script version (%d) is too large", versionRead)
+	}
+	scriptVersion := uint32(versionRead)
+	if _, ok := ctautwire.AutScriptVersionSet[scriptVersion]; !ok {
+		return nil, fmt.Errorf("unknown version %d", scriptVersion)
+	}
+
+	if scriptVersion != ctautwire.AutScriptVersion_1 {
+		return nil, fmt.Errorf("the readed version %d is not AutScriptVersion_1", scriptVersion)
+	}
+
+	scriptType, err := r.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+
+	var autScript AutScript
+	switch scriptType {
+	case AutScriptTypeRegistration:
+		autScript = &RegistrationScript{}
+	case AutScriptTypeReRegistration:
+		autScript = &ReRegistrationScript{}
+	case AutScriptTypeMint:
+		autScript = &MintScript{}
+	case AutScriptTypeTransfer:
+		autScript = &TransferScript{}
+	case AutScriptTypeBurn:
+		autScript = &BurnScript{}
+	default:
+		return nil, fmt.Errorf("unknown aut script type %d", scriptType)
+	}
+
+	err = autScript.Deserialize(serializedAutScript)
+	if err != nil {
+		return nil, err
+	}
+
+	return autScript, nil
+}
+
 // ParseAutScript try to deserialize CTAUT script from transaction memo
 // todo: rename memo to TxMemo
 // todo: why not use a MsgTxAbe as input?
-func ParseAutScript(txVersion uint32, txHash chainhash.Hash, memo []byte) (script AutScript, err error) {
+func ParseAutScript(txVersion uint32, txHash chainhash.Hash, memo []byte) (AutScript, error) {
 	if txVersion < wire.TxVersion_Height_464000_Aconcagua {
 		return nil, nil
 	}
 
+	commonPrefixLen := len([]byte(commonPrefix))
+
 	// could not be an AUT transaction
-	if len(memo) < len(commonPrefix) {
+	if len(memo) < commonPrefixLen {
 		return nil, nil
 	}
-	if !bytes.Equal(memo[:len(commonPrefix)], []byte(commonPrefix)) {
+	if !bytes.Equal(memo[:commonPrefixLen], []byte(commonPrefix)) {
 		return nil, nil
 	}
 
-	if len(memo) == len(commonPrefix) {
-		return nil, fmt.Errorf("the memo start with %s, but have no content", commonPrefix)
-	}
-
-	// todo(ctaut): why +1? "CTAUTSCRIPT" will result (nil, nil) or (nil, err)
-	// todo(ctaut): only if ctaut-script's CommonPrefixLength is the the start position, it will be recognized as ctaut-script.
-	// todo(ctaut): what "txMemo" should be shown at the front end?
-
-	tmpReader := bytes.NewReader(memo[len(commonPrefix):])
-	scriptVersion, err := ReadVarInt(tmpReader)
+	// RULE: if commonPrefix appears, the commonPrefix and its following bytes must be a well-formed packagedAutScript,
+	// namely, commonPrefix || Version(in VarInt form) || serializedAutScript (in VarBytes form).
+	autScript, err := ExtractAutScriptFromTxMemo(memo)
 	if err != nil {
 		return nil, err
 	}
-	if scriptVersion > math.MaxUint32 {
-		return nil, ErrInValidAUTTx
-	}
+
 	// check the script version with the host version
 	// todo: use the ScriptVersion and TxVersion rule.
-	expectedTxVersion, err := GetTxVersionFromAutScriptVersion(uint32(scriptVersion))
+	expectedTxVersion, err := GetTxVersionFromAutScriptVersion(autScript.Version())
 	if expectedTxVersion != txVersion {
-		return nil, ErrInValidAUTTx
-	}
-
-	scriptType, err := ReadByte(tmpReader)
-	if err != nil {
-		return nil, err
-	}
-
-	switch scriptType {
-	case AutScriptTypeRegistration:
-		script = &RegistrationScript{}
-	case AutScriptTypeReRegistration:
-		script = &ReRegistrationScript{}
-	case AutScriptTypeMint:
-		script = &MintScript{}
-	case AutScriptTypeTransfer:
-		script = &TransferScript{}
-	case AutScriptTypeBurn:
-		script = &BurnScript{}
-	default:
-		return nil, ErrInValidAUTTx
-	}
-
-	// reset the reader to deserialize the complete script
-	// todo: here use read; separate Write/Read and Serialize/Deserialize
-	// todo: using Deserialize is also fine. [:]
-	err = script.Deserialize(memo)
-	if err != nil {
-		return nil, err
-	}
-
-	// double check the script version with the host version
-	expectedTxVersion, err = GetTxVersionFromAutScriptVersion(script.Version())
-	if expectedTxVersion != txVersion {
-		return nil, ErrInValidAUTTx
+		return nil, fmt.Errorf("autScript.Version() (%d) corresponds to TxVersion (%d), does not match TxVersion %d",
+			autScript.Version(), expectedTxVersion, txVersion)
 	}
 
 	// populate the identifier for registration script
-	if script.Type() == AutScriptTypeRegistration {
-		ctAUTScript, ok := script.(*RegistrationScript)
+	if autScript.Type() == AutScriptTypeRegistration {
+		registrationScript, ok := autScript.(*RegistrationScript)
 		if !ok {
-			return nil, ErrInValidAUTTx
+			return nil, fmt.Errorf("autScript.Type() (%d) is not RegistrationScript", autScript.Type())
 		}
-		ctAUTScript.autIdentifier = txHash
+		registrationScript.autIdentifier = txHash
 	}
 
-	return script, nil
+	return autScript, nil
 }
 
 // todo(ctaut): this is for database storage or only memeory? why has CoinAddress and ValueScript?
