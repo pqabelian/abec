@@ -559,13 +559,13 @@ func (autMetadata *AutMetadata) SanityCheck() error {
 		return fmt.Errorf("the number of issuers (%d) exceeds the allowed maximum (%d)",
 			len(autMetadata.Issuers), MaxIssuerNum)
 	}
-	issuersMap := map[string]struct{}{}
-	for _, issuer := range autMetadata.Issuers {
+	issuersMap := make(map[string]int, len(autMetadata.Issuers))
+	for i, issuer := range autMetadata.Issuers {
 		issuerStr := issuer.String()
-		if _, ok := issuersMap[issuerStr]; ok {
-			return fmt.Errorf("repeated issuers exist")
+		if index, ok := issuersMap[issuerStr]; ok {
+			return fmt.Errorf("duplicate issuers[%d] and issuers[%d]: %s", i, index, issuerStr)
 		}
-		issuersMap[issuerStr] = struct{}{}
+		issuersMap[issuerStr] = i
 	}
 
 	if autMetadata.ReregistrationExpireHeight < InfiniteExpireHeight {
@@ -608,6 +608,7 @@ func (autMetadata *AutMetadata) SanityCheck() error {
 	}
 
 	for i := 1; i < len(autMetadata.UpdateScriptVersions); i++ {
+		// todo: discuss whether this is too strict: an old version will fail to deserialize an AutMetadata with higher updateScriptVersion.
 		if _, ok := ctautwire.AutScriptVersionSet[autMetadata.UpdateScriptVersions[i]]; !ok {
 			return fmt.Errorf("invalid UpdateScriptVersion (%d) at position %d: not in the AutScriptVersionSet",
 				autMetadata.UpdateScriptVersions[i], i)
@@ -980,9 +981,9 @@ func (script *RegistrationScript) Deserialize(serializedScript []byte) error {
 
 	// todo: not necessary for define a function readPrefix,
 	// todo: even do this, the expected Type should be used inside the function
-	if script.version, script.autIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeRegistration); err != nil {
-		return err
-	}
+	//if script.version, script.autIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeRegistration); err != nil {
+	//	return err
+	//}
 
 	// commonPrefix
 	// todo: discuss, remove
@@ -1106,6 +1107,7 @@ func (script *RegistrationScript) Deserialize(serializedScript []byte) error {
 func (script *RegistrationScript) SanityCheck() error {
 
 	// version                    uint32
+	// todo: discuss whether this is too strict
 	if _, ok := ctautwire.AutScriptVersionSet[script.version]; !ok {
 		return fmt.Errorf("invalid version: %d", script.version)
 	}
@@ -1175,7 +1177,7 @@ func (script *RegistrationScript) SanityCheck() error {
 	if len(script.issuers) == 0 || len(script.issuers) > MaxIssuerNum {
 		return fmt.Errorf("the number of issuers (%d) is not in [1, %d]", len(script.issuers), MaxIssuerNum)
 	}
-	issuersMap := make(map[string]int)
+	issuersMap := make(map[string]int, len(script.issuers))
 	for i, issuer := range script.issuers {
 		issuerStr := issuer.String()
 		if index, ok := issuersMap[issuerStr]; ok {
