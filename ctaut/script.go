@@ -1267,7 +1267,7 @@ type ReRegistrationScript struct {
 	// version denotes the AutScriptVersion
 	version uint32
 
-	// scriptType denotes the AutScriptType, should be "AutScriptTypeRegistration"
+	// scriptType denotes the AutScriptType, should be "AutScriptTypeReRegistration"
 	scriptType AutScriptType
 
 	// autIdentifier stores the AutIdentifier that this AutScript operates.
@@ -1703,23 +1703,35 @@ var _ AutScript = &ReRegistrationScript{}
 // <WitnessHash> a byte array with fixed length
 // <Memo> a byte array with max length, for this transaction
 type MintScript struct {
-	version       uint32
-	scriptType    AutScriptType
+	// version denotes the AutScriptVersion
+	version uint32
+
+	// scriptType denotes the AutScriptType, should be "AutScriptTypeMint"
+	scriptType AutScriptType
+
+	// autIdentifier stores the AutIdentifier that this AutScript operates.
+	// For MintScript, the autIdentifier points to an existing AutMetadata.
 	autIdentifier AutId
 
+	// vin specifies the value to mint.
 	vin uint64
-	// TODO specify the start index?
-	// When generate the script, it must fill the index before creating the transaction
-	//	because doesn't know the user how to provide a transaction fee, which is not a reasonable assumption
-	// When parse/check the script, it must check the index with a valid host transaction output
-	//inStartIndex  uint8 // coin address v.s. issuer token
+
+	// inAutRootTokenNum specifies the number of consumed AutRootTokens by the host-Tx.
+	// It is used to locate the start and end TxIn of the host-Tx, which should be parsed as AutRootToken.
+	// The RULE is the FIRST inAutRootTokenNum pseudonym TxIn of the host-Tx should be AutRootToken.
+	// When generating the script, inAutRootTokenNum must be set correctly.
 	inAutRootTokenNum uint8
-	//outStartIndex uint8
-	outHiddenAutTokenNum uint8          // todo(ctaut): explicitly specify the number of plain-aut and the number of ct-aut? not specified, will call underlying API to extract AutTxoType?
-	outPublicAutTokenNum uint8          // todo(ctaut): explicitly specify the number of plain-aut and the number of ct-aut? not specified, will call underlying API to extract AutTxoType?
+
+	// outHiddenAutTokenNum and outPublicAutTokenNum together specify the number of generated AutTokens by the host-Tx.
+	// They are used to locate the start and end Txo of the host-Tx, which should be parsed as AutTokens.
+	// The RULE is (a) the FIRST outHiddenAutTokenNum pseudonym Txo of the host-Tx should be HiddenAutTxo,
+	// and then (b) the following outPublicAutTokenNum pseudonym Txo of the host-Tx should be publicAutTxo.
+	outHiddenAutTokenNum uint8
+	outPublicAutTokenNum uint8
 	valueScripts         [][]byte       // todo: limited to value? // todo: defined as serializedAutTxos? why not autTxos
 	witnessHash          chainhash.Hash // todo(ctaut): move to the last position
-	scriptMemo           []byte         // todo: scriptMemo
+
+	scriptMemo []byte // todo: scriptMemo
 }
 
 func (script *MintScript) WitnessHash() chainhash.Hash {
