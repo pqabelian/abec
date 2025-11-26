@@ -1716,7 +1716,7 @@ type MintScript struct {
 	inAutRootTokenNum uint8
 	//outStartIndex uint8
 	outHiddenAutTokenNum uint8          // todo(ctaut): explicitly specify the number of plain-aut and the number of ct-aut? not specified, will call underlying API to extract AutTxoType?
-	outPlainAutTokenNum  uint8          // todo(ctaut): explicitly specify the number of plain-aut and the number of ct-aut? not specified, will call underlying API to extract AutTxoType?
+	outPublicAutTokenNum uint8          // todo(ctaut): explicitly specify the number of plain-aut and the number of ct-aut? not specified, will call underlying API to extract AutTxoType?
 	valueScripts         [][]byte       // todo: limited to value? // todo: defined as serializedAutTxos? why not autTxos
 	witnessHash          chainhash.Hash // todo(ctaut): move to the last position
 	scriptMemo           []byte         // todo: scriptMemo
@@ -1742,7 +1742,7 @@ func NewMintScript(version uint32,
 		vin:                  vin,
 		inAutRootTokenNum:    inAutRootTokenNum,
 		outHiddenAutTokenNum: outCTAutTokenNum,
-		outPlainAutTokenNum:  outPlainAutTokenNum,
+		outPublicAutTokenNum: outPlainAutTokenNum,
 		valueScripts:         valueScripts,
 		witnessHash:          witnessHash,
 		scriptMemo:           scriptMemo,
@@ -1777,7 +1777,7 @@ func (script *MintScript) Serialize() ([]byte, error) {
 	if err = b.WriteByte(script.outHiddenAutTokenNum); err != nil {
 		return nil, err
 	}
-	if err = b.WriteByte(script.outPlainAutTokenNum); err != nil {
+	if err = b.WriteByte(script.outPublicAutTokenNum); err != nil {
 		return nil, err
 	}
 
@@ -1818,12 +1818,12 @@ func (script *MintScript) Deserialize(serializedScript []byte) error {
 	if script.outHiddenAutTokenNum, err = ReadByte(r); err != nil {
 		return err
 	}
-	if script.outPlainAutTokenNum, err = ReadByte(r); err != nil {
+	if script.outPublicAutTokenNum, err = ReadByte(r); err != nil {
 		return err
 	}
 
 	// todo: necessary to use a function?
-	if script.valueScripts, err = readCTAUTTxoScript(r, int(script.outHiddenAutTokenNum), int(script.outPlainAutTokenNum)); err != nil {
+	if script.valueScripts, err = readCTAUTTxoScript(r, int(script.outHiddenAutTokenNum), int(script.outPublicAutTokenNum)); err != nil {
 		return err
 	}
 
@@ -1859,11 +1859,11 @@ func (script *MintScript) SanityCheck() error {
 	if int(script.outHiddenAutTokenNum) > MaxNumCTToken {
 		return ErrInValidAUTTx
 	}
-	if int(script.outHiddenAutTokenNum)+int(script.outPlainAutTokenNum) > MaxNumToken {
+	if int(script.outHiddenAutTokenNum)+int(script.outPublicAutTokenNum) > MaxNumToken {
 		return ErrInValidAUTTx
 	}
 
-	if len(script.valueScripts) != int(script.outHiddenAutTokenNum)+int(script.outPlainAutTokenNum) {
+	if len(script.valueScripts) != int(script.outHiddenAutTokenNum)+int(script.outPublicAutTokenNum) {
 		return ErrInValidAUTTx
 	}
 	for i := 0; i < len(script.valueScripts); i++ {
@@ -1899,7 +1899,7 @@ func (script *MintScript) NumConsumedTokens() int {
 	return int(script.inAutRootTokenNum)
 }
 func (script *MintScript) NumGeneratedTokens() int {
-	return int(script.outHiddenAutTokenNum + script.outPlainAutTokenNum)
+	return int(script.outHiddenAutTokenNum + script.outPublicAutTokenNum)
 }
 
 var _ AutScript = &MintScript{}
