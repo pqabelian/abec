@@ -2356,6 +2356,8 @@ var _ AutScript = &BurnScript{}
 var ErrNonAutTx = errors.New("not a AUT transaction")
 var ErrInValidAUTTx = errors.New("not a valid AUT transaction")
 
+// PackageAutScriptForTxMemo
+// = commonPrefix || version (in VarInt form) || serializedAutScript (in VarBytes form)
 func PackageAutScriptForTxMemo(script AutScript) (packagedAutScript []byte, err error) {
 	serializedScript, err := script.Serialize()
 	if err != nil {
@@ -2394,14 +2396,14 @@ func ExtractAutScriptFromTxMemo(txMemo []byte) (AutScript, error) {
 	}
 
 	r := bytes.NewReader(txMemo[length:])
-	versionReaded, err := wire.ReadVarInt(r, 0)
+	versionRead, err := wire.ReadVarInt(r, 0)
 	if err != nil {
 		return nil, err
 	}
-	if versionReaded > math.MaxUint32 {
-		return nil, fmt.Errorf("readed script version (%d) is too large", versionReaded)
+	if versionRead > math.MaxUint32 {
+		return nil, fmt.Errorf("readed script version (%d) is too large", versionRead)
 	}
-	scriptVersion := uint32(versionReaded)
+	scriptVersion := uint32(versionRead)
 	if _, ok := ctautwire.AutScriptVersionSet[scriptVersion]; !ok {
 		return nil, fmt.Errorf("unknown version %d", scriptVersion)
 	}
