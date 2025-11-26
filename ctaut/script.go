@@ -1715,11 +1715,11 @@ type MintScript struct {
 	//inStartIndex  uint8 // coin address v.s. issuer token
 	inAutRootTokenNum uint8
 	//outStartIndex uint8
-	outCTAutTokenNum    uint8          // todo(ctaut): explicitly specify the number of plain-aut and the number of ct-aut? not specified, will call underlying API to extract AutTxoType?
-	outPlainAutTokenNum uint8          // todo(ctaut): explicitly specify the number of plain-aut and the number of ct-aut? not specified, will call underlying API to extract AutTxoType?
-	valueScripts        [][]byte       // todo: limited to value? // todo: defined as serializedAutTxos? why not autTxos
-	witnessHash         chainhash.Hash // todo(ctaut): move to the last position
-	scriptMemo          []byte         // todo: scriptMemo
+	outHiddenAutTokenNum uint8          // todo(ctaut): explicitly specify the number of plain-aut and the number of ct-aut? not specified, will call underlying API to extract AutTxoType?
+	outPlainAutTokenNum  uint8          // todo(ctaut): explicitly specify the number of plain-aut and the number of ct-aut? not specified, will call underlying API to extract AutTxoType?
+	valueScripts         [][]byte       // todo: limited to value? // todo: defined as serializedAutTxos? why not autTxos
+	witnessHash          chainhash.Hash // todo(ctaut): move to the last position
+	scriptMemo           []byte         // todo: scriptMemo
 }
 
 func (script *MintScript) WitnessHash() chainhash.Hash {
@@ -1736,16 +1736,16 @@ func NewMintScript(version uint32,
 	outCTAutTokenNum uint8, outPlainAutTokenNum uint8, valueScripts [][]byte,
 	witnessHash chainhash.Hash, scriptMemo []byte) *MintScript {
 	return &MintScript{
-		version:             version,
-		scriptType:          AutScriptTypeMint,
-		autIdentifier:       autIdentifier,
-		vin:                 vin,
-		inAutRootTokenNum:   inAutRootTokenNum,
-		outCTAutTokenNum:    outCTAutTokenNum,
-		outPlainAutTokenNum: outPlainAutTokenNum,
-		valueScripts:        valueScripts,
-		witnessHash:         witnessHash,
-		scriptMemo:          scriptMemo,
+		version:              version,
+		scriptType:           AutScriptTypeMint,
+		autIdentifier:        autIdentifier,
+		vin:                  vin,
+		inAutRootTokenNum:    inAutRootTokenNum,
+		outHiddenAutTokenNum: outCTAutTokenNum,
+		outPlainAutTokenNum:  outPlainAutTokenNum,
+		valueScripts:         valueScripts,
+		witnessHash:          witnessHash,
+		scriptMemo:           scriptMemo,
 	}
 }
 
@@ -1774,7 +1774,7 @@ func (script *MintScript) Serialize() ([]byte, error) {
 	if err = b.WriteByte(script.inAutRootTokenNum); err != nil {
 		return nil, err
 	}
-	if err = b.WriteByte(script.outCTAutTokenNum); err != nil {
+	if err = b.WriteByte(script.outHiddenAutTokenNum); err != nil {
 		return nil, err
 	}
 	if err = b.WriteByte(script.outPlainAutTokenNum); err != nil {
@@ -1815,7 +1815,7 @@ func (script *MintScript) Deserialize(serializedScript []byte) error {
 	if script.inAutRootTokenNum, err = ReadByte(r); err != nil {
 		return err
 	}
-	if script.outCTAutTokenNum, err = ReadByte(r); err != nil {
+	if script.outHiddenAutTokenNum, err = ReadByte(r); err != nil {
 		return err
 	}
 	if script.outPlainAutTokenNum, err = ReadByte(r); err != nil {
@@ -1823,7 +1823,7 @@ func (script *MintScript) Deserialize(serializedScript []byte) error {
 	}
 
 	// todo: necessary to use a function?
-	if script.valueScripts, err = readCTAUTTxoScript(r, int(script.outCTAutTokenNum), int(script.outPlainAutTokenNum)); err != nil {
+	if script.valueScripts, err = readCTAUTTxoScript(r, int(script.outHiddenAutTokenNum), int(script.outPlainAutTokenNum)); err != nil {
 		return err
 	}
 
@@ -1856,14 +1856,14 @@ func (script *MintScript) SanityCheck() error {
 		return ErrInValidAUTTx
 	}
 
-	if int(script.outCTAutTokenNum) > MaxNumCTToken {
+	if int(script.outHiddenAutTokenNum) > MaxNumCTToken {
 		return ErrInValidAUTTx
 	}
-	if int(script.outCTAutTokenNum)+int(script.outPlainAutTokenNum) > MaxNumToken {
+	if int(script.outHiddenAutTokenNum)+int(script.outPlainAutTokenNum) > MaxNumToken {
 		return ErrInValidAUTTx
 	}
 
-	if len(script.valueScripts) != int(script.outCTAutTokenNum)+int(script.outPlainAutTokenNum) {
+	if len(script.valueScripts) != int(script.outHiddenAutTokenNum)+int(script.outPlainAutTokenNum) {
 		return ErrInValidAUTTx
 	}
 	for i := 0; i < len(script.valueScripts); i++ {
@@ -1877,7 +1877,7 @@ func (script *MintScript) SanityCheck() error {
 		if err != nil {
 			return ErrInValidAUTTx
 		}
-		if i < int(script.outCTAutTokenNum) {
+		if i < int(script.outHiddenAutTokenNum) {
 			if autTxoType != abecryptox.AutTxoTypeHidden {
 				return ErrInValidAUTTx
 			}
@@ -1899,7 +1899,7 @@ func (script *MintScript) NumConsumedTokens() int {
 	return int(script.inAutRootTokenNum)
 }
 func (script *MintScript) NumGeneratedTokens() int {
-	return int(script.outCTAutTokenNum + script.outPlainAutTokenNum)
+	return int(script.outHiddenAutTokenNum + script.outPlainAutTokenNum)
 }
 
 var _ AutScript = &MintScript{}
