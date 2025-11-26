@@ -608,7 +608,6 @@ func (autMetadata *AutMetadata) SanityCheck() error {
 	}
 
 	for i := 1; i < len(autMetadata.UpdateScriptVersions); i++ {
-		// todo: discuss whether this is too strict: an old version will fail to deserialize an AutMetadata with higher updateScriptVersion.
 		if _, ok := ctautwire.AutScriptVersionSet[autMetadata.UpdateScriptVersions[i]]; !ok {
 			return fmt.Errorf("invalid UpdateScriptVersion (%d) at position %d: not in the AutScriptVersionSet",
 				autMetadata.UpdateScriptVersions[i], i)
@@ -813,6 +812,9 @@ func (script *RegistrationScript) ScriptMemo() []byte {
 	return script.scriptMemo
 }
 
+// NewRegistrationScript creates a new RegistrationScript.
+//
+// Note that RegistrationScript's autIdentifier is zeroHash, and does not need a corresponding input.
 func NewRegistrationScript(version uint32,
 	autName []byte, autSymbol []byte, baseUnitName []byte, subUnitName []byte, unitScale uint64,
 	autMemo []byte, plannedTotalSupply uint64,
@@ -901,7 +903,7 @@ func (script *RegistrationScript) Serialize() ([]byte, error) {
 
 	// autIdentifier              AutId
 	if _, err = w.Write(script.autIdentifier[:]); err != nil {
-
+		return nil, err
 	}
 
 	// autName                    []byte
@@ -1014,7 +1016,6 @@ func (script *RegistrationScript) Deserialize(serializedScript []byte) error {
 	}
 
 	// autIdentifier              AutId
-	// todo: r.Read? to be symmetric?
 	if _, err = io.ReadFull(r, script.autIdentifier[:]); err != nil {
 		return err
 	}
@@ -1110,7 +1111,6 @@ func (script *RegistrationScript) Deserialize(serializedScript []byte) error {
 func (script *RegistrationScript) SanityCheck() error {
 
 	// version                    uint32
-	// todo: discuss whether this is too strict
 	if _, ok := ctautwire.AutScriptVersionSet[script.version]; !ok {
 		return fmt.Errorf("invalid version: %d", script.version)
 	}
@@ -1500,14 +1500,12 @@ func (script *ReRegistrationScript) Deserialize(serializedScript []byte) error {
 	script.version = uint32(version)
 
 	// scriptType                 AutScriptType
-	// todo: discuss, io.ReadFull (not r.Read()), while here r.ReadByte()
 	script.scriptType, err = r.ReadByte()
 	if err != nil {
 		return err
 	}
 
 	// autIdentifier              AutId
-	// todo: r.Read? to be symmetric?
 	if _, err = io.ReadFull(r, script.autIdentifier[:]); err != nil {
 		return err
 	}
@@ -1648,7 +1646,6 @@ func (script *ReRegistrationScript) SanityCheck() error {
 	}
 
 	// inAutRootTokenNum         uint8
-	// todo: discuss, need check?
 	if int(script.inAutRootTokenNum) == 0 {
 		return fmt.Errorf("script.inAutRootTokenNum (%d) is invalid",
 			script.inAutRootTokenNum)
@@ -1728,8 +1725,8 @@ type MintScript struct {
 	// and then (b) the following outPublicAutTokenNum pseudonym Txo of the host-Tx should be publicAutTxo.
 	outHiddenAutTokenNum uint8
 	outPublicAutTokenNum uint8
-	valueScripts         [][]byte       // todo: limited to value? // todo: defined as serializedAutTxos? why not autTxos
-	witnessHash          chainhash.Hash // todo(ctaut): move to the last position
+	valueScripts         [][]byte // todo: limited to value? // todo: defined as serializedAutTxos? why not autTxos
+	witnessHash          chainhash.Hash
 
 	scriptMemo []byte // todo: scriptMemo
 }
