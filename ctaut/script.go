@@ -1648,6 +1648,7 @@ func (script *ReRegistrationScript) SanityCheck() error {
 	}
 
 	// inAutRootTokenNum         uint8
+	// todo: discuss, need check?
 	if int(script.inAutRootTokenNum) == 0 {
 		return fmt.Errorf("script.inAutRootTokenNum (%d) is invalid",
 			script.inAutRootTokenNum)
