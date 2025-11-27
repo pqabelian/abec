@@ -2404,7 +2404,7 @@ type BurnScript struct {
 	autIdentifier AutId
 
 	inHiddenAutTokenNum uint8
-	inPlainAutTokenNum  uint8
+	inPublicAutTokenNum uint8
 	outCTAutTokenNum    uint8
 	outPlainAutTokenNum uint8
 	valueScripts        [][]byte // todo: defined as serializedAutTxos? why not autTxos
@@ -2425,7 +2425,7 @@ func NewBurnScript(
 	version uint32,
 	autIdentifier AutId,
 	inHiddenAutTokenNum uint8,
-	inPlainAutTokenNum uint8,
+	inPublicAutTokenNum uint8,
 	outCTAutTokenNum uint8,
 	outPlainAutTokenNum uint8,
 	valueScripts [][]byte,
@@ -2437,7 +2437,7 @@ func NewBurnScript(
 		scriptType:          AutScriptTypeBurn,
 		autIdentifier:       autIdentifier,
 		inHiddenAutTokenNum: inHiddenAutTokenNum,
-		inPlainAutTokenNum:  inPlainAutTokenNum,
+		inPublicAutTokenNum: inPublicAutTokenNum,
 		outCTAutTokenNum:    outCTAutTokenNum,
 		outPlainAutTokenNum: outPlainAutTokenNum,
 		valueScripts:        valueScripts,
@@ -2466,7 +2466,7 @@ func (script *BurnScript) Serialize() ([]byte, error) {
 	if err = b.WriteByte(script.inHiddenAutTokenNum); err != nil {
 		return nil, err
 	}
-	if err = b.WriteByte(script.inPlainAutTokenNum); err != nil {
+	if err = b.WriteByte(script.inPublicAutTokenNum); err != nil {
 		return nil, err
 	}
 
@@ -2509,7 +2509,7 @@ func (script *BurnScript) Deserialize(serializedScript []byte) error {
 	if script.inHiddenAutTokenNum, err = ReadByte(r); err != nil {
 		return err
 	}
-	if script.inPlainAutTokenNum, err = ReadByte(r); err != nil {
+	if script.inPublicAutTokenNum, err = ReadByte(r); err != nil {
 		return err
 	}
 
@@ -2549,7 +2549,7 @@ func (script *BurnScript) SanityCheck() error {
 		return errors.New("unexpected type for burn script")
 	}
 
-	if script.inHiddenAutTokenNum+script.inPlainAutTokenNum == 0 {
+	if script.inHiddenAutTokenNum+script.inPublicAutTokenNum == 0 {
 		return ErrInValidAUTTx
 	}
 	if script.outCTAutTokenNum+script.outPlainAutTokenNum == 0 {
@@ -2593,7 +2593,7 @@ func (script *BurnScript) SanityCheck() error {
 	return nil
 }
 func (script *BurnScript) NumConsumedTokens() int {
-	return int(script.inHiddenAutTokenNum + script.inPlainAutTokenNum)
+	return int(script.inHiddenAutTokenNum + script.inPublicAutTokenNum)
 }
 func (script *BurnScript) NumGeneratedTokens() int {
 	return int(script.outCTAutTokenNum + script.outPlainAutTokenNum)
