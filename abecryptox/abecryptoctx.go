@@ -102,17 +102,17 @@ func GetAutTxoType(autTxo *wire.AutTxo) (AutTxoType, error) {
 	// or aut script version -> tx version -> crypto scheme?
 	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autTxo.Version)
 	if err != nil {
-		return 0, err
+		return AutTxoTypeHidden, err
 	}
 
 	switch cryptoScheme {
 
 	case abecryptoxparam.CryptoSchemePQRingCTX:
 		return pqringctxGetAutTxoType(abecryptoxparam.PQRingCTXPP, autTxo)
+		
 	default:
-		return 0, fmt.Errorf("GetAutTxoType: the crypto scheme mapped from autTxo.Version is not supported")
+		return AutTxoTypeHidden, fmt.Errorf("GetAutTxoType: the crypto scheme mapped from autTxo.Version is not supported")
 	}
-	return 0, nil
 }
 
 // GetAutTxoScriptSize returns the TxoScript size of AutTxo with the input AutTxoType.
