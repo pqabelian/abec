@@ -710,8 +710,9 @@ type AutScript interface {
 // 2. consumedTokens would be populated with the help of host-transaction and corresponding wire.TxoRing
 // 3. generatedTokens would be populated with the function populateGeneratedCTAUTTokens with the help of host-transaction.
 //
-// RegistrationScript would be serialized with following format
-// <Common Prefix> "AUTSCRIPT" "0"
+// RegistrationScript contains
+// <Version>
+// <ScriptType>
 // <autIdentifier> ZeroHash, this is because the underlying Abelian-Tx has not been created,
 // and the TxHash actually need RegistrationScript as a part of the preimage.
 // <autName> a byte array with max length, would not be changed anymore
@@ -1226,20 +1227,22 @@ var _ AutScript = &RegistrationScript{}
 // 2. consumedTokens would be populated with the help of host transaction and corresponding wire.TxoRing
 // 3. generatedTokens would be populated with the function populateGeneratedCTAUTTokens with the help of host transaction
 //
-// ReRegistrationScript would be serialized with following format
-// Flag = "CTAUTReRegistration"
-// <Common Prefix> "CTAUTSCRIPT" "1"
-// <Identifier> a byte array with fixed length, would not be changed anymore
-// <AUTMemo> a byte array with max length
-// <Planed Total Amount> an integer range in [1, 1<<51 -1)
-// <IssuerTokens> an array with length N of hash, each one represents a public key (represented by a pseudonym coin address)
-// <ReregistrationThreshold> An integer update_t <= N
-// <MintThreshold> An integer mint_t <= N
-// <Expiry of IssuerTokens> a height value
+// ReRegistrationScript contains
+// <Version>
+// <ScriptType>
+// <autIdentifier>
 //
-// <Number of consumed RootTokens> A number m, explicitly specify the 0~(m-1)-th pseudonym TXO of inputs in host transaction as RootToken
-// <Number of generated RootTokens> A number n, Explicitly specify the 0~(n-1)-th pseudonym TXO of outputs in host transaction as RootToken
-// <Memo> a byte array with max length, for this transaction
+// <autMemo> a byte array with max length, to update that of the AutInstance with <autIdentifier>
+// <plannedTotalSupply> an integer range in [1, 1<<51 -1], to update that of the AutInstance with <autIdentifier>
+// <issuers> an array with length N AutIssuer, to update that of the AutInstance with <autIdentifier>
+// <reregistrationExpireHeight> to update that of the AutInstance with <autIdentifier>
+// <reregisterThreshold> An integer update_t in [1, N], to update that of the AutInstance with <autIdentifier>
+// <mintThreshold> An integer mint_t in [1, N], to update that of the AutInstance with <autIdentifier>
+//
+// <inAutRootTokenNum> A number m, explicitly specify the 0~(m-1)-th pseudonym TXO of inputs in host transaction as RootToken
+// <outAutRootTokenNum> A number n, Explicitly specify the 0~(n-1)-th pseudonym TXO of outputs in host transaction as RootToken
+//
+// <ScriptMemo> a byte array with max length
 type ReRegistrationScript struct {
 
 	// version denotes the AutScriptVersion
