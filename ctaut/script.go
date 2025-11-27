@@ -2039,7 +2039,7 @@ type TransferScript struct {
 	inPublicAutTokenNum uint8
 
 	outHiddenAutTokenNum uint8
-	outPlainAutTokenNum  uint8
+	outPublicAutTokenNum uint8
 	valueScripts         [][]byte // todo: defined as serializedAutTxos? why not autTxos
 
 	witnessHash chainhash.Hash
@@ -2072,7 +2072,7 @@ func NewTransferScript(
 		inHiddenAutTokenNum:  inHiddenAutTokenNum,
 		inPublicAutTokenNum:  inPublicAutTokenNum,
 		outHiddenAutTokenNum: outHiddenAutTokenNum,
-		outPlainAutTokenNum:  outPlainAutTokenNum,
+		outPublicAutTokenNum: outPlainAutTokenNum,
 		valueScripts:         autTxoScripts,
 		witnessHash:          witnessHash,
 		scriptMemo:           scriptMemo,
@@ -2106,7 +2106,7 @@ func (script *TransferScript) Serialize() ([]byte, error) {
 	if err = b.WriteByte(script.outHiddenAutTokenNum); err != nil {
 		return nil, err
 	}
-	if err = b.WriteByte(script.outPlainAutTokenNum); err != nil {
+	if err = b.WriteByte(script.outPublicAutTokenNum); err != nil {
 		return nil, err
 	}
 
@@ -2147,12 +2147,12 @@ func (script *TransferScript) Deserialize(serializedScript []byte) error {
 	if script.outHiddenAutTokenNum, err = ReadByte(r); err != nil {
 		return err
 	}
-	if script.outPlainAutTokenNum, err = ReadByte(r); err != nil {
+	if script.outPublicAutTokenNum, err = ReadByte(r); err != nil {
 		return err
 	}
 
 	// todo: necessary to use a function?
-	if script.valueScripts, err = readCTAUTTxoScript(r, int(script.outHiddenAutTokenNum), int(script.outPlainAutTokenNum)); err != nil {
+	if script.valueScripts, err = readCTAUTTxoScript(r, int(script.outHiddenAutTokenNum), int(script.outPublicAutTokenNum)); err != nil {
 		return err
 	}
 
@@ -2183,14 +2183,14 @@ func (script *TransferScript) SanityCheck() error {
 	if script.inHiddenAutTokenNum+script.inPublicAutTokenNum == 0 {
 		return ErrInValidAUTTx
 	}
-	if script.outHiddenAutTokenNum+script.outPlainAutTokenNum == 0 {
+	if script.outHiddenAutTokenNum+script.outPublicAutTokenNum == 0 {
 		return ErrInValidAUTTx
 	}
 
 	if int(script.outHiddenAutTokenNum) > MaxNumHiddenToken {
 		return ErrInValidAUTTx
 	}
-	if len(script.valueScripts) != int(script.outHiddenAutTokenNum)+int(script.outPlainAutTokenNum) {
+	if len(script.valueScripts) != int(script.outHiddenAutTokenNum)+int(script.outPublicAutTokenNum) {
 		return ErrInValidAUTTx
 	}
 
@@ -2227,7 +2227,7 @@ func (script *TransferScript) NumConsumedTokens() int {
 	return int(script.inHiddenAutTokenNum + script.inPublicAutTokenNum)
 }
 func (script *TransferScript) NumGeneratedTokens() int {
-	return int(script.outHiddenAutTokenNum + script.outPlainAutTokenNum)
+	return int(script.outHiddenAutTokenNum + script.outPublicAutTokenNum)
 }
 
 var _ AutScript = &TransferScript{}
