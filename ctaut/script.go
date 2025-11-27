@@ -1642,21 +1642,23 @@ var _ AutScript = &ReRegistrationScript{}
 
 // MintScript would be the structured script parsed from memo in host transaction,
 // 1. the minted amount with such a script MUST be explicit specified
-// 2. the number of generated CT-Token and Plain-Token MUST be explicit specified, and corresponding value scripts
-// 3. the witness hash would be computed from AutWitness in host transaction
-// 3. consumedTokens would be populated with the help of host transaction and corresponding wire.TxoRing
-// 4. generatedTokens would be populated with the function populateGeneratedCTAUTTokens with the help of host transaction
+// 2. the number of generated Hidden-Token and Plain-Token MUST be explicitly specified, and corresponding value scripts
+// 3. the number of consumed RootTokens MUST be explicitly specified,
+// 4. the witnessHash MUST be given, which is computed from AutWitness at host-transaction layer,
+// 5. the generatedTokens would be populated with the function populateGeneratedCTAUTTokens with the help of host transaction
+// 6. the consumedTokens would be populated with the help of host transaction and corresponding wire.TxoRing.
 //
-// MintScript would be serialized with following format
-// <Common Prefix> "CTAUTSCRIPT" "2"
-// <Identifier> a byte array with fixed length
-// <Vin> an integer, representing the amount of token to be minted, must less than plannedTotalSupply
-// <Number of RootToken> A number n, explicitly specify the 0~(n-1)-th pseudonym TXO of inputs in host transaction as RootToken
-// <Number of CTAUTTokens> A number i, Explicitly specify the 0~(i-1)-th pseudonym TXO of outputs in host transaction as CT-Token
-// <Number of PlainTokens> A number j, Explicitly specify the i~(i+j-1)-th pseudonym TXO of outputs in host transaction as Plain-Token
-// <ValueScript> an array of n byte array, represent the amount for an AUTToken
-// <WitnessHash> a byte array with fixed length
-// <Memo> a byte array with max length, for this transaction
+// MintScript consists of
+// <version>
+// <scriptType>
+// <autIdentifier>
+// <vin> an integer, representing the amount of tokens to be minted, must less than plannedTotalSupply
+// <inAutRootTokenNum> A number n, explicitly specify the 0~(n-1)-th pseudonym TxIn of host-transaction as consumed RootToken
+// <outHiddenAutTokenNum> A number i, Explicitly specify the 0~(i-1)-th pseudonym Txo of host-transaction as the host-points of Hidden-Tokens
+// <outPublicAutTokenNum> A number j, Explicitly specify the i~(i+j-1)-th pseudonym Txo of in host-transaction as host-points of Public-Tokens
+// <serializedAutTxos> an array of i+j byte array, corresponding to the outAutTokens
+// <witnessHash> a Hash of the witness for balance proof between vin and outAutTokens
+// <scriptMemo> a byte array with max length, for this script
 type MintScript struct {
 	// version denotes the AutScriptVersion
 	version uint32
