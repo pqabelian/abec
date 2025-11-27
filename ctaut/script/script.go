@@ -761,56 +761,56 @@ type RegistrationScript struct {
 	scriptMemo []byte
 }
 
-func (script *RegistrationScript) AutName() []byte {
-	return script.autName
+func (autScript *RegistrationScript) AutName() []byte {
+	return autScript.autName
 }
 
-func (script *RegistrationScript) AutSymbol() []byte {
-	return script.autSymbol
+func (autScript *RegistrationScript) AutSymbol() []byte {
+	return autScript.autSymbol
 }
 
-func (script *RegistrationScript) BaseUnitName() []byte {
-	return script.baseUnitName
+func (autScript *RegistrationScript) BaseUnitName() []byte {
+	return autScript.baseUnitName
 }
 
-func (script *RegistrationScript) SubUnitName() []byte {
-	return script.subUnitName
+func (autScript *RegistrationScript) SubUnitName() []byte {
+	return autScript.subUnitName
 }
 
-func (script *RegistrationScript) UnitScale() uint64 {
-	return script.unitScale
+func (autScript *RegistrationScript) UnitScale() uint64 {
+	return autScript.unitScale
 }
 
-func (script *RegistrationScript) AutMemo() []byte {
-	return script.autMemo
+func (autScript *RegistrationScript) AutMemo() []byte {
+	return autScript.autMemo
 }
 
-func (script *RegistrationScript) PlannedTotalSupply() uint64 {
-	return script.plannedTotalSupply
+func (autScript *RegistrationScript) PlannedTotalSupply() uint64 {
+	return autScript.plannedTotalSupply
 }
 
-func (script *RegistrationScript) Issuers() []*AutIssuer {
-	return script.issuers
+func (autScript *RegistrationScript) Issuers() []*AutIssuer {
+	return autScript.issuers
 }
 
-func (script *RegistrationScript) ReregistrationExpireHeight() int32 {
-	return script.reregistrationExpireHeight
+func (autScript *RegistrationScript) ReregistrationExpireHeight() int32 {
+	return autScript.reregistrationExpireHeight
 }
 
-func (script *RegistrationScript) MintThreshold() uint8 {
-	return script.mintThreshold
+func (autScript *RegistrationScript) MintThreshold() uint8 {
+	return autScript.mintThreshold
 }
 
-func (script *RegistrationScript) ReregisterThreshold() uint8 {
-	return script.reregisterThreshold
+func (autScript *RegistrationScript) ReregisterThreshold() uint8 {
+	return autScript.reregisterThreshold
 }
 
-func (script *RegistrationScript) OutAutRootTokenNum() uint8 {
-	return script.outAutRootTokenNum
+func (autScript *RegistrationScript) OutAutRootTokenNum() uint8 {
+	return autScript.outAutRootTokenNum
 }
 
-func (script *RegistrationScript) ScriptMemo() []byte {
-	return script.scriptMemo
+func (autScript *RegistrationScript) ScriptMemo() []byte {
+	return autScript.scriptMemo
 }
 
 // NewRegistrationScript creates a new RegistrationScript.
@@ -843,136 +843,136 @@ func NewRegistrationScript(version uint32,
 	}
 }
 
-func (script *RegistrationScript) Version() uint32 {
-	return script.version
+func (autScript *RegistrationScript) Version() uint32 {
+	return autScript.version
 }
-func (script *RegistrationScript) Type() AutScriptType {
-	return script.scriptType
+func (autScript *RegistrationScript) Type() AutScriptType {
+	return autScript.scriptType
 }
-func (script *RegistrationScript) AutIdentifier() AutId {
-	return script.autIdentifier
+func (autScript *RegistrationScript) AutIdentifier() AutId {
+	return autScript.autIdentifier
 }
 
-func (script *RegistrationScript) serializeSize() int {
-	n := wire.VarIntSerializeSize(uint64(script.version))                                      // version                    uint32
-	n += 1                                                                                     // scriptType                 AutScriptType
-	n += chainhash.HashSize                                                                    // autIdentifier              AutId
-	n += wire.VarIntSerializeSize(uint64(len(script.autName))) + len(script.autName)           // autName                    []byte
-	n += wire.VarIntSerializeSize(uint64(len(script.autSymbol))) + len(script.autSymbol)       // autSymbol                  []byte
-	n += wire.VarIntSerializeSize(uint64(len(script.baseUnitName))) + len(script.baseUnitName) // baseUnitName               []byte
-	n += wire.VarIntSerializeSize(uint64(len(script.subUnitName))) + len(script.subUnitName)   // subUnitName                []byte
-	n += wire.VarIntSerializeSize(script.unitScale)                                            // unitScale                  uint64
-	n += wire.VarIntSerializeSize(uint64(len(script.autMemo))) + len(script.autMemo)           // autMemo                    []byte
-	n += wire.VarIntSerializeSize(script.plannedTotalSupply)                                   // plannedTotalSupply         uint64
-	n += wire.VarIntSerializeSize(uint64(len(script.issuers)))                                 // issuers                    []*AutIssuer
-	for _, issuer := range script.issuers {
+func (autScript *RegistrationScript) serializeSize() int {
+	n := wire.VarIntSerializeSize(uint64(autScript.version))                                         // version                    uint32
+	n += 1                                                                                           // scriptType                 AutScriptType
+	n += chainhash.HashSize                                                                          // autIdentifier              AutId
+	n += wire.VarIntSerializeSize(uint64(len(autScript.autName))) + len(autScript.autName)           // autName                    []byte
+	n += wire.VarIntSerializeSize(uint64(len(autScript.autSymbol))) + len(autScript.autSymbol)       // autSymbol                  []byte
+	n += wire.VarIntSerializeSize(uint64(len(autScript.baseUnitName))) + len(autScript.baseUnitName) // baseUnitName               []byte
+	n += wire.VarIntSerializeSize(uint64(len(autScript.subUnitName))) + len(autScript.subUnitName)   // subUnitName                []byte
+	n += wire.VarIntSerializeSize(autScript.unitScale)                                               // unitScale                  uint64
+	n += wire.VarIntSerializeSize(uint64(len(autScript.autMemo))) + len(autScript.autMemo)           // autMemo                    []byte
+	n += wire.VarIntSerializeSize(autScript.plannedTotalSupply)                                      // plannedTotalSupply         uint64
+	n += wire.VarIntSerializeSize(uint64(len(autScript.issuers)))                                    // issuers                    []*AutIssuer
+	for _, issuer := range autScript.issuers {
 		n += issuer.serializeSize()
 	}
-	n += wire.VarIntSerializeSize(uint64(script.reregistrationExpireHeight)) // reregistrationExpireHeight int32
+	n += wire.VarIntSerializeSize(uint64(autScript.reregistrationExpireHeight)) // reregistrationExpireHeight int32
 
 	n += 1 // reregisterThreshold        uint8
 	n += 1 // mintThreshold              uint8
 	n += 1 // outAutRootTokenNum         uint8
 
-	n += wire.VarIntSerializeSize(uint64(len(script.scriptMemo))) + len(script.scriptMemo) // scriptMemo                 []byte
+	n += wire.VarIntSerializeSize(uint64(len(autScript.scriptMemo))) + len(autScript.scriptMemo) // scriptMemo                 []byte
 
 	return n
 }
 
-func (script *RegistrationScript) Serialize() ([]byte, error) {
+func (autScript *RegistrationScript) Serialize() ([]byte, error) {
 	var err error
 
-	w := bytes.NewBuffer(make([]byte, 0, script.serializeSize()))
+	w := bytes.NewBuffer(make([]byte, 0, autScript.serializeSize()))
 
 	// version                    uint32
-	if err = wire.WriteVarInt(w, 0, uint64(script.version)); err != nil {
+	if err = wire.WriteVarInt(w, 0, uint64(autScript.version)); err != nil {
 		return nil, err
 	}
 
 	// scriptType                 AutScriptType
-	if err = w.WriteByte(script.Type()); err != nil {
+	if err = w.WriteByte(autScript.Type()); err != nil {
 		return nil, err
 	}
 
 	// autIdentifier              AutId
-	if _, err = w.Write(script.autIdentifier[:]); err != nil {
+	if _, err = w.Write(autScript.autIdentifier[:]); err != nil {
 		return nil, err
 	}
 
 	// autName                    []byte
-	if err = wire.WriteVarBytes(w, 0, script.autName); err != nil {
+	if err = wire.WriteVarBytes(w, 0, autScript.autName); err != nil {
 		return nil, err
 	}
 
 	// autSymbol                  []byte
-	if err = wire.WriteVarBytes(w, 0, script.autSymbol); err != nil {
+	if err = wire.WriteVarBytes(w, 0, autScript.autSymbol); err != nil {
 		return nil, err
 	}
 
 	// baseUnitName               []byte
-	if err = wire.WriteVarBytes(w, 0, script.baseUnitName); err != nil {
+	if err = wire.WriteVarBytes(w, 0, autScript.baseUnitName); err != nil {
 		return nil, err
 	}
 
 	// subUnitName                []byte
-	if err = wire.WriteVarBytes(w, 0, script.subUnitName); err != nil {
+	if err = wire.WriteVarBytes(w, 0, autScript.subUnitName); err != nil {
 		return nil, err
 	}
 
 	// unitScale                  uint64
-	if err = wire.WriteVarInt(w, 0, script.unitScale); err != nil {
+	if err = wire.WriteVarInt(w, 0, autScript.unitScale); err != nil {
 		return nil, err
 	}
 
 	// autMemo                    []byte
-	if err = wire.WriteVarBytes(w, 0, script.autMemo); err != nil {
+	if err = wire.WriteVarBytes(w, 0, autScript.autMemo); err != nil {
 		return nil, err
 	}
 
 	// plannedTotalSupply         uint64
-	if err = wire.WriteVarInt(w, 0, script.plannedTotalSupply); err != nil {
+	if err = wire.WriteVarInt(w, 0, autScript.plannedTotalSupply); err != nil {
 		return nil, err
 	}
 
 	// issuers                    []*AutIssuer
-	if err = wire.WriteVarInt(w, 0, uint64(len(script.issuers))); err != nil {
+	if err = wire.WriteVarInt(w, 0, uint64(len(autScript.issuers))); err != nil {
 		return nil, err
 	}
-	for _, issuer := range script.issuers {
+	for _, issuer := range autScript.issuers {
 		if err = issuer.write(w); err != nil {
 			return nil, err
 		}
 	}
 
 	// reregistrationExpireHeight int32
-	if err = wire.WriteVarInt(w, 0, uint64(script.reregistrationExpireHeight)); err != nil {
+	if err = wire.WriteVarInt(w, 0, uint64(autScript.reregistrationExpireHeight)); err != nil {
 		return nil, err
 	}
 
 	// reregisterThreshold        uint8
-	if err = w.WriteByte(script.reregisterThreshold); err != nil {
+	if err = w.WriteByte(autScript.reregisterThreshold); err != nil {
 		return nil, err
 	}
 
 	// mintThreshold              uint8
-	if err = w.WriteByte(script.mintThreshold); err != nil {
+	if err = w.WriteByte(autScript.mintThreshold); err != nil {
 		return nil, err
 	}
 
 	// outAutRootTokenNum         uint8
-	if err = w.WriteByte(script.outAutRootTokenNum); err != nil {
+	if err = w.WriteByte(autScript.outAutRootTokenNum); err != nil {
 		return nil, err
 	}
 
 	// scriptMemo                 []byte
-	if err = wire.WriteVarBytes(w, 0, script.scriptMemo); err != nil {
+	if err = wire.WriteVarBytes(w, 0, autScript.scriptMemo); err != nil {
 		return nil, err
 	}
 
 	return w.Bytes(), nil
 }
 
-func (script *RegistrationScript) Deserialize(serializedScript []byte) error {
+func (autScript *RegistrationScript) Deserialize(serializedScript []byte) error {
 	var err error
 
 	r := bytes.NewReader(serializedScript)
@@ -985,51 +985,51 @@ func (script *RegistrationScript) Deserialize(serializedScript []byte) error {
 	if version > math.MaxUint32 {
 		return fmt.Errorf("readed version %d is too large", version)
 	}
-	script.version = uint32(version)
+	autScript.version = uint32(version)
 
 	// scriptType                 AutScriptType
-	script.scriptType, err = r.ReadByte()
+	autScript.scriptType, err = r.ReadByte()
 	if err != nil {
 		return err
 	}
 
 	// autIdentifier              AutId
-	if _, err = io.ReadFull(r, script.autIdentifier[:]); err != nil {
+	if _, err = io.ReadFull(r, autScript.autIdentifier[:]); err != nil {
 		return err
 	}
 
 	// autName                    []byte
-	if script.autName, err = wire.ReadVarBytes(r, 0, MaxAutNameLength, "autName"); err != nil {
+	if autScript.autName, err = wire.ReadVarBytes(r, 0, MaxAutNameLength, "autName"); err != nil {
 		return err
 	}
 
 	// autSymbol                  []byte
-	if script.autSymbol, err = wire.ReadVarBytes(r, 0, MaxAutSymbolLength, "autSymbol"); err != nil {
+	if autScript.autSymbol, err = wire.ReadVarBytes(r, 0, MaxAutSymbolLength, "autSymbol"); err != nil {
 		return err
 	}
 
 	// baseUnitName               []byte
-	if script.baseUnitName, err = wire.ReadVarBytes(r, 0, MaxBaseUnitLength, "baseUnitName"); err != nil {
+	if autScript.baseUnitName, err = wire.ReadVarBytes(r, 0, MaxBaseUnitLength, "baseUnitName"); err != nil {
 		return err
 	}
 
 	// subUnitName                []byte
-	if script.subUnitName, err = wire.ReadVarBytes(r, 0, MaxSubUnitLength, "subUnitName"); err != nil {
+	if autScript.subUnitName, err = wire.ReadVarBytes(r, 0, MaxSubUnitLength, "subUnitName"); err != nil {
 		return err
 	}
 
 	// unitScale                  uint64
-	if script.unitScale, err = wire.ReadVarInt(r, 0); err != nil {
+	if autScript.unitScale, err = wire.ReadVarInt(r, 0); err != nil {
 		return err
 	}
 
 	// autMemo                    []byte
-	if script.autMemo, err = wire.ReadVarBytes(r, 0, MaxAutMemoLength, "autMemo"); err != nil {
+	if autScript.autMemo, err = wire.ReadVarBytes(r, 0, MaxAutMemoLength, "autMemo"); err != nil {
 		return err
 	}
 
 	// plannedTotalSupply         uint64
-	if script.plannedTotalSupply, err = wire.ReadVarInt(r, 0); err != nil {
+	if autScript.plannedTotalSupply, err = wire.ReadVarInt(r, 0); err != nil {
 		return err
 	}
 
@@ -1041,13 +1041,13 @@ func (script *RegistrationScript) Deserialize(serializedScript []byte) error {
 	if issuerNum > MaxIssuerNum {
 		return fmt.Errorf("readed issuer num %d is too large", issuerNum)
 	}
-	script.issuers = make([]*AutIssuer, issuerNum)
+	autScript.issuers = make([]*AutIssuer, issuerNum)
 	for i := uint64(0); i < issuerNum; i++ {
 		issuer := &AutIssuer{}
 		if err = issuer.read(r); err != nil {
 			return err
 		}
-		script.issuers[i] = issuer
+		autScript.issuers[i] = issuer
 	}
 
 	// reregistrationExpireHeight int32
@@ -1059,107 +1059,107 @@ func (script *RegistrationScript) Deserialize(serializedScript []byte) error {
 	if tmp < -1 || tmp > math.MaxInt32 {
 		return fmt.Errorf("readed expire height %d is not in [-1, %d]", tmp, math.MaxInt32)
 	}
-	script.reregistrationExpireHeight = int32(expireHeightRead)
+	autScript.reregistrationExpireHeight = int32(expireHeightRead)
 
 	// reregisterThreshold        uint8
-	script.reregisterThreshold, err = r.ReadByte()
+	autScript.reregisterThreshold, err = r.ReadByte()
 	if err != nil {
 		return err
 	}
 
 	// mintThreshold              uint8
-	if script.mintThreshold, err = r.ReadByte(); err != nil {
+	if autScript.mintThreshold, err = r.ReadByte(); err != nil {
 		return err
 	}
 
 	// outAutRootTokenNum         uint8
-	if script.outAutRootTokenNum, err = r.ReadByte(); err != nil {
+	if autScript.outAutRootTokenNum, err = r.ReadByte(); err != nil {
 		return err
 	}
 
 	// scriptMemo                 []byte
-	script.scriptMemo, err = wire.ReadVarBytes(r, 0, MaxScriptMemoLength, "scriptMemo")
+	autScript.scriptMemo, err = wire.ReadVarBytes(r, 0, MaxScriptMemoLength, "scriptMemo")
 	if err != nil {
 		return err
 	}
 
-	return script.SanityCheck()
+	return autScript.SanityCheck()
 }
 
-func (script *RegistrationScript) SanityCheck() error {
+func (autScript *RegistrationScript) SanityCheck() error {
 
 	// version                    uint32
-	if _, ok := ctautwire.AutScriptVersionSet[script.version]; !ok {
-		return fmt.Errorf("invalid version: %d", script.version)
+	if _, ok := ctautwire.AutScriptVersionSet[autScript.version]; !ok {
+		return fmt.Errorf("invalid version: %d", autScript.version)
 	}
 
 	// scriptType                 AutScriptType
-	if script.scriptType != AutScriptTypeRegistration {
-		return fmt.Errorf("script.scriptType (%d) is not AutScriptTypeRegistration", script.scriptType)
+	if autScript.scriptType != AutScriptTypeRegistration {
+		return fmt.Errorf("autScript.scriptType (%d) is not AutScriptTypeRegistration", autScript.scriptType)
 	}
 
 	// autIdentifier              AutId
-	if !bytes.Equal(script.autIdentifier[:], ZeroHash[:]) {
-		return fmt.Errorf("invalid autIdentifier (%x) for RegistrationScript", script.autIdentifier[:])
+	if !bytes.Equal(autScript.autIdentifier[:], ZeroHash[:]) {
+		return fmt.Errorf("invalid autIdentifier (%x) for RegistrationScript", autScript.autIdentifier[:])
 	}
 
 	// autName                    []byte
-	if len(script.autName) == 0 {
-		return fmt.Errorf("script.autName is empty/nil")
+	if len(autScript.autName) == 0 {
+		return fmt.Errorf("autScript.autName is empty/nil")
 	}
-	if len(script.autName) > MaxAutNameLength {
-		return fmt.Errorf("script.autName is too long (%d)", len(script.autName))
+	if len(autScript.autName) > MaxAutNameLength {
+		return fmt.Errorf("autScript.autName is too long (%d)", len(autScript.autName))
 	}
 
 	// autSymbol                  []byte
-	if len(script.autSymbol) == 0 {
-		return fmt.Errorf("script.autSymbol is empty/nil")
+	if len(autScript.autSymbol) == 0 {
+		return fmt.Errorf("autScript.autSymbol is empty/nil")
 	}
-	if len(script.autSymbol) > MaxAutSymbolLength {
-		return fmt.Errorf("script.autSymbol is too long (%d)", len(script.autSymbol))
+	if len(autScript.autSymbol) > MaxAutSymbolLength {
+		return fmt.Errorf("autScript.autSymbol is too long (%d)", len(autScript.autSymbol))
 	}
 
 	// baseUnitName               []byte
-	if len(script.baseUnitName) == 0 {
-		return fmt.Errorf("script.baseUnitName is empty/nil")
+	if len(autScript.baseUnitName) == 0 {
+		return fmt.Errorf("autScript.baseUnitName is empty/nil")
 	}
-	if len(script.baseUnitName) > MaxBaseUnitLength {
-		return fmt.Errorf("script.baseUnitName is too long (%d)", len(script.baseUnitName))
+	if len(autScript.baseUnitName) > MaxBaseUnitLength {
+		return fmt.Errorf("autScript.baseUnitName is too long (%d)", len(autScript.baseUnitName))
 	}
 
 	// subUnitName                []byte
-	if len(script.subUnitName) == 0 {
-		return fmt.Errorf("script.subUnitName is empty/nil")
+	if len(autScript.subUnitName) == 0 {
+		return fmt.Errorf("autScript.subUnitName is empty/nil")
 	}
-	if len(script.subUnitName) > MaxSubUnitLength {
-		return fmt.Errorf("script.subUnitName is too long (%d)", len(script.subUnitName))
+	if len(autScript.subUnitName) > MaxSubUnitLength {
+		return fmt.Errorf("autScript.subUnitName is too long (%d)", len(autScript.subUnitName))
 	}
 
 	// unitScale                  uint64
-	if script.unitScale == 0 || script.unitScale > MaxAmount {
-		return fmt.Errorf("script.unitScale (%d) is not in [1, %d]", script.unitScale, MaxAmount)
+	if autScript.unitScale == 0 || autScript.unitScale > MaxAmount {
+		return fmt.Errorf("autScript.unitScale (%d) is not in [1, %d]", autScript.unitScale, MaxAmount)
 	}
-	if script.unitScale > script.plannedTotalSupply {
-		return fmt.Errorf("script.unitScale (%d) exceeds script.plannedTotalSupply (%d)",
-			script.unitScale, script.plannedTotalSupply)
+	if autScript.unitScale > autScript.plannedTotalSupply {
+		return fmt.Errorf("autScript.unitScale (%d) exceeds autScript.plannedTotalSupply (%d)",
+			autScript.unitScale, autScript.plannedTotalSupply)
 	}
 
 	// autMemo                    []byte
-	if len(script.autMemo) > MaxAutMemoLength {
-		return fmt.Errorf("script.autMemo length (%d) exceeds MaxAutMemoLength (%d)", len(script.autMemo), MaxAutMemoLength)
+	if len(autScript.autMemo) > MaxAutMemoLength {
+		return fmt.Errorf("autScript.autMemo length (%d) exceeds MaxAutMemoLength (%d)", len(autScript.autMemo), MaxAutMemoLength)
 	}
 
 	// plannedTotalSupply         uint64
-	if script.plannedTotalSupply == 0 || script.plannedTotalSupply > MaxAmount {
-		return fmt.Errorf("script.plannedTotalSupply (%d) is not in [1, %d]", script.plannedTotalSupply, MaxAmount)
+	if autScript.plannedTotalSupply == 0 || autScript.plannedTotalSupply > MaxAmount {
+		return fmt.Errorf("autScript.plannedTotalSupply (%d) is not in [1, %d]", autScript.plannedTotalSupply, MaxAmount)
 	}
 
 	// issuers                    []*AutIssuer
-	if len(script.issuers) == 0 || len(script.issuers) > MaxIssuerNum {
-		return fmt.Errorf("the number of issuers (%d) is not in [1, %d]", len(script.issuers), MaxIssuerNum)
+	if len(autScript.issuers) == 0 || len(autScript.issuers) > MaxIssuerNum {
+		return fmt.Errorf("the number of issuers (%d) is not in [1, %d]", len(autScript.issuers), MaxIssuerNum)
 	}
-	issuersMap := make(map[string]int, len(script.issuers))
-	for i, issuer := range script.issuers {
+	issuersMap := make(map[string]int, len(autScript.issuers))
+	for i, issuer := range autScript.issuers {
 		issuerStr := issuer.String()
 		if index, ok := issuersMap[issuerStr]; ok {
 			return fmt.Errorf("issuers[%d] and issuers[%d] are repeated : %s", i, index, issuerStr)
@@ -1168,55 +1168,55 @@ func (script *RegistrationScript) SanityCheck() error {
 	}
 
 	// reregistrationExpireHeight int32
-	if script.reregistrationExpireHeight < InfiniteExpireHeight || script.reregistrationExpireHeight > math.MaxInt32 {
-		return fmt.Errorf("script.reregistrationExpireHeight (%d) is not in [-1, %d]",
-			script.reregistrationExpireHeight, math.MaxInt32)
+	if autScript.reregistrationExpireHeight < InfiniteExpireHeight || autScript.reregistrationExpireHeight > math.MaxInt32 {
+		return fmt.Errorf("autScript.reregistrationExpireHeight (%d) is not in [-1, %d]",
+			autScript.reregistrationExpireHeight, math.MaxInt32)
 	}
 
 	// reregisterThreshold        uint8
-	if int(script.reregisterThreshold) == 0 {
-		return fmt.Errorf("script.reregisterThreshold (%d) is invalid",
-			script.reregisterThreshold)
+	if int(autScript.reregisterThreshold) == 0 {
+		return fmt.Errorf("autScript.reregisterThreshold (%d) is invalid",
+			autScript.reregisterThreshold)
 	}
-	if int(script.reregisterThreshold) > len(script.issuers) {
-		return fmt.Errorf("script.reregisterThreshold (%d) exceeds the number of issuers (%d)",
-			script.reregisterThreshold, len(script.issuers))
+	if int(autScript.reregisterThreshold) > len(autScript.issuers) {
+		return fmt.Errorf("autScript.reregisterThreshold (%d) exceeds the number of issuers (%d)",
+			autScript.reregisterThreshold, len(autScript.issuers))
 	}
 
 	// mintThreshold              uint8
-	if int(script.mintThreshold) == 0 {
-		return fmt.Errorf("script.mintThreshold (%d) is invalid",
-			script.mintThreshold)
+	if int(autScript.mintThreshold) == 0 {
+		return fmt.Errorf("autScript.mintThreshold (%d) is invalid",
+			autScript.mintThreshold)
 	}
-	if int(script.mintThreshold) > len(script.issuers) {
-		return fmt.Errorf("script.mintThreshold (%d) exceeds the number of issuers (%d)",
-			script.mintThreshold, len(script.issuers))
+	if int(autScript.mintThreshold) > len(autScript.issuers) {
+		return fmt.Errorf("autScript.mintThreshold (%d) exceeds the number of issuers (%d)",
+			autScript.mintThreshold, len(autScript.issuers))
 	}
 
 	// outAutRootTokenNum         uint8
-	if int(script.outAutRootTokenNum) == 0 {
-		return fmt.Errorf("script.outAutRootTokenNum (%d) is invalid",
-			script.outAutRootTokenNum)
+	if int(autScript.outAutRootTokenNum) == 0 {
+		return fmt.Errorf("autScript.outAutRootTokenNum (%d) is invalid",
+			autScript.outAutRootTokenNum)
 	}
-	if int(script.outAutRootTokenNum) > MaxNumToken {
-		return fmt.Errorf("script.outAutRootTokenNum (%d) exceeds the allowed max number (%d)",
-			script.outAutRootTokenNum, MaxNumToken)
+	if int(autScript.outAutRootTokenNum) > MaxNumToken {
+		return fmt.Errorf("autScript.outAutRootTokenNum (%d) exceeds the allowed max number (%d)",
+			autScript.outAutRootTokenNum, MaxNumToken)
 	}
 
-	// scriptMemo                 []byte
-	if len(script.scriptMemo) > MaxScriptMemoLength {
-		return fmt.Errorf("len(script.scriptMemo) (%d) is too large", len(script.scriptMemo))
+	// autScriptMemo                 []byte
+	if len(autScript.scriptMemo) > MaxScriptMemoLength {
+		return fmt.Errorf("len(autScript.scriptMemo) (%d) is too large", len(autScript.scriptMemo))
 	}
 
 	return nil
 }
 
-func (script *RegistrationScript) NumConsumedTokens() int {
+func (autScript *RegistrationScript) NumConsumedTokens() int {
 	return 0
 }
 
-func (script *RegistrationScript) NumGeneratedTokens() int {
-	return int(script.outAutRootTokenNum)
+func (autScript *RegistrationScript) NumGeneratedTokens() int {
+	return int(autScript.outAutRootTokenNum)
 }
 
 var _ AutScript = &RegistrationScript{}
@@ -1278,40 +1278,40 @@ type ReRegistrationScript struct {
 	scriptMemo []byte
 }
 
-func (script *ReRegistrationScript) AutMemo() []byte {
-	return script.autMemo
+func (autScript *ReRegistrationScript) AutMemo() []byte {
+	return autScript.autMemo
 }
 
-func (script *ReRegistrationScript) PlannedTotalSupply() uint64 {
-	return script.plannedTotalSupply
+func (autScript *ReRegistrationScript) PlannedTotalSupply() uint64 {
+	return autScript.plannedTotalSupply
 }
 
-func (script *ReRegistrationScript) Issuers() []*AutIssuer {
-	return script.issuers
+func (autScript *ReRegistrationScript) Issuers() []*AutIssuer {
+	return autScript.issuers
 }
 
-func (script *ReRegistrationScript) ReregistrationExpireHeight() int32 {
-	return script.reregistrationExpireHeight
+func (autScript *ReRegistrationScript) ReregistrationExpireHeight() int32 {
+	return autScript.reregistrationExpireHeight
 }
 
-func (script *ReRegistrationScript) MintThreshold() uint8 {
-	return script.mintThreshold
+func (autScript *ReRegistrationScript) MintThreshold() uint8 {
+	return autScript.mintThreshold
 }
 
-func (script *ReRegistrationScript) ReregisterThreshold() uint8 {
-	return script.reregisterThreshold
+func (autScript *ReRegistrationScript) ReregisterThreshold() uint8 {
+	return autScript.reregisterThreshold
 }
 
-func (script *ReRegistrationScript) InAutRootTokenNum() uint8 {
-	return script.inAutRootTokenNum
+func (autScript *ReRegistrationScript) InAutRootTokenNum() uint8 {
+	return autScript.inAutRootTokenNum
 }
 
-func (script *ReRegistrationScript) OutAutRootTokenNum() uint8 {
-	return script.outAutRootTokenNum
+func (autScript *ReRegistrationScript) OutAutRootTokenNum() uint8 {
+	return autScript.outAutRootTokenNum
 }
 
-func (script *ReRegistrationScript) ScriptMemo() []byte {
-	return script.scriptMemo
+func (autScript *ReRegistrationScript) ScriptMemo() []byte {
+	return autScript.scriptMemo
 }
 
 func NewReRegistrationScript(version uint32,
@@ -1337,112 +1337,112 @@ func NewReRegistrationScript(version uint32,
 	}
 }
 
-func (script *ReRegistrationScript) Version() uint32 {
-	return script.version
+func (autScript *ReRegistrationScript) Version() uint32 {
+	return autScript.version
 }
-func (script *ReRegistrationScript) Type() AutScriptType {
-	return script.scriptType
+func (autScript *ReRegistrationScript) Type() AutScriptType {
+	return autScript.scriptType
 }
-func (script *ReRegistrationScript) AutIdentifier() AutId {
-	return script.autIdentifier
+func (autScript *ReRegistrationScript) AutIdentifier() AutId {
+	return autScript.autIdentifier
 }
 
-func (script *ReRegistrationScript) serializeSize() int {
-	n := wire.VarIntSerializeSize(uint64(script.version))                            // version                    uint32
-	n += 1                                                                           // scriptType                 AutScriptType
-	n += chainhash.HashSize                                                          // autIdentifier              AutId
-	n += wire.VarIntSerializeSize(uint64(len(script.autMemo))) + len(script.autMemo) // autMemo                    []byte
-	n += wire.VarIntSerializeSize(script.plannedTotalSupply)                         // plannedTotalSupply         uint64
-	n += wire.VarIntSerializeSize(uint64(len(script.issuers)))                       // issuers                    []*AutIssuer
-	for _, issuer := range script.issuers {
+func (autScript *ReRegistrationScript) serializeSize() int {
+	n := wire.VarIntSerializeSize(uint64(autScript.version))                               // version                    uint32
+	n += 1                                                                                 // scriptType                 AutScriptType
+	n += chainhash.HashSize                                                                // autIdentifier              AutId
+	n += wire.VarIntSerializeSize(uint64(len(autScript.autMemo))) + len(autScript.autMemo) // autMemo                    []byte
+	n += wire.VarIntSerializeSize(autScript.plannedTotalSupply)                            // plannedTotalSupply         uint64
+	n += wire.VarIntSerializeSize(uint64(len(autScript.issuers)))                          // issuers                    []*AutIssuer
+	for _, issuer := range autScript.issuers {
 		n += issuer.serializeSize()
 	}
-	n += wire.VarIntSerializeSize(uint64(script.reregistrationExpireHeight)) // reregistrationExpireHeight int32
+	n += wire.VarIntSerializeSize(uint64(autScript.reregistrationExpireHeight)) // reregistrationExpireHeight int32
 
 	n += 1 // reregisterThreshold        uint8
 	n += 1 // mintThreshold              uint8
 	n += 1 // inAutRootTokenNum          uint8
 	n += 1 // outAutRootTokenNum         uint8
 
-	n += wire.VarIntSerializeSize(uint64(len(script.scriptMemo))) + len(script.scriptMemo) // scriptMemo                 []byte
+	n += wire.VarIntSerializeSize(uint64(len(autScript.scriptMemo))) + len(autScript.scriptMemo) // scriptMemo                 []byte
 
 	return n
 }
 
-func (script *ReRegistrationScript) Serialize() ([]byte, error) {
+func (autScript *ReRegistrationScript) Serialize() ([]byte, error) {
 	var err error
 
-	w := bytes.NewBuffer(make([]byte, 0, script.serializeSize()))
+	w := bytes.NewBuffer(make([]byte, 0, autScript.serializeSize()))
 
 	// version                    uint32
-	if err = wire.WriteVarInt(w, 0, uint64(script.version)); err != nil {
+	if err = wire.WriteVarInt(w, 0, uint64(autScript.version)); err != nil {
 		return nil, err
 	}
 
 	// scriptType                 AutScriptType
-	if err = w.WriteByte(script.Type()); err != nil {
+	if err = w.WriteByte(autScript.Type()); err != nil {
 		return nil, err
 	}
 
 	// autIdentifier              AutId
-	if _, err = w.Write(script.autIdentifier[:]); err != nil {
+	if _, err = w.Write(autScript.autIdentifier[:]); err != nil {
 		return nil, err
 	}
 
 	// autMemo                    []byte
-	if err = wire.WriteVarBytes(w, 0, script.autMemo); err != nil {
+	if err = wire.WriteVarBytes(w, 0, autScript.autMemo); err != nil {
 		return nil, err
 	}
 
 	// plannedTotalSupply         uint64
-	if err = wire.WriteVarInt(w, 0, script.plannedTotalSupply); err != nil {
+	if err = wire.WriteVarInt(w, 0, autScript.plannedTotalSupply); err != nil {
 		return nil, err
 	}
 
 	// issuers                    []*AutIssuer
-	if err = wire.WriteVarInt(w, 0, uint64(len(script.issuers))); err != nil {
+	if err = wire.WriteVarInt(w, 0, uint64(len(autScript.issuers))); err != nil {
 		return nil, err
 	}
-	for _, issuer := range script.issuers {
+	for _, issuer := range autScript.issuers {
 		if err = issuer.write(w); err != nil {
 			return nil, err
 		}
 	}
 
 	// reregistrationExpireHeight int32
-	if err = wire.WriteVarInt(w, 0, uint64(script.reregistrationExpireHeight)); err != nil {
+	if err = wire.WriteVarInt(w, 0, uint64(autScript.reregistrationExpireHeight)); err != nil {
 		return nil, err
 	}
 
 	// reregisterThreshold        uint8
-	if err = w.WriteByte(script.reregisterThreshold); err != nil {
+	if err = w.WriteByte(autScript.reregisterThreshold); err != nil {
 		return nil, err
 	}
 
 	// mintThreshold              uint8
-	if err = w.WriteByte(script.mintThreshold); err != nil {
+	if err = w.WriteByte(autScript.mintThreshold); err != nil {
 		return nil, err
 	}
 
 	// inAutRootTokenNum         uint8
-	if err = w.WriteByte(script.inAutRootTokenNum); err != nil {
+	if err = w.WriteByte(autScript.inAutRootTokenNum); err != nil {
 		return nil, err
 	}
 
 	// outAutRootTokenNum         uint8
-	if err = w.WriteByte(script.outAutRootTokenNum); err != nil {
+	if err = w.WriteByte(autScript.outAutRootTokenNum); err != nil {
 		return nil, err
 	}
 
 	// scriptMemo                 []byte
-	if err = wire.WriteVarBytes(w, 0, script.scriptMemo); err != nil {
+	if err = wire.WriteVarBytes(w, 0, autScript.scriptMemo); err != nil {
 		return nil, err
 	}
 
 	return w.Bytes(), nil
 }
 
-func (script *ReRegistrationScript) Deserialize(serializedScript []byte) error {
+func (autScript *ReRegistrationScript) Deserialize(serializedScript []byte) error {
 	var err error
 
 	r := bytes.NewReader(serializedScript)
@@ -1455,26 +1455,26 @@ func (script *ReRegistrationScript) Deserialize(serializedScript []byte) error {
 	if version > math.MaxUint32 {
 		return fmt.Errorf("readed version %d is too large", version)
 	}
-	script.version = uint32(version)
+	autScript.version = uint32(version)
 
 	// scriptType                 AutScriptType
-	script.scriptType, err = r.ReadByte()
+	autScript.scriptType, err = r.ReadByte()
 	if err != nil {
 		return err
 	}
 
 	// autIdentifier              AutId
-	if _, err = io.ReadFull(r, script.autIdentifier[:]); err != nil {
+	if _, err = io.ReadFull(r, autScript.autIdentifier[:]); err != nil {
 		return err
 	}
 
 	// autMemo                    []byte
-	if script.autMemo, err = wire.ReadVarBytes(r, 0, MaxAutMemoLength, "autMemo"); err != nil {
+	if autScript.autMemo, err = wire.ReadVarBytes(r, 0, MaxAutMemoLength, "autMemo"); err != nil {
 		return err
 	}
 
 	// plannedTotalSupply         uint64
-	if script.plannedTotalSupply, err = wire.ReadVarInt(r, 0); err != nil {
+	if autScript.plannedTotalSupply, err = wire.ReadVarInt(r, 0); err != nil {
 		return err
 	}
 
@@ -1484,15 +1484,15 @@ func (script *ReRegistrationScript) Deserialize(serializedScript []byte) error {
 		return err
 	}
 	if issuerNum > MaxIssuerNum {
-		return fmt.Errorf("readed issuer num %d is too large", issuerNum)
+		return fmt.Errorf("read issuer num %d is too large", issuerNum)
 	}
-	script.issuers = make([]*AutIssuer, issuerNum)
+	autScript.issuers = make([]*AutIssuer, issuerNum)
 	for i := uint64(0); i < issuerNum; i++ {
 		issuer := &AutIssuer{}
 		if err = issuer.read(r); err != nil {
 			return err
 		}
-		script.issuers[i] = issuer
+		autScript.issuers[i] = issuer
 	}
 
 	// reregistrationExpireHeight int32
@@ -1502,70 +1502,70 @@ func (script *ReRegistrationScript) Deserialize(serializedScript []byte) error {
 	}
 	tmp := int64(expireHeightRead)
 	if tmp < -1 || tmp > math.MaxInt32 {
-		return fmt.Errorf("readed expire height %d is not in [-1, %d]", tmp, math.MaxInt32)
+		return fmt.Errorf("read expire height %d is not in [-1, %d]", tmp, math.MaxInt32)
 	}
-	script.reregistrationExpireHeight = int32(expireHeightRead)
+	autScript.reregistrationExpireHeight = int32(expireHeightRead)
 
 	// reregisterThreshold        uint8
-	script.reregisterThreshold, err = r.ReadByte()
+	autScript.reregisterThreshold, err = r.ReadByte()
 	if err != nil {
 		return err
 	}
 
 	// mintThreshold              uint8
-	if script.mintThreshold, err = r.ReadByte(); err != nil {
+	if autScript.mintThreshold, err = r.ReadByte(); err != nil {
 		return err
 	}
 
 	// inAutRootTokenNum         uint8
-	if script.inAutRootTokenNum, err = r.ReadByte(); err != nil {
+	if autScript.inAutRootTokenNum, err = r.ReadByte(); err != nil {
 		return err
 	}
 
 	// outAutRootTokenNum         uint8
-	if script.outAutRootTokenNum, err = r.ReadByte(); err != nil {
+	if autScript.outAutRootTokenNum, err = r.ReadByte(); err != nil {
 		return err
 	}
 
 	// scriptMemo                 []byte
-	script.scriptMemo, err = wire.ReadVarBytes(r, 0, MaxScriptMemoLength, "scriptMemo")
+	autScript.scriptMemo, err = wire.ReadVarBytes(r, 0, MaxScriptMemoLength, "scriptMemo")
 	if err != nil {
 		return err
 	}
 
-	return script.SanityCheck()
+	return autScript.SanityCheck()
 }
 
-func (script *ReRegistrationScript) SanityCheck() error {
+func (autScript *ReRegistrationScript) SanityCheck() error {
 
 	// version                    uint32
-	if _, ok := ctautwire.AutScriptVersionSet[script.version]; !ok {
-		return fmt.Errorf("invalid version: %d", script.version)
+	if _, ok := ctautwire.AutScriptVersionSet[autScript.version]; !ok {
+		return fmt.Errorf("invalid version: %d", autScript.version)
 	}
 
 	// scriptType                 AutScriptType
-	if script.scriptType != AutScriptTypeReRegistration {
-		return fmt.Errorf("script.scriptType (%d) is not AutScriptTypeReRegistration", script.scriptType)
+	if autScript.scriptType != AutScriptTypeReRegistration {
+		return fmt.Errorf("autScript.scriptType (%d) is not AutScriptTypeReRegistration", autScript.scriptType)
 	}
 
 	// autIdentifier              AutId
 
 	// autMemo                    []byte
-	if len(script.autMemo) > MaxAutMemoLength {
-		return fmt.Errorf("script.autMemo length (%d) exceeds MaxAutMemoLength (%d)", len(script.autMemo), MaxAutMemoLength)
+	if len(autScript.autMemo) > MaxAutMemoLength {
+		return fmt.Errorf("autScript.autMemo length (%d) exceeds MaxAutMemoLength (%d)", len(autScript.autMemo), MaxAutMemoLength)
 	}
 
 	// plannedTotalSupply         uint64
-	if script.plannedTotalSupply == 0 || script.plannedTotalSupply > MaxAmount {
-		return fmt.Errorf("script.plannedTotalSupply (%d) is not in [1, %d]", script.plannedTotalSupply, MaxAmount)
+	if autScript.plannedTotalSupply == 0 || autScript.plannedTotalSupply > MaxAmount {
+		return fmt.Errorf("script.plannedTotalSupply (%d) is not in [1, %d]", autScript.plannedTotalSupply, MaxAmount)
 	}
 
 	// issuers                    []*AutIssuer
-	if len(script.issuers) == 0 || len(script.issuers) > MaxIssuerNum {
-		return fmt.Errorf("the number of issuers (%d) is not in [1, %d]", len(script.issuers), MaxIssuerNum)
+	if len(autScript.issuers) == 0 || len(autScript.issuers) > MaxIssuerNum {
+		return fmt.Errorf("the number of issuers (%d) is not in [1, %d]", len(autScript.issuers), MaxIssuerNum)
 	}
-	issuersMap := make(map[string]int, len(script.issuers))
-	for i, issuer := range script.issuers {
+	issuersMap := make(map[string]int, len(autScript.issuers))
+	for i, issuer := range autScript.issuers {
 		issuerStr := issuer.String()
 		if index, ok := issuersMap[issuerStr]; ok {
 			return fmt.Errorf("issuers[%d] and issuers[%d] are repeated : %s", i, index, issuerStr)
@@ -1574,64 +1574,64 @@ func (script *ReRegistrationScript) SanityCheck() error {
 	}
 
 	// reregistrationExpireHeight int32
-	if script.reregistrationExpireHeight < InfiniteExpireHeight || script.reregistrationExpireHeight > math.MaxInt32 {
-		return fmt.Errorf("script.reregistrationExpireHeight (%d) is not in [-1, %d]",
-			script.reregistrationExpireHeight, math.MaxInt32)
+	if autScript.reregistrationExpireHeight < InfiniteExpireHeight || autScript.reregistrationExpireHeight > math.MaxInt32 {
+		return fmt.Errorf("autScript.reregistrationExpireHeight (%d) is not in [-1, %d]",
+			autScript.reregistrationExpireHeight, math.MaxInt32)
 	}
 
 	// reregisterThreshold        uint8
-	if int(script.reregisterThreshold) == 0 {
-		return fmt.Errorf("script.reregisterThreshold (%d) is invalid",
-			script.reregisterThreshold)
+	if int(autScript.reregisterThreshold) == 0 {
+		return fmt.Errorf("autScript.reregisterThreshold (%d) is invalid",
+			autScript.reregisterThreshold)
 	}
-	if int(script.reregisterThreshold) > len(script.issuers) {
-		return fmt.Errorf("script.reregisterThreshold (%d) exceeds the number of issuers (%d)",
-			script.reregisterThreshold, len(script.issuers))
+	if int(autScript.reregisterThreshold) > len(autScript.issuers) {
+		return fmt.Errorf("autScript.reregisterThreshold (%d) exceeds the number of issuers (%d)",
+			autScript.reregisterThreshold, len(autScript.issuers))
 	}
 
 	// mintThreshold              uint8
-	if int(script.mintThreshold) == 0 {
-		return fmt.Errorf("script.mintThreshold (%d) is invalid",
-			script.mintThreshold)
+	if int(autScript.mintThreshold) == 0 {
+		return fmt.Errorf("autScript.mintThreshold (%d) is invalid",
+			autScript.mintThreshold)
 	}
-	if int(script.mintThreshold) > len(script.issuers) {
-		return fmt.Errorf("script.mintThreshold (%d) exceeds the number of issuers (%d)",
-			script.mintThreshold, len(script.issuers))
+	if int(autScript.mintThreshold) > len(autScript.issuers) {
+		return fmt.Errorf("autScript.mintThreshold (%d) exceeds the number of issuers (%d)",
+			autScript.mintThreshold, len(autScript.issuers))
 	}
 
 	// inAutRootTokenNum         uint8
-	if int(script.inAutRootTokenNum) == 0 {
-		return fmt.Errorf("script.inAutRootTokenNum (%d) is invalid",
-			script.inAutRootTokenNum)
+	if int(autScript.inAutRootTokenNum) == 0 {
+		return fmt.Errorf("autScript.inAutRootTokenNum (%d) is invalid",
+			autScript.inAutRootTokenNum)
 	}
-	if int(script.inAutRootTokenNum) > MaxNumToken {
-		return fmt.Errorf("script.inAutRootTokenNum (%d) exceeds the allowed max number (%d)",
-			script.inAutRootTokenNum, MaxNumToken)
+	if int(autScript.inAutRootTokenNum) > MaxNumToken {
+		return fmt.Errorf("autScript.inAutRootTokenNum (%d) exceeds the allowed max number (%d)",
+			autScript.inAutRootTokenNum, MaxNumToken)
 	}
 
 	// outAutRootTokenNum         uint8
-	if int(script.outAutRootTokenNum) == 0 {
-		return fmt.Errorf("script.outAutRootTokenNum (%d) is invalid",
-			script.outAutRootTokenNum)
+	if int(autScript.outAutRootTokenNum) == 0 {
+		return fmt.Errorf("autScript.outAutRootTokenNum (%d) is invalid",
+			autScript.outAutRootTokenNum)
 	}
-	if int(script.outAutRootTokenNum) > MaxNumToken {
-		return fmt.Errorf("script.outAutRootTokenNum (%d) exceeds the allowed max number (%d)",
-			script.outAutRootTokenNum, MaxNumToken)
+	if int(autScript.outAutRootTokenNum) > MaxNumToken {
+		return fmt.Errorf("autScript.outAutRootTokenNum (%d) exceeds the allowed max number (%d)",
+			autScript.outAutRootTokenNum, MaxNumToken)
 	}
 
 	// scriptMemo                 []byte
-	if len(script.scriptMemo) > MaxScriptMemoLength {
-		return fmt.Errorf("len(script.scriptMemo) (%d) is too large", len(script.scriptMemo))
+	if len(autScript.scriptMemo) > MaxScriptMemoLength {
+		return fmt.Errorf("len(script.scriptMemo) (%d) is too large", len(autScript.scriptMemo))
 	}
 
 	return nil
 }
 
-func (script *ReRegistrationScript) NumConsumedTokens() int {
-	return int(script.inAutRootTokenNum)
+func (autScript *ReRegistrationScript) NumConsumedTokens() int {
+	return int(autScript.inAutRootTokenNum)
 }
-func (script *ReRegistrationScript) NumGeneratedTokens() int {
-	return int(script.outAutRootTokenNum)
+func (autScript *ReRegistrationScript) NumGeneratedTokens() int {
+	return int(autScript.outAutRootTokenNum)
 }
 
 var _ AutScript = &ReRegistrationScript{}
@@ -1687,32 +1687,32 @@ type MintScript struct {
 	scriptMemo []byte
 }
 
-func (script *MintScript) Vin() uint64 {
-	return script.vin
+func (autScript *MintScript) Vin() uint64 {
+	return autScript.vin
 }
 
-func (script *MintScript) InAutRootTokenNum() uint8 {
-	return script.inAutRootTokenNum
+func (autScript *MintScript) InAutRootTokenNum() uint8 {
+	return autScript.inAutRootTokenNum
 }
 
-func (script *MintScript) OutHiddenAutTokenNum() uint8 {
-	return script.outHiddenAutTokenNum
+func (autScript *MintScript) OutHiddenAutTokenNum() uint8 {
+	return autScript.outHiddenAutTokenNum
 }
 
-func (script *MintScript) OutPublicAutTokenNum() uint8 {
-	return script.outPublicAutTokenNum
+func (autScript *MintScript) OutPublicAutTokenNum() uint8 {
+	return autScript.outPublicAutTokenNum
 }
 
-func (script *MintScript) SerializedAutTxos() [][]byte {
-	return script.serializedAutTxos
+func (autScript *MintScript) SerializedAutTxos() [][]byte {
+	return autScript.serializedAutTxos
 }
 
-func (script *MintScript) WitnessHash() chainhash.Hash {
-	return script.witnessHash
+func (autScript *MintScript) WitnessHash() chainhash.Hash {
+	return autScript.witnessHash
 }
 
-func (script *MintScript) ScriptMemo() []byte {
-	return script.scriptMemo
+func (autScript *MintScript) ScriptMemo() []byte {
+	return autScript.scriptMemo
 }
 
 func NewMintScript(version uint32,
@@ -1736,102 +1736,102 @@ func NewMintScript(version uint32,
 	}
 }
 
-func (script *MintScript) Version() uint32 {
-	return script.version
+func (autScript *MintScript) Version() uint32 {
+	return autScript.version
 }
 
-func (script *MintScript) Type() AutScriptType {
-	return script.scriptType
+func (autScript *MintScript) Type() AutScriptType {
+	return autScript.scriptType
 }
-func (script *MintScript) AutIdentifier() AutId {
-	return script.autIdentifier
+func (autScript *MintScript) AutIdentifier() AutId {
+	return autScript.autIdentifier
 }
 
-func (script *MintScript) serializeSize() int {
-	n := wire.VarIntSerializeSize(uint64(script.version)) // version                    uint32
-	n += 1                                                // scriptType                 AutScriptType
-	n += chainhash.HashSize                               // autIdentifier              AutId
+func (autScript *MintScript) serializeSize() int {
+	n := wire.VarIntSerializeSize(uint64(autScript.version)) // version                    uint32
+	n += 1                                                   // scriptType                 AutScriptType
+	n += chainhash.HashSize                                  // autIdentifier              AutId
 
-	n += wire.VarIntSerializeSize(script.vin) // vin                  uint64
-	n += 1                                    // inAutRootTokenNum    uint8
-	n += 1                                    // outHiddenAutTokenNum uint8
-	n += 1                                    // outPublicAutTokenNum uint8
+	n += wire.VarIntSerializeSize(autScript.vin) // vin                  uint64
+	n += 1                                       // inAutRootTokenNum    uint8
+	n += 1                                       // outHiddenAutTokenNum uint8
+	n += 1                                       // outPublicAutTokenNum uint8
 
-	n += wire.VarIntSerializeSize(uint64(len(script.serializedAutTxos))) // serializedAutTxos    [][]byte
-	for _, serializedAutTxo := range script.serializedAutTxos {
+	n += wire.VarIntSerializeSize(uint64(len(autScript.serializedAutTxos))) // serializedAutTxos    [][]byte
+	for _, serializedAutTxo := range autScript.serializedAutTxos {
 		n += wire.VarIntSerializeSize(uint64(len(serializedAutTxo))) + len(serializedAutTxo)
 	}
 
-	n += chainhash.HashSize                                                                // witnessHash          chainhash.Hash
-	n += wire.VarIntSerializeSize(uint64(len(script.scriptMemo))) + len(script.scriptMemo) // scriptMemo                 []byte
+	n += chainhash.HashSize                                                                      // witnessHash          chainhash.Hash
+	n += wire.VarIntSerializeSize(uint64(len(autScript.scriptMemo))) + len(autScript.scriptMemo) // scriptMemo                 []byte
 
 	return n
 }
 
-func (script *MintScript) Serialize() ([]byte, error) {
+func (autScript *MintScript) Serialize() ([]byte, error) {
 	var err error
 
-	w := bytes.NewBuffer(make([]byte, 0, script.serializeSize()))
+	w := bytes.NewBuffer(make([]byte, 0, autScript.serializeSize()))
 
 	// version                    uint32
-	if err = wire.WriteVarInt(w, 0, uint64(script.version)); err != nil {
+	if err = wire.WriteVarInt(w, 0, uint64(autScript.version)); err != nil {
 		return nil, err
 	}
 
 	// scriptType                 AutScriptType
-	if err = w.WriteByte(script.Type()); err != nil {
+	if err = w.WriteByte(autScript.Type()); err != nil {
 		return nil, err
 	}
 
 	// autIdentifier              AutId
-	if _, err = w.Write(script.autIdentifier[:]); err != nil {
+	if _, err = w.Write(autScript.autIdentifier[:]); err != nil {
 		return nil, err
 	}
 
 	// vin                  uint64
-	if err = wire.WriteVarInt(w, 0, script.vin); err != nil {
+	if err = wire.WriteVarInt(w, 0, autScript.vin); err != nil {
 		return nil, err
 	}
 
 	// inAutRootTokenNum    uint8
-	if err = w.WriteByte(script.inAutRootTokenNum); err != nil {
+	if err = w.WriteByte(autScript.inAutRootTokenNum); err != nil {
 		return nil, err
 	}
 
 	// outHiddenAutTokenNum uint8
-	if err = w.WriteByte(script.outHiddenAutTokenNum); err != nil {
+	if err = w.WriteByte(autScript.outHiddenAutTokenNum); err != nil {
 		return nil, err
 	}
 
 	// outPublicAutTokenNum uint8
-	if err = w.WriteByte(script.outPublicAutTokenNum); err != nil {
+	if err = w.WriteByte(autScript.outPublicAutTokenNum); err != nil {
 		return nil, err
 	}
 
 	// serializedAutTxos    [][]byte
-	if err = wire.WriteVarInt(w, 0, uint64(len(script.serializedAutTxos))); err != nil {
+	if err = wire.WriteVarInt(w, 0, uint64(len(autScript.serializedAutTxos))); err != nil {
 		return nil, err
 	}
-	for _, serializedAutTxo := range script.serializedAutTxos {
+	for _, serializedAutTxo := range autScript.serializedAutTxos {
 		if err = wire.WriteVarBytes(w, 0, serializedAutTxo); err != nil {
 			return nil, err
 		}
 	}
 
 	// witnessHash          chainhash.Hash
-	if _, err = w.Write(script.witnessHash[:]); err != nil {
+	if _, err = w.Write(autScript.witnessHash[:]); err != nil {
 		return nil, err
 	}
 
 	// scriptMemo                 []byte
-	if err = wire.WriteVarBytes(w, 0, script.scriptMemo); err != nil {
+	if err = wire.WriteVarBytes(w, 0, autScript.scriptMemo); err != nil {
 		return nil, err
 	}
 
 	return w.Bytes(), nil
 }
 
-func (script *MintScript) Deserialize(serializedScript []byte) error {
+func (autScript *MintScript) Deserialize(serializedScript []byte) error {
 	var err error
 
 	r := bytes.NewReader(serializedScript)
@@ -1842,40 +1842,40 @@ func (script *MintScript) Deserialize(serializedScript []byte) error {
 		return err
 	}
 	if version > math.MaxUint32 {
-		return fmt.Errorf("readed version %d is too large", version)
+		return fmt.Errorf("read version %d is too large", version)
 	}
-	script.version = uint32(version)
+	autScript.version = uint32(version)
 
 	// scriptType                 AutScriptType
-	script.scriptType, err = r.ReadByte()
+	autScript.scriptType, err = r.ReadByte()
 	if err != nil {
 		return err
 	}
 
 	// autIdentifier              AutId
-	if _, err = io.ReadFull(r, script.autIdentifier[:]); err != nil {
+	if _, err = io.ReadFull(r, autScript.autIdentifier[:]); err != nil {
 		return err
 	}
 
 	// vin                  uint64
-	if script.vin, err = wire.ReadVarInt(r, 0); err != nil {
+	if autScript.vin, err = wire.ReadVarInt(r, 0); err != nil {
 		return err
 	}
 
 	// inAutRootTokenNum    uint8
-	script.inAutRootTokenNum, err = r.ReadByte()
+	autScript.inAutRootTokenNum, err = r.ReadByte()
 	if err != nil {
 		return err
 	}
 
 	// outHiddenAutTokenNum    uint8
-	script.outHiddenAutTokenNum, err = r.ReadByte()
+	autScript.outHiddenAutTokenNum, err = r.ReadByte()
 	if err != nil {
 		return err
 	}
 
 	// inAutRootTokenNum    uint8
-	script.outPublicAutTokenNum, err = r.ReadByte()
+	autScript.outPublicAutTokenNum, err = r.ReadByte()
 	if err != nil {
 		return err
 	}
@@ -1888,106 +1888,106 @@ func (script *MintScript) Deserialize(serializedScript []byte) error {
 	if autTxoNum > MaxNumToken {
 		return fmt.Errorf("read AutTxo num %d is too large", autTxoNum)
 	}
-	script.serializedAutTxos = make([][]byte, autTxoNum)
+	autScript.serializedAutTxos = make([][]byte, autTxoNum)
 	for i := uint64(0); i < autTxoNum; i++ {
-		if script.serializedAutTxos[i], err = wire.ReadVarBytes(r, 0, MaxAutTxoLength, "SerializedAutTxo"); err != nil {
+		if autScript.serializedAutTxos[i], err = wire.ReadVarBytes(r, 0, MaxAutTxoLength, "SerializedAutTxo"); err != nil {
 			return err
 		}
 	}
 
 	// witnessHash          chainhash.Hash
-	if _, err = io.ReadFull(r, script.witnessHash[:]); err != nil {
+	if _, err = io.ReadFull(r, autScript.witnessHash[:]); err != nil {
 		return err
 	}
 
 	// scriptMemo                 []byte
-	script.scriptMemo, err = wire.ReadVarBytes(r, 0, MaxScriptMemoLength, "scriptMemo")
+	autScript.scriptMemo, err = wire.ReadVarBytes(r, 0, MaxScriptMemoLength, "scriptMemo")
 	if err != nil {
 		return err
 	}
 
-	return script.SanityCheck()
+	return autScript.SanityCheck()
 }
 
-func (script *MintScript) SanityCheck() error {
+func (autScript *MintScript) SanityCheck() error {
 
 	// version                    uint32
-	if _, ok := ctautwire.AutScriptVersionSet[script.version]; !ok {
-		return fmt.Errorf("invalid version: %d", script.version)
+	if _, ok := ctautwire.AutScriptVersionSet[autScript.version]; !ok {
+		return fmt.Errorf("invalid version: %d", autScript.version)
 	}
 
 	// scriptType                 AutScriptType
-	if script.scriptType != AutScriptTypeMint {
-		return fmt.Errorf("script.scriptType (%d) is not AutScriptTypeMint", script.scriptType)
+	if autScript.scriptType != AutScriptTypeMint {
+		return fmt.Errorf("autScript.scriptType (%d) is not AutScriptTypeMint", autScript.scriptType)
 	}
 
 	// autIdentifier              AutId
 
 	// vin                  uint64
-	if script.vin == 0 || script.vin > MaxAmount {
-		return fmt.Errorf("script.vin (%d) is not in [1, %d]", script.vin, MaxAmount)
+	if autScript.vin == 0 || autScript.vin > MaxAmount {
+		return fmt.Errorf("autScript.vin (%d) is not in [1, %d]", autScript.vin, MaxAmount)
 	}
 
 	// inAutRootTokenNum    uint8
-	if int(script.inAutRootTokenNum) == 0 {
-		return fmt.Errorf("script.inAutRootTokenNum (%d) is invalid",
-			script.inAutRootTokenNum)
+	if int(autScript.inAutRootTokenNum) == 0 {
+		return fmt.Errorf("autScript.inAutRootTokenNum (%d) is invalid",
+			autScript.inAutRootTokenNum)
 	}
-	if int(script.inAutRootTokenNum) > MaxNumToken {
-		return fmt.Errorf("script.inAutRootTokenNum (%d) exceeds the allowed max number (%d)",
-			script.inAutRootTokenNum, MaxNumToken)
+	if int(autScript.inAutRootTokenNum) > MaxNumToken {
+		return fmt.Errorf("autScript.inAutRootTokenNum (%d) exceeds the allowed max number (%d)",
+			autScript.inAutRootTokenNum, MaxNumToken)
 	}
 
 	// outHiddenAutTokenNum uint8
-	if int(script.outHiddenAutTokenNum) > MaxNumHiddenToken {
-		return fmt.Errorf("script.outHiddenAutTokenNum (%d) exceeds the allowed max number (%d)",
-			script.outHiddenAutTokenNum, MaxNumHiddenToken)
+	if int(autScript.outHiddenAutTokenNum) > MaxNumHiddenToken {
+		return fmt.Errorf("autScript.outHiddenAutTokenNum (%d) exceeds the allowed max number (%d)",
+			autScript.outHiddenAutTokenNum, MaxNumHiddenToken)
 	}
 
 	// outPublicAutTokenNum uint8
-	if int(script.outPublicAutTokenNum) > MaxNumToken {
-		return fmt.Errorf("script.outPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
-			script.outPublicAutTokenNum, MaxNumToken)
+	if int(autScript.outPublicAutTokenNum) > MaxNumToken {
+		return fmt.Errorf("autScript.outPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
+			autScript.outPublicAutTokenNum, MaxNumToken)
 	}
 
-	if script.outHiddenAutTokenNum+script.outPublicAutTokenNum == 0 {
-		return fmt.Errorf("script.outHiddenAutTokenNum (%d) + script.outPublicAutTokenNum (%d) is 0",
-			script.outHiddenAutTokenNum, script.outPublicAutTokenNum)
+	if autScript.outHiddenAutTokenNum+autScript.outPublicAutTokenNum == 0 {
+		return fmt.Errorf("autScript.outHiddenAutTokenNum (%d) + autScript.outPublicAutTokenNum (%d) is 0",
+			autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum)
 	}
 
-	if script.outHiddenAutTokenNum+script.outPublicAutTokenNum > MaxNumToken {
-		return fmt.Errorf("script.outHiddenAutTokenNum (%d) + script.outPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
-			script.outHiddenAutTokenNum, script.outPublicAutTokenNum, MaxNumToken)
+	if autScript.outHiddenAutTokenNum+autScript.outPublicAutTokenNum > MaxNumToken {
+		return fmt.Errorf("autScript.outHiddenAutTokenNum (%d) + autScript.outPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
+			autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum, MaxNumToken)
 	}
 
 	// serializedAutTxos    [][]byte
-	if len(script.serializedAutTxos) != int(script.outHiddenAutTokenNum+script.outPublicAutTokenNum) {
+	if len(autScript.serializedAutTxos) != int(autScript.outHiddenAutTokenNum+autScript.outPublicAutTokenNum) {
 		return fmt.Errorf("the number of serializedAutTxos (%d) does equal script.outHiddenAutTokenNum (%d) + script.outPublicAutTokenNum (%d)",
-			len(script.serializedAutTxos), script.outHiddenAutTokenNum, script.outPublicAutTokenNum)
+			len(autScript.serializedAutTxos), autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum)
 	}
-	for i := 0; i < len(script.serializedAutTxos); i++ {
+	for i := 0; i < len(autScript.serializedAutTxos); i++ {
 		autTxo := &ctautwire.AutTxo{}
-		err := autTxo.Deserialize(script.serializedAutTxos[i])
+		err := autTxo.Deserialize(autScript.serializedAutTxos[i])
 		if err != nil {
 			return err
 		}
-		if autTxo.Version != script.version {
-			return fmt.Errorf("version mismatch (autTxo.Version %d != script.version %d)", autTxo.Version, script.version)
+		if autTxo.Version != autScript.version {
+			return fmt.Errorf("version mismatch (autTxo.Version %d != autScript.version %d)", autTxo.Version, autScript.version)
 		}
 
 		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
 		if err != nil {
 			return err
 		}
-		if i < int(script.outHiddenAutTokenNum) {
+		if i < int(autScript.outHiddenAutTokenNum) {
 			if autTxoType != abecryptox.AutTxoTypeHidden {
-				return fmt.Errorf("script.outHiddenAutTokenNum = %d, but %d -th AutTxo has type %d (not AutTxoTypeHidden)",
-					script.outHiddenAutTokenNum, autTxoType, abecryptox.AutTxoTypeHidden)
+				return fmt.Errorf("autScript.outHiddenAutTokenNum = %d, but %d -th AutTxo has type %d (not AutTxoTypeHidden)",
+					autScript.outHiddenAutTokenNum, autTxoType, abecryptox.AutTxoTypeHidden)
 			}
 		} else {
 			if autTxoType != abecryptox.AutTxoTypePublic {
-				return fmt.Errorf("script.outHiddenAutTokenNum = %d, script.outPublicAutTokenNum =%d, but %d -th AutTxo has type %d (not AutTxoTypePublic)",
-					script.outHiddenAutTokenNum, script.outPublicAutTokenNum, autTxoType, abecryptox.AutTxoTypePublic)
+				return fmt.Errorf("autScript.outHiddenAutTokenNum = %d, autScript.outPublicAutTokenNum =%d, but %d -th AutTxo has type %d (not AutTxoTypePublic)",
+					autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum, autTxoType, abecryptox.AutTxoTypePublic)
 			}
 		}
 	}
@@ -1995,18 +1995,18 @@ func (script *MintScript) SanityCheck() error {
 	// witnessHash          chainhash.Hash
 
 	// scriptMemo                 []byte
-	if len(script.scriptMemo) > MaxScriptMemoLength {
-		return fmt.Errorf("len(script.scriptMemo) (%d) is too large", len(script.scriptMemo))
+	if len(autScript.scriptMemo) > MaxScriptMemoLength {
+		return fmt.Errorf("len(autScript.scriptMemo) (%d) is too large", len(autScript.scriptMemo))
 	}
 
 	return nil
 }
 
-func (script *MintScript) NumConsumedTokens() int {
-	return int(script.inAutRootTokenNum)
+func (autScript *MintScript) NumConsumedTokens() int {
+	return int(autScript.inAutRootTokenNum)
 }
-func (script *MintScript) NumGeneratedTokens() int {
-	return int(script.outHiddenAutTokenNum + script.outPublicAutTokenNum)
+func (autScript *MintScript) NumGeneratedTokens() int {
+	return int(autScript.outHiddenAutTokenNum + autScript.outPublicAutTokenNum)
 }
 
 var _ AutScript = &MintScript{}
@@ -2045,32 +2045,32 @@ type TransferScript struct {
 	scriptMemo  []byte
 }
 
-func (script *TransferScript) InHiddenAutTokenNum() uint8 {
-	return script.inHiddenAutTokenNum
+func (autScript *TransferScript) InHiddenAutTokenNum() uint8 {
+	return autScript.inHiddenAutTokenNum
 }
 
-func (script *TransferScript) InPublicAutTokenNum() uint8 {
-	return script.inPublicAutTokenNum
+func (autScript *TransferScript) InPublicAutTokenNum() uint8 {
+	return autScript.inPublicAutTokenNum
 }
 
-func (script *TransferScript) OutHiddenAutTokenNum() uint8 {
-	return script.outHiddenAutTokenNum
+func (autScript *TransferScript) OutHiddenAutTokenNum() uint8 {
+	return autScript.outHiddenAutTokenNum
 }
 
-func (script *TransferScript) OutPublicAutTokenNum() uint8 {
-	return script.outPublicAutTokenNum
+func (autScript *TransferScript) OutPublicAutTokenNum() uint8 {
+	return autScript.outPublicAutTokenNum
 }
 
-func (script *TransferScript) SerializedAutTxos() [][]byte {
-	return script.serializedAutTxos
+func (autScript *TransferScript) SerializedAutTxos() [][]byte {
+	return autScript.serializedAutTxos
 }
 
-func (script *TransferScript) WitnessHash() chainhash.Hash {
-	return script.witnessHash
+func (autScript *TransferScript) WitnessHash() chainhash.Hash {
+	return autScript.witnessHash
 }
 
-func (script *TransferScript) ScriptMemo() []byte {
-	return script.scriptMemo
+func (autScript *TransferScript) ScriptMemo() []byte {
+	return autScript.scriptMemo
 }
 
 func NewTransferScript(version uint32,
@@ -2094,103 +2094,103 @@ func NewTransferScript(version uint32,
 	}
 }
 
-func (script *TransferScript) Version() uint32 {
-	return script.version
+func (autScript *TransferScript) Version() uint32 {
+	return autScript.version
 }
 
-func (script *TransferScript) Type() AutScriptType {
-	return script.scriptType
+func (autScript *TransferScript) Type() AutScriptType {
+	return autScript.scriptType
 }
 
-func (script *TransferScript) AutIdentifier() AutId {
-	return script.autIdentifier
+func (autScript *TransferScript) AutIdentifier() AutId {
+	return autScript.autIdentifier
 }
 
-func (script *TransferScript) serializeSize() int {
-	n := wire.VarIntSerializeSize(uint64(script.version)) // version                    uint32
-	n += 1                                                // scriptType                 AutScriptType
-	n += chainhash.HashSize                               // autIdentifier              AutId
+func (autScript *TransferScript) serializeSize() int {
+	n := wire.VarIntSerializeSize(uint64(autScript.version)) // version                    uint32
+	n += 1                                                   // scriptType                 AutScriptType
+	n += chainhash.HashSize                                  // autIdentifier              AutId
 
 	n += 1 // inHiddenAutTokenNum  uint8
 	n += 1 // inPublicAutTokenNum  uint8
 	n += 1 // outHiddenAutTokenNum uint8
 	n += 1 // outPublicAutTokenNum uint8
 
-	n += wire.VarIntSerializeSize(uint64(len(script.serializedAutTxos))) // serializedAutTxos    [][]byte
-	for _, serializedAutTxo := range script.serializedAutTxos {
+	n += wire.VarIntSerializeSize(uint64(len(autScript.serializedAutTxos))) // serializedAutTxos    [][]byte
+	for _, serializedAutTxo := range autScript.serializedAutTxos {
 		n += wire.VarIntSerializeSize(uint64(len(serializedAutTxo))) + len(serializedAutTxo)
 	}
 
-	n += chainhash.HashSize                                                                // witnessHash          chainhash.Hash
-	n += wire.VarIntSerializeSize(uint64(len(script.scriptMemo))) + len(script.scriptMemo) // scriptMemo                 []byte
+	n += chainhash.HashSize                                                                      // witnessHash          chainhash.Hash
+	n += wire.VarIntSerializeSize(uint64(len(autScript.scriptMemo))) + len(autScript.scriptMemo) // scriptMemo                 []byte
 
 	return n
 }
 
-func (script *TransferScript) Serialize() ([]byte, error) {
+func (autScript *TransferScript) Serialize() ([]byte, error) {
 	var err error
 
-	w := bytes.NewBuffer(make([]byte, 0, script.serializeSize()))
+	w := bytes.NewBuffer(make([]byte, 0, autScript.serializeSize()))
 
 	// version                    uint32
-	if err = wire.WriteVarInt(w, 0, uint64(script.version)); err != nil {
+	if err = wire.WriteVarInt(w, 0, uint64(autScript.version)); err != nil {
 		return nil, err
 	}
 
 	// scriptType                 AutScriptType
-	if err = w.WriteByte(script.Type()); err != nil {
+	if err = w.WriteByte(autScript.Type()); err != nil {
 		return nil, err
 	}
 
 	// autIdentifier              AutId
-	if _, err = w.Write(script.autIdentifier[:]); err != nil {
+	if _, err = w.Write(autScript.autIdentifier[:]); err != nil {
 		return nil, err
 	}
 
 	// inHiddenAutTokenNum    uint8
-	if err = w.WriteByte(script.inHiddenAutTokenNum); err != nil {
+	if err = w.WriteByte(autScript.inHiddenAutTokenNum); err != nil {
 		return nil, err
 	}
 
 	// inPublicAutTokenNum    uint8
-	if err = w.WriteByte(script.inPublicAutTokenNum); err != nil {
+	if err = w.WriteByte(autScript.inPublicAutTokenNum); err != nil {
 		return nil, err
 	}
 
 	// outHiddenAutTokenNum uint8
-	if err = w.WriteByte(script.outHiddenAutTokenNum); err != nil {
+	if err = w.WriteByte(autScript.outHiddenAutTokenNum); err != nil {
 		return nil, err
 	}
 
 	// outPublicAutTokenNum uint8
-	if err = w.WriteByte(script.outPublicAutTokenNum); err != nil {
+	if err = w.WriteByte(autScript.outPublicAutTokenNum); err != nil {
 		return nil, err
 	}
 
 	// serializedAutTxos    [][]byte
-	if err = wire.WriteVarInt(w, 0, uint64(len(script.serializedAutTxos))); err != nil {
+	if err = wire.WriteVarInt(w, 0, uint64(len(autScript.serializedAutTxos))); err != nil {
 		return nil, err
 	}
-	for _, serializedAutTxo := range script.serializedAutTxos {
+	for _, serializedAutTxo := range autScript.serializedAutTxos {
 		if err = wire.WriteVarBytes(w, 0, serializedAutTxo); err != nil {
 			return nil, err
 		}
 	}
 
 	// witnessHash          chainhash.Hash
-	if _, err = w.Write(script.witnessHash[:]); err != nil {
+	if _, err = w.Write(autScript.witnessHash[:]); err != nil {
 		return nil, err
 	}
 
 	// scriptMemo                 []byte
-	if err = wire.WriteVarBytes(w, 0, script.scriptMemo); err != nil {
+	if err = wire.WriteVarBytes(w, 0, autScript.scriptMemo); err != nil {
 		return nil, err
 	}
 
 	return w.Bytes(), nil
 }
 
-func (script *TransferScript) Deserialize(serializedScript []byte) error {
+func (autScript *TransferScript) Deserialize(serializedScript []byte) error {
 	var err error
 
 	r := bytes.NewReader(serializedScript)
@@ -2201,41 +2201,41 @@ func (script *TransferScript) Deserialize(serializedScript []byte) error {
 		return err
 	}
 	if version > math.MaxUint32 {
-		return fmt.Errorf("readed version %d is too large", version)
+		return fmt.Errorf("read version %d is too large", version)
 	}
-	script.version = uint32(version)
+	autScript.version = uint32(version)
 
 	// scriptType                 AutScriptType
-	script.scriptType, err = r.ReadByte()
+	autScript.scriptType, err = r.ReadByte()
 	if err != nil {
 		return err
 	}
 
 	// autIdentifier              AutId
-	if _, err = io.ReadFull(r, script.autIdentifier[:]); err != nil {
+	if _, err = io.ReadFull(r, autScript.autIdentifier[:]); err != nil {
 		return err
 	}
 
 	// inHiddenAutTokenNum    uint8
-	script.inHiddenAutTokenNum, err = r.ReadByte()
+	autScript.inHiddenAutTokenNum, err = r.ReadByte()
 	if err != nil {
 		return err
 	}
 
 	// inPublicAutTokenNum    uint8
-	script.inPublicAutTokenNum, err = r.ReadByte()
+	autScript.inPublicAutTokenNum, err = r.ReadByte()
 	if err != nil {
 		return err
 	}
 
 	// outHiddenAutTokenNum    uint8
-	script.outHiddenAutTokenNum, err = r.ReadByte()
+	autScript.outHiddenAutTokenNum, err = r.ReadByte()
 	if err != nil {
 		return err
 	}
 
 	// inAutRootTokenNum    uint8
-	script.outPublicAutTokenNum, err = r.ReadByte()
+	autScript.outPublicAutTokenNum, err = r.ReadByte()
 	if err != nil {
 		return err
 	}
@@ -2248,113 +2248,113 @@ func (script *TransferScript) Deserialize(serializedScript []byte) error {
 	if autTxoNum > MaxNumToken {
 		return fmt.Errorf("read AutTxo num %d is too large", autTxoNum)
 	}
-	script.serializedAutTxos = make([][]byte, autTxoNum)
+	autScript.serializedAutTxos = make([][]byte, autTxoNum)
 	for i := uint64(0); i < autTxoNum; i++ {
-		if script.serializedAutTxos[i], err = wire.ReadVarBytes(r, 0, MaxAutTxoLength, "SerializedAutTxo"); err != nil {
+		if autScript.serializedAutTxos[i], err = wire.ReadVarBytes(r, 0, MaxAutTxoLength, "SerializedAutTxo"); err != nil {
 			return err
 		}
 	}
 
 	// witnessHash          chainhash.Hash
-	if _, err = io.ReadFull(r, script.witnessHash[:]); err != nil {
+	if _, err = io.ReadFull(r, autScript.witnessHash[:]); err != nil {
 		return err
 	}
 
 	// scriptMemo                 []byte
-	script.scriptMemo, err = wire.ReadVarBytes(r, 0, MaxScriptMemoLength, "scriptMemo")
+	autScript.scriptMemo, err = wire.ReadVarBytes(r, 0, MaxScriptMemoLength, "scriptMemo")
 	if err != nil {
 		return err
 	}
 
-	return script.SanityCheck()
+	return autScript.SanityCheck()
 }
 
-func (script *TransferScript) SanityCheck() error {
+func (autScript *TransferScript) SanityCheck() error {
 
 	// version                    uint32
-	if _, ok := ctautwire.AutScriptVersionSet[script.version]; !ok {
-		return fmt.Errorf("invalid version: %d", script.version)
+	if _, ok := ctautwire.AutScriptVersionSet[autScript.version]; !ok {
+		return fmt.Errorf("invalid version: %d", autScript.version)
 	}
 
 	// scriptType                 AutScriptType
-	if script.scriptType != AutScriptTypeTransfer {
-		return fmt.Errorf("script.scriptType (%d) is not AutScriptTypeTransfer", script.scriptType)
+	if autScript.scriptType != AutScriptTypeTransfer {
+		return fmt.Errorf("autScript.scriptType (%d) is not AutScriptTypeTransfer", autScript.scriptType)
 	}
 
 	// autIdentifier              AutId
 
 	// inHiddenAutTokenNum    uint8
-	if int(script.inHiddenAutTokenNum) > MaxNumHiddenToken {
-		return fmt.Errorf("script.inHiddenAutTokenNum (%d) exceeds the allowed max number (%d)",
-			script.inHiddenAutTokenNum, MaxNumHiddenToken)
+	if int(autScript.inHiddenAutTokenNum) > MaxNumHiddenToken {
+		return fmt.Errorf("autScript.inHiddenAutTokenNum (%d) exceeds the allowed max number (%d)",
+			autScript.inHiddenAutTokenNum, MaxNumHiddenToken)
 	}
 
 	// inPublicAutTokenNum    uint8
-	if int(script.inPublicAutTokenNum) > MaxNumToken {
-		return fmt.Errorf("script.inPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
-			script.inPublicAutTokenNum, MaxNumToken)
+	if int(autScript.inPublicAutTokenNum) > MaxNumToken {
+		return fmt.Errorf("autScript.inPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
+			autScript.inPublicAutTokenNum, MaxNumToken)
 	}
 
-	if script.inHiddenAutTokenNum+script.inPublicAutTokenNum == 0 {
-		return fmt.Errorf("script.inHiddenAutTokenNum (%d) + script.inPublicAutTokenNum (%d) is 0",
-			script.inHiddenAutTokenNum, script.inPublicAutTokenNum)
+	if autScript.inHiddenAutTokenNum+autScript.inPublicAutTokenNum == 0 {
+		return fmt.Errorf("autScript.inHiddenAutTokenNum (%d) + script.inPublicAutTokenNum (%d) is 0",
+			autScript.inHiddenAutTokenNum, autScript.inPublicAutTokenNum)
 	}
 
-	if script.inHiddenAutTokenNum+script.inPublicAutTokenNum > MaxNumToken {
-		return fmt.Errorf("script.inHiddenAutTokenNum (%d) + script.inPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
-			script.inHiddenAutTokenNum, script.inPublicAutTokenNum, MaxNumToken)
+	if autScript.inHiddenAutTokenNum+autScript.inPublicAutTokenNum > MaxNumToken {
+		return fmt.Errorf("autScript.inHiddenAutTokenNum (%d) + script.inPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
+			autScript.inHiddenAutTokenNum, autScript.inPublicAutTokenNum, MaxNumToken)
 	}
 
 	// outHiddenAutTokenNum uint8
-	if int(script.outHiddenAutTokenNum) > MaxNumHiddenToken {
-		return fmt.Errorf("script.outHiddenAutTokenNum (%d) exceeds the allowed max number (%d)",
-			script.outHiddenAutTokenNum, MaxNumHiddenToken)
+	if int(autScript.outHiddenAutTokenNum) > MaxNumHiddenToken {
+		return fmt.Errorf("autScript.outHiddenAutTokenNum (%d) exceeds the allowed max number (%d)",
+			autScript.outHiddenAutTokenNum, MaxNumHiddenToken)
 	}
 
 	// outPublicAutTokenNum uint8
-	if int(script.outPublicAutTokenNum) > MaxNumToken {
-		return fmt.Errorf("script.outPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
-			script.outPublicAutTokenNum, MaxNumToken)
+	if int(autScript.outPublicAutTokenNum) > MaxNumToken {
+		return fmt.Errorf("autScript.outPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
+			autScript.outPublicAutTokenNum, MaxNumToken)
 	}
 
-	if script.outHiddenAutTokenNum+script.outPublicAutTokenNum == 0 {
-		return fmt.Errorf("script.outHiddenAutTokenNum (%d) + script.outPublicAutTokenNum (%d) is 0",
-			script.outHiddenAutTokenNum, script.outPublicAutTokenNum)
+	if autScript.outHiddenAutTokenNum+autScript.outPublicAutTokenNum == 0 {
+		return fmt.Errorf("autScript.outHiddenAutTokenNum (%d) + script.outPublicAutTokenNum (%d) is 0",
+			autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum)
 	}
 
-	if script.outHiddenAutTokenNum+script.outPublicAutTokenNum > MaxNumToken {
-		return fmt.Errorf("script.outHiddenAutTokenNum (%d) + script.outPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
-			script.outHiddenAutTokenNum, script.outPublicAutTokenNum, MaxNumToken)
+	if autScript.outHiddenAutTokenNum+autScript.outPublicAutTokenNum > MaxNumToken {
+		return fmt.Errorf("autScript.outHiddenAutTokenNum (%d) + autScript.outPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
+			autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum, MaxNumToken)
 	}
 
 	// serializedAutTxos    [][]byte
-	if len(script.serializedAutTxos) != int(script.outHiddenAutTokenNum+script.outPublicAutTokenNum) {
-		return fmt.Errorf("the number of serializedAutTxos (%d) does equal script.outHiddenAutTokenNum (%d) + script.outPublicAutTokenNum (%d)",
-			len(script.serializedAutTxos), script.outHiddenAutTokenNum, script.outPublicAutTokenNum)
+	if len(autScript.serializedAutTxos) != int(autScript.outHiddenAutTokenNum+autScript.outPublicAutTokenNum) {
+		return fmt.Errorf("the number of serializedAutTxos (%d) does equal autScript.outHiddenAutTokenNum (%d) + autScript.outPublicAutTokenNum (%d)",
+			len(autScript.serializedAutTxos), autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum)
 	}
-	for i := 0; i < len(script.serializedAutTxos); i++ {
+	for i := 0; i < len(autScript.serializedAutTxos); i++ {
 		autTxo := &ctautwire.AutTxo{}
-		err := autTxo.Deserialize(script.serializedAutTxos[i])
+		err := autTxo.Deserialize(autScript.serializedAutTxos[i])
 		if err != nil {
 			return err
 		}
-		if autTxo.Version != script.version {
-			return fmt.Errorf("version mismatch (autTxo.Version %d != script.version %d)", autTxo.Version, script.version)
+		if autTxo.Version != autScript.version {
+			return fmt.Errorf("version mismatch (autTxo.Version %d != autScript.version %d)", autTxo.Version, autScript.version)
 		}
 
 		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
 		if err != nil {
 			return err
 		}
-		if i < int(script.outHiddenAutTokenNum) {
+		if i < int(autScript.outHiddenAutTokenNum) {
 			if autTxoType != abecryptox.AutTxoTypeHidden {
-				return fmt.Errorf("script.outHiddenAutTokenNum = %d, but %d -th AutTxo has type %d (not AutTxoTypeHidden)",
-					script.outHiddenAutTokenNum, autTxoType, abecryptox.AutTxoTypeHidden)
+				return fmt.Errorf("autScript.outHiddenAutTokenNum = %d, but %d -th AutTxo has type %d (not AutTxoTypeHidden)",
+					autScript.outHiddenAutTokenNum, autTxoType, abecryptox.AutTxoTypeHidden)
 			}
 		} else {
 			if autTxoType != abecryptox.AutTxoTypePublic {
-				return fmt.Errorf("script.outHiddenAutTokenNum = %d, script.outPublicAutTokenNum =%d, but %d -th AutTxo has type %d (not AutTxoTypePublic)",
-					script.outHiddenAutTokenNum, script.outPublicAutTokenNum, autTxoType, abecryptox.AutTxoTypePublic)
+				return fmt.Errorf("autScript.outHiddenAutTokenNum = %d, script.outPublicAutTokenNum =%d, but %d -th AutTxo has type %d (not AutTxoTypePublic)",
+					autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum, autTxoType, abecryptox.AutTxoTypePublic)
 			}
 		}
 	}
@@ -2362,18 +2362,18 @@ func (script *TransferScript) SanityCheck() error {
 	// witnessHash          chainhash.Hash
 
 	// scriptMemo                 []byte
-	if len(script.scriptMemo) > MaxScriptMemoLength {
-		return fmt.Errorf("len(script.scriptMemo) (%d) is too large", len(script.scriptMemo))
+	if len(autScript.scriptMemo) > MaxScriptMemoLength {
+		return fmt.Errorf("len(autScript.scriptMemo) (%d) is too large", len(autScript.scriptMemo))
 	}
 
 	return nil
 }
 
-func (script *TransferScript) NumConsumedTokens() int {
-	return int(script.inHiddenAutTokenNum + script.inPublicAutTokenNum)
+func (autScript *TransferScript) NumConsumedTokens() int {
+	return int(autScript.inHiddenAutTokenNum + autScript.inPublicAutTokenNum)
 }
-func (script *TransferScript) NumGeneratedTokens() int {
-	return int(script.outHiddenAutTokenNum + script.outPublicAutTokenNum)
+func (autScript *TransferScript) NumGeneratedTokens() int {
+	return int(autScript.outHiddenAutTokenNum + autScript.outPublicAutTokenNum)
 }
 
 var _ AutScript = &TransferScript{}
@@ -2412,32 +2412,32 @@ type BurnScript struct {
 	scriptMemo  []byte
 }
 
-func (script *BurnScript) InHiddenAutTokenNum() uint8 {
-	return script.inHiddenAutTokenNum
+func (autScript *BurnScript) InHiddenAutTokenNum() uint8 {
+	return autScript.inHiddenAutTokenNum
 }
 
-func (script *BurnScript) InPublicAutTokenNum() uint8 {
-	return script.inPublicAutTokenNum
+func (autScript *BurnScript) InPublicAutTokenNum() uint8 {
+	return autScript.inPublicAutTokenNum
 }
 
-func (script *BurnScript) OutHiddenAutTokenNum() uint8 {
-	return script.outHiddenAutTokenNum
+func (autScript *BurnScript) OutHiddenAutTokenNum() uint8 {
+	return autScript.outHiddenAutTokenNum
 }
 
-func (script *BurnScript) OutPublicAutTokenNum() uint8 {
-	return script.outPublicAutTokenNum
+func (autScript *BurnScript) OutPublicAutTokenNum() uint8 {
+	return autScript.outPublicAutTokenNum
 }
 
-func (script *BurnScript) SerializedAutTxos() [][]byte {
-	return script.serializedAutTxos
+func (autScript *BurnScript) SerializedAutTxos() [][]byte {
+	return autScript.serializedAutTxos
 }
 
-func (script *BurnScript) WitnessHash() chainhash.Hash {
-	return script.witnessHash
+func (autScript *BurnScript) WitnessHash() chainhash.Hash {
+	return autScript.witnessHash
 }
 
-func (script *BurnScript) ScriptMemo() []byte {
-	return script.scriptMemo
+func (autScript *BurnScript) ScriptMemo() []byte {
+	return autScript.scriptMemo
 }
 
 func NewBurnScript(version uint32,
@@ -2461,103 +2461,103 @@ func NewBurnScript(version uint32,
 	}
 }
 
-func (script *BurnScript) Version() uint32 {
-	return script.version
+func (autScript *BurnScript) Version() uint32 {
+	return autScript.version
 }
 
-func (script *BurnScript) Type() AutScriptType {
-	return script.scriptType
+func (autScript *BurnScript) Type() AutScriptType {
+	return autScript.scriptType
 }
 
-func (script *BurnScript) AutIdentifier() AutId {
-	return script.autIdentifier
+func (autScript *BurnScript) AutIdentifier() AutId {
+	return autScript.autIdentifier
 }
 
-func (script *BurnScript) serializeSize() int {
-	n := wire.VarIntSerializeSize(uint64(script.version)) // version                    uint32
-	n += 1                                                // scriptType                 AutScriptType
-	n += chainhash.HashSize                               // autIdentifier              AutId
+func (autScript *BurnScript) serializeSize() int {
+	n := wire.VarIntSerializeSize(uint64(autScript.version)) // version                    uint32
+	n += 1                                                   // scriptType                 AutScriptType
+	n += chainhash.HashSize                                  // autIdentifier              AutId
 
 	n += 1 // inHiddenAutTokenNum  uint8
 	n += 1 // inPublicAutTokenNum  uint8
 	n += 1 // outHiddenAutTokenNum uint8
 	n += 1 // outPublicAutTokenNum uint8
 
-	n += wire.VarIntSerializeSize(uint64(len(script.serializedAutTxos))) // serializedAutTxos    [][]byte
-	for _, serializedAutTxo := range script.serializedAutTxos {
+	n += wire.VarIntSerializeSize(uint64(len(autScript.serializedAutTxos))) // serializedAutTxos    [][]byte
+	for _, serializedAutTxo := range autScript.serializedAutTxos {
 		n += wire.VarIntSerializeSize(uint64(len(serializedAutTxo))) + len(serializedAutTxo)
 	}
 
-	n += chainhash.HashSize                                                                // witnessHash          chainhash.Hash
-	n += wire.VarIntSerializeSize(uint64(len(script.scriptMemo))) + len(script.scriptMemo) // scriptMemo                 []byte
+	n += chainhash.HashSize                                                                      // witnessHash          chainhash.Hash
+	n += wire.VarIntSerializeSize(uint64(len(autScript.scriptMemo))) + len(autScript.scriptMemo) // scriptMemo                 []byte
 
 	return n
 }
 
-func (script *BurnScript) Serialize() ([]byte, error) {
+func (autScript *BurnScript) Serialize() ([]byte, error) {
 	var err error
 
-	w := bytes.NewBuffer(make([]byte, 0, script.serializeSize()))
+	w := bytes.NewBuffer(make([]byte, 0, autScript.serializeSize()))
 
 	// version                    uint32
-	if err = wire.WriteVarInt(w, 0, uint64(script.version)); err != nil {
+	if err = wire.WriteVarInt(w, 0, uint64(autScript.version)); err != nil {
 		return nil, err
 	}
 
 	// scriptType                 AutScriptType
-	if err = w.WriteByte(script.Type()); err != nil {
+	if err = w.WriteByte(autScript.Type()); err != nil {
 		return nil, err
 	}
 
 	// autIdentifier              AutId
-	if _, err = w.Write(script.autIdentifier[:]); err != nil {
+	if _, err = w.Write(autScript.autIdentifier[:]); err != nil {
 		return nil, err
 	}
 
 	// inHiddenAutTokenNum    uint8
-	if err = w.WriteByte(script.inHiddenAutTokenNum); err != nil {
+	if err = w.WriteByte(autScript.inHiddenAutTokenNum); err != nil {
 		return nil, err
 	}
 
 	// inPublicAutTokenNum    uint8
-	if err = w.WriteByte(script.inPublicAutTokenNum); err != nil {
+	if err = w.WriteByte(autScript.inPublicAutTokenNum); err != nil {
 		return nil, err
 	}
 
 	// outHiddenAutTokenNum uint8
-	if err = w.WriteByte(script.outHiddenAutTokenNum); err != nil {
+	if err = w.WriteByte(autScript.outHiddenAutTokenNum); err != nil {
 		return nil, err
 	}
 
 	// outPublicAutTokenNum uint8
-	if err = w.WriteByte(script.outPublicAutTokenNum); err != nil {
+	if err = w.WriteByte(autScript.outPublicAutTokenNum); err != nil {
 		return nil, err
 	}
 
 	// serializedAutTxos    [][]byte
-	if err = wire.WriteVarInt(w, 0, uint64(len(script.serializedAutTxos))); err != nil {
+	if err = wire.WriteVarInt(w, 0, uint64(len(autScript.serializedAutTxos))); err != nil {
 		return nil, err
 	}
-	for _, serializedAutTxo := range script.serializedAutTxos {
+	for _, serializedAutTxo := range autScript.serializedAutTxos {
 		if err = wire.WriteVarBytes(w, 0, serializedAutTxo); err != nil {
 			return nil, err
 		}
 	}
 
 	// witnessHash          chainhash.Hash
-	if _, err = w.Write(script.witnessHash[:]); err != nil {
+	if _, err = w.Write(autScript.witnessHash[:]); err != nil {
 		return nil, err
 	}
 
 	// scriptMemo                 []byte
-	if err = wire.WriteVarBytes(w, 0, script.scriptMemo); err != nil {
+	if err = wire.WriteVarBytes(w, 0, autScript.scriptMemo); err != nil {
 		return nil, err
 	}
 
 	return w.Bytes(), nil
 }
 
-func (script *BurnScript) Deserialize(serializedScript []byte) error {
+func (autScript *BurnScript) Deserialize(serializedScript []byte) error {
 	var err error
 
 	r := bytes.NewReader(serializedScript)
@@ -2568,41 +2568,41 @@ func (script *BurnScript) Deserialize(serializedScript []byte) error {
 		return err
 	}
 	if version > math.MaxUint32 {
-		return fmt.Errorf("readed version %d is too large", version)
+		return fmt.Errorf("read version %d is too large", version)
 	}
-	script.version = uint32(version)
+	autScript.version = uint32(version)
 
 	// scriptType                 AutScriptType
-	script.scriptType, err = r.ReadByte()
+	autScript.scriptType, err = r.ReadByte()
 	if err != nil {
 		return err
 	}
 
 	// autIdentifier              AutId
-	if _, err = io.ReadFull(r, script.autIdentifier[:]); err != nil {
+	if _, err = io.ReadFull(r, autScript.autIdentifier[:]); err != nil {
 		return err
 	}
 
 	// inHiddenAutTokenNum    uint8
-	script.inHiddenAutTokenNum, err = r.ReadByte()
+	autScript.inHiddenAutTokenNum, err = r.ReadByte()
 	if err != nil {
 		return err
 	}
 
 	// inPublicAutTokenNum    uint8
-	script.inPublicAutTokenNum, err = r.ReadByte()
+	autScript.inPublicAutTokenNum, err = r.ReadByte()
 	if err != nil {
 		return err
 	}
 
 	// outHiddenAutTokenNum    uint8
-	script.outHiddenAutTokenNum, err = r.ReadByte()
+	autScript.outHiddenAutTokenNum, err = r.ReadByte()
 	if err != nil {
 		return err
 	}
 
 	// inAutRootTokenNum    uint8
-	script.outPublicAutTokenNum, err = r.ReadByte()
+	autScript.outPublicAutTokenNum, err = r.ReadByte()
 	if err != nil {
 		return err
 	}
@@ -2615,118 +2615,118 @@ func (script *BurnScript) Deserialize(serializedScript []byte) error {
 	if autTxoNum > MaxNumToken {
 		return fmt.Errorf("read AutTxo num %d is too large", autTxoNum)
 	}
-	script.serializedAutTxos = make([][]byte, autTxoNum)
+	autScript.serializedAutTxos = make([][]byte, autTxoNum)
 	for i := uint64(0); i < autTxoNum; i++ {
-		if script.serializedAutTxos[i], err = wire.ReadVarBytes(r, 0, MaxAutTxoLength, "SerializedAutTxo"); err != nil {
+		if autScript.serializedAutTxos[i], err = wire.ReadVarBytes(r, 0, MaxAutTxoLength, "SerializedAutTxo"); err != nil {
 			return err
 		}
 	}
 
 	// witnessHash          chainhash.Hash
-	if _, err = io.ReadFull(r, script.witnessHash[:]); err != nil {
+	if _, err = io.ReadFull(r, autScript.witnessHash[:]); err != nil {
 		return err
 	}
 
 	// scriptMemo                 []byte
-	script.scriptMemo, err = wire.ReadVarBytes(r, 0, MaxScriptMemoLength, "scriptMemo")
+	autScript.scriptMemo, err = wire.ReadVarBytes(r, 0, MaxScriptMemoLength, "scriptMemo")
 	if err != nil {
 		return err
 	}
 
-	return script.SanityCheck()
+	return autScript.SanityCheck()
 }
 
-func (script *BurnScript) SanityCheck() error {
+func (autScript *BurnScript) SanityCheck() error {
 
 	// version                    uint32
-	if _, ok := ctautwire.AutScriptVersionSet[script.version]; !ok {
-		return fmt.Errorf("invalid version: %d", script.version)
+	if _, ok := ctautwire.AutScriptVersionSet[autScript.version]; !ok {
+		return fmt.Errorf("invalid version: %d", autScript.version)
 	}
 
 	// scriptType                 AutScriptType
-	if script.scriptType != AutScriptTypeBurn {
-		return fmt.Errorf("script.scriptType (%d) is not AutScriptTypeTransfer", script.scriptType)
+	if autScript.scriptType != AutScriptTypeBurn {
+		return fmt.Errorf("autScript.scriptType (%d) is not AutScriptTypeTransfer", autScript.scriptType)
 	}
 
 	// autIdentifier              AutId
 
 	// inHiddenAutTokenNum    uint8
-	if int(script.inHiddenAutTokenNum) > MaxNumHiddenToken {
-		return fmt.Errorf("script.inHiddenAutTokenNum (%d) exceeds the allowed max number (%d)",
-			script.inHiddenAutTokenNum, MaxNumHiddenToken)
+	if int(autScript.inHiddenAutTokenNum) > MaxNumHiddenToken {
+		return fmt.Errorf("autScript.inHiddenAutTokenNum (%d) exceeds the allowed max number (%d)",
+			autScript.inHiddenAutTokenNum, MaxNumHiddenToken)
 	}
 
 	// inPublicAutTokenNum    uint8
-	if int(script.inPublicAutTokenNum) > MaxNumToken {
-		return fmt.Errorf("script.inPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
-			script.inPublicAutTokenNum, MaxNumToken)
+	if int(autScript.inPublicAutTokenNum) > MaxNumToken {
+		return fmt.Errorf("autScript.inPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
+			autScript.inPublicAutTokenNum, MaxNumToken)
 	}
 
-	if script.inHiddenAutTokenNum+script.inPublicAutTokenNum == 0 {
-		return fmt.Errorf("script.inHiddenAutTokenNum (%d) + script.inPublicAutTokenNum (%d) is 0",
-			script.inHiddenAutTokenNum, script.inPublicAutTokenNum)
+	if autScript.inHiddenAutTokenNum+autScript.inPublicAutTokenNum == 0 {
+		return fmt.Errorf("autScript.inHiddenAutTokenNum (%d) + autScript.inPublicAutTokenNum (%d) is 0",
+			autScript.inHiddenAutTokenNum, autScript.inPublicAutTokenNum)
 	}
 
-	if script.inHiddenAutTokenNum+script.inPublicAutTokenNum > MaxNumToken {
-		return fmt.Errorf("script.inHiddenAutTokenNum (%d) + script.inPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
-			script.inHiddenAutTokenNum, script.inPublicAutTokenNum, MaxNumToken)
+	if autScript.inHiddenAutTokenNum+autScript.inPublicAutTokenNum > MaxNumToken {
+		return fmt.Errorf("autScript.inHiddenAutTokenNum (%d) + autScript.inPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
+			autScript.inHiddenAutTokenNum, autScript.inPublicAutTokenNum, MaxNumToken)
 	}
 
 	// outHiddenAutTokenNum uint8
-	if int(script.outHiddenAutTokenNum) > MaxNumHiddenToken {
-		return fmt.Errorf("script.outHiddenAutTokenNum (%d) exceeds the allowed max number (%d)",
-			script.outHiddenAutTokenNum, MaxNumHiddenToken)
+	if int(autScript.outHiddenAutTokenNum) > MaxNumHiddenToken {
+		return fmt.Errorf("autScript.outHiddenAutTokenNum (%d) exceeds the allowed max number (%d)",
+			autScript.outHiddenAutTokenNum, MaxNumHiddenToken)
 	}
 
 	// outPublicAutTokenNum uint8
-	if int(script.outPublicAutTokenNum) > MaxNumToken {
-		return fmt.Errorf("script.outPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
-			script.outPublicAutTokenNum, MaxNumToken)
+	if int(autScript.outPublicAutTokenNum) > MaxNumToken {
+		return fmt.Errorf("autScript.outPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
+			autScript.outPublicAutTokenNum, MaxNumToken)
 	}
-	if int(script.outPublicAutTokenNum) < 1 {
-		return fmt.Errorf("script.outPublicAutTokenNum (%d) is smaller than 1: invalid for BurnScript",
-			script.outPublicAutTokenNum)
+	if int(autScript.outPublicAutTokenNum) < 1 {
+		return fmt.Errorf("autScript.outPublicAutTokenNum (%d) is smaller than 1: invalid for BurnScript",
+			autScript.outPublicAutTokenNum)
 	}
 
 	// This check can be removed. Keep here for alignment.
-	if script.outHiddenAutTokenNum+script.outPublicAutTokenNum == 0 {
-		return fmt.Errorf("script.outHiddenAutTokenNum (%d) + script.outPublicAutTokenNum (%d) is 0",
-			script.outHiddenAutTokenNum, script.outPublicAutTokenNum)
+	if autScript.outHiddenAutTokenNum+autScript.outPublicAutTokenNum == 0 {
+		return fmt.Errorf("autScript.outHiddenAutTokenNum (%d) + autScript.outPublicAutTokenNum (%d) is 0",
+			autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum)
 	}
 
-	if script.outHiddenAutTokenNum+script.outPublicAutTokenNum > MaxNumToken {
-		return fmt.Errorf("script.outHiddenAutTokenNum (%d) + script.outPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
-			script.outHiddenAutTokenNum, script.outPublicAutTokenNum, MaxNumToken)
+	if autScript.outHiddenAutTokenNum+autScript.outPublicAutTokenNum > MaxNumToken {
+		return fmt.Errorf("autScript.outHiddenAutTokenNum (%d) + autScript.outPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
+			autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum, MaxNumToken)
 	}
 
 	// serializedAutTxos    [][]byte
-	if len(script.serializedAutTxos) != int(script.outHiddenAutTokenNum+script.outPublicAutTokenNum) {
-		return fmt.Errorf("the number of serializedAutTxos (%d) does equal script.outHiddenAutTokenNum (%d) + script.outPublicAutTokenNum (%d)",
-			len(script.serializedAutTxos), script.outHiddenAutTokenNum, script.outPublicAutTokenNum)
+	if len(autScript.serializedAutTxos) != int(autScript.outHiddenAutTokenNum+autScript.outPublicAutTokenNum) {
+		return fmt.Errorf("the number of serializedAutTxos (%d) does equal autScript.outHiddenAutTokenNum (%d) + autScript.outPublicAutTokenNum (%d)",
+			len(autScript.serializedAutTxos), autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum)
 	}
-	for i := 0; i < len(script.serializedAutTxos); i++ {
+	for i := 0; i < len(autScript.serializedAutTxos); i++ {
 		autTxo := &ctautwire.AutTxo{}
-		err := autTxo.Deserialize(script.serializedAutTxos[i])
+		err := autTxo.Deserialize(autScript.serializedAutTxos[i])
 		if err != nil {
 			return err
 		}
-		if autTxo.Version != script.version {
-			return fmt.Errorf("version mismatch (autTxo.Version %d != script.version %d)", autTxo.Version, script.version)
+		if autTxo.Version != autScript.version {
+			return fmt.Errorf("version mismatch (autTxo.Version %d != autScript.version %d)", autTxo.Version, autScript.version)
 		}
 
 		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
 		if err != nil {
 			return err
 		}
-		if i < int(script.outHiddenAutTokenNum) {
+		if i < int(autScript.outHiddenAutTokenNum) {
 			if autTxoType != abecryptox.AutTxoTypeHidden {
-				return fmt.Errorf("script.outHiddenAutTokenNum = %d, but %d -th AutTxo has type %d (not AutTxoTypeHidden)",
-					script.outHiddenAutTokenNum, autTxoType, abecryptox.AutTxoTypeHidden)
+				return fmt.Errorf("autScript.outHiddenAutTokenNum = %d, but %d -th AutTxo has type %d (not AutTxoTypeHidden)",
+					autScript.outHiddenAutTokenNum, autTxoType, abecryptox.AutTxoTypeHidden)
 			}
 		} else {
 			if autTxoType != abecryptox.AutTxoTypePublic {
-				return fmt.Errorf("script.outHiddenAutTokenNum = %d, script.outPublicAutTokenNum =%d, but %d -th AutTxo has type %d (not AutTxoTypePublic)",
-					script.outHiddenAutTokenNum, script.outPublicAutTokenNum, autTxoType, abecryptox.AutTxoTypePublic)
+				return fmt.Errorf("autScript.outHiddenAutTokenNum = %d, script.outPublicAutTokenNum =%d, but %d -th AutTxo has type %d (not AutTxoTypePublic)",
+					autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum, autTxoType, abecryptox.AutTxoTypePublic)
 			}
 		}
 	}
@@ -2734,18 +2734,18 @@ func (script *BurnScript) SanityCheck() error {
 	// witnessHash          chainhash.Hash
 
 	// scriptMemo                 []byte
-	if len(script.scriptMemo) > MaxScriptMemoLength {
-		return fmt.Errorf("len(script.scriptMemo) (%d) is too large", len(script.scriptMemo))
+	if len(autScript.scriptMemo) > MaxScriptMemoLength {
+		return fmt.Errorf("len(autScript.scriptMemo) (%d) is too large", len(autScript.scriptMemo))
 	}
 
 	return nil
 }
 
-func (script *BurnScript) NumConsumedTokens() int {
-	return int(script.inHiddenAutTokenNum + script.inPublicAutTokenNum)
+func (autScript *BurnScript) NumConsumedTokens() int {
+	return int(autScript.inHiddenAutTokenNum + autScript.inPublicAutTokenNum)
 }
-func (script *BurnScript) NumGeneratedTokens() int {
-	return int(script.outHiddenAutTokenNum + script.outPublicAutTokenNum)
+func (autScript *BurnScript) NumGeneratedTokens() int {
+	return int(autScript.outHiddenAutTokenNum + autScript.outPublicAutTokenNum)
 }
 
 var _ AutScript = &BurnScript{}
