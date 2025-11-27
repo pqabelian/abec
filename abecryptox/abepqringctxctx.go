@@ -39,7 +39,7 @@ func pqringctxAutCoinbaseTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 	for j := 0; j < len(autTxOutputDescs); j++ {
 
 		// The rules of (txoVersion, autTxoType) need to be checked, since the ring-rules need this.
-		err = pqringctxAutRuleCheckOnTxoVersionType(pp, autScriptVersion, autTxOutputDescs[j].AutTxoType())
+		err = pqringctxAutRuleCheckOnAutTxoVersionType(pp, autScriptVersion, autTxOutputDescs[j].AutTxoType())
 		if err != nil {
 			return nil, fmt.Errorf("pqringctxAutCoinbaseTxGen: (txVersion, autTxOutputDescs[%d].AutTxoType()) (%d, %d) "+
 				"fail to pass the AutRuleCheckOnTxoVersionType: %v",
@@ -117,7 +117,7 @@ func pqringctxAutCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, autCoinbaseT
 		}
 
 		// The rules of (txoVersion, autTxoType) need to be checked, since the ring-rules need this.
-		err = pqringctxAutRuleCheckOnTxoVersionType(pp, autTxo.Version, autTxoType)
+		err = pqringctxAutRuleCheckOnAutTxoVersionType(pp, autTxo.Version, autTxoType)
 		if err != nil {
 			return fmt.Errorf("pqringctxAutCoinbaseTxVerify: autCoinbaseTx.TxOuts[%d]'s (Version, autTxoType) (%d, %d) "+
 				"fail to pass the AutRuleCheckOnTxoVersionType: %v",
@@ -213,7 +213,7 @@ func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 		}
 
 		// The rules of (txoVersion, autTxoType) need to be checked, since the ring-rules need this.
-		err = pqringctxAutRuleCheckOnTxoVersionType(pp, autScriptVersion, autTxOutputDescs[j].AutTxoType())
+		err = pqringctxAutRuleCheckOnAutTxoVersionType(pp, autScriptVersion, autTxOutputDescs[j].AutTxoType())
 		if err != nil {
 			return nil, fmt.Errorf("pqringctxAutTransferTxGen: (autScriptVersion, autTxOutputDescs[%d].AutTxoType()) (%d, %d) "+
 				"fail to pass the AutRuleCheckOnTxoVersionType: %v",
@@ -319,7 +319,7 @@ func pqringctxAutTransferTxVerify(pp *pqringctxapi.PublicParameter, autTransferT
 		}
 
 		// The rules of (txoVersion, autTxoType) need to be checked, since the ring-rules need this.
-		err = pqringctxAutRuleCheckOnTxoVersionType(pp, autTxo.Version, autTxoType)
+		err = pqringctxAutRuleCheckOnAutTxoVersionType(pp, autTxo.Version, autTxoType)
 		if err != nil {
 			return fmt.Errorf("pqringctxTransferTxVerify: autTransferTx.TxOuts[%d]'s (Version, autTxoType) (%d, %d) "+
 				"fail to pass the AutRuleCheckOnTxoVersionType: %v",
@@ -438,23 +438,24 @@ func pqringctxGetAutTransferTxWitnessSizeByDesc(pp *pqringctxapi.PublicParameter
 
 // APIs for ruleChecks	begin
 
-// pqringctxRuleCheckOnTxoVersionPrivacyLevel checks the match between Txo's Version and PrivacyLevel.
+// pqringctxAutRuleCheckOnAutTxoVersionType checks the match between AutTxo's Version and AutTxoType.
 //
-// When new TxVersion is added, rules need to be added here.
-// todo: change hostTxoVersion to AutScriptVersion
-func pqringctxAutRuleCheckOnTxoVersionType(pp *pqringctxapi.PublicParameter, autScriptVersion uint32, autType AutTxoType) error {
+// Note that AutTxo's version is inherited from AutScriptVersion.
+//
+// When new AutScriptVersion is added, rules need to be added here.
+func pqringctxAutRuleCheckOnAutTxoVersionType(pp *pqringctxapi.PublicParameter, autScriptVersion uint32, autType AutTxoType) error {
 	switch autScriptVersion {
 	case wire.AutScriptVersion_1:
 		if autType == AutTxoTypeHidden || autType == AutTxoTypePublic {
 			// allowed cases
 		} else {
-			return fmt.Errorf("pqringctxAutRuleCheckOnTxoVersionPrivacyLevel: autScriptVersion is %d, "+
+			return fmt.Errorf("pqringctxAutRuleCheckOnAutTxoVersionType: autScriptVersion is %d, "+
 				"but the autType (%d) is not AutTxoTypeHidden or AutTxoTypePublic",
 				autScriptVersion, autType)
 		}
 
 	default:
-		return fmt.Errorf("pqringctxAutRuleCheckOnTxoVersionType: autScriptVersion (%d) is not supported",
+		return fmt.Errorf("pqringctxAutRuleCheckOnAutTxoVersionType: autScriptVersion (%d) is not supported",
 			autScriptVersion)
 	}
 

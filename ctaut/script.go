@@ -1975,7 +1975,6 @@ func (script *MintScript) SanityCheck() error {
 			return fmt.Errorf("version mismatch (autTxo.Version %d != script.version %d)", autTxo.Version, script.version)
 		}
 
-		// todo: cyclic import?
 		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
 		if err != nil {
 			return err
@@ -2343,7 +2342,6 @@ func (script *TransferScript) SanityCheck() error {
 			return fmt.Errorf("version mismatch (autTxo.Version %d != script.version %d)", autTxo.Version, script.version)
 		}
 
-		// todo: cyclic import?
 		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
 		if err != nil {
 			return err
@@ -2386,7 +2384,7 @@ var _ AutScript = &TransferScript{}
 // 4. the witnessHash MUST be given, which is computed from AutWitness at host-transaction layer,
 // 5. the generatedTokens would be populated with the function populateGeneratedCTAUTTokens with the help of host transaction
 // 6. the consumedTokens would be populated with the help of host transaction and corresponding wire.TxoRing,
-// 7. (RULE) the number of generated Public-Tokens MUST be at least 1, since (RULE) the first Public-Token would be marked burned.
+// 7. (RULE) the number of generated Public-Tokens MUST be at least 1, since (RULE) the LAST Public-Token would be marked burned.
 //
 // BurnScript consists of
 // <version>
@@ -2685,7 +2683,6 @@ func (script *BurnScript) SanityCheck() error {
 		return fmt.Errorf("script.outPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
 			script.outPublicAutTokenNum, MaxNumToken)
 	}
-	// todo: confirm
 	if int(script.outPublicAutTokenNum) < 1 {
 		return fmt.Errorf("script.outPublicAutTokenNum (%d) is smaller than 1: invalid for BurnScript",
 			script.outPublicAutTokenNum)
@@ -2717,7 +2714,6 @@ func (script *BurnScript) SanityCheck() error {
 			return fmt.Errorf("version mismatch (autTxo.Version %d != script.version %d)", autTxo.Version, script.version)
 		}
 
-		// todo: cyclic import?
 		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
 		if err != nil {
 			return err
@@ -2957,6 +2953,7 @@ type EnhancedAutScript struct {
 	// Note that for following 2 fields:
 	// - if the value is nil, it means that the tokens is not set
 	// - if the value is empty slice, it means that the tokens is set but has no token
+	// todo: add an explicit flag?
 	consumedTokens  []*AutToken
 	generatedTokens []*AutToken
 }

@@ -109,7 +109,7 @@ func GetAutTxoType(autTxo *wire.AutTxo) (AutTxoType, error) {
 
 	case abecryptoxparam.CryptoSchemePQRingCTX:
 		return pqringctxGetAutTxoType(abecryptoxparam.PQRingCTXPP, autTxo)
-		
+
 	default:
 		return AutTxoTypeHidden, fmt.Errorf("GetAutTxoType: the crypto scheme mapped from autTxo.Version is not supported")
 	}
@@ -204,7 +204,7 @@ func AutRuleCheckOnTxoVersionType(hostTxoVersion uint32, autTxoType AutTxoType) 
 
 	switch cryptoScheme {
 	case abecryptoxparam.CryptoSchemePQRingCTX:
-		return pqringctxAutRuleCheckOnTxoVersionType(abecryptoxparam.PQRingCTXPP, hostTxoVersion, autTxoType)
+		return pqringctxAutRuleCheckOnAutTxoVersionType(abecryptoxparam.PQRingCTXPP, hostTxoVersion, autTxoType)
 
 	default:
 		return fmt.Errorf("AutRuleCheckOnTxoVersionType: Unsupported hostTxoVersion (%d)", hostTxoVersion)
