@@ -341,12 +341,12 @@ func GetGeneratedAutTokens(script AutScript, txHash chainhash.Hash, txOuts []*wi
 		// no value script need to assign
 	case *MintScript: // todo: add TransferScript, BurnScript here?
 		for i := 0; i < numCTAUTTokens; i++ {
-			err := RuleCheckOnTxoVersionType(generatedTokens[i].Version, ctAUTScript.valueScripts[i])
+			err := RuleCheckOnTxoVersionType(generatedTokens[i].Version, ctAUTScript.serializedAutTxos[i])
 			if err != nil {
 				return nil, err
 			}
 
-			generatedTokens[i].ValueScript = ctAUTScript.valueScripts[i]
+			generatedTokens[i].ValueScript = ctAUTScript.serializedAutTxos[i]
 		}
 	case *TransferScript:
 		for i := 0; i < numCTAUTTokens; i++ {

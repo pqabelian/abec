@@ -1685,10 +1685,10 @@ type MintScript struct {
 	// and then (b) the following outPublicAutTokenNum pseudonym Txo of the host-Tx should be publicAutTxo.
 	outHiddenAutTokenNum uint8
 	outPublicAutTokenNum uint8
-	valueScripts         [][]byte // todo: limited to value? // todo: defined as serializedAutTxos? why not autTxos
+	serializedAutTxos    [][]byte // length = outHiddenAutTokenNum + outPublicAutTokenNum
 	witnessHash          chainhash.Hash
 
-	scriptMemo []byte // todo: scriptMemo
+	scriptMemo []byte
 }
 
 func (script *MintScript) WitnessHash() chainhash.Hash {
@@ -1702,7 +1702,7 @@ func (script *MintScript) Vin() uint64 {
 func NewMintScript(version uint32,
 	autIdentifier AutId,
 	vin uint64, inAutRootTokenNum uint8,
-	outCTAutTokenNum uint8, outPlainAutTokenNum uint8, valueScripts [][]byte,
+	outCTAutTokenNum uint8, outPlainAutTokenNum uint8, serializedAutTxos [][]byte,
 	witnessHash chainhash.Hash, scriptMemo []byte) *MintScript {
 	return &MintScript{
 		version:              version,
@@ -1712,7 +1712,7 @@ func NewMintScript(version uint32,
 		inAutRootTokenNum:    inAutRootTokenNum,
 		outHiddenAutTokenNum: outCTAutTokenNum,
 		outPublicAutTokenNum: outPlainAutTokenNum,
-		valueScripts:         valueScripts,
+		serializedAutTxos:    serializedAutTxos,
 		witnessHash:          witnessHash,
 		scriptMemo:           scriptMemo,
 	}
@@ -1751,7 +1751,7 @@ func (script *MintScript) Serialize() ([]byte, error) {
 	}
 
 	// todo: necessary to use a function?
-	if err = writeCTAUTTxoScripts(&b, script.valueScripts); err != nil {
+	if err = writeCTAUTTxoScripts(&b, script.serializedAutTxos); err != nil {
 		return nil, err
 	}
 
@@ -1792,7 +1792,7 @@ func (script *MintScript) Deserialize(serializedScript []byte) error {
 	}
 
 	// todo: necessary to use a function?
-	if script.valueScripts, err = readCTAUTTxoScript(r, int(script.outHiddenAutTokenNum), int(script.outPublicAutTokenNum)); err != nil {
+	if script.serializedAutTxos, err = readCTAUTTxoScript(r, int(script.outHiddenAutTokenNum), int(script.outPublicAutTokenNum)); err != nil {
 		return err
 	}
 
@@ -1832,12 +1832,12 @@ func (script *MintScript) SanityCheck() error {
 		return ErrInValidAUTTx
 	}
 
-	if len(script.valueScripts) != int(script.outHiddenAutTokenNum)+int(script.outPublicAutTokenNum) {
+	if len(script.serializedAutTxos) != int(script.outHiddenAutTokenNum)+int(script.outPublicAutTokenNum) {
 		return ErrInValidAUTTx
 	}
-	for i := 0; i < len(script.valueScripts); i++ {
+	for i := 0; i < len(script.serializedAutTxos); i++ {
 		autTxo := &ctautwire.AutTxo{}
-		err := autTxo.Deserialize(script.valueScripts[i])
+		err := autTxo.Deserialize(script.serializedAutTxos[i])
 		if err != nil {
 			return err
 		}
