@@ -2403,7 +2403,7 @@ type BurnScript struct {
 	scriptType    AutScriptType
 	autIdentifier AutId
 
-	inHiddenAutTokenNum uint8
+	inHiddenAutTokenNum  uint8
 	inPublicAutTokenNum  uint8
 	outHiddenAutTokenNum uint8
 	outPublicAutTokenNum uint8
@@ -2426,8 +2426,8 @@ func NewBurnScript(
 	autIdentifier AutId,
 	inHiddenAutTokenNum uint8,
 	inPublicAutTokenNum uint8,
-	outCTAutTokenNum uint8,
-	outPlainAutTokenNum uint8,
+	outHiddenAutTokenNum uint8,
+	outPublicAutTokenNum uint8,
 	valueScripts [][]byte,
 	witnessHash chainhash.Hash,
 	scriptMemo []byte,
@@ -2438,8 +2438,8 @@ func NewBurnScript(
 		autIdentifier:        autIdentifier,
 		inHiddenAutTokenNum:  inHiddenAutTokenNum,
 		inPublicAutTokenNum:  inPublicAutTokenNum,
-		outHiddenAutTokenNum: outCTAutTokenNum,
-		outPublicAutTokenNum: outPlainAutTokenNum,
+		outHiddenAutTokenNum: outHiddenAutTokenNum,
+		outPublicAutTokenNum: outPublicAutTokenNum,
 		valueScripts:         valueScripts,
 		witnessHash:          witnessHash,
 		scriptMemo:           scriptMemo,
