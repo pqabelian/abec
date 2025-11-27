@@ -2404,9 +2404,9 @@ type BurnScript struct {
 	autIdentifier AutId
 
 	inHiddenAutTokenNum uint8
-	inPublicAutTokenNum uint8
-	outCTAutTokenNum    uint8
-	outPlainAutTokenNum uint8
+	inPublicAutTokenNum  uint8
+	outHiddenAutTokenNum uint8
+	outPlainAutTokenNum  uint8
 	valueScripts        [][]byte // todo: defined as serializedAutTxos? why not autTxos
 
 	witnessHash chainhash.Hash
@@ -2433,16 +2433,16 @@ func NewBurnScript(
 	scriptMemo []byte,
 ) *BurnScript {
 	return &BurnScript{
-		version:             version,
-		scriptType:          AutScriptTypeBurn,
-		autIdentifier:       autIdentifier,
-		inHiddenAutTokenNum: inHiddenAutTokenNum,
-		inPublicAutTokenNum: inPublicAutTokenNum,
-		outCTAutTokenNum:    outCTAutTokenNum,
-		outPlainAutTokenNum: outPlainAutTokenNum,
-		valueScripts:        valueScripts,
-		witnessHash:         witnessHash,
-		scriptMemo:          scriptMemo,
+		version:              version,
+		scriptType:           AutScriptTypeBurn,
+		autIdentifier:        autIdentifier,
+		inHiddenAutTokenNum:  inHiddenAutTokenNum,
+		inPublicAutTokenNum:  inPublicAutTokenNum,
+		outHiddenAutTokenNum: outCTAutTokenNum,
+		outPlainAutTokenNum:  outPlainAutTokenNum,
+		valueScripts:         valueScripts,
+		witnessHash:          witnessHash,
+		scriptMemo:           scriptMemo,
 	}
 }
 
@@ -2470,7 +2470,7 @@ func (script *BurnScript) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	if err = b.WriteByte(script.outCTAutTokenNum); err != nil {
+	if err = b.WriteByte(script.outHiddenAutTokenNum); err != nil {
 		return nil, err
 	}
 	if err = b.WriteByte(script.outPlainAutTokenNum); err != nil {
@@ -2513,7 +2513,7 @@ func (script *BurnScript) Deserialize(serializedScript []byte) error {
 		return err
 	}
 
-	if script.outCTAutTokenNum, err = ReadByte(r); err != nil {
+	if script.outHiddenAutTokenNum, err = ReadByte(r); err != nil {
 		return err
 	}
 	if script.outPlainAutTokenNum, err = ReadByte(r); err != nil {
@@ -2521,7 +2521,7 @@ func (script *BurnScript) Deserialize(serializedScript []byte) error {
 	}
 
 	// todo: necessary to use a function?
-	if script.valueScripts, err = readCTAUTTxoScript(r, int(script.outCTAutTokenNum), int(script.outPlainAutTokenNum)); err != nil {
+	if script.valueScripts, err = readCTAUTTxoScript(r, int(script.outHiddenAutTokenNum), int(script.outPlainAutTokenNum)); err != nil {
 		return err
 	}
 
@@ -2552,14 +2552,14 @@ func (script *BurnScript) SanityCheck() error {
 	if script.inHiddenAutTokenNum+script.inPublicAutTokenNum == 0 {
 		return ErrInValidAUTTx
 	}
-	if script.outCTAutTokenNum+script.outPlainAutTokenNum == 0 {
+	if script.outHiddenAutTokenNum+script.outPlainAutTokenNum == 0 {
 		return ErrInValidAUTTx
 	}
 
-	if int(script.outCTAutTokenNum) > MaxNumHiddenToken {
+	if int(script.outHiddenAutTokenNum) > MaxNumHiddenToken {
 		return ErrInValidAUTTx
 	}
-	if len(script.valueScripts) != int(script.outCTAutTokenNum)+int(script.outPlainAutTokenNum) {
+	if len(script.valueScripts) != int(script.outHiddenAutTokenNum)+int(script.outPlainAutTokenNum) {
 		return ErrInValidAUTTx
 	}
 
@@ -2573,7 +2573,7 @@ func (script *BurnScript) SanityCheck() error {
 		if err != nil {
 			return ErrInValidAUTTx
 		}
-		if i < int(script.outCTAutTokenNum) {
+		if i < int(script.outHiddenAutTokenNum) {
 			if autTxoType != abecryptox.AutTxoTypeHidden {
 				return ErrInValidAUTTx
 			}
@@ -2596,7 +2596,7 @@ func (script *BurnScript) NumConsumedTokens() int {
 	return int(script.inHiddenAutTokenNum + script.inPublicAutTokenNum)
 }
 func (script *BurnScript) NumGeneratedTokens() int {
-	return int(script.outCTAutTokenNum + script.outPlainAutTokenNum)
+	return int(script.outHiddenAutTokenNum + script.outPlainAutTokenNum)
 }
 
 var _ AutScript = &BurnScript{}
