@@ -2407,7 +2407,7 @@ type BurnScript struct {
 	inPublicAutTokenNum  uint8
 	outHiddenAutTokenNum uint8
 	outPublicAutTokenNum uint8
-	valueScripts         [][]byte // todo: defined as serializedAutTxos? why not autTxos
+	serializedAutTxos    [][]byte
 
 	witnessHash chainhash.Hash
 	scriptMemo  []byte // todo: scriptMemo
@@ -2428,7 +2428,7 @@ func NewBurnScript(
 	inPublicAutTokenNum uint8,
 	outHiddenAutTokenNum uint8,
 	outPublicAutTokenNum uint8,
-	valueScripts [][]byte,
+	serializedAutTxos [][]byte,
 	witnessHash chainhash.Hash,
 	scriptMemo []byte,
 ) *BurnScript {
@@ -2440,7 +2440,7 @@ func NewBurnScript(
 		inPublicAutTokenNum:  inPublicAutTokenNum,
 		outHiddenAutTokenNum: outHiddenAutTokenNum,
 		outPublicAutTokenNum: outPublicAutTokenNum,
-		valueScripts:         valueScripts,
+		serializedAutTxos:    serializedAutTxos,
 		witnessHash:          witnessHash,
 		scriptMemo:           scriptMemo,
 	}
@@ -2478,7 +2478,7 @@ func (script *BurnScript) Serialize() ([]byte, error) {
 	}
 
 	// todo: necessary to use a function?
-	if err = writeCTAUTTxoScripts(&b, script.valueScripts); err != nil {
+	if err = writeCTAUTTxoScripts(&b, script.serializedAutTxos); err != nil {
 		return nil, err
 	}
 
@@ -2521,7 +2521,7 @@ func (script *BurnScript) Deserialize(serializedScript []byte) error {
 	}
 
 	// todo: necessary to use a function?
-	if script.valueScripts, err = readCTAUTTxoScript(r, int(script.outHiddenAutTokenNum), int(script.outPublicAutTokenNum)); err != nil {
+	if script.serializedAutTxos, err = readCTAUTTxoScript(r, int(script.outHiddenAutTokenNum), int(script.outPublicAutTokenNum)); err != nil {
 		return err
 	}
 
@@ -2559,13 +2559,13 @@ func (script *BurnScript) SanityCheck() error {
 	if int(script.outHiddenAutTokenNum) > MaxNumHiddenToken {
 		return ErrInValidAUTTx
 	}
-	if len(script.valueScripts) != int(script.outHiddenAutTokenNum)+int(script.outPublicAutTokenNum) {
+	if len(script.serializedAutTxos) != int(script.outHiddenAutTokenNum)+int(script.outPublicAutTokenNum) {
 		return ErrInValidAUTTx
 	}
 
-	for i := 0; i < len(script.valueScripts); i++ {
+	for i := 0; i < len(script.serializedAutTxos); i++ {
 		autTxo := &ctautwire.AutTxo{}
-		err := autTxo.Deserialize(script.valueScripts[i])
+		err := autTxo.Deserialize(script.serializedAutTxos[i])
 		if err != nil {
 			return err
 		}
@@ -3083,7 +3083,7 @@ func ExtractAutScript(tx *wire.MsgTxAbe) (enhancedScript *EnhancedAutScript, err
 		// for outputs, check the legality of burned token (a.k.a last generated token)
 		// Above ParseCTAUTScript() ensures the length of serializedAutTxos is not less than 1
 		autTxo := &ctautwire.AutTxo{}
-		err = autTxo.Deserialize(script.valueScripts[len(script.valueScripts)-1])
+		err = autTxo.Deserialize(script.serializedAutTxos[len(script.serializedAutTxos)-1])
 		if err != nil {
 			return nil, err
 		}

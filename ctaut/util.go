@@ -359,12 +359,12 @@ func GetGeneratedAutTokens(script AutScript, txHash chainhash.Hash, txOuts []*wi
 		}
 	case *BurnScript:
 		for i := 0; i < numCTAUTTokens; i++ {
-			err := RuleCheckOnTxoVersionType(generatedTokens[i].Version, ctAUTScript.valueScripts[i])
+			err := RuleCheckOnTxoVersionType(generatedTokens[i].Version, ctAUTScript.serializedAutTxos[i])
 			if err != nil {
 				return nil, err
 			}
 
-			generatedTokens[i].ValueScript = ctAUTScript.valueScripts[i]
+			generatedTokens[i].ValueScript = ctAUTScript.serializedAutTxos[i]
 		}
 	default:
 		return nil, fmt.Errorf("unexpected aut transaction type %d", script.Type())
