@@ -281,7 +281,7 @@ func CheckHostTxoParasiticity(txHash chainhash.Hash, outputIndex uint8, txOut *w
 
 // GetGeneratedAutTokens would get the specified host output from the host transaction
 // todo(ctaut): add comments to define the rules
-func GetGeneratedAutTokens(script AutScript, txHash chainhash.Hash, txOuts []*wire.TxOutAbe) ([]*CTAUTToken, error) {
+func GetGeneratedAutTokens(script AutScript, txHash chainhash.Hash, txOuts []*wire.TxOutAbe) ([]*AutToken, error) {
 	numCTAUTTokens := script.NumGeneratedTokens()
 	startIdx := 0
 	for ; startIdx < len(txOuts); startIdx++ {
@@ -313,7 +313,7 @@ func GetGeneratedAutTokens(script AutScript, txHash chainhash.Hash, txOuts []*wi
 	}
 
 	// todo(ctaut): seems not correct. it is possible startIdx is not hosting ctaut. need define the rules
-	generatedTokens := make([]*CTAUTToken, numCTAUTTokens)
+	generatedTokens := make([]*AutToken, numCTAUTTokens)
 	for i := 0; i < numCTAUTTokens; i++ {
 		index := uint8(startIdx + i)
 		txOut := txOuts[index]
@@ -323,7 +323,7 @@ func GetGeneratedAutTokens(script AutScript, txHash chainhash.Hash, txOuts []*wi
 			return nil, err
 		}
 
-		generatedTokens[i] = &CTAUTToken{
+		generatedTokens[i] = &AutToken{
 			Version: script.Version(),
 			HostOutPoint: HostOutPoint{
 				TxHash: txHash,
@@ -375,9 +375,9 @@ func GetGeneratedAutTokens(script AutScript, txHash chainhash.Hash, txOuts []*wi
 
 // todo(ctaut): define the rules on the mint/update threshold.
 // todo: confirm, this is only a minimum check, say,
-// each claimed issuer has at least one corresponding CTAUTToken,
+// each claimed issuer has at least one corresponding AutToken,
 // and each CTAUToken has has corresponding issuer.
-func matchIssuers(issuers []*AutIssuer, outputs []*CTAUTToken) error {
+func matchIssuers(issuers []*AutIssuer, outputs []*AutToken) error {
 	claimedIssuersByCoinAddress := map[string]struct{}{}
 	for i := 0; i < len(issuers); i++ {
 		coinAddressStr := hex.EncodeToString(issuers[i].CoinAddress())

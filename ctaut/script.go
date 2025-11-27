@@ -2929,8 +2929,8 @@ func ParseAutScript(txVersion uint32, txHash chainhash.Hash, memo []byte) (AutSc
 
 // todo(ctaut): this is for database storage or only memeory? why has CoinAddress and ValueScript?
 // todo(ctaut): define an interface? only a case needs coinAddress.
-// CTAUTToken holds the main information of token in memory, it would be used to check all rules
-type CTAUTToken struct {
+// AutToken holds the main information of token in memory, it would be used to check all rules
+type AutToken struct {
 	// inherit from script
 	Version uint32
 	// used to track the host location on blockchain
@@ -2957,18 +2957,18 @@ type EnhancedAutScript struct {
 	// Note that for following 2 fields:
 	// - if the value is nil, it means that the tokens is not set
 	// - if the value is empty slice, it means that the tokens is set but has no token
-	consumedTokens  []*CTAUTToken
-	generatedTokens []*CTAUTToken
+	consumedTokens  []*AutToken
+	generatedTokens []*AutToken
 }
 
-func (script *EnhancedAutScript) ConsumedTokens() ([]*CTAUTToken, error) {
+func (script *EnhancedAutScript) ConsumedTokens() ([]*AutToken, error) {
 	if script.consumedTokens == nil {
 		return nil, errors.New("consumed tokens not set")
 	}
 
 	return script.consumedTokens, nil
 }
-func (script *EnhancedAutScript) setConsumedTokens(consumedTokens []*CTAUTToken) error {
+func (script *EnhancedAutScript) setConsumedTokens(consumedTokens []*AutToken) error {
 	if len(consumedTokens) != script.NumConsumedTokens() {
 		return errors.New("mismatched number of consumed tokens")
 	}
@@ -2977,14 +2977,14 @@ func (script *EnhancedAutScript) setConsumedTokens(consumedTokens []*CTAUTToken)
 	return nil
 }
 
-func (script *EnhancedAutScript) GeneratedTokens() ([]*CTAUTToken, error) {
+func (script *EnhancedAutScript) GeneratedTokens() ([]*AutToken, error) {
 	if script.generatedTokens == nil {
 		return nil, errors.New("generated tokens not set")
 	}
 
 	return script.generatedTokens, nil
 }
-func (script *EnhancedAutScript) setGeneratedTokens(generatedTokens []*CTAUTToken) error {
+func (script *EnhancedAutScript) setGeneratedTokens(generatedTokens []*AutToken) error {
 	if len(generatedTokens) != script.NumGeneratedTokens() {
 		return errors.New("mismatched number of consumed tokens")
 	}
@@ -3270,7 +3270,7 @@ func PresetHostOutpointForCTAUT(script *EnhancedAutScript, msgTx *wire.MsgTxAbe,
 		return nil
 	}
 	if script.Type() == AutScriptTypeRegistration {
-		return script.setConsumedTokens([]*CTAUTToken{})
+		return script.setConsumedTokens([]*AutToken{})
 	}
 	txHash := msgTx.TxHash()
 
@@ -3307,7 +3307,7 @@ func PresetHostOutpointForCTAUT(script *EnhancedAutScript, msgTx *wire.MsgTxAbe,
 			numInCoins, len(hostedTxIns)-startIndex)
 	}
 
-	consumedTokens := make([]*CTAUTToken, numInCoins)
+	consumedTokens := make([]*AutToken, numInCoins)
 	for i := 0; i < len(consumedTokens); i++ {
 		hostIndex := startIndex + i
 
@@ -3348,7 +3348,7 @@ func PresetHostOutpointForCTAUT(script *EnhancedAutScript, msgTx *wire.MsgTxAbe,
 		//		hostedTxIns[hostIndex].PreviousOutPointRing.Version, msgTx.Version)
 		//}
 
-		consumedTokens[i] = &CTAUTToken{
+		consumedTokens[i] = &AutToken{
 			Version:      ctautwire.AutScriptVersion_Unknown,
 			HostOutPoint: outpoint,    // will be populated later with CTAUTViewpoint
 			ValueScript:  nil,         // will be populated later with CTAUTViewpoint
