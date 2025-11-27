@@ -853,9 +853,7 @@ func (script *RegistrationScript) AutIdentifier() AutId {
 }
 
 func (script *RegistrationScript) serializeSize() int {
-	n := len([]byte(commonPrefix)) // commonPrefix = "AUTSCRIPT"
-
-	n += wire.VarIntSerializeSize(uint64(script.version))                                      // version                    uint32
+	n := wire.VarIntSerializeSize(uint64(script.version))                                      // version                    uint32
 	n += 1                                                                                     // scriptType                 AutScriptType
 	n += chainhash.HashSize                                                                    // autIdentifier              AutId
 	n += wire.VarIntSerializeSize(uint64(len(script.autName))) + len(script.autName)           // autName                    []byte
@@ -884,12 +882,6 @@ func (script *RegistrationScript) Serialize() ([]byte, error) {
 	var err error
 
 	w := bytes.NewBuffer(make([]byte, 0, script.serializeSize()))
-
-	// commonPrefix
-	// todo: discuss, need this?
-	if _, err = w.Write([]byte(commonPrefix)); err != nil {
-		return nil, err
-	}
 
 	// version                    uint32
 	if err = wire.WriteVarInt(w, 0, uint64(script.version)); err != nil {
@@ -983,20 +975,6 @@ func (script *RegistrationScript) Deserialize(serializedScript []byte) error {
 	var err error
 
 	r := bytes.NewReader(serializedScript)
-
-	// todo: not necessary for define a function readPrefix,
-	// todo: even do this, the expected Type should be used inside the function
-	//if script.version, script.autIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeRegistration); err != nil {
-	//	return err
-	//}
-
-	// commonPrefix
-	// todo: discuss, remove
-	// todo: discuss the error type
-	commonPrefixRead := make([]byte, len([]byte(commonPrefix)))
-	if _, err = io.ReadFull(r, commonPrefixRead); err != nil {
-		return err
-	}
 
 	// version                    uint32
 	version, err := wire.ReadVarInt(r, 0)
@@ -1368,9 +1346,7 @@ func (script *ReRegistrationScript) AutIdentifier() AutId {
 }
 
 func (script *ReRegistrationScript) serializeSize() int {
-	n := len([]byte(commonPrefix)) // commonPrefix = "AUTSCRIPT"
-
-	n += wire.VarIntSerializeSize(uint64(script.version))                            // version                    uint32
+	n := wire.VarIntSerializeSize(uint64(script.version))                            // version                    uint32
 	n += 1                                                                           // scriptType                 AutScriptType
 	n += chainhash.HashSize                                                          // autIdentifier              AutId
 	n += wire.VarIntSerializeSize(uint64(len(script.autMemo))) + len(script.autMemo) // autMemo                    []byte
@@ -1395,12 +1371,6 @@ func (script *ReRegistrationScript) Serialize() ([]byte, error) {
 	var err error
 
 	w := bytes.NewBuffer(make([]byte, 0, script.serializeSize()))
-
-	// commonPrefix
-	// todo: discuss, need this?
-	if _, err = w.Write([]byte(commonPrefix)); err != nil {
-		return nil, err
-	}
 
 	// version                    uint32
 	if err = wire.WriteVarInt(w, 0, uint64(script.version)); err != nil {
@@ -1474,20 +1444,6 @@ func (script *ReRegistrationScript) Deserialize(serializedScript []byte) error {
 	var err error
 
 	r := bytes.NewReader(serializedScript)
-
-	// todo: not necessary for define a function readPrefix,
-	// todo: even do this, the expected Type should be used inside the function
-	//if script.version, script.autIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeRegistration); err != nil {
-	//	return err
-	//}
-
-	// commonPrefix
-	// todo: discuss, remove
-	// todo: discuss the error type
-	commonPrefixRead := make([]byte, len([]byte(commonPrefix)))
-	if _, err = io.ReadFull(r, commonPrefixRead); err != nil {
-		return err
-	}
 
 	// version                    uint32
 	version, err := wire.ReadVarInt(r, 0)
@@ -1581,7 +1537,6 @@ func (script *ReRegistrationScript) Deserialize(serializedScript []byte) error {
 func (script *ReRegistrationScript) SanityCheck() error {
 
 	// version                    uint32
-	// todo: discuss whether this is too strict
 	if _, ok := ctautwire.AutScriptVersionSet[script.version]; !ok {
 		return fmt.Errorf("invalid version: %d", script.version)
 	}
