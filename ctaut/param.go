@@ -19,6 +19,8 @@ const (
 	AutScriptTypeBurn           AutScriptType = 4
 )
 
+const MaxAutScriptLength uint32 = 128 * 1024 // 128K, consistent with MaxAllowedTxMemoSize
+
 const AutIdentifierLength = chainhash.HashSize
 
 // The following parameters would be chosen with the following references and actual limitation on Abelian

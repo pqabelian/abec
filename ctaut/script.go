@@ -2356,18 +2356,19 @@ var _ AutScript = &BurnScript{}
 var ErrNonAutTx = errors.New("not a AUT transaction")
 var ErrInValidAUTTx = errors.New("not a valid AUT transaction")
 
-// PackageAutScriptForTxMemo
-// = commonPrefix || version (in VarInt form) || serializedAutScript (in VarBytes form)
-func PackageAutScriptForTxMemo(script AutScript) (packagedAutScript []byte, err error) {
+// PackageAutScript packages an AutScript to a packagedAutScript, where
+// packagedAutScript = commonPrefix (="AUTSCRIPT") || version (in VarInt form) || serializedAutScript (in VarBytes form).
+func PackageAutScript(script AutScript) (packagedAutScript []byte, err error) {
+
 	serializedScript, err := script.Serialize()
 	if err != nil {
 		return nil, err
 	}
+
 	length := len([]byte(commonPrefix))
 	length += wire.VarIntSerializeSize(uint64(script.Version()))
 
-	length += wire.VarIntSerializeSize(uint64(len(serializedScript)))
-	length += len(serializedScript)
+	length += wire.VarIntSerializeSize(uint64(len(serializedScript))) + len(serializedScript)
 
 	w := bytes.NewBuffer(make([]byte, 0, length))
 
@@ -2389,13 +2390,20 @@ func PackageAutScriptForTxMemo(script AutScript) (packagedAutScript []byte, err 
 	return w.Bytes(), nil
 }
 
-func ExtractAutScriptFromTxMemo(txMemo []byte) (AutScript, error) {
-	length := len([]byte(commonPrefix))
-	if len(txMemo) < length {
-		return nil, fmt.Errorf("packaged script too short")
+// UnpackageAutScript unpackages a packagedAutScript to an AutScript, where packagedAutScript is assumed to start from
+// commonPrefix (="AUTSCRIPT") || version (in VarInt form) || serializedAutScript (in VarBytes form).
+// A packagedAutScript does not satisfy this form will result an error returned.
+func UnpackageAutScript(packagedAutScript []byte) (AutScript, error) {
+	commonPrefixLen := len([]byte(commonPrefix))
+	if len(packagedAutScript) < commonPrefixLen {
+		return nil, fmt.Errorf("packagedAutScript is not well-form as expected")
 	}
 
-	r := bytes.NewReader(txMemo[length:])
+	if !bytes.Equal(packagedAutScript[:commonPrefixLen], []byte(commonPrefix)) {
+		return nil, fmt.Errorf("packagedAutScript is not well-form as expected: not start with %s", commonPrefix)
+	}
+
+	r := bytes.NewReader(packagedAutScript[commonPrefixLen:])
 	versionRead, err := wire.ReadVarInt(r, 0)
 	if err != nil {
 		return nil, err
@@ -2408,7 +2416,7 @@ func ExtractAutScriptFromTxMemo(txMemo []byte) (AutScript, error) {
 		return nil, fmt.Errorf("unknown version %d", scriptVersion)
 	}
 
-	serializedScript, err := wire.ReadVarBytes(r, 0, 1000, "AutScript")
+	serializedScript, err := wire.ReadVarBytes(r, 0, MaxAutScriptLength, "AutScript")
 	if err != nil {
 		return nil, err
 	}
@@ -2416,13 +2424,16 @@ func ExtractAutScriptFromTxMemo(txMemo []byte) (AutScript, error) {
 	// todo: if multiple versions are supported, may need to code here to run different branch
 	switch scriptVersion {
 	case ctautwire.AutScriptVersion_1:
-
 		return deserializeAutScriptV1(serializedScript)
+
 	default:
-		return nil, fmt.Errorf("unknown version %d", scriptVersion)
+		return nil, fmt.Errorf("unknown aut script version %d", scriptVersion)
 	}
 }
 
+// deserializeAutScriptV1 deserializes the serializedAutScript to an AutScript, where
+// serializedAutScript is assumed to be the result of Serialize of AutScript with Version=AutScriptVersion_1.
+// If the input serializedAutScript does not satisfy this requirement, an error will be returned.
 func deserializeAutScriptV1(serializedAutScript []byte) (AutScript, error) {
 	r := bytes.NewReader(serializedAutScript)
 
@@ -2435,9 +2446,8 @@ func deserializeAutScriptV1(serializedAutScript []byte) (AutScript, error) {
 	}
 	scriptVersion := uint32(versionRead)
 	if _, ok := ctautwire.AutScriptVersionSet[scriptVersion]; !ok {
-		return nil, fmt.Errorf("unknown version %d", scriptVersion)
+		return nil, fmt.Errorf("unknown au script version %d", scriptVersion)
 	}
-
 	if scriptVersion != ctautwire.AutScriptVersion_1 {
 		return nil, fmt.Errorf("the readed version %d is not AutScriptVersion_1", scriptVersion)
 	}
@@ -2491,7 +2501,7 @@ func ParseAutScript(txVersion uint32, txHash chainhash.Hash, memo []byte) (AutSc
 
 	// RULE: if commonPrefix appears, the commonPrefix and its following bytes must be a well-formed packagedAutScript,
 	// namely, commonPrefix || Version(in VarInt form) || serializedAutScript (in VarBytes form).
-	autScript, err := ExtractAutScriptFromTxMemo(memo)
+	autScript, err := UnpackageAutScript(memo)
 	if err != nil {
 		return nil, err
 	}
