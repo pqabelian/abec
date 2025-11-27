@@ -2036,7 +2036,7 @@ type TransferScript struct {
 	autIdentifier AutId
 
 	inHiddenAutTokenNum uint8
-	inPlainAutTokenNum  uint8
+	inPublicAutTokenNum uint8
 
 	outCTAutTokenNum    uint8
 	outPlainAutTokenNum uint8
@@ -2057,8 +2057,8 @@ func (script *TransferScript) Version() uint32 {
 func NewTransferScript(
 	version uint32,
 	autIdentifier AutId,
-	inCTAutTokenNum uint8,
-	inPlainAutTokenNum uint8,
+	inHiddenAutTokenNum uint8,
+	inPublicAutTokenNum uint8,
 	outCTAutTokenNum uint8,
 	outPlainAutTokenNum uint8,
 	autTxoScripts [][]byte,
@@ -2069,8 +2069,8 @@ func NewTransferScript(
 		version:             version,
 		scriptType:          AutScriptTypeTransfer,
 		autIdentifier:       autIdentifier,
-		inHiddenAutTokenNum: inCTAutTokenNum,
-		inPlainAutTokenNum:  inPlainAutTokenNum,
+		inHiddenAutTokenNum: inHiddenAutTokenNum,
+		inPublicAutTokenNum: inPublicAutTokenNum,
 		outCTAutTokenNum:    outCTAutTokenNum,
 		outPlainAutTokenNum: outPlainAutTokenNum,
 		valueScripts:        autTxoScripts,
@@ -2099,7 +2099,7 @@ func (script *TransferScript) Serialize() ([]byte, error) {
 	if err = b.WriteByte(script.inHiddenAutTokenNum); err != nil {
 		return nil, err
 	}
-	if err = b.WriteByte(script.inPlainAutTokenNum); err != nil {
+	if err = b.WriteByte(script.inPublicAutTokenNum); err != nil {
 		return nil, err
 	}
 
@@ -2140,7 +2140,7 @@ func (script *TransferScript) Deserialize(serializedScript []byte) error {
 	if script.inHiddenAutTokenNum, err = ReadByte(r); err != nil {
 		return err
 	}
-	if script.inPlainAutTokenNum, err = ReadByte(r); err != nil {
+	if script.inPublicAutTokenNum, err = ReadByte(r); err != nil {
 		return err
 	}
 
@@ -2180,7 +2180,7 @@ func (script *TransferScript) SanityCheck() error {
 		return errors.New("unexpected type for transfer script")
 	}
 
-	if script.inHiddenAutTokenNum+script.inPlainAutTokenNum == 0 {
+	if script.inHiddenAutTokenNum+script.inPublicAutTokenNum == 0 {
 		return ErrInValidAUTTx
 	}
 	if script.outCTAutTokenNum+script.outPlainAutTokenNum == 0 {
@@ -2224,7 +2224,7 @@ func (script *TransferScript) SanityCheck() error {
 }
 
 func (script *TransferScript) NumConsumedTokens() int {
-	return int(script.inHiddenAutTokenNum + script.inPlainAutTokenNum)
+	return int(script.inHiddenAutTokenNum + script.inPublicAutTokenNum)
 }
 func (script *TransferScript) NumGeneratedTokens() int {
 	return int(script.outCTAutTokenNum + script.outPlainAutTokenNum)
