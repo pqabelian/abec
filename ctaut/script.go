@@ -988,7 +988,6 @@ func (script *RegistrationScript) Deserialize(serializedScript []byte) error {
 	script.version = uint32(version)
 
 	// scriptType                 AutScriptType
-	// todo: discuss, io.ReadFull (not r.Read()), while here r.ReadByte()
 	script.scriptType, err = r.ReadByte()
 	if err != nil {
 		return err
@@ -1639,7 +1638,7 @@ var _ AutScript = &ReRegistrationScript{}
 
 // MintScript would be the structured script parsed from memo in host transaction,
 // 1. the minted amount with such a script MUST be explicit specified
-// 2. the number of generated Hidden-Token and Plain-Token MUST be explicitly specified, and corresponding value scripts
+// 2. the number of generated Hidden-Token and Plain-Token MUST be explicitly specified, as well as corresponding serializedAutTxos
 // 3. the number of consumed RootTokens MUST be explicitly specified,
 // 4. the witnessHash MUST be given, which is computed from AutWitness at host-transaction layer,
 // 5. the generatedTokens would be populated with the function populateGeneratedCTAUTTokens with the help of host transaction
@@ -2014,22 +2013,23 @@ func (script *MintScript) NumGeneratedTokens() int {
 var _ AutScript = &MintScript{}
 
 // TransferScript would be the structured script parsed from memo in host transaction,
-// 1. the number of consumed CT-Token and Plain-Token MUST be explicit specified
-// 2. the number of generated CT-Token and Plain-Token MUST be explicit specified, and corresponding value scripts
-// 3. the witness hash would be computed from AutWitness in host transaction
-// 3. consumedTokens would be populated with the help of host transaction and corresponding wire.TxoRing
-// 4. generatedTokens would be populated with the function populateGeneratedCTAUTTokens with the help of host transaction
+// 1. the number of generated Hidden-Tokens and Public-Tokens MUST be explicitly specified, as well as corresponding serializedAutTxos
+// 3. the number of consumed Hidden-Tokens and Public-Tokens MUST be explicitly specified,
+// 4. the witnessHash MUST be given, which is computed from AutWitness at host-transaction layer,
+// 5. the generatedTokens would be populated with the function populateGeneratedCTAUTTokens with the help of host transaction
+// 6. the consumedTokens would be populated with the help of host transaction and corresponding wire.TxoRing.
 //
-// TransferScript would be serialized with following format
-// <Common Prefix> "CTAUTSCRIPT" "3"
-// <Identifier> a byte array with fixed length
-// <Number of CTAUTTokens> A number n, Explicitly specify the 0~(m-1)-th pseudonym TXO of outputs in host transaction as CT-Token
-// <Number of PlainTokens> A number m, Explicitly specify the n~(n+m-1)-th pseudonym TXO of outputs in host transaction as Plain-Token
-// <Number of CTAUTTokens> A number i, Explicitly specify the 0~(i-1)-th pseudonym TXO of outputs in host transaction as CT-Token
-// <Number of PlainTokens> A number j, Explicitly specify the i~(i+j-1)-th pseudonym TXO of outputs in host transaction as Plain-Token
-// <ValueScript> an array of n byte array, represent the amount for an AUTToken
-// <WitnessHash> a byte array with fixed length
-// <Memo> a byte array with max length, for this transaction
+// TransferScript consists of
+// <version>
+// <scriptType>
+// <autIdentifier>
+// <inHiddenAutTokenNum> A number n, explicitly specify the 0~(n-1)-th pseudonym TxIn of host-transaction as consumed Hidden-Tokens
+// <inPublicAutTokenNum> A number m, explicitly specify the m~(n+m-1)-th pseudonym TxIn of host-transaction as consumed Public-Tokens
+// <outHiddenAutTokenNum> A number i, Explicitly specify the 0~(i-1)-th pseudonym Txo of host-transaction as the host-points of Hidden-Tokens
+// <outPublicAutTokenNum> A number j, Explicitly specify the i~(i+j-1)-th pseudonym Txo of in host-transaction as host-points of Public-Tokens
+// <serializedAutTxos> an array of i+j byte array, corresponding to the outAutTokens
+// <witnessHash> a Hash of the witness for balance proof between inAutTokens and outAutTokens
+// <scriptMemo> a byte array with max length, for this script
 type TransferScript struct {
 	version       uint32
 	scriptType    AutScriptType
@@ -2040,31 +2040,47 @@ type TransferScript struct {
 
 	outHiddenAutTokenNum uint8
 	outPublicAutTokenNum uint8
-	serializedAutTxos    [][]byte // todo: defined as serializedAutTxos? why not autTxos
+	serializedAutTxos    [][]byte
 
 	witnessHash chainhash.Hash
-	scriptMemo  []byte // todo: scriptMemo
+	scriptMemo  []byte
+}
+
+func (script *TransferScript) InHiddenAutTokenNum() uint8 {
+	return script.inHiddenAutTokenNum
+}
+
+func (script *TransferScript) InPublicAutTokenNum() uint8 {
+	return script.inPublicAutTokenNum
+}
+
+func (script *TransferScript) OutHiddenAutTokenNum() uint8 {
+	return script.outHiddenAutTokenNum
+}
+
+func (script *TransferScript) OutPublicAutTokenNum() uint8 {
+	return script.outPublicAutTokenNum
+}
+
+func (script *TransferScript) SerializedAutTxos() [][]byte {
+	return script.serializedAutTxos
 }
 
 func (script *TransferScript) WitnessHash() chainhash.Hash {
 	return script.witnessHash
 }
 
-func (script *TransferScript) Version() uint32 {
-	return script.version
+func (script *TransferScript) ScriptMemo() []byte {
+	return script.scriptMemo
 }
 
-func NewTransferScript(
-	version uint32,
+func NewTransferScript(version uint32,
 	autIdentifier AutId,
-	inHiddenAutTokenNum uint8,
-	inPublicAutTokenNum uint8,
-	outHiddenAutTokenNum uint8,
-	outPlainAutTokenNum uint8,
-	serializedAutTxos [][]byte,
+	inHiddenAutTokenNum uint8, inPublicAutTokenNum uint8,
+	outHiddenAutTokenNum uint8, outPlainAutTokenNum uint8, serializedAutTxos [][]byte,
 	witnessHash chainhash.Hash,
-	scriptMemo []byte,
-) *TransferScript {
+	scriptMemo []byte) *TransferScript {
+
 	return &TransferScript{
 		version:              version,
 		scriptType:           AutScriptTypeTransfer,
@@ -2079,6 +2095,10 @@ func NewTransferScript(
 	}
 }
 
+func (script *TransferScript) Version() uint32 {
+	return script.version
+}
+
 func (script *TransferScript) Type() AutScriptType {
 	return script.scriptType
 }
@@ -2087,137 +2107,265 @@ func (script *TransferScript) AutIdentifier() AutId {
 	return script.autIdentifier
 }
 
+func (script *TransferScript) serializeSize() int {
+	n := wire.VarIntSerializeSize(uint64(script.version)) // version                    uint32
+	n += 1                                                // scriptType                 AutScriptType
+	n += chainhash.HashSize                               // autIdentifier              AutId
+
+	n += 1 // inHiddenAutTokenNum  uint8
+	n += 1 // inPublicAutTokenNum  uint8
+	n += 1 // outHiddenAutTokenNum uint8
+	n += 1 // outPublicAutTokenNum uint8
+
+	n += wire.VarIntSerializeSize(uint64(len(script.serializedAutTxos))) // serializedAutTxos    [][]byte
+	for _, serializedAutTxo := range script.serializedAutTxos {
+		n += wire.VarIntSerializeSize(uint64(len(serializedAutTxo))) + len(serializedAutTxo)
+	}
+
+	n += chainhash.HashSize                                                                // witnessHash          chainhash.Hash
+	n += wire.VarIntSerializeSize(uint64(len(script.scriptMemo))) + len(script.scriptMemo) // scriptMemo                 []byte
+
+	return n
+}
+
 func (script *TransferScript) Serialize() ([]byte, error) {
-	var b bytes.Buffer
 	var err error
 
-	// todo: necessary to use a function?
-	if err = writePrefix(&b, script.version, script.scriptType, script.autIdentifier); err != nil {
+	w := bytes.NewBuffer(make([]byte, 0, script.serializeSize()))
+
+	// version                    uint32
+	if err = wire.WriteVarInt(w, 0, uint64(script.version)); err != nil {
 		return nil, err
 	}
 
-	if err = b.WriteByte(script.inHiddenAutTokenNum); err != nil {
-		return nil, err
-	}
-	if err = b.WriteByte(script.inPublicAutTokenNum); err != nil {
-		return nil, err
-	}
-
-	if err = b.WriteByte(script.outHiddenAutTokenNum); err != nil {
-		return nil, err
-	}
-	if err = b.WriteByte(script.outPublicAutTokenNum); err != nil {
+	// scriptType                 AutScriptType
+	if err = w.WriteByte(script.Type()); err != nil {
 		return nil, err
 	}
 
-	// todo: necessary to use a function?
-	if err = writeCTAUTTxoScripts(&b, script.serializedAutTxos); err != nil {
+	// autIdentifier              AutId
+	if _, err = w.Write(script.autIdentifier[:]); err != nil {
 		return nil, err
 	}
 
-	// todo: necessary to use a function?
-	if err = writeWitnessHash(&b, script.witnessHash); err != nil {
+	// inHiddenAutTokenNum    uint8
+	if err = w.WriteByte(script.inHiddenAutTokenNum); err != nil {
 		return nil, err
 	}
 
-	// todo: necessary to use a function?
-	if err = writeMemo(&b, script.scriptMemo); err != nil {
+	// inPublicAutTokenNum    uint8
+	if err = w.WriteByte(script.inPublicAutTokenNum); err != nil {
 		return nil, err
 	}
 
-	return b.Bytes(), nil
+	// outHiddenAutTokenNum uint8
+	if err = w.WriteByte(script.outHiddenAutTokenNum); err != nil {
+		return nil, err
+	}
+
+	// outPublicAutTokenNum uint8
+	if err = w.WriteByte(script.outPublicAutTokenNum); err != nil {
+		return nil, err
+	}
+
+	// serializedAutTxos    [][]byte
+	if err = wire.WriteVarInt(w, 0, uint64(len(script.serializedAutTxos))); err != nil {
+		return nil, err
+	}
+	for _, serializedAutTxo := range script.serializedAutTxos {
+		if err = wire.WriteVarBytes(w, 0, serializedAutTxo); err != nil {
+			return nil, err
+		}
+	}
+
+	// witnessHash          chainhash.Hash
+	if _, err = w.Write(script.witnessHash[:]); err != nil {
+		return nil, err
+	}
+
+	// scriptMemo                 []byte
+	if err = wire.WriteVarBytes(w, 0, script.scriptMemo); err != nil {
+		return nil, err
+	}
+
+	return w.Bytes(), nil
 }
+
 func (script *TransferScript) Deserialize(serializedScript []byte) error {
 	var err error
 
 	r := bytes.NewReader(serializedScript)
 
-	// todo: necessary to use a function?
-	if script.version, script.autIdentifier, script.scriptType, err = readPrefix(r, AutScriptTypeTransfer); err != nil {
+	// version                    uint32
+	version, err := wire.ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	if version > math.MaxUint32 {
+		return fmt.Errorf("readed version %d is too large", version)
+	}
+	script.version = uint32(version)
+
+	// scriptType                 AutScriptType
+	script.scriptType, err = r.ReadByte()
+	if err != nil {
 		return err
 	}
 
-	if script.inHiddenAutTokenNum, err = ReadByte(r); err != nil {
-		return err
-	}
-	if script.inPublicAutTokenNum, err = ReadByte(r); err != nil {
-		return err
-	}
-
-	if script.outHiddenAutTokenNum, err = ReadByte(r); err != nil {
-		return err
-	}
-	if script.outPublicAutTokenNum, err = ReadByte(r); err != nil {
+	// autIdentifier              AutId
+	if _, err = io.ReadFull(r, script.autIdentifier[:]); err != nil {
 		return err
 	}
 
-	// todo: necessary to use a function?
-	if script.serializedAutTxos, err = readCTAUTTxoScript(r, int(script.outHiddenAutTokenNum), int(script.outPublicAutTokenNum)); err != nil {
+	// inHiddenAutTokenNum    uint8
+	script.inHiddenAutTokenNum, err = r.ReadByte()
+	if err != nil {
 		return err
 	}
 
-	// todo: necessary to use a function?
-	if script.witnessHash, err = readWitnessHash(r); err != nil {
+	// inPublicAutTokenNum    uint8
+	script.inPublicAutTokenNum, err = r.ReadByte()
+	if err != nil {
 		return err
 	}
 
-	// todo: necessary to use a function?
-	if script.scriptMemo, err = readMemo(r); err != nil {
+	// outHiddenAutTokenNum    uint8
+	script.outHiddenAutTokenNum, err = r.ReadByte()
+	if err != nil {
 		return err
 	}
 
-	// todo: sanity check here, so that the above checks could be optimized.
-	if err = script.SanityCheck(); err != nil {
+	// inAutRootTokenNum    uint8
+	script.outPublicAutTokenNum, err = r.ReadByte()
+	if err != nil {
 		return err
 	}
-	return nil
+
+	// serializedAutTxos    [][]byte
+	autTxoNum, err := wire.ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	if autTxoNum > MaxNumToken {
+		return fmt.Errorf("read AutTxo num %d is too large", autTxoNum)
+	}
+	script.serializedAutTxos = make([][]byte, autTxoNum)
+	for i := uint64(0); i < autTxoNum; i++ {
+		if script.serializedAutTxos[i], err = wire.ReadVarBytes(r, 0, MaxAutTxoLength, "SerializedAutTxo"); err != nil {
+			return err
+		}
+	}
+
+	// witnessHash          chainhash.Hash
+	if _, err = io.ReadFull(r, script.witnessHash[:]); err != nil {
+		return err
+	}
+
+	// scriptMemo                 []byte
+	script.scriptMemo, err = wire.ReadVarBytes(r, 0, MaxScriptMemoLength, "scriptMemo")
+	if err != nil {
+		return err
+	}
+
+	return script.SanityCheck()
 }
 
 func (script *TransferScript) SanityCheck() error {
-	// todo(ctaut): check version
 
+	// version                    uint32
+	if _, ok := ctautwire.AutScriptVersionSet[script.version]; !ok {
+		return fmt.Errorf("invalid version: %d", script.version)
+	}
+
+	// scriptType                 AutScriptType
 	if script.scriptType != AutScriptTypeTransfer {
-		return errors.New("unexpected type for transfer script")
+		return fmt.Errorf("script.scriptType (%d) is not AutScriptTypeTransfer", script.scriptType)
+	}
+
+	// autIdentifier              AutId
+
+	// inHiddenAutTokenNum    uint8
+	if int(script.inHiddenAutTokenNum) > MaxNumHiddenToken {
+		return fmt.Errorf("script.inHiddenAutTokenNum (%d) exceeds the allowed max number (%d)",
+			script.inHiddenAutTokenNum, MaxNumHiddenToken)
+	}
+
+	// inPublicAutTokenNum    uint8
+	if int(script.inPublicAutTokenNum) > MaxNumToken {
+		return fmt.Errorf("script.inPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
+			script.inPublicAutTokenNum, MaxNumToken)
 	}
 
 	if script.inHiddenAutTokenNum+script.inPublicAutTokenNum == 0 {
-		return ErrInValidAUTTx
-	}
-	if script.outHiddenAutTokenNum+script.outPublicAutTokenNum == 0 {
-		return ErrInValidAUTTx
+		return fmt.Errorf("script.inHiddenAutTokenNum (%d) + script.inPublicAutTokenNum (%d) is 0",
+			script.inHiddenAutTokenNum, script.inPublicAutTokenNum)
 	}
 
+	if script.inHiddenAutTokenNum+script.inPublicAutTokenNum > MaxNumToken {
+		return fmt.Errorf("script.inHiddenAutTokenNum (%d) + script.inPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
+			script.inHiddenAutTokenNum, script.inPublicAutTokenNum, MaxNumToken)
+	}
+
+	// outHiddenAutTokenNum uint8
 	if int(script.outHiddenAutTokenNum) > MaxNumHiddenToken {
-		return ErrInValidAUTTx
-	}
-	if len(script.serializedAutTxos) != int(script.outHiddenAutTokenNum)+int(script.outPublicAutTokenNum) {
-		return ErrInValidAUTTx
+		return fmt.Errorf("script.outHiddenAutTokenNum (%d) exceeds the allowed max number (%d)",
+			script.outHiddenAutTokenNum, MaxNumHiddenToken)
 	}
 
+	// outPublicAutTokenNum uint8
+	if int(script.outPublicAutTokenNum) > MaxNumToken {
+		return fmt.Errorf("script.outPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
+			script.outPublicAutTokenNum, MaxNumToken)
+	}
+
+	if script.outHiddenAutTokenNum+script.outPublicAutTokenNum == 0 {
+		return fmt.Errorf("script.outHiddenAutTokenNum (%d) + script.outPublicAutTokenNum (%d) is 0",
+			script.outHiddenAutTokenNum, script.outPublicAutTokenNum)
+	}
+
+	if script.outHiddenAutTokenNum+script.outPublicAutTokenNum > MaxNumToken {
+		return fmt.Errorf("script.outHiddenAutTokenNum (%d) + script.outPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
+			script.outHiddenAutTokenNum, script.outPublicAutTokenNum, MaxNumToken)
+	}
+
+	// serializedAutTxos    [][]byte
+	if len(script.serializedAutTxos) != int(script.outHiddenAutTokenNum+script.outPublicAutTokenNum) {
+		return fmt.Errorf("the number of serializedAutTxos (%d) does equal script.outHiddenAutTokenNum (%d) + script.outPublicAutTokenNum (%d)",
+			len(script.serializedAutTxos), script.outHiddenAutTokenNum, script.outPublicAutTokenNum)
+	}
 	for i := 0; i < len(script.serializedAutTxos); i++ {
 		autTxo := &ctautwire.AutTxo{}
 		err := autTxo.Deserialize(script.serializedAutTxos[i])
 		if err != nil {
 			return err
 		}
+		if autTxo.Version != script.version {
+			return fmt.Errorf("version mismatch (autTxo.Version %d != script.version %d)", autTxo.Version, script.version)
+		}
 
+		// todo: cyclic import?
 		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
 		if err != nil {
-			return ErrInValidAUTTx
+			return err
 		}
 		if i < int(script.outHiddenAutTokenNum) {
 			if autTxoType != abecryptox.AutTxoTypeHidden {
-				return ErrInValidAUTTx
+				return fmt.Errorf("script.outHiddenAutTokenNum = %d, but %d -th AutTxo has type %d (not AutTxoTypeHidden)",
+					script.outHiddenAutTokenNum, autTxoType, abecryptox.AutTxoTypeHidden)
 			}
 		} else {
 			if autTxoType != abecryptox.AutTxoTypePublic {
-				return ErrInValidAUTTx
+				return fmt.Errorf("script.outHiddenAutTokenNum = %d, script.outPublicAutTokenNum =%d, but %d -th AutTxo has type %d (not AutTxoTypePublic)",
+					script.outHiddenAutTokenNum, script.outPublicAutTokenNum, autTxoType, abecryptox.AutTxoTypePublic)
 			}
 		}
 	}
 
+	// witnessHash          chainhash.Hash
+
+	// scriptMemo                 []byte
 	if len(script.scriptMemo) > MaxScriptMemoLength {
-		return ErrInValidAUTTx
+		return fmt.Errorf("len(script.scriptMemo) (%d) is too large", len(script.scriptMemo))
 	}
 
 	return nil
