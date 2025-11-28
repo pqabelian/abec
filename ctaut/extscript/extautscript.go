@@ -353,7 +353,7 @@ func (extAutScript *ExtAutScript) ConsumedTokens() ([]*auttoken.AutToken, error)
 }
 
 // CreateAutMetadata create a new AutMetadata from the RegistrationScript.
-func (extAutScript *ExtAutScript) CreateAutMetadata(txHash chainhash.Hash) (*script.AutMetadata, error) {
+func (extAutScript *ExtAutScript) CreateAutMetadata() (*script.AutMetadata, error) {
 
 	if extAutScript.Type() != script.AutScriptTypeRegistration {
 		return nil, fmt.Errorf("wrong call on CreateMetadata: should be called only by registration script")
@@ -374,13 +374,10 @@ func (extAutScript *ExtAutScript) CreateAutMetadata(txHash chainhash.Hash) (*scr
 		opStr := hostOutPoint.String()
 		rootTokenSet[opStr] = &hostOutPoint
 	}
-
-	autIdentifier := chainhash.Hash{}
-	copy(autIdentifier[:], txHash[:])
-
+	
 	newAutMetadata := &script.AutMetadata{
 		Version:                    ctautwire.AutMetadataVersionInitValue,
-		AutIdentifier:              autIdentifier,
+		AutIdentifier:              extAutScript.msgTx.TxHash(),
 		AutName:                    registerScript.AutName(),
 		AutSymbol:                  registerScript.AutSymbol(),
 		BaseUnitName:               registerScript.BaseUnitName(),
