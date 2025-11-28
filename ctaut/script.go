@@ -452,12 +452,12 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 	autMetadata.ReregistrationExpireHeight = int32(temp)
 
 	// ReregistrationThreshold    uint8
-	if autMetadata.ReregistrationThreshold, err = ReadByte(r); err != nil {
+	if autMetadata.ReregistrationThreshold, err = r.ReadByte(); err != nil {
 		return err
 	}
 
 	// MintThreshold              uint8
-	if autMetadata.MintThreshold, err = ReadByte(r); err != nil {
+	if autMetadata.MintThreshold, err = r.ReadByte(); err != nil {
 		return err
 	}
 

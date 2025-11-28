@@ -6,7 +6,7 @@ import (
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparamctx"
-	"github.com/abesuite/abec/ctaut/wire"
+	autwire "github.com/abesuite/abec/ctaut/wire"
 	"github.com/cryptosuite/pqringctx/pqringctxapi"
 )
 
@@ -24,7 +24,7 @@ const (
 // pqringctxAutCoinbaseTxGen generates a new AutCoinbaseTx,
 // for the input (txVersion uint32, vin uint64, autTxOutputDescs []*AutTxOutputDesc).
 func pqringctxAutCoinbaseTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
-	autScriptVersion uint32, vin uint64, autTxOutputDescs []*AutTxOutputDesc) (*wire.AutCoinbaseTx, error) {
+	autScriptVersion uint32, vin uint64, autTxOutputDescs []*AutTxOutputDesc) (*autwire.AutCoinbaseTx, error) {
 	// just redundant double check
 	cryptoSchemeFromAutScriptVersion, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autScriptVersion)
 	if err != nil {
@@ -57,13 +57,13 @@ func pqringctxAutCoinbaseTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 
 	// parse the pqringctx.CtxCoinbaseTxGen to wire.AutCoinbaseTx
 	ctxTxos := pqringctxapi.GetCtxCoinbaseTxTxos(ctxCoinbaseTx)
-	autTxos := make([]*wire.AutTxo, len(ctxTxos))
+	autTxos := make([]*autwire.AutTxo, len(ctxTxos))
 	for i := 0; i < len(ctxTxos); i++ {
 		serializedCtxTxo, err := pqringctxapi.SerializeCtxTxo(pp, ctxTxos[i])
 		if err != nil {
 			return nil, err
 		}
-		autTxos[i] = &wire.AutTxo{
+		autTxos[i] = &autwire.AutTxo{
 			Version:   autScriptVersion,
 			TxoScript: serializedCtxTxo,
 		}
@@ -76,7 +76,7 @@ func pqringctxAutCoinbaseTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 		return nil, err
 	}
 
-	autCoinbaseTx := &wire.AutCoinbaseTx{
+	autCoinbaseTx := &autwire.AutCoinbaseTx{
 		Version:   autScriptVersion,
 		Vin:       vin,
 		TxOuts:    autTxos,
@@ -89,7 +89,7 @@ func pqringctxAutCoinbaseTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 // pqringctxAutCoinbaseTxVerify verify the input autCoinbaseTx *wire.AutCoinbaseTx.
 // The caller needs to guarantee the well-form of the input autCoinbaseTx *wire.AutCoinbaseTx, such as the TxOuts.
 // This function only checks the balance proof, by calling the crypto-scheme.
-func pqringctxAutCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, autCoinbaseTx *wire.AutCoinbaseTx) error {
+func pqringctxAutCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, autCoinbaseTx *autwire.AutCoinbaseTx) error {
 	if autCoinbaseTx == nil {
 		return fmt.Errorf("pqringctxAutCoinbaseTxVerify: the input autCoinbaseTx is nil")
 	}
@@ -151,7 +151,7 @@ func pqringctxAutCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, autCoinbaseT
 // Now it is redundant at this moment and works for ony double-check.
 // todo: change hostTxoVersion to AutScriptVersion
 func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
-	autScriptVersion uint32, autTxInputDescs []*AutTxInputDesc, autTxOutputDescs []*AutTxOutputDesc) (*wire.AutTransferTx, error) {
+	autScriptVersion uint32, autTxInputDescs []*AutTxInputDesc, autTxOutputDescs []*AutTxOutputDesc) (*autwire.AutTransferTx, error) {
 
 	// just redundant double check
 	cryptoSchemeFromTxVersion, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autScriptVersion)
@@ -231,20 +231,20 @@ func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 
 	//	Set the txInputs
 	//	As the underlying crypto-scheme will not change this part, it can be set directly using the autTxInputDescs
-	autTxIns := make([]*wire.AutTxo, inputNum)
+	autTxIns := make([]*autwire.AutTxo, inputNum)
 	for i := 0; i < inputNum; i++ {
 		autTxIns[i] = autTxInputDescs[i].autTxo
 	}
 
 	// Set the TxOuts
 	ctxTxos := pqringctxapi.GetCtxTransferTxTxos(ctxTransferTx)
-	autTxos := make([]*wire.AutTxo, len(ctxTxos))
+	autTxos := make([]*autwire.AutTxo, len(ctxTxos))
 	for j := 0; j < len(ctxTxos); j++ {
 		serializedCtxTxo, err := pqringctxapi.SerializeCtxTxo(pp, ctxTxos[j])
 		if err != nil {
 			return nil, err
 		}
-		autTxos[j] = &wire.AutTxo{
+		autTxos[j] = &autwire.AutTxo{
 			Version:   autScriptVersion,
 			TxoScript: serializedCtxTxo,
 		}
@@ -257,7 +257,7 @@ func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 		return nil, err
 	}
 
-	autTransferTx := &wire.AutTransferTx{
+	autTransferTx := &autwire.AutTransferTx{
 		Version:   autScriptVersion,
 		TxIns:     autTxIns,
 		TxOuts:    autTxos,
@@ -270,7 +270,7 @@ func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 // pqringctxAutTransferTxVerify verify the input autTransferTx *wire.AutTransferTx.
 // The caller needs to guarantee the well-form of the input autTransferTx *wire.AutTransferTx, such as the TxOuts.
 // This function only checks the balance proof, by calling the crypto-scheme.
-func pqringctxAutTransferTxVerify(pp *pqringctxapi.PublicParameter, autTransferTx *wire.AutTransferTx) error {
+func pqringctxAutTransferTxVerify(pp *pqringctxapi.PublicParameter, autTransferTx *autwire.AutTransferTx) error {
 	if autTransferTx == nil {
 		return fmt.Errorf("pqringctxAutTransferTxVerify: the input transferTx is empty")
 	}
@@ -355,7 +355,7 @@ func pqringctxAutTransferTxVerify(pp *pqringctxapi.PublicParameter, autTransferT
 //	APIs for Txos	begin
 
 // pqringctxGetAutTxoType returns the AutTxoType of the input *wire.AutTxo.
-func pqringctxGetAutTxoType(pp *pqringctxapi.PublicParameter, autTxo *wire.AutTxo) (AutTxoType, error) {
+func pqringctxGetAutTxoType(pp *pqringctxapi.PublicParameter, autTxo *autwire.AutTxo) (AutTxoType, error) {
 	ctxTxo, err := pqringctxapi.DeserializeCtxTxo(pp, autTxo.TxoScript)
 	if err != nil {
 		return pqringctxapi.CtxTxoTypeHidden, err
@@ -373,7 +373,7 @@ func pqringctxGetAutTxoScriptSize(pp *pqringctxapi.PublicParameter, autTxoType A
 // pqringctxExtractValueFromAutTxo extracts the value of the input AutTxo,
 // using the input (coinValuePublicKey, coinValueSecretKey).
 func pqringctxExtractValueFromAutTxo(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
-	autTxo *wire.AutTxo, cryptoValuePublicKey []byte, cryptoValueSecretKey []byte) (value uint64, err error) {
+	autTxo *autwire.AutTxo, cryptoValuePublicKey []byte, cryptoValueSecretKey []byte) (value uint64, err error) {
 	cryptoSchemeInTxo, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autTxo.Version)
 	if err != nil {
 		return 0, err
@@ -445,7 +445,7 @@ func pqringctxGetAutTransferTxWitnessSizeByDesc(pp *pqringctxapi.PublicParameter
 // When new AutScriptVersion is added, rules need to be added here.
 func pqringctxAutRuleCheckOnAutTxoVersionType(pp *pqringctxapi.PublicParameter, autScriptVersion uint32, autType AutTxoType) error {
 	switch autScriptVersion {
-	case wire.AutScriptVersion_1:
+	case autwire.AutScriptVersion_1:
 		if autType == AutTxoTypeHidden || autType == AutTxoTypePublic {
 			// allowed cases
 		} else {
@@ -469,8 +469,8 @@ func pqringctxAutRuleCheckOnAutTxoVersionType(pp *pqringctxapi.PublicParameter, 
 func pqringctxAutRuleCheckOnTxInputVersion(pp *pqringctxapi.PublicParameter, autTxInputVersion uint32, autScriptVersion uint32) error {
 
 	switch autScriptVersion {
-	case wire.AutScriptVersion_1:
-		if autTxInputVersion == wire.AutScriptVersion_1 {
+	case autwire.AutScriptVersion_1:
+		if autTxInputVersion == autwire.AutScriptVersion_1 {
 			// allowed cases
 		} else {
 			return fmt.Errorf("pqringctxAutRuleCheckOnTxInputVersion: (autTxInputVersion, autScriptVersion) (%d, %d), "+

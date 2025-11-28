@@ -193,21 +193,23 @@ func GetAutTransferTxWitnessSizeByDesc(autScriptVersion uint32,
 
 // APIs for ruleChecks	begin
 
-// AutRuleCheckOnTxoVersionType checks the match between HostTxo's Version and AutTxoType.
+// AutRuleCheckOnAutTxoVersionType checks the match between AutTxo's Version and AutTxoType.
+//
+// Note that AutTxo's version is inherited from AutScriptVersion.
 //
 // When new TxVersion is added, rules need to be added here.
-func AutRuleCheckOnTxoVersionType(hostTxoVersion uint32, autTxoType AutTxoType) error {
-	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(hostTxoVersion)
+func AutRuleCheckOnAutTxoVersionType(autScriptVersion uint32, autTxoType AutTxoType) error {
+	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autScriptVersion)
 	if err != nil {
 		return err
 	}
 
 	switch cryptoScheme {
 	case abecryptoxparam.CryptoSchemePQRingCTX:
-		return pqringctxAutRuleCheckOnAutTxoVersionType(abecryptoxparam.PQRingCTXPP, hostTxoVersion, autTxoType)
+		return pqringctxAutRuleCheckOnAutTxoVersionType(abecryptoxparam.PQRingCTXPP, autScriptVersion, autTxoType)
 
 	default:
-		return fmt.Errorf("AutRuleCheckOnTxoVersionType: Unsupported hostTxoVersion (%d)", hostTxoVersion)
+		return fmt.Errorf("AutRuleCheckOnTxoVersionType: Unsupported autScriptVersion (%d)", autScriptVersion)
 	}
 }
 
