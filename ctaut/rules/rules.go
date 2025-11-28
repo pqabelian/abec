@@ -28,22 +28,22 @@ func RuleGetTxVersionFromAutScriptVersion(autScriptVersion uint32) (uint32, erro
 // 1. the privacy level MUST be abecryptoxkey.PrivacyLevelPSEUDONYMCT, note that this means the value in Abelian-Txo is public
 // 2. the value must be 1 Neutrino
 // todo: txHash and outputIndex donot have actual use.
-func RuleCheckOnHostTxo(txHash chainhash.Hash, outputIndex uint8, txOut *wire.TxOutAbe) ([]byte, error) {
+func RuleCheckOnHostTxo(hostOutPoint *script.HostOutPoint, txOut *wire.TxOutAbe) ([]byte, error) {
 	privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
 	if err != nil {
-		return nil, fmt.Errorf("fail to extract the privacy level from transaction %s:%s", txHash, err.Error())
+		return nil, fmt.Errorf("fail to extract the privacy level from transaction %s:%s", hostOutPoint.TxHash, err.Error())
 	}
 	if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
-		return nil, fmt.Errorf("invalid privacy level to %d-th output from transaction %s", outputIndex, txHash)
+		return nil, fmt.Errorf("invalid privacy level to %d-th output from transaction %s", hostOutPoint.Index, hostOutPoint.TxHash)
 	}
 
 	// todo: the above codes are necessary, since if it is not Pseudonym, the PseudonymTxoCoinParse will return error.
 	coinAddress, coinValue, err := abecryptox.PseudonymTxoCoinParse(txOut)
 	if err != nil {
-		return nil, fmt.Errorf("fail to parse %d-th output as an pseudonym txo from transaction %s", outputIndex, txHash)
+		return nil, fmt.Errorf("fail to parse %d-th output as an pseudonym txo from transaction %s", hostOutPoint.Index, hostOutPoint.TxHash)
 	}
 	if coinValue != 1 {
-		return nil, fmt.Errorf("invalid value from %d-th output from transaction %s as AUT coin", outputIndex, txHash)
+		return nil, fmt.Errorf("invalid value from %d-th output from transaction %s as AUT coin", hostOutPoint.Index, hostOutPoint.TxHash)
 	}
 
 	// remove the start codes, and check coinAddress here; need to add an api abecryptox.GetPrivacyLevelFromCoinAddress(),
