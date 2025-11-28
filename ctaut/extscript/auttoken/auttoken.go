@@ -1,13 +1,7 @@
-package extscript
+package auttoken
 
 import (
-	"fmt"
-	"github.com/abesuite/abec/abecryptox"
-	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
-	"github.com/abesuite/abec/ctaut/rules"
 	"github.com/abesuite/abec/ctaut/script"
-	ctautwire "github.com/abesuite/abec/ctaut/wire"
-	"github.com/abesuite/abec/wire"
 )
 
 // AutToken holds the information of token in memory, and would be used to conduct the RULE-CHECKS.

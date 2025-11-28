@@ -6,7 +6,7 @@ import (
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/ctaut/extscript"
+	"github.com/abesuite/abec/ctaut/extscript/auttoken"
 	"github.com/abesuite/abec/ctaut/script"
 	ctautwire "github.com/abesuite/abec/ctaut/wire"
 	"github.com/abesuite/abec/wire"
@@ -67,7 +67,7 @@ func RuleCheckOnAutTxoVersionType(autScriptVersion uint32, autTxo *ctautwire.Aut
 // RuleCheckOnIssuerHostClaim checks that
 // (1) each claimed issuer has at least one corresponding AutToken, and
 // (2) each output AutToken has a corresponding issuer.
-func RuleCheckOnIssuerHostClaim(issuers []*script.AutIssuer, outputTokens []*extscript.AutToken) error {
+func RuleCheckOnIssuerHostClaim(issuers []*script.AutIssuer, outputTokens []*auttoken.AutToken) error {
 	claimedIssuersByCoinAddress := make(map[string]*script.AutIssuer, len(issuers))
 	for i := 0; i < len(issuers); i++ {
 		coinAddressStr := hex.EncodeToString(issuers[i].CoinAddress())
@@ -78,7 +78,7 @@ func RuleCheckOnIssuerHostClaim(issuers []*script.AutIssuer, outputTokens []*ext
 		claimedIssuersByCoinAddress[coinAddressStr] = issuers[i]
 	}
 
-	outputTokenCoinAddressesMap := make(map[string]*extscript.AutToken, len(outputTokens))
+	outputTokenCoinAddressesMap := make(map[string]*auttoken.AutToken, len(outputTokens))
 	for i := 0; i < len(outputTokens); i++ {
 		coinAddressStr := hex.EncodeToString(outputTokens[i].CoinAddress)
 		if _, ok := outputTokenCoinAddressesMap[coinAddressStr]; !ok {

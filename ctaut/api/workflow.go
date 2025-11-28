@@ -174,6 +174,7 @@ func unpackageAutScript(packagedAutScript []byte) (AutScript, error) {
 	}
 }
 
+// DetectAndAssembleExtAutScriptFromHostTx is the only entrance for generating ExtAutScript.
 func DetectAndAssembleExtAutScriptFromHostTx(txMsg *wire.MsgTxAbe) (*ExtAutScript, error) {
 	if txMsg.Version < wire.TxVersion_Height_464000_Aconcagua {
 		return nil, nil

@@ -10,16 +10,17 @@ import (
 // Use a constant string to avoid unconscious modifications
 const commonPrefix = "AUTSCRIPT"
 
-type ExtAutScript = extscript.ExtAutScript
-
 type HostOutPoint = script.HostOutPoint
 type AutIssuer = script.AutIssuer
 type AutId = script.AutId
 
-type AutMetadata = script.AutMetadata
 type AutScript = script.AutScript
 type RegistrationScript = script.RegistrationScript
 type ReRegistrationScript = script.ReRegistrationScript
 type MintScript = script.MintScript
 type TransferScript = script.TransferScript
 type BurnScript = script.BurnScript
+
+type ExtAutScript = extscript.ExtAutScript
+
+type AutMetadata = script.AutMetadata

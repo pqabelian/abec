@@ -6,6 +6,7 @@ import (
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/ctaut/extscript/auttoken"
 	"github.com/abesuite/abec/ctaut/rules"
 	"github.com/abesuite/abec/ctaut/script"
 	ctautwire "github.com/abesuite/abec/ctaut/wire"
@@ -21,10 +22,10 @@ type ExtAutScript struct {
 	// - if the value is nil, it means that the tokens is not set
 	// - if the value is empty slice, it means that the tokens is set but has no token
 	inputHandled   bool //	indicate whether consumedTokens has been handled
-	consumedTokens []*AutToken
+	consumedTokens []*auttoken.AutToken
 
 	outputHandled   bool //	indicate whether generatedTokens has been handled
-	generatedTokens []*AutToken
+	generatedTokens []*auttoken.AutToken
 }
 
 func NewExtAutScript(autScript script.AutScript) *ExtAutScript {
@@ -74,7 +75,7 @@ func (extAutScript *ExtAutScript) AssembleOutputAutTokens(txMsg *wire.MsgTxAbe) 
 			numAutTokens, len(txOuts)-startIdx)
 	}
 
-	generatedTokens := make([]*AutToken, numAutTokens)
+	generatedTokens := make([]*auttoken.AutToken, numAutTokens)
 	for i := 0; i < numAutTokens; i++ {
 		index := uint8(startIdx + i)
 		txOut := txOuts[index]
@@ -84,7 +85,7 @@ func (extAutScript *ExtAutScript) AssembleOutputAutTokens(txMsg *wire.MsgTxAbe) 
 			return err
 		}
 
-		generatedTokens[i] = &AutToken{
+		generatedTokens[i] = &auttoken.AutToken{
 			Version: extAutScript.Version(),
 			HostOutPoint: script.HostOutPoint{
 				TxHash: txHash,
@@ -161,7 +162,7 @@ func (extAutScript *ExtAutScript) AssembleOutputAutTokens(txMsg *wire.MsgTxAbe) 
 	return nil
 }
 
-func (extAutScript *ExtAutScript) GeneratedTokens() ([]*AutToken, error) {
+func (extAutScript *ExtAutScript) GeneratedTokens() ([]*auttoken.AutToken, error) {
 	if !extAutScript.outputHandled {
 		return nil, fmt.Errorf("generated tokens not set")
 	}
@@ -169,7 +170,7 @@ func (extAutScript *ExtAutScript) GeneratedTokens() ([]*AutToken, error) {
 	return extAutScript.generatedTokens, nil
 }
 
-func (extAutScript *ExtAutScript) SetConsumedTokens(consumedTokens []*AutToken) error {
+func (extAutScript *ExtAutScript) SetConsumedTokens(consumedTokens []*auttoken.AutToken) error {
 
 	if len(consumedTokens) != extAutScript.NumConsumedTokens() {
 		return fmt.Errorf("mismatched number of consumed tokens")
@@ -182,7 +183,7 @@ func (extAutScript *ExtAutScript) SetConsumedTokens(consumedTokens []*AutToken) 
 	return nil
 }
 
-func (extAutScript *ExtAutScript) ConsumedTokens() ([]*AutToken, error) {
+func (extAutScript *ExtAutScript) ConsumedTokens() ([]*auttoken.AutToken, error) {
 	if !extAutScript.inputHandled {
 		return nil, fmt.Errorf("consumed tokens not set")
 	}
