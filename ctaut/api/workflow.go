@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/abesuite/abec/abecryptox"
+	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/ctaut/extscript"
 	"github.com/abesuite/abec/ctaut/rules"
 	"github.com/abesuite/abec/ctaut/script"
@@ -18,22 +19,97 @@ import (
 // 3. write to TxMemo
 
 // Use:
-// 1.
+// 1. DetectAndAssembleExtAutScriptFromHostTx
 
 // New Functions	begin
+
+func NewRegistrationScript(version uint32,
+	autName []byte, autSymbol []byte, baseUnitName []byte, subUnitName []byte, unitScale uint64,
+	autMemo []byte, plannedTotalSupply uint64,
+	issuers []*AutIssuer, reregistrationExpireHeight int32, reregisterThreshold uint8, mintThreshold uint8,
+	outAutRootTokenNum uint8,
+	scriptMemo []byte) *RegistrationScript {
+	return script.NewRegistrationScript(version,
+		autName, autSymbol, baseUnitName, subUnitName, unitScale,
+		autMemo, plannedTotalSupply,
+		issuers, reregistrationExpireHeight, reregisterThreshold, mintThreshold,
+		outAutRootTokenNum,
+		scriptMemo)
+}
+
+func NewReRegistrationScript(version uint32,
+	autIdentifier AutId,
+	autMemo []byte, plannedTotalSupply uint64,
+	issuers []*AutIssuer, reregistrationExpireHeight int32, reregisterThreshold uint8, mintThreshold uint8,
+	inAutRootTokenNum uint8, outAutRootTokenNum uint8,
+	scriptMemo []byte) *ReRegistrationScript {
+
+	return script.NewReRegistrationScript(version,
+		autIdentifier,
+		autMemo, plannedTotalSupply,
+		issuers, reregistrationExpireHeight, reregisterThreshold, mintThreshold,
+		inAutRootTokenNum, outAutRootTokenNum,
+		scriptMemo)
+}
+
+func NewMintScript(version uint32,
+	autIdentifier AutId,
+	vin uint64, inAutRootTokenNum uint8,
+	outCTAutTokenNum uint8, outPlainAutTokenNum uint8, serializedAutTxos [][]byte,
+	witnessHash chainhash.Hash,
+	scriptMemo []byte) *MintScript {
+
+	return script.NewMintScript(version,
+		autIdentifier,
+		vin, inAutRootTokenNum,
+		outCTAutTokenNum, outPlainAutTokenNum, serializedAutTxos,
+		witnessHash,
+		scriptMemo)
+}
+
+func NewTransferScript(version uint32,
+	autIdentifier AutId,
+	inHiddenAutTokenNum uint8, inPublicAutTokenNum uint8,
+	outHiddenAutTokenNum uint8, outPlainAutTokenNum uint8, serializedAutTxos [][]byte,
+	witnessHash chainhash.Hash,
+	scriptMemo []byte) *TransferScript {
+
+	return script.NewTransferScript(version,
+		autIdentifier,
+		inHiddenAutTokenNum, inPublicAutTokenNum,
+		outHiddenAutTokenNum, outPlainAutTokenNum, serializedAutTxos,
+		witnessHash,
+		scriptMemo)
+}
+
+func NewBurnScript(version uint32,
+	autIdentifier AutId,
+	inHiddenAutTokenNum uint8, inPublicAutTokenNum uint8,
+	outHiddenAutTokenNum uint8, outPublicAutTokenNum uint8, serializedAutTxos [][]byte,
+	witnessHash chainhash.Hash,
+	scriptMemo []byte) *BurnScript {
+
+	return script.NewBurnScript(version,
+		autIdentifier,
+		inHiddenAutTokenNum, inPublicAutTokenNum,
+		outHiddenAutTokenNum, outPublicAutTokenNum, serializedAutTxos,
+		witnessHash,
+		scriptMemo)
+}
+
 // New Functions	end
 
 // PackageAutScript packages an AutScript to a packagedAutScript, where
 // packagedAutScript = commonPrefix (="AUTSCRIPT") || version (in VarInt form) || serializedAutScript (in VarBytes form).
-func PackageAutScript(script AutScript) (packagedAutScript []byte, err error) {
+func PackageAutScript(autScript AutScript) (packagedAutScript []byte, err error) {
 
-	serializedScript, err := script.Serialize()
+	serializedScript, err := autScript.Serialize()
 	if err != nil {
 		return nil, err
 	}
 
 	length := len([]byte(commonPrefix))
-	length += wire.VarIntSerializeSize(uint64(script.Version()))
+	length += wire.VarIntSerializeSize(uint64(autScript.Version()))
 
 	length += wire.VarIntSerializeSize(uint64(len(serializedScript))) + len(serializedScript)
 
@@ -44,7 +120,7 @@ func PackageAutScript(script AutScript) (packagedAutScript []byte, err error) {
 		return nil, err
 	}
 
-	err = wire.WriteVarInt(w, 0, uint64(script.Version()))
+	err = wire.WriteVarInt(w, 0, uint64(autScript.Version()))
 	if err != nil {
 		return nil, err
 	}
@@ -57,10 +133,10 @@ func PackageAutScript(script AutScript) (packagedAutScript []byte, err error) {
 	return w.Bytes(), nil
 }
 
-// UnpackageAutScript unpackages a packagedAutScript to an AutScript, where packagedAutScript is assumed to start from
+// unpackageAutScript unpackages a packagedAutScript to an AutScript, where packagedAutScript is assumed to start from
 // commonPrefix (="AUTSCRIPT") || version (in VarInt form) || serializedAutScript (in VarBytes form).
 // A packagedAutScript does not satisfy this form will result an error returned.
-func UnpackageAutScript(packagedAutScript []byte) (AutScript, error) {
+func unpackageAutScript(packagedAutScript []byte) (AutScript, error) {
 	commonPrefixLen := len([]byte(commonPrefix))
 	if len(packagedAutScript) < commonPrefixLen {
 		return nil, fmt.Errorf("packagedAutScript is not well-form as expected")
@@ -102,13 +178,30 @@ func DetectAndAssembleExtAutScriptFromHostTx(txMsg *wire.MsgTxAbe) (*ExtAutScrip
 	if txMsg.Version < wire.TxVersion_Height_464000_Aconcagua {
 		return nil, nil
 	}
+
 	// detect and extract aut script from TxMemo and check well-formedness
-	autScript, err := DetectAndExtractAutScriptFromTxMemo(txMsg.Version, txMsg.TxMemo)
+	commonPrefixLen := len([]byte(commonPrefix))
+
+	// could not be an AUT transaction
+	if len(txMsg.TxMemo) < commonPrefixLen {
+		return nil, nil
+	}
+	if !bytes.Equal(txMsg.TxMemo[:commonPrefixLen], []byte(commonPrefix)) {
+		return nil, nil
+	}
+
+	// RULE: if commonPrefix appears, the commonPrefix and its following bytes must be a well-formed packagedAutScript,
+	// namely, commonPrefix || Version(in VarInt form) || serializedAutScript (in VarBytes form).
+	autScript, err := unpackageAutScript(txMsg.TxMemo)
 	if err != nil {
 		return nil, err
 	}
-	if autScript == nil {
-		return nil, nil
+
+	// check the script version with the host-txo version
+	expectedTxVersion, err := rules.RuleGetTxVersionFromAutScriptVersion(autScript.Version())
+	if expectedTxVersion != txMsg.Version {
+		return nil, fmt.Errorf("autScript.Version() (%d) corresponds to TxVersion (%d), does not match TxVersion %d",
+			autScript.Version(), expectedTxVersion, txMsg.Version)
 	}
 
 	// populate the generated tokens with host transaction outputs
@@ -153,6 +246,7 @@ func DetectAndAssembleExtAutScriptFromHostTx(txMsg *wire.MsgTxAbe) (*ExtAutScrip
 		// 4. check whether minted amount conflict with planned total amount
 		// Above checks have to be delayed until the instance could be seen
 
+		// here we do not check the witnessHash, since the msgTx may not carry the AutWitness.
 		//witnessHash := chainhash.HashH(tx.AutWitness)
 		//if !witnessHash.IsEqual(&script.witnessHash) {
 		//	return nil, fmt.Errorf("mismatch witness for script")
@@ -164,6 +258,7 @@ func DetectAndAssembleExtAutScriptFromHostTx(txMsg *wire.MsgTxAbe) (*ExtAutScrip
 		// 2. check the balance proof
 		// Above checks have to be delayed until the instance could be seen
 
+		// here we do not check the witnessHash, since the msgTx may not carry the AutWitness.
 		//witnessHash := chainhash.HashH(tx.AutWitness)
 		//if !witnessHash.IsEqual(&script.witnessHash) {
 		//	return nil, fmt.Errorf("mismatch witness for script")
@@ -194,6 +289,7 @@ func DetectAndAssembleExtAutScriptFromHostTx(txMsg *wire.MsgTxAbe) (*ExtAutScrip
 			return nil, fmt.Errorf("last aut txo type is not public")
 		}
 
+		// here we do not check the witnessHash, since the msgTx may not carry the AutWitness.
 		//witnessHash := chainhash.HashH(tx.AutWitness)
 		//if !witnessHash.IsEqual(&script.witnessHash) {
 		//	return nil, fmt.Errorf("mismatch witness for script")
@@ -203,40 +299,4 @@ func DetectAndAssembleExtAutScriptFromHostTx(txMsg *wire.MsgTxAbe) (*ExtAutScrip
 	}
 
 	return extAutScript, nil
-}
-
-// DetectAndExtractAutScriptFromTxMemo
-// The difference from DetectAndAssembleExtAutScriptFromHostTx
-// ParseAutScript try to deserialize CTAUT script from transaction memo
-// todo: This is necessary?
-func DetectAndExtractAutScriptFromTxMemo(txVersion uint32, txMemo []byte) (AutScript, error) {
-	if txVersion < wire.TxVersion_Height_464000_Aconcagua {
-		return nil, nil
-	}
-
-	commonPrefixLen := len([]byte(commonPrefix))
-
-	// could not be an AUT transaction
-	if len(txMemo) < commonPrefixLen {
-		return nil, nil
-	}
-	if !bytes.Equal(txMemo[:commonPrefixLen], []byte(commonPrefix)) {
-		return nil, nil
-	}
-
-	// RULE: if commonPrefix appears, the commonPrefix and its following bytes must be a well-formed packagedAutScript,
-	// namely, commonPrefix || Version(in VarInt form) || serializedAutScript (in VarBytes form).
-	autScript, err := UnpackageAutScript(txMemo)
-	if err != nil {
-		return nil, err
-	}
-
-	// check the script version with the host-txo version
-	expectedTxVersion, err := rules.RuleGetTxVersionFromAutScriptVersion(autScript.Version())
-	if expectedTxVersion != txVersion {
-		return nil, fmt.Errorf("autScript.Version() (%d) corresponds to TxVersion (%d), does not match TxVersion %d",
-			autScript.Version(), expectedTxVersion, txVersion)
-	}
-
-	return autScript, nil
 }

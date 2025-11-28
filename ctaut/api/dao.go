@@ -13,6 +13,8 @@ const commonPrefix = "AUTSCRIPT"
 type ExtAutScript = extscript.ExtAutScript
 
 type HostOutPoint = script.HostOutPoint
+type AutIssuer = script.AutIssuer
+type AutId = script.AutId
 
 type AutMetadata = script.AutMetadata
 type AutScript = script.AutScript
