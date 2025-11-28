@@ -2821,17 +2821,17 @@ func UnpackageAutScript(packagedAutScript []byte) (AutScript, error) {
 	// todo: if multiple versions are supported, may need to code here to run different branch
 	switch scriptVersion {
 	case ctautwire.AutScriptVersion_1:
-		return deserializeAutScriptV1(serializedScript)
+		return DeserializeAutScriptV1(serializedScript)
 
 	default:
 		return nil, fmt.Errorf("unknown aut script version %d", scriptVersion)
 	}
 }
 
-// deserializeAutScriptV1 deserializes the serializedAutScript to an AutScript, where
+// DeserializeAutScriptV1 deserializes the serializedAutScript to an AutScript, where
 // serializedAutScript is assumed to be the result of Serialize of AutScript with Version=AutScriptVersion_1.
 // If the input serializedAutScript does not satisfy this requirement, an error will be returned.
-func deserializeAutScriptV1(serializedAutScript []byte) (AutScript, error) {
+func DeserializeAutScriptV1(serializedAutScript []byte) (AutScript, error) {
 	r := bytes.NewReader(serializedAutScript)
 
 	versionRead, err := wire.ReadVarInt(r, 0)
