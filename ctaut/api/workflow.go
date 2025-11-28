@@ -175,8 +175,8 @@ func unpackageAutScript(packagedAutScript []byte) (AutScript, error) {
 }
 
 // DetectAndAssembleExtAutScriptFromHostTx is the only entrance for generating ExtAutScript.
-func DetectAndAssembleExtAutScriptFromHostTx(txMsg *wire.MsgTxAbe) (*ExtAutScript, error) {
-	if txMsg.Version < wire.TxVersion_Height_464000_Aconcagua {
+func DetectAndAssembleExtAutScriptFromHostTx(msgTx *wire.MsgTxAbe) (*ExtAutScript, error) {
+	if msgTx.Version < wire.TxVersion_Height_464000_Aconcagua {
 		return nil, nil
 	}
 
@@ -184,38 +184,33 @@ func DetectAndAssembleExtAutScriptFromHostTx(txMsg *wire.MsgTxAbe) (*ExtAutScrip
 	commonPrefixLen := len([]byte(commonPrefix))
 
 	// could not be an AUT transaction
-	if len(txMsg.TxMemo) < commonPrefixLen {
+	if len(msgTx.TxMemo) < commonPrefixLen {
 		return nil, nil
 	}
-	if !bytes.Equal(txMsg.TxMemo[:commonPrefixLen], []byte(commonPrefix)) {
+	if !bytes.Equal(msgTx.TxMemo[:commonPrefixLen], []byte(commonPrefix)) {
 		return nil, nil
 	}
 
 	// RULE: if commonPrefix appears, the commonPrefix and its following bytes must be a well-formed packagedAutScript,
 	// namely, commonPrefix || Version(in VarInt form) || serializedAutScript (in VarBytes form).
-	autScript, err := unpackageAutScript(txMsg.TxMemo)
+	autScript, err := unpackageAutScript(msgTx.TxMemo)
 	if err != nil {
 		return nil, err
 	}
 
 	// check the script version with the host-txo version
 	expectedTxVersion, err := rules.RuleGetTxVersionFromAutScriptVersion(autScript.Version())
-	if expectedTxVersion != txMsg.Version {
+	if expectedTxVersion != msgTx.Version {
 		return nil, fmt.Errorf("autScript.Version() (%d) corresponds to TxVersion (%d), does not match TxVersion %d",
-			autScript.Version(), expectedTxVersion, txMsg.Version)
+			autScript.Version(), expectedTxVersion, msgTx.Version)
 	}
 
 	// populate the generated tokens with host transaction outputs
-	extAutScript := extscript.NewExtAutScript(autScript)
-
-	err = extAutScript.AssembleOutputAutTokens(txMsg)
+	extAutScript, err := extscript.NewExtAutScript(autScript, msgTx)
 	if err != nil {
 		return nil, err
 	}
-	outputTokens, err := extAutScript.GeneratedTokens()
-	if err != nil {
-		return nil, err
-	}
+	outputTokens := extAutScript.GeneratedTokens()
 
 	switch autScriptInst := autScript.(type) {
 	case *RegistrationScript:

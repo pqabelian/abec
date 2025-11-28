@@ -18,34 +18,44 @@ import (
 type ExtAutScript struct {
 	script.AutScript
 
+	msgTx *wire.MsgTxAbe
+
+	generatedTokens []*auttoken.AutToken
+
 	// Note that for following 2 fields:
 	// - if the value is nil, it means that the tokens is not set
 	// - if the value is empty slice, it means that the tokens is set but has no token
 	inputHandled   bool //	indicate whether consumedTokens has been handled
 	consumedTokens []*auttoken.AutToken
-
-	outputHandled   bool //	indicate whether generatedTokens has been handled
-	generatedTokens []*auttoken.AutToken
 }
 
-func NewExtAutScript(autScript script.AutScript) *ExtAutScript {
+// NewExtAutScript news an ExtAutScript,
+// where ExtAutScript is initialized using the input autScript and msgTx,
+// and GenerateTokens are assembled.
+// Note that the ConsumedTokens are still set here.
+func NewExtAutScript(autScript script.AutScript, msgTx *wire.MsgTxAbe) (*ExtAutScript, error) {
 	extAutScript := &ExtAutScript{
 		AutScript: autScript,
+		msgTx:     msgTx,
 	}
 
 	extAutScript.consumedTokens = nil
 	extAutScript.inputHandled = false
 
-	extAutScript.generatedTokens = nil
-	extAutScript.outputHandled = false
+	err := extAutScript.assembleOutputAutTokens()
+	if err != nil {
+		return nil, err
+	}
 
-	return extAutScript
+	return extAutScript, nil
 }
 
 // AssembleOutputAutTokens would get the specified host output from the host transaction
-func (extAutScript *ExtAutScript) AssembleOutputAutTokens(txMsg *wire.MsgTxAbe) error {
-	txOuts := txMsg.TxOuts
-	txHash := txMsg.TxHash()
+func (extAutScript *ExtAutScript) assembleOutputAutTokens() error {
+	extAutScript.generatedTokens = nil
+
+	txOuts := extAutScript.msgTx.TxOuts
+	txHash := extAutScript.msgTx.TxHash()
 
 	numAutTokens := extAutScript.NumGeneratedTokens()
 	startIdx := 0
@@ -157,19 +167,15 @@ func (extAutScript *ExtAutScript) AssembleOutputAutTokens(txMsg *wire.MsgTxAbe) 
 	}
 
 	extAutScript.generatedTokens = generatedTokens
-	extAutScript.outputHandled = true
 
 	return nil
 }
 
-func (extAutScript *ExtAutScript) GeneratedTokens() ([]*auttoken.AutToken, error) {
-	if !extAutScript.outputHandled {
-		return nil, fmt.Errorf("generated tokens not set")
-	}
-
-	return extAutScript.generatedTokens, nil
+func (extAutScript *ExtAutScript) GeneratedTokens() []*auttoken.AutToken {
+	return extAutScript.generatedTokens
 }
 
+// todo:
 func (extAutScript *ExtAutScript) SetConsumedTokens(consumedTokens []*auttoken.AutToken) error {
 
 	if len(consumedTokens) != extAutScript.NumConsumedTokens() {
@@ -183,6 +189,7 @@ func (extAutScript *ExtAutScript) SetConsumedTokens(consumedTokens []*auttoken.A
 	return nil
 }
 
+// todo:
 func (extAutScript *ExtAutScript) ConsumedTokens() ([]*auttoken.AutToken, error) {
 	if !extAutScript.inputHandled {
 		return nil, fmt.Errorf("consumed tokens not set")
@@ -207,14 +214,11 @@ func (extAutScript *ExtAutScript) CreateAutMetadata(txHash chainhash.Hash) (*scr
 		return nil, fmt.Errorf("registerScript sanity check failed: %v", err)
 	}
 
-	if !extAutScript.outputHandled {
-		return nil, fmt.Errorf("wrong call on CreateMetadata: generated tokens are not set yet")
-	}
-
 	rootTokenSet := map[string]*script.HostOutPoint{}
 	for i := 0; i < len(extAutScript.generatedTokens); i++ {
-		opStr := extAutScript.generatedTokens[i].HostOutPoint.String()
-		rootTokenSet[opStr] = &extAutScript.generatedTokens[i].HostOutPoint
+		hostOutPoint := extAutScript.generatedTokens[i].HostOutPoint
+		opStr := hostOutPoint.String()
+		rootTokenSet[opStr] = &hostOutPoint
 	}
 
 	autIdentifier := chainhash.Hash{}
@@ -267,52 +271,62 @@ func (extAutScript *ExtAutScript) UpdateAutMetadata(autMetadata *script.AutMetad
 			"does not match", identifier.String(), autMetadata.AutIdentifier.String())
 	}
 
-	// todo: does not check inputHandled/outputHandled?
+	if !extAutScript.inputHandled {
+		return fmt.Errorf("the re-registration script did not set its consumedTokens")
+	}
+
+	updatedAutMetadata := autMetadata.Clone()
+
 	consumedTokens := extAutScript.consumedTokens
 	for i := 0; i < len(consumedTokens); i++ {
 		opStr := consumedTokens[i].HostOutPoint.String()
-		if _, ok := autMetadata.ActiveRootTokenSet[opStr]; !ok {
+		if _, ok := updatedAutMetadata.ActiveRootTokenSet[opStr]; !ok {
 			return fmt.Errorf("an re-registration script attempts to update AutMetadata "+
 				"with non-existing/spent root token (%s,%d) for AutInstance identified by %s",
 				consumedTokens[i].HostOutPoint.TxHash, consumedTokens[i].HostOutPoint.Index,
-				autMetadata.AutIdentifier)
+				updatedAutMetadata.AutIdentifier)
 		}
-		// todo: if abort, the autMetadata is changed? should use a local var, and finally set when succeed
-		delete(autMetadata.ActiveRootTokenSet, opStr)
+		delete(updatedAutMetadata.ActiveRootTokenSet, opStr)
 	}
 
 	// follow defined rules in AutScriptVersion
-	autMetadata.Version += 1
+	updatedAutMetadata.Version += 1
 
-	autMetadata.AutMemo = reregisterScript.AutMemo()
+	updatedAutMetadata.AutMemo = reregisterScript.AutMemo()
 
-	if reregisterScript.PlannedTotalSupply() < autMetadata.MintedAmount {
+	if reregisterScript.PlannedTotalSupply() < updatedAutMetadata.MintedAmount {
 		return fmt.Errorf("re-registration script attempts to make planned supply (%d) less than minted amount (%d)",
-			reregisterScript.PlannedTotalSupply(), autMetadata.MintedAmount)
+			reregisterScript.PlannedTotalSupply(), updatedAutMetadata.MintedAmount)
 	}
-	autMetadata.PlannedTotalSupply = reregisterScript.PlannedTotalSupply()
+	updatedAutMetadata.PlannedTotalSupply = reregisterScript.PlannedTotalSupply()
 
-	autMetadata.Issuers = reregisterScript.Issuers()
-	autMetadata.ReregistrationExpireHeight = reregisterScript.ReregistrationExpireHeight()
+	// issuers
+	updatedAutMetadata.Issuers = make([]*script.AutIssuer, len(reregisterScript.Issuers()))
+	for i := 0; i < len(reregisterScript.Issuers()); i++ {
+		updatedAutMetadata.Issuers[i] = reregisterScript.Issuers()[i].Clone()
+	}
 
-	autMetadata.ReregistrationThreshold = reregisterScript.ReregisterThreshold()
-	autMetadata.MintThreshold = reregisterScript.MintThreshold()
+	updatedAutMetadata.ReregistrationExpireHeight = reregisterScript.ReregistrationExpireHeight()
 
-	// remove previous root tokens
-	autMetadata.ActiveRootTokenSet = make(map[string]*script.HostOutPoint, len(extAutScript.generatedTokens))
+	updatedAutMetadata.ReregistrationThreshold = reregisterScript.ReregisterThreshold()
+	updatedAutMetadata.MintThreshold = reregisterScript.MintThreshold()
+
+	// set the new AutRootTokens
+	updatedAutMetadata.ActiveRootTokenSet = make(map[string]*script.HostOutPoint, len(extAutScript.generatedTokens))
 	for i := 0; i < len(extAutScript.generatedTokens); i++ {
-		opStr := extAutScript.generatedTokens[i].HostOutPoint.String()
-		autMetadata.ActiveRootTokenSet[opStr] = &extAutScript.generatedTokens[i].HostOutPoint
+		hostOutPoint := extAutScript.generatedTokens[i].HostOutPoint
+		opStr := hostOutPoint.String()
+		updatedAutMetadata.ActiveRootTokenSet[opStr] = &hostOutPoint
 	}
 
 	// check
-	updateScriptVersionMax := autMetadata.UpdateScriptVersions[len(autMetadata.UpdateScriptVersions)-1]
+	updateScriptVersionMax := updatedAutMetadata.UpdateScriptVersions[len(autMetadata.UpdateScriptVersions)-1]
 	if reregisterScript.Version() < updateScriptVersionMax {
 		return fmt.Errorf("the version of re-register script %d should be not smaller than the largest version (%d) in UpdateScriptVersions",
 			reregisterScript.Version(), updateScriptVersionMax,
 		)
 	}
-	autMetadata.UpdateScriptVersions = append(autMetadata.UpdateScriptVersions, reregisterScript.Version())
+	updatedAutMetadata.UpdateScriptVersions = append(updatedAutMetadata.UpdateScriptVersions, reregisterScript.Version())
 
 	return nil
 }
