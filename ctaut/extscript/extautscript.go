@@ -171,6 +171,125 @@ func (extAutScript *ExtAutScript) assembleOutputAutTokens() error {
 	return nil
 }
 
+// PresetHostOutpointForCTAUT would preset the host outpoint for consumed tokens with the help of
+// host transaction and ring
+// todo: use the correcy HostOutPoint
+func (extAutScript *ExtAutScript) AssembleInputAutTokens(lookupHostOutput func(ringHash chainhash.Hash) (*wire.TxoRing, error)) error {
+
+	if extAutScript.Type() == script.AutScriptTypeRegistration {
+
+		extAutScript.inputHandled = true
+		extAutScript.consumedTokens = nil
+
+		return nil
+	}
+
+	txHash := extAutScript.msgTx.TxHash()
+
+	hostedTxIns := extAutScript.msgTx.TxIns
+
+	startIndex := 0
+	for ; startIndex < len(hostedTxIns); startIndex++ {
+		ringHash := hostedTxIns[startIndex].PreviousOutPointRing.Hash()
+		txoRing, err := lookupHostOutput(ringHash)
+		if err != nil {
+			return err
+		}
+
+		if txoRing == nil {
+			return fmt.Errorf("the TxoRing obtained by ringHash (%s) is nil ", ringHash.String())
+		}
+		if txoRing.OutPointRing == nil {
+			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) is nil ", ringHash.String())
+		}
+		ringId := txoRing.OutPointRing.RingId()
+		if ringId.IsEqual(&ringHash) {
+			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has ringId (%s)", ringHash.String(), ringId.String())
+		}
+
+		if len(txoRing.OutPointRing.OutPoints) != 1 || len(txoRing.TxOuts) != 1 {
+			return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
+				"len(txoRing.OutPointRing.OutPoints) = %d || len(txoRing.TxOuts) = %d ",
+				ringHash.String(), len(txoRing.OutPointRing.OutPoints), len(txoRing.TxOuts))
+		}
+
+		txOut := txoRing.TxOuts[0]
+
+		privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
+		if err != nil {
+			return err
+		}
+
+		// skip fully-privacy area
+		if privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre ||
+			privacyLevel == abecryptoxkey.PrivacyLevelRINGCT {
+			continue
+		}
+
+		if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+			return fmt.Errorf("expect privacy level %d but got %d",
+				abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
+		}
+		break
+	}
+
+	numInCoins := script.NumConsumedTokens()
+	if startIndex+numInCoins > len(hostedTxIns) {
+		return fmt.Errorf("claim %d (root) coins but only remain %d outputs",
+			numInCoins, len(hostedTxIns)-startIndex)
+	}
+
+	consumedTokens := make([]*AutToken, numInCoins)
+	for i := 0; i < len(consumedTokens); i++ {
+		hostIndex := startIndex + i
+
+		// sanity-check
+		ringHash := hostedTxIns[hostIndex].PreviousOutPointRing.Hash()
+		txOut, err := lookupHostOutput(ringHash)
+		if err != nil {
+			return err
+		}
+
+		privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
+		if err != nil {
+			return err
+		}
+		if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+			return fmt.Errorf("expect privacy level %d but got %d",
+				abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
+		}
+
+		// fill out with the first item in ring
+		ringIdx := 0
+		outpoint := HostOutPoint{
+			TxHash: hostedTxIns[hostIndex].PreviousOutPointRing.OutPoints[ringIdx].TxHash,
+			Index:  hostedTxIns[hostIndex].PreviousOutPointRing.OutPoints[ringIdx].Index,
+		}
+
+		coinAddress, err := CheckHostTxoParasiticity(outpoint.TxHash, outpoint.Index, txOut)
+		if err != nil {
+			return fmt.Errorf("transaction %s try to consume UTXO at Ring %s is not a valid output", txHash,
+				hostedTxIns[hostIndex].PreviousOutPointRing.Hash())
+		}
+
+		// TODO would be check with populated version
+		//err = abecryptox.AutRuleCheckOnTxInputVersion(hostedTxIns[hostIndex].PreviousOutPointRing.Version, msgTx.Version)
+		//if err != nil {
+		//	return fmt.Errorf("transaction %s try to consume CT-AUT token %s with version %d, but tx version is %d",
+		//		txHash, outpoint,
+		//		hostedTxIns[hostIndex].PreviousOutPointRing.Version, msgTx.Version)
+		//}
+
+		consumedTokens[i] = &AutToken{
+			Version:      ctautwire.AutScriptVersion_Unknown,
+			HostOutPoint: outpoint,    // will be populated later with CTAUTViewpoint
+			ValueScript:  nil,         // will be populated later with CTAUTViewpoint
+			CoinAddress:  coinAddress, // required by root coin while optional for coin
+		}
+	}
+	return script.setConsumedTokens(consumedTokens)
+}
+
 func (extAutScript *ExtAutScript) GeneratedTokens() []*auttoken.AutToken {
 	return extAutScript.generatedTokens
 }
