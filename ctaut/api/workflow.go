@@ -19,7 +19,7 @@ import (
 // 3. write to TxMemo
 
 // Use:
-// 1. DetectAndAssembleExtAutScriptFromHostTx
+// 1. DetectAndAssembleExtAutScriptFromHostTx, which call unpackageAutScript as a subroutine
 
 // New Functions	begin
 
@@ -175,6 +175,8 @@ func unpackageAutScript(packagedAutScript []byte) (AutScript, error) {
 }
 
 // DetectAndAssembleExtAutScriptFromHostTx is the only entrance for generating ExtAutScript.
+//
+// NOTE: only outputTokens of ExtAutScript are assembled.
 func DetectAndAssembleExtAutScriptFromHostTx(msgTx *wire.MsgTxAbe) (*ExtAutScript, error) {
 	if msgTx.Version < wire.TxVersion_Height_464000_Aconcagua {
 		return nil, nil

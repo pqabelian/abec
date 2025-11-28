@@ -183,7 +183,7 @@ func (extAutScript *ExtAutScript) assembleOutputAutTokens() error {
 	return nil
 }
 
-// AssembleInputAutTokens assemble the input Tokens for ExtutScript, making use of the lookupHostOutputTxoRing,
+// AssembleInputAutTokensStep1 assemble the input Tokens for ExtutScript (Step1), making use of the lookupHostOutputTxoRing,
 // which returns a TxoRing corresponding to TxIn.RingHash, from somewhere.
 //
 // RULE on the TxIn for Host-Tx:
@@ -374,7 +374,7 @@ func (extAutScript *ExtAutScript) CreateAutMetadata() (*script.AutMetadata, erro
 		opStr := hostOutPoint.String()
 		rootTokenSet[opStr] = &hostOutPoint
 	}
-	
+
 	newAutMetadata := &script.AutMetadata{
 		Version:                    ctautwire.AutMetadataVersionInitValue,
 		AutIdentifier:              extAutScript.msgTx.TxHash(),
