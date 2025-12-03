@@ -6,10 +6,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	ctautapi "github.com/abesuite/abec/ctaut/api"
 	"math"
 	"math/big"
 	"time"
+
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 
 	"github.com/abesuite/abec/blockchain/consensus"
 	"github.com/abesuite/abec/blockchain/ruleerror"
@@ -2107,7 +2108,8 @@ func checkCTAUTRegistrationTransactionInputs(ctAutScript *ctautapi.ExtAutScript,
 	}
 
 	// if the claimed height will expire soon, reject it
-	if registrationScript.ReregistrationExpireHeight() <= txHeight {
+	if registrationScript.ReregistrationExpireHeight() != ctaut.InfiniteExpireHeight &&
+		registrationScript.ReregistrationExpireHeight() <= txHeight {
 		return fmt.Errorf("transaction %s try to register an AUT "+
 			"instance with expire height %d , but current block height %d, it will expire soon", tx.Hash(),
 			registrationScript.ReregistrationExpireHeight(), txHeight)
@@ -2202,7 +2204,8 @@ func checkCTAUTReRegistrationTransactionInputs(script *ctautapi.ExtAutScript, tx
 	}
 
 	// expiry
-	if reRegisterScript.ReregistrationExpireHeight() <= txHeight {
+	if reRegisterScript.ReregistrationExpireHeight() != ctaut.InfiniteExpireHeight &&
+		reRegisterScript.ReregistrationExpireHeight() <= txHeight {
 		return fmt.Errorf("transaction %s try to re-register the "+
 			"instance with expire height %d (current height %d)", tx.Hash(),
 			reRegisterScript.ReregistrationExpireHeight(), txHeight)
