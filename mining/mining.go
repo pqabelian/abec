@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	ctautapi "github.com/abesuite/abec/ctaut/api"
 	"time"
 
 	"github.com/abesuite/abec/abecryptox"
@@ -506,13 +505,20 @@ func spendTransaction(utxoView *blockchain.UtxoViewpoint, tx *abeutil.Tx, height
 // todo(ABE): the block is unknown yet, use hainhash.ZeroHash as the block hash consuming the serialNumber
 // Move this function to blockchain package
 // todo: remove ctautScript *ctautapi.ExtAutScript
-func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, tx *abeutil.TxAbe,
-	ctAutView *blockchain.CTAUTViewpoint, ctautScript *ctautapi.ExtAutScript, blockHeight int32) error {
+func spendTransactionAbe(tx *abeutil.TxAbe, utxoRingView *blockchain.UtxoRingViewpoint, blockHeight int32) error {
 	for _, txIn := range tx.MsgTx().TxIns {
 		entry := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())
 		if entry != nil {
 			entry.Spend(txIn.SerialNumber, &chainhash.ZeroHash) // TODO(review)
 		}
+	}
+
+	return nil
+}
+func spendTransactionAUTScript(tx *abeutil.TxAbe, ctAutView *blockchain.CTAUTViewpoint, blockHeight int32) error {
+	ctautScript, err := tx.ExtAutScript()
+	if err != nil {
+		return err
 	}
 
 	// CTAUT
@@ -1039,10 +1045,16 @@ mempoolLoop:
 		// an entry for it to ensure any transactions which reference
 		// this one have it available as an input and can ensure they
 		// aren't double spending.
-		err = spendTransactionAbe(blockUtxoRings, tx, blockCTAUTView, extAutScript, nextBlockHeight)
+		err = spendTransactionAbe(tx, blockUtxoRings, nextBlockHeight)
 		if err != nil {
 			log.Debugf("Skipping tx %s due to error in "+
 				"spendTransactionAbe: %v", tx.Hash(), err)
+			continue
+		}
+		err = spendTransactionAUTScript(tx, blockCTAUTView, nextBlockHeight)
+		if err != nil {
+			log.Debugf("Skipping tx %s due to error in "+
+				"spendTransactionAUTScriptAbe: %v", tx.Hash(), err)
 			continue
 		}
 
