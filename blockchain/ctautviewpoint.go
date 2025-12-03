@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+
 	ctautapi "github.com/abesuite/abec/ctaut/api"
 
 	"github.com/abesuite/abec/abecryptox"
@@ -281,6 +282,7 @@ func (view *CTAUTViewpoint) connectRegistrationScript(script *ctautapi.ExtAutScr
 	}
 
 	log.Debugf("In transaction %s, CT-AUT with identifier %s with following configuration is registered:", txHash, identifierKey)
+	log.Debugf("\t Version: %d", metadata.Version)
 	log.Debugf("\t Name: %v:", hex.EncodeToString(metadata.AutName))
 	log.Debugf("\t Symbol: %v", hex.EncodeToString(metadata.AutSymbol))
 	log.Debugf("\t BaseUnitName: %v", hex.EncodeToString(metadata.BaseUnitName))
@@ -298,6 +300,10 @@ func (view *CTAUTViewpoint) connectRegistrationScript(script *ctautapi.ExtAutScr
 	log.Debugf("\t Enabled RootCoin: len = %d", len(metadata.ActiveRootTokenSet))
 	for point := range metadata.ActiveRootTokenSet {
 		log.Debugf("\t\t %s", point)
+	}
+	log.Debugf("\t Updated Version: len = %d", len(metadata.UpdateScriptVersions))
+	for i := 0; i < len(metadata.UpdateScriptVersions); i++ {
+		log.Debugf("\t\t %d", metadata.UpdateScriptVersions[i])
 	}
 	return nil
 }
@@ -339,6 +345,7 @@ func (view *CTAUTViewpoint) connectReRegistrationScript(script *ctautapi.ExtAutS
 		*sctauts = append(*sctauts, stxo)
 	}
 	log.Debugf("Re-register AUT with identifier %s with following configuration:", identifierKey)
+	log.Debugf("\t Version: %d", metadata.Version)
 	log.Debugf("\t Memo: %v -> %v", previousMetadata.AutMemo, metadata.AutMemo)
 	log.Debugf("\t PlannedTotalSupply: %v -> %v", previousMetadata.PlannedTotalSupply, metadata.PlannedTotalSupply)
 	log.Debugf("\t ReregistrationExpireHeight: %v -> %v", previousMetadata.ReregistrationExpireHeight, metadata.ReregistrationExpireHeight)
@@ -360,6 +367,10 @@ func (view *CTAUTViewpoint) connectReRegistrationScript(script *ctautapi.ExtAutS
 	log.Debugf("\t Enabled RootCoin: len = %d", len(metadata.ActiveRootTokenSet))
 	for point := range metadata.ActiveRootTokenSet {
 		log.Debugf("%s", point)
+	}
+	log.Debugf("\t Updated Version: len = %d", len(metadata.UpdateScriptVersions))
+	for i := 0; i < len(metadata.UpdateScriptVersions); i++ {
+		log.Debugf("\t\t %d", metadata.UpdateScriptVersions[i])
 	}
 	return nil
 }
