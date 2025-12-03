@@ -6,12 +6,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	ctautapi "github.com/abesuite/abec/ctaut/api"
 	"math"
 	"os"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 
 	"github.com/abesuite/abec/blockchain/ruleerror"
 
@@ -771,12 +772,16 @@ func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 	if extAutScript != nil {
 		if extAutScript.Type() == ctaut.AutScriptTypeRegistration {
 			ctAutScript := extAutScript.AutScript.(*ctautapi.RegistrationScript)
-			willExpiredCTAut := mp.expiredHeightAUT[ctAutScript.ReregistrationExpireHeight()]
-			delete(willExpiredCTAut, *tx.Hash())
-			if len(willExpiredCTAut) > 0 {
-				mp.expiredHeightAUT[ctAutScript.ReregistrationExpireHeight()] = willExpiredCTAut
+			expireHeight := ctAutScript.ReregistrationExpireHeight()
+			if expireHeight != ctaut.InfiniteExpireHeight {
+				willExpiredCTAut := mp.expiredHeightAUT[expireHeight]
+				delete(willExpiredCTAut, *tx.Hash())
+				if len(willExpiredCTAut) > 0 {
+					mp.expiredHeightAUT[ctAutScript.ReregistrationExpireHeight()] = willExpiredCTAut
+				}
 			}
 		}
+		// TODO for re-register also?
 	}
 }
 
@@ -921,19 +926,23 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 		switch extAutScriptInst := extAutScript.AutScript.(type) {
 		case *ctaut.RegistrationScript:
 			expireHeight := extAutScriptInst.ReregistrationExpireHeight()
-			if mp.expiredHeightAUT[expireHeight] == nil {
-				mp.expiredHeightAUT[expireHeight] = map[chainhash.Hash]*TxDescAbe{}
+			if expireHeight != ctaut.InfiniteExpireHeight {
+				if mp.expiredHeightAUT[expireHeight] == nil {
+					mp.expiredHeightAUT[expireHeight] = map[chainhash.Hash]*TxDescAbe{}
+				}
+				mp.expiredHeightAUT[expireHeight][*txD.Tx.Hash()] = txD
 			}
-			mp.expiredHeightAUT[expireHeight][*txD.Tx.Hash()] = txD
 
 			//identifier := autTransaction.Identifier()
 			//mp.registeredAUTName[hex.EncodeToString(identifier[:])] = *tx.Hash()
 		case *ctaut.ReRegistrationScript:
 			expireHeight := extAutScriptInst.ReregistrationExpireHeight()
-			if mp.expiredHeightAUT[expireHeight] == nil {
-				mp.expiredHeightAUT[expireHeight] = map[chainhash.Hash]*TxDescAbe{}
+			if expireHeight != ctaut.InfiniteExpireHeight {
+				if mp.expiredHeightAUT[expireHeight] == nil {
+					mp.expiredHeightAUT[expireHeight] = map[chainhash.Hash]*TxDescAbe{}
+				}
+				mp.expiredHeightAUT[expireHeight][*txD.Tx.Hash()] = txD
 			}
-			mp.expiredHeightAUT[expireHeight][*txD.Tx.Hash()] = txD
 		default:
 			// nothing to do
 		}
