@@ -1338,9 +1338,10 @@ func countSpentOutputsCTAUT(block *abeutil.BlockAbe) int {
 		//	num++
 		//}
 
-		autTx, err := tx.CTAUTTScript()
+		autTx, err := tx.ExtAutScript()
 		if err != nil {
 			//	This should not happen
+			// todo: will refactor
 			log.Warnf("countSpentOutputsAUT: error happens when extracting AutTransaction from Tx %s: %v", tx.Hash(), err)
 		}
 		if autTx != nil {

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 	"io"
 
 	//"reflect"
@@ -19,6 +20,7 @@ import (
 
 var (
 	// Confidential Transaction AUTScript - Abelian User Token (CTAUT) state
+	// todo: could remove "ct"
 	ctAutInstanceBucketName     = []byte("ctautinstance")
 	ctAutTokenBucketName        = []byte("ctauttoken")
 	ctAutSpendJournalBucketName = []byte("ctautspendjournal")
@@ -74,8 +76,8 @@ type SpentCTAUT interface {
 	Type() SpentCTAUTType
 }
 type UpdatedCTAUTInfo struct {
-	Before *ctaut.AutMetadata
-	After  *ctaut.AutMetadata
+	Before *ctautapi.AutMetadata
+	After  *ctautapi.AutMetadata
 
 	// Height is the height of the the block containing the creating tx.
 	Height int32
@@ -294,7 +296,7 @@ func decodeSpentCTAUT(serialized []byte) (SpentCTAUT, int, error) {
 			offset += 1
 		} else {
 			offset += 1
-			res.Before = &ctaut.AutMetadata{}
+			res.Before = &ctautapi.AutMetadata{}
 			sizeOfInfo, bytesRead := deserializeVLQ(serialized[offset:])
 			offset += bytesRead
 			if offset >= len(serialized) {
@@ -314,7 +316,7 @@ func decodeSpentCTAUT(serialized []byte) (SpentCTAUT, int, error) {
 			offset += 1
 		} else {
 			offset += 1
-			res.After = &ctaut.AutMetadata{}
+			res.After = &ctautapi.AutMetadata{}
 			sizeOfInfo, bytesRead := deserializeVLQ(serialized[offset:])
 			offset += bytesRead
 			if offset >= len(serialized) {
@@ -365,7 +367,9 @@ func serializeSpendJournalEntryCTAUT(stxos []SpentCTAUT) ([]byte, error) {
 	return serialized, nil
 
 }
-func deserializeSpendJournalEntryCTAUT(serialized []byte, scripts []*abeutil.AutScript) ([]SpentCTAUT, error) {
+
+// todo: why scripts is used only by len()
+func deserializeSpendJournalEntryCTAUT(serialized []byte, scripts []*ctautapi.ExtAutScript) ([]SpentCTAUT, error) {
 	// Calculate the total number of stxos.
 	numStxos := len(scripts)
 
@@ -418,7 +422,7 @@ func dbFetchSpendJournalEntryCTAUT(dbTx database.Tx, block *abeutil.BlockAbe) ([
 	spendJournalBucket := dbTx.Metadata().Bucket(ctAutSpendJournalBucketName)
 	serialized := spendJournalBucket.Get(block.Hash()[:])
 
-	scripts := block.CTAUTScripts()
+	scripts := block.ExtAutScripts()
 	stxos, err := deserializeSpendJournalEntryCTAUT(serialized, scripts)
 	if err != nil {
 		// Ensure any deserialization errors are returned as database
@@ -560,7 +564,7 @@ func dbFetchCTAUTCoin(dbTx database.Tx, outpoint ctaut.HostOutPoint) (*CTAUTCoin
 	return coin, nil
 }
 
-func dbFetchCTAUTMetadata(dbTx database.Tx, key ctaut.AutId) (*ctaut.AutMetadata, error) {
+func dbFetchCTAUTMetadata(dbTx database.Tx, key ctaut.AutId) (*ctautapi.AutMetadata, error) {
 	// Fetch the unspent transaction output information for the passed
 	// transaction output.  Return now when there is no entry.
 	autInfoBucket := dbTx.Metadata().Bucket(ctAutInstanceBucketName)
@@ -570,7 +574,7 @@ func dbFetchCTAUTMetadata(dbTx database.Tx, key ctaut.AutId) (*ctaut.AutMetadata
 	}
 
 	// Deserialize the utxo entry and return it.
-	var metadata ctaut.AutMetadata
+	var metadata ctautapi.AutMetadata
 	err := metadata.Deserialize(serializedAUTInfo)
 	if err != nil {
 		// Ensure any deserialization errors are returned as database

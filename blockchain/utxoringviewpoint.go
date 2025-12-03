@@ -779,6 +779,25 @@ func (entry *UtxoRingEntry) IsSame(obj *UtxoRingEntry) bool {
 	return true
 }
 
+// TxoRing returns the TxoRing of the UtxoRingEntry.
+// todo: discuss and confirm that the resulting TxoRing shares the pointers in UtxoRingEntry.
+// todo: refactor UtxoRingEntry to have a TxoRing pointer?
+func (entry *UtxoRingEntry) TxoRing() *wire.TxoRing {
+	if entry == nil {
+		return nil
+	}
+
+	txoRing := &wire.TxoRing{}
+
+	txoRing.Version = entry.Version
+	txoRing.RingBlockHeight = entry.ringBlockHeight
+	txoRing.OutPointRing = entry.outPointRing
+	txoRing.TxOuts = entry.txOuts
+	txoRing.IsCoinbase = entry.IsCoinBase()
+	
+	return txoRing
+}
+
 func initNewUtxoRingEntry(version uint32, ringBlockHeight int32, blockhashs []*chainhash.Hash, ringMemberTxos []*RingMemberTxo, isCoinBase bool) (*UtxoRingEntry, error) {
 
 	ringSize := len(ringMemberTxos)

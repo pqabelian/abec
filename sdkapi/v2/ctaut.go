@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 	"sort"
 
 	"github.com/abesuite/abec/abecryptox"
@@ -498,13 +499,15 @@ func ExtractAutTokenValue(version uint32, valueScript []byte, cryptoValuePublicK
 	return value, autTxoType, nil
 }
 
-func ParseAutScript(txVersion uint32, txID string, memo []byte) (AutScript, error) {
-	txHash, err := chainhash.NewHashFromStr(txID)
-	if err != nil {
-		return nil, err
-	}
-	return ctaut.ParseAutScript(txVersion, *txHash, memo)
-}
+// todo: remove this api?
+//func ParseAutScript(txVersion uint32, txID string, memo []byte) (AutScript, error) {
+//	txHash, err := chainhash.NewHashFromStr(txID)
+//	if err != nil {
+//		return nil, err
+//	}
+//	return ctaut.ParseAutScript(txVersion, *txHash, memo)
+//}
+
 func RegisteredAutMetadata(autScript AutScript, scriptVersion uint32, txID string, serializedTxOuts [][]byte) (*Metadata, error) {
 	if autScript == nil {
 		return nil, errors.New("aut script is nil")
@@ -719,29 +722,64 @@ func GetConsumedOutpoints(serializedTx []byte, rings map[string]*TxoRing) ([]*Ou
 	if err != nil {
 		return nil, err
 	}
-	ctAutScript, err := ctaut.ExtractAutScript(tx.MsgTx())
+	extAutScript, err := ctautapi.DetectAndAssembleExtAutScriptFromHostTx(tx.MsgTx())
 	if err != nil {
 		return nil, err
 	}
-	if ctAutScript == nil {
+	if extAutScript == nil {
 		return nil, nil
 	}
-	err = ctaut.PresetHostOutpointForCTAUT(ctAutScript, tx.MsgTx(), func(ringHash chainhash.Hash) (*wire.TxOutAbe, error) {
+	err = extAutScript.AssembleInputAutTokensStep1(func(ringHash chainhash.Hash) (*wire.TxoRing, error) {
 		ring := rings[ringHash.String()]
 		if ring == nil {
 			return nil, fmt.Errorf("no such txo ring found")
 		}
-		abeTxo := &wire.TxOutAbe{}
-		err = wire.ReadTxOutAbe(bytes.NewReader(ring.SerializedTxOuts[0]), 0, ring.Version, abeTxo)
-		if err != nil {
-			return nil, err
+
+		if ring.OutPointRing == nil {
+			return nil, fmt.Errorf("ring's OutPointRing is nil")
 		}
-		return abeTxo, nil
+		outPointRing := &wire.OutPointRing{
+			Version: ring.Version,
+		}
+		outPointRing.BlockHashs = make([]*chainhash.Hash, len(ring.OutPointRing.BlockIDs))
+		for i := 0; i < len(ring.OutPointRing.BlockIDs); i++ {
+			// todo: confirm whether this work
+			outPointRing.BlockHashs[i], err = chainhash.NewHashFromStr(ring.OutPointRing.BlockIDs[i])
+			if err != nil {
+				return nil, err
+			}
+		}
+		outPointRing.OutPoints = make([]*wire.OutPointAbe, len(ring.OutPointRing.OutPoints))
+		for i := 0; i < len(ring.OutPointRing.OutPoints); i++ {
+			outPointRing.OutPoints[i] = &wire.OutPointAbe{}
+			copy(outPointRing.OutPoints[i].TxHash[:], ring.OutPointRing.OutPoints[i].TxId[:])
+			outPointRing.OutPoints[i].Index = ring.OutPointRing.OutPoints[i].Index
+		}
+
+		txOuts := make([]*wire.TxOutAbe, len(ring.SerializedTxOuts))
+		for i := 0; i < len(ring.SerializedTxOuts); i++ {
+			txOut := &wire.TxOutAbe{}
+			err = wire.ReadTxOutAbe(bytes.NewReader(ring.SerializedTxOuts[i]), 0, ring.Version, txOut)
+			if err != nil {
+				return nil, err
+			}
+			txOuts[i] = txOut
+		}
+
+		txoRing := &wire.TxoRing{
+			Version:         ring.Version,
+			RingBlockHeight: ring.RingBlockHeight,
+			OutPointRing:    outPointRing,
+			TxOuts:          txOuts,
+			IsCoinbase:      ring.IsCoinbase,
+		}
+		return txoRing, nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	consumedTokens, err := ctAutScript.ConsumedTokens()
+	// todo: only step1, will return error
+	consumedTokens, err := extAutScript.ConsumedTokens()
 	if err != nil {
 		return nil, err
 	}

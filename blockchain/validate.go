@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 	"math"
 	"math/big"
 	"time"
@@ -473,6 +474,14 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 	// The rules of (txoVersion, PrivacyLevel) need to be checked, since the ring-rules need this.
 	for j := 0; j < len(msgTx.TxOuts); j++ {
 		txOut := msgTx.TxOuts[j]
+
+		if txOut.Version != msgTx.Version {
+			str := fmt.Sprintf("msgTx.TxOuts[%d]'s version (%d) "+
+				"does not equal msgTx.Version (%d)",
+				j, txOut.Version, msgTx.Version)
+			return ruleerror.NewRuleError(ruleerror.ErrMismatchedTxoVersionAndTxVersion, str)
+		}
+
 		privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
 		if err != nil {
 			return err
@@ -596,33 +605,25 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		consumedOutPoints[ringHash][snStr] = struct{}{}
 	}
 
-	// todo(CTAUT): to review
-	ctAutTx, err := tx.CTAUTTScript()
+	extAutScript, err := tx.ExtAutScript()
 	if err != nil {
 		str := fmt.Sprintf("error hapeens when extracting CT-AUT script from Tx %s: %v", tx.Hash(), err)
 		return ruleerror.NewRuleError(ruleerror.ErrCTAUTBadForm, str)
 	}
-	if ctAutTx != nil {
-		if tx.MsgTx().Version < wire.TxVersion_Height_464000_Aconcagua {
-			return ruleerror.NewRuleError(ruleerror.ErrTxVersionForCTAUT, "transaction "+
-				"contains CTAUT but the transaction version is invalid")
-		}
+	if extAutScript != nil {
+		// todo: As all the LOCAL extAutScript has only one entrance (in abeutil.NewTx()), where these checks on GeneratedTokens have been performed.
 
-		// for input part, with no utxoRingView, it can't know which inputs are used for CTAUT
-
-		// for output part, all tokens must be parasitized in the output with valid version
-		txOuts := tx.MsgTx().TxOuts
-		generatedTokens, err := ctAutTx.GeneratedTokens()
-		if err != nil {
-			return err
-		}
-		for _, token := range generatedTokens {
-			index := token.HostOutPoint.Index
-			if txOuts[index].Version < wire.TxVersion_Height_464000_Aconcagua {
-				return ruleerror.NewRuleError(ruleerror.ErrTxVersionForCTAUT, "transaction "+
-					"contains CTAUT but the parasitized output has invalid version")
-			}
-		}
+		//if tx.MsgTx().Version < wire.TxVersion_Height_464000_Aconcagua {
+		//	return ruleerror.NewRuleError(ruleerror.ErrTxVersionForCTAUT, "transaction "+
+		//		"contains CTAUT but the transaction version is invalid")
+		//}
+		//
+		//// for input part, with no utxoRingView, it can't know which inputs are used for CTAUT
+		//
+		//// for output part, all tokens must be parasitized in the output with valid version
+		//txOuts := tx.MsgTx().TxOuts
+		//for _, token := range extAutScript.GeneratedTokens() {
+		//}
 	}
 
 	return nil
@@ -2083,7 +2084,9 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 	return nil
 }
 
-func checkCTAUTRegistrationTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, tx *abeutil.TxAbe, txHeight int32,
+// todo: remove tx *abeutil.TxAbe, since ctAutScript *ctautapi.ExtAutScript carries txMsg.
+// todo: remove ctAutScript *ctautapi.ExtAutScript
+func checkCTAUTRegistrationTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
 	if ctAutScript.Type() != ctaut.AutScriptTypeRegistration {
 		return fmt.Errorf("expected registration script, but got %d", ctAutScript.Type())
@@ -2113,7 +2116,8 @@ func checkCTAUTRegistrationTransactionInputs(ctAutScript *ctaut.EnhancedAutScrip
 	return nil
 }
 
-func checkCTAUTReRegistrationTransactionInputs(script *ctaut.EnhancedAutScript, tx *abeutil.TxAbe, txHeight int32,
+// todo: remove ctAutScript *ctautapi.ExtAutScript
+func checkCTAUTReRegistrationTransactionInputs(script *ctautapi.ExtAutScript, tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
 	if script.Type() != ctaut.AutScriptTypeReRegistration {
 		return fmt.Errorf("expected re-registration script, but got %d", script.Type())
@@ -2207,7 +2211,8 @@ func checkCTAUTReRegistrationTransactionInputs(script *ctaut.EnhancedAutScript, 
 	return nil
 }
 
-func checkCTAUTMintTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, tx *abeutil.TxAbe, txHeight int32,
+// todo: remove ctAutScript *ctautapi.ExtAutScript
+func checkCTAUTMintTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
 	if ctAutScript.Type() != ctaut.AutScriptTypeMint {
 		return fmt.Errorf("expected mint script, but got %d", ctAutScript.Type())
@@ -2288,10 +2293,7 @@ func checkCTAUTMintTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, tx *a
 		return fmt.Errorf("mismatch witness for script")
 	}
 
-	generatedTokens, err := ctAutScript.GeneratedTokens()
-	if err != nil {
-		return err
-	}
+	generatedTokens := ctAutScript.GeneratedTokens()
 	cbTx := &ctautwire.AutCoinbaseTx{
 		Version:   ctAutScript.Version(),
 		Vin:       mintScript.Vin(),
@@ -2318,7 +2320,8 @@ func checkCTAUTMintTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, tx *a
 	return nil
 }
 
-func checkCTAUTTransferTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, tx *abeutil.TxAbe, txHeight int32,
+// todo: remove ctAutScript *ctautapi.ExtAutScript
+func checkCTAUTTransferTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
 	if ctAutScript.Type() != ctaut.AutScriptTypeTransfer {
 		return fmt.Errorf("expected transfer script, but got %d", ctAutScript.Type())
@@ -2369,10 +2372,7 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, t
 		return fmt.Errorf("mismatch witness for script")
 	}
 
-	generatedTokens, err := ctAutScript.GeneratedTokens()
-	if err != nil {
-		return err
-	}
+	generatedTokens := ctAutScript.GeneratedTokens()
 	trTx := &ctautwire.AutTransferTx{
 		Version:   ctAutScript.Version(),
 		TxIns:     make([]*ctautwire.AutTxo, 0, len(consumedTokens)),
@@ -2409,7 +2409,8 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, t
 	return nil
 }
 
-func checkCTAUTBurnTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, tx *abeutil.TxAbe, txHeight int32,
+// todo: remove ctAutScript *ctautapi.ExtAutScript
+func checkCTAUTBurnTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
 	if ctAutScript.Type() != ctaut.AutScriptTypeBurn {
 		return fmt.Errorf("expected burn script, but got %d", ctAutScript.Type())
@@ -2461,10 +2462,7 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, tx *a
 		return fmt.Errorf("mismatch witness for script")
 	}
 
-	generatedTokens, err := ctAutScript.GeneratedTokens()
-	if err != nil {
-		return err
-	}
+	generatedTokens := ctAutScript.GeneratedTokens()
 	trTx := &ctautwire.AutTransferTx{
 		Version:   ctAutScript.Version(),
 		TxIns:     make([]*ctautwire.AutTxo, 0, len(consumedTokens)),
@@ -2501,7 +2499,9 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctaut.EnhancedAutScript, tx *a
 	return nil
 }
 
-func ValidateCTAUTScript(script *ctaut.EnhancedAutScript, tx *abeutil.TxAbe, txHeight int32,
+// todo: tx could be removed, or script *ctautapi.ExtAutScript, since abeutil.TxAbe carries ExtAutScript
+// todo: remove script *ctautapi.ExtAutScript
+func ValidateCTAUTScript(script *ctautapi.ExtAutScript, tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
 	if tx == nil {
 		return fmt.Errorf("ValidateCTAUTScript: a nil transaction")
@@ -2773,21 +2773,17 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 			return err
 		}
 
-		ctautTx, err := tx.CTAUTTScript()
+		extAutScript, err := tx.ExtAutScript()
 		if err != nil {
 			return err
 		}
-		if ctautTx != nil {
-			err = ctaut.PresetHostOutpointForCTAUT(ctautTx, tx.MsgTx(), func(ringHash chainhash.Hash) (*wire.TxOutAbe, error) {
+		if extAutScript != nil {
+			err = extAutScript.AssembleInputAutTokensStep1(func(ringHash chainhash.Hash) (*wire.TxoRing, error) {
 				ringEntry := view.LookupEntry(ringHash)
 				if ringEntry == nil {
 					return nil, errors.New("no such ring found")
 				}
-				txOuts := ringEntry.TxOuts()
-				if len(txOuts) == 0 {
-					return nil, errors.New("an empty ring found")
-				}
-				return txOuts[0], nil
+				return ringEntry.TxoRing(), nil
 			})
 			if err != nil {
 				return err
@@ -2795,7 +2791,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 
 			// 1. check the no repeat input
 			// 2. check witness
-			err = ValidateCTAUTScript(ctautTx, tx, node.height, ctautView, b.chainParams)
+			err = ValidateCTAUTScript(extAutScript, tx, node.height, ctautView, b.chainParams)
 			if err != nil {
 				return err
 			}

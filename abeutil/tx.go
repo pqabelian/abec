@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/abesuite/abec/aut"
-	"github.com/abesuite/abec/ctaut"
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
@@ -29,6 +29,7 @@ type Tx struct {
 	txIndex       int             // Position within a block or TxIndexUnknown
 }
 
+// todo: make a uniqe creator of TxAbe
 type TxAbe struct {
 	msgTx         *wire.MsgTxAbe  // Underlying MsgTx
 	txHash        *chainhash.Hash // Cached transaction content hash
@@ -43,9 +44,9 @@ type TxAbe struct {
 	autTx     aut.Transaction
 	errAUTTx  error
 
-	ctAutScriptDone bool
-	ctAutScript     *ctaut.EnhancedAutScript
-	errCTAUTScript  error
+	extAutScriptDone bool
+	extAutScript     *ctautapi.ExtAutScript // todo: confirm that ExtAutScript also carries msgTx
+	errExtAuTScript  error
 }
 
 // MsgTx returns the underlying wire.MsgTx for the transaction.
@@ -76,21 +77,22 @@ func (tx *TxAbe) AUTTransaction() (aut.Transaction, error) {
 	return tx.autTx, tx.errAUTTx
 }
 
-// CTAUTTScript would extract the AUT script from memo in transaction
-func (tx *TxAbe) CTAUTTScript() (*ctaut.EnhancedAutScript, error) {
+// ExtAutScript would extract the AUT script from memo in transaction
+// todo: should be called when NewTx() = abeutil.Tx, so that abeutil.Tx always carries ExtAutScript (if it has)
+func (tx *TxAbe) ExtAutScript() (*ctautapi.ExtAutScript, error) {
 	if tx.MsgTx().Version < wire.TxVersion_Height_464000_Aconcagua {
 		// The transactions with lower version do not support CTAUT
 		return nil, nil
 	}
 	// TODO(ctaut) return err?
-	if tx.ctAutScriptDone {
-		return tx.ctAutScript, tx.errCTAUTScript
+	if tx.extAutScriptDone {
+		return tx.extAutScript, tx.errExtAuTScript
 	}
-	tx.ctAutScriptDone = true
+	tx.extAutScriptDone = true
 
-	tx.ctAutScript, tx.errCTAUTScript = ctaut.ExtractAutScript(tx.MsgTx())
+	tx.extAutScript, tx.errExtAuTScript = ctautapi.DetectAndAssembleExtAutScriptFromHostTx(tx.MsgTx())
 
-	return tx.ctAutScript, tx.errCTAUTScript
+	return tx.extAutScript, tx.errExtAuTScript
 }
 
 func (tx *TxAbe) InvType() wire.InvType {
@@ -265,6 +267,7 @@ func NewTxFromReader(r io.Reader) (*Tx, error) {
 	return &t, nil
 }
 
+// todo: make a uniqe entrance for TxAbe
 func NewTxAbeFromReader(r io.Reader) (*TxAbe, error) {
 	// Deserialize the bytes into a MsgTx.
 	var msgTx wire.MsgTxAbe

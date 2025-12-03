@@ -8,6 +8,7 @@ import (
 
 	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/chainhash"
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 	"github.com/abesuite/abec/wire"
 )
 
@@ -51,9 +52,9 @@ type BlockAbe struct {
 
 	autTransactions  []aut.Transaction
 	autTxnsGenerated bool
-
-	ctAutScripts          []*AutScript
-	ctAutScriptsGenerated bool
+	
+	extAutScripts          []*ctautapi.ExtAutScript
+	extAutScriptsGenerated bool
 }
 
 // Abe to do
@@ -383,17 +384,17 @@ func (b *BlockAbe) AUTTransactions() []aut.Transaction {
 	b.autTxnsGenerated = true
 	return b.autTransactions
 }
-func (b *BlockAbe) CTAUTScripts() []*AutScript {
+func (b *BlockAbe) ExtAutScripts() []*ctautapi.ExtAutScript {
 	// Return transactions if they have ALL already been generated.  This
 	// flag is necessary because the wrapped transactions are lazily
 	// generated in a sparse fashion.
-	if b.ctAutScriptsGenerated {
-		return b.ctAutScripts
+	if b.extAutScriptsGenerated {
+		return b.extAutScripts
 	}
 
 	// Generate slice to hold all of the wrapped transactions if needed.
-	if len(b.ctAutScripts) == 0 {
-		b.ctAutScripts = make([]*AutScript, 0, len(b.msgBlock.Transactions))
+	if len(b.extAutScripts) == 0 {
+		b.extAutScripts = make([]*ctautapi.ExtAutScript, 0, len(b.msgBlock.Transactions))
 	}
 
 	// Generate and cache the wrapped autTransactions for all that haven't
@@ -409,7 +410,7 @@ func (b *BlockAbe) CTAUTScripts() []*AutScript {
 			continue
 		}
 
-		script, err := txAbe.CTAUTTScript()
+		script, err := txAbe.ExtAutScript()
 		if err != nil {
 			//	this should not happen
 			log.Warnf("AUTTransactions: error happens when getting AutTransaction from the %d-th transaction (%s) of the block: %v", i, txAbe.Hash(), err)
@@ -419,14 +420,11 @@ func (b *BlockAbe) CTAUTScripts() []*AutScript {
 			log.Debugf("AUTTransactions: skip non-AUT transaction %s", txAbe.Hash())
 			continue
 		}
-		b.ctAutScripts = append(b.ctAutScripts, &AutScript{
-			HostTx: txAbe.msgTx,
-			Script: script,
-		})
+		b.extAutScripts = append(b.extAutScripts, script)
 	}
 
-	b.ctAutScriptsGenerated = true
-	return b.ctAutScripts
+	b.extAutScriptsGenerated = true
+	return b.extAutScripts
 }
 
 // TxHash returns the hash for the requested transaction number in the Block.

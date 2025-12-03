@@ -220,6 +220,8 @@ const (
 	ErrCTAUTBadForm
 
 	ErrTxVersionForCTAUT
+
+	ErrMismatchedTxoVersionAndTxVersion
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
@@ -265,17 +267,18 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrMissingCoinbaseHeight: "ErrMissingCoinbaseHeight",
 	ErrBadCoinbaseHeight:     "ErrBadCoinbaseHeight",
 	//ErrScriptMalformed:           "ErrScriptMalformed",
-	ErrTxVersionNotSupported:     "ErrTxVersionNotSupported",
-	ErrScriptValidation:          "ErrScriptValidation",
-	ErrUnexpectedWitness:         "ErrUnexpectedWitness",
-	ErrInvalidWitnessCommitment:  "ErrInvalidWitnessCommitment",
-	ErrWitnessCommitmentMismatch: "ErrWitnessCommitmentMismatch",
-	ErrPreviousBlockUnknown:      "ErrPreviousBlockUnknown",
-	ErrInvalidAncestorBlock:      "ErrInvalidAncestorBlock",
-	ErrPrevBlockNotBest:          "ErrPrevBlockNotBest",
-	ErrWitnessMissing:            "ErrWitnessMissing",
-	ErrCTAUTBadForm:              "ErrCTAUTBadForm",
-	ErrTxVersionForCTAUT:         "ErrTxVersionForCTAUT",
+	ErrTxVersionNotSupported:            "ErrTxVersionNotSupported",
+	ErrScriptValidation:                 "ErrScriptValidation",
+	ErrUnexpectedWitness:                "ErrUnexpectedWitness",
+	ErrInvalidWitnessCommitment:         "ErrInvalidWitnessCommitment",
+	ErrWitnessCommitmentMismatch:        "ErrWitnessCommitmentMismatch",
+	ErrPreviousBlockUnknown:             "ErrPreviousBlockUnknown",
+	ErrInvalidAncestorBlock:             "ErrInvalidAncestorBlock",
+	ErrPrevBlockNotBest:                 "ErrPrevBlockNotBest",
+	ErrWitnessMissing:                   "ErrWitnessMissing",
+	ErrCTAUTBadForm:                     "ErrCTAUTBadForm",
+	ErrTxVersionForCTAUT:                "ErrTxVersionForCTAUT",
+	ErrMismatchedTxoVersionAndTxVersion: "ErrMismatchedTxoVersionAndTxVersion",
 }
 
 // String returns the ErrorCode as a human-readable name.
