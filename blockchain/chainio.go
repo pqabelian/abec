@@ -2409,7 +2409,10 @@ func dbPutBestState(dbTx database.Tx, snapshot *BestState, workSum *big.Int, wor
 // the genesis block, so it must only be called on an uninitialized database.
 func (b *BlockChain) createChainState() error {
 	// Create a new node from the genesis block and set it as the best node.
-	genesisBlock := abeutil.NewBlockAbe(b.chainParams.GenesisBlock)
+	genesisBlock, err := abeutil.NewBlockAbe(b.chainParams.GenesisBlock)
+	if err != nil {
+		return err
+	}
 	genesisBlock.SetHeight(0)
 	header := &genesisBlock.MsgBlock().Header
 	//	todo: (EthashPoW)

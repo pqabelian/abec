@@ -125,7 +125,11 @@ func gensis() {
 	}
 	fmt.Fprintln(f)
 	blockTxns := make([]*abeutil.TxAbe, 1)
-	coinbaseTx := abeutil.NewTxAbe(genesisCoinbaseTx)
+	coinbaseTx, err := abeutil.NewTxAbe(genesisCoinbaseTx, nil)
+	if err != nil {
+		panic(fmt.Errorf("error happens when calling abeutil.NewTxAbe on MsgTx (%v): %v", genesisCoinbaseTx.TxHash(), err))
+	}
+
 	blockTxns[0] = coinbaseTx
 	genesisMerkleRoot := blockchain.BuildMerkleTreeStoreAbe(blockTxns, false)
 

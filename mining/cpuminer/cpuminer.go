@@ -907,7 +907,12 @@ out:
 		}
 
 		if found {
-			block := abeutil.NewBlockAbe(template.BlockAbe)
+			block, err := abeutil.NewBlockAbe(template.BlockAbe)
+			if err != nil {
+				log.Errorf("error happens when calling NewBlockAbe on a found msgBlock (hash=%s): %v",
+					consensus.SealHashFast(&template.BlockAbe.Header), err)
+				continue
+			}
 			m.submitBlock(block)
 		}
 	}
@@ -1182,7 +1187,13 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 		}
 
 		if found {
-			block := abeutil.NewBlockAbe(template.BlockAbe)
+			block, err := abeutil.NewBlockAbe(template.BlockAbe)
+			if err != nil {
+				log.Errorf("error happens when calling NewBlockAbe on a found msgBlock (hash=%s): %v",
+					consensus.SealHashFast(&template.BlockAbe.Header), err)
+				continue
+			}
+
 			m.submitBlock(block)
 			blockHashes[i] = block.Hash()
 			i++

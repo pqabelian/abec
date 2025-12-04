@@ -1364,7 +1364,12 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 		msgBlockAbe.WitnessHashs = append(msgBlockAbe.WitnessHashs, witnessHash)
 	}
 
-	block := abeutil.NewBlockAbe(&msgBlockAbe)
+	block, err := abeutil.NewBlockAbe(&msgBlockAbe)
+	if err != nil {
+		log.Errorf("error happens when calling NewBlockAbe on a msgBlock (hash=%s): %v",
+			consensus.SealHashFast(&msgBlockAbe.Header), err)
+	}
+
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
 	_, isOrphan, err := sm.chain.ProcessBlockAbe(block, sm.powConsensus, behaviorFlags)

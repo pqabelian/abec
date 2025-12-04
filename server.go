@@ -474,7 +474,14 @@ func (sp *serverPeer) OnTx(_ *peer.Peer, msg *wire.MsgTxAbe) {
 	// Add the transaction to the known inventory for the peer.
 	// Convert the raw MsgTx to a abeutil.Tx which provides some convenience
 	// methods and things such as hash caching.
-	tx := abeutil.NewTxAbe(msg)
+	tx, err := abeutil.NewTxAbe(msg, nil)
+	if err != nil {
+		peerLog.Tracef("Ignoring msgBlock %v from %v: errors happen when calling abeutil.NewTxAbe: %v",
+			msg.TxHash(), sp, err)
+
+		return
+	}
+
 	iv := wire.NewInvVect(wire.InvTypeTx, tx.Hash())
 	sp.AddKnownInventory(iv)
 
@@ -493,7 +500,13 @@ func (sp *serverPeer) OnBlock(p *peer.Peer, msg *wire.MsgBlockAbe, buf []byte) {
 	// peerLog.Debugf("Receive block %s containing %v transactions from peer %s", msg.BlockHash().String(), len(msg.Transactions), p)
 	// Convert the raw MsgBlock to a abeutil.Block which provides some
 	// convenience methods and things such as hash caching.
-	block := abeutil.NewBlockFromBlockAndBytesAbe(msg, buf) // TODO(abe): the height of block is unknown
+	block, err := abeutil.NewBlockFromBlockAndBytesAbe(msg, buf) // TODO(abe): the height of block is unknown
+	if err != nil {
+		peerLog.Tracef("Ignoring msgBlock %v from %v: errors happen when calling abeutil.NewBlock: %v",
+			msg.BlockHash(), sp, err)
+
+		return
+	}
 
 	// Add the block to the known inventory for the peer.
 	inv := wire.InvTypeBlock

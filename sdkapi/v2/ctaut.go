@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	ctautapi "github.com/abesuite/abec/ctaut/api"
 	"sort"
 
 	"github.com/abesuite/abec/abecryptox"
@@ -722,10 +721,15 @@ func GetConsumedOutpoints(serializedTx []byte, rings map[string]*TxoRing) ([]*Ou
 	if err != nil {
 		return nil, err
 	}
-	extAutScript, err := ctautapi.DetectAndAssembleExtAutScriptFromHostTx(tx.MsgTx())
-	if err != nil {
-		return nil, err
-	}
+	
+	// Note that tx will carry ExtAutScript (if has)
+	extAutScript := tx.ExtAutScript()
+
+	//extAutScript, err := ctautapi.DetectAndAssembleExtAutScriptFromHostTx(tx.MsgTx())
+	//if err != nil {
+	//	return nil, err
+	//}
+
 	if extAutScript == nil {
 		return nil, nil
 	}

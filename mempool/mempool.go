@@ -1421,7 +1421,7 @@ func (mp *TxPool) FetchTransaction(txHash *chainhash.Hash) (*abeutil.TxAbe, erro
 		if err != nil {
 			return nil, fmt.Errorf("transaction is not in the pool")
 		}
-		return abeutil.NewTxAbe(msgTx), nil
+		return abeutil.NewTxAbe(msgTx, nil)
 	}
 
 	return nil, fmt.Errorf("transaction is not in the pool")

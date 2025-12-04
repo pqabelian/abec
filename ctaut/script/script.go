@@ -698,6 +698,8 @@ type AutScript interface {
 	// Deserialize deserializes []byte to AutScript.
 	Deserialize([]byte) error
 
+	WitnessHash() chainhash.Hash
+
 	// NumConsumedTokens returns the number of AutRootTokens/AutTokens that this AutScript consumes.
 	NumConsumedTokens() int
 
@@ -1211,6 +1213,10 @@ func (autScript *RegistrationScript) SanityCheck() error {
 	return nil
 }
 
+func (autScript *RegistrationScript) WitnessHash() chainhash.Hash {
+	return ZeroHash // nonsense
+}
+
 func (autScript *RegistrationScript) NumConsumedTokens() int {
 	return 0
 }
@@ -1627,6 +1633,10 @@ func (autScript *ReRegistrationScript) SanityCheck() error {
 	return nil
 }
 
+func (autScript *ReRegistrationScript) WitnessHash() chainhash.Hash {
+	return ZeroHash // non sense
+}
+
 func (autScript *ReRegistrationScript) NumConsumedTokens() int {
 	return int(autScript.inAutRootTokenNum)
 }
@@ -1705,10 +1715,6 @@ func (autScript *MintScript) OutPublicAutTokenNum() uint8 {
 
 func (autScript *MintScript) SerializedAutTxos() [][]byte {
 	return autScript.serializedAutTxos
-}
-
-func (autScript *MintScript) WitnessHash() chainhash.Hash {
-	return autScript.witnessHash
 }
 
 func (autScript *MintScript) ScriptMemo() []byte {
@@ -2002,6 +2008,10 @@ func (autScript *MintScript) SanityCheck() error {
 	return nil
 }
 
+func (autScript *MintScript) WitnessHash() chainhash.Hash {
+	return autScript.witnessHash
+}
+
 func (autScript *MintScript) NumConsumedTokens() int {
 	return int(autScript.inAutRootTokenNum)
 }
@@ -2063,10 +2073,6 @@ func (autScript *TransferScript) OutPublicAutTokenNum() uint8 {
 
 func (autScript *TransferScript) SerializedAutTxos() [][]byte {
 	return autScript.serializedAutTxos
-}
-
-func (autScript *TransferScript) WitnessHash() chainhash.Hash {
-	return autScript.witnessHash
 }
 
 func (autScript *TransferScript) ScriptMemo() []byte {
@@ -2369,6 +2375,10 @@ func (autScript *TransferScript) SanityCheck() error {
 	return nil
 }
 
+func (autScript *TransferScript) WitnessHash() chainhash.Hash {
+	return autScript.witnessHash
+}
+
 func (autScript *TransferScript) NumConsumedTokens() int {
 	return int(autScript.inHiddenAutTokenNum + autScript.inPublicAutTokenNum)
 }
@@ -2430,10 +2440,6 @@ func (autScript *BurnScript) OutPublicAutTokenNum() uint8 {
 
 func (autScript *BurnScript) SerializedAutTxos() [][]byte {
 	return autScript.serializedAutTxos
-}
-
-func (autScript *BurnScript) WitnessHash() chainhash.Hash {
-	return autScript.witnessHash
 }
 
 func (autScript *BurnScript) ScriptMemo() []byte {
@@ -2739,6 +2745,10 @@ func (autScript *BurnScript) SanityCheck() error {
 	}
 
 	return nil
+}
+
+func (autScript *BurnScript) WitnessHash() chainhash.Hash {
+	return autScript.witnessHash
 }
 
 func (autScript *BurnScript) NumConsumedTokens() int {

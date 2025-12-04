@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/abesuite/abec/blockchain/consensus"
 	"time"
 
 	"github.com/abesuite/abec/abecryptox"
@@ -516,10 +517,7 @@ func spendTransactionAbe(tx *abeutil.TxAbe, utxoRingView *blockchain.UtxoRingVie
 	return nil
 }
 func spendTransactionAUTScript(tx *abeutil.TxAbe, ctAutView *blockchain.CTAUTViewpoint, blockHeight int32) error {
-	ctautScript, err := tx.ExtAutScript()
-	if err != nil {
-		return err
-	}
+	ctautScript := tx.ExtAutScript()
 
 	// CTAUT
 	if ctautScript != nil {
@@ -723,7 +721,11 @@ func (g *BlkTmplGenerator) NewBlockTemplate(consensusApplied wire.ConsensusProto
 	// house all of the input transactions so multiple lookups can be
 	// avoided.
 	blockTxns := make([]*abeutil.TxAbe, 0, len(sourceTxns)+1)
-	coinbaseTx := abeutil.NewTxAbe(coinbaseTxMsg)
+	coinbaseTx, err := abeutil.NewTxAbe(coinbaseTxMsg, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error happens when calling abeutil.NewTxAbe on MsgTx (%v): %v", coinbaseTxMsg.TxHash(), err)
+	}
+
 	blockTxns = append(blockTxns, coinbaseTx)
 	blockUtxoRings := blockchain.NewUtxoRingViewpoint()
 	blockCTAUTView := blockchain.NewCTAUTViewpoint()
@@ -835,13 +837,7 @@ mempoolLoop:
 			}
 		}
 
-		extAutScript, err := tx.ExtAutScript()
-		if err != nil {
-			log.Debugf("Skipping tx %s because it "+
-				"contains an invalid CTAUT transaction: %v",
-				tx.Hash(), err)
-			continue
-		}
+		extAutScript := tx.ExtAutScript()
 		var ctAutView *blockchain.CTAUTViewpoint
 		if extAutScript != nil {
 			err = extAutScript.AssembleInputAutTokensStep1(func(ringHash chainhash.Hash) (*wire.TxoRing, error) {
@@ -1015,12 +1011,7 @@ mempoolLoop:
 			continue
 		}
 
-		extAutScript, err := tx.ExtAutScript()
-		if err != nil {
-			log.Debugf("Skipping tx %s due to error in "+
-				"CTAUTTScript: %v", tx.Hash(), err)
-			continue
-		}
+		extAutScript := tx.ExtAutScript()
 		if extAutScript != nil {
 			err = extAutScript.AssembleInputAutTokensStep1(func(ringHash chainhash.Hash) (*wire.TxoRing, error) {
 				ringEntry := blockUtxoRings.LookupEntry(ringHash)
@@ -1090,7 +1081,11 @@ mempoolLoop:
 	if err != nil {
 		return nil, err
 	}
-	coinbaseTx = abeutil.NewTxAbe(coinbaseTxMsg)
+	coinbaseTx, err = abeutil.NewTxAbe(coinbaseTxMsg, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error happens when calling abeutil.NewTxAbe on MsgTx (%v): %v", coinbaseTxMsg.TxHash(), err)
+	}
+
 	blockTxns[0] = coinbaseTx
 
 	//	todo(ABE): Does ABE need to store a commitment of the hash for the witnesses of transactions?
@@ -1139,7 +1134,12 @@ mempoolLoop:
 	// Finally, perform a full check on the created block against the chain
 	// consensus rules to ensure it properly connects to the current best
 	// chain with no issues.
-	block := abeutil.NewBlockAbe(&msgBlock)
+	block, err := abeutil.NewBlockAbe(&msgBlock)
+	if err != nil {
+		return nil, fmt.Errorf("error happens when calling NewBlockAbe on a msgBlock (hash=%s): %v",
+			consensus.SealHashFast(&msgBlock.Header), err)
+	}
+
 	block.SetHeight(nextBlockHeight)
 	if err := g.chain.CheckConnectBlockTemplateAbe(block); err != nil {
 		return nil, err
@@ -1282,7 +1282,11 @@ func (g *BlkTmplGenerator) UpdateExtraNonceAbe(msgBlock *wire.MsgBlockAbe, extra
 	binary.BigEndian.PutUint64(msgBlock.Transactions[0].TxIns[0].PreviousOutPointRing.BlockHashs[1][0:8], extraNonce)
 
 	// Recalculate the merkle root with the updated extra nonce.
-	block := abeutil.NewBlockAbe(msgBlock) //	This is important. By this new block, block.Transactions() will be re-generated.
+	block, err := abeutil.NewBlockAbe(msgBlock) //	This is important. By this new block, block.Transactions() will be re-generated.
+	if err != nil {
+		return fmt.Errorf("error happens when calling NewBlockAbe on a msgBlock (hash=%s): %v",
+			consensus.SealHashFast(&msgBlock.Header), err)
+	}
 	merkles := blockchain.BuildMerkleTreeStoreAbe(block.Transactions(), false)
 	msgBlock.Header.MerkleRoot = *merkles[len(merkles)-1]
 	return nil
@@ -1302,7 +1306,10 @@ func (g *BlkTmplGenerator) UpdateExtraNonceAbeEthash(blockTemplate *BlockTemplat
 	binary.BigEndian.PutUint64(blockTemplate.BlockAbe.Transactions[0].TxIns[0].PreviousOutPointRing.BlockHashs[1][0:8], extraNonce)
 
 	//	This new coinbaseTx will make the later coinbaseTx.Hash()[:] return the hash of the updated coinbaseTx.
-	coinbaseTx := abeutil.NewTxAbe(blockTemplate.BlockAbe.Transactions[0])
+	coinbaseTx, err := abeutil.NewTxAbe(blockTemplate.BlockAbe.Transactions[0], nil)
+	if err != nil {
+		return fmt.Errorf("error happens when calling abeutil.NewTxAbe on MsgTx (%v): %v", blockTemplate.BlockAbe.Transactions[0].TxHash(), err)
+	}
 
 	// Recalculate the merkle root with the updated extra nonce.
 	//	Consistent with the codes in BuildMerkleTreeStoreAbeEthash

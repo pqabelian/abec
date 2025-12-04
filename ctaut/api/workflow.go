@@ -3,7 +3,6 @@ package api
 import (
 	"bytes"
 	"fmt"
-	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/ctaut/extscript"
 	"github.com/abesuite/abec/ctaut/rules"
@@ -178,7 +177,18 @@ func unpackageAutScript(packagedAutScript []byte) (AutScript, error) {
 //
 // NOTE: only outputTokens of ExtAutScript are assembled.
 func DetectAndAssembleExtAutScriptFromHostTx(msgTx *wire.MsgTxAbe) (*ExtAutScript, error) {
+	if msgTx == nil {
+		return nil, fmt.Errorf("DetectAndAssembleExtAutScriptFromHostTx: msgTx is nil")
+	}
+
 	if msgTx.Version < wire.TxVersion_Height_464000_Aconcagua {
+		return nil, nil
+	}
+	isCoinbase, err := msgTx.IsCoinBase()
+	if err != nil {
+		return nil, fmt.Errorf("DetectAndAssembleExtAutScriptFromHostTx: error happens when calling msgTx.IsCoinBase() : %v", err)
+	}
+	if isCoinbase {
 		return nil, nil
 	}
 
@@ -200,100 +210,45 @@ func DetectAndAssembleExtAutScriptFromHostTx(msgTx *wire.MsgTxAbe) (*ExtAutScrip
 		return nil, err
 	}
 
+	// conduct some sanity-checks on autScript 		BEGIN
+	// 1. expectedTxVersion
+	// 2. autWitnessHash
+
 	// check the script version with the host-txo version
 	expectedTxVersion, err := rules.RuleGetTxVersionFromAutScriptVersion(autScript.Version())
+	if err != nil {
+		return nil, fmt.Errorf("DetectAndAssembleExtAutScriptFromHostTx: error happens when calling RuleGetTxVersionFromAutScriptVersion() : %v", err)
+	}
 	if expectedTxVersion != msgTx.Version {
 		return nil, fmt.Errorf("autScript.Version() (%d) corresponds to TxVersion (%d), does not match TxVersion %d",
 			autScript.Version(), expectedTxVersion, msgTx.Version)
 	}
 
-	// populate the generated tokens with host transaction outputs
-	extAutScript, err := extscript.NewExtAutScript(autScript, msgTx)
-	if err != nil {
-		return nil, err
-	}
-	outputTokens := extAutScript.GeneratedTokens()
-
+	autWitnessHashInScript := autScript.WitnessHash()
 	switch autScriptInst := autScript.(type) {
-	case *RegistrationScript:
-		// for inputs, there is no rules
+	case *RegistrationScript, *ReRegistrationScript:
+		break
 
-		// for outputs, the claimed issuer tokens must match the generated tokens exactly
-		// - all issuer tokens must appear
-		// - no unclaimed issuer token appear
-		if err = rules.RuleCheckOnIssuerHostClaim(autScriptInst.Issuers(), outputTokens); err != nil {
-			return nil, err
+	case *MintScript, *TransferScript, *BurnScript:
+		if msgTx.HasAutWitness() {
+			autWitnessHashComputed := ctautwire.AutWitnessHash(msgTx.AutWitness)
+			if autWitnessHashComputed.IsEqual(&autWitnessHashInScript) {
+				return nil, fmt.Errorf("autWitnessHash computed from msgTx.AutWitness (%s) does not match "+
+					"autScriptInst.AutWitnessHash (%s)", autWitnessHashComputed, autWitnessHashInScript)
+			}
 		}
+		break
 
-	case *ReRegistrationScript:
-		// for inputs, note that here is no enough information to
-		// 1. check the legality of token
-		// 2. check the re-register threshold is meet
-		// Above checks have to be delayed until the instance could be seen
-
-		// for outputs, the claimed issuer tokens must match the outputs exactly
-		if err = rules.RuleCheckOnIssuerHostClaim(autScriptInst.Issuers(), outputTokens); err != nil {
-			return nil, err
-		}
-
-	case *MintScript:
-		// for inputs, note that here is no enough information to
-		// 1. check the legality of token
-		// 2. check the mint threshold is meet
-		// 3. check the balance proof
-		// 4. check whether minted amount conflict with planned total amount
-		// Above checks have to be delayed until the instance could be seen
-
-		// here we do not check the witnessHash, since the msgTx may not carry the AutWitness.
-		//witnessHash := chainhash.HashH(tx.AutWitness)
-		//if !witnessHash.IsEqual(&script.witnessHash) {
-		//	return nil, fmt.Errorf("mismatch witness for script")
-		//}
-
-	case *TransferScript:
-		// for inputs, note that here is no enough information to
-		// 1. check the legality of token
-		// 2. check the balance proof
-		// Above checks have to be delayed until the instance could be seen
-
-		// here we do not check the witnessHash, since the msgTx may not carry the AutWitness.
-		//witnessHash := chainhash.HashH(tx.AutWitness)
-		//if !witnessHash.IsEqual(&script.witnessHash) {
-		//	return nil, fmt.Errorf("mismatch witness for script")
-		//}
-
-	case *BurnScript:
-		// for inputs, note that here is no enough information to
-		// 1. check the legality of token
-		// 2. check the balance proof
-		// Above checks have to be delayed until the instance could be seen
-
-		// for outputs, check the legality of burned token (a.k.a last generated token)
-		// In the DetectAndExtractAutScriptFromTxMemo(), SanityCheck has been conducted in Deserialize,
-		// in particular, the length of autScriptInst.SerializedAutTxos() is not less than 1.
-		serializedAutTxos := autScriptInst.SerializedAutTxos()
-
-		autTxo := &ctautwire.AutTxo{}
-		err = autTxo.Deserialize(serializedAutTxos[len(serializedAutTxos)-1])
-		if err != nil {
-			return nil, err
-		}
-		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
-		if err != nil {
-			return nil, fmt.Errorf("fail to get last aut txo type from burn script: %v", err)
-		}
-		// assert the last aut txo must be public
-		if autTxoType != abecryptox.AutTxoTypePublic {
-			return nil, fmt.Errorf("last aut txo type is not public")
-		}
-
-		// here we do not check the witnessHash, since the msgTx may not carry the AutWitness.
-		//witnessHash := chainhash.HashH(tx.AutWitness)
-		//if !witnessHash.IsEqual(&script.witnessHash) {
-		//	return nil, fmt.Errorf("mismatch witness for script")
-		//}
 	default:
 		return nil, fmt.Errorf("unknown autScript Type %d", autScriptInst.Type())
+	}
+
+	// conduct some sanity-checks on autScript 		END
+
+	// populate the generated tokens with host transaction outputs
+	extAutScript, err := extscript.NewExtAutScriptAndAssembleOutputTokens(autScript, msgTx)
+	if err != nil {
+		return nil, fmt.Errorf("DetectAndAssembleExtAutScriptFromHostTx: error happens when calling NewExtAutScriptAndAssembleOutputTokens() : %v", err)
 	}
 
 	return extAutScript, nil

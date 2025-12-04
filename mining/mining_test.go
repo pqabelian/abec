@@ -7,6 +7,7 @@ import (
 	"github.com/abesuite/abec/abecrypto"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
+	"github.com/abesuite/abec/blockchain/consensus"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 	"testing"
@@ -45,7 +46,10 @@ func TestBlkTmplGenerator_NewBlockTemplate_UpdateExtraNonceAbe(t *testing.T) {
 	subsidy := uint64(256)
 
 	blockTxns := make([]*abeutil.TxAbe, 0, 1)
-	coinbaseTx := abeutil.NewTxAbe(coinbaseTxMsg)
+	coinbaseTx, err := abeutil.NewTxAbe(coinbaseTxMsg, nil)
+	if err != nil {
+		fmt.Println(err)
+	}
 	blockTxns = append(blockTxns, coinbaseTx)
 
 	// Calculate the next expected block version based on the state of the
@@ -76,7 +80,11 @@ func TestBlkTmplGenerator_NewBlockTemplate_UpdateExtraNonceAbe(t *testing.T) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	coinbaseTx = abeutil.NewTxAbe(coinbaseTxMsg)
+	coinbaseTx, err = abeutil.NewTxAbe(coinbaseTxMsg, nil)
+	if err != nil {
+		fmt.Println(err)
+	}
+	
 	blockTxns[0] = coinbaseTx
 
 	ts := time.Now()
@@ -110,7 +118,11 @@ func TestBlkTmplGenerator_NewBlockTemplate_UpdateExtraNonceAbe(t *testing.T) {
 	// Finally, perform a full check on the created block against the chain
 	// consensus rules to ensure it properly connects to the current best
 	// chain with no issues.
-	block := abeutil.NewBlockAbe(&msgBlock)
+	block, err := abeutil.NewBlockAbe(&msgBlock)
+	if err != nil {
+		log.Errorf("error happens when calling NewBlockAbe on a msgBlock (hash=%s): %v",
+			consensus.SealHashFast(&msgBlock.Header), err)
+	}
 	block.SetHeight(nextBlockHeight)
 
 	log.Debugf("Created new block template (%d transactions, %d in "+

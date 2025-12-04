@@ -2199,7 +2199,14 @@ func (state *gbtWorkState) blockTemplateResult(miningAddr abeutil.AbelAddress, s
 		//	return nil, internalRPCError(err.Error(), context)
 		//}
 
-		bTx := abeutil.NewTxAbe(tx)
+		bTx, err := abeutil.NewTxAbe(tx, msgBlock.WitnessHashs[i])
+		if err != nil {
+			return nil, &abejson.RPCError{
+				Code: abejson.ErrRPCIntegerEncodeError,
+				Message: fmt.Sprintf("error happens when calling abeutil.NewTxAbe on MsgTx (%v): %v",
+					tx.TxHash(), err),
+			}
+		}
 		resultTx := abejson.GetBlockTemplateResultTxAbe{
 			// Data: hex.EncodeToString(txBuf.Bytes()),
 			TxHash:      txHash.String(),
@@ -2655,7 +2662,13 @@ func handleGetBlockTemplateProposal(s *rpcServer, request *abejson.TemplateReque
 			Message: "Block decode failed: " + err.Error(),
 		}
 	}
-	block := abeutil.NewBlockAbe(&msgBlock)
+	block, err := abeutil.NewBlockAbe(&msgBlock)
+	if err != nil {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCIntegerEncodeError,
+			Message: fmt.Sprintf("Block decode failed: error happens when calling NewBlockAbe on a msgBlock (hash=%s): %v ", consensus.SealHashFast(&msgBlock.Header), err.Error()),
+		}
+	}
 
 	// Ensure the block is building from the expected previous block.
 	expectedPrevHash := s.cfg.Chain.BestSnapshot().Hash
@@ -4236,7 +4249,15 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 	}
 
 	// Use 0 for the tag to represent local node.
-	tx := abeutil.NewTxAbe(&msgTx)
+	tx, err := abeutil.NewTxAbe(&msgTx, nil)
+	if err != nil {
+		return nil, &abejson.RPCError{
+			Code: abejson.ErrRPCIntegerEncodeError,
+			Message: fmt.Sprintf("error happens when calling abeutil.NewTxAbe on MsgTx (%v): %v",
+				msgTx.TxHash(), err),
+		}
+	}
+
 	acceptedTx, err := s.cfg.TxMemPool.ProcessTransactionAbe(tx, false, false, 0, false)
 	if err != nil {
 		// When the error is a rule error, it means the transaction was
@@ -4348,7 +4369,14 @@ func handleSendRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-chan
 	}
 
 	// Use 0 for the tag to represent local node.
-	tx := abeutil.NewTxAbe(&msgTx)
+	tx, err := abeutil.NewTxAbe(&msgTx, nil)
+	if err != nil {
+		return nil, &abejson.RPCError{
+			Code: abejson.ErrRPCIntegerEncodeError,
+			Message: fmt.Sprintf("error happens when calling abeutil.NewTxAbe on MsgTx (%v): %v",
+				msgTx.TxHash(), err),
+		}
+	}
 	acceptedTx, err := s.cfg.TxMemPool.ProcessTransactionAbe(tx, false, false, 0, false)
 	if err != nil {
 		// When the error is a rule error, it means the transaction was
@@ -4614,7 +4642,10 @@ func AddWitnessForSimplifiedBlock(simplifiedBlock *wire.MsgSimplifiedBlock, txPo
 		}
 	}
 
-	block := abeutil.NewBlockAbe(msgBlock)
+	block, err := abeutil.NewBlockAbe(msgBlock)
+	if err != nil {
+		return nil, err
+	}
 
 	return block, nil
 }

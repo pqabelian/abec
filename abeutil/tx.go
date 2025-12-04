@@ -2,6 +2,7 @@ package abeutil
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 
 	"github.com/abesuite/abec/aut"
@@ -44,9 +45,7 @@ type TxAbe struct {
 	autTx     aut.Transaction
 	errAUTTx  error
 
-	extAutScriptDone bool
-	extAutScript     *ctautapi.ExtAutScript // todo: confirm that ExtAutScript also carries msgTx
-	errExtAuTScript  error
+	extAutScript *ctautapi.ExtAutScript // todo: confirm that ExtAutScript also carries msgTx
 }
 
 // MsgTx returns the underlying wire.MsgTx for the transaction.
@@ -77,22 +76,11 @@ func (tx *TxAbe) AUTTransaction() (aut.Transaction, error) {
 	return tx.autTx, tx.errAUTTx
 }
 
-// ExtAutScript would extract the AUT script from memo in transaction
-// todo: should be called when NewTx() = abeutil.Tx, so that abeutil.Tx always carries ExtAutScript (if it has)
-func (tx *TxAbe) ExtAutScript() (*ctautapi.ExtAutScript, error) {
-	if tx.MsgTx().Version < wire.TxVersion_Height_464000_Aconcagua {
-		// The transactions with lower version do not support CTAUT
-		return nil, nil
-	}
-	// TODO(ctaut) return err?
-	if tx.extAutScriptDone {
-		return tx.extAutScript, tx.errExtAuTScript
-	}
-	tx.extAutScriptDone = true
-
-	tx.extAutScript, tx.errExtAuTScript = ctautapi.DetectAndAssembleExtAutScriptFromHostTx(tx.MsgTx())
-
-	return tx.extAutScript, tx.errExtAuTScript
+// ExtAutScript returns the ExtAutScript of the abeutil.Tx, which returns nil is it does not exist.
+//
+// NOTE: MUST keep NewTxAbe() as the unique way to make abeutil.Tx, where tx.extAutScript is initialized.
+func (tx *TxAbe) ExtAutScript() *ctautapi.ExtAutScript {
+	return tx.extAutScript
 }
 
 func (tx *TxAbe) InvType() wire.InvType {
@@ -231,11 +219,65 @@ func NewTx(msgTx *wire.MsgTx) *Tx {
 	}
 }
 
-func NewTxAbe(msgTx *wire.MsgTxAbe) *TxAbe {
-	return &TxAbe{
+func NewTxAbe(msgTx *wire.MsgTxAbe, txWitnessHashInBlock *chainhash.Hash) (*TxAbe, error) {
+	if msgTx == nil {
+		return nil, fmt.Errorf("NewTxAbe: the input msgTx is nil")
+	}
+
+	tx := &TxAbe{
 		msgTx:   msgTx,
 		txIndex: TxAbeIndexUnknown,
 	}
+
+	// tx.txHash
+	txHash := msgTx.TxHash()
+	tx.txHash = &txHash // why use pointer?
+
+	// tx.txWitnessHash
+	hasWitness := msgTx.HasTxWitness()
+	if !hasWitness && txWitnessHashInBlock == nil {
+		return nil, fmt.Errorf("NewTxAbe: the input MsgTxAbe does not have witness and the input txWitnessHashInBlock is empty/nil")
+	}
+
+	if txWitnessHashInBlock == nil {
+		// implying hasWitness == true
+		// case 1: txWitnessHashInBlock == nil AND hasWitness == true
+		tx.txWitnessHash = msgTx.TxWitnessHash()
+	} else {
+		if !hasWitness {
+			// case 2: txWitnessHashInBlock != nil AND hasWitness == false
+			// use the input txWitnessHash
+			tmpHash := &chainhash.Hash{}
+			copy(tmpHash[:], txWitnessHashInBlock[:])
+			tx.txWitnessHash = tmpHash
+		} else {
+			// case 3: txWitnessHashInBlock != nil AND hasWitness == true
+			// need to check consistence
+			tmpHash := msgTx.TxWitnessHash()
+			if !txWitnessHashInBlock.IsEqual(tmpHash) {
+				return nil, fmt.Errorf("NewTxAbe: the txWitnessHash of input MsgTxAbe is not equal to the input txWitnessHashInBlock")
+			}
+			tx.txWitnessHash = tmpHash
+		}
+	}
+
+	var err error
+
+	// tx.extAutScript
+	tx.extAutScript, err = ctautapi.DetectAndAssembleExtAutScriptFromHostTx(msgTx)
+	if err != nil {
+		return nil, err
+	}
+
+	// isCoinbase
+	// todo: Note that here just to make sure when tx.IsCoinBase() is called, no error is returned.
+	// todo: Note that at present, we still allow other places call the old tx.IsCoinBase(), where msgTx.IsCoinBase() is called.
+	_, err = msgTx.IsCoinBase()
+	if err != nil {
+		return nil, err
+	}
+
+	return tx, nil
 }
 
 // NewTxFromBytes returns a new instance of a bitcoin transaction given the
@@ -276,9 +318,11 @@ func NewTxAbeFromReader(r io.Reader) (*TxAbe, error) {
 		return nil, err
 	}
 
-	tx := TxAbe{
-		msgTx:   &msgTx,
-		txIndex: TxAbeIndexUnknown,
-	}
-	return &tx, nil
+	//tx := TxAbe{
+	//	msgTx:   &msgTx,
+	//	txIndex: TxAbeIndexUnknown,
+	//}
+	//return &tx, nil
+
+	return NewTxAbe(&msgTx, nil)
 }

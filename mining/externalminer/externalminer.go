@@ -344,7 +344,12 @@ out:
 				//	check the validity of (nonce, mixDigest) to prevent DOS attack
 				job.SharedBlockTemplate.BlockTemplate.BlockAbe.Header.NonceExt = submitWorkReq.Params.Nonce
 				job.SharedBlockTemplate.BlockTemplate.BlockAbe.Header.MixDigest = submitWorkReq.Params.MixDigest
-				block := abeutil.NewBlockAbe(job.SharedBlockTemplate.BlockTemplate.BlockAbe)
+				block, err := abeutil.NewBlockAbe(job.SharedBlockTemplate.BlockTemplate.BlockAbe)
+				if err != nil {
+					log.Errorf("error happens when calling NewBlockAbe on a found msgBlock (hash=%s): %v",
+						consensus.SealHashFast(&job.SharedBlockTemplate.BlockTemplate.BlockAbe.Header), err)
+					continue
+				}
 				if m.submitBlock(block) == false {
 					log.Infof("The (nonce, mixDigest) submitted to external miner is valid to the corresponding active job, but it is not accepted by the blockchain due to some reason.")
 				}

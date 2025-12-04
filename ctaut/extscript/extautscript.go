@@ -37,11 +37,11 @@ type ExtAutScript struct {
 	consumedTokens    []*auttoken.AutToken
 }
 
-// NewExtAutScript news an ExtAutScript,
+// NewExtAutScriptAndAssembleOutputTokens news an ExtAutScript,
 // where ExtAutScript is initialized using the input autScript and msgTx,
 // and GenerateTokens are assembled.
 // Note that the ConsumedTokens are still set here.
-func NewExtAutScript(autScript script.AutScript, msgTx *wire.MsgTxAbe) (*ExtAutScript, error) {
+func NewExtAutScriptAndAssembleOutputTokens(autScript script.AutScript, msgTx *wire.MsgTxAbe) (*ExtAutScript, error) {
 	extAutScript := &ExtAutScript{
 		AutScript: autScript,
 		msgTx:     msgTx,
@@ -118,14 +118,24 @@ func (extAutScript *ExtAutScript) assembleOutputAutTokens() error {
 		}
 	}
 
-	switch ctAUTScript := extAutScript.AutScript.(type) {
+	switch autScriptInst := extAutScript.AutScript.(type) {
 	case *script.RegistrationScript:
 		// no value script need to assign
+		if err := rules.RuleCheckOnIssuerHostClaim(autScriptInst.Issuers(), generatedTokens); err != nil {
+			return err
+		}
+		break
+
 	case *script.ReRegistrationScript:
 		// no value script need to assign
+		if err := rules.RuleCheckOnIssuerHostClaim(autScriptInst.Issuers(), generatedTokens); err != nil {
+			return err
+		}
+		break
+
 	case *script.MintScript:
 		for i := 0; i < numAutTokens; i++ {
-			serializedAutTxo := ctAUTScript.SerializedAutTxos()[i]
+			serializedAutTxo := autScriptInst.SerializedAutTxos()[i]
 			autTxo := &ctautwire.AutTxo{}
 			err := autTxo.Deserialize(serializedAutTxo)
 			if err != nil {
@@ -140,9 +150,11 @@ func (extAutScript *ExtAutScript) assembleOutputAutTokens() error {
 			// Implement Rule: set ValueScript to be serializedAutTxo
 			generatedTokens[i].ValueScript = serializedAutTxo
 		}
+		break
+
 	case *script.TransferScript:
 		for i := 0; i < numAutTokens; i++ {
-			serializedAutTxo := ctAUTScript.SerializedAutTxos()[i]
+			serializedAutTxo := autScriptInst.SerializedAutTxos()[i]
 			autTxo := &ctautwire.AutTxo{}
 			err := autTxo.Deserialize(serializedAutTxo)
 			if err != nil {
@@ -156,10 +168,11 @@ func (extAutScript *ExtAutScript) assembleOutputAutTokens() error {
 
 			generatedTokens[i].ValueScript = serializedAutTxo
 		}
+		break
 
 	case *script.BurnScript:
 		for i := 0; i < numAutTokens; i++ {
-			serializedAutTxo := ctAUTScript.SerializedAutTxos()[i]
+			serializedAutTxo := autScriptInst.SerializedAutTxos()[i]
 			autTxo := &ctautwire.AutTxo{}
 			err := autTxo.Deserialize(serializedAutTxo)
 			if err != nil {
@@ -171,8 +184,20 @@ func (extAutScript *ExtAutScript) assembleOutputAutTokens() error {
 				return err
 			}
 
+			if i == numAutTokens-1 {
+				autTxoType, err := abecryptox.GetAutTxoType(autTxo)
+				if err != nil {
+					return fmt.Errorf("fail to get last aut txo type from burn script: %v", err)
+				}
+				// assert the last aut txo must be public
+				if autTxoType != abecryptox.AutTxoTypePublic {
+					return fmt.Errorf("last aut txo type is not public")
+				}
+			}
+
 			generatedTokens[i].ValueScript = serializedAutTxo
 		}
+		break
 
 	default:
 		return fmt.Errorf("unexpected aut script type %d", extAutScript.Type())
