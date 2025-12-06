@@ -3,13 +3,14 @@ package api
 import (
 	"bytes"
 	"fmt"
+	"math"
+
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/ctaut/extscript"
 	"github.com/abesuite/abec/ctaut/rules"
 	"github.com/abesuite/abec/ctaut/script"
 	ctautwire "github.com/abesuite/abec/ctaut/wire"
 	"github.com/abesuite/abec/wire"
-	"math"
 )
 
 // Create:
@@ -232,7 +233,7 @@ func DetectAndAssembleExtAutScriptFromHostTx(msgTx *wire.MsgTxAbe) (*ExtAutScrip
 	case *MintScript, *TransferScript, *BurnScript:
 		if msgTx.HasAutWitness() {
 			autWitnessHashComputed := ctautwire.AutWitnessHash(msgTx.AutWitness)
-			if autWitnessHashComputed.IsEqual(&autWitnessHashInScript) {
+			if !autWitnessHashComputed.IsEqual(&autWitnessHashInScript) {
 				return nil, fmt.Errorf("autWitnessHash computed from msgTx.AutWitness (%s) does not match "+
 					"autScriptInst.AutWitnessHash (%s)", autWitnessHashComputed, autWitnessHashInScript)
 			}

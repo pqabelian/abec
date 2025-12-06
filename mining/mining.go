@@ -5,7 +5,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+
 	"github.com/abesuite/abec/blockchain/consensus"
+	"github.com/abesuite/abec/ctaut"
+	ctautapi "github.com/abesuite/abec/ctaut/api"
+
 	"time"
 
 	"github.com/abesuite/abec/abecryptox"
@@ -837,33 +841,60 @@ mempoolLoop:
 			}
 		}
 
-		extAutScript := tx.ExtAutScript()
-		var ctAutView *blockchain.CTAUTViewpoint
-		if extAutScript != nil {
-			err = extAutScript.AssembleInputAutTokensStep1(func(ringHash chainhash.Hash) (*wire.TxoRing, error) {
+		ctAutView := blockchain.NewCTAUTViewpoint()
+		err = blockchain.ValidateTxCTAUTScript(
+			tx,
+			ctAutView,
+			nextBlockHeight,
+			func(ringHash chainhash.Hash) (*wire.TxoRing, error) {
 				ringEntry := utxoRings.LookupEntry(ringHash)
 				if ringEntry == nil {
 					return nil, errors.New("no such ring found")
 				}
 				return ringEntry.TxoRing(), nil
-			})
-			if err != nil {
-				return nil, err
-			}
+			},
+			func(identifier ctaut.AutId) (*ctautapi.AutMetadata, error) {
+				metadata := ctAutView.LookupCTAUTMetaInfo(identifier)
+				if metadata != nil {
+					return metadata, nil
+				}
 
-			ctAutView, err = g.chain.FetchCTAUTView(extAutScript)
-			if err != nil {
-				log.Warnf("Unable to fetch ctaut view for tx %s: %v", tx.Hash(), err)
-				continue
-			}
+				autMetadata, err := g.chain.FetchCTAUTMetadata(identifier)
+				if err != nil {
+					return nil, err
+				}
 
-			err = blockchain.ValidateCTAUTScript(extAutScript, tx, nextBlockHeight, ctAutView, g.chainParams)
-			if err != nil {
-				log.Debugf("Skipping tx %s because it "+
-					"contains an invalid CTAUT transaction: %v",
-					tx.Hash(), err)
-				continue
-			}
+				if autMetadata != nil {
+					err = ctAutView.AddMetadata(autMetadata)
+					if err != nil {
+						return nil, err
+					}
+				}
+
+				return autMetadata, nil
+			},
+			func(identifier ctaut.AutId, outpoint *ctaut.HostOutPoint) (*blockchain.CTAUTCoin, error) {
+				coin := ctAutView.LookupCTAUTCoin(identifier, *outpoint)
+				if coin != nil {
+					return coin, nil
+				}
+				coin, err := g.chain.FetchCTAUTToken(identifier, *outpoint)
+				if err != nil {
+					return nil, err
+				}
+				err = ctAutView.AddToken(*outpoint, coin)
+				if err != nil {
+					return nil, err
+				}
+				return coin, nil
+			},
+			g.chainParams,
+		)
+		if err != nil {
+			log.Debugf("Skipping tx %s because it "+
+				"contains an invalid CTAUT transaction: %v",
+				tx.Hash(), err)
+			continue
 		}
 
 		prioItem := &txPrioItemAbe{tx: tx}
@@ -1011,27 +1042,37 @@ mempoolLoop:
 			continue
 		}
 
-		extAutScript := tx.ExtAutScript()
-		if extAutScript != nil {
-			err = extAutScript.AssembleInputAutTokensStep1(func(ringHash chainhash.Hash) (*wire.TxoRing, error) {
+		// TODO confirm blockCTAUTView is used correctly?
+		err = blockchain.ValidateTxCTAUTScript(tx, blockCTAUTView, nextBlockHeight,
+			func(ringHash chainhash.Hash) (*wire.TxoRing, error) {
 				ringEntry := blockUtxoRings.LookupEntry(ringHash)
 				if ringEntry == nil {
 					return nil, errors.New("no such ring found")
 				}
 				return ringEntry.TxoRing(), nil
-			})
-			if err != nil {
-				return nil, err
-			}
-
-			err = blockchain.ValidateCTAUTScript(extAutScript, tx, nextBlockHeight, blockCTAUTView, g.chainParams)
-			if err != nil {
-				log.Debugf("Skipping tx %s due to error in "+
-					"CheckTransactionInputsAUT: %v", tx.Hash(), err)
-				continue
-			}
+			},
+			func(identifier ctaut.AutId) (*ctautapi.AutMetadata, error) {
+				// Note that all metadata should be fetched from database when assembling blockCTAUTView
+				metadata := blockCTAUTView.LookupCTAUTMetaInfo(identifier)
+				return metadata, nil
+			},
+			func(identifier ctaut.AutId, outpoint *ctaut.HostOutPoint) (*blockchain.CTAUTCoin, error) {
+				// Note that all tokens should be fetched from database when assembling blockCTAUTView
+				coin := blockCTAUTView.LookupCTAUTCoin(identifier, *outpoint)
+				if coin == nil {
+					return nil, fmt.Errorf("no such CTAUT coin found")
+				}
+				return coin, nil
+			},
+			g.chainParams,
+		)
+		if err != nil {
+			log.Debugf("Skipping tx %s due to error in "+
+				"CheckTransactionInputsAUT: %v", tx.Hash(), err)
+			continue
 		}
 
+		// TODO why not consistent with
 		// Spend the transaction inputs in the block utxoRing view and add
 		// an entry for it to ensure any transactions which reference
 		// this one have it available as an input and can ensure they

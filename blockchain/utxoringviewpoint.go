@@ -794,7 +794,7 @@ func (entry *UtxoRingEntry) TxoRing() *wire.TxoRing {
 	txoRing.OutPointRing = entry.outPointRing
 	txoRing.TxOuts = entry.txOuts
 	txoRing.IsCoinbase = entry.IsCoinBase()
-	
+
 	return txoRing
 }
 
@@ -1086,6 +1086,7 @@ func (b *BlockChain) FetchUtxoRingView(tx *abeutil.TxAbe) (*UtxoRingViewpoint, e
 // Abe to do: In ABE, the connectTransaction algorithm only 'spend' TxoRings, does not generate new TxoRing.
 // Only the blocks with height%3 ==0 will trigger the generation of new TxoRings.
 // todo_DONE(MLP): reviewed on 2024.01.04
+// TODO change function name, such as connectTransactionInputs
 func (view *UtxoRingViewpoint) connectTransaction(tx *abeutil.TxAbe, blockhash *chainhash.Hash, stxos *[]*SpentTxOutAbe) error {
 	// Coinbase transactions don't have any inputs to spend.
 	isCb, err := tx.IsCoinBase()

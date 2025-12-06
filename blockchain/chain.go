@@ -943,6 +943,7 @@ func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 			return err
 		}
 
+		// TODO check spendjournal logic
 		err = dbPutSpendJournalEntryCTAUT(dbTx, block.Hash(), sctauts)
 		if err != nil {
 			return err
@@ -1328,6 +1329,8 @@ func countSpentOutputsAUT(block *abeutil.BlockAbe) int {
 	return num
 }
 func countSpentOutputsCTAUT(block *abeutil.BlockAbe) int {
+	// TODO replace with block.ExtAutScripts()
+
 	// Exclude the transfer transaction which is not an AUT transaction
 	var num = 0
 	for _, tx := range block.Transactions()[1:] {
@@ -1427,7 +1430,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 
 	ctautView := NewCTAUTViewpoint()
 	ctautView.SetBestHash(&oldBest.hash)
-	var ctautInstanceToDel map[string]struct{}
+	var ctautInstanceToDelForBlocks map[string]struct{}
 
 	for e := detachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
@@ -1485,11 +1488,18 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			return err
 		}
 
-		ctautInstanceToDel, err = ctautView.disconnectCTAUTScripts(b.db, block, sctauts, view)
+		ctautInstanceToDelForBlock, err := ctautView.disconnectCTAUTScripts(b.db, block, sctauts, view)
 		if err != nil {
 			return err
 		}
+		for autIdentifierKey := range ctautInstanceToDelForBlock {
+			// assert
+			if _, ok := ctautInstanceToDelForBlocks[autIdentifierKey]; ok {
+				return fmt.Errorf("duplicate CTAUT instance to delete %s", autIdentifierKey)
+			}
 
+			ctautInstanceToDelForBlocks[autIdentifierKey] = struct{}{}
+		}
 		//	Abe to do new UtxoRings if n.height % 2 == 0
 		//	These utxoRings should will be deleted from database
 		//	TODO: when BlockNumPerRingGroup or TxoRingSize change, it may cause fork.
@@ -1542,13 +1552,13 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		}
 	}
 
-	for ctautIdentifierKey := range ctautInstanceToDel {
-		entry := ctautView.instances[ctautIdentifierKey]
-		if entry != nil {
-			delete(ctautView.instances, ctautIdentifierKey)
-		} else {
-			// ?
+	for ctautIdentifierKey := range ctautInstanceToDelForBlocks {
+		entry, ok := ctautView.instances[ctautIdentifierKey]
+		if !ok || entry == nil {
+			return fmt.Errorf("no such CTAUT instance found, this should not happen")
 		}
+
+		delete(ctautView.instances, ctautIdentifierKey)
 	}
 
 	// Set the fork point only if there are nodes to attach since otherwise
@@ -1737,17 +1747,16 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		}
 
 		for autIdentifierKey := range unregisteredInstances {
-			entry := ctautView.instances[autIdentifierKey]
-			if entry != nil {
-				delete(ctautView.instances, autIdentifierKey)
-			} else {
-				// ?
+			entry, ok := ctautView.instances[autIdentifierKey]
+			if !ok || entry == nil {
+				return AssertError(fmt.Sprintf("detaching CTAUT instance %s fail: the instance does not exist", autIdentifierKey))
 			}
-		}
 
+			delete(ctautView.instances, autIdentifierKey)
+		}
 		// Update the database and chain state.
 		// todo_DONE(MLP): reviewed on 2024.01.05
-		err = b.disconnectBlockAbe(n, block, view, viewToDel, ctautView, ctautInstanceToDel)
+		err = b.disconnectBlockAbe(n, block, view, viewToDel, ctautView, unregisteredInstances)
 		if err != nil {
 			return err
 		}

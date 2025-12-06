@@ -3,6 +3,7 @@ package extscript
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/chainhash"
@@ -13,13 +14,13 @@ import (
 	"github.com/abesuite/abec/wire"
 )
 
-type ExtAutScriptInputAssembleStatus uint8
-
-const (
-	ExtAutScriptInputAssembleStatus_Init  ExtAutScriptInputAssembleStatus = 0
-	ExtAutScriptInputAssembleStatus_Step1 ExtAutScriptInputAssembleStatus = 1
-	ExtAutScriptInputAssembleStatus_Step2 ExtAutScriptInputAssembleStatus = 2
-)
+//type ExtAutScriptInputAssembleStatus uint8
+//
+//const (
+//	ExtAutScriptInputAssembleStatus_Init  ExtAutScriptInputAssembleStatus = 0
+//	ExtAutScriptInputAssembleStatus_Step1 ExtAutScriptInputAssembleStatus = 1
+//	ExtAutScriptInputAssembleStatus_Step2 ExtAutScriptInputAssembleStatus = 2
+//)
 
 // ExtAutScript is used to collect the input Tokens and generate output Tokens by the AutScript,
 // based on the information of host-Tx and AutScript.
@@ -33,8 +34,17 @@ type ExtAutScript struct {
 	// Note that for following 2 fields:
 	// - if the value is nil, it means that the tokens is not set
 	// - if the value is empty slice, it means that the tokens is set but has no token
-	inputHandleStatus ExtAutScriptInputAssembleStatus //	indicate whether consumedTokens has been handled
-	consumedTokens    []*auttoken.AutToken
+	//inputHandleStatus ExtAutScriptInputAssembleStatus //	indicate whether consumedTokens has been handled
+	handledConsumedTokens bool
+	consumedTokens        []*auttoken.AutToken
+}
+
+func (extAutScript *ExtAutScript) AutIdentifier() script.AutId {
+	if extAutScript.AutScript.Type() == script.AutScriptTypeRegistration {
+		return extAutScript.msgTx.TxHash()
+	}
+
+	return extAutScript.AutScript.AutIdentifier()
 }
 
 // NewExtAutScriptAndAssembleOutputTokens news an ExtAutScript,
@@ -47,8 +57,9 @@ func NewExtAutScriptAndAssembleOutputTokens(autScript script.AutScript, msgTx *w
 		msgTx:     msgTx,
 	}
 
+	extAutScript.handledConsumedTokens = false
 	extAutScript.consumedTokens = nil
-	extAutScript.inputHandleStatus = ExtAutScriptInputAssembleStatus_Init
+	//extAutScript.inputHandleStatus = ExtAutScriptInputAssembleStatus_Init
 
 	err := extAutScript.assembleOutputAutTokens()
 	if err != nil {
@@ -217,15 +228,18 @@ func (extAutScript *ExtAutScript) assembleOutputAutTokens() error {
 // (b) PrivacyLevelPSEUDONYMCT
 // (c) PrivacyLevelPSEUDONYM
 // and the AutTokens hosts on the first "consumedTokenNum" PrivacyLevelPSEUDONYMCT TxIns.
-func (extAutScript *ExtAutScript) AssembleInputAutTokensStep1(lookupHostOutputTxoRing func(ringHash chainhash.Hash) (*wire.TxoRing, error)) error {
+func (extAutScript *ExtAutScript) AssembleInputAutTokensStep1(
+	lookupHostOutputTxoRing func(ringHash chainhash.Hash) (*wire.TxoRing, error),
+	lookupCTAUTToken func(identifier script.AutId, outpoint *script.HostOutPoint) (uint32, []byte, error),
+) error {
 
-	if extAutScript.Type() == script.AutScriptTypeRegistration {
+	//if extAutScript.Type() == script.AutScriptTypeRegistration {
 
-		extAutScript.inputHandleStatus = ExtAutScriptInputAssembleStatus_Step1 // nonsense
-		extAutScript.consumedTokens = nil
-
-		return nil
-	}
+	//extAutScript.inputHandleStatus = ExtAutScriptInputAssembleStatus_Step1 // nonsense
+	//extAutScript.consumedTokens = nil
+	//
+	//return nil
+	//}
 
 	// getTxoRingForHost lookups the txoRing for ringHash, and perform sanity-checks to guarantee that
 	// the size of resulting txoRing is not 0.
@@ -243,7 +257,7 @@ func (extAutScript *ExtAutScript) AssembleInputAutTokensStep1(lookupHostOutputTx
 		}
 
 		ringId := txoRing.OutPointRing.RingId()
-		if ringId.IsEqual(&ringHash) {
+		if !ringId.IsEqual(&ringHash) {
 			return nil, fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has ringId (%s)", ringHash.String(), ringId.String())
 		}
 
@@ -300,6 +314,8 @@ func (extAutScript *ExtAutScript) AssembleInputAutTokensStep1(lookupHostOutputTx
 			numInCoins, len(hostedTxIns)-startIndex)
 	}
 
+	scriptVersion := extAutScript.Version()
+	identifier := extAutScript.AutIdentifier()
 	consumedTokens := make([]*auttoken.AutToken, numInCoins)
 	for i := 0; i < len(consumedTokens); i++ {
 		hostTxInIndex := startIndex + i
@@ -336,16 +352,37 @@ func (extAutScript *ExtAutScript) AssembleInputAutTokensStep1(lookupHostOutputTx
 				hostTxIn.PreviousOutPointRing.Hash())
 		}
 
+		tokenVersion := uint32(0)
+		var valueScript []byte
+		switch extAutScript.Type() {
+		case script.AutScriptTypeRegistration:
+			return fmt.Errorf("registration script should not consume any token")
+		case script.AutScriptTypeReRegistration, script.AutScriptTypeMint:
+			// no version and value script is need by script with those type
+			// they would consume the root token
+		case script.AutScriptTypeTransfer, script.AutScriptTypeBurn:
+			// they would consume the token
+			tokenVersion, valueScript, err = lookupCTAUTToken(identifier, hostOutPoint)
+			err = abecryptox.AutRuleCheckOnTxInputVersion(tokenVersion, scriptVersion)
+			if err != nil {
+				return fmt.Errorf("script with version %d failed to consume the token with version %d",
+					scriptVersion, tokenVersion)
+			}
+		default:
+			return fmt.Errorf("unsupported aut script type %d", extAutScript.Type())
+		}
+
 		consumedTokens[i] = &auttoken.AutToken{
-			Version:      ctautwire.AutScriptVersion_Unknown, // not known at this moment
-			HostOutPoint: *hostOutPoint,                      // will be populated later with CTAUTViewpoint
-			CoinAddress:  coinAddress,                        // required by root coin while optional for coin
-			ValueScript:  nil,                                // will be populated later with CTAUTViewpoint
+			Version:      tokenVersion,
+			HostOutPoint: *hostOutPoint,
+			CoinAddress:  coinAddress,
+			ValueScript:  valueScript,
 		}
 	}
 
-	extAutScript.inputHandleStatus = ExtAutScriptInputAssembleStatus_Step1
+	//extAutScript.inputHandleStatus = ExtAutScriptInputAssembleStatus_Step1
 
+	extAutScript.handledConsumedTokens = true
 	extAutScript.consumedTokens = consumedTokens
 
 	return nil
@@ -363,17 +400,20 @@ func (extAutScript *ExtAutScript) SetConsumedTokens(consumedTokens []*auttoken.A
 	}
 
 	extAutScript.consumedTokens = consumedTokens
-	extAutScript.inputHandleStatus = ExtAutScriptInputAssembleStatus_Step2
+	extAutScript.handledConsumedTokens = true
 
 	return nil
 }
 
 // todo:
 func (extAutScript *ExtAutScript) ConsumedTokens() ([]*auttoken.AutToken, error) {
-	if extAutScript.inputHandleStatus != ExtAutScriptInputAssembleStatus_Step2 {
+	//if extAutScript.inputHandleStatus != ExtAutScriptInputAssembleStatus_Step2 {
+	//	return nil, fmt.Errorf("consumed tokens not set")
+	//}
+
+	if !extAutScript.handledConsumedTokens {
 		return nil, fmt.Errorf("consumed tokens not set")
 	}
-
 	return extAutScript.consumedTokens, nil
 }
 
@@ -426,29 +466,32 @@ func (extAutScript *ExtAutScript) CreateAutMetadata() (*script.AutMetadata, erro
 
 // UpdateAutMetadata updates an AutMetadata using the ReRegistrationScript.
 // todo: use var rather than pointer, and return a new AutMetadata?
-func (extAutScript *ExtAutScript) UpdateAutMetadata(autMetadata *script.AutMetadata) error {
+func (extAutScript *ExtAutScript) UpdateAutMetadata(autMetadata *script.AutMetadata) (*script.AutMetadata, error) {
 	// assert
 	if extAutScript.Type() != script.AutScriptTypeReRegistration {
-		return fmt.Errorf("wrong call on UpdateAutMetadata: should be called only by re-registration script")
+		return nil, fmt.Errorf("wrong call on UpdateAutMetadata: should be called only by re-registration script")
 	}
 
 	reregisterScript, ok := extAutScript.AutScript.(*script.ReRegistrationScript)
 	if !ok {
-		return fmt.Errorf("wrong call on UpdateAutMetadata: should be called only by re-registration script")
+		return nil, fmt.Errorf("wrong call on UpdateAutMetadata: should be called only by re-registration script")
 	}
 
 	if err := reregisterScript.SanityCheck(); err != nil {
-		return fmt.Errorf("reregisterScript sanity check failed: %v", err)
+		return nil, fmt.Errorf("reregisterScript sanity check failed: %v", err)
 	}
 
 	identifier := extAutScript.AutIdentifier()
 	if !bytes.Equal(identifier[:], autMetadata.AutIdentifier[:]) {
-		return fmt.Errorf("the AutIdentifier of the re-registration script (%s) and that of the autMetadata (%s) "+
+		return nil, fmt.Errorf("the AutIdentifier of the re-registration script (%s) and that of the autMetadata (%s) "+
 			"does not match", identifier.String(), autMetadata.AutIdentifier.String())
 	}
 
-	if extAutScript.inputHandleStatus != ExtAutScriptInputAssembleStatus_Step2 {
-		return fmt.Errorf("the re-registration script did not finish the assembly of the input token ")
+	//if extAutScript.inputHandleStatus != ExtAutScriptInputAssembleStatus_Step2 {
+	//	return fmt.Errorf("the re-registration script did not finish the assembly of the input token ")
+	//}
+	if !extAutScript.handledConsumedTokens {
+		return nil, fmt.Errorf("the re-registration script did not finish the assembly of the input token ")
 	}
 
 	updatedAutMetadata := autMetadata.Clone()
@@ -457,7 +500,7 @@ func (extAutScript *ExtAutScript) UpdateAutMetadata(autMetadata *script.AutMetad
 	for i := 0; i < len(consumedTokens); i++ {
 		opStr := consumedTokens[i].HostOutPoint.String()
 		if _, ok := updatedAutMetadata.ActiveRootTokenSet[opStr]; !ok {
-			return fmt.Errorf("an re-registration script attempts to update AutMetadata "+
+			return nil, fmt.Errorf("an re-registration script attempts to update AutMetadata "+
 				"with non-existing/spent root token (%s,%d) for AutInstance identified by %s",
 				consumedTokens[i].HostOutPoint.TxHash, consumedTokens[i].HostOutPoint.Index,
 				updatedAutMetadata.AutIdentifier)
@@ -471,7 +514,7 @@ func (extAutScript *ExtAutScript) UpdateAutMetadata(autMetadata *script.AutMetad
 	updatedAutMetadata.AutMemo = reregisterScript.AutMemo()
 
 	if reregisterScript.PlannedTotalSupply() < updatedAutMetadata.MintedAmount {
-		return fmt.Errorf("re-registration script attempts to make planned supply (%d) less than minted amount (%d)",
+		return nil, fmt.Errorf("re-registration script attempts to make planned supply (%d) less than minted amount (%d)",
 			reregisterScript.PlannedTotalSupply(), updatedAutMetadata.MintedAmount)
 	}
 	updatedAutMetadata.PlannedTotalSupply = reregisterScript.PlannedTotalSupply()
@@ -498,11 +541,11 @@ func (extAutScript *ExtAutScript) UpdateAutMetadata(autMetadata *script.AutMetad
 	// check
 	updateScriptVersionMax := updatedAutMetadata.UpdateScriptVersions[len(autMetadata.UpdateScriptVersions)-1]
 	if reregisterScript.Version() < updateScriptVersionMax {
-		return fmt.Errorf("the version of re-register script %d should be not smaller than the largest version (%d) in UpdateScriptVersions",
+		return nil, fmt.Errorf("the version of re-register script %d should be not smaller than the largest version (%d) in UpdateScriptVersions",
 			reregisterScript.Version(), updateScriptVersionMax,
 		)
 	}
 	updatedAutMetadata.UpdateScriptVersions = append(updatedAutMetadata.UpdateScriptVersions, reregisterScript.Version())
 
-	return nil
+	return updatedAutMetadata, nil
 }

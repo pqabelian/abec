@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
-	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/ctaut/extscript/auttoken"
 	"github.com/abesuite/abec/ctaut/script"
 	ctautwire "github.com/abesuite/abec/ctaut/wire"

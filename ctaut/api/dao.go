@@ -12,6 +12,11 @@ const commonPrefix = "AUTSCRIPT"
 
 type HostOutPoint = script.HostOutPoint
 type AutIssuer = script.AutIssuer
+
+func NewAutIssuer(coinAddress []byte) *AutIssuer {
+	return script.NewAutIssuer(coinAddress)
+}
+
 type AutId = script.AutId
 
 type AutScript = script.AutScript

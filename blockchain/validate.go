@@ -10,19 +10,18 @@ import (
 	"math/big"
 	"time"
 
-	ctautapi "github.com/abesuite/abec/ctaut/api"
-
-	"github.com/abesuite/abec/blockchain/consensus"
-	"github.com/abesuite/abec/blockchain/ruleerror"
-
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/aut"
+	"github.com/abesuite/abec/blockchain/consensus"
+	"github.com/abesuite/abec/blockchain/ruleerror"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/ctaut"
+	ctautapi "github.com/abesuite/abec/ctaut/api"
+	"github.com/abesuite/abec/ctaut/script"
 	ctautwire "github.com/abesuite/abec/ctaut/wire"
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
@@ -407,14 +406,16 @@ func CheckTransactionSanity(tx *abeutil.Tx) error {
 //  1. There is at least one input and one output
 //  2. The number of input and output should not exceed the maximum
 //  3. Fee should not smaller than zero and bigger than MaxNeutrino
-//  4. The size (without witness) should not exceed MaxBlockBaseSize
-//  5. If is coinbase tx
-//  1. Input's block number and ring size should obey the ring version
-//     If is transfer tx
-//  1. Each input's serial number should not be zero
-//  2. Each input's ring version should be the same
-//  3. Each input's block number and ring size should obey the ring version
-//  4. No duplicate inputs (same ring and same serial number)
+//  4. The size (without / with witness) should not exceed MaxBlockBaseSizeMLPAUT / MaxBlockFullSizeMLPAUT
+//  5. The version and privacy level of all outputs would be well-matched
+//  6. If it is coinbase tx
+//     6.1. the input's block number and ring size should obey the ring version
+//  7. If it is transfer tx,
+//     7.1. Each input's serial number should not be zero
+//     7.2. Each input's version in a ring should be the same, and should obey the transaction version
+//     7.3. Each input's block number and ring size should obey the ring version
+//     7.4. No duplicate inputs (same ring and same serial number)
+//  8. If the transaction contain AUT script, it should be conducted well-formed before
 //
 // todo_DONE(MLP): reviewed on 2024.01.03 by Alice.
 func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
@@ -606,11 +607,7 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		consumedOutPoints[ringHash][snStr] = struct{}{}
 	}
 
-	extAutScript, err := tx.ExtAutScript()
-	if err != nil {
-		str := fmt.Sprintf("error hapeens when extracting CT-AUT script from Tx %s: %v", tx.Hash(), err)
-		return ruleerror.NewRuleError(ruleerror.ErrCTAUTBadForm, str)
-	}
+	extAutScript := tx.ExtAutScript()
 	if extAutScript != nil {
 		// todo: As all the LOCAL extAutScript has only one entrance (in abeutil.NewTx()), where these checks on GeneratedTokens have been performed.
 
@@ -2093,7 +2090,7 @@ func checkCTAUTRegistrationTransactionInputs(ctAutScript *ctautapi.ExtAutScript,
 		return fmt.Errorf("expected registration script, but got %d", ctAutScript.Type())
 	}
 
-	registrationScript, ok := ctAutScript.AutScript.(*ctaut.RegistrationScript)
+	registrationScript, ok := ctAutScript.AutScript.(*ctautapi.RegistrationScript)
 	if !ok {
 		return fmt.Errorf("expected registration script, but got %d", ctAutScript.Type())
 	}
@@ -2124,7 +2121,7 @@ func checkCTAUTReRegistrationTransactionInputs(script *ctautapi.ExtAutScript, tx
 	if script.Type() != ctaut.AutScriptTypeReRegistration {
 		return fmt.Errorf("expected re-registration script, but got %d", script.Type())
 	}
-	reRegisterScript, ok := script.AutScript.(*ctaut.ReRegistrationScript)
+	reRegisterScript, ok := script.AutScript.(*ctautapi.ReRegistrationScript)
 	if !ok {
 		return fmt.Errorf("expected re-registration script, but got %d", script.Type())
 	}
@@ -2220,7 +2217,7 @@ func checkCTAUTMintTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abe
 	if ctAutScript.Type() != ctaut.AutScriptTypeMint {
 		return fmt.Errorf("expected mint script, but got %d", ctAutScript.Type())
 	}
-	mintScript, ok := ctAutScript.AutScript.(*ctaut.MintScript)
+	mintScript, ok := ctAutScript.AutScript.(*ctautapi.MintScript)
 	if !ok {
 		return fmt.Errorf("expected mint script, but got %d", ctAutScript.Type())
 	}
@@ -2329,7 +2326,7 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx 
 	if ctAutScript.Type() != ctaut.AutScriptTypeTransfer {
 		return fmt.Errorf("expected transfer script, but got %d", ctAutScript.Type())
 	}
-	transferScript, ok := ctAutScript.AutScript.(*ctaut.TransferScript)
+	transferScript, ok := ctAutScript.AutScript.(*ctautapi.TransferScript)
 	if !ok {
 		return fmt.Errorf("expected transfer script, but got %d", ctAutScript.Type())
 	}
@@ -2418,7 +2415,7 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abe
 	if ctAutScript.Type() != ctaut.AutScriptTypeBurn {
 		return fmt.Errorf("expected burn script, but got %d", ctAutScript.Type())
 	}
-	burnScript, ok := ctAutScript.AutScript.(*ctaut.BurnScript)
+	burnScript, ok := ctAutScript.AutScript.(*ctautapi.BurnScript)
 	if !ok {
 		return fmt.Errorf("expected burn script, but got %d", ctAutScript.Type())
 	}
@@ -2526,25 +2523,25 @@ func ValidateCTAUTScript(script *ctautapi.ExtAutScript, tx *abeutil.TxAbe, txHei
 	}
 
 	switch script.AutScript.(type) {
-	case *ctaut.RegistrationScript:
+	case *ctautapi.RegistrationScript:
 		err = checkCTAUTRegistrationTransactionInputs(script, tx, txHeight, ctautView, chainParams)
 		if err != nil {
 			return err
 		}
 
-	case *ctaut.ReRegistrationScript:
+	case *ctautapi.ReRegistrationScript:
 		err = checkCTAUTReRegistrationTransactionInputs(script, tx, txHeight, ctautView, chainParams)
 		if err != nil {
 			return err
 		}
 
-	case *ctaut.MintScript:
+	case *ctautapi.MintScript:
 		err = checkCTAUTMintTransactionInputs(script, tx, txHeight, ctautView, chainParams)
 		if err != nil {
 			return err
 		}
 
-	case *ctaut.TransferScript:
+	case *ctautapi.TransferScript:
 		// populate consumed tokens
 		presetConsumedTokens, err := script.ConsumedTokens()
 		if err != nil {
@@ -2573,7 +2570,7 @@ func ValidateCTAUTScript(script *ctautapi.ExtAutScript, tx *abeutil.TxAbe, txHei
 			return err
 		}
 
-	case *ctaut.BurnScript:
+	case *ctautapi.BurnScript:
 		// populate consumed tokens
 		presetConsumedTokens, err := script.ConsumedTokens()
 		if err != nil {
@@ -2599,6 +2596,97 @@ func ValidateCTAUTScript(script *ctautapi.ExtAutScript, tx *abeutil.TxAbe, txHei
 
 		// This branch is exactly the same checking as the previous one, except for all the differences in handling outputs
 		err = checkCTAUTBurnTransactionInputs(script, tx, txHeight, ctautView, chainParams)
+		if err != nil {
+			return err
+		}
+
+	default:
+		return errors.New("unsupported AUT transaction type")
+	}
+
+	return nil
+}
+
+func ValidateTxCTAUTScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, txHeight int32,
+	lookupHostRing func(ringHash chainhash.Hash) (*wire.TxoRing, error),
+	lookupCTAUTMetadata func(identifier ctaut.AutId) (*ctautapi.AutMetadata, error),
+	lookupCTAUTToken func(identifier ctaut.AutId, outpoint *ctaut.HostOutPoint) (*CTAUTCoin, error),
+	chainParams *chaincfg.Params) error {
+	if tx == nil {
+		return fmt.Errorf("ValidateCTAUTScript: a nil transaction")
+	}
+
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		return nil
+	}
+
+	// check whether the version of host transaction match the rule for script
+	autScriptVersion := extAutScript.Version()
+	txVersion, err := ctaut.GetTxVersionFromAutScriptVersion(autScriptVersion)
+	if err != nil {
+		return fmt.Errorf("ValidateCTAUTScript: fail to get tx version from aut script version %d: %s",
+			autScriptVersion, err)
+	}
+	if txVersion != tx.MsgTx().Version {
+		return fmt.Errorf("ValidateCTAUTScript: the version (%d) of aut script failed to match the version (%d) of host transcation",
+			autScriptVersion, tx.MsgTx().Version)
+	}
+
+	// for every AUT instance, fetch the metadata anyway
+	_, err = lookupCTAUTMetadata(extAutScript.AutIdentifier())
+	if err != nil {
+		return err
+	}
+
+	err = extAutScript.AssembleInputAutTokensStep1(
+		lookupHostRing,
+		func(identifier script.AutId, outpoint *script.HostOutPoint) (uint32, []byte, error) {
+			token, err := lookupCTAUTToken(identifier, outpoint)
+			if err != nil {
+				return 0, nil, err
+			}
+			if token == nil {
+				return 0, nil, fmt.Errorf("no such token found")
+			}
+			if token.IsSpent() {
+				return 0, nil, fmt.Errorf("token is already spent")
+			}
+			return token.Version(), token.Script(), nil
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	switch extAutScript.AutScript.(type) {
+	case *ctautapi.RegistrationScript:
+		err = checkCTAUTRegistrationTransactionInputs(extAutScript, tx, txHeight, ctautView, chainParams)
+		if err != nil {
+			return err
+		}
+
+	case *ctautapi.ReRegistrationScript:
+		err = checkCTAUTReRegistrationTransactionInputs(extAutScript, tx, txHeight, ctautView, chainParams)
+		if err != nil {
+			return err
+		}
+
+	case *ctautapi.MintScript:
+		err = checkCTAUTMintTransactionInputs(extAutScript, tx, txHeight, ctautView, chainParams)
+		if err != nil {
+			return err
+		}
+
+	case *ctautapi.TransferScript:
+		err = checkCTAUTTransferTransactionInputs(extAutScript, tx, txHeight, ctautView, chainParams)
+		if err != nil {
+			return err
+		}
+
+	case *ctautapi.BurnScript:
+		// This branch is exactly the same checking as the previous one, except for all the differences in handling outputs
+		err = checkCTAUTBurnTransactionInputs(extAutScript, tx, txHeight, ctautView, chainParams)
 		if err != nil {
 			return err
 		}
@@ -2642,9 +2730,11 @@ func ValidateCTAUTScript(script *ctautapi.ExtAutScript, tx *abeutil.TxAbe, txHei
 //	  7. Set new best height for utxo ring view
 //
 // todo_DONE(MLP): reviewed on 2024.01.04
-func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
+func (b *BlockChain) checkConnectBlockAbe(
+	node *blockNode, block *abeutil.BlockAbe,
 	view *UtxoRingViewpoint, stxos *[]*SpentTxOutAbe,
-	ctautView *CTAUTViewpoint, sctauts *[]SpentCTAUT) error {
+	ctautView *CTAUTViewpoint, sctauts *[]SpentCTAUT,
+) error {
 	// If the side chain blocks end up in the database, a call to
 	// CheckBlockSanity should be done here in case a previous version
 	// allowed a block that is no longer valid.  However, since the
@@ -2705,10 +2795,10 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	}
 
 	// 1. fetch ctaut input from blockchain
-	err = ctautView.fetchConsumedCTAUTTokens(b.db, block, view)
-	if err != nil {
-		return err
-	}
+	//err = ctautView.fetchConsumedCTAUTTokens(b.db, block, view)
+	//if err != nil {
+	//	return err
+	//}
 
 	// Abe to do: Abe does not support p2sh at this moment
 	/*	// BIP0016 describes a pay-to-script-hash type that is considered a
@@ -2776,28 +2866,57 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 			return err
 		}
 
-		extAutScript, err := tx.ExtAutScript()
-		if err != nil {
-			return err
-		}
-		if extAutScript != nil {
-			err = extAutScript.AssembleInputAutTokensStep1(func(ringHash chainhash.Hash) (*wire.TxoRing, error) {
-				ringEntry := view.LookupEntry(ringHash)
-				if ringEntry == nil {
+		err = ValidateTxCTAUTScript(tx, ctautView, node.height,
+			func(ringHash chainhash.Hash) (*wire.TxoRing, error) {
+				entry := view.LookupEntry(ringHash)
+				if entry == nil {
 					return nil, errors.New("no such ring found")
 				}
-				return ringEntry.TxoRing(), nil
-			})
-			if err != nil {
-				return err
-			}
+				return entry.TxoRing(), nil
+			},
+			func(identifier ctaut.AutId) (*ctautapi.AutMetadata, error) {
+				metadata := ctautView.LookupCTAUTMetaInfo(identifier)
+				if metadata != nil {
+					return metadata, nil
+				}
 
-			// 1. check the no repeat input
-			// 2. check witness
-			err = ValidateCTAUTScript(extAutScript, tx, node.height, ctautView, b.chainParams)
-			if err != nil {
-				return err
-			}
+				autMetadata, err := b.fetchCTAUTMetadata(identifier)
+				if err != nil {
+					return nil, err
+				}
+
+				if autMetadata != nil {
+					err = ctautView.AddMetadata(autMetadata)
+					if err != nil {
+						return nil, err
+					}
+				}
+
+				return autMetadata, nil
+			},
+			func(identifier ctaut.AutId, outpoint *ctaut.HostOutPoint) (*CTAUTCoin, error) {
+				coin := ctautView.LookupCTAUTCoin(identifier, *outpoint)
+				if coin != nil {
+					return coin, nil
+				}
+
+				coin, err := b.fetchCTAUTToken(identifier, *outpoint)
+				if err != nil {
+					return nil, err
+				}
+
+				err = ctautView.AddToken(*outpoint, coin)
+				if err != nil {
+					return nil, err
+				}
+
+				return coin, nil
+			},
+			b.chainParams,
+		)
+
+		if err != nil {
+			return err
 		}
 
 		// Sum the total fees and ensure we don't overflow the
