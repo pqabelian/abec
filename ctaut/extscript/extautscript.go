@@ -230,11 +230,14 @@ func (extAutScript *ExtAutScript) assembleOutputAutTokens() error {
 // and the AutTokens hosts on the first "consumedTokenNum" PrivacyLevelPSEUDONYMCT TxIns.
 func (extAutScript *ExtAutScript) AssembleInputAutTokensStep1(
 	lookupHostOutputTxoRing func(ringHash chainhash.Hash) (*wire.TxoRing, error),
-	lookupCTAUTToken func(identifier script.AutId, outpoint *script.HostOutPoint) (uint32, []byte, error),
+	lookupAutToken func(identifier script.AutId, outpoint script.HostOutPoint) (uint32, []byte, error),
 ) error {
 
-	//if extAutScript.Type() == script.AutScriptTypeRegistration {
-
+	if extAutScript.Type() == script.AutScriptTypeRegistration {
+		extAutScript.handledConsumedTokens = true
+		extAutScript.consumedTokens = nil
+		return nil
+	}
 	//extAutScript.inputHandleStatus = ExtAutScriptInputAssembleStatus_Step1 // nonsense
 	//extAutScript.consumedTokens = nil
 	//
@@ -360,9 +363,13 @@ func (extAutScript *ExtAutScript) AssembleInputAutTokensStep1(
 		case script.AutScriptTypeReRegistration, script.AutScriptTypeMint:
 			// no version and value script is need by script with those type
 			// they would consume the root token
+			break
 		case script.AutScriptTypeTransfer, script.AutScriptTypeBurn:
 			// they would consume the token
-			tokenVersion, valueScript, err = lookupCTAUTToken(identifier, hostOutPoint)
+			tokenVersion, valueScript, err = lookupAutToken(identifier, *hostOutPoint)
+			if err != nil {
+				return err
+			}
 			err = abecryptox.AutRuleCheckOnTxInputVersion(tokenVersion, scriptVersion)
 			if err != nil {
 				return fmt.Errorf("script with version %d failed to consume the token with version %d",

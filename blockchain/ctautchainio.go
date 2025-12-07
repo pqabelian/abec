@@ -5,15 +5,15 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	ctautapi "github.com/abesuite/abec/ctaut/api"
 	"io"
+
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 
 	//"reflect"
 	"sync"
 
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/ctaut"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/wire"
 )
@@ -51,7 +51,7 @@ var ctautOutpointKeyPool = sync.Pool{
 	},
 }
 
-func ctautOutpointKey(outpoint ctaut.HostOutPoint) *[]byte {
+func ctautOutpointKey(outpoint ctautapi.HostOutPoint) *[]byte {
 	// A VLQ employs an MSB encoding, so they are useful not only to reduce
 	// the amount of storage space, but also so iteration of utxos when
 	// doing byte-wise comparisons will produce them in order.
@@ -510,13 +510,13 @@ func deserializeCTAUTCoin(serialized []byte) (*CTAUTCoin, error) {
 	}
 	version := binary.LittleEndian.Uint32(tmp)
 
-	var identifier ctaut.AutId
+	var identifier ctautapi.AutId
 	_, err = io.ReadFull(reader, identifier[:])
 	if err != nil {
 		return nil, err
 	}
 
-	script, err := wire.ReadVarBytes(reader, 0, ctaut.MaxAutValueScriptLength, "script")
+	script, err := wire.ReadVarBytes(reader, 0, ctautapi.MaxAutValueScriptLength, "script")
 	if err != nil {
 		return nil, err
 	}
@@ -524,7 +524,7 @@ func deserializeCTAUTCoin(serialized []byte) (*CTAUTCoin, error) {
 	return NewCTAUTCoin(version, identifier, script, blockHeight), nil
 }
 
-func dbFetchCTAUTCoin(dbTx database.Tx, outpoint ctaut.HostOutPoint) (*CTAUTCoin, error) {
+func dbFetchCTAUTCoin(dbTx database.Tx, outpoint ctautapi.HostOutPoint) (*CTAUTCoin, error) {
 	// Fetch the unspent transaction output information for the passed
 	// transaction output.  Return now when there is no entry.
 	key := ctautOutpointKey(outpoint)
@@ -564,7 +564,7 @@ func dbFetchCTAUTCoin(dbTx database.Tx, outpoint ctaut.HostOutPoint) (*CTAUTCoin
 	return coin, nil
 }
 
-func dbFetchCTAUTMetadata(dbTx database.Tx, key ctaut.AutId) (*ctautapi.AutMetadata, error) {
+func dbFetchCTAUTMetadata(dbTx database.Tx, key ctautapi.AutId) (*ctautapi.AutMetadata, error) {
 	// Fetch the unspent transaction output information for the passed
 	// transaction output.  Return now when there is no entry.
 	autInfoBucket := dbTx.Metadata().Bucket(ctAutInstanceBucketName)

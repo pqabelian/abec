@@ -12,7 +12,6 @@ import (
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/ctaut"
 	ctautwire "github.com/abesuite/abec/ctaut/wire"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/wire"
@@ -60,9 +59,9 @@ func NewCTAUTInstance(metadata *ctautapi.AutMetadata, coins map[ctautapi.HostOut
 }
 
 // todo: AddCion
-func (instance *CTAUTInstance) Add(outpiont ctaut.HostOutPoint, coin *CTAUTCoin) {
+func (instance *CTAUTInstance) Add(outpiont ctautapi.HostOutPoint, coin *CTAUTCoin) {
 	if instance.coins == nil {
-		instance.coins = make(map[ctaut.HostOutPoint]*CTAUTCoin)
+		instance.coins = make(map[ctautapi.HostOutPoint]*CTAUTCoin)
 	}
 	instance.coins[outpiont] = coin
 }
@@ -89,7 +88,7 @@ func (instance *CTAUTInstance) SpendCoin(point ctautapi.HostOutPoint) (*CTAUTCoi
 }
 
 type CTAUTCoin struct {
-	identifier ctaut.AutId
+	identifier ctautapi.AutId
 	// NOTE: Additions, deletions, or modifications to the order of the
 	// definitions in this struct should not be changed without considering
 	// how it affects alignment on 64-bit platforms.  The current order is
@@ -161,7 +160,7 @@ func (coin *CTAUTCoin) Clone() *CTAUTCoin {
 
 // todo: function name
 // NewAUTCoin returns a new AUTCoin built from the arguments.
-func NewCTAUTCoin(version uint32, identifier ctaut.AutId, script []byte, blockHeight int32) *CTAUTCoin {
+func NewCTAUTCoin(version uint32, identifier ctautapi.AutId, script []byte, blockHeight int32) *CTAUTCoin {
 
 	return &CTAUTCoin{
 		version:     version,
@@ -211,7 +210,7 @@ func (view *CTAUTViewpoint) SetInstances(instances map[string]*CTAUTInstance) {
 // not exist in the view or is otherwise not available such as when it has been
 // disconnected during a reorg.
 // todo: function name LookupAutCoin
-func (view *CTAUTViewpoint) LookupCTAUTCoin(identifier ctaut.AutId, outpoint ctaut.HostOutPoint) *CTAUTCoin {
+func (view *CTAUTViewpoint) LookupCTAUTCoin(identifier ctautapi.AutId, outpoint ctautapi.HostOutPoint) *CTAUTCoin {
 	if view.instances == nil {
 		return nil
 	}
@@ -238,7 +237,7 @@ func (view *CTAUTViewpoint) LookupCTAUTMetaInfo(identifier ctautapi.AutId) *ctau
 // unspendable.  When the view already has an entry for the output, it will be
 // marked unspent.  All fields will be updated for existing entries since it's
 // possible it has changed during a reorg.
-func (view *CTAUTViewpoint) addCTAUTCoin(version uint32, identifier ctaut.AutId, outpoint ctaut.HostOutPoint, script []byte, blockHeight int32) {
+func (view *CTAUTViewpoint) addCTAUTCoin(version uint32, identifier ctautapi.AutId, outpoint ctautapi.HostOutPoint, script []byte, blockHeight int32) error {
 	// if the tx is not existing in the utxoentry, create a new one. otherwise update the height of view
 	// Update existing entries.  All fields are updated because it's
 	// possible (although extremely unlikely) that the existing entry is
@@ -246,16 +245,19 @@ func (view *CTAUTViewpoint) addCTAUTCoin(version uint32, identifier ctaut.AutId,
 	// is allowed so long as the previous transaction is fully spent.
 	instance, ok := view.instances[identifier.String()]
 	if !ok {
-		log.Errorf("unreachable, invalid addAUTToken is called")
-		return
+		return fmt.Errorf("unreachable, invalid addAUTToken is called")
+	}
+	if instance.coins == nil {
+		instance.coins = make(map[ctautapi.HostOutPoint]*CTAUTCoin)
 	}
 	instance.coins[outpoint] = NewCTAUTCoin(version, identifier, script, blockHeight)
+	return nil
 }
 
 // todo: remove txHash chainhash.Hash
 func (view *CTAUTViewpoint) connectRegistrationScript(script *ctautapi.ExtAutScript, txHash chainhash.Hash,
 	blockHeight int32, sctauts *[]SpentCTAUT) error {
-	if script.Type() != ctaut.AutScriptTypeRegistration {
+	if script.Type() != ctautapi.AutScriptTypeRegistration {
 		return fmt.Errorf("expected registration script, but got %d", script.Type())
 	}
 
@@ -315,7 +317,7 @@ func (view *CTAUTViewpoint) connectRegistrationScript(script *ctautapi.ExtAutScr
 
 // todo: remove txHash chainhash.Hash
 func (view *CTAUTViewpoint) connectReRegistrationScript(script *ctautapi.ExtAutScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
-	if script.Type() != ctaut.AutScriptTypeReRegistration {
+	if script.Type() != ctautapi.AutScriptTypeReRegistration {
 		return fmt.Errorf("expected re-registration script, but got %d", script.Type())
 	}
 
@@ -382,7 +384,7 @@ func (view *CTAUTViewpoint) connectReRegistrationScript(script *ctautapi.ExtAutS
 
 // todo: remove txHash chainhash.Hash
 func (view *CTAUTViewpoint) connectMintScript(script *ctautapi.ExtAutScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
-	if script.Type() != ctaut.AutScriptTypeMint {
+	if script.Type() != ctautapi.AutScriptTypeMint {
 		return fmt.Errorf("expected mint script, but got %d", script.Type())
 	}
 	mintScript, ok := script.AutScript.(*ctautapi.MintScript)
@@ -457,7 +459,7 @@ func (view *CTAUTViewpoint) connectMintScript(script *ctautapi.ExtAutScript, txH
 
 // todo: remove txHash chainhash.Hash
 func (view *CTAUTViewpoint) connectTransferScript(script *ctautapi.ExtAutScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
-	if script.Type() != ctaut.AutScriptTypeTransfer {
+	if script.Type() != ctautapi.AutScriptTypeTransfer {
 		return fmt.Errorf("expected transfer script, but got %d", script.Type())
 	}
 
@@ -511,7 +513,7 @@ func (view *CTAUTViewpoint) connectTransferScript(script *ctautapi.ExtAutScript,
 
 // todo: remove txHash chainhash.Hash
 func (view *CTAUTViewpoint) connectBurnScript(script *ctautapi.ExtAutScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
-	if script.Type() != ctaut.AutScriptTypeBurn {
+	if script.Type() != ctautapi.AutScriptTypeBurn {
 		return fmt.Errorf("expected burn script, but got %d", script.Type())
 	}
 
@@ -658,7 +660,7 @@ func (view *CTAUTViewpoint) connectTransactions(block *abeutil.BlockAbe, sctauts
 }
 func (view *CTAUTViewpoint) disconnectRegistrationTransaction(db database.DB, script *ctautapi.ExtAutScript,
 	blockHeight int32, sctaut SpentCTAUT) (map[string]struct{}, error) {
-	if script.Type() != ctaut.AutScriptTypeRegistration {
+	if script.Type() != ctautapi.AutScriptTypeRegistration {
 		return nil, fmt.Errorf("expected registration script, but got %d", script.Type())
 	}
 
@@ -699,7 +701,7 @@ func (view *CTAUTViewpoint) disconnectRegistrationTransaction(db database.DB, sc
 
 func (view *CTAUTViewpoint) disconnectReRegistrationTransaction(db database.DB, script *ctautapi.ExtAutScript,
 	blockHeight int32, sctaut SpentCTAUT) (map[string]struct{}, error) {
-	if script.Type() != ctaut.AutScriptTypeReRegistration {
+	if script.Type() != ctautapi.AutScriptTypeReRegistration {
 		return nil, fmt.Errorf("expected re-registration script, but got %d", script.Type())
 	}
 
@@ -737,7 +739,7 @@ func (view *CTAUTViewpoint) disconnectReRegistrationTransaction(db database.DB, 
 
 func (view *CTAUTViewpoint) disconnectMintTransaction(db database.DB, script *ctautapi.ExtAutScript,
 	blockHeight int32, sctaut SpentCTAUT) (map[string]struct{}, error) {
-	if script.Type() != ctaut.AutScriptTypeMint {
+	if script.Type() != ctautapi.AutScriptTypeMint {
 		return nil, fmt.Errorf("expected mint script, but got %d", script.Type())
 	}
 
@@ -789,7 +791,7 @@ func (view *CTAUTViewpoint) disconnectMintTransaction(db database.DB, script *ct
 }
 func (view *CTAUTViewpoint) disconnectTransferTransaction(db database.DB, script *ctautapi.ExtAutScript,
 	blockHeight int32, sctaut SpentCTAUT) (map[string]struct{}, error) {
-	if script.Type() != ctaut.AutScriptTypeTransfer {
+	if script.Type() != ctautapi.AutScriptTypeTransfer {
 		return nil, fmt.Errorf("expected transfer script, but got %d", script.Type())
 	}
 
@@ -847,7 +849,7 @@ func (view *CTAUTViewpoint) disconnectTransferTransaction(db database.DB, script
 }
 func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, script *ctautapi.ExtAutScript,
 	blockHeight int32, sctaut SpentCTAUT) (map[string]struct{}, error) {
-	if script.Type() != ctaut.AutScriptTypeBurn {
+	if script.Type() != ctautapi.AutScriptTypeBurn {
 		return nil, fmt.Errorf("expected burn script, but got %d", script.Type())
 	}
 
@@ -962,8 +964,8 @@ func (view *CTAUTViewpoint) disconnectCTAUTScripts(db database.DB, block *abeuti
 				}
 				return ringEntry.TxoRing(), nil
 			},
-			func(identifier ctaut.AutId, outpoint *ctaut.HostOutPoint) (uint32, []byte, error) {
-				coin, err := view.fetchCTAUTToken(db, identifier, *outpoint)
+			func(identifier ctautapi.AutId, outpoint ctautapi.HostOutPoint) (uint32, []byte, error) {
+				coin, err := view.fetchCTAUTToken(db, identifier, outpoint)
 				if err != nil {
 					return 0, nil, err
 				}
@@ -1215,8 +1217,8 @@ func (view *CTAUTViewpoint) fetchConsumedCTAUTTokens(db database.DB, block *abeu
 
 				return ringEntry.TxoRing(), nil
 			},
-			func(identifier script.AutId, outpoint *script.HostOutPoint) (uint32, []byte, error) {
-				token, err := view.fetchCTAUTToken(db, identifier, *outpoint)
+			func(identifier script.AutId, outpoint script.HostOutPoint) (uint32, []byte, error) {
+				token, err := view.fetchCTAUTToken(db, identifier, outpoint)
 				if err != nil {
 					return 0, nil, err
 				}
@@ -1320,7 +1322,7 @@ func (b *BlockChain) FetchCTAUTView(script *ctautapi.ExtAutScript) (*CTAUTViewpo
 		return view, nil
 	}
 
-	neededSet := make(map[ctaut.HostOutPoint]struct{})
+	neededSet := make(map[ctautapi.HostOutPoint]struct{})
 
 	switch script.AutScript.(type) {
 	case *ctautapi.RegistrationScript:
@@ -1402,7 +1404,7 @@ func (b *BlockChain) FetchCTAUTMetadata(identifier ctautapi.AutId) (*ctautapi.Au
 //
 // This function is safe for concurrent access however the returned entry (if
 // any) is NOT.
-func (b *BlockChain) fetchCTAUTToken(identifier ctautapi.AutId, outpoint ctaut.HostOutPoint) (*CTAUTCoin, error) {
+func (b *BlockChain) fetchCTAUTToken(identifier ctautapi.AutId, outpoint ctautapi.HostOutPoint) (*CTAUTCoin, error) {
 	var coin *CTAUTCoin
 	err := b.db.View(func(dbTx database.Tx) error {
 		var err error
@@ -1422,7 +1424,7 @@ func (b *BlockChain) fetchCTAUTToken(identifier ctautapi.AutId, outpoint ctaut.H
 
 	return coin, nil
 }
-func (b *BlockChain) FetchCTAUTToken(identifier ctautapi.AutId, outpoint ctaut.HostOutPoint) (*CTAUTCoin, error) {
+func (b *BlockChain) FetchCTAUTToken(identifier ctautapi.AutId, outpoint ctautapi.HostOutPoint) (*CTAUTCoin, error) {
 	b.chainLock.RLock()
 	defer b.chainLock.RUnlock()
 

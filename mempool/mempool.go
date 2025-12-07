@@ -21,7 +21,6 @@ import (
 	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/ctaut"
 	"github.com/abesuite/abec/mempool/rotator"
 	"github.com/abesuite/abec/mining"
 	"github.com/abesuite/abec/txscript"
@@ -773,10 +772,10 @@ func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 	//return
 	//}
 	if extAutScript != nil {
-		if extAutScript.Type() == ctaut.AutScriptTypeRegistration {
+		if extAutScript.Type() == ctautapi.AutScriptTypeRegistration {
 			ctAutScript := extAutScript.AutScript.(*ctautapi.RegistrationScript)
 			expireHeight := ctAutScript.ReregistrationExpireHeight()
-			if expireHeight != ctaut.InfiniteExpireHeight {
+			if expireHeight != ctautapi.InfiniteExpireHeight {
 				willExpiredCTAut := mp.expiredHeightAUT[expireHeight]
 				delete(willExpiredCTAut, *tx.Hash())
 				if len(willExpiredCTAut) > 0 {
@@ -929,7 +928,7 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 		switch extAutScriptInst := extAutScript.AutScript.(type) {
 		case *ctautapi.RegistrationScript:
 			expireHeight := extAutScriptInst.ReregistrationExpireHeight()
-			if expireHeight != ctaut.InfiniteExpireHeight {
+			if expireHeight != ctautapi.InfiniteExpireHeight {
 				if mp.expiredHeightAUT[expireHeight] == nil {
 					mp.expiredHeightAUT[expireHeight] = map[chainhash.Hash]*TxDescAbe{}
 				}
@@ -940,7 +939,7 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 			//mp.registeredAUTName[hex.EncodeToString(identifier[:])] = *tx.Hash()
 		case *ctautapi.ReRegistrationScript:
 			expireHeight := extAutScriptInst.ReregistrationExpireHeight()
-			if expireHeight != ctaut.InfiniteExpireHeight {
+			if expireHeight != ctautapi.InfiniteExpireHeight {
 				if mp.expiredHeightAUT[expireHeight] == nil {
 					mp.expiredHeightAUT[expireHeight] = map[chainhash.Hash]*TxDescAbe{}
 				}
@@ -1381,40 +1380,10 @@ func (mp *TxPool) fetchInputCTAUT(extAutScript *ctautapi.ExtAutScript) (*blockch
 	return ctAutView, nil
 }
 
-func (mp *TxPool) fetchCTAUTMetadata(ctautView *blockchain.CTAUTViewpoint, identifier ctaut.AutId) (*ctautapi.AutMetadata, error) {
-	metadata := ctautView.LookupCTAUTMetaInfo(identifier)
-	if metadata != nil {
-		return metadata, nil
-	}
-
-	metadata, err := mp.cfg.FetchCTAUTMetadata(identifier)
-	if err != nil {
-		return nil, err
-	}
-	if metadata != nil {
-		err = ctautView.AddMetadata(metadata)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return metadata, nil
-}
-
-func (mp *TxPool) fetchInputCTAUTToken(ctautView *blockchain.CTAUTViewpoint, identifier ctaut.AutId, outpoint *ctaut.HostOutPoint) (*blockchain.CTAUTCoin, error) {
+func (mp *TxPool) fetchInputCTAUTToken(ctautView *blockchain.CTAUTViewpoint, identifier ctautapi.AutId, outpoint *ctautapi.HostOutPoint) (*blockchain.CTAUTCoin, error) {
 	autToken := ctautView.LookupCTAUTCoin(identifier, *outpoint)
 	if autToken != nil {
 		return autToken, nil
-	}
-
-	autToken, err := mp.cfg.FetchCTAUTToken(identifier, *outpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	err = ctautView.AddToken(*outpoint, autToken)
-	if err != nil {
-		return nil, err
 	}
 
 	return autToken, nil
@@ -1925,6 +1894,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	// == CT-AUT checking rule ==
 	// cache any token for checking
 	ctAutView := blockchain.NewCTAUTViewpoint()
+	// load all token andd me
 	err = blockchain.ValidateTxCTAUTScript(
 		tx,
 		ctAutView,
@@ -1936,21 +1906,8 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 			}
 			return ringEntry.TxoRing(), nil
 		},
-		func(identifier ctaut.AutId) (*ctautapi.AutMetadata, error) {
-			metadata, err := mp.fetchCTAUTMetadata(ctAutView, identifier)
-			if err != nil {
-				return nil, err
-			}
-			return metadata, err
-		},
-		func(identifier ctaut.AutId, outpoint *ctaut.HostOutPoint) (*blockchain.CTAUTCoin, error) {
-			// note that ctAutView would be used to cache the token and mark its status
-			autToken, err := mp.fetchInputCTAUTToken(ctAutView, identifier, outpoint)
-			if err != nil {
-				return nil, err
-			}
-			return autToken, nil
-		},
+		mp.cfg.FetchCTAUTMetadata,
+		mp.cfg.FetchCTAUTToken,
 		mp.cfg.ChainParams,
 	)
 	if err != nil {

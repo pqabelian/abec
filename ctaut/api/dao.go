@@ -9,6 +9,7 @@ type HostOutPoint = script.HostOutPoint
 type AutIssuer = script.AutIssuer
 
 type AutId = script.AutId
+type AutScriptType = script.AutScriptType
 
 type AutScript = script.AutScript
 type RegistrationScript = script.RegistrationScript

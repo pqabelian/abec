@@ -7,8 +7,6 @@ import (
 	"fmt"
 
 	"github.com/abesuite/abec/blockchain/consensus"
-	"github.com/abesuite/abec/ctaut"
-	ctautapi "github.com/abesuite/abec/ctaut/api"
 
 	"time"
 
@@ -853,41 +851,8 @@ mempoolLoop:
 				}
 				return ringEntry.TxoRing(), nil
 			},
-			func(identifier ctaut.AutId) (*ctautapi.AutMetadata, error) {
-				metadata := ctAutView.LookupCTAUTMetaInfo(identifier)
-				if metadata != nil {
-					return metadata, nil
-				}
-
-				autMetadata, err := g.chain.FetchCTAUTMetadata(identifier)
-				if err != nil {
-					return nil, err
-				}
-
-				if autMetadata != nil {
-					err = ctAutView.AddMetadata(autMetadata)
-					if err != nil {
-						return nil, err
-					}
-				}
-
-				return autMetadata, nil
-			},
-			func(identifier ctaut.AutId, outpoint *ctaut.HostOutPoint) (*blockchain.CTAUTCoin, error) {
-				coin := ctAutView.LookupCTAUTCoin(identifier, *outpoint)
-				if coin != nil {
-					return coin, nil
-				}
-				coin, err := g.chain.FetchCTAUTToken(identifier, *outpoint)
-				if err != nil {
-					return nil, err
-				}
-				err = ctAutView.AddToken(*outpoint, coin)
-				if err != nil {
-					return nil, err
-				}
-				return coin, nil
-			},
+			g.chain.FetchCTAUTMetadata,
+			g.chain.FetchCTAUTToken,
 			g.chainParams,
 		)
 		if err != nil {
@@ -1051,19 +1016,8 @@ mempoolLoop:
 				}
 				return ringEntry.TxoRing(), nil
 			},
-			func(identifier ctaut.AutId) (*ctautapi.AutMetadata, error) {
-				// Note that all metadata should be fetched from database when assembling blockCTAUTView
-				metadata := blockCTAUTView.LookupCTAUTMetaInfo(identifier)
-				return metadata, nil
-			},
-			func(identifier ctaut.AutId, outpoint *ctaut.HostOutPoint) (*blockchain.CTAUTCoin, error) {
-				// Note that all tokens should be fetched from database when assembling blockCTAUTView
-				coin := blockCTAUTView.LookupCTAUTCoin(identifier, *outpoint)
-				if coin == nil {
-					return nil, fmt.Errorf("no such CTAUT coin found")
-				}
-				return coin, nil
-			},
+			nil,
+			nil,
 			g.chainParams,
 		)
 		if err != nil {
