@@ -8,10 +8,6 @@ import (
 type HostOutPoint = script.HostOutPoint
 type AutIssuer = script.AutIssuer
 
-func NewAutIssuer(coinAddress []byte) *AutIssuer {
-	return script.NewAutIssuer(coinAddress)
-}
-
 type AutId = script.AutId
 
 type AutScript = script.AutScript
@@ -24,3 +20,7 @@ type BurnScript = script.BurnScript
 type ExtAutScript = extscript.ExtAutScript
 
 type AutMetadata = script.AutMetadata
+
+func NewAutIssuer(issuerAddress []byte) *AutIssuer {
+	return script.NewAutIssuer(issuerAddress)
+}
