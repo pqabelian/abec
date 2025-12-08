@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/abesuite/abec/ctaut/rules"
 	"io"
 	"math"
 	"strings"
@@ -452,12 +453,12 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 	autMetadata.ReregistrationExpireHeight = int32(temp)
 
 	// ReregistrationThreshold    uint8
-	if autMetadata.ReregistrationThreshold, err = ReadByte(r); err != nil {
+	if autMetadata.ReregistrationThreshold, err = r.ReadByte(); err != nil {
 		return err
 	}
 
 	// MintThreshold              uint8
-	if autMetadata.MintThreshold, err = ReadByte(r); err != nil {
+	if autMetadata.MintThreshold, err = r.ReadByte(); err != nil {
 		return err
 	}
 
@@ -2915,7 +2916,7 @@ func ParseAutScript(txVersion uint32, txHash chainhash.Hash, memo []byte) (AutSc
 
 	// check the script version with the host version
 	// todo: use the ScriptVersion and TxVersion rule.
-	expectedTxVersion, err := GetTxVersionFromAutScriptVersion(autScript.Version())
+	expectedTxVersion, err := rules.RuleGetTxVersionFromAutScriptVersion(autScript.Version())
 	if expectedTxVersion != txVersion {
 		return nil, fmt.Errorf("autScript.Version() (%d) corresponds to TxVersion (%d), does not match TxVersion %d",
 			autScript.Version(), expectedTxVersion, txVersion)
