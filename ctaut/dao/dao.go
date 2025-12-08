@@ -28,6 +28,7 @@ type AutIssuer struct {
 }
 
 // NewAutIssuer returns a new AutIssuer for the input issuerAddress.
+// todo: discuss, need NewAutIssuerFromCoinAddress() ?
 func NewAutIssuer(issuerAddress []byte) *AutIssuer {
 	return &AutIssuer{
 		IssuerAddress: issuerAddress,
@@ -98,7 +99,7 @@ type AutToken struct {
 	// say, each coin on chain has a format (coinAddress, valueScript).
 	// Do not limit the CoinAddress here to the concept in CryptoAddress in abecryptox package.
 	// As Abelian-Txo belongs to CoinAddress, AutToken also belongs to CoinAddress.
-	// For all token, coinAdress would be used to indicate the ownership of token
+	// For all token, coinAddress would be used to indicate the owner of a token.
 	// For root token, it would be used match the claimed issuers to recognize operational permission.
 	CoinAddress []byte
 

@@ -95,3 +95,5 @@ const AutScriptVersion = AutScriptVersion_1
 // AutMetadataVersionInitValue defines the initial value for AutMetadata.Version,
 // and increase by 1 each time the Metadata is updated due to ReRegistrationScript.
 const AutMetadataVersionInitValue = uint32(1)
+
+// end of codes

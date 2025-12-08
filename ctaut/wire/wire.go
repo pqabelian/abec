@@ -8,6 +8,8 @@ import (
 	"math"
 )
 
+const MaxAutTxoLength = 16 * 1024 // 16K
+
 type AutTxo struct {
 	Version   uint32 // Inherit the AutScriptVersion
 	TxoScript []byte
@@ -33,12 +35,6 @@ func (txo *AutTxo) Serialize() ([]byte, error) {
 	return w.Bytes(), nil
 }
 
-// For aconcagua:
-// - hidden value script is 10959
-// - public value script is 9
-
-const MaxAutTxoLength = 16 * 1024
-
 func (txo *AutTxo) Deserialize(serializedAutTxo []byte) error {
 	r := bytes.NewBuffer(serializedAutTxo)
 
@@ -47,7 +43,7 @@ func (txo *AutTxo) Deserialize(serializedAutTxo []byte) error {
 		return err
 	}
 	if version > math.MaxUint32 {
-		return fmt.Errorf("readed version (%d) is too big", version)
+		return fmt.Errorf("read version (%d) is too big", version)
 	}
 	txo.Version = uint32(version)
 
@@ -78,3 +74,5 @@ type AutTransferTx struct {
 func AutWitnessHash(autWitness []byte) chainhash.Hash {
 	return chainhash.ChainHash(autWitness)
 }
+
+// end of codes
