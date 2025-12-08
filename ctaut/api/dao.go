@@ -1,14 +1,15 @@
 package api
 
 import (
+	"github.com/abesuite/abec/ctaut/dao"
 	"github.com/abesuite/abec/ctaut/extscript"
 	"github.com/abesuite/abec/ctaut/script"
 )
 
-type HostOutPoint = script.HostOutPoint
-type AutIssuer = script.AutIssuer
+type HostOutPoint = dao.HostOutPoint
+type AutIssuer = dao.AutIssuer
 
-type AutId = script.AutId
+type AutId = dao.AutId
 type AutScriptType = script.AutScriptType
 
 type AutScript = script.AutScript
@@ -23,5 +24,5 @@ type ExtAutScript = extscript.ExtAutScript
 type AutMetadata = script.AutMetadata
 
 func NewAutIssuer(issuerAddress []byte) *AutIssuer {
-	return script.NewAutIssuer(issuerAddress)
+	return dao.NewAutIssuer(issuerAddress)
 }

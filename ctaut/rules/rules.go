@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
-	"github.com/abesuite/abec/ctaut/extscript/auttoken"
-	"github.com/abesuite/abec/ctaut/script"
+	"github.com/abesuite/abec/ctaut/dao"
 	ctautwire "github.com/abesuite/abec/ctaut/wire"
 	"github.com/abesuite/abec/wire"
 )
+
+type HostOutPoint = dao.HostOutPoint
+type AutIssuer = dao.AutIssuer
+type AutToken = dao.AutToken
 
 // RuleGetTxVersionFromAutScriptVersion defines a map from AutScriptVersion to host-Txo-Version.
 //
@@ -27,7 +30,7 @@ func RuleGetTxVersionFromAutScriptVersion(autScriptVersion uint32) (uint32, erro
 // 1. the privacy level MUST be abecryptoxkey.PrivacyLevelPSEUDONYMCT, note that this means the value in Abelian-Txo is public
 // 2. the value must be 1 Neutrino
 // todo: txHash and outputIndex donot have actual use.
-func RuleCheckOnHostTxo(hostOutPoint *script.HostOutPoint, txOut *wire.TxOutAbe) ([]byte, error) {
+func RuleCheckOnHostTxo(hostOutPoint *HostOutPoint, txOut *wire.TxOutAbe) ([]byte, error) {
 	privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
 	if err != nil {
 		return nil, fmt.Errorf("fail to extract the privacy level from transaction %s:%s", hostOutPoint.TxHash, err.Error())
@@ -66,8 +69,8 @@ func RuleCheckOnAutTxoVersionType(autScriptVersion uint32, autTxo *ctautwire.Aut
 // RuleCheckOnIssuerHostClaim checks that
 // (1) each claimed issuer has at least one corresponding AutToken, and
 // (2) each output AutToken has a corresponding issuer.
-func RuleCheckOnIssuerHostClaim(issuers []*script.AutIssuer, outputTokens []*auttoken.AutToken) error {
-	claimedIssuersByCoinAddress := make(map[string]*script.AutIssuer, len(issuers))
+func RuleCheckOnIssuerHostClaim(issuers []*AutIssuer, outputTokens []*AutToken) error {
+	claimedIssuersByCoinAddress := make(map[string]*AutIssuer, len(issuers))
 	for i := 0; i < len(issuers); i++ {
 		coinAddressStr := hex.EncodeToString(issuers[i].CoinAddress())
 		// ensure no duplicates one
@@ -77,7 +80,7 @@ func RuleCheckOnIssuerHostClaim(issuers []*script.AutIssuer, outputTokens []*aut
 		claimedIssuersByCoinAddress[coinAddressStr] = issuers[i]
 	}
 
-	outputTokenCoinAddressesMap := make(map[string]*auttoken.AutToken, len(outputTokens))
+	outputTokenCoinAddressesMap := make(map[string]*AutToken, len(outputTokens))
 	for i := 0; i < len(outputTokens); i++ {
 		coinAddressStr := hex.EncodeToString(outputTokens[i].CoinAddress)
 		if _, ok := outputTokenCoinAddressesMap[coinAddressStr]; !ok {

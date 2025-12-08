@@ -2,9 +2,9 @@ package script
 
 import (
 	"bytes"
-	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/abesuite/abec/ctaut/dao"
 	"github.com/abesuite/abec/ctaut/rules"
 	"io"
 	"math"
@@ -17,81 +17,9 @@ import (
 	"github.com/abesuite/abec/wire"
 )
 
-// HostOutPoint defines the host of aut token, it could be used to track previous tokens.
-type HostOutPoint = wire.OutPointAbe
-
-type AutId = chainhash.Hash
-
-// AutIssuer defines Aut Issuer by IssuerAddress, where IssuerAddress is a wrapper of coinAddress.
-// Each AutIssuer corresponds to a coinAddress,
-// where coinAddress means the address on chain that a coin belongs to,
-// say, each coin on chain has a format (coinAddress, valueScript).
-// Do not limit the coinAddress here to the concept in CryptoAddress in abecryptox package.
-// Note that, as Abelian-Txo belongs to coinAddress, AutToken also belongs to coinAddress.
-// Note that it must keep that each AutIssuer can be identified by its underlying coinAddress.
-// Note that it must keep that each AutIssuer can be identified by its IssuerAddress.
-type AutIssuer struct {
-	IssuerAddress []byte
-}
-
-// NewAutIssuer returns a new AutIssuer for the input issuerAddress.
-func NewAutIssuer(issuerAddress []byte) *AutIssuer {
-	return &AutIssuer{
-		IssuerAddress: issuerAddress,
-	}
-}
-
-// CoinAddress returns the coinAddress contained in autIssuer.IssuerAddress.
-func (autIssuer *AutIssuer) CoinAddress() []byte {
-	// At present, IssuerAddress is exactly the coinAddress.
-	return autIssuer.IssuerAddress
-}
-
-func (autIssuer *AutIssuer) serializeSize() int {
-	return wire.VarIntSerializeSize(uint64(len(autIssuer.IssuerAddress))) + len(autIssuer.IssuerAddress)
-}
-
-func (autIssuer *AutIssuer) write(w io.Writer) error {
-	return wire.WriteVarBytes(w, 0, autIssuer.IssuerAddress)
-}
-
-func (autIssuer *AutIssuer) read(r io.Reader) error {
-	issuerAddress, err := wire.ReadVarBytes(r, 0, MaxIssuerAddressLength, "AutIssuer.IssuerAddress")
-	if err != nil {
-		return err
-	}
-
-	autIssuer.IssuerAddress = issuerAddress
-	return nil
-}
-
-func (autIssuer *AutIssuer) String() string {
-	return hex.EncodeToString(autIssuer.IssuerAddress)
-}
-
-// Equal reports whether autIssuer and issuer have the same IssuerAddress.
-// Equal returns TURE only if
-// autIssuer and issuer are not nil,
-// autIssuer.IssuerAddress and issuer.IssuerAddress are not nil/empty, and
-// autIssuer.IssuerAddress and issuer.IssuerAddress have the same length and contain the same bytes.
-func (autIssuer *AutIssuer) Equal(issuer *AutIssuer) bool {
-	if autIssuer == nil || issuer == nil {
-		return false
-	}
-
-	if len(autIssuer.IssuerAddress) == 0 || len(issuer.IssuerAddress) == 0 {
-		return false
-	}
-
-	return bytes.Equal(autIssuer.IssuerAddress, issuer.IssuerAddress)
-}
-
-func (autIssuer *AutIssuer) Clone() *AutIssuer {
-	rst := &AutIssuer{}
-	rst.IssuerAddress = make([]byte, len(autIssuer.IssuerAddress))
-	copy(rst.IssuerAddress, autIssuer.IssuerAddress)
-	return rst
-}
+type HostOutPoint = dao.HostOutPoint
+type AutId = dao.AutId
+type AutIssuer = dao.AutIssuer
 
 // AutMetadata maintains the metadata information of Abelian User Token (AUT) instance on Abelian
 // 1. Each AutInstance has a unique identifier, which is actually a hash of the Abelian-Tx
@@ -209,7 +137,7 @@ func (autMetadata *AutMetadata) serializeSize() int {
 
 	n += wire.VarIntSerializeSize(uint64(len(autMetadata.Issuers))) // number of issuers
 	for i := 0; i < len(autMetadata.Issuers); i++ {
-		n += autMetadata.Issuers[i].serializeSize()
+		n += autMetadata.Issuers[i].SerializeSize()
 	}
 
 	n += wire.VarIntSerializeSize(uint64(autMetadata.ReregistrationExpireHeight)) // ReregistrationExpireHeight
@@ -297,7 +225,7 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 		return nil, err
 	}
 	for i := 0; i < len(autMetadata.Issuers); i++ {
-		err = autMetadata.Issuers[i].write(w)
+		err = autMetadata.Issuers[i].Write(w)
 		if err != nil {
 			return nil, fmt.Errorf("error happens when writing issuer: %v", err)
 		}
@@ -434,7 +362,7 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 	autMetadata.Issuers = make([]*AutIssuer, issuerNum)
 	for i := uint64(0); i < issuerNum; i++ {
 		issuer := &AutIssuer{}
-		err = issuer.read(r)
+		err = issuer.Read(r)
 		if err != nil {
 			return fmt.Errorf("error happens when reading issuer: %v", err)
 		}
@@ -869,7 +797,7 @@ func (autScript *RegistrationScript) serializeSize() int {
 	n += wire.VarIntSerializeSize(autScript.plannedTotalSupply)                                      // plannedTotalSupply         uint64
 	n += wire.VarIntSerializeSize(uint64(len(autScript.issuers)))                                    // issuers                    []*AutIssuer
 	for _, issuer := range autScript.issuers {
-		n += issuer.serializeSize()
+		n += issuer.SerializeSize()
 	}
 	n += wire.VarIntSerializeSize(uint64(autScript.reregistrationExpireHeight)) // reregistrationExpireHeight int32
 
@@ -942,7 +870,7 @@ func (autScript *RegistrationScript) Serialize() ([]byte, error) {
 		return nil, err
 	}
 	for _, issuer := range autScript.issuers {
-		if err = issuer.write(w); err != nil {
+		if err = issuer.Write(w); err != nil {
 			return nil, err
 		}
 	}
@@ -1047,7 +975,7 @@ func (autScript *RegistrationScript) Deserialize(serializedScript []byte) error 
 	autScript.issuers = make([]*AutIssuer, issuerNum)
 	for i := uint64(0); i < issuerNum; i++ {
 		issuer := &AutIssuer{}
-		if err = issuer.read(r); err != nil {
+		if err = issuer.Read(r); err != nil {
 			return err
 		}
 		autScript.issuers[i] = issuer
@@ -1362,7 +1290,7 @@ func (autScript *ReRegistrationScript) serializeSize() int {
 	n += wire.VarIntSerializeSize(autScript.plannedTotalSupply)                            // plannedTotalSupply         uint64
 	n += wire.VarIntSerializeSize(uint64(len(autScript.issuers)))                          // issuers                    []*AutIssuer
 	for _, issuer := range autScript.issuers {
-		n += issuer.serializeSize()
+		n += issuer.SerializeSize()
 	}
 	n += wire.VarIntSerializeSize(uint64(autScript.reregistrationExpireHeight)) // reregistrationExpireHeight int32
 
@@ -1411,7 +1339,7 @@ func (autScript *ReRegistrationScript) Serialize() ([]byte, error) {
 		return nil, err
 	}
 	for _, issuer := range autScript.issuers {
-		if err = issuer.write(w); err != nil {
+		if err = issuer.Write(w); err != nil {
 			return nil, err
 		}
 	}
@@ -1496,7 +1424,7 @@ func (autScript *ReRegistrationScript) Deserialize(serializedScript []byte) erro
 	autScript.issuers = make([]*AutIssuer, issuerNum)
 	for i := uint64(0); i < issuerNum; i++ {
 		issuer := &AutIssuer{}
-		if err = issuer.read(r); err != nil {
+		if err = issuer.Read(r); err != nil {
 			return err
 		}
 		autScript.issuers[i] = issuer

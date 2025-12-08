@@ -3,11 +3,11 @@ package extscript
 import (
 	"bytes"
 	"fmt"
+	"github.com/abesuite/abec/ctaut/dao"
 
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/ctaut/extscript/auttoken"
 	"github.com/abesuite/abec/ctaut/rules"
 	"github.com/abesuite/abec/ctaut/script"
 	ctautwire "github.com/abesuite/abec/ctaut/wire"
@@ -22,6 +22,11 @@ import (
 //	ExtAutScriptInputAssembleStatus_Step2 ExtAutScriptInputAssembleStatus = 2
 //)
 
+type HostOutPoint = dao.HostOutPoint
+type AutId = dao.AutId
+type AutIssuer = dao.AutIssuer
+type AutToken = dao.AutToken
+
 // ExtAutScript is used to collect the input Tokens and generate output Tokens by the AutScript,
 // based on the information of host-Tx and AutScript.
 type ExtAutScript struct {
@@ -29,17 +34,17 @@ type ExtAutScript struct {
 
 	msgTx *wire.MsgTxAbe
 
-	generatedTokens []*auttoken.AutToken
+	generatedTokens []*AutToken
 
 	// Note that for following 2 fields:
 	// - if the value is nil, it means that the tokens is not set
 	// - if the value is empty slice, it means that the tokens is set but has no token
 	//inputHandleStatus ExtAutScriptInputAssembleStatus //	indicate whether consumedTokens has been handled
 	handledConsumedTokens bool
-	consumedTokens        []*auttoken.AutToken
+	consumedTokens        []*AutToken
 }
 
-func (extAutScript *ExtAutScript) AutIdentifier() script.AutId {
+func (extAutScript *ExtAutScript) AutIdentifier() AutId {
 	if extAutScript.AutScript.Type() == script.AutScriptTypeRegistration {
 		return extAutScript.msgTx.TxHash()
 	}
@@ -104,13 +109,13 @@ func (extAutScript *ExtAutScript) assembleOutputAutTokens() error {
 			numAutTokens, len(txOuts)-startIdx)
 	}
 
-	generatedTokens := make([]*auttoken.AutToken, numAutTokens)
+	generatedTokens := make([]*AutToken, numAutTokens)
 	for i := 0; i < numAutTokens; i++ {
 		index := uint8(startIdx + i)
 		txOut := txOuts[index]
 
 		hostOutPoint :=
-			script.HostOutPoint{
+			HostOutPoint{
 				TxHash: txHash,
 				Index:  index,
 			}
@@ -120,7 +125,7 @@ func (extAutScript *ExtAutScript) assembleOutputAutTokens() error {
 			return err
 		}
 
-		generatedTokens[i] = &auttoken.AutToken{
+		generatedTokens[i] = &AutToken{
 			Version:      extAutScript.Version(),
 			HostOutPoint: hostOutPoint,
 			CoinAddress:  coinAddress,
@@ -230,7 +235,7 @@ func (extAutScript *ExtAutScript) assembleOutputAutTokens() error {
 // and the AutTokens hosts on the first "consumedTokenNum" PrivacyLevelPSEUDONYMCT TxIns.
 func (extAutScript *ExtAutScript) AssembleInputAutTokensStep1(
 	lookupHostOutputTxoRing func(ringHash chainhash.Hash) (*wire.TxoRing, error),
-	lookupAutToken func(identifier script.AutId, outpoint script.HostOutPoint) (uint32, []byte, error),
+	lookupAutToken func(identifier AutId, outpoint HostOutPoint) (uint32, []byte, error),
 ) error {
 
 	if extAutScript.Type() == script.AutScriptTypeRegistration {
@@ -319,7 +324,7 @@ func (extAutScript *ExtAutScript) AssembleInputAutTokensStep1(
 
 	scriptVersion := extAutScript.Version()
 	identifier := extAutScript.AutIdentifier()
-	consumedTokens := make([]*auttoken.AutToken, numInCoins)
+	consumedTokens := make([]*AutToken, numInCoins)
 	for i := 0; i < len(consumedTokens); i++ {
 		hostTxInIndex := startIndex + i
 		hostTxIn := hostedTxIns[hostTxInIndex]
@@ -379,7 +384,7 @@ func (extAutScript *ExtAutScript) AssembleInputAutTokensStep1(
 			return fmt.Errorf("unsupported aut script type %d", extAutScript.Type())
 		}
 
-		consumedTokens[i] = &auttoken.AutToken{
+		consumedTokens[i] = &AutToken{
 			Version:      tokenVersion,
 			HostOutPoint: *hostOutPoint,
 			CoinAddress:  coinAddress,
@@ -395,12 +400,12 @@ func (extAutScript *ExtAutScript) AssembleInputAutTokensStep1(
 	return nil
 }
 
-func (extAutScript *ExtAutScript) GeneratedTokens() []*auttoken.AutToken {
+func (extAutScript *ExtAutScript) GeneratedTokens() []*AutToken {
 	return extAutScript.generatedTokens
 }
 
 // todo: remove, use assemble function
-func (extAutScript *ExtAutScript) SetConsumedTokens(consumedTokens []*auttoken.AutToken) error {
+func (extAutScript *ExtAutScript) SetConsumedTokens(consumedTokens []*AutToken) error {
 
 	if len(consumedTokens) != extAutScript.NumConsumedTokens() {
 		return fmt.Errorf("mismatched number of consumed tokens")
@@ -413,7 +418,7 @@ func (extAutScript *ExtAutScript) SetConsumedTokens(consumedTokens []*auttoken.A
 }
 
 // todo:
-func (extAutScript *ExtAutScript) ConsumedTokens() ([]*auttoken.AutToken, error) {
+func (extAutScript *ExtAutScript) ConsumedTokens() ([]*AutToken, error) {
 	//if extAutScript.inputHandleStatus != ExtAutScriptInputAssembleStatus_Step2 {
 	//	return nil, fmt.Errorf("consumed tokens not set")
 	//}
@@ -440,7 +445,7 @@ func (extAutScript *ExtAutScript) CreateAutMetadata() (*script.AutMetadata, erro
 		return nil, fmt.Errorf("registerScript sanity check failed: %v", err)
 	}
 
-	rootTokenSet := map[string]*script.HostOutPoint{}
+	rootTokenSet := map[string]*HostOutPoint{}
 	for i := 0; i < len(extAutScript.generatedTokens); i++ {
 		hostOutPoint := extAutScript.generatedTokens[i].HostOutPoint
 		opStr := hostOutPoint.String()
@@ -527,7 +532,7 @@ func (extAutScript *ExtAutScript) UpdateAutMetadata(autMetadata *script.AutMetad
 	updatedAutMetadata.PlannedTotalSupply = reregisterScript.PlannedTotalSupply()
 
 	// issuers
-	updatedAutMetadata.Issuers = make([]*script.AutIssuer, len(reregisterScript.Issuers()))
+	updatedAutMetadata.Issuers = make([]*AutIssuer, len(reregisterScript.Issuers()))
 	for i := 0; i < len(reregisterScript.Issuers()); i++ {
 		updatedAutMetadata.Issuers[i] = reregisterScript.Issuers()[i].Clone()
 	}
@@ -538,7 +543,7 @@ func (extAutScript *ExtAutScript) UpdateAutMetadata(autMetadata *script.AutMetad
 	updatedAutMetadata.MintThreshold = reregisterScript.MintThreshold()
 
 	// set the new AutRootTokens
-	updatedAutMetadata.ActiveRootTokenSet = make(map[string]*script.HostOutPoint, len(extAutScript.generatedTokens))
+	updatedAutMetadata.ActiveRootTokenSet = make(map[string]*HostOutPoint, len(extAutScript.generatedTokens))
 	for i := 0; i < len(extAutScript.generatedTokens); i++ {
 		hostOutPoint := extAutScript.generatedTokens[i].HostOutPoint
 		opStr := hostOutPoint.String()

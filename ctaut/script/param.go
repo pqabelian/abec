@@ -54,8 +54,7 @@ const MaxNumToken = 100             // The allowed total number of output AutTok
 const MaxNumHiddenToken = 5         // TODO get the value from abecryptoxparam.???
 const MaxIssuerNum = 100            // TODO get the value from abecryptoxparam.GetTxOutputMaxNumForSingle(wire.TxVersion)
 
-const issuerLength = 193           // todo(ctaut): confirm to use coin address?
-const MaxIssuerAddressLength = 256 // not exact, to have some redundancy
+const issuerLength = 193 // todo(ctaut): confirm to use coin address?
 
 // The ValueScript in wire.AutTxo would be 10959 bytes (for hidden one) or 9 bytes (for public one)
 // At this moment, there may be up to 5 hidden one and 95 public one, i.e. 10959*5 + 95*9 = 55650
