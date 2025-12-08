@@ -23,6 +23,6 @@ type ExtAutScript = extscript.ExtAutScript
 
 type AutMetadata = script.AutMetadata
 
-func NewAutIssuer(issuerAddress []byte) *AutIssuer {
-	return dao.NewAutIssuer(issuerAddress)
+func NewAutIssuerFromCoinAddress(coinAddress []byte) *AutIssuer {
+	return dao.NewAutIssuerFromCoinAddress(coinAddress)
 }
