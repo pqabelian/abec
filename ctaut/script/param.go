@@ -5,11 +5,6 @@ import (
 	ctautwire "github.com/abesuite/abec/ctaut/wire"
 )
 
-// All CT-AUT Script must start with the following specified prefix.
-// Any that starts with this prefix but does not have valid script content will be rejected.
-// Use a constant string to avoid unconscious modifications
-const commonPrefix = "AUTSCRIPT"
-
 type AutScriptType = uint8
 
 const (
@@ -53,8 +48,6 @@ const MaxAmount = uint64(1)<<51 - 1 // TODO get the value from abecryptoxparam.?
 const MaxNumToken = 100             // The allowed total number of output AutTokens in one AutTransaction.
 const MaxNumHiddenToken = 5         // TODO get the value from abecryptoxparam.???
 const MaxIssuerNum = 100            // TODO get the value from abecryptoxparam.GetTxOutputMaxNumForSingle(wire.TxVersion)
-
-const issuerLength = 193 // todo(ctaut): confirm to use coin address?
 
 // The ValueScript in wire.AutTxo would be 10959 bytes (for hidden one) or 9 bytes (for public one)
 // At this moment, there may be up to 5 hidden one and 95 public one, i.e. 10959*5 + 95*9 = 55650

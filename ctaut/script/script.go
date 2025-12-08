@@ -2,7 +2,6 @@ package script
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"github.com/abesuite/abec/ctaut/dao"
 	"io"
@@ -2686,84 +2685,6 @@ func (autScript *BurnScript) NumGeneratedTokens() int {
 }
 
 var _ AutScript = &BurnScript{}
-
-var ErrNonAutTx = errors.New("not a AUT transaction")
-var ErrInValidAUTTx = errors.New("not a valid AUT transaction")
-
-// PackageAutScript packages an AutScript to a packagedAutScript, where
-// packagedAutScript = commonPrefix (="AUTSCRIPT") || version (in VarInt form) || serializedAutScript (in VarBytes form).
-func PackageAutScript(script AutScript) (packagedAutScript []byte, err error) {
-
-	serializedScript, err := script.Serialize()
-	if err != nil {
-		return nil, err
-	}
-
-	length := len([]byte(commonPrefix))
-	length += wire.VarIntSerializeSize(uint64(script.Version()))
-
-	length += wire.VarIntSerializeSize(uint64(len(serializedScript))) + len(serializedScript)
-
-	w := bytes.NewBuffer(make([]byte, 0, length))
-
-	_, err = w.Write([]byte(commonPrefix))
-	if err != nil {
-		return nil, err
-	}
-
-	err = wire.WriteVarInt(w, 0, uint64(script.Version()))
-	if err != nil {
-		return nil, err
-	}
-
-	err = wire.WriteVarBytes(w, 0, serializedScript)
-	if err != nil {
-		return nil, err
-	}
-
-	return w.Bytes(), nil
-}
-
-// UnpackageAutScript unpackages a packagedAutScript to an AutScript, where packagedAutScript is assumed to start from
-// commonPrefix (="AUTSCRIPT") || version (in VarInt form) || serializedAutScript (in VarBytes form).
-// A packagedAutScript does not satisfy this form will result an error returned.
-func UnpackageAutScript(packagedAutScript []byte) (AutScript, error) {
-	commonPrefixLen := len([]byte(commonPrefix))
-	if len(packagedAutScript) < commonPrefixLen {
-		return nil, fmt.Errorf("packagedAutScript is not well-form as expected")
-	}
-
-	if !bytes.Equal(packagedAutScript[:commonPrefixLen], []byte(commonPrefix)) {
-		return nil, fmt.Errorf("packagedAutScript is not well-form as expected: not start with %s", commonPrefix)
-	}
-
-	r := bytes.NewReader(packagedAutScript[commonPrefixLen:])
-	versionRead, err := wire.ReadVarInt(r, 0)
-	if err != nil {
-		return nil, err
-	}
-	if versionRead > math.MaxUint32 {
-		return nil, fmt.Errorf("readed script version (%d) is too large", versionRead)
-	}
-	scriptVersion := uint32(versionRead)
-	if _, ok := ctautwire.AutScriptVersionSet[scriptVersion]; !ok {
-		return nil, fmt.Errorf("unknown version %d", scriptVersion)
-	}
-
-	serializedScript, err := wire.ReadVarBytes(r, 0, MaxAutScriptLength, "AutScript")
-	if err != nil {
-		return nil, err
-	}
-
-	// todo: if multiple versions are supported, may need to code here to run different branch
-	switch scriptVersion {
-	case ctautwire.AutScriptVersion_1:
-		return DeserializeAutScriptV1(serializedScript)
-
-	default:
-		return nil, fmt.Errorf("unknown aut script version %d", scriptVersion)
-	}
-}
 
 // DeserializeAutScriptV1 deserializes the serializedAutScript to an AutScript, where
 // serializedAutScript is assumed to be the result of Serialize of AutScript with Version=AutScriptVersion_1.
