@@ -3,10 +3,11 @@ package script
 import (
 	"bytes"
 	"fmt"
-	"github.com/abesuite/abec/ctaut/dao"
 	"io"
 	"math"
 	"strings"
+
+	"github.com/abesuite/abec/ctaut/dao"
 
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/chainhash"
@@ -616,8 +617,14 @@ type AutScript interface {
 
 	WitnessHash() chainhash.Hash
 
+	// InStartIndex returns the start index of the input AutTokens.
+	InStartIndex() uint8
+
 	// NumConsumedTokens returns the number of AutRootTokens/AutTokens that this AutScript consumes.
 	NumConsumedTokens() int
+
+	// OutStartIndex returns the start index of the output AutTokens.
+	OutStartIndex() uint8
 
 	// NumGeneratedTokens returns the number of AutRootTokens/AutTokens that this AutScript generates.
 	NumGeneratedTokens() int
@@ -674,9 +681,14 @@ type RegistrationScript struct {
 	mintThreshold              uint8
 
 	// the number of output AutRootTokens
+	outStartIndex      uint8
 	outAutRootTokenNum uint8 // value is set in deserialize, so, do not provide set function, but provide get function.
 
 	scriptMemo []byte
+}
+
+func (autScript *RegistrationScript) InStartIndex() uint8 {
+	return 0
 }
 
 func (autScript *RegistrationScript) AutName() []byte {
@@ -723,6 +735,9 @@ func (autScript *RegistrationScript) ReregisterThreshold() uint8 {
 	return autScript.reregisterThreshold
 }
 
+func (autScript *RegistrationScript) OutStartIndex() uint8 {
+	return autScript.outStartIndex
+}
 func (autScript *RegistrationScript) OutAutRootTokenNum() uint8 {
 	return autScript.outAutRootTokenNum
 }
@@ -738,7 +753,7 @@ func NewRegistrationScript(version uint32,
 	autName []byte, autSymbol []byte, baseUnitName []byte, subUnitName []byte, unitScale uint64,
 	autMemo []byte, plannedTotalSupply uint64,
 	issuers []*AutIssuer, reregistrationExpireHeight int32, reregisterThreshold uint8, mintThreshold uint8,
-	outAutRootTokenNum uint8,
+	outStarIndex uint8, outAutRootTokenNum uint8,
 	scriptMemo []byte) *RegistrationScript {
 
 	return &RegistrationScript{
@@ -756,6 +771,7 @@ func NewRegistrationScript(version uint32,
 		reregistrationExpireHeight: reregistrationExpireHeight,
 		reregisterThreshold:        reregisterThreshold,
 		mintThreshold:              mintThreshold,
+		outStartIndex:              outStarIndex,
 		outAutRootTokenNum:         outAutRootTokenNum,
 		scriptMemo:                 scriptMemo,
 	}
@@ -790,6 +806,7 @@ func (autScript *RegistrationScript) serializeSize() int {
 
 	n += 1 // reregisterThreshold        uint8
 	n += 1 // mintThreshold              uint8
+	n += 1 // outStartIndex         uint8
 	n += 1 // outAutRootTokenNum         uint8
 
 	n += wire.VarIntSerializeSize(uint64(len(autScript.scriptMemo))) + len(autScript.scriptMemo) // scriptMemo                 []byte
@@ -1111,6 +1128,12 @@ func (autScript *RegistrationScript) SanityCheck() error {
 			autScript.mintThreshold, len(autScript.issuers))
 	}
 
+	// outStartIndex         uint8
+	//if int(autScript.outStartIndex) == 0 {
+	//	return fmt.Errorf("autScript.outStartIndex (%d) is invalid",
+	//		autScript.outStartIndex)
+	//}
+
 	// outAutRootTokenNum         uint8
 	if int(autScript.outAutRootTokenNum) == 0 {
 		return fmt.Errorf("autScript.outAutRootTokenNum (%d) is invalid",
@@ -1192,9 +1215,11 @@ type ReRegistrationScript struct {
 	mintThreshold              uint8
 
 	// inAutRootTokenNum is an additional field that ReRegistrationScript has while RegistrationScript doesn't.
+	inStartIndex      uint8
 	inAutRootTokenNum uint8
 
 	// the number of output AutRootTokens
+	outStartIndex      uint8
 	outAutRootTokenNum uint8 // value is set in deserialize, so, do not provide set function, but provide get function.
 
 	scriptMemo []byte
@@ -1224,8 +1249,16 @@ func (autScript *ReRegistrationScript) ReregisterThreshold() uint8 {
 	return autScript.reregisterThreshold
 }
 
+func (autScript *ReRegistrationScript) InStartIndex() uint8 {
+	return autScript.inStartIndex
+}
+
 func (autScript *ReRegistrationScript) InAutRootTokenNum() uint8 {
 	return autScript.inAutRootTokenNum
+}
+
+func (autScript *ReRegistrationScript) OutStartIndex() uint8 {
+	return autScript.outStartIndex
 }
 
 func (autScript *ReRegistrationScript) OutAutRootTokenNum() uint8 {
@@ -1240,7 +1273,8 @@ func NewReRegistrationScript(version uint32,
 	autIdentifier AutId,
 	autMemo []byte, plannedTotalSupply uint64,
 	issuers []*AutIssuer, reregistrationExpireHeight int32, reregisterThreshold uint8, mintThreshold uint8,
-	inAutRootTokenNum uint8, outAutRootTokenNum uint8,
+	inStartIndex uint8, inAutRootTokenNum uint8,
+	outStartIndex uint8, outAutRootTokenNum uint8,
 	scriptMemo []byte) *ReRegistrationScript {
 
 	return &ReRegistrationScript{
@@ -1253,7 +1287,9 @@ func NewReRegistrationScript(version uint32,
 		reregistrationExpireHeight: reregistrationExpireHeight,
 		reregisterThreshold:        reregisterThreshold,
 		mintThreshold:              mintThreshold,
+		inStartIndex:               inStartIndex,
 		inAutRootTokenNum:          inAutRootTokenNum,
+		outStartIndex:              outStartIndex,
 		outAutRootTokenNum:         outAutRootTokenNum,
 		scriptMemo:                 scriptMemo,
 	}
@@ -1283,7 +1319,9 @@ func (autScript *ReRegistrationScript) serializeSize() int {
 
 	n += 1 // reregisterThreshold        uint8
 	n += 1 // mintThreshold              uint8
+	n += 1 // inStartIndex          uint8
 	n += 1 // inAutRootTokenNum          uint8
+	n += 1 // outStartIndex         uint8
 	n += 1 // outAutRootTokenNum         uint8
 
 	n += wire.VarIntSerializeSize(uint64(len(autScript.scriptMemo))) + len(autScript.scriptMemo) // scriptMemo                 []byte
@@ -1346,8 +1384,23 @@ func (autScript *ReRegistrationScript) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
+	// inStartIndex         uint8
+	if err = w.WriteByte(autScript.inStartIndex); err != nil {
+		return nil, err
+	}
+
 	// inAutRootTokenNum         uint8
 	if err = w.WriteByte(autScript.inAutRootTokenNum); err != nil {
+		return nil, err
+	}
+
+	// outStartIndex         uint8
+	if err = w.WriteByte(autScript.outStartIndex); err != nil {
+		return nil, err
+	}
+
+	// outStartIndex         uint8
+	if err = w.WriteByte(autScript.outStartIndex); err != nil {
 		return nil, err
 	}
 
@@ -1439,8 +1492,23 @@ func (autScript *ReRegistrationScript) Deserialize(serializedScript []byte) erro
 		return err
 	}
 
+	// inStartIndex         uint8
+	if autScript.inStartIndex, err = r.ReadByte(); err != nil {
+		return err
+	}
+
 	// inAutRootTokenNum         uint8
 	if autScript.inAutRootTokenNum, err = r.ReadByte(); err != nil {
+		return err
+	}
+
+	// outStartIndex         uint8
+	if autScript.outStartIndex, err = r.ReadByte(); err != nil {
+		return err
+	}
+
+	// outStartIndex         uint8
+	if autScript.outStartIndex, err = r.ReadByte(); err != nil {
 		return err
 	}
 
@@ -1521,6 +1589,12 @@ func (autScript *ReRegistrationScript) SanityCheck() error {
 			autScript.mintThreshold, len(autScript.issuers))
 	}
 
+	// inStartIndex         uint8
+	//if int(autScript.inStartIndex) == 0 {
+	//	return fmt.Errorf("autScript.inStartIndex (%d) is invalid",
+	//		autScript.inStartIndex)
+	//}
+
 	// inAutRootTokenNum         uint8
 	if int(autScript.inAutRootTokenNum) == 0 {
 		return fmt.Errorf("autScript.inAutRootTokenNum (%d) is invalid",
@@ -1530,6 +1604,12 @@ func (autScript *ReRegistrationScript) SanityCheck() error {
 		return fmt.Errorf("autScript.inAutRootTokenNum (%d) exceeds the allowed max number (%d)",
 			autScript.inAutRootTokenNum, MaxNumToken)
 	}
+
+	// outStartIndex         uint8
+	//if int(autScript.outStartIndex) == 0 {
+	//	return fmt.Errorf("autScript.outStartIndex (%d) is invalid",
+	//		autScript.outStartIndex)
+	//}
 
 	// outAutRootTokenNum         uint8
 	if int(autScript.outAutRootTokenNum) == 0 {
@@ -1599,12 +1679,14 @@ type MintScript struct {
 	// It is used to locate the start and end TxIn of the host-Tx, which should be parsed as AutRootToken.
 	// The RULE is the FIRST inAutRootTokenNum pseudonym TxIn of the host-Tx should be AutRootToken.
 	// When generating the script, inAutRootTokenNum must be set correctly.
+	inStartIndex      uint8
 	inAutRootTokenNum uint8
 
 	// outHiddenAutTokenNum and outPublicAutTokenNum together specify the number of generated AutTokens by the host-Tx.
 	// They are used to locate the start and end Txo of the host-Tx, which should be parsed as AutTokens.
 	// The RULE is (a) the FIRST outHiddenAutTokenNum pseudonym Txo of the host-Tx should be HiddenAutTxo,
 	// and then (b) the following outPublicAutTokenNum pseudonym Txo of the host-Tx should be publicAutTxo.
+	outStartIndex        uint8
 	outHiddenAutTokenNum uint8
 	outPublicAutTokenNum uint8
 	serializedAutTxos    [][]byte // length = outHiddenAutTokenNum + outPublicAutTokenNum
@@ -1617,8 +1699,16 @@ func (autScript *MintScript) Vin() uint64 {
 	return autScript.vin
 }
 
+func (autScript *MintScript) InStartIndex() uint8 {
+	return autScript.inStartIndex
+}
+
 func (autScript *MintScript) InAutRootTokenNum() uint8 {
 	return autScript.inAutRootTokenNum
+}
+
+func (autScript *MintScript) OutStartIndex() uint8 {
+	return autScript.outStartIndex
 }
 
 func (autScript *MintScript) OutHiddenAutTokenNum() uint8 {
@@ -1639,8 +1729,10 @@ func (autScript *MintScript) ScriptMemo() []byte {
 
 func NewMintScript(version uint32,
 	autIdentifier AutId,
-	vin uint64, inAutRootTokenNum uint8,
-	outCTAutTokenNum uint8, outPlainAutTokenNum uint8, serializedAutTxos [][]byte,
+	vin uint64,
+	inStartIndex uint8, inAutRootTokenNum uint8,
+	outStartIndex uint8, outCTAutTokenNum uint8, outPlainAutTokenNum uint8,
+	serializedAutTxos [][]byte,
 	witnessHash chainhash.Hash,
 	scriptMemo []byte) *MintScript {
 
@@ -1649,7 +1741,9 @@ func NewMintScript(version uint32,
 		scriptType:           AutScriptTypeMint,
 		autIdentifier:        autIdentifier,
 		vin:                  vin,
+		inStartIndex:         inStartIndex,
 		inAutRootTokenNum:    inAutRootTokenNum,
+		outStartIndex:        outStartIndex,
 		outHiddenAutTokenNum: outCTAutTokenNum,
 		outPublicAutTokenNum: outPlainAutTokenNum,
 		serializedAutTxos:    serializedAutTxos,
@@ -1675,7 +1769,9 @@ func (autScript *MintScript) serializeSize() int {
 	n += chainhash.HashSize                                  // autIdentifier              AutId
 
 	n += wire.VarIntSerializeSize(autScript.vin) // vin                  uint64
+	n += 1                                       // inStartIndex    uint8
 	n += 1                                       // inAutRootTokenNum    uint8
+	n += 1                                       // outStartIndex uint8
 	n += 1                                       // outHiddenAutTokenNum uint8
 	n += 1                                       // outPublicAutTokenNum uint8
 
@@ -1715,8 +1811,18 @@ func (autScript *MintScript) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
+	// inStartIndex    uint8
+	if err = w.WriteByte(autScript.inStartIndex); err != nil {
+		return nil, err
+	}
+
 	// inAutRootTokenNum    uint8
 	if err = w.WriteByte(autScript.inAutRootTokenNum); err != nil {
+		return nil, err
+	}
+
+	// outStartIndex    uint8
+	if err = w.WriteByte(autScript.outStartIndex); err != nil {
 		return nil, err
 	}
 
@@ -1784,8 +1890,20 @@ func (autScript *MintScript) Deserialize(serializedScript []byte) error {
 		return err
 	}
 
+	// inStartIndex    uint8
+	autScript.inStartIndex, err = r.ReadByte()
+	if err != nil {
+		return err
+	}
+
 	// inAutRootTokenNum    uint8
 	autScript.inAutRootTokenNum, err = r.ReadByte()
+	if err != nil {
+		return err
+	}
+
+	// inStartIndex    uint8
+	autScript.outStartIndex, err = r.ReadByte()
 	if err != nil {
 		return err
 	}
@@ -1850,6 +1968,12 @@ func (autScript *MintScript) SanityCheck() error {
 		return fmt.Errorf("autScript.vin (%d) is not in [1, %d]", autScript.vin, MaxAmount)
 	}
 
+	// inStartIndex    uint8
+	//if int(autScript.inStartIndex) == 0 {
+	//	return fmt.Errorf("autScript.inStartIndex (%d) is invalid",
+	//		autScript.inStartIndex)
+	//}
+
 	// inAutRootTokenNum    uint8
 	if int(autScript.inAutRootTokenNum) == 0 {
 		return fmt.Errorf("autScript.inAutRootTokenNum (%d) is invalid",
@@ -1859,6 +1983,12 @@ func (autScript *MintScript) SanityCheck() error {
 		return fmt.Errorf("autScript.inAutRootTokenNum (%d) exceeds the allowed max number (%d)",
 			autScript.inAutRootTokenNum, MaxNumToken)
 	}
+
+	// outStartIndex    uint8
+	//if int(autScript.outStartIndex) == 0 {
+	//	return fmt.Errorf("autScript.outStartIndex (%d) is invalid",
+	//		autScript.outStartIndex)
+	//}
 
 	// outHiddenAutTokenNum uint8
 	if int(autScript.outHiddenAutTokenNum) > MaxNumHiddenToken {
@@ -1960,9 +2090,11 @@ type TransferScript struct {
 	scriptType    AutScriptType
 	autIdentifier AutId
 
+	inStartIndex        uint8
 	inHiddenAutTokenNum uint8
 	inPublicAutTokenNum uint8
 
+	outStartIndex        uint8
 	outHiddenAutTokenNum uint8
 	outPublicAutTokenNum uint8
 	serializedAutTxos    [][]byte
@@ -1971,12 +2103,20 @@ type TransferScript struct {
 	scriptMemo  []byte
 }
 
+func (autScript *TransferScript) InStartIndex() uint8 {
+	return autScript.inStartIndex
+}
+
 func (autScript *TransferScript) InHiddenAutTokenNum() uint8 {
 	return autScript.inHiddenAutTokenNum
 }
 
 func (autScript *TransferScript) InPublicAutTokenNum() uint8 {
 	return autScript.inPublicAutTokenNum
+}
+
+func (autScript *TransferScript) OutStartIndex() uint8 {
+	return autScript.outStartIndex
 }
 
 func (autScript *TransferScript) OutHiddenAutTokenNum() uint8 {
@@ -1997,8 +2137,9 @@ func (autScript *TransferScript) ScriptMemo() []byte {
 
 func NewTransferScript(version uint32,
 	autIdentifier AutId,
-	inHiddenAutTokenNum uint8, inPublicAutTokenNum uint8,
-	outHiddenAutTokenNum uint8, outPlainAutTokenNum uint8, serializedAutTxos [][]byte,
+	inStartIndex uint8, inHiddenAutTokenNum uint8, inPublicAutTokenNum uint8,
+	outStartIndex uint8, outHiddenAutTokenNum uint8, outPlainAutTokenNum uint8,
+	serializedAutTxos [][]byte,
 	witnessHash chainhash.Hash,
 	scriptMemo []byte) *TransferScript {
 
@@ -2006,8 +2147,10 @@ func NewTransferScript(version uint32,
 		version:              version,
 		scriptType:           AutScriptTypeTransfer,
 		autIdentifier:        autIdentifier,
+		inStartIndex:         inStartIndex,
 		inHiddenAutTokenNum:  inHiddenAutTokenNum,
 		inPublicAutTokenNum:  inPublicAutTokenNum,
+		outStartIndex:        outStartIndex,
 		outHiddenAutTokenNum: outHiddenAutTokenNum,
 		outPublicAutTokenNum: outPlainAutTokenNum,
 		serializedAutTxos:    serializedAutTxos,
@@ -2033,8 +2176,10 @@ func (autScript *TransferScript) serializeSize() int {
 	n += 1                                                   // scriptType                 AutScriptType
 	n += chainhash.HashSize                                  // autIdentifier              AutId
 
+	n += 1 // inStartIndex  uint8
 	n += 1 // inHiddenAutTokenNum  uint8
 	n += 1 // inPublicAutTokenNum  uint8
+	n += 1 // outStartIndex uint8
 	n += 1 // outHiddenAutTokenNum uint8
 	n += 1 // outPublicAutTokenNum uint8
 
@@ -2138,6 +2283,12 @@ func (autScript *TransferScript) Deserialize(serializedScript []byte) error {
 		return err
 	}
 
+	// inStartIndex    uint8
+	autScript.inStartIndex, err = r.ReadByte()
+	if err != nil {
+		return err
+	}
+
 	// inHiddenAutTokenNum    uint8
 	autScript.inHiddenAutTokenNum, err = r.ReadByte()
 	if err != nil {
@@ -2146,6 +2297,12 @@ func (autScript *TransferScript) Deserialize(serializedScript []byte) error {
 
 	// inPublicAutTokenNum    uint8
 	autScript.inPublicAutTokenNum, err = r.ReadByte()
+	if err != nil {
+		return err
+	}
+
+	// outStartIndex    uint8
+	autScript.outStartIndex, err = r.ReadByte()
 	if err != nil {
 		return err
 	}
@@ -2205,6 +2362,12 @@ func (autScript *TransferScript) SanityCheck() error {
 
 	// autIdentifier              AutId
 
+	// inStartIndex    uint8
+	//if int(autScript.inStartIndex) > MaxNumHiddenToken {
+	//	return fmt.Errorf("autScript.inStartIndex (%d) exceeds the allowed max number (%d)",
+	//		autScript.inStartIndex, MaxNumHiddenToken)
+	//}
+
 	// inHiddenAutTokenNum    uint8
 	if int(autScript.inHiddenAutTokenNum) > MaxNumHiddenToken {
 		return fmt.Errorf("autScript.inHiddenAutTokenNum (%d) exceeds the allowed max number (%d)",
@@ -2226,6 +2389,12 @@ func (autScript *TransferScript) SanityCheck() error {
 		return fmt.Errorf("autScript.inHiddenAutTokenNum (%d) + script.inPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
 			autScript.inHiddenAutTokenNum, autScript.inPublicAutTokenNum, MaxNumToken)
 	}
+
+	// outStartIndex uint8
+	//if int(autScript.outStartIndex) > MaxNumHiddenToken {
+	//	return fmt.Errorf("autScript.outStartIndex (%d) exceeds the allowed max number (%d)",
+	//		autScript.outStartIndex, MaxNumHiddenToken)
+	//}
 
 	// outHiddenAutTokenNum uint8
 	if int(autScript.outHiddenAutTokenNum) > MaxNumHiddenToken {
@@ -2328,8 +2497,11 @@ type BurnScript struct {
 	scriptType    AutScriptType
 	autIdentifier AutId
 
-	inHiddenAutTokenNum  uint8
-	inPublicAutTokenNum  uint8
+	inStartIndex        uint8
+	inHiddenAutTokenNum uint8
+	inPublicAutTokenNum uint8
+
+	outStartIndex        uint8
 	outHiddenAutTokenNum uint8
 	outPublicAutTokenNum uint8
 	serializedAutTxos    [][]byte
@@ -2338,12 +2510,20 @@ type BurnScript struct {
 	scriptMemo  []byte
 }
 
+func (autScript *BurnScript) InStartIndex() uint8 {
+	return autScript.inStartIndex
+}
+
 func (autScript *BurnScript) InHiddenAutTokenNum() uint8 {
 	return autScript.inHiddenAutTokenNum
 }
 
 func (autScript *BurnScript) InPublicAutTokenNum() uint8 {
 	return autScript.inPublicAutTokenNum
+}
+
+func (autScript *BurnScript) OutStartIndex() uint8 {
+	return autScript.outStartIndex
 }
 
 func (autScript *BurnScript) OutHiddenAutTokenNum() uint8 {
@@ -2364,8 +2544,9 @@ func (autScript *BurnScript) ScriptMemo() []byte {
 
 func NewBurnScript(version uint32,
 	autIdentifier AutId,
-	inHiddenAutTokenNum uint8, inPublicAutTokenNum uint8,
-	outHiddenAutTokenNum uint8, outPublicAutTokenNum uint8, serializedAutTxos [][]byte,
+	inStartIndex uint8, inHiddenAutTokenNum uint8, inPublicAutTokenNum uint8,
+	outStartIndex uint8, outHiddenAutTokenNum uint8, outPublicAutTokenNum uint8,
+	serializedAutTxos [][]byte,
 	witnessHash chainhash.Hash,
 	scriptMemo []byte) *BurnScript {
 
@@ -2373,8 +2554,10 @@ func NewBurnScript(version uint32,
 		version:              version,
 		scriptType:           AutScriptTypeBurn,
 		autIdentifier:        autIdentifier,
+		inStartIndex:         inStartIndex,
 		inHiddenAutTokenNum:  inHiddenAutTokenNum,
 		inPublicAutTokenNum:  inPublicAutTokenNum,
+		outStartIndex:        outStartIndex,
 		outHiddenAutTokenNum: outHiddenAutTokenNum,
 		outPublicAutTokenNum: outPublicAutTokenNum,
 		serializedAutTxos:    serializedAutTxos,
@@ -2400,8 +2583,10 @@ func (autScript *BurnScript) serializeSize() int {
 	n += 1                                                   // scriptType                 AutScriptType
 	n += chainhash.HashSize                                  // autIdentifier              AutId
 
+	n += 1 // inStartIndex  uint8
 	n += 1 // inHiddenAutTokenNum  uint8
 	n += 1 // inPublicAutTokenNum  uint8
+	n += 1 // outStartIndex uint8
 	n += 1 // outHiddenAutTokenNum uint8
 	n += 1 // outPublicAutTokenNum uint8
 
@@ -2436,6 +2621,16 @@ func (autScript *BurnScript) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
+	// inStartIndex    uint8
+	if err = w.WriteByte(autScript.inStartIndex); err != nil {
+		return nil, err
+	}
+
+	// inStartIndex    uint8
+	if err = w.WriteByte(autScript.inStartIndex); err != nil {
+		return nil, err
+	}
+
 	// inHiddenAutTokenNum    uint8
 	if err = w.WriteByte(autScript.inHiddenAutTokenNum); err != nil {
 		return nil, err
@@ -2443,6 +2638,16 @@ func (autScript *BurnScript) Serialize() ([]byte, error) {
 
 	// inPublicAutTokenNum    uint8
 	if err = w.WriteByte(autScript.inPublicAutTokenNum); err != nil {
+		return nil, err
+	}
+
+	// outStartIndex uint8
+	if err = w.WriteByte(autScript.outStartIndex); err != nil {
+		return nil, err
+	}
+
+	// outStartIndex uint8
+	if err = w.WriteByte(autScript.outStartIndex); err != nil {
 		return nil, err
 	}
 
@@ -2505,6 +2710,12 @@ func (autScript *BurnScript) Deserialize(serializedScript []byte) error {
 		return err
 	}
 
+	// inStartIndex    uint8
+	autScript.inStartIndex, err = r.ReadByte()
+	if err != nil {
+		return err
+	}
+
 	// inHiddenAutTokenNum    uint8
 	autScript.inHiddenAutTokenNum, err = r.ReadByte()
 	if err != nil {
@@ -2513,6 +2724,12 @@ func (autScript *BurnScript) Deserialize(serializedScript []byte) error {
 
 	// inPublicAutTokenNum    uint8
 	autScript.inPublicAutTokenNum, err = r.ReadByte()
+	if err != nil {
+		return err
+	}
+
+	// outStartIndex    uint8
+	autScript.outStartIndex, err = r.ReadByte()
 	if err != nil {
 		return err
 	}
@@ -2572,6 +2789,12 @@ func (autScript *BurnScript) SanityCheck() error {
 
 	// autIdentifier              AutId
 
+	// inStartIndex    uint8
+	//if int(autScript.inStartIndex) > MaxNumHiddenToken {
+	//	return fmt.Errorf("autScript.inStartIndex (%d) exceeds the allowed max number (%d)",
+	//		autScript.inStartIndex, MaxNumHiddenToken)
+	//}
+
 	// inHiddenAutTokenNum    uint8
 	if int(autScript.inHiddenAutTokenNum) > MaxNumHiddenToken {
 		return fmt.Errorf("autScript.inHiddenAutTokenNum (%d) exceeds the allowed max number (%d)",
@@ -2593,6 +2816,12 @@ func (autScript *BurnScript) SanityCheck() error {
 		return fmt.Errorf("autScript.inHiddenAutTokenNum (%d) + autScript.inPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
 			autScript.inHiddenAutTokenNum, autScript.inPublicAutTokenNum, MaxNumToken)
 	}
+
+	// outStartIndex uint8
+	//if int(autScript.outStartIndex) > MaxNumHiddenToken {
+	//	return fmt.Errorf("autScript.outStartIndex (%d) exceeds the allowed max number (%d)",
+	//		autScript.outStartIndex, MaxNumHiddenToken)
+	//}
 
 	// outHiddenAutTokenNum uint8
 	if int(autScript.outHiddenAutTokenNum) > MaxNumHiddenToken {

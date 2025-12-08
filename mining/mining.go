@@ -3,7 +3,6 @@ package mining
 import (
 	"container/heap"
 	"encoding/binary"
-	"errors"
 	"fmt"
 
 	"github.com/abesuite/abec/blockchain/consensus"
@@ -839,20 +838,20 @@ mempoolLoop:
 			}
 		}
 
-		ctAutView := blockchain.NewCTAUTViewpoint()
+		// TODO fetch
+		ctAutView, err := g.chain.FetchCTAUTView(tx.ExtAutScript())
+		if err != nil {
+			log.Debugf("Skipping tx %s because it "+
+				"contains an invalid CTAUT transaction: %v",
+				tx.Hash(), err)
+			continue
+		}
+
 		err = blockchain.ValidateTxCTAUTScript(
 			tx,
 			ctAutView,
+			utxoRings,
 			nextBlockHeight,
-			func(ringHash chainhash.Hash) (*wire.TxoRing, error) {
-				ringEntry := utxoRings.LookupEntry(ringHash)
-				if ringEntry == nil {
-					return nil, errors.New("no such ring found")
-				}
-				return ringEntry.TxoRing(), nil
-			},
-			g.chain.FetchCTAUTMetadata,
-			g.chain.FetchCTAUTToken,
 			g.chainParams,
 		)
 		if err != nil {
@@ -1008,16 +1007,10 @@ mempoolLoop:
 		}
 
 		// TODO confirm blockCTAUTView is used correctly?
-		err = blockchain.ValidateTxCTAUTScript(tx, blockCTAUTView, nextBlockHeight,
-			func(ringHash chainhash.Hash) (*wire.TxoRing, error) {
-				ringEntry := blockUtxoRings.LookupEntry(ringHash)
-				if ringEntry == nil {
-					return nil, errors.New("no such ring found")
-				}
-				return ringEntry.TxoRing(), nil
-			},
-			nil,
-			nil,
+		err = blockchain.ValidateTxCTAUTScript(tx,
+			blockCTAUTView,
+			blockUtxoRings,
+			nextBlockHeight,
 			g.chainParams,
 		)
 		if err != nil {

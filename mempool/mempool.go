@@ -81,9 +81,7 @@ type Config struct {
 	FetchUtxoRingView func(*abeutil.TxAbe) (*blockchain.UtxoRingViewpoint, error)
 	//FetchAUTView      func(*abeutil.TxAbe) (*blockchain.AUTViewpoint, error)
 	// TODO should be removed
-	FetchCTAUTView     func(ctAutScript *ctautapi.ExtAutScript) (*blockchain.CTAUTViewpoint, error)
-	FetchCTAUTMetadata func(identifier ctautapi.AutId) (*ctautapi.AutMetadata, error)
-	FetchCTAUTToken    func(identifier ctautapi.AutId, outpoint ctautapi.HostOutPoint) (*blockchain.CTAUTCoin, error)
+	FetchCTAUTView func(ctAutScript *ctautapi.ExtAutScript) (*blockchain.CTAUTViewpoint, error)
 
 	// BestHeight defines the function to use to access the block height of
 	// the current best chain.
@@ -1371,7 +1369,12 @@ func (mp *TxPool) fetchInputAUT(tx *abeutil.TxAbe) (*blockchain.AUTViewpoint, er
 	//return autView, nil
 	return nil, errors.New("AUT is not supported")
 }
-func (mp *TxPool) fetchInputCTAUT(extAutScript *ctautapi.ExtAutScript) (*blockchain.CTAUTViewpoint, error) {
+func (mp *TxPool) fetchInputCTAUT(tx *abeutil.TxAbe) (*blockchain.CTAUTViewpoint, error) {
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		return nil, nil
+	}
+
 	ctAutView, err := mp.cfg.FetchCTAUTView(extAutScript)
 	if err != nil {
 		return nil, err
@@ -1893,23 +1896,16 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 
 	// == CT-AUT checking rule ==
 	// cache any token for checking
-	ctAutView := blockchain.NewCTAUTViewpoint()
+	ctAutView, err := mp.fetchInputCTAUT(tx)
+	if err != nil {
+		if cerr, ok := err.(ruleerror.RuleError); ok {
+			return nil, nil, chainRuleError(cerr)
+		}
+		return nil, nil, err
+	}
+
 	// load all token andd me
-	err = blockchain.ValidateTxCTAUTScript(
-		tx,
-		ctAutView,
-		nextBlockHeight,
-		func(ringHash chainhash.Hash) (*wire.TxoRing, error) {
-			ringEntry := utxoRingView.LookupEntry(ringHash)
-			if ringEntry == nil {
-				return nil, fmt.Errorf("no such txo ring found")
-			}
-			return ringEntry.TxoRing(), nil
-		},
-		mp.cfg.FetchCTAUTMetadata,
-		mp.cfg.FetchCTAUTToken,
-		mp.cfg.ChainParams,
-	)
+	err = blockchain.ValidateTxCTAUTScript(tx, ctAutView, utxoRingView, nextBlockHeight, mp.cfg.ChainParams)
 	if err != nil {
 		return nil, nil, txRuleError(wire.RejectCTAutBadForm, err.Error())
 	}

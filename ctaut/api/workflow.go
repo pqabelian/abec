@@ -27,72 +27,82 @@ func NewRegistrationScript(version uint32,
 	autName []byte, autSymbol []byte, baseUnitName []byte, subUnitName []byte, unitScale uint64,
 	autMemo []byte, plannedTotalSupply uint64,
 	issuers []*AutIssuer, reregistrationExpireHeight int32, reregisterThreshold uint8, mintThreshold uint8,
-	outAutRootTokenNum uint8,
+	outStarIndex uint8, outAutRootTokenNum uint8,
 	scriptMemo []byte) *RegistrationScript {
 	return script.NewRegistrationScript(version,
 		autName, autSymbol, baseUnitName, subUnitName, unitScale,
 		autMemo, plannedTotalSupply,
 		issuers, reregistrationExpireHeight, reregisterThreshold, mintThreshold,
-		outAutRootTokenNum,
+		outStarIndex, outAutRootTokenNum,
 		scriptMemo)
 }
 
 func NewReRegistrationScript(version uint32,
 	autIdentifier AutId,
 	autMemo []byte, plannedTotalSupply uint64,
-	issuers []*AutIssuer, reregistrationExpireHeight int32, reregisterThreshold uint8, mintThreshold uint8,
-	inAutRootTokenNum uint8, outAutRootTokenNum uint8,
+	issuers []*AutIssuer, reregistrationExpireHeight int32,
+	reregisterThreshold uint8, mintThreshold uint8,
+	inStartIndex uint8, inAutRootTokenNum uint8,
+	outStartIndex uint8, outAutRootTokenNum uint8,
 	scriptMemo []byte) *ReRegistrationScript {
 
 	return script.NewReRegistrationScript(version,
 		autIdentifier,
 		autMemo, plannedTotalSupply,
 		issuers, reregistrationExpireHeight, reregisterThreshold, mintThreshold,
-		inAutRootTokenNum, outAutRootTokenNum,
+		inStartIndex, inAutRootTokenNum,
+		outStartIndex, outAutRootTokenNum,
 		scriptMemo)
 }
 
 func NewMintScript(version uint32,
 	autIdentifier AutId,
-	vin uint64, inAutRootTokenNum uint8,
-	outCTAutTokenNum uint8, outPlainAutTokenNum uint8, serializedAutTxos [][]byte,
+	vin uint64,
+	inStartIndex uint8, inAutRootTokenNum uint8,
+	outStartIndex uint8, outCTAutTokenNum uint8, outPlainAutTokenNum uint8,
+	serializedAutTxos [][]byte,
 	witnessHash chainhash.Hash,
 	scriptMemo []byte) *MintScript {
 
 	return script.NewMintScript(version,
 		autIdentifier,
-		vin, inAutRootTokenNum,
-		outCTAutTokenNum, outPlainAutTokenNum, serializedAutTxos,
+		vin,
+		inStartIndex, inAutRootTokenNum,
+		outStartIndex, outCTAutTokenNum, outPlainAutTokenNum,
+		serializedAutTxos,
 		witnessHash,
 		scriptMemo)
 }
 
 func NewTransferScript(version uint32,
 	autIdentifier AutId,
-	inHiddenAutTokenNum uint8, inPublicAutTokenNum uint8,
-	outHiddenAutTokenNum uint8, outPlainAutTokenNum uint8, serializedAutTxos [][]byte,
+	inStartIndex uint8, inHiddenAutTokenNum uint8, inPublicAutTokenNum uint8,
+	outStartIndex uint8, outHiddenAutTokenNum uint8, outPlainAutTokenNum uint8,
+	serializedAutTxos [][]byte,
 	witnessHash chainhash.Hash,
 	scriptMemo []byte) *TransferScript {
 
 	return script.NewTransferScript(version,
 		autIdentifier,
-		inHiddenAutTokenNum, inPublicAutTokenNum,
-		outHiddenAutTokenNum, outPlainAutTokenNum, serializedAutTxos,
+		inStartIndex, inHiddenAutTokenNum, inPublicAutTokenNum,
+		outStartIndex, outHiddenAutTokenNum, outPlainAutTokenNum,
+		serializedAutTxos,
 		witnessHash,
 		scriptMemo)
 }
 
 func NewBurnScript(version uint32,
 	autIdentifier AutId,
-	inHiddenAutTokenNum uint8, inPublicAutTokenNum uint8,
-	outHiddenAutTokenNum uint8, outPublicAutTokenNum uint8, serializedAutTxos [][]byte,
+	inStartIndex uint8, inHiddenAutTokenNum uint8, inPublicAutTokenNum uint8,
+	outStartIndex uint8, outHiddenAutTokenNum uint8, outPublicAutTokenNum uint8,
+	serializedAutTxos [][]byte,
 	witnessHash chainhash.Hash,
 	scriptMemo []byte) *BurnScript {
 
 	return script.NewBurnScript(version,
 		autIdentifier,
-		inHiddenAutTokenNum, inPublicAutTokenNum,
-		outHiddenAutTokenNum, outPublicAutTokenNum, serializedAutTxos,
+		inStartIndex, inHiddenAutTokenNum, inPublicAutTokenNum,
+		outStartIndex, outHiddenAutTokenNum, outPublicAutTokenNum, serializedAutTxos,
 		witnessHash,
 		scriptMemo)
 }
@@ -227,10 +237,147 @@ func DetectAndAssembleExtAutScriptFromHostTx(msgTx *wire.MsgTxAbe) (*ExtAutScrip
 
 	autWitnessHashInScript := autScript.WitnessHash()
 	switch autScriptInst := autScript.(type) {
-	case *RegistrationScript, *ReRegistrationScript:
+	case *RegistrationScript:
+		// no input
+
+		// output
+		outStartIndex := autScriptInst.OutStartIndex()
+		outAutRootTokenNum := autScriptInst.OutAutRootTokenNum()
+		if outStartIndex+outAutRootTokenNum < outStartIndex || outStartIndex+outAutRootTokenNum < outAutRootTokenNum {
+			return nil, fmt.Errorf("outStartIndex (%d) + outAutRootTokenNum (%d) overflows", outStartIndex, outAutRootTokenNum)
+		}
+
+		lastOutIndex := outStartIndex + outAutRootTokenNum - 1
+		if lastOutIndex > uint8(len(msgTx.TxOuts)) {
+			return nil, fmt.Errorf("outStartIndex (%d) + outAutRootTokenNum (%d) exceeds the number of txOuts (%d)",
+				outStartIndex, outAutRootTokenNum, len(msgTx.TxOuts))
+		}
 		break
 
-	case *MintScript, *TransferScript, *BurnScript:
+	case *ReRegistrationScript:
+		inStartIndex := autScriptInst.InStartIndex()
+		inAutRootTokenNum := autScriptInst.InAutRootTokenNum()
+		if inStartIndex+inAutRootTokenNum < inStartIndex || inStartIndex+inAutRootTokenNum < inAutRootTokenNum {
+			return nil, fmt.Errorf("inStartIndex (%d) + inAutRootTokenNum (%d) overflows", inStartIndex, inAutRootTokenNum)
+		}
+		lastInIndex := inStartIndex + inAutRootTokenNum - 1
+		if lastInIndex > uint8(len(msgTx.TxIns)) {
+			return nil, fmt.Errorf("inStartIndex (%d) + inAutRootTokenNum (%d) exceeds the number of txIns (%d)",
+				inStartIndex, inAutRootTokenNum, len(msgTx.TxIns))
+		}
+
+		outStartIndex := autScriptInst.OutStartIndex()
+		outAutRootTokenNum := autScriptInst.OutAutRootTokenNum()
+		if outStartIndex+outAutRootTokenNum < outStartIndex || outStartIndex+outAutRootTokenNum < outAutRootTokenNum {
+			return nil, fmt.Errorf("outStartIndex (%d) + outAutRootTokenNum (%d) overflows", outStartIndex, outAutRootTokenNum)
+		}
+		lastOutIndex := outStartIndex + outAutRootTokenNum - 1
+		if lastOutIndex > uint8(len(msgTx.TxOuts)) {
+			return nil, fmt.Errorf("outStartIndex (%d) + outAutRootTokenNum (%d) exceeds the number of txOuts (%d)",
+				outStartIndex, outAutRootTokenNum, len(msgTx.TxOuts))
+		}
+		break
+
+	case *MintScript:
+		inStartIndex := autScriptInst.InStartIndex()
+		inAutRootTokenNum := autScriptInst.InAutRootTokenNum()
+		if inStartIndex+inAutRootTokenNum < inStartIndex || inStartIndex+inAutRootTokenNum < inAutRootTokenNum {
+			return nil, fmt.Errorf("inStartIndex (%d) + inAutRootTokenNum (%d) overflows", inStartIndex, inAutRootTokenNum)
+		}
+		lastInIndex := inStartIndex + inAutRootTokenNum - 1
+		if lastInIndex > uint8(len(msgTx.TxIns)) {
+			return nil, fmt.Errorf("inStartIndex (%d) + inAutRootTokenNum (%d) exceeds the number of txIns (%d)",
+				inStartIndex, inAutRootTokenNum, len(msgTx.TxIns))
+		}
+
+		outStartIndex := autScriptInst.OutStartIndex()
+		outCTAutTokenNum := autScriptInst.OutHiddenAutTokenNum()
+		outPlainAutTokenNum := autScriptInst.OutPublicAutTokenNum()
+		if outStartIndex+outCTAutTokenNum+outPlainAutTokenNum < outStartIndex ||
+			outStartIndex+outCTAutTokenNum+outPlainAutTokenNum < outCTAutTokenNum ||
+			outStartIndex+outCTAutTokenNum+outPlainAutTokenNum < outPlainAutTokenNum {
+			return nil, fmt.Errorf("outStartIndex (%d) + outCTAutTokenNum (%d) + outPlainAutTokenNum (%d) overflows", outStartIndex, outCTAutTokenNum, outPlainAutTokenNum)
+		}
+		lastOutIndex := outStartIndex + outCTAutTokenNum + outPlainAutTokenNum - 1
+		if lastOutIndex > uint8(len(msgTx.TxOuts)) {
+			return nil, fmt.Errorf("outStartIndex (%d) + outCTAutTokenNum (%d) + outPlainAutTokenNum (%d) exceeds the number of txOuts (%d)",
+				outStartIndex, outCTAutTokenNum, outPlainAutTokenNum, len(msgTx.TxOuts))
+		}
+
+		if msgTx.HasAutWitness() {
+			autWitnessHashComputed := ctautwire.AutWitnessHash(msgTx.AutWitness)
+			if !autWitnessHashComputed.IsEqual(&autWitnessHashInScript) {
+				return nil, fmt.Errorf("autWitnessHash computed from msgTx.AutWitness (%s) does not match "+
+					"autScriptInst.AutWitnessHash (%s)", autWitnessHashComputed, autWitnessHashInScript)
+			}
+		}
+		break
+	case *TransferScript:
+		inStartIndex := autScriptInst.InStartIndex()
+		inHiddenAutTokenNum := autScriptInst.InHiddenAutTokenNum()
+		inPublicAutTokenNum := autScriptInst.InPublicAutTokenNum()
+		if inStartIndex+inHiddenAutTokenNum+inPublicAutTokenNum < inStartIndex ||
+			inStartIndex+inHiddenAutTokenNum+inPublicAutTokenNum < inHiddenAutTokenNum ||
+			inStartIndex+inHiddenAutTokenNum+inPublicAutTokenNum < inPublicAutTokenNum {
+			return nil, fmt.Errorf("inStartIndex (%d) + inHiddenAutTokenNum (%d) + inPublicAutTokenNum (%d) overflows", inStartIndex, inHiddenAutTokenNum, inPublicAutTokenNum)
+		}
+		lastInIndex := inStartIndex + inHiddenAutTokenNum + inPublicAutTokenNum - 1
+		if lastInIndex > uint8(len(msgTx.TxIns)) {
+			return nil, fmt.Errorf("inStartIndex (%d) + inHiddenAutTokenNum (%d) + inPublicAutTokenNum (%d) exceeds the number of txIns (%d)",
+				inStartIndex, inHiddenAutTokenNum, inPublicAutTokenNum, len(msgTx.TxIns))
+		}
+
+		outStartIndex := autScriptInst.OutStartIndex()
+		outHiddenAutTokenNum := autScriptInst.OutHiddenAutTokenNum()
+		outPublicAutTokenNum := autScriptInst.OutPublicAutTokenNum()
+		if outStartIndex+outHiddenAutTokenNum+outPublicAutTokenNum < outStartIndex ||
+			outStartIndex+outHiddenAutTokenNum+outPublicAutTokenNum < outHiddenAutTokenNum ||
+			outStartIndex+outHiddenAutTokenNum+outPublicAutTokenNum < outPublicAutTokenNum {
+			return nil, fmt.Errorf("outStartIndex (%d) + outHiddenAutTokenNum (%d) + outPublicAutTokenNum (%d) overflows", outStartIndex, outHiddenAutTokenNum, outPublicAutTokenNum)
+		}
+		lastOutIndex := outStartIndex + outHiddenAutTokenNum + outPublicAutTokenNum - 1
+		if lastOutIndex > uint8(len(msgTx.TxOuts)) {
+			return nil, fmt.Errorf("outStartIndex (%d) + outHiddenAutTokenNum (%d) + outPublicAutTokenNum (%d) exceeds the number of txOuts (%d)",
+				outStartIndex, outHiddenAutTokenNum, outPublicAutTokenNum, len(msgTx.TxOuts))
+		}
+
+		if msgTx.HasAutWitness() {
+			autWitnessHashComputed := ctautwire.AutWitnessHash(msgTx.AutWitness)
+			if !autWitnessHashComputed.IsEqual(&autWitnessHashInScript) {
+				return nil, fmt.Errorf("autWitnessHash computed from msgTx.AutWitness (%s) does not match "+
+					"autScriptInst.AutWitnessHash (%s)", autWitnessHashComputed, autWitnessHashInScript)
+			}
+		}
+		break
+	case *BurnScript:
+		inStartIndex := autScriptInst.InStartIndex()
+		inHiddenAutTokenNum := autScriptInst.InHiddenAutTokenNum()
+		inPublicAutTokenNum := autScriptInst.InPublicAutTokenNum()
+		if inStartIndex+inHiddenAutTokenNum+inPublicAutTokenNum < inStartIndex ||
+			inStartIndex+inHiddenAutTokenNum+inPublicAutTokenNum < inHiddenAutTokenNum ||
+			inStartIndex+inHiddenAutTokenNum+inPublicAutTokenNum < inPublicAutTokenNum {
+			return nil, fmt.Errorf("inStartIndex (%d) + inHiddenAutTokenNum (%d) + inPublicAutTokenNum (%d) overflows", inStartIndex, inHiddenAutTokenNum, inPublicAutTokenNum)
+		}
+		lastInIndex := inStartIndex + inHiddenAutTokenNum + inPublicAutTokenNum - 1
+		if lastInIndex > uint8(len(msgTx.TxIns)) {
+			return nil, fmt.Errorf("inStartIndex (%d) + inHiddenAutTokenNum (%d) + inPublicAutTokenNum (%d) exceeds the number of txIns (%d)",
+				inStartIndex, inHiddenAutTokenNum, inPublicAutTokenNum, len(msgTx.TxIns))
+		}
+
+		outStartIndex := autScriptInst.OutStartIndex()
+		outHiddenAutTokenNum := autScriptInst.OutHiddenAutTokenNum()
+		outPublicAutTokenNum := autScriptInst.OutPublicAutTokenNum()
+		if outStartIndex+outHiddenAutTokenNum+outPublicAutTokenNum < outStartIndex ||
+			outStartIndex+outHiddenAutTokenNum+outPublicAutTokenNum < outHiddenAutTokenNum ||
+			outStartIndex+outHiddenAutTokenNum+outPublicAutTokenNum < outPublicAutTokenNum {
+			return nil, fmt.Errorf("outStartIndex (%d) + outHiddenAutTokenNum (%d) + outPublicAutTokenNum (%d) overflows", outStartIndex, outHiddenAutTokenNum, outPublicAutTokenNum)
+		}
+		lastOutIndex := outStartIndex + outHiddenAutTokenNum + outPublicAutTokenNum - 1
+		if lastOutIndex > uint8(len(msgTx.TxOuts)) {
+			return nil, fmt.Errorf("outStartIndex (%d) + outHiddenAutTokenNum (%d) + outPublicAutTokenNum (%d) exceeds the number of txOuts (%d)",
+				outStartIndex, outHiddenAutTokenNum, outPublicAutTokenNum, len(msgTx.TxOuts))
+		}
+
 		if msgTx.HasAutWitness() {
 			autWitnessHashComputed := ctautwire.AutWitnessHash(msgTx.AutWitness)
 			if !autWitnessHashComputed.IsEqual(&autWitnessHashInScript) {

@@ -3,6 +3,7 @@ package rules
 import (
 	"encoding/hex"
 	"fmt"
+
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/ctaut/dao"
@@ -103,6 +104,20 @@ func RuleCheckOnIssuerHostClaim(issuers []*AutIssuer, outputTokens []*AutToken) 
 	}
 	if len(outputTokenCoinAddressesMap) != 0 {
 		return fmt.Errorf(" %d output tokens do not have corresponding issuer", len(outputTokenCoinAddressesMap))
+	}
+	return nil
+}
+
+func RuleCheckOnAutVersionInput(autScriptVersion uint32, autTxo *ctautwire.AutTxo) error {
+	// TODO check the type of the input autTxo?
+	//autTxoType, err := abecryptox.GetAutTxoType(autTxo)
+	//if err != nil {
+	//	return fmt.Errorf("fail to get last aut txo type: %v", err)
+	//}
+
+	err := abecryptox.AutRuleCheckOnTxInputVersion(autScriptVersion, autTxo.Version)
+	if err != nil {
+		return fmt.Errorf("fail to pass the AutRuleCheckOnTxoVersionType: %v", err)
 	}
 	return nil
 }
