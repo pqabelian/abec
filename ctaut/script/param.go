@@ -51,7 +51,9 @@ const MaxIssuerNum = 100            // TODO get the value from abecryptoxparam.G
 
 // The ValueScript in wire.AutTxo would be 10959 bytes (for hidden one) or 9 bytes (for public one)
 // At this moment, there may be up to 5 hidden one and 95 public one, i.e. 10959*5 + 95*9 = 55650
-const MaxAutValueScriptLength = 10963
+
+// todo: dicsuss and confirm
+const MaxAutValueScriptLength = 16 * 1024 // 16K
 const MaxAutTxoLength = ctautwire.MaxAutTxoLength
 
 const MaxScriptMemoLength = 1024 // 1K
