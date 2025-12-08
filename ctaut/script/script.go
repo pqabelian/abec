@@ -80,7 +80,7 @@ type AutMetadata struct {
 	// the ReregistrationThreshold and MintThreshold specify the number of required issuers for Reregistration and Mint respectively.
 	Issuers []*AutIssuer
 
-	// ReregistrationExpireHeight specifies a height, after which the ReRegistrationScript could not be applied any more.
+	// ReregistrationExpireHeight specifies a height, after which the ReRegistrationScript could not be applied anymore.
 	// Using int32 is to allow -1 to be used as the infinite height.
 	ReregistrationExpireHeight int32
 
@@ -217,13 +217,11 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 	}
 
 	// Issuers               []*AutIssuer
-	err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.Issuers)))
-	if err != nil {
+	if err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.Issuers))); err != nil {
 		return nil, err
 	}
 	for i := 0; i < len(autMetadata.Issuers); i++ {
-		err = autMetadata.Issuers[i].Write(w)
-		if err != nil {
+		if err = autMetadata.Issuers[i].Write(w); err != nil {
 			return nil, fmt.Errorf("error happens when writing issuer: %v", err)
 		}
 	}
@@ -244,34 +242,31 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 	}
 
 	// MintedAmount               uint64
-	err = wire.WriteVarInt(w, 0, autMetadata.MintedAmount)
-	if err != nil {
+	if err = wire.WriteVarInt(w, 0, autMetadata.MintedAmount); err != nil {
 		return nil, err
 	}
 
 	// BurnedAmount               uint64
-	err = wire.WriteVarInt(w, 0, autMetadata.BurnedAmount)
-	if err != nil {
+	if err = wire.WriteVarInt(w, 0, autMetadata.BurnedAmount); err != nil {
 		return nil, err
 	}
 
 	// ActiveRootTokenSet         map[string]*HostOutPoint
-	err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.ActiveRootTokenSet)))
-	if err != nil {
+	if err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.ActiveRootTokenSet))); err != nil {
 		return nil, err
 	}
 	for _, hostOutPoint := range autMetadata.ActiveRootTokenSet {
-		err = wire.WriteOutPointAbe(w, 0, 0, hostOutPoint)
-		if err != nil {
+		if err = wire.WriteOutPointAbe(w, 0, 0, hostOutPoint); err != nil {
 			return nil, fmt.Errorf("error happens when writing active root token: %v", err)
 		}
 	}
 
 	// UpdateScriptVersions            []uint32
-	err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.UpdateScriptVersions)))
+	if err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.UpdateScriptVersions))); err != nil {
+		return nil, err
+	}
 	for _, version := range autMetadata.UpdateScriptVersions {
-		err = wire.WriteVarInt(w, 0, uint64(version))
-		if err != nil {
+		if err = wire.WriteVarInt(w, 0, uint64(version)); err != nil {
 			return nil, err
 		}
 	}
@@ -295,15 +290,13 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 	r := bytes.NewReader(serializedMetadata)
 
-	var err error
-
 	// Version                    uint32
 	version, err := wire.ReadVarInt(r, 0)
 	if err != nil {
 		return err
 	}
 	if version > math.MaxUint32 {
-		return fmt.Errorf("readed version (%d) is too large", version)
+		return fmt.Errorf("read version (%d) is too large", version)
 	}
 	autMetadata.Version = uint32(version)
 
@@ -354,15 +347,15 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 	}
 	if issuerNum > MaxIssuerNum {
 		//	This is necessary here to prevent possible attack.
-		return fmt.Errorf("issuerNum (%d) is too large", issuerNum)
+		return fmt.Errorf("read issuerNum (%d) is too large", issuerNum)
 	}
 	autMetadata.Issuers = make([]*AutIssuer, issuerNum)
 	for i := uint64(0); i < issuerNum; i++ {
 		issuer := &AutIssuer{}
-		err = issuer.Read(r)
-		if err != nil {
+		if err = issuer.Read(r); err != nil {
 			return fmt.Errorf("error happens when reading issuer: %v", err)
 		}
+
 		autMetadata.Issuers[i] = issuer
 	}
 
@@ -373,7 +366,7 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 	}
 	temp := int64(expiredHeightRead)
 	if temp > math.MaxInt32 || temp < -1 {
-		return fmt.Errorf("the readed ReregistrationExpireHeight (%d) is not in the scope [-1, %d]", temp, math.MaxInt32)
+		return fmt.Errorf("the read ReregistrationExpireHeight (%d) is not in the scope [-1, %d]", temp, math.MaxInt32)
 	}
 	autMetadata.ReregistrationExpireHeight = int32(temp)
 
@@ -388,14 +381,12 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 	}
 
 	// MintedAmount               uint64
-	autMetadata.MintedAmount, err = wire.ReadVarInt(r, 0)
-	if err != nil {
+	if autMetadata.MintedAmount, err = wire.ReadVarInt(r, 0); err != nil {
 		return err
 	}
 
 	// BurnedAmount               uint64
-	autMetadata.BurnedAmount, err = wire.ReadVarInt(r, 0)
-	if err != nil {
+	if autMetadata.BurnedAmount, err = wire.ReadVarInt(r, 0); err != nil {
 		return err
 	}
 
@@ -405,13 +396,12 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 		return err
 	}
 	if rootCoinNum > MaxNumToken {
-		return fmt.Errorf("rootCoinNum (%d) is too large", rootCoinNum)
+		return fmt.Errorf("read rootCoinNum (%d) is too large", rootCoinNum)
 	}
 	autMetadata.ActiveRootTokenSet = make(map[string]*HostOutPoint, rootCoinNum)
 	for i := uint64(0); i < rootCoinNum; i++ {
 		hostOutPoint := &HostOutPoint{}
-		err = wire.ReadOutPointAbe(r, 0, 0, hostOutPoint)
-		if err != nil {
+		if err = wire.ReadOutPointAbe(r, 0, 0, hostOutPoint); err != nil {
 			return fmt.Errorf("error happens when reading active root token: %v", err)
 		}
 
@@ -438,7 +428,7 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 			return err
 		}
 		if version > math.MaxUint32 {
-			return fmt.Errorf("readed update script version (%d) is too large", version)
+			return fmt.Errorf("read update script version (%d) is too large", version)
 		}
 		autMetadata.UpdateScriptVersions[i] = uint32(version)
 	}
