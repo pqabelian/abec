@@ -32,7 +32,6 @@ func RuleGetTxVersionFromAutScriptVersion(autScriptVersion uint32) (uint32, erro
 // 2. the value must be 1 Neutrino
 //
 // If the checks are passed, the coinAddress will be returned.
-// todo: txHash and outputIndex donot have actual use.
 func RuleCheckOnHostTxo(txOut *wire.TxOutAbe) ([]byte, error) {
 	privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
 	if err != nil {
@@ -117,7 +116,6 @@ func RuleCheckOnIssuerHostClaim(issuers []*AutIssuer, outputTokens []*AutToken) 
 	return nil
 }
 
-// todo: the caller seems incorrect
 func RuleCheckOnAutVersionInput(autScriptVersion uint32, inputAutTxo *ctautwire.AutTxo) error {
 	// TODO check the type of the input autTxo?
 	//autTxoType, err := abecryptox.GetAutTxoType(autTxo)
@@ -131,3 +129,5 @@ func RuleCheckOnAutVersionInput(autScriptVersion uint32, inputAutTxo *ctautwire.
 	}
 	return nil
 }
+
+// end of codes
