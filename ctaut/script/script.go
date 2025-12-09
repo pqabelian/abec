@@ -640,25 +640,26 @@ type AutScript interface {
 	// AutIdentifier returns the autIdentifier of the AutInstance that this AutScript is operating.
 	AutIdentifier() AutId
 
+	// InStartIndex returns the start index of the input AutTokens.
+	InStartIndex() uint8
+
+	// OutStartIndex returns the start index of the output AutTokens.
+	OutStartIndex() uint8
+
+	// WitnessHash returns the WitnessHash in the script.
+	WitnessHash() chainhash.Hash
+
+	// NumConsumedTokens returns the number of AutRootTokens/AutTokens that this AutScript consumes.
+	NumConsumedTokens() int
+
+	// NumGeneratedTokens returns the number of AutRootTokens/AutTokens that this AutScript generates.
+	NumGeneratedTokens() int
+
 	// Serialize serializes AutScript to []byte.
 	Serialize() ([]byte, error)
 
 	// Deserialize deserializes []byte to AutScript.
 	Deserialize([]byte) error
-
-	WitnessHash() chainhash.Hash
-
-	// InStartIndex returns the start index of the input AutTokens.
-	InStartIndex() uint8
-
-	// NumConsumedTokens returns the number of AutRootTokens/AutTokens that this AutScript consumes.
-	NumConsumedTokens() int
-
-	// OutStartIndex returns the start index of the output AutTokens.
-	OutStartIndex() uint8
-
-	// NumGeneratedTokens returns the number of AutRootTokens/AutTokens that this AutScript generates.
-	NumGeneratedTokens() int
 }
 
 // RegistrationScript would be the structured script parsed from TxMemo in the host Abelian-Transaction,
@@ -815,12 +816,12 @@ func (autScript *RegistrationScript) ScriptMemo() []byte {
 	return autScript.scriptMemo
 }
 
-func (autScript *RegistrationScript) WitnessHash() chainhash.Hash {
-	return ZeroHash // nonsense
-}
-
 func (autScript *RegistrationScript) InStartIndex() uint8 {
 	return 0
+}
+
+func (autScript *RegistrationScript) WitnessHash() chainhash.Hash {
+	return ZeroHash // nonsense
 }
 
 func (autScript *RegistrationScript) NumConsumedTokens() int {
@@ -1825,6 +1826,7 @@ func (autScript *MintScript) WitnessHash() chainhash.Hash {
 func (autScript *MintScript) NumConsumedTokens() int {
 	return int(autScript.inAutRootTokenNum)
 }
+
 func (autScript *MintScript) NumGeneratedTokens() int {
 	return int(autScript.outHiddenAutTokenNum + autScript.outPublicAutTokenNum)
 }
@@ -2640,6 +2642,7 @@ func (autScript *BurnScript) WitnessHash() chainhash.Hash {
 func (autScript *BurnScript) NumConsumedTokens() int {
 	return int(autScript.inHiddenAutTokenNum + autScript.inPublicAutTokenNum)
 }
+
 func (autScript *BurnScript) NumGeneratedTokens() int {
 	return int(autScript.outHiddenAutTokenNum + autScript.outPublicAutTokenNum)
 }
