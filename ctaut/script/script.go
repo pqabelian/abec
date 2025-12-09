@@ -1069,7 +1069,7 @@ func (autScript *RegistrationScript) Deserialize(serializedScript []byte) error 
 		return err
 	}
 
-	// outAutRootTokenNum         uint8
+	// outStartIndex         uint8
 	if autScript.outStartIndex, err = r.ReadByte(); err != nil {
 		return err
 	}
@@ -1457,11 +1457,6 @@ func (autScript *ReRegistrationScript) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	// outStartIndex         uint8
-	if err = w.WriteByte(autScript.outStartIndex); err != nil {
-		return nil, err
-	}
-
 	// outAutRootTokenNum         uint8
 	if err = w.WriteByte(autScript.outAutRootTokenNum); err != nil {
 		return nil, err
@@ -1557,11 +1552,6 @@ func (autScript *ReRegistrationScript) Deserialize(serializedScript []byte) erro
 
 	// inAutRootTokenNum         uint8
 	if autScript.inAutRootTokenNum, err = r.ReadByte(); err != nil {
-		return err
-	}
-
-	// outStartIndex         uint8
-	if autScript.outStartIndex, err = r.ReadByte(); err != nil {
 		return err
 	}
 
@@ -2684,11 +2674,6 @@ func (autScript *BurnScript) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	// inStartIndex    uint8
-	if err = w.WriteByte(autScript.inStartIndex); err != nil {
-		return nil, err
-	}
-
 	// inHiddenAutTokenNum    uint8
 	if err = w.WriteByte(autScript.inHiddenAutTokenNum); err != nil {
 		return nil, err
@@ -2696,11 +2681,6 @@ func (autScript *BurnScript) Serialize() ([]byte, error) {
 
 	// inPublicAutTokenNum    uint8
 	if err = w.WriteByte(autScript.inPublicAutTokenNum); err != nil {
-		return nil, err
-	}
-
-	// outStartIndex uint8
-	if err = w.WriteByte(autScript.outStartIndex); err != nil {
 		return nil, err
 	}
 
