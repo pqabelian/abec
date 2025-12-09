@@ -121,7 +121,7 @@ type AutMetadata struct {
 	UpdateScriptVersions []uint32
 }
 
-func (autMetadata *AutMetadata) serializeSize() int {
+func (autMetadata *AutMetadata) serializeSize() (int, error) {
 	n := wire.VarIntSerializeSize(uint64(autMetadata.Version)) + //version
 		chainhash.HashSize + // identifier, fixed length
 		wire.VarIntSerializeSize(uint64(len(autMetadata.AutName))) + len(autMetadata.AutName) + // name, variable length
@@ -135,6 +135,9 @@ func (autMetadata *AutMetadata) serializeSize() int {
 
 	n += wire.VarIntSerializeSize(uint64(len(autMetadata.Issuers))) // number of issuers
 	for i := 0; i < len(autMetadata.Issuers); i++ {
+		if autMetadata.Issuers[i] == nil {
+			return 0, fmt.Errorf("autMetadata.Issuers[%d] is nil", i)
+		}
 		n += autMetadata.Issuers[i].SerializeSize()
 	}
 
@@ -147,16 +150,19 @@ func (autMetadata *AutMetadata) serializeSize() int {
 		wire.VarIntSerializeSize(autMetadata.BurnedAmount) // burned amount,variable length
 
 	n += wire.VarIntSerializeSize(uint64(len(autMetadata.ActiveRootTokenSet))) // number of issuer tokens
-	for _, hostOutPoint := range autMetadata.ActiveRootTokenSet {
+	for opStr, hostOutPoint := range autMetadata.ActiveRootTokenSet {
+		if hostOutPoint == nil {
+			return 0, fmt.Errorf("autMetadata.ActiveRootTokenSet[%s] is nil", opStr)
+		}
 		n += hostOutPoint.SerializeSize()
 	}
 
 	n += wire.VarIntSerializeSize(uint64(len(autMetadata.UpdateScriptVersions)))
-	for _, version := range autMetadata.UpdateScriptVersions {
-		n += wire.VarIntSerializeSize(uint64(version))
+	for i := 0; i < len(autMetadata.UpdateScriptVersions); i++ {
+		n += wire.VarIntSerializeSize(uint64(autMetadata.UpdateScriptVersions[i]))
 	}
 
-	return n
+	return n, nil
 }
 
 // Serialize serializes AutMetadata to []byte.
@@ -166,8 +172,10 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 	}
 
 	// Calculate the size needed to serialize AUT autMetadata.
-	var err error
-	size := autMetadata.serializeSize()
+	size, err := autMetadata.serializeSize()
+	if err != nil {
+		return nil, err
+	}
 	// Serialize the header code followed by the compressed unspent
 	// transaction output.
 	w := bytes.NewBuffer(make([]byte, 0, size))
@@ -222,6 +230,9 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 		return nil, err
 	}
 	for i := 0; i < len(autMetadata.Issuers); i++ {
+		if autMetadata.Issuers[i] == nil {
+			return nil, fmt.Errorf("autMetadata.Issuers[%d] is nil", i)
+		}
 		if err = autMetadata.Issuers[i].Write(w); err != nil {
 			return nil, fmt.Errorf("error happens when writing issuer: %v", err)
 		}
@@ -256,7 +267,10 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 	if err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.ActiveRootTokenSet))); err != nil {
 		return nil, err
 	}
-	for _, hostOutPoint := range autMetadata.ActiveRootTokenSet {
+	for opStr, hostOutPoint := range autMetadata.ActiveRootTokenSet {
+		if hostOutPoint == nil {
+			return nil, fmt.Errorf("autMetadata.ActiveRootTokenSet[%s] is nil", opStr)
+		}
 		if err = wire.WriteOutPointAbe(w, 0, 0, hostOutPoint); err != nil {
 			return nil, fmt.Errorf("error happens when writing active root token: %v", err)
 		}
@@ -266,8 +280,8 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 	if err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.UpdateScriptVersions))); err != nil {
 		return nil, err
 	}
-	for _, version := range autMetadata.UpdateScriptVersions {
-		if err = wire.WriteVarInt(w, 0, uint64(version)); err != nil {
+	for i := 0; i < len(autMetadata.UpdateScriptVersions); i++ {
+		if err = wire.WriteVarInt(w, 0, uint64(autMetadata.UpdateScriptVersions[i])); err != nil {
 			return nil, err
 		}
 	}
@@ -478,6 +492,9 @@ func (autMetadata *AutMetadata) SanityCheck() error {
 	}
 	issuersMap := make(map[string]int, len(autMetadata.Issuers))
 	for i, issuer := range autMetadata.Issuers {
+		if issuer == nil {
+			return fmt.Errorf("autMetadata.Issuers[%d] is nil", i)
+		}
 		issuerStr := issuer.String()
 		if index, ok := issuersMap[issuerStr]; ok {
 			return fmt.Errorf("duplicate issuers[%d] and issuers[%d]: %s", i, index, issuerStr)
@@ -508,6 +525,9 @@ func (autMetadata *AutMetadata) SanityCheck() error {
 		return fmt.Errorf("active root token number (%d) is too large", len(autMetadata.ActiveRootTokenSet))
 	}
 	for opStr, hostOutPoint := range autMetadata.ActiveRootTokenSet {
+		if hostOutPoint == nil {
+			return fmt.Errorf("autMetadata.ActiveRootTokenSet[%s] is nil", opStr)
+		}
 		valueKey := hostOutPoint.String()
 		if strings.Compare(opStr, valueKey) != 0 {
 			return fmt.Errorf("invalid active root token for %s, having key from value %s", opStr, valueKey)
@@ -579,15 +599,19 @@ func (autMetadata *AutMetadata) Clone() *AutMetadata {
 	copy(cloned.AutMemo, autMetadata.AutMemo)
 
 	for i := 0; i < len(autMetadata.Issuers); i++ {
-		cloned.Issuers[i] = autMetadata.Issuers[i].Clone()
+		if autMetadata.Issuers[i] == nil {
+			cloned.Issuers[i] = nil
+		} else {
+			cloned.Issuers[i] = autMetadata.Issuers[i].Clone()
+		}
 	}
 
-	for _, hostOutpoint := range autMetadata.ActiveRootTokenSet {
-		newHosOutpoint := &HostOutPoint{}
-		copy(newHosOutpoint.TxHash[:], hostOutpoint.TxHash[:])
-		newHosOutpoint.Index = hostOutpoint.Index
-
-		cloned.ActiveRootTokenSet[newHosOutpoint.String()] = newHosOutpoint
+	for opStr, hostOutpoint := range autMetadata.ActiveRootTokenSet {
+		if hostOutpoint == nil {
+			cloned.ActiveRootTokenSet[opStr] = nil
+		} else {
+			cloned.ActiveRootTokenSet[opStr] = hostOutpoint.Clone()
+		}
 	}
 
 	for i := 0; i < len(autMetadata.UpdateScriptVersions); i++ {

@@ -57,6 +57,19 @@ type OutPointAbe struct {
 	// For safety, we do not cache outPointId. 2023.12.08
 }
 
+func (outPoint *OutPointAbe) Clone() *OutPointAbe {
+	if outPoint == nil {
+		return nil
+	}
+
+	newOutPoint := &OutPointAbe{}
+
+	copy(newOutPoint.TxHash[:], outPoint.TxHash[:])
+	newOutPoint.Index = outPoint.Index
+
+	return newOutPoint
+}
+
 func (outPoint *OutPointAbe) OutPointId() OutPointId {
 	// For safety, we do not cache outPointId. 2023.12.08
 	//if outPoint.outPointId == nil {
