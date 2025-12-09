@@ -1343,12 +1343,12 @@ func (autScript *ReRegistrationScript) ReregistrationExpireHeight() int32 {
 	return autScript.reregistrationExpireHeight
 }
 
-func (autScript *ReRegistrationScript) MintThreshold() uint8 {
-	return autScript.mintThreshold
-}
-
 func (autScript *ReRegistrationScript) ReregisterThreshold() uint8 {
 	return autScript.reregisterThreshold
+}
+
+func (autScript *ReRegistrationScript) MintThreshold() uint8 {
+	return autScript.mintThreshold
 }
 
 func (autScript *ReRegistrationScript) InStartIndex() uint8 {
@@ -1378,38 +1378,53 @@ func (autScript *ReRegistrationScript) WitnessHash() chainhash.Hash {
 func (autScript *ReRegistrationScript) NumConsumedTokens() int {
 	return int(autScript.inAutRootTokenNum)
 }
+
 func (autScript *ReRegistrationScript) NumGeneratedTokens() int {
 	return int(autScript.outAutRootTokenNum)
 }
 
-func (autScript *ReRegistrationScript) serializeSize() int {
+func (autScript *ReRegistrationScript) serializeSize() (int, error) {
+	if autScript == nil {
+		return 0, fmt.Errorf("autScript is nil")
+	}
+
 	n := wire.VarIntSerializeSize(uint64(autScript.version))                               // version                    uint32
 	n += 1                                                                                 // scriptType                 AutScriptType
 	n += chainhash.HashSize                                                                // autIdentifier              AutId
 	n += wire.VarIntSerializeSize(uint64(len(autScript.autMemo))) + len(autScript.autMemo) // autMemo                    []byte
 	n += wire.VarIntSerializeSize(autScript.plannedTotalSupply)                            // plannedTotalSupply         uint64
-	n += wire.VarIntSerializeSize(uint64(len(autScript.issuers)))                          // issuers                    []*AutIssuer
-	for _, issuer := range autScript.issuers {
+
+	n += wire.VarIntSerializeSize(uint64(len(autScript.issuers))) // issuers                    []*AutIssuer
+	for i, issuer := range autScript.issuers {
+		if issuer == nil {
+			return 0, fmt.Errorf("autScript.issuers[%d] is nil", i)
+		}
 		n += issuer.SerializeSize()
 	}
+
 	n += wire.VarIntSerializeSize(uint64(autScript.reregistrationExpireHeight)) // reregistrationExpireHeight int32
 
 	n += 1 // reregisterThreshold        uint8
 	n += 1 // mintThreshold              uint8
-	n += 1 // inStartIndex          uint8
+
+	n += 1 // inStartIndex               uint8
 	n += 1 // inAutRootTokenNum          uint8
-	n += 1 // outStartIndex         uint8
+
+	n += 1 // outStartIndex              uint8
 	n += 1 // outAutRootTokenNum         uint8
 
 	n += wire.VarIntSerializeSize(uint64(len(autScript.scriptMemo))) + len(autScript.scriptMemo) // scriptMemo                 []byte
 
-	return n
+	return n, nil
 }
 
 func (autScript *ReRegistrationScript) Serialize() ([]byte, error) {
-	var err error
+	if autScript == nil {
+		return nil, fmt.Errorf("autScript is nil")
+	}
 
-	w := bytes.NewBuffer(make([]byte, 0, autScript.serializeSize()))
+	size, err := autScript.serializeSize()
+	w := bytes.NewBuffer(make([]byte, 0, size))
 
 	// version                    uint32
 	if err = wire.WriteVarInt(w, 0, uint64(autScript.version)); err != nil {
@@ -1440,7 +1455,10 @@ func (autScript *ReRegistrationScript) Serialize() ([]byte, error) {
 	if err = wire.WriteVarInt(w, 0, uint64(len(autScript.issuers))); err != nil {
 		return nil, err
 	}
-	for _, issuer := range autScript.issuers {
+	for i, issuer := range autScript.issuers {
+		if issuer == nil {
+			return nil, fmt.Errorf("autScript.issuers[%d] is nil", i)
+		}
 		if err = issuer.Write(w); err != nil {
 			return nil, err
 		}
@@ -1490,7 +1508,10 @@ func (autScript *ReRegistrationScript) Serialize() ([]byte, error) {
 }
 
 func (autScript *ReRegistrationScript) Deserialize(serializedScript []byte) error {
-	var err error
+
+	if autScript == nil {
+		return fmt.Errorf("autScript is nil")
+	}
 
 	r := bytes.NewReader(serializedScript)
 
@@ -1554,8 +1575,7 @@ func (autScript *ReRegistrationScript) Deserialize(serializedScript []byte) erro
 	autScript.reregistrationExpireHeight = int32(expireHeightRead)
 
 	// reregisterThreshold        uint8
-	autScript.reregisterThreshold, err = r.ReadByte()
-	if err != nil {
+	if autScript.reregisterThreshold, err = r.ReadByte(); err != nil {
 		return err
 	}
 
@@ -1564,7 +1584,7 @@ func (autScript *ReRegistrationScript) Deserialize(serializedScript []byte) erro
 		return err
 	}
 
-	// inStartIndex         uint8
+	// inStartIndex               uint8
 	if autScript.inStartIndex, err = r.ReadByte(); err != nil {
 		return err
 	}
@@ -1585,8 +1605,7 @@ func (autScript *ReRegistrationScript) Deserialize(serializedScript []byte) erro
 	}
 
 	// scriptMemo                 []byte
-	autScript.scriptMemo, err = wire.ReadVarBytes(r, 0, MaxScriptMemoLength, "scriptMemo")
-	if err != nil {
+	if autScript.scriptMemo, err = wire.ReadVarBytes(r, 0, MaxScriptMemoLength, "scriptMemo"); err != nil {
 		return err
 	}
 
@@ -1594,6 +1613,9 @@ func (autScript *ReRegistrationScript) Deserialize(serializedScript []byte) erro
 }
 
 func (autScript *ReRegistrationScript) SanityCheck() error {
+	if autScript == nil {
+		return fmt.Errorf("autScript is nil")
+	}
 
 	// version                    uint32
 	if _, ok := ctautwire.AutScriptVersionSet[autScript.version]; !ok {
@@ -1623,6 +1645,10 @@ func (autScript *ReRegistrationScript) SanityCheck() error {
 	}
 	issuersMap := make(map[string]int, len(autScript.issuers))
 	for i, issuer := range autScript.issuers {
+		if issuer == nil {
+			return fmt.Errorf("autScript.issuers[%d] is nil", i)
+		}
+
 		issuerStr := issuer.String()
 		if index, ok := issuersMap[issuerStr]; ok {
 			return fmt.Errorf("issuers[%d] and issuers[%d] are repeated : %s", i, index, issuerStr)
@@ -1657,10 +1683,6 @@ func (autScript *ReRegistrationScript) SanityCheck() error {
 	}
 
 	// inStartIndex         uint8
-	//if int(autScript.inStartIndex) == 0 {
-	//	return fmt.Errorf("autScript.inStartIndex (%d) is invalid",
-	//		autScript.inStartIndex)
-	//}
 
 	// inAutRootTokenNum         uint8
 	if int(autScript.inAutRootTokenNum) == 0 {
@@ -1673,10 +1695,6 @@ func (autScript *ReRegistrationScript) SanityCheck() error {
 	}
 
 	// outStartIndex         uint8
-	//if int(autScript.outStartIndex) == 0 {
-	//	return fmt.Errorf("autScript.outStartIndex (%d) is invalid",
-	//		autScript.outStartIndex)
-	//}
 
 	// outAutRootTokenNum         uint8
 	if int(autScript.outAutRootTokenNum) == 0 {
