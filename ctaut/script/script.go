@@ -711,6 +711,47 @@ type RegistrationScript struct {
 	scriptMemo []byte
 }
 
+// NewRegistrationScript creates a new RegistrationScript.
+//
+// Note that RegistrationScript's autIdentifier is zeroHash, and does not need a corresponding input.
+func NewRegistrationScript(version uint32,
+	autName []byte, autSymbol []byte, baseUnitName []byte, subUnitName []byte, unitScale uint64,
+	autMemo []byte, plannedTotalSupply uint64,
+	issuers []*AutIssuer, reregistrationExpireHeight int32, reregisterThreshold uint8, mintThreshold uint8,
+	outStarIndex uint8, outAutRootTokenNum uint8,
+	scriptMemo []byte) *RegistrationScript {
+
+	return &RegistrationScript{
+		version:                    version,
+		scriptType:                 AutScriptTypeRegistration,
+		autIdentifier:              ZeroHash,
+		autName:                    autName,
+		autSymbol:                  autSymbol,
+		baseUnitName:               baseUnitName,
+		subUnitName:                subUnitName,
+		unitScale:                  unitScale,
+		autMemo:                    autMemo,
+		plannedTotalSupply:         plannedTotalSupply,
+		issuers:                    issuers,
+		reregistrationExpireHeight: reregistrationExpireHeight,
+		reregisterThreshold:        reregisterThreshold,
+		mintThreshold:              mintThreshold,
+		outStartIndex:              outStarIndex,
+		outAutRootTokenNum:         outAutRootTokenNum,
+		scriptMemo:                 scriptMemo,
+	}
+}
+
+func (autScript *RegistrationScript) Version() uint32 {
+	return autScript.version
+}
+func (autScript *RegistrationScript) Type() AutScriptType {
+	return autScript.scriptType
+}
+func (autScript *RegistrationScript) AutIdentifier() AutId {
+	return autScript.autIdentifier
+}
+
 func (autScript *RegistrationScript) AutName() []byte {
 	return autScript.autName
 }
@@ -765,47 +806,6 @@ func (autScript *RegistrationScript) OutAutRootTokenNum() uint8 {
 
 func (autScript *RegistrationScript) ScriptMemo() []byte {
 	return autScript.scriptMemo
-}
-
-// NewRegistrationScript creates a new RegistrationScript.
-//
-// Note that RegistrationScript's autIdentifier is zeroHash, and does not need a corresponding input.
-func NewRegistrationScript(version uint32,
-	autName []byte, autSymbol []byte, baseUnitName []byte, subUnitName []byte, unitScale uint64,
-	autMemo []byte, plannedTotalSupply uint64,
-	issuers []*AutIssuer, reregistrationExpireHeight int32, reregisterThreshold uint8, mintThreshold uint8,
-	outStarIndex uint8, outAutRootTokenNum uint8,
-	scriptMemo []byte) *RegistrationScript {
-
-	return &RegistrationScript{
-		version:                    version,
-		scriptType:                 AutScriptTypeRegistration,
-		autIdentifier:              ZeroHash,
-		autName:                    autName,
-		autSymbol:                  autSymbol,
-		baseUnitName:               baseUnitName,
-		subUnitName:                subUnitName,
-		unitScale:                  unitScale,
-		autMemo:                    autMemo,
-		plannedTotalSupply:         plannedTotalSupply,
-		issuers:                    issuers,
-		reregistrationExpireHeight: reregistrationExpireHeight,
-		reregisterThreshold:        reregisterThreshold,
-		mintThreshold:              mintThreshold,
-		outStartIndex:              outStarIndex,
-		outAutRootTokenNum:         outAutRootTokenNum,
-		scriptMemo:                 scriptMemo,
-	}
-}
-
-func (autScript *RegistrationScript) Version() uint32 {
-	return autScript.version
-}
-func (autScript *RegistrationScript) Type() AutScriptType {
-	return autScript.scriptType
-}
-func (autScript *RegistrationScript) AutIdentifier() AutId {
-	return autScript.autIdentifier
 }
 
 func (autScript *RegistrationScript) WitnessHash() chainhash.Hash {
@@ -1283,6 +1283,42 @@ type ReRegistrationScript struct {
 	scriptMemo []byte
 }
 
+func NewReRegistrationScript(version uint32,
+	autIdentifier AutId,
+	autMemo []byte, plannedTotalSupply uint64,
+	issuers []*AutIssuer, reregistrationExpireHeight int32, reregisterThreshold uint8, mintThreshold uint8,
+	inStartIndex uint8, inAutRootTokenNum uint8,
+	outStartIndex uint8, outAutRootTokenNum uint8,
+	scriptMemo []byte) *ReRegistrationScript {
+
+	return &ReRegistrationScript{
+		version:                    version,
+		scriptType:                 AutScriptTypeReRegistration,
+		autIdentifier:              autIdentifier,
+		autMemo:                    autMemo,
+		plannedTotalSupply:         plannedTotalSupply,
+		issuers:                    issuers,
+		reregistrationExpireHeight: reregistrationExpireHeight,
+		reregisterThreshold:        reregisterThreshold,
+		mintThreshold:              mintThreshold,
+		inStartIndex:               inStartIndex,
+		inAutRootTokenNum:          inAutRootTokenNum,
+		outStartIndex:              outStartIndex,
+		outAutRootTokenNum:         outAutRootTokenNum,
+		scriptMemo:                 scriptMemo,
+	}
+}
+
+func (autScript *ReRegistrationScript) Version() uint32 {
+	return autScript.version
+}
+func (autScript *ReRegistrationScript) Type() AutScriptType {
+	return autScript.scriptType
+}
+func (autScript *ReRegistrationScript) AutIdentifier() AutId {
+	return autScript.autIdentifier
+}
+
 func (autScript *ReRegistrationScript) AutMemo() []byte {
 	return autScript.autMemo
 }
@@ -1327,40 +1363,15 @@ func (autScript *ReRegistrationScript) ScriptMemo() []byte {
 	return autScript.scriptMemo
 }
 
-func NewReRegistrationScript(version uint32,
-	autIdentifier AutId,
-	autMemo []byte, plannedTotalSupply uint64,
-	issuers []*AutIssuer, reregistrationExpireHeight int32, reregisterThreshold uint8, mintThreshold uint8,
-	inStartIndex uint8, inAutRootTokenNum uint8,
-	outStartIndex uint8, outAutRootTokenNum uint8,
-	scriptMemo []byte) *ReRegistrationScript {
-
-	return &ReRegistrationScript{
-		version:                    version,
-		scriptType:                 AutScriptTypeReRegistration,
-		autIdentifier:              autIdentifier,
-		autMemo:                    autMemo,
-		plannedTotalSupply:         plannedTotalSupply,
-		issuers:                    issuers,
-		reregistrationExpireHeight: reregistrationExpireHeight,
-		reregisterThreshold:        reregisterThreshold,
-		mintThreshold:              mintThreshold,
-		inStartIndex:               inStartIndex,
-		inAutRootTokenNum:          inAutRootTokenNum,
-		outStartIndex:              outStartIndex,
-		outAutRootTokenNum:         outAutRootTokenNum,
-		scriptMemo:                 scriptMemo,
-	}
+func (autScript *ReRegistrationScript) WitnessHash() chainhash.Hash {
+	return ZeroHash // non sense
 }
 
-func (autScript *ReRegistrationScript) Version() uint32 {
-	return autScript.version
+func (autScript *ReRegistrationScript) NumConsumedTokens() int {
+	return int(autScript.inAutRootTokenNum)
 }
-func (autScript *ReRegistrationScript) Type() AutScriptType {
-	return autScript.scriptType
-}
-func (autScript *ReRegistrationScript) AutIdentifier() AutId {
-	return autScript.autIdentifier
+func (autScript *ReRegistrationScript) NumGeneratedTokens() int {
+	return int(autScript.outAutRootTokenNum)
 }
 
 func (autScript *ReRegistrationScript) serializeSize() int {
@@ -1677,17 +1688,6 @@ func (autScript *ReRegistrationScript) SanityCheck() error {
 	return nil
 }
 
-func (autScript *ReRegistrationScript) WitnessHash() chainhash.Hash {
-	return ZeroHash // non sense
-}
-
-func (autScript *ReRegistrationScript) NumConsumedTokens() int {
-	return int(autScript.inAutRootTokenNum)
-}
-func (autScript *ReRegistrationScript) NumGeneratedTokens() int {
-	return int(autScript.outAutRootTokenNum)
-}
-
 var _ AutScript = &ReRegistrationScript{}
 
 // MintScript would be the structured script parsed from memo in host transaction,
@@ -1743,38 +1743,6 @@ type MintScript struct {
 	scriptMemo []byte
 }
 
-func (autScript *MintScript) Vin() uint64 {
-	return autScript.vin
-}
-
-func (autScript *MintScript) InStartIndex() uint8 {
-	return autScript.inStartIndex
-}
-
-func (autScript *MintScript) InAutRootTokenNum() uint8 {
-	return autScript.inAutRootTokenNum
-}
-
-func (autScript *MintScript) OutStartIndex() uint8 {
-	return autScript.outStartIndex
-}
-
-func (autScript *MintScript) OutHiddenAutTokenNum() uint8 {
-	return autScript.outHiddenAutTokenNum
-}
-
-func (autScript *MintScript) OutPublicAutTokenNum() uint8 {
-	return autScript.outPublicAutTokenNum
-}
-
-func (autScript *MintScript) SerializedAutTxos() [][]byte {
-	return autScript.serializedAutTxos
-}
-
-func (autScript *MintScript) ScriptMemo() []byte {
-	return autScript.scriptMemo
-}
-
 func NewMintScript(version uint32,
 	autIdentifier AutId,
 	vin uint64,
@@ -1809,6 +1777,49 @@ func (autScript *MintScript) Type() AutScriptType {
 }
 func (autScript *MintScript) AutIdentifier() AutId {
 	return autScript.autIdentifier
+}
+
+func (autScript *MintScript) Vin() uint64 {
+	return autScript.vin
+}
+
+func (autScript *MintScript) InStartIndex() uint8 {
+	return autScript.inStartIndex
+}
+
+func (autScript *MintScript) InAutRootTokenNum() uint8 {
+	return autScript.inAutRootTokenNum
+}
+
+func (autScript *MintScript) OutStartIndex() uint8 {
+	return autScript.outStartIndex
+}
+
+func (autScript *MintScript) OutHiddenAutTokenNum() uint8 {
+	return autScript.outHiddenAutTokenNum
+}
+
+func (autScript *MintScript) OutPublicAutTokenNum() uint8 {
+	return autScript.outPublicAutTokenNum
+}
+
+func (autScript *MintScript) SerializedAutTxos() [][]byte {
+	return autScript.serializedAutTxos
+}
+
+func (autScript *MintScript) ScriptMemo() []byte {
+	return autScript.scriptMemo
+}
+
+func (autScript *MintScript) WitnessHash() chainhash.Hash {
+	return autScript.witnessHash
+}
+
+func (autScript *MintScript) NumConsumedTokens() int {
+	return int(autScript.inAutRootTokenNum)
+}
+func (autScript *MintScript) NumGeneratedTokens() int {
+	return int(autScript.outHiddenAutTokenNum + autScript.outPublicAutTokenNum)
 }
 
 func (autScript *MintScript) serializeSize() int {
@@ -2102,17 +2113,6 @@ func (autScript *MintScript) SanityCheck() error {
 	return nil
 }
 
-func (autScript *MintScript) WitnessHash() chainhash.Hash {
-	return autScript.witnessHash
-}
-
-func (autScript *MintScript) NumConsumedTokens() int {
-	return int(autScript.inAutRootTokenNum)
-}
-func (autScript *MintScript) NumGeneratedTokens() int {
-	return int(autScript.outHiddenAutTokenNum + autScript.outPublicAutTokenNum)
-}
-
 var _ AutScript = &MintScript{}
 
 // TransferScript would be the structured script parsed from memo in host transaction,
@@ -2151,38 +2151,6 @@ type TransferScript struct {
 	scriptMemo  []byte
 }
 
-func (autScript *TransferScript) InStartIndex() uint8 {
-	return autScript.inStartIndex
-}
-
-func (autScript *TransferScript) InHiddenAutTokenNum() uint8 {
-	return autScript.inHiddenAutTokenNum
-}
-
-func (autScript *TransferScript) InPublicAutTokenNum() uint8 {
-	return autScript.inPublicAutTokenNum
-}
-
-func (autScript *TransferScript) OutStartIndex() uint8 {
-	return autScript.outStartIndex
-}
-
-func (autScript *TransferScript) OutHiddenAutTokenNum() uint8 {
-	return autScript.outHiddenAutTokenNum
-}
-
-func (autScript *TransferScript) OutPublicAutTokenNum() uint8 {
-	return autScript.outPublicAutTokenNum
-}
-
-func (autScript *TransferScript) SerializedAutTxos() [][]byte {
-	return autScript.serializedAutTxos
-}
-
-func (autScript *TransferScript) ScriptMemo() []byte {
-	return autScript.scriptMemo
-}
-
 func NewTransferScript(version uint32,
 	autIdentifier AutId,
 	inStartIndex uint8, inHiddenAutTokenNum uint8, inPublicAutTokenNum uint8,
@@ -2217,6 +2185,49 @@ func (autScript *TransferScript) Type() AutScriptType {
 
 func (autScript *TransferScript) AutIdentifier() AutId {
 	return autScript.autIdentifier
+}
+
+func (autScript *TransferScript) InStartIndex() uint8 {
+	return autScript.inStartIndex
+}
+
+func (autScript *TransferScript) InHiddenAutTokenNum() uint8 {
+	return autScript.inHiddenAutTokenNum
+}
+
+func (autScript *TransferScript) InPublicAutTokenNum() uint8 {
+	return autScript.inPublicAutTokenNum
+}
+
+func (autScript *TransferScript) OutStartIndex() uint8 {
+	return autScript.outStartIndex
+}
+
+func (autScript *TransferScript) OutHiddenAutTokenNum() uint8 {
+	return autScript.outHiddenAutTokenNum
+}
+
+func (autScript *TransferScript) OutPublicAutTokenNum() uint8 {
+	return autScript.outPublicAutTokenNum
+}
+
+func (autScript *TransferScript) SerializedAutTxos() [][]byte {
+	return autScript.serializedAutTxos
+}
+
+func (autScript *TransferScript) ScriptMemo() []byte {
+	return autScript.scriptMemo
+}
+
+func (autScript *TransferScript) WitnessHash() chainhash.Hash {
+	return autScript.witnessHash
+}
+
+func (autScript *TransferScript) NumConsumedTokens() int {
+	return int(autScript.inHiddenAutTokenNum + autScript.inPublicAutTokenNum)
+}
+func (autScript *TransferScript) NumGeneratedTokens() int {
+	return int(autScript.outHiddenAutTokenNum + autScript.outPublicAutTokenNum)
 }
 
 func (autScript *TransferScript) serializeSize() int {
@@ -2508,17 +2519,6 @@ func (autScript *TransferScript) SanityCheck() error {
 	return nil
 }
 
-func (autScript *TransferScript) WitnessHash() chainhash.Hash {
-	return autScript.witnessHash
-}
-
-func (autScript *TransferScript) NumConsumedTokens() int {
-	return int(autScript.inHiddenAutTokenNum + autScript.inPublicAutTokenNum)
-}
-func (autScript *TransferScript) NumGeneratedTokens() int {
-	return int(autScript.outHiddenAutTokenNum + autScript.outPublicAutTokenNum)
-}
-
 var _ AutScript = &TransferScript{}
 
 // BurnScript would be the structured script parsed from memo in host transaction,
@@ -2558,38 +2558,6 @@ type BurnScript struct {
 	scriptMemo  []byte
 }
 
-func (autScript *BurnScript) InStartIndex() uint8 {
-	return autScript.inStartIndex
-}
-
-func (autScript *BurnScript) InHiddenAutTokenNum() uint8 {
-	return autScript.inHiddenAutTokenNum
-}
-
-func (autScript *BurnScript) InPublicAutTokenNum() uint8 {
-	return autScript.inPublicAutTokenNum
-}
-
-func (autScript *BurnScript) OutStartIndex() uint8 {
-	return autScript.outStartIndex
-}
-
-func (autScript *BurnScript) OutHiddenAutTokenNum() uint8 {
-	return autScript.outHiddenAutTokenNum
-}
-
-func (autScript *BurnScript) OutPublicAutTokenNum() uint8 {
-	return autScript.outPublicAutTokenNum
-}
-
-func (autScript *BurnScript) SerializedAutTxos() [][]byte {
-	return autScript.serializedAutTxos
-}
-
-func (autScript *BurnScript) ScriptMemo() []byte {
-	return autScript.scriptMemo
-}
-
 func NewBurnScript(version uint32,
 	autIdentifier AutId,
 	inStartIndex uint8, inHiddenAutTokenNum uint8, inPublicAutTokenNum uint8,
@@ -2624,6 +2592,49 @@ func (autScript *BurnScript) Type() AutScriptType {
 
 func (autScript *BurnScript) AutIdentifier() AutId {
 	return autScript.autIdentifier
+}
+
+func (autScript *BurnScript) InStartIndex() uint8 {
+	return autScript.inStartIndex
+}
+
+func (autScript *BurnScript) InHiddenAutTokenNum() uint8 {
+	return autScript.inHiddenAutTokenNum
+}
+
+func (autScript *BurnScript) InPublicAutTokenNum() uint8 {
+	return autScript.inPublicAutTokenNum
+}
+
+func (autScript *BurnScript) OutStartIndex() uint8 {
+	return autScript.outStartIndex
+}
+
+func (autScript *BurnScript) OutHiddenAutTokenNum() uint8 {
+	return autScript.outHiddenAutTokenNum
+}
+
+func (autScript *BurnScript) OutPublicAutTokenNum() uint8 {
+	return autScript.outPublicAutTokenNum
+}
+
+func (autScript *BurnScript) SerializedAutTxos() [][]byte {
+	return autScript.serializedAutTxos
+}
+
+func (autScript *BurnScript) ScriptMemo() []byte {
+	return autScript.scriptMemo
+}
+
+func (autScript *BurnScript) WitnessHash() chainhash.Hash {
+	return autScript.witnessHash
+}
+
+func (autScript *BurnScript) NumConsumedTokens() int {
+	return int(autScript.inHiddenAutTokenNum + autScript.inPublicAutTokenNum)
+}
+func (autScript *BurnScript) NumGeneratedTokens() int {
+	return int(autScript.outHiddenAutTokenNum + autScript.outPublicAutTokenNum)
 }
 
 func (autScript *BurnScript) serializeSize() int {
@@ -2928,17 +2939,6 @@ func (autScript *BurnScript) SanityCheck() error {
 	}
 
 	return nil
-}
-
-func (autScript *BurnScript) WitnessHash() chainhash.Hash {
-	return autScript.witnessHash
-}
-
-func (autScript *BurnScript) NumConsumedTokens() int {
-	return int(autScript.inHiddenAutTokenNum + autScript.inPublicAutTokenNum)
-}
-func (autScript *BurnScript) NumGeneratedTokens() int {
-	return int(autScript.outHiddenAutTokenNum + autScript.outPublicAutTokenNum)
 }
 
 var _ AutScript = &BurnScript{}
