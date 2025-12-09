@@ -14,6 +14,7 @@ import (
 type HostOutPoint = dao.HostOutPoint
 type AutIssuer = dao.AutIssuer
 type AutToken = dao.AutToken
+type AutPrivacyType = dao.AutPrivacyType
 
 // RuleGetTxVersionFromAutScriptVersion defines a map from AutScriptVersion to host-Txo-Version.
 //
@@ -126,6 +127,28 @@ func RuleCheckOnAutVersionInput(autScriptVersion uint32, inputAutTxo *ctautwire.
 	err := abecryptox.AutRuleCheckOnTxInputVersion(autScriptVersion, inputAutTxo.Version)
 	if err != nil {
 		return fmt.Errorf("fail to pass the AutRuleCheckOnTxInputVersion: %v", err)
+	}
+	return nil
+}
+
+func RuleCheckOnAutPrivacyType(privacyType AutPrivacyType, autTxo *ctautwire.AutTxo) error {
+	autTxoType, err := abecryptox.GetAutTxoType(autTxo)
+	if err != nil {
+		return err
+	}
+
+	if privacyType == dao.PrivacyTypeUnlimited {
+		// nothing
+	} else if privacyType == dao.PrivacyTypeLimitedPublic {
+		if autTxoType != abecryptox.AutTxoTypePublic {
+			return fmt.Errorf("expected public aut txo, but got %d", autTxoType)
+		}
+	} else if privacyType == dao.PrivacyTypeLimitedHidden {
+		if autTxoType != abecryptox.AutTxoTypeHidden {
+			return fmt.Errorf("expected hidden aut txo, but got %d", autTxoType)
+		}
+	} else {
+		return fmt.Errorf("unknown privacy type %d", privacyType)
 	}
 	return nil
 }

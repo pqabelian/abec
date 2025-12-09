@@ -3,9 +3,10 @@ package dao
 import (
 	"bytes"
 	"encoding/hex"
+	"io"
+
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
-	"io"
 )
 
 const MaxIssuerAddressLength = 256 // not exact, to have some redundancy
@@ -98,6 +99,14 @@ func (autIssuer *AutIssuer) Clone() *AutIssuer {
 	copy(rst.IssuerAddress, autIssuer.IssuerAddress)
 	return rst
 }
+
+type AutPrivacyType = uint8
+
+const (
+	PrivacyTypeUnlimited     = 0
+	PrivacyTypeLimitedPublic = 1
+	PrivacyTypeLimitedHidden = 2
+)
 
 // AutToken holds the information of token in memory, and would be used to conduct the RULE-CHECKS.
 type AutToken struct {

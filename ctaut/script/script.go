@@ -18,6 +18,7 @@ import (
 type HostOutPoint = dao.HostOutPoint
 type AutId = dao.AutId
 type AutIssuer = dao.AutIssuer
+type PrivacyType = dao.AutPrivacyType
 
 // AutMetadata maintains the metadata information of Abelian User Token (AUT) instance on Abelian
 // 1. Each AutInstance has a unique identifier, which is actually a hash of the Abelian-Tx
@@ -91,6 +92,9 @@ type AutMetadata struct {
 	// MintThreshold specifies the size of authorized issuer set for MintScript.
 	MintThreshold uint8
 
+	// PrivacyType specifies the privacy type of the AutInstance.
+	PrivacyType PrivacyType
+
 	// MintedAmount records the total minted amount of this AutInstance.
 	MintedAmount uint64
 
@@ -143,8 +147,9 @@ func (autMetadata *AutMetadata) serializeSize() (int, error) {
 
 	n += wire.VarIntSerializeSize(uint64(autMetadata.ReregistrationExpireHeight)) // ReregistrationExpireHeight
 
-	n += 1 + // reregister threshold
-		1 // mint threshold
+	n += 1 // reregister threshold
+	n += 1 // mint threshold
+	n += 1 // privacy type
 
 	n += wire.VarIntSerializeSize(autMetadata.MintedAmount) + // minted amount,variable length
 		wire.VarIntSerializeSize(autMetadata.BurnedAmount) // burned amount,variable length
@@ -250,6 +255,11 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 
 	// MintThreshold              uint8
 	if err = w.WriteByte(autMetadata.MintThreshold); err != nil {
+		return nil, err
+	}
+
+	// AutPrivacyType              uint8
+	if err = w.WriteByte(autMetadata.PrivacyType); err != nil {
 		return nil, err
 	}
 
@@ -399,6 +409,11 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 		return err
 	}
 
+	// AutPrivacyType              uint8
+	if autMetadata.PrivacyType, err = r.ReadByte(); err != nil {
+		return err
+	}
+
 	// MintedAmount               uint64
 	if autMetadata.MintedAmount, err = wire.ReadVarInt(r, 0); err != nil {
 		return err
@@ -521,6 +536,12 @@ func (autMetadata *AutMetadata) SanityCheck() error {
 		return fmt.Errorf("invalid mint threshold (%d) for %d issuers", autMetadata.MintThreshold, len(autMetadata.Issuers))
 	}
 
+	if autMetadata.PrivacyType != dao.PrivacyTypeUnlimited &&
+		autMetadata.PrivacyType != dao.PrivacyTypeLimitedPublic &&
+		autMetadata.PrivacyType != dao.PrivacyTypeLimitedHidden {
+		return fmt.Errorf("invalid privacy type (%d)", autMetadata.PrivacyType)
+	}
+
 	if autMetadata.MintedAmount > autMetadata.PlannedTotalSupply {
 		return fmt.Errorf("invalid minted amount (%d) for planned total supply (%d)", autMetadata.MintedAmount, autMetadata.PlannedTotalSupply)
 	}
@@ -590,6 +611,7 @@ func (autMetadata *AutMetadata) Clone() *AutMetadata {
 		ReregistrationExpireHeight: autMetadata.ReregistrationExpireHeight,
 		ReregistrationThreshold:    autMetadata.ReregistrationThreshold,
 		MintThreshold:              autMetadata.MintThreshold,
+		PrivacyType:                autMetadata.PrivacyType,
 
 		MintedAmount:         autMetadata.MintedAmount,
 		BurnedAmount:         autMetadata.BurnedAmount,
@@ -714,6 +736,7 @@ type RegistrationScript struct {
 	reregistrationExpireHeight int32
 	reregisterThreshold        uint8
 	mintThreshold              uint8
+	privacyType                PrivacyType
 
 	// the number of output AutRootTokens
 	outStartIndex      uint8
@@ -729,6 +752,7 @@ func NewRegistrationScript(version uint32,
 	autName []byte, autSymbol []byte, baseUnitName []byte, subUnitName []byte, unitScale uint64,
 	autMemo []byte, plannedTotalSupply uint64,
 	issuers []*AutIssuer, reregistrationExpireHeight int32, reregisterThreshold uint8, mintThreshold uint8,
+	privacyType PrivacyType,
 	outStarIndex uint8, outAutRootTokenNum uint8,
 	scriptMemo []byte) *RegistrationScript {
 
@@ -747,6 +771,7 @@ func NewRegistrationScript(version uint32,
 		reregistrationExpireHeight: reregistrationExpireHeight,
 		reregisterThreshold:        reregisterThreshold,
 		mintThreshold:              mintThreshold,
+		privacyType:                privacyType,
 		outStartIndex:              outStarIndex,
 		outAutRootTokenNum:         outAutRootTokenNum,
 		scriptMemo:                 scriptMemo,
@@ -807,6 +832,10 @@ func (autScript *RegistrationScript) MintThreshold() uint8 {
 	return autScript.mintThreshold
 }
 
+func (autScript *RegistrationScript) PrivacyType() PrivacyType {
+	return autScript.privacyType
+}
+
 func (autScript *RegistrationScript) OutStartIndex() uint8 {
 	return autScript.outStartIndex
 }
@@ -863,6 +892,7 @@ func (autScript *RegistrationScript) serializeSize() (int, error) {
 
 	n += 1 // reregisterThreshold        uint8
 	n += 1 // mintThreshold              uint8
+	n += 1 // privacyType              uint8
 
 	n += 1 // outStartIndex				uint8
 	n += 1 // outAutRootTokenNum		uint8
@@ -959,6 +989,11 @@ func (autScript *RegistrationScript) Serialize() ([]byte, error) {
 
 	// mintThreshold              uint8
 	if err = w.WriteByte(autScript.mintThreshold); err != nil {
+		return nil, err
+	}
+
+	// privacyType              uint8
+	if err = w.WriteByte(autScript.privacyType); err != nil {
 		return nil, err
 	}
 
@@ -1077,6 +1112,11 @@ func (autScript *RegistrationScript) Deserialize(serializedScript []byte) error 
 
 	// mintThreshold              uint8
 	if autScript.mintThreshold, err = r.ReadByte(); err != nil {
+		return err
+	}
+
+	// privacyType              uint8
+	if autScript.privacyType, err = r.ReadByte(); err != nil {
 		return err
 	}
 
@@ -1212,6 +1252,14 @@ func (autScript *RegistrationScript) SanityCheck() error {
 			autScript.mintThreshold, len(autScript.issuers))
 	}
 
+	// privacyType              uint8
+	if autScript.privacyType != dao.PrivacyTypeUnlimited &&
+		autScript.privacyType != dao.PrivacyTypeLimitedPublic &&
+		autScript.privacyType != dao.PrivacyTypeLimitedHidden {
+		return fmt.Errorf("autScript.privacyType (%d) is not supported",
+			autScript.privacyType)
+	}
+
 	// outStartIndex         uint8
 	// no checks can conduct here
 
@@ -1282,6 +1330,7 @@ type ReRegistrationScript struct {
 	reregistrationExpireHeight int32
 	reregisterThreshold        uint8
 	mintThreshold              uint8
+	privacyType                PrivacyType
 
 	// inAutRootTokenNum is an additional field that ReRegistrationScript has while RegistrationScript doesn't.
 	inStartIndex      uint8
@@ -1298,6 +1347,7 @@ func NewReRegistrationScript(version uint32,
 	autIdentifier AutId,
 	autMemo []byte, plannedTotalSupply uint64,
 	issuers []*AutIssuer, reregistrationExpireHeight int32, reregisterThreshold uint8, mintThreshold uint8,
+	privacyType PrivacyType,
 	inStartIndex uint8, inAutRootTokenNum uint8,
 	outStartIndex uint8, outAutRootTokenNum uint8,
 	scriptMemo []byte) *ReRegistrationScript {
@@ -1312,6 +1362,7 @@ func NewReRegistrationScript(version uint32,
 		reregistrationExpireHeight: reregistrationExpireHeight,
 		reregisterThreshold:        reregisterThreshold,
 		mintThreshold:              mintThreshold,
+		privacyType:                privacyType,
 		inStartIndex:               inStartIndex,
 		inAutRootTokenNum:          inAutRootTokenNum,
 		outStartIndex:              outStartIndex,
@@ -1352,6 +1403,10 @@ func (autScript *ReRegistrationScript) ReregisterThreshold() uint8 {
 
 func (autScript *ReRegistrationScript) MintThreshold() uint8 {
 	return autScript.mintThreshold
+}
+
+func (autScript *ReRegistrationScript) PrivacyType() PrivacyType {
+	return autScript.privacyType
 }
 
 func (autScript *ReRegistrationScript) InStartIndex() uint8 {
@@ -1409,6 +1464,7 @@ func (autScript *ReRegistrationScript) serializeSize() (int, error) {
 
 	n += 1 // reregisterThreshold        uint8
 	n += 1 // mintThreshold              uint8
+	n += 1 // privacyType              uint8
 
 	n += 1 // inStartIndex               uint8
 	n += 1 // inAutRootTokenNum          uint8
@@ -1479,6 +1535,11 @@ func (autScript *ReRegistrationScript) Serialize() ([]byte, error) {
 
 	// mintThreshold              uint8
 	if err = w.WriteByte(autScript.mintThreshold); err != nil {
+		return nil, err
+	}
+
+	// privacyType              uint8
+	if err = w.WriteByte(autScript.privacyType); err != nil {
 		return nil, err
 	}
 
@@ -1587,6 +1648,11 @@ func (autScript *ReRegistrationScript) Deserialize(serializedScript []byte) erro
 		return err
 	}
 
+	// privacyType              uint8
+	if autScript.privacyType, err = r.ReadByte(); err != nil {
+		return err
+	}
+
 	// inStartIndex               uint8
 	if autScript.inStartIndex, err = r.ReadByte(); err != nil {
 		return err
@@ -1683,6 +1749,14 @@ func (autScript *ReRegistrationScript) SanityCheck() error {
 	if int(autScript.mintThreshold) > len(autScript.issuers) {
 		return fmt.Errorf("autScript.mintThreshold (%d) exceeds the number of issuers (%d)",
 			autScript.mintThreshold, len(autScript.issuers))
+	}
+
+	// privacyType           uint8
+	if autScript.privacyType != dao.PrivacyTypeUnlimited &&
+		autScript.privacyType != dao.PrivacyTypeLimitedPublic &&
+		autScript.privacyType != dao.PrivacyTypeLimitedHidden {
+		return fmt.Errorf("autScript.privacyType (%d) is not supported",
+			autScript.privacyType)
 	}
 
 	// inStartIndex         uint8

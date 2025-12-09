@@ -3076,10 +3076,46 @@ func ValidateTxCTAUTScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostVie
 			return err
 		}
 
+		// check privacy type
+		metadata := ctautView.LookupCTAUTMetaInfo(extAutScript.AutIdentifier())
+		privacyType := metadata.PrivacyType
+
+		generatedTokens := extAutScript.GeneratedTokens()
+		for _, token := range generatedTokens {
+			autTxo := &ctautwire.AutTxo{}
+			err = autTxo.Deserialize(token.ValueScript)
+			if err != nil {
+				return err
+			}
+
+			err = rules.RuleCheckOnAutPrivacyType(privacyType, autTxo)
+			if err != nil {
+				return err
+			}
+		}
+
 	case *ctautapi.TransferScript:
 		err = checkCTAUTTransferTransactionInputs(extAutScript, tx, txHeight, ctautView, hostView, chainParams)
 		if err != nil {
 			return err
+		}
+
+		// check privacy type
+		metadata := ctautView.LookupCTAUTMetaInfo(extAutScript.AutIdentifier())
+		privacyType := metadata.PrivacyType
+
+		generatedTokens := extAutScript.GeneratedTokens()
+		for _, token := range generatedTokens {
+			autTxo := &ctautwire.AutTxo{}
+			err = autTxo.Deserialize(token.ValueScript)
+			if err != nil {
+				return err
+			}
+
+			err = rules.RuleCheckOnAutPrivacyType(privacyType, autTxo)
+			if err != nil {
+				return err
+			}
 		}
 
 	case *ctautapi.BurnScript:
@@ -3087,6 +3123,24 @@ func ValidateTxCTAUTScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostVie
 		err = checkCTAUTBurnTransactionInputs(extAutScript, tx, txHeight, ctautView, hostView, chainParams)
 		if err != nil {
 			return err
+		}
+
+		// check privacy type
+		metadata := ctautView.LookupCTAUTMetaInfo(extAutScript.AutIdentifier())
+		privacyType := metadata.PrivacyType
+
+		generatedTokens := extAutScript.GeneratedTokens()
+		for _, token := range generatedTokens {
+			autTxo := &ctautwire.AutTxo{}
+			err = autTxo.Deserialize(token.ValueScript)
+			if err != nil {
+				return err
+			}
+
+			err = rules.RuleCheckOnAutPrivacyType(privacyType, autTxo)
+			if err != nil {
+				return err
+			}
 		}
 
 	default:

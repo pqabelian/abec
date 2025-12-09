@@ -10,6 +10,15 @@ type HostOutPoint = dao.HostOutPoint
 type AutIssuer = dao.AutIssuer
 
 type AutId = dao.AutId
+
+type AutPrivacyType = dao.AutPrivacyType
+
+const (
+	PrivacyTypeUnlimited     = dao.PrivacyTypeUnlimited
+	PrivacyTypeLimitedPublic = dao.PrivacyTypeLimitedPublic
+	PrivacyTypeLimitedHidden = dao.PrivacyTypeLimitedHidden
+)
+
 type AutScriptType = script.AutScriptType
 
 type AutScript = script.AutScript

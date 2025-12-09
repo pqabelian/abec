@@ -3,10 +3,10 @@ package extscript
 import (
 	"bytes"
 	"fmt"
-	"github.com/abesuite/abec/ctaut/dao"
 	"math"
 
 	"github.com/abesuite/abec/abecryptox"
+	"github.com/abesuite/abec/ctaut/dao"
 	"github.com/abesuite/abec/ctaut/rules"
 	"github.com/abesuite/abec/ctaut/script"
 	ctautwire "github.com/abesuite/abec/ctaut/wire"
@@ -323,6 +323,7 @@ func (extAutScript *ExtAutScript) CreateAutMetadata() (*script.AutMetadata, erro
 
 		ReregistrationThreshold: registerScript.ReregisterThreshold(),
 		MintThreshold:           registerScript.MintThreshold(),
+		PrivacyType:             registerScript.PrivacyType(),
 
 		MintedAmount:         0,
 		BurnedAmount:         0,
@@ -394,6 +395,13 @@ func (extAutScript *ExtAutScript) UpdateAutMetadata(autMetadata *script.AutMetad
 
 	updatedAutMetadata.ReregistrationThreshold = reregisterScript.ReregisterThreshold()
 	updatedAutMetadata.MintThreshold = reregisterScript.MintThreshold()
+
+	if autMetadata.PrivacyType != dao.PrivacyTypeUnlimited &&
+		autMetadata.PrivacyType != dao.PrivacyTypeLimitedPublic &&
+		autMetadata.PrivacyType != dao.PrivacyTypeLimitedHidden {
+		return nil, fmt.Errorf("unknown privacy type %d", autMetadata.PrivacyType)
+	}
+	updatedAutMetadata.PrivacyType = reregisterScript.PrivacyType()
 
 	// set the new AutRootTokens
 	updatedAutMetadata.ActiveRootTokenSet = make(map[string]*HostOutPoint, len(extAutScript.generatedTokens))
