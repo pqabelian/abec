@@ -23,3 +23,5 @@ const (
 	AutScriptTypeTransfer       = script.AutScriptTypeTransfer
 	AutScriptTypeBurn           = script.AutScriptTypeBurn
 )
+
+// end of codes

@@ -7,10 +7,8 @@ import (
 )
 
 type HostOutPoint = dao.HostOutPoint
-type AutIssuer = dao.AutIssuer
-
 type AutId = dao.AutId
-type AutScriptType = script.AutScriptType
+type AutIssuer = dao.AutIssuer
 
 type AutScript = script.AutScript
 type RegistrationScript = script.RegistrationScript
@@ -18,11 +16,12 @@ type ReRegistrationScript = script.ReRegistrationScript
 type MintScript = script.MintScript
 type TransferScript = script.TransferScript
 type BurnScript = script.BurnScript
+type AutMetadata = script.AutMetadata
 
 type ExtAutScript = extscript.ExtAutScript
-
-type AutMetadata = script.AutMetadata
 
 func NewAutIssuerFromCoinAddress(coinAddress []byte) *AutIssuer {
 	return dao.NewAutIssuerFromCoinAddress(coinAddress)
 }
+
+// end of codes
