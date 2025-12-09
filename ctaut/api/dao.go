@@ -19,6 +19,7 @@ const (
 
 type AutScriptType = script.AutScriptType
 type AutIssuer = dao.AutIssuer
+type PrivacyType = script.PrivacyType
 
 type AutScript = script.AutScript
 type RegistrationScript = script.RegistrationScript

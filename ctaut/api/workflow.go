@@ -27,12 +27,14 @@ func NewRegistrationScript(version uint32,
 	autName []byte, autSymbol []byte, baseUnitName []byte, subUnitName []byte, unitScale uint64,
 	autMemo []byte, plannedTotalSupply uint64,
 	issuers []*AutIssuer, reregistrationExpireHeight int32, reregisterThreshold uint8, mintThreshold uint8,
+	privacyType PrivacyType,
 	outStarIndex uint8, outAutRootTokenNum uint8,
 	scriptMemo []byte) *RegistrationScript {
 	return script.NewRegistrationScript(version,
 		autName, autSymbol, baseUnitName, subUnitName, unitScale,
 		autMemo, plannedTotalSupply,
 		issuers, reregistrationExpireHeight, reregisterThreshold, mintThreshold,
+		privacyType,
 		outStarIndex, outAutRootTokenNum,
 		scriptMemo)
 }
@@ -42,6 +44,7 @@ func NewReRegistrationScript(version uint32,
 	autMemo []byte, plannedTotalSupply uint64,
 	issuers []*AutIssuer, reregistrationExpireHeight int32,
 	reregisterThreshold uint8, mintThreshold uint8,
+	privacyType PrivacyType,
 	inStartIndex uint8, inAutRootTokenNum uint8,
 	outStartIndex uint8, outAutRootTokenNum uint8,
 	scriptMemo []byte) *ReRegistrationScript {
@@ -50,6 +53,7 @@ func NewReRegistrationScript(version uint32,
 		autIdentifier,
 		autMemo, plannedTotalSupply,
 		issuers, reregistrationExpireHeight, reregisterThreshold, mintThreshold,
+		privacyType,
 		inStartIndex, inAutRootTokenNum,
 		outStartIndex, outAutRootTokenNum,
 		scriptMemo)
@@ -61,8 +65,8 @@ func NewMintScript(version uint32,
 	inStartIndex uint8, inAutRootTokenNum uint8,
 	outStartIndex uint8, outCTAutTokenNum uint8, outPlainAutTokenNum uint8,
 	serializedAutTxos [][]byte,
-	witnessHash chainhash.Hash,
-	scriptMemo []byte) *MintScript {
+	scriptMemo []byte,
+	witnessHash chainhash.Hash) *MintScript {
 
 	return script.NewMintScript(version,
 		autIdentifier,
@@ -79,8 +83,8 @@ func NewTransferScript(version uint32,
 	inStartIndex uint8, inHiddenAutTokenNum uint8, inPublicAutTokenNum uint8,
 	outStartIndex uint8, outHiddenAutTokenNum uint8, outPlainAutTokenNum uint8,
 	serializedAutTxos [][]byte,
-	witnessHash chainhash.Hash,
-	scriptMemo []byte) *TransferScript {
+	scriptMemo []byte,
+	witnessHash chainhash.Hash) *TransferScript {
 
 	return script.NewTransferScript(version,
 		autIdentifier,
@@ -96,8 +100,8 @@ func NewBurnScript(version uint32,
 	inStartIndex uint8, inHiddenAutTokenNum uint8, inPublicAutTokenNum uint8,
 	outStartIndex uint8, outHiddenAutTokenNum uint8, outPublicAutTokenNum uint8,
 	serializedAutTxos [][]byte,
-	witnessHash chainhash.Hash,
-	scriptMemo []byte) *BurnScript {
+	scriptMemo []byte,
+	witnessHash chainhash.Hash) *BurnScript {
 
 	return script.NewBurnScript(version,
 		autIdentifier,
