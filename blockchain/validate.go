@@ -2452,6 +2452,7 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx 
 
 	identifier := ctAutScript.AutIdentifier()
 	identifierKey := identifier.String()
+	scriptVersion := ctAutScript.Version()
 
 	instance, exist := ctautView.instances[identifierKey]
 	if !exist || instance == nil || instance.metadata == nil {
@@ -2552,7 +2553,7 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx 
 				abecryptox.AutTxoTypeHidden, autTxoType)
 		}
 
-		err = rules.RuleCheckOnAutVersionInput(coin.version, autTxo)
+		err = rules.RuleCheckOnAutVersionInput(scriptVersion, autTxo)
 		if err != nil {
 			return err
 		}
@@ -2644,7 +2645,7 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx 
 				abecryptox.AutTxoTypePublic, autTxoType)
 		}
 
-		err = rules.RuleCheckOnAutVersionInput(coin.version, autTxo)
+		err = rules.RuleCheckOnAutVersionInput(scriptVersion, autTxo)
 		if err != nil {
 			return err
 		}
@@ -2698,6 +2699,7 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abe
 
 	identifier := ctAutScript.AutIdentifier()
 	identifierKey := identifier.String()
+	scriptVersion := ctAutScript.Version()
 
 	instance, exist := ctautView.instances[identifierKey]
 	if !exist || instance == nil || instance.metadata == nil {
@@ -2798,7 +2800,7 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abe
 				abecryptox.AutTxoTypeHidden, autTxoType)
 		}
 
-		err = rules.RuleCheckOnAutVersionInput(coin.version, autTxo)
+		err = rules.RuleCheckOnAutVersionInput(scriptVersion, autTxo)
 		if err != nil {
 			return err
 		}
@@ -2891,7 +2893,7 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abe
 				abecryptox.AutTxoTypePublic, autTxoType)
 		}
 
-		err = rules.RuleCheckOnAutVersionInput(coin.version, autTxo)
+		err = rules.RuleCheckOnAutVersionInput(scriptVersion, autTxo)
 		if err != nil {
 			return err
 		}
