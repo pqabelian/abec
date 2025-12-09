@@ -475,7 +475,7 @@ func pqringctxAutRuleCheckOnTxInputVersion(pp *pqringctxapi.PublicParameter, aut
 		} else {
 			return fmt.Errorf("pqringctxAutRuleCheckOnTxInputVersion: (autScriptVersion, autTxInputVersion) (%d, %d), "+
 				"is not allowed/supported",
-				autTxInputVersion, autScriptVersion)
+				autScriptVersion, autTxInputVersion)
 		}
 	default:
 		return fmt.Errorf("pqringctxAutRuleCheckOnTxInputVersion: autScriptVersion (%d) is not supported",
