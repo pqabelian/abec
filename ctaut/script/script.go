@@ -755,6 +755,10 @@ func (autScript *RegistrationScript) ReregisterThreshold() uint8 {
 	return autScript.reregisterThreshold
 }
 
+func (autScript *RegistrationScript) OutStartIndex() uint8 {
+	return autScript.outStartIndex
+}
+
 func (autScript *RegistrationScript) OutAutRootTokenNum() uint8 {
 	return autScript.outAutRootTokenNum
 }
@@ -816,9 +820,6 @@ func (autScript *RegistrationScript) NumConsumedTokens() int {
 	return 0
 }
 
-func (autScript *RegistrationScript) OutStartIndex() uint8 {
-	return autScript.outStartIndex
-}
 func (autScript *RegistrationScript) NumGeneratedTokens() int {
 	return int(autScript.outAutRootTokenNum)
 }
