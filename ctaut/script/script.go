@@ -2300,6 +2300,11 @@ func (autScript *TransferScript) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
+	// inStartIndex    uint8
+	if err = w.WriteByte(autScript.inStartIndex); err != nil {
+		return nil, err
+	}
+
 	// inHiddenAutTokenNum    uint8
 	if err = w.WriteByte(autScript.inHiddenAutTokenNum); err != nil {
 		return nil, err
@@ -2307,6 +2312,11 @@ func (autScript *TransferScript) Serialize() ([]byte, error) {
 
 	// inPublicAutTokenNum    uint8
 	if err = w.WriteByte(autScript.inPublicAutTokenNum); err != nil {
+		return nil, err
+	}
+
+	// outStartIndex    uint8
+	if err = w.WriteByte(autScript.outStartIndex); err != nil {
 		return nil, err
 	}
 
