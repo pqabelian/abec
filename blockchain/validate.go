@@ -2213,7 +2213,7 @@ func checkCTAUTReRegistrationTransactionInputs(extAutScript *ctautapi.ExtAutScri
 
 		// fill out with the first item in ring
 		hostOutPoint := txoRing.OutPointRing.OutPoints[0]
-		coinAddress, err := rules.RuleCheckOnHostTxo(hostOutPoint, txoRing.TxOuts[0])
+		coinAddress, err := rules.RuleCheckOnHostTxo(txoRing.TxOuts[0])
 		if err != nil {
 			return fmt.Errorf("transaction %s try to consume UTXO at Ring %s is not a valid output", txHash,
 				hostTxIn.PreviousOutPointRing.Hash())
@@ -2361,7 +2361,7 @@ func checkCTAUTMintTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abe
 
 		// fill out with the first item in ring
 		hostOutPoint := txoRing.OutPointRing.OutPoints[0]
-		coinAddress, err := rules.RuleCheckOnHostTxo(hostOutPoint, txoRing.TxOuts[0])
+		coinAddress, err := rules.RuleCheckOnHostTxo(txoRing.TxOuts[0])
 		if err != nil {
 			return fmt.Errorf("transaction %s try to consume UTXO at Ring %s is not a valid output", txHash,
 				hostTxIn.PreviousOutPointRing.Hash())

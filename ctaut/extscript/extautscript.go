@@ -141,7 +141,7 @@ func (extAutScript *ExtAutScript) assembleOutputAutTokens() error {
 				Index:  index,
 			}
 
-		coinAddress, err := rules.RuleCheckOnHostTxo(&hostOutPoint, txOut)
+		coinAddress, err := rules.RuleCheckOnHostTxo(txOut)
 		if err != nil {
 			return err
 		}
@@ -406,7 +406,7 @@ func (extAutScript *ExtAutScript) AssembleInputAutTokensStep1(
 
 		// fill out with the first item in ring
 		hostOutPoint := txoRing.OutPointRing.OutPoints[0]
-		coinAddress, err := rules.RuleCheckOnHostTxo(hostOutPoint, txoRing.TxOuts[0])
+		coinAddress, err := rules.RuleCheckOnHostTxo(txoRing.TxOuts[0])
 		if err != nil {
 			return fmt.Errorf("transaction %s try to consume UTXO at Ring %s is not a valid output", txHash,
 				hostTxIn.PreviousOutPointRing.Hash())
