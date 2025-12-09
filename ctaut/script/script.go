@@ -2965,7 +2965,7 @@ func (autScript *BurnScript) SanityCheck() error {
 			}
 		}
 	}
-	
+
 	// scriptMemo                 []byte
 	if len(autScript.scriptMemo) > MaxScriptMemoLength {
 		return fmt.Errorf("len(autScript.scriptMemo) (%d) is too large", len(autScript.scriptMemo))
@@ -2989,14 +2989,16 @@ func DeserializeAutScriptV1(serializedAutScript []byte) (AutScript, error) {
 		return nil, err
 	}
 	if versionRead > math.MaxUint32 {
-		return nil, fmt.Errorf("readed script version (%d) is too large", versionRead)
+		return nil, fmt.Errorf("read script version (%d) is too large", versionRead)
 	}
 	scriptVersion := uint32(versionRead)
 	if _, ok := ctautwire.AutScriptVersionSet[scriptVersion]; !ok {
 		return nil, fmt.Errorf("unknown au script version %d", scriptVersion)
 	}
+
+	// make sure the function is correctly called
 	if scriptVersion != ctautwire.AutScriptVersion_1 {
-		return nil, fmt.Errorf("the readed version %d is not AutScriptVersion_1", scriptVersion)
+		return nil, fmt.Errorf("the read version %d is not AutScriptVersion_1", scriptVersion)
 	}
 
 	scriptType, err := r.ReadByte()
@@ -3027,3 +3029,5 @@ func DeserializeAutScriptV1(serializedAutScript []byte) (AutScript, error) {
 
 	return autScript, nil
 }
+
+// end of codes
