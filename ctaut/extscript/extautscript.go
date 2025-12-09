@@ -7,22 +7,11 @@ import (
 	"math"
 
 	"github.com/abesuite/abec/abecryptox"
-	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
-	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/ctaut/rules"
 	"github.com/abesuite/abec/ctaut/script"
 	ctautwire "github.com/abesuite/abec/ctaut/wire"
 	"github.com/abesuite/abec/wire"
 )
-
-// todo: remove
-//type ExtAutScriptInputAssembleStatus uint8
-//
-//const (
-//	ExtAutScriptInputAssembleStatus_Init  ExtAutScriptInputAssembleStatus = 0
-//	ExtAutScriptInputAssembleStatus_Step1 ExtAutScriptInputAssembleStatus = 1
-//	ExtAutScriptInputAssembleStatus_Step2 ExtAutScriptInputAssembleStatus = 2
-//)
 
 type HostOutPoint = dao.HostOutPoint
 type AutId = dao.AutId
@@ -288,183 +277,6 @@ func (extAutScript *ExtAutScript) assembleOutputAutTokens() error {
 	return nil
 }
 
-// AssembleInputAutTokensStep1 assemble the input Tokens for ExtutScript (Step1), making use of the lookupHostOutputTxoRing,
-// which returns a TxoRing corresponding to TxIn.RingHash, from somewhere.
-//
-// RULE on the TxIn for Host-Tx:
-// The TxIn should be ordered by
-// (a) PrivacyLevelRINGCTPre/PrivacyLevelRINGCT
-// (b) PrivacyLevelPSEUDONYMCT
-// (c) PrivacyLevelPSEUDONYM
-// and the AutTokens hosts on the first "consumedTokenNum" PrivacyLevelPSEUDONYMCT TxIns.
-// todo: remove?
-func (extAutScript *ExtAutScript) AssembleInputAutTokensStep1(
-	lookupHostOutputTxoRing func(ringHash chainhash.Hash) (*wire.TxoRing, error),
-	lookupAutToken func(identifier AutId, outpoint HostOutPoint) (uint32, []byte, error),
-) error {
-
-	if extAutScript.Type() == script.AutScriptTypeRegistration {
-		//extAutScript.handledConsumedTokens = true
-		//extAutScript.consumedTokens = nil
-		return nil
-	}
-	//extAutScript.inputHandleStatus = ExtAutScriptInputAssembleStatus_Step1 // nonsense
-	//extAutScript.consumedTokens = nil
-	//
-	//return nil
-	//}
-
-	// getTxoRingForHost lookups the txoRing for ringHash, and perform sanity-checks to guarantee that
-	// the size of resulting txoRing is not 0.
-	getTxoRingForHost := func(ringHash chainhash.Hash) (txoRing *wire.TxoRing, rstErr error) {
-		txoRing, err := lookupHostOutputTxoRing(ringHash)
-		if err != nil {
-			return nil, err
-		}
-
-		if txoRing == nil {
-			return nil, fmt.Errorf("the TxoRing obtained by ringHash (%s) is nil ", ringHash.String())
-		}
-		if txoRing.OutPointRing == nil {
-			return nil, fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) is nil ", ringHash.String())
-		}
-
-		ringId := txoRing.OutPointRing.RingId()
-		if !ringId.IsEqual(&ringHash) {
-			return nil, fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has ringId (%s)", ringHash.String(), ringId.String())
-		}
-
-		if len(txoRing.OutPointRing.OutPoints) != len(txoRing.TxOuts) {
-			return nil, fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-				"len(txoRing.OutPointRing.OutPoints) = %d || len(txoRing.TxOuts) = %d ",
-				ringHash.String(), len(txoRing.OutPointRing.OutPoints), len(txoRing.TxOuts))
-		}
-
-		if len(txoRing.OutPointRing.OutPoints) == 0 {
-			return nil, fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-				"len(txoRing.OutPointRing.OutPoints) = 0 ",
-				ringHash.String())
-		}
-
-		return txoRing, nil
-	}
-
-	txHash := extAutScript.msgTx.TxHash()
-
-	hostedTxIns := extAutScript.msgTx.TxIns
-
-	startIndex := 0
-	for ; startIndex < len(hostedTxIns); startIndex++ {
-		ringHash := hostedTxIns[startIndex].PreviousOutPointRing.Hash()
-
-		txoRing, err := getTxoRingForHost(ringHash)
-		if err != nil {
-			return err
-		}
-
-		privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txoRing.TxOuts[0])
-		if err != nil {
-			return err
-		}
-
-		// skip fully-privacy area
-		if privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre ||
-			privacyLevel == abecryptoxkey.PrivacyLevelRINGCT {
-			continue
-		}
-
-		if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
-			return fmt.Errorf("expect privacy level %d but got %d",
-				abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
-		}
-
-		break
-	}
-
-	numInCoins := extAutScript.NumConsumedTokens()
-	if startIndex+numInCoins > len(hostedTxIns) {
-		return fmt.Errorf("claim %d (root) coins but only remain %d outputs",
-			numInCoins, len(hostedTxIns)-startIndex)
-	}
-
-	scriptVersion := extAutScript.Version()
-	identifier := extAutScript.AutIdentifier()
-	consumedTokens := make([]*AutToken, numInCoins)
-	for i := 0; i < len(consumedTokens); i++ {
-		hostTxInIndex := startIndex + i
-		hostTxIn := hostedTxIns[hostTxInIndex]
-
-		// sanity-check
-		ringHash := hostTxIn.PreviousOutPointRing.Hash()
-
-		txoRing, err := getTxoRingForHost(ringHash)
-		if err != nil {
-			return err
-		}
-
-		privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txoRing.TxOuts[0])
-		if err != nil {
-			return err
-		}
-		if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
-			return fmt.Errorf("expect privacy level %d but got %d",
-				abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
-		}
-
-		if len(txoRing.TxOuts) != 1 {
-			return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-				"privacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYMCT but "+
-				"len(txoRing.TxOuts) = %d ", ringHash.String(), len(txoRing.TxOuts))
-		}
-
-		// fill out with the first item in ring
-		hostOutPoint := txoRing.OutPointRing.OutPoints[0]
-		coinAddress, err := rules.RuleCheckOnHostTxo(txoRing.TxOuts[0])
-		if err != nil {
-			return fmt.Errorf("transaction %s try to consume UTXO at Ring %s is not a valid output", txHash,
-				hostTxIn.PreviousOutPointRing.Hash())
-		}
-
-		tokenVersion := uint32(0)
-		var valueScript []byte
-		switch extAutScript.Type() {
-		case script.AutScriptTypeRegistration:
-			return fmt.Errorf("registration script should not consume any token")
-		case script.AutScriptTypeReRegistration, script.AutScriptTypeMint:
-			// no version and value script is need by script with those type
-			// they would consume the root token
-			break
-		case script.AutScriptTypeTransfer, script.AutScriptTypeBurn:
-			// they would consume the token
-			tokenVersion, valueScript, err = lookupAutToken(identifier, *hostOutPoint)
-			if err != nil {
-				return err
-			}
-			err = abecryptox.AutRuleCheckOnTxInputVersion(scriptVersion, tokenVersion)
-			if err != nil {
-				return fmt.Errorf("script with version %d failed to consume the token with version %d",
-					scriptVersion, tokenVersion)
-			}
-		default:
-			return fmt.Errorf("unsupported aut script type %d", extAutScript.Type())
-		}
-
-		consumedTokens[i] = &AutToken{
-			Version:      tokenVersion,
-			HostOutPoint: *hostOutPoint,
-			CoinAddress:  coinAddress,
-			ValueScript:  valueScript,
-		}
-	}
-
-	//extAutScript.inputHandleStatus = ExtAutScriptInputAssembleStatus_Step1
-
-	//extAutScript.handledConsumedTokens = true
-	//extAutScript.consumedTokens = consumedTokens
-
-	return nil
-}
-
 func (extAutScript *ExtAutScript) ConsumedHostOutpoints() []*HostOutPoint {
 	return extAutScript.consumedHostOutpoints
 }
@@ -472,31 +284,6 @@ func (extAutScript *ExtAutScript) ConsumedHostOutpoints() []*HostOutPoint {
 func (extAutScript *ExtAutScript) GeneratedTokens() []*AutToken {
 	return extAutScript.generatedTokens
 }
-
-// todo: remove, use assemble function
-func (extAutScript *ExtAutScript) SetConsumedTokens(consumedTokens []*AutToken) error {
-
-	if len(consumedTokens) != extAutScript.NumConsumedTokens() {
-		return fmt.Errorf("mismatched number of consumed tokens")
-	}
-
-	//extAutScript.consumedTokens = consumedTokens
-	//extAutScript.handledConsumedTokens = true
-
-	return nil
-}
-
-// todo:
-//func (extAutScript *ExtAutScript) ConsumedTokens() ([]*AutToken, error) {
-//if extAutScript.inputHandleStatus != ExtAutScriptInputAssembleStatus_Step2 {
-//	return nil, fmt.Errorf("consumed tokens not set")
-//}
-
-//if !extAutScript.handledConsumedTokens {
-//	return nil, fmt.Errorf("consumed tokens not set")
-//}
-//return extAutScript.consumedTokens, nil
-//}
 
 // CreateAutMetadata create a new AutMetadata from the RegistrationScript.
 func (extAutScript *ExtAutScript) CreateAutMetadata() (*script.AutMetadata, error) {
@@ -627,3 +414,5 @@ func (extAutScript *ExtAutScript) UpdateAutMetadata(autMetadata *script.AutMetad
 
 	return updatedAutMetadata, nil
 }
+
+// end of codes
