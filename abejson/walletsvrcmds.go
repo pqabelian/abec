@@ -852,32 +852,36 @@ type RegisterCTAUTCmd struct {
 	BaseUnitName string
 	SubUnitName  string
 	UnitScale    uint64
+	CTAUTMemo    string
 
-	CTAUTMemo string
+	PlannedTotalAmount         uint64
+	IssuerTokens               []string
+	ReRegistrationExpireHeight int32
 
-	PlannedTotalAmount uint64
-	IssuerTokens       []string
-	IssuerTimes        int
-
-	MintThreshold       uint8
 	ReRegisterThreshold uint8
-	ExpireHeight        int32
+	MintThreshold       uint8
+	PrivacyType         uint8
+
+	IssuerTimes int
+	Memo        string
 }
 type ReRegisterCTAUTCmd struct {
 	AUTIdentifier string
 
 	CTAUTMemo string
 
-	PlannedTotalAmount uint64
-	IssuerTokens       []string
-	IssuerTimes        int
+	PlannedTotalAmount         uint64
+	IssuerTokens               []string
+	ReRegistrationExpireHeight int32
 
-	MintThreshold       uint8
 	ReRegisterThreshold uint8
-	ExpireHeight        int32
+	MintThreshold       uint8
+	PrivacyType         uint8
+
+	IssuerTimes int
+	Memo        string
 
 	AUTIssuerUpdateThreshold uint8
-	Memo                     string
 }
 
 type CTAUTPair struct {
@@ -890,9 +894,9 @@ type MintCTAUTCmd struct {
 
 	Vin        uint64
 	Recipients []*CTAUTPair
+	Memo       string
 
 	CTAUTMintThreshold uint8
-	Memo               string
 }
 type TransferCTAUTCmd struct {
 	AUTIdentifier string
