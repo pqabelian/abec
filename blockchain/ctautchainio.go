@@ -128,13 +128,15 @@ func spentCTAUTSerializeSize(stxo SpentCTAUT) (int, error) {
 		size += 1
 		// +1 to represent nil for before
 		size += 1
-		serializedBefore, err := updated.Before.Serialize()
-		if err != nil {
-			return 0, err
-		}
-		if len(serializedBefore) != 0 {
-			size += serializeSizeVLQ(uint64(len(serializedBefore)))
-			size += len(serializedBefore)
+		if updated.Before != nil {
+			serializedBefore, err := updated.Before.Serialize()
+			if err != nil {
+				return 0, err
+			}
+			if len(serializedBefore) != 0 {
+				size += serializeSizeVLQ(uint64(len(serializedBefore)))
+				size += len(serializedBefore)
+			}
 		}
 
 		// +1 to represent nil for after
@@ -154,6 +156,7 @@ func spentCTAUTSerializeSize(stxo SpentCTAUT) (int, error) {
 	return size, nil
 }
 func putSpentCTAUT(target []byte, stxo SpentCTAUT) (int, error) {
+	var err error
 	offset := 0
 	switch updated := stxo.(type) {
 	case *SpentCTAUTTokens:
@@ -188,9 +191,12 @@ func putSpentCTAUT(target []byte, stxo SpentCTAUT) (int, error) {
 		offset += 1
 
 		// +1 to represent nil
-		serializedBefore, err := updated.Before.Serialize()
-		if err != nil {
-			return 0, err
+		var serializedBefore []byte
+		if updated.Before != nil {
+			serializedBefore, err = updated.Before.Serialize()
+			if err != nil {
+				return 0, err
+			}
 		}
 		if len(serializedBefore) == 0 {
 			target[offset] = 0

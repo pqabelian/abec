@@ -297,6 +297,7 @@ func (view *CTAUTViewpoint) connectRegistrationScript(script *ctautapi.ExtAutScr
 	log.Debugf("\t ReregistrationExpireHeight: %v", metadata.ReregistrationExpireHeight)
 	log.Debugf("\t ReregistrationThreshold: %v", metadata.ReregistrationThreshold)
 	log.Debugf("\t MintThreshold: %v", metadata.MintThreshold)
+	log.Debugf("\t PrivacyType: %v", metadata.PrivacyType)
 	log.Debugf("\t Totoal %d issuers", len(metadata.Issuers))
 	for i := 0; i < len(metadata.Issuers); i++ {
 		log.Debugf("\t\t [%d] %s", i, metadata.Issuers[i].String())
@@ -356,6 +357,7 @@ func (view *CTAUTViewpoint) connectReRegistrationScript(script *ctautapi.ExtAutS
 	log.Debugf("\t ReregistrationThreshold: %v -> %v", previousMetadata.ReregistrationThreshold, metadata.ReregistrationThreshold)
 	log.Debugf("\t MintThreshold: %v -> %v", previousMetadata.MintThreshold, metadata.MintThreshold)
 	log.Debugf("\t UnitScale: %v -> %v", previousMetadata.UnitScale, metadata.UnitScale)
+	log.Debugf("\t PrivacyType: %v -> %v", previousMetadata.PrivacyType, metadata.PrivacyType)
 	log.Debugf("\t Previous Issuers: len = %d", len(previousMetadata.Issuers))
 	for i := 0; i < len(previousMetadata.Issuers); i++ {
 		log.Debugf("\t\t [%d] %s", i, previousMetadata.Issuers[i].String())
