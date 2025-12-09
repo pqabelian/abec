@@ -660,6 +660,9 @@ type AutScript interface {
 
 	// Deserialize deserializes []byte to AutScript.
 	Deserialize([]byte) error
+
+	// SanityCheck perform sanity-checks on AutScript.
+	SanityCheck() error
 }
 
 // RegistrationScript would be the structured script parsed from TxMemo in the host Abelian-Transaction,

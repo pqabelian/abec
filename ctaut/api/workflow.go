@@ -70,8 +70,8 @@ func NewMintScript(version uint32,
 		inStartIndex, inAutRootTokenNum,
 		outStartIndex, outCTAutTokenNum, outPlainAutTokenNum,
 		serializedAutTxos,
-		witnessHash,
-		scriptMemo)
+		scriptMemo,
+		witnessHash)
 }
 
 func NewTransferScript(version uint32,
@@ -87,8 +87,8 @@ func NewTransferScript(version uint32,
 		inStartIndex, inHiddenAutTokenNum, inPublicAutTokenNum,
 		outStartIndex, outHiddenAutTokenNum, outPlainAutTokenNum,
 		serializedAutTxos,
-		witnessHash,
-		scriptMemo)
+		scriptMemo,
+		witnessHash)
 }
 
 func NewBurnScript(version uint32,
@@ -103,8 +103,8 @@ func NewBurnScript(version uint32,
 		autIdentifier,
 		inStartIndex, inHiddenAutTokenNum, inPublicAutTokenNum,
 		outStartIndex, outHiddenAutTokenNum, outPublicAutTokenNum, serializedAutTxos,
-		witnessHash,
-		scriptMemo)
+		scriptMemo,
+		witnessHash)
 }
 
 // New Functions	end
@@ -394,7 +394,7 @@ func DetectAndAssembleExtAutScriptFromHostTx(msgTx *wire.MsgTxAbe) (*ExtAutScrip
 	// conduct some sanity-checks on autScript 		END
 
 	// populate the generated tokens with host transaction outputs
-	extAutScript, err := extscript.NewExtAutScriptAndAssembleOutputTokens(autScript, msgTx)
+	extAutScript, err := extscript.NewAndAssembleExtAutScript(autScript, msgTx)
 	if err != nil {
 		return nil, fmt.Errorf("DetectAndAssembleExtAutScriptFromHostTx: error happens when calling NewExtAutScriptAndAssembleOutputTokens() : %v", err)
 	}
