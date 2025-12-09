@@ -173,7 +173,7 @@ func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 	ctxTxInputDescs := make([]*pqringctxapi.CtxTxInputDesc, inputNum)
 	for i := 0; i < inputNum; i++ {
 
-		err = pqringctxAutRuleCheckOnTxInputVersion(pp, autTxInputDescs[i].autTxo.Version, autScriptVersion)
+		err = pqringctxAutRuleCheckOnTxInputVersion(pp, autScriptVersion, autTxInputDescs[i].autTxo.Version)
 		if err != nil {
 			return nil, fmt.Errorf("pqringctxAutTransferTxGen: the autScriptVersion is %d, "+
 				"but autTxInputDescs[%d].autTxo.Version is %d, which is out of the allowed ones",
@@ -289,7 +289,7 @@ func pqringctxAutTransferTxVerify(pp *pqringctxapi.PublicParameter, autTransferT
 	ctxTxInputs := make([]pqringctxapi.CtxTxo, inputNum)
 	for i := 0; i < inputNum; i++ {
 		// todo: assure AutScriptVersion not TxInputVersion
-		err = pqringctxAutRuleCheckOnTxInputVersion(pp, autTransferTx.TxIns[i].Version, autTransferTx.Version)
+		err = pqringctxAutRuleCheckOnTxInputVersion(pp, autTransferTx.Version, autTransferTx.TxIns[i].Version)
 		if err != nil {
 			return fmt.Errorf("pqringctxAutTransferTxVerify: autTransferTx.Version is %d, "+
 				"but autTransferTx.TxIns[%d].Version is %d, which is out of the allowed ones",
@@ -462,18 +462,18 @@ func pqringctxAutRuleCheckOnAutTxoVersionType(pp *pqringctxapi.PublicParameter, 
 	return nil
 }
 
-// pqringctxRuleCheckOnTxInputVersion checks the match between TxInput's Version and Tx's Version.
+// pqringctxRuleCheckOnTxInputVersion checks the match between Tx's Version and TxInput's Version.
 //
 // When new TxVersion is added, rules need to be added here.
 // todo: change txVersion to AutScriptVersion
-func pqringctxAutRuleCheckOnTxInputVersion(pp *pqringctxapi.PublicParameter, autTxInputVersion uint32, autScriptVersion uint32) error {
+func pqringctxAutRuleCheckOnTxInputVersion(pp *pqringctxapi.PublicParameter, autScriptVersion uint32, autTxInputVersion uint32) error {
 
 	switch autScriptVersion {
 	case autwire.AutScriptVersion_1:
 		if autTxInputVersion == autwire.AutScriptVersion_1 {
 			// allowed cases
 		} else {
-			return fmt.Errorf("pqringctxAutRuleCheckOnTxInputVersion: (autTxInputVersion, autScriptVersion) (%d, %d), "+
+			return fmt.Errorf("pqringctxAutRuleCheckOnTxInputVersion: (autScriptVersion, autTxInputVersion) (%d, %d), "+
 				"is not allowed/supported",
 				autTxInputVersion, autScriptVersion)
 		}

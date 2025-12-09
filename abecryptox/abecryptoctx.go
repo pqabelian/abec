@@ -213,17 +213,17 @@ func AutRuleCheckOnAutTxoVersionType(autScriptVersion uint32, autTxoType AutTxoT
 	}
 }
 
-// AutRuleCheckOnTxInputVersion checks the match between TxInput's Version and Tx's Version.
+// AutRuleCheckOnTxInputVersion checks the match between Tx's Version and TxInput's Version.
 //
 // When new TxVersion is added, rules need to be added here.
-func AutRuleCheckOnTxInputVersion(txInputVersion uint32, autScriptVersion uint32) error {
+func AutRuleCheckOnTxInputVersion(autScriptVersion uint32, txInputVersion uint32) error {
 	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autScriptVersion)
 	if err != nil {
 		return err
 	}
 	switch cryptoScheme {
 	case abecryptoxparam.CryptoSchemePQRingCTX:
-		return pqringctxAutRuleCheckOnTxInputVersion(abecryptoxparam.PQRingCTXPP, txInputVersion, autScriptVersion)
+		return pqringctxAutRuleCheckOnTxInputVersion(abecryptoxparam.PQRingCTXPP, autScriptVersion, txInputVersion)
 
 	default:
 		return fmt.Errorf("AutRuleCheckOnTxInputVersion: Unsupported autScriptVersion (%d)", autScriptVersion)

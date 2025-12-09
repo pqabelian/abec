@@ -427,7 +427,7 @@ func (extAutScript *ExtAutScript) AssembleInputAutTokensStep1(
 			if err != nil {
 				return err
 			}
-			err = abecryptox.AutRuleCheckOnTxInputVersion(tokenVersion, scriptVersion)
+			err = abecryptox.AutRuleCheckOnTxInputVersion(scriptVersion, tokenVersion)
 			if err != nil {
 				return fmt.Errorf("script with version %d failed to consume the token with version %d",
 					scriptVersion, tokenVersion)

@@ -27,9 +27,11 @@ func RuleGetTxVersionFromAutScriptVersion(autScriptVersion uint32) (uint32, erro
 	}
 }
 
-// RuleCheckOnHostTxo would check the following rule on HostTxo
+// RuleCheckOnHostTxo would check the following rule on HostTxo:
 // 1. the privacy level MUST be abecryptoxkey.PrivacyLevelPSEUDONYMCT, note that this means the value in Abelian-Txo is public
 // 2. the value must be 1 Neutrino
+//
+// If the checks are passed, the coinAddress will be returned.
 // todo: txHash and outputIndex donot have actual use.
 func RuleCheckOnHostTxo(hostOutPoint *HostOutPoint, txOut *wire.TxOutAbe) ([]byte, error) {
 	privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
@@ -64,6 +66,7 @@ func RuleCheckOnAutTxoVersionType(autScriptVersion uint32, autTxo *ctautwire.Aut
 	if err != nil {
 		return fmt.Errorf("fail to pass the AutRuleCheckOnTxoVersionType: %v", err)
 	}
+
 	return nil
 }
 
@@ -73,16 +76,22 @@ func RuleCheckOnAutTxoVersionType(autScriptVersion uint32, autTxo *ctautwire.Aut
 func RuleCheckOnIssuerHostClaim(issuers []*AutIssuer, outputTokens []*AutToken) error {
 	claimedIssuersByCoinAddress := make(map[string]*AutIssuer, len(issuers))
 	for i := 0; i < len(issuers); i++ {
+		if issuers[i] == nil {
+			return fmt.Errorf("issuers[%d] is nil]", i)
+		}
 		coinAddressStr := hex.EncodeToString(issuers[i].CoinAddress())
 		// ensure no duplicates one
 		if _, ok := claimedIssuersByCoinAddress[coinAddressStr]; ok {
-			return fmt.Errorf("claimed repeated issuers")
+			return fmt.Errorf("claimed repeated issuers: %s", coinAddressStr)
 		}
 		claimedIssuersByCoinAddress[coinAddressStr] = issuers[i]
 	}
 
 	outputTokenCoinAddressesMap := make(map[string]*AutToken, len(outputTokens))
 	for i := 0; i < len(outputTokens); i++ {
+		if outputTokens[i] == nil {
+			return fmt.Errorf("outputTokens[%d] is nil", i)
+		}
 		coinAddressStr := hex.EncodeToString(outputTokens[i].CoinAddress)
 		if _, ok := outputTokenCoinAddressesMap[coinAddressStr]; !ok {
 			outputTokenCoinAddressesMap[coinAddressStr] = outputTokens[i]
@@ -108,16 +117,17 @@ func RuleCheckOnIssuerHostClaim(issuers []*AutIssuer, outputTokens []*AutToken) 
 	return nil
 }
 
-func RuleCheckOnAutVersionInput(autScriptVersion uint32, autTxo *ctautwire.AutTxo) error {
+// todo: the caller seems incorrect
+func RuleCheckOnAutVersionInput(autScriptVersion uint32, inputAutTxo *ctautwire.AutTxo) error {
 	// TODO check the type of the input autTxo?
 	//autTxoType, err := abecryptox.GetAutTxoType(autTxo)
 	//if err != nil {
 	//	return fmt.Errorf("fail to get last aut txo type: %v", err)
 	//}
 
-	err := abecryptox.AutRuleCheckOnTxInputVersion(autScriptVersion, autTxo.Version)
+	err := abecryptox.AutRuleCheckOnTxInputVersion(autScriptVersion, inputAutTxo.Version)
 	if err != nil {
-		return fmt.Errorf("fail to pass the AutRuleCheckOnTxoVersionType: %v", err)
+		return fmt.Errorf("fail to pass the AutRuleCheckOnTxInputVersion: %v", err)
 	}
 	return nil
 }
