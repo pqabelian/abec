@@ -796,12 +796,12 @@ func (autScript *RegistrationScript) ReregistrationExpireHeight() int32 {
 	return autScript.reregistrationExpireHeight
 }
 
-func (autScript *RegistrationScript) MintThreshold() uint8 {
-	return autScript.mintThreshold
-}
-
 func (autScript *RegistrationScript) ReregisterThreshold() uint8 {
 	return autScript.reregisterThreshold
+}
+
+func (autScript *RegistrationScript) MintThreshold() uint8 {
+	return autScript.mintThreshold
 }
 
 func (autScript *RegistrationScript) OutStartIndex() uint8 {
