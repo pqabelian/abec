@@ -89,6 +89,10 @@ func (autIssuer *AutIssuer) Equal(issuer *AutIssuer) bool {
 }
 
 func (autIssuer *AutIssuer) Clone() *AutIssuer {
+	if autIssuer == nil {
+		return nil
+	}
+	
 	rst := &AutIssuer{}
 	rst.IssuerAddress = make([]byte, len(autIssuer.IssuerAddress))
 	copy(rst.IssuerAddress, autIssuer.IssuerAddress)

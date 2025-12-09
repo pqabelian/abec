@@ -168,7 +168,7 @@ func (autMetadata *AutMetadata) serializeSize() (int, error) {
 // Serialize serializes AutMetadata to []byte.
 func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 	if autMetadata == nil {
-		return nil, nil
+		return nil, fmt.Errorf("autMetadata is nil")
 	}
 
 	// Calculate the size needed to serialize AUT autMetadata.
@@ -303,6 +303,10 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 
 // Deserialize deserializes serializedMetadata to an AutMetadata.
 func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
+	if autMetadata == nil {
+		return fmt.Errorf("autMetadata is nil")
+	}
+
 	r := bytes.NewReader(serializedMetadata)
 
 	// Version                    uint32
@@ -453,6 +457,9 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 
 // SanityCheck checks whether the AutMetadata is well-formed, and return a non-nil error if it is not well-formed.
 func (autMetadata *AutMetadata) SanityCheck() error {
+	if autMetadata == nil {
+		return fmt.Errorf("AutMetadata is nil")
+	}
 
 	if autMetadata.Version < ctautwire.AutMetadataVersionInitValue {
 		return fmt.Errorf("invalid autMetadata.Version (%d)", autMetadata.Version)
