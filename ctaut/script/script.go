@@ -1764,7 +1764,8 @@ type MintScript struct {
 	outHiddenAutTokenNum uint8
 	outPublicAutTokenNum uint8
 	serializedAutTxos    [][]byte // length = outHiddenAutTokenNum + outPublicAutTokenNum
-	witnessHash          chainhash.Hash
+
+	witnessHash chainhash.Hash
 
 	scriptMemo []byte
 }
@@ -1773,10 +1774,10 @@ func NewMintScript(version uint32,
 	autIdentifier AutId,
 	vin uint64,
 	inStartIndex uint8, inAutRootTokenNum uint8,
-	outStartIndex uint8, outCTAutTokenNum uint8, outPlainAutTokenNum uint8,
+	outStartIndex uint8, outHiddenAutTokenNum uint8, outPublicAutTokenNum uint8,
 	serializedAutTxos [][]byte,
-	witnessHash chainhash.Hash,
-	scriptMemo []byte) *MintScript {
+	scriptMemo []byte,
+	witnessHash chainhash.Hash) *MintScript {
 
 	return &MintScript{
 		version:              version,
@@ -1786,11 +1787,11 @@ func NewMintScript(version uint32,
 		inStartIndex:         inStartIndex,
 		inAutRootTokenNum:    inAutRootTokenNum,
 		outStartIndex:        outStartIndex,
-		outHiddenAutTokenNum: outCTAutTokenNum,
-		outPublicAutTokenNum: outPlainAutTokenNum,
+		outHiddenAutTokenNum: outHiddenAutTokenNum,
+		outPublicAutTokenNum: outPublicAutTokenNum,
 		serializedAutTxos:    serializedAutTxos,
-		witnessHash:          witnessHash,
 		scriptMemo:           scriptMemo,
+		witnessHash:          witnessHash,
 	}
 }
 
@@ -1801,6 +1802,7 @@ func (autScript *MintScript) Version() uint32 {
 func (autScript *MintScript) Type() AutScriptType {
 	return autScript.scriptType
 }
+
 func (autScript *MintScript) AutIdentifier() AutId {
 	return autScript.autIdentifier
 }
@@ -1866,13 +1868,18 @@ func (autScript *MintScript) serializeSize() int {
 		n += wire.VarIntSerializeSize(uint64(len(serializedAutTxo))) + len(serializedAutTxo)
 	}
 
-	n += chainhash.HashSize                                                                      // witnessHash          chainhash.Hash
 	n += wire.VarIntSerializeSize(uint64(len(autScript.scriptMemo))) + len(autScript.scriptMemo) // scriptMemo                 []byte
+
+	n += chainhash.HashSize // witnessHash          chainhash.Hash
 
 	return n
 }
 
 func (autScript *MintScript) Serialize() ([]byte, error) {
+	if autScript == nil {
+		return nil, fmt.Errorf("autScript is nil")
+	}
+
 	var err error
 
 	w := bytes.NewBuffer(make([]byte, 0, autScript.serializeSize()))
@@ -1932,13 +1939,13 @@ func (autScript *MintScript) Serialize() ([]byte, error) {
 		}
 	}
 
-	// witnessHash          chainhash.Hash
-	if _, err = w.Write(autScript.witnessHash[:]); err != nil {
+	// scriptMemo                 []byte
+	if err = wire.WriteVarBytes(w, 0, autScript.scriptMemo); err != nil {
 		return nil, err
 	}
 
-	// scriptMemo                 []byte
-	if err = wire.WriteVarBytes(w, 0, autScript.scriptMemo); err != nil {
+	// witnessHash          chainhash.Hash
+	if _, err = w.Write(autScript.witnessHash[:]); err != nil {
 		return nil, err
 	}
 
@@ -1946,6 +1953,10 @@ func (autScript *MintScript) Serialize() ([]byte, error) {
 }
 
 func (autScript *MintScript) Deserialize(serializedScript []byte) error {
+	if autScript == nil {
+		return fmt.Errorf("autScript is nil")
+	}
+
 	var err error
 
 	r := bytes.NewReader(serializedScript)
@@ -1961,8 +1972,7 @@ func (autScript *MintScript) Deserialize(serializedScript []byte) error {
 	autScript.version = uint32(version)
 
 	// scriptType                 AutScriptType
-	autScript.scriptType, err = r.ReadByte()
-	if err != nil {
+	if autScript.scriptType, err = r.ReadByte(); err != nil {
 		return err
 	}
 
@@ -1977,32 +1987,27 @@ func (autScript *MintScript) Deserialize(serializedScript []byte) error {
 	}
 
 	// inStartIndex    uint8
-	autScript.inStartIndex, err = r.ReadByte()
-	if err != nil {
+	if autScript.inStartIndex, err = r.ReadByte(); err != nil {
 		return err
 	}
 
 	// inAutRootTokenNum    uint8
-	autScript.inAutRootTokenNum, err = r.ReadByte()
-	if err != nil {
+	if autScript.inAutRootTokenNum, err = r.ReadByte(); err != nil {
 		return err
 	}
 
-	// inStartIndex    uint8
-	autScript.outStartIndex, err = r.ReadByte()
-	if err != nil {
+	// outStartIndex    uint8
+	if autScript.outStartIndex, err = r.ReadByte(); err != nil {
 		return err
 	}
 
 	// outHiddenAutTokenNum    uint8
-	autScript.outHiddenAutTokenNum, err = r.ReadByte()
-	if err != nil {
+	if autScript.outHiddenAutTokenNum, err = r.ReadByte(); err != nil {
 		return err
 	}
 
-	// inAutRootTokenNum    uint8
-	autScript.outPublicAutTokenNum, err = r.ReadByte()
-	if err != nil {
+	// outPublicAutTokenNum    uint8
+	if autScript.outPublicAutTokenNum, err = r.ReadByte(); err != nil {
 		return err
 	}
 
@@ -2021,14 +2026,13 @@ func (autScript *MintScript) Deserialize(serializedScript []byte) error {
 		}
 	}
 
-	// witnessHash          chainhash.Hash
-	if _, err = io.ReadFull(r, autScript.witnessHash[:]); err != nil {
+	// scriptMemo                 []byte
+	if autScript.scriptMemo, err = wire.ReadVarBytes(r, 0, MaxScriptMemoLength, "scriptMemo"); err != nil {
 		return err
 	}
 
-	// scriptMemo                 []byte
-	autScript.scriptMemo, err = wire.ReadVarBytes(r, 0, MaxScriptMemoLength, "scriptMemo")
-	if err != nil {
+	// witnessHash          chainhash.Hash
+	if _, err = io.ReadFull(r, autScript.witnessHash[:]); err != nil {
 		return err
 	}
 
@@ -2036,6 +2040,9 @@ func (autScript *MintScript) Deserialize(serializedScript []byte) error {
 }
 
 func (autScript *MintScript) SanityCheck() error {
+	if autScript == nil {
+		return fmt.Errorf("autScript is nil")
+	}
 
 	// version                    uint32
 	if _, ok := ctautwire.AutScriptVersionSet[autScript.version]; !ok {
@@ -2055,10 +2062,6 @@ func (autScript *MintScript) SanityCheck() error {
 	}
 
 	// inStartIndex    uint8
-	//if int(autScript.inStartIndex) == 0 {
-	//	return fmt.Errorf("autScript.inStartIndex (%d) is invalid",
-	//		autScript.inStartIndex)
-	//}
 
 	// inAutRootTokenNum    uint8
 	if int(autScript.inAutRootTokenNum) == 0 {
@@ -2071,10 +2074,6 @@ func (autScript *MintScript) SanityCheck() error {
 	}
 
 	// outStartIndex    uint8
-	//if int(autScript.outStartIndex) == 0 {
-	//	return fmt.Errorf("autScript.outStartIndex (%d) is invalid",
-	//		autScript.outStartIndex)
-	//}
 
 	// outHiddenAutTokenNum uint8
 	if int(autScript.outHiddenAutTokenNum) > MaxNumHiddenToken {
@@ -2130,12 +2129,12 @@ func (autScript *MintScript) SanityCheck() error {
 		}
 	}
 
-	// witnessHash          chainhash.Hash
-
 	// scriptMemo                 []byte
 	if len(autScript.scriptMemo) > MaxScriptMemoLength {
 		return fmt.Errorf("len(autScript.scriptMemo) (%d) is too large", len(autScript.scriptMemo))
 	}
+
+	// witnessHash          chainhash.Hash
 
 	return nil
 }
