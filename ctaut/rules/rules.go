@@ -17,18 +17,6 @@ type AutIssuer = dao.AutIssuer
 type AutToken = dao.AutToken
 type AutPrivacyType = script.AutPrivacyType
 
-// RuleGetTxVersionFromAutScriptVersion defines a map from AutScriptVersion to host-Txo-Version.
-//
-// See the design on version in ctaut/wire.
-func RuleGetTxVersionFromAutScriptVersion(autScriptVersion uint32) (uint32, error) {
-	switch autScriptVersion {
-	case ctautwire.AutScriptVersion_1:
-		return wire.TxVersion_Height_464000_Aconcagua, nil
-	default:
-		return 0, fmt.Errorf("RuleGetTxVersionFromAutScriptVersion: unknown autScriptVersion %d", autScriptVersion)
-	}
-}
-
 // RuleCheckOnHostTxo would check the following rule on HostTxo:
 // 1. the privacy level MUST be abecryptoxkey.PrivacyLevelPSEUDONYMCT, note that this means the value in Abelian-Txo is public
 // 2. the value must be 1 Neutrino
@@ -55,21 +43,6 @@ func RuleCheckOnHostTxo(txOut *wire.TxOutAbe) ([]byte, error) {
 	// remove the start codes, and check coinAddress here; need to add an api abecryptox.GetPrivacyLevelFromCoinAddress(),
 	// which does not parse all, to improve efficiency
 	return coinAddress, nil
-}
-
-// RuleCheckOnAutTxoVersionType checks whether the AutTxo's version and type match.
-func RuleCheckOnAutTxoVersionType(autScriptVersion uint32, autTxo *ctautwire.AutTxo) error {
-	autTxoType, err := abecryptox.GetAutTxoType(autTxo)
-	if err != nil {
-		return fmt.Errorf("fail to get last aut txo type: %v", err)
-	}
-
-	err = abecryptox.AutRuleCheckOnAutTxoVersionType(autScriptVersion, autTxoType)
-	if err != nil {
-		return fmt.Errorf("fail to pass the AutRuleCheckOnTxoVersionType: %v", err)
-	}
-
-	return nil
 }
 
 // RuleCheckOnIssuerHostClaim checks that
@@ -119,17 +92,30 @@ func RuleCheckOnIssuerHostClaim(issuers []*AutIssuer, outputTokens []*AutToken) 
 	return nil
 }
 
-func RuleCheckOnAutTxInputVersion(autScriptVersion uint32, inputAutTxo *ctautwire.AutTxo) error {
-	// TODO check the type of the input autTxo?
-	//autTxoType, err := abecryptox.GetAutTxoType(autTxo)
-	//if err != nil {
-	//	return fmt.Errorf("fail to get last aut txo type: %v", err)
-	//}
-
-	err := abecryptox.AutRuleCheckOnTxInputVersion(autScriptVersion, inputAutTxo.Version)
-	if err != nil {
-		return fmt.Errorf("fail to pass the AutRuleCheckOnTxInputVersion: %v", err)
+// RuleGetTxVersionFromAutScriptVersion defines a map from AutScriptVersion to host-Txo-Version.
+//
+// See the design on version in ctaut/wire.
+func RuleGetTxVersionFromAutScriptVersion(autScriptVersion uint32) (uint32, error) {
+	switch autScriptVersion {
+	case ctautwire.AutScriptVersion_1:
+		return wire.TxVersion_Height_464000_Aconcagua, nil
+	default:
+		return 0, fmt.Errorf("RuleGetTxVersionFromAutScriptVersion: unknown autScriptVersion %d", autScriptVersion)
 	}
+}
+
+// RuleCheckOnAutTxoVersionType checks whether the AutTxo's version and type match.
+func RuleCheckOnAutTxoVersionType(autScriptVersion uint32, autTxo *ctautwire.AutTxo) error {
+	autTxoType, err := abecryptox.GetAutTxoType(autTxo)
+	if err != nil {
+		return fmt.Errorf("fail to get last aut txo type: %v", err)
+	}
+
+	err = abecryptox.AutRuleCheckOnAutTxoVersionType(autScriptVersion, autTxoType)
+	if err != nil {
+		return fmt.Errorf("fail to pass the AutRuleCheckOnTxoVersionType: %v", err)
+	}
+
 	return nil
 }
 
@@ -152,6 +138,20 @@ func RuleCheckOnAutTxOutputPrivacyType(autPrivacyType AutPrivacyType, outputAutT
 		}
 	} else {
 		return fmt.Errorf("unknown aut privacy type %d", autPrivacyType)
+	}
+	return nil
+}
+
+func RuleCheckOnAutTxInputVersion(autScriptVersion uint32, inputAutTxo *ctautwire.AutTxo) error {
+	// TODO check the type of the input autTxo?
+	//autTxoType, err := abecryptox.GetAutTxoType(autTxo)
+	//if err != nil {
+	//	return fmt.Errorf("fail to get last aut txo type: %v", err)
+	//}
+
+	err := abecryptox.AutRuleCheckOnTxInputVersion(autScriptVersion, inputAutTxo.Version)
+	if err != nil {
+		return fmt.Errorf("fail to pass the AutRuleCheckOnTxInputVersion: %v", err)
 	}
 	return nil
 }
