@@ -138,13 +138,13 @@ func RuleCheckOnAutPrivacyType(privacyType AutPrivacyType, autTxo *ctautwire.Aut
 		return err
 	}
 
-	if privacyType == script.PrivacyTypeUnlimited {
+	if privacyType == script.AutPrivacyTypeUnlimited {
 		// nothing
-	} else if privacyType == script.PrivacyTypeLimitedPublic {
+	} else if privacyType == script.AutPrivacyTypeLimitedPublic {
 		if autTxoType != abecryptox.AutTxoTypePublic {
 			return fmt.Errorf("expected public aut txo, but got %d", autTxoType)
 		}
-	} else if privacyType == script.PrivacyTypeLimitedHidden {
+	} else if privacyType == script.AutPrivacyTypeLimitedHidden {
 		if autTxoType != abecryptox.AutTxoTypeHidden {
 			return fmt.Errorf("expected hidden aut txo, but got %d", autTxoType)
 		}

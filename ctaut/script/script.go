@@ -535,9 +535,9 @@ func (autMetadata *AutMetadata) SanityCheck() error {
 		return fmt.Errorf("invalid mint threshold (%d) for %d issuers", autMetadata.MintThreshold, len(autMetadata.Issuers))
 	}
 
-	if autMetadata.PrivacyType != PrivacyTypeUnlimited &&
-		autMetadata.PrivacyType != PrivacyTypeLimitedPublic &&
-		autMetadata.PrivacyType != PrivacyTypeLimitedHidden {
+	if autMetadata.PrivacyType != AutPrivacyTypeUnlimited &&
+		autMetadata.PrivacyType != AutPrivacyTypeLimitedPublic &&
+		autMetadata.PrivacyType != AutPrivacyTypeLimitedHidden {
 		return fmt.Errorf("invalid privacy type (%d)", autMetadata.PrivacyType)
 	}
 
@@ -1252,9 +1252,9 @@ func (autScript *RegistrationScript) SanityCheck() error {
 	}
 
 	// privacyType              uint8
-	if autScript.privacyType != PrivacyTypeUnlimited &&
-		autScript.privacyType != PrivacyTypeLimitedPublic &&
-		autScript.privacyType != PrivacyTypeLimitedHidden {
+	if autScript.privacyType != AutPrivacyTypeUnlimited &&
+		autScript.privacyType != AutPrivacyTypeLimitedPublic &&
+		autScript.privacyType != AutPrivacyTypeLimitedHidden {
 		return fmt.Errorf("autScript.privacyType (%d) is not supported",
 			autScript.privacyType)
 	}
@@ -1751,9 +1751,9 @@ func (autScript *ReRegistrationScript) SanityCheck() error {
 	}
 
 	// privacyType           uint8
-	if autScript.privacyType != PrivacyTypeUnlimited &&
-		autScript.privacyType != PrivacyTypeLimitedPublic &&
-		autScript.privacyType != PrivacyTypeLimitedHidden {
+	if autScript.privacyType != AutPrivacyTypeUnlimited &&
+		autScript.privacyType != AutPrivacyTypeLimitedPublic &&
+		autScript.privacyType != AutPrivacyTypeLimitedHidden {
 		return fmt.Errorf("autScript.privacyType (%d) is not supported",
 			autScript.privacyType)
 	}

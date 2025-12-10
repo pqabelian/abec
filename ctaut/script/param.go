@@ -18,9 +18,9 @@ const (
 type AutPrivacyType = uint8
 
 const (
-	PrivacyTypeUnlimited     = 0
-	PrivacyTypeLimitedPublic = 1
-	PrivacyTypeLimitedHidden = 2
+	AutPrivacyTypeUnlimited     = 0
+	AutPrivacyTypeLimitedPublic = 1
+	AutPrivacyTypeLimitedHidden = 2
 )
 
 const MaxAutScriptLength uint32 = 128 * 1024 // 128K, consistent with MaxAllowedTxMemoSize
