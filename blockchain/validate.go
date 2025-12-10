@@ -21,6 +21,7 @@ import (
 	"github.com/abesuite/abec/chainhash"
 	ctautapi "github.com/abesuite/abec/ctaut/api"
 	"github.com/abesuite/abec/ctaut/rules"
+	"github.com/abesuite/abec/ctaut/script"
 	ctautwire "github.com/abesuite/abec/ctaut/wire"
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
@@ -3130,7 +3131,11 @@ func ValidateTxCTAUTScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostVie
 		privacyType := metadata.PrivacyType
 
 		generatedTokens := extAutScript.GeneratedTokens()
-		for _, token := range generatedTokens {
+		// special case: ignore the last one token when checking the privacy type rule
+		// it must be public
+		for i := 0; i < len(generatedTokens)-1; i++ {
+			token := generatedTokens[i]
+
 			autTxo := &ctautwire.AutTxo{}
 			err = autTxo.Deserialize(token.ValueScript)
 			if err != nil {
@@ -3141,6 +3146,19 @@ func ValidateTxCTAUTScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostVie
 			if err != nil {
 				return err
 			}
+		}
+		willBurnToken := generatedTokens[len(generatedTokens)-1]
+		autTxo := &ctautwire.AutTxo{}
+		err = autTxo.Deserialize(willBurnToken.ValueScript)
+		if err != nil {
+			return err
+		}
+		txoType, err := abecryptox.GetAutTxoType(autTxo)
+		if err != nil {
+			return err
+		}
+		if txoType != script.AutPrivacyTypeLimitedPublic {
+			return fmt.Errorf("invalid txoType for burn token: %d", txoType)
 		}
 
 	default:
