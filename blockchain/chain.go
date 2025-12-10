@@ -16,7 +16,6 @@ import (
 	"github.com/abesuite/abec/blockchain/ruleerror"
 
 	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/database"
@@ -1404,7 +1403,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 
 	ctautView := NewCTAUTViewpoint()
 	ctautView.SetBestHash(&oldBest.hash)
-	var ctautInstanceToDelForBlocks map[string]struct{}
+	ctautInstanceToDelForBlocks := map[string]struct{}{}
 
 	for e := detachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
