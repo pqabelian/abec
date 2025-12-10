@@ -57,6 +57,7 @@ func RuleCheckOnHostTxo(txOut *wire.TxOutAbe) ([]byte, error) {
 	return coinAddress, nil
 }
 
+// RuleCheckOnAutTxoVersionType checks whether the AutTxo's version and type match.
 func RuleCheckOnAutTxoVersionType(autScriptVersion uint32, autTxo *ctautwire.AutTxo) error {
 	autTxoType, err := abecryptox.GetAutTxoType(autTxo)
 	if err != nil {
@@ -118,7 +119,7 @@ func RuleCheckOnIssuerHostClaim(issuers []*AutIssuer, outputTokens []*AutToken) 
 	return nil
 }
 
-func RuleCheckOnAutVersionInput(autScriptVersion uint32, inputAutTxo *ctautwire.AutTxo) error {
+func RuleCheckOnAutTxInputVersion(autScriptVersion uint32, inputAutTxo *ctautwire.AutTxo) error {
 	// TODO check the type of the input autTxo?
 	//autTxoType, err := abecryptox.GetAutTxoType(autTxo)
 	//if err != nil {
@@ -132,24 +133,25 @@ func RuleCheckOnAutVersionInput(autScriptVersion uint32, inputAutTxo *ctautwire.
 	return nil
 }
 
-func RuleCheckOnAutPrivacyType(privacyType AutPrivacyType, autTxo *ctautwire.AutTxo) error {
-	autTxoType, err := abecryptox.GetAutTxoType(autTxo)
+// RuleCheckOnAutTxOutputPrivacyType checks whether the outputAutTxo's type match the autPrivacyType's requirements.
+func RuleCheckOnAutTxOutputPrivacyType(autPrivacyType AutPrivacyType, outputAutTxo *ctautwire.AutTxo) error {
+	outAutTxoType, err := abecryptox.GetAutTxoType(outputAutTxo)
 	if err != nil {
 		return err
 	}
 
-	if privacyType == script.AutPrivacyTypeUnlimited {
+	if autPrivacyType == script.AutPrivacyTypeUnlimited {
 		// nothing
-	} else if privacyType == script.AutPrivacyTypeLimitedPublic {
-		if autTxoType != abecryptox.AutTxoTypePublic {
-			return fmt.Errorf("expected public aut txo, but got %d", autTxoType)
+	} else if autPrivacyType == script.AutPrivacyTypeLimitedPublic {
+		if outAutTxoType != abecryptox.AutTxoTypePublic {
+			return fmt.Errorf("expected public aut txo, but got %d", outAutTxoType)
 		}
-	} else if privacyType == script.AutPrivacyTypeLimitedHidden {
-		if autTxoType != abecryptox.AutTxoTypeHidden {
-			return fmt.Errorf("expected hidden aut txo, but got %d", autTxoType)
+	} else if autPrivacyType == script.AutPrivacyTypeLimitedHidden {
+		if outAutTxoType != abecryptox.AutTxoTypeHidden {
+			return fmt.Errorf("expected hidden aut txo, but got %d", outAutTxoType)
 		}
 	} else {
-		return fmt.Errorf("unknown privacy type %d", privacyType)
+		return fmt.Errorf("unknown aut privacy type %d", autPrivacyType)
 	}
 	return nil
 }

@@ -2553,7 +2553,7 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx 
 				abecryptox.AutTxoTypeHidden, autTxoType)
 		}
 
-		err = rules.RuleCheckOnAutVersionInput(scriptVersion, autTxo)
+		err = rules.RuleCheckOnAutTxInputVersion(scriptVersion, autTxo)
 		if err != nil {
 			return err
 		}
@@ -2645,7 +2645,7 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx 
 				abecryptox.AutTxoTypePublic, autTxoType)
 		}
 
-		err = rules.RuleCheckOnAutVersionInput(scriptVersion, autTxo)
+		err = rules.RuleCheckOnAutTxInputVersion(scriptVersion, autTxo)
 		if err != nil {
 			return err
 		}
@@ -2800,7 +2800,7 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abe
 				abecryptox.AutTxoTypeHidden, autTxoType)
 		}
 
-		err = rules.RuleCheckOnAutVersionInput(scriptVersion, autTxo)
+		err = rules.RuleCheckOnAutTxInputVersion(scriptVersion, autTxo)
 		if err != nil {
 			return err
 		}
@@ -2893,7 +2893,7 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abe
 				abecryptox.AutTxoTypePublic, autTxoType)
 		}
 
-		err = rules.RuleCheckOnAutVersionInput(scriptVersion, autTxo)
+		err = rules.RuleCheckOnAutTxInputVersion(scriptVersion, autTxo)
 		if err != nil {
 			return err
 		}
@@ -3088,7 +3088,7 @@ func ValidateTxCTAUTScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostVie
 				return err
 			}
 
-			err = rules.RuleCheckOnAutPrivacyType(privacyType, autTxo)
+			err = rules.RuleCheckOnAutTxOutputPrivacyType(privacyType, autTxo)
 			if err != nil {
 				return err
 			}
@@ -3112,7 +3112,7 @@ func ValidateTxCTAUTScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostVie
 				return err
 			}
 
-			err = rules.RuleCheckOnAutPrivacyType(privacyType, autTxo)
+			err = rules.RuleCheckOnAutTxOutputPrivacyType(privacyType, autTxo)
 			if err != nil {
 				return err
 			}
@@ -3137,7 +3137,7 @@ func ValidateTxCTAUTScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostVie
 				return err
 			}
 
-			err = rules.RuleCheckOnAutPrivacyType(privacyType, autTxo)
+			err = rules.RuleCheckOnAutTxOutputPrivacyType(privacyType, autTxo)
 			if err != nil {
 				return err
 			}
