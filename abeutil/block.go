@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/abesuite/abec/aut"
 	"github.com/abesuite/abec/chainhash"
 	ctautapi "github.com/abesuite/abec/ctaut/api"
 	"github.com/abesuite/abec/wire"
@@ -49,9 +48,6 @@ type BlockAbe struct {
 	blockHeight              int32             // Height in the main block chain
 	transactions             []*TxAbe          // Transactions
 	txnsGenerated            bool              // ALL wrapped transactions generated
-
-	autTransactions  []aut.Transaction
-	autTxnsGenerated bool
 
 	extAutScripts []*ctautapi.ExtAutScript
 }
@@ -338,51 +334,6 @@ func (b *BlockAbe) Transactions() []*TxAbe {
 	return b.transactions
 }
 
-// AUTTransactions returns the AutTransaction hosted by the transaction in the block.
-// If they have been parsed, just return, otherwise, parse and return.
-// refactored by Alice on 2024.03.01
-func (b *BlockAbe) AUTTransactions() []aut.Transaction {
-	// Return transactions if they have ALL already been generated.  This
-	// flag is necessary because the wrapped transactions are lazily
-	// generated in a sparse fashion.
-	if b.autTxnsGenerated {
-		return b.autTransactions
-	}
-
-	// Generate slice to hold all of the wrapped transactions if needed.
-	if len(b.autTransactions) == 0 {
-		b.autTransactions = make([]aut.Transaction, 0, len(b.msgBlock.Transactions))
-	}
-
-	// Generate and cache the wrapped autTransactions for all that haven't
-	// already been done.
-	for i, txAbe := range b.Transactions() {
-		isCb, err := txAbe.IsCoinBase()
-		if err != nil {
-			//	this should not happen
-			log.Warnf("AUTTransactions: error happens when calling IsCoinBase() on the %d-th transaction of the block: %v", i, err)
-			continue
-		}
-		if isCb {
-			continue
-		}
-
-		autTx, err := txAbe.AUTTransaction()
-		if err != nil {
-			//	this should not happen
-			log.Warnf("AUTTransactions: error happens when getting AutTransaction from the %d-th transaction (%s) of the block: %v", i, txAbe.Hash(), err)
-			continue
-		}
-		if autTx == nil {
-			log.Debugf("AUTTransactions: skip non-AUT transaction %s", txAbe.Hash())
-			continue
-		}
-		b.autTransactions = append(b.autTransactions, autTx)
-	}
-
-	b.autTxnsGenerated = true
-	return b.autTransactions
-}
 func (b *BlockAbe) ExtAutScripts() []*ctautapi.ExtAutScript {
 	//// Return transactions if they have ALL already been generated.  This
 	//// flag is necessary because the wrapped transactions are lazily

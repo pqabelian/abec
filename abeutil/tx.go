@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/abesuite/abec/aut"
 	ctautapi "github.com/abesuite/abec/ctaut/api"
 
 	"github.com/abesuite/abec/chainhash"
@@ -41,10 +40,6 @@ type TxAbe struct {
 	txHasAutWitness *bool
 	txIndex         int // Position within a block or TxIndexUnknown
 
-	autTxDone bool
-	autTx     aut.Transaction
-	errAUTTx  error
-
 	extAutScript *ctautapi.ExtAutScript // todo: confirm that ExtAutScript also carries msgTx
 }
 
@@ -57,23 +52,6 @@ func (t *Tx) MsgTx() *wire.MsgTx {
 func (tx *TxAbe) MsgTx() *wire.MsgTxAbe {
 	// Return the cached transaction.
 	return tx.msgTx
-}
-
-// AUTTransaction try to deserialize the memo in transaction to AUT transaction,
-// when success, set the fields autTx to the AUT transaction, and isAUTTx to true
-// when failed:
-// - if the origin transaction can not be an AUT transaction, set the fields autTx to nil, and isAUTTx to false
-// - if the origin transaction can be an AUT transaction but conflict with sanity, set the fields autTx to nil, and isAUTTx to true
-// refactored by Alice, on 2024.02.29, to return err if there is
-func (tx *TxAbe) AUTTransaction() (aut.Transaction, error) {
-	if tx.autTxDone {
-		return tx.autTx, tx.errAUTTx
-	}
-	tx.autTxDone = true
-
-	tx.autTx, tx.errAUTTx = aut.ExtractAutTransaction(tx.MsgTx())
-
-	return tx.autTx, tx.errAUTTx
 }
 
 // ExtAutScript returns the ExtAutScript of the abeutil.Tx, which returns nil is it does not exist.

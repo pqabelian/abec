@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -1359,16 +1358,6 @@ func (mp *TxPool) fetchInputUtxoRingsAbe(tx *abeutil.TxAbe) (*blockchain.UtxoRin
 	return utxoRingView, nil
 }
 
-// fetch relevant info withAUT transaction
-func (mp *TxPool) fetchInputAUT(tx *abeutil.TxAbe) (*blockchain.AUTViewpoint, error) {
-	//autView, err := mp.cfg.FetchAUTView(tx)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//return autView, nil
-	return nil, errors.New("AUT is not supported")
-}
 func (mp *TxPool) fetchInputCTAUT(tx *abeutil.TxAbe) (*blockchain.CTAUTViewpoint, error) {
 	extAutScript := tx.ExtAutScript()
 	if extAutScript == nil {

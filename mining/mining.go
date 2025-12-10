@@ -264,31 +264,6 @@ func mergeUtxoRingView(viewA *blockchain.UtxoRingViewpoint, viewB *blockchain.Ut
 	viewA.SetEntries(viewAEntries)
 }
 
-func mergeAUTView(viewA *blockchain.AUTViewpoint, viewB *blockchain.AUTViewpoint) {
-	if viewB == nil {
-		return
-	}
-
-	viewAEntries := viewA.Entries()
-	if viewAEntries == nil {
-		viewAEntries = make(map[string]*blockchain.AUTEntry)
-	}
-	for autNameKeys, entry := range viewB.Entries() {
-		existAUTInfo := viewAEntries[autNameKeys]
-		if existAUTInfo == nil {
-			viewAEntries[autNameKeys] = entry
-			continue
-		}
-		// do not change AUT info
-		// but add all coin to viewA
-		for outpiont, coin := range entry.AUTCoins() {
-			existAUTInfo.Add(outpiont, coin)
-		}
-		viewAEntries[autNameKeys] = existAUTInfo
-	}
-	viewA.SetEntries(viewAEntries)
-}
-
 func mergeCTAUTView(viewA *blockchain.CTAUTViewpoint, viewB *blockchain.CTAUTViewpoint) {
 	if viewB == nil {
 		return

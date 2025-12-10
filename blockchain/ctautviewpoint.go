@@ -41,7 +41,7 @@ const (
 // Transfer Abelian TXO  -> AUT Coin (AUT IDENTIFIER)
 //
 
-// AUTCoin houses details about an AUT CTAUTScript output in a AUT
+// CTAUTInstance houses details about an AUT CTAUTScript output in a AUT
 // view such as whether or not it was contained in a AUT Registration CTAUTScript, the height of
 // the block that contains the tx, whether or not it is spent, its public key
 // script, and how much it pays.
@@ -156,7 +156,8 @@ func (coin *CTAUTCoin) Clone() *CTAUTCoin {
 }
 
 // todo: function name
-// NewAUTCoin returns a new AUTCoin built from the arguments.
+
+// NewCTAUTCoin returns a new CTAUTCoin built from the arguments.
 func NewCTAUTCoin(version uint32, identifier ctautapi.AutId, script []byte, blockHeight int32) *CTAUTCoin {
 
 	return &CTAUTCoin{
