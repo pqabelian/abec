@@ -47,7 +47,6 @@ type BlockAbe struct {
 	blockHash                *chainhash.Hash   // Cached block hash
 	blockHeight              int32             // Height in the main block chain
 	transactions             []*TxAbe          // Transactions
-	txnsGenerated            bool              // ALL wrapped transactions generated
 
 	extAutScripts []*ctautapi.ExtAutScript
 }
@@ -756,3 +755,5 @@ func DecodeTxWitnesses(txVersion uint32, witness []byte) (txWitness []byte, autW
 	copy(txWitness, witness)
 	return txWitness, autWitness, nil
 }
+
+// aut review done 1210
