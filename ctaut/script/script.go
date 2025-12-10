@@ -257,7 +257,7 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	// AutPrivacyType              uint8
+	// PrivacyType                AutPrivacyType
 	if err = w.WriteByte(autMetadata.PrivacyType); err != nil {
 		return nil, err
 	}
@@ -408,7 +408,7 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 		return err
 	}
 
-	// AutPrivacyType              uint8
+	// PrivacyType                AutPrivacyType
 	if autMetadata.PrivacyType, err = r.ReadByte(); err != nil {
 		return err
 	}
@@ -891,7 +891,7 @@ func (autScript *RegistrationScript) serializeSize() (int, error) {
 
 	n += 1 // reregisterThreshold        uint8
 	n += 1 // mintThreshold              uint8
-	n += 1 // privacyType              uint8
+	n += 1 // privacyType                AutPrivacyType
 
 	n += 1 // outStartIndex				uint8
 	n += 1 // outAutRootTokenNum		uint8
@@ -991,7 +991,7 @@ func (autScript *RegistrationScript) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	// privacyType              uint8
+	// privacyType                AutPrivacyType
 	if err = w.WriteByte(autScript.privacyType); err != nil {
 		return nil, err
 	}
@@ -1114,7 +1114,7 @@ func (autScript *RegistrationScript) Deserialize(serializedScript []byte) error 
 		return err
 	}
 
-	// privacyType              uint8
+	// privacyType                AutPrivacyType
 	if autScript.privacyType, err = r.ReadByte(); err != nil {
 		return err
 	}
@@ -1251,7 +1251,7 @@ func (autScript *RegistrationScript) SanityCheck() error {
 			autScript.mintThreshold, len(autScript.issuers))
 	}
 
-	// privacyType              uint8
+	// privacyType                AutPrivacyType
 	if autScript.privacyType != AutPrivacyTypeUnlimited &&
 		autScript.privacyType != AutPrivacyTypeLimitedPublic &&
 		autScript.privacyType != AutPrivacyTypeLimitedHidden {
@@ -1463,7 +1463,7 @@ func (autScript *ReRegistrationScript) serializeSize() (int, error) {
 
 	n += 1 // reregisterThreshold        uint8
 	n += 1 // mintThreshold              uint8
-	n += 1 // privacyType              uint8
+	n += 1 // privacyType                AutPrivacyType
 
 	n += 1 // inStartIndex               uint8
 	n += 1 // inAutRootTokenNum          uint8
@@ -1537,7 +1537,7 @@ func (autScript *ReRegistrationScript) Serialize() ([]byte, error) {
 		return nil, err
 	}
 
-	// privacyType              uint8
+	// privacyType                AutPrivacyType
 	if err = w.WriteByte(autScript.privacyType); err != nil {
 		return nil, err
 	}
@@ -1647,7 +1647,7 @@ func (autScript *ReRegistrationScript) Deserialize(serializedScript []byte) erro
 		return err
 	}
 
-	// privacyType              uint8
+	// privacyType                AutPrivacyType
 	if autScript.privacyType, err = r.ReadByte(); err != nil {
 		return err
 	}
@@ -1750,7 +1750,7 @@ func (autScript *ReRegistrationScript) SanityCheck() error {
 			autScript.mintThreshold, len(autScript.issuers))
 	}
 
-	// privacyType           uint8
+	// privacyType                AutPrivacyType
 	if autScript.privacyType != AutPrivacyTypeUnlimited &&
 		autScript.privacyType != AutPrivacyTypeLimitedPublic &&
 		autScript.privacyType != AutPrivacyTypeLimitedHidden {
