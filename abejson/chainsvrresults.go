@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/wire"
 )
@@ -28,6 +29,28 @@ type GetBlockHeaderVerboseResult struct {
 	ConsensusApplied uint8   `json:"consensusApplied"`
 	PreviousHash     string  `json:"previousblockhash,omitempty"`
 	NextHash         string  `json:"nextblockhash,omitempty"`
+}
+
+type GetAutMetadataResult struct {
+	Version                    uint32   `json:"version"`
+	AutIdentifier              string   `json:"identifier"`
+	AutName                    string   `json:"name"`
+	AutSymbol                  string   `json:"symbol"`
+	BaseUnitName               string   `json:"baseUnitName"`
+	SubUnitName                string   `json:"subUnitName"`
+	UnitScale                  uint64   `json:"unitScale"`
+	AutMemo                    string   `json:"autMemo"`
+	PlannedTotalSupply         uint64   `json:"plannedTotalSupply"`
+	Issuers                    []string `json:"issuers"`
+	ReregistrationExpireHeight int32    `json:"reRegistrationHeight"`
+	ReRegistrationThreshold    uint8    `json:"reRegistrationThreshold"`
+	MintThreshold              uint8    `json:"mintThreshold"`
+	PrivacyType                uint8    `json:"privacyType"`
+
+	MintedAmount         uint64              `json:"mintedAmount"`
+	BurnedAmount         uint64              `json:"burnedAmount"`
+	UpdateScriptVersions []uint32            `json:"updateScriptVersions"`
+	ActiveRootTokenSet   []*wire.OutPointAbe `json:"activeRootTokenSet"`
 }
 
 // GetBlockStatsResult models the data from the getblockstats command.

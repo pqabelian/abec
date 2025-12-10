@@ -189,6 +189,8 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	//	todo(ABE.MUST): At this moment, ABE does not support this cmd. As this is related to cyrpto function.
 	//	"verifymessage":         handleVerifyMessage,
 	"version": handleVersion,
+
+	"getautmetadata": handleGetAutMetadata,
 }
 
 // list of commands that we recognize, but for which abec has no support because
@@ -295,6 +297,7 @@ var rpcLimited = map[string]struct{}{
 	"validateaddress":       {},
 	"verifymessage":         {},
 	"version":               {},
+	"getautmetadata":        {},
 }
 
 // builderScript is a convenience function which is used for hard-coded scripts
@@ -1790,6 +1793,64 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 	}
 
 	return blockHeaderReply, nil
+}
+func handleGetAutMetadata(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	// Obtain a snapshot of the current best known blockchain state. We'll
+	// populate the response to this call primarily from this snapshot.
+	chain := s.cfg.Chain
+
+	c := cmd.(*abejson.GetAutMetadataCmd)
+
+	// Load the raw block bytes from the database.
+	identifier, err := chainhash.NewHashFromStr(c.Identifier)
+	if err != nil {
+		return nil, rpcDecodeHexError(c.Identifier)
+	}
+
+	metadata, err := chain.FetchCTAUTMetadata(*identifier)
+	if err != nil {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCBlockNotFound,
+			Message: "Block not found",
+		}
+	}
+	if metadata == nil {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCBlockNotFound,
+			Message: "Metadata not found",
+		}
+	}
+
+	issuers := make([]string, 0, len(metadata.Issuers))
+	for i := 0; i < len(metadata.Issuers); i++ {
+		issuers = append(issuers, metadata.Issuers[i].String())
+	}
+	activeRootTokenSet := make([]*wire.OutPointAbe, 0, len(metadata.ActiveRootTokenSet))
+	for _, point := range metadata.ActiveRootTokenSet {
+		activeRootTokenSet = append(activeRootTokenSet, point)
+	}
+	metadaReply := abejson.GetAutMetadataResult{
+		Version:                    metadata.Version,
+		AutIdentifier:              metadata.AutIdentifier.String(),
+		AutName:                    hex.EncodeToString(metadata.AutName),
+		AutSymbol:                  hex.EncodeToString(metadata.AutSymbol),
+		BaseUnitName:               hex.EncodeToString(metadata.BaseUnitName),
+		SubUnitName:                hex.EncodeToString(metadata.SubUnitName),
+		UnitScale:                  metadata.UnitScale,
+		AutMemo:                    hex.EncodeToString(metadata.AutMemo),
+		PlannedTotalSupply:         metadata.PlannedTotalSupply,
+		Issuers:                    issuers,
+		ReregistrationExpireHeight: metadata.ReregistrationExpireHeight,
+		ReRegistrationThreshold:    metadata.ReregistrationThreshold,
+		MintThreshold:              metadata.MintThreshold,
+		PrivacyType:                metadata.PrivacyType,
+		MintedAmount:               metadata.MintedAmount,
+		BurnedAmount:               metadata.BurnedAmount,
+		UpdateScriptVersions:       metadata.UpdateScriptVersions,
+		ActiveRootTokenSet:         activeRootTokenSet,
+	}
+
+	return metadaReply, nil
 }
 
 // encodeTemplateID encodes the passed details into an ID that can be used to

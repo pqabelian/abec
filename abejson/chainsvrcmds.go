@@ -343,7 +343,7 @@ type TemplateRequest struct {
 
 	// MiningAddr should be filled if there is 'useownaddr' in capabilities
 	MiningAddr string `json:"miningaddr,omitempty"`
-	
+
 	ConsensusApplied uint8 `json:"consensusApplied,omitempty"`
 }
 
@@ -1030,6 +1030,21 @@ func NewVerifyTxOutProofCmd(proof string) *VerifyTxOutProofCmd {
 	}
 }
 
+type GetAutMetadataCmd struct {
+	Identifier string
+}
+
+// NewSendRawTransactionCmd returns a new instance which can be used to issue a
+// sendrawtransaction JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewGetAutMetadataCmd(identifier string) *GetAutMetadataCmd {
+	return &GetAutMetadataCmd{
+		Identifier: identifier,
+	}
+}
+
 func init() {
 	// No special flags for commands in this file.
 	flags := UsageFlag(0)
@@ -1094,4 +1109,5 @@ func init() {
 	MustRegisterCmd("verifychain", (*VerifyChainCmd)(nil), flags)
 	MustRegisterCmd("verifymessage", (*VerifyMessageCmd)(nil), flags)
 	MustRegisterCmd("verifytxoutproof", (*VerifyTxOutProofCmd)(nil), flags)
+	MustRegisterCmd("getautmetadata", (*GetAutMetadataCmd)(nil), flags)
 }

@@ -880,8 +880,6 @@ type ReRegisterCTAUTCmd struct {
 
 	IssuerTimes int
 	Memo        string
-
-	AUTIssuerUpdateThreshold uint8
 }
 
 type CTAUTPair struct {
@@ -895,24 +893,24 @@ type MintCTAUTCmd struct {
 	Vin        uint64
 	Recipients []*CTAUTPair
 	Memo       string
-
-	CTAUTMintThreshold uint8
 }
 type TransferCTAUTCmd struct {
 	AUTIdentifier string
 
 	Recipients []*CTAUTPair
 
-	Memo          string
-	ChangeAddress string
+	Memo              string
+	ChangeAddress     string
+	ChangePrivacyType *uint8
 }
 type BurnCTAUTCmd struct {
 	AUTIdentifier string
 
 	Recipients []*CTAUTPair // the first recipient would be marked burned
 
-	Memo          string
-	ChangeAddress string
+	Memo              string
+	ChangeAddress     string
+	ChangePrivacyType *uint8
 }
 
 func NewRegisterAUTTransactionCmd(autIdentifier string, autSymbol string,

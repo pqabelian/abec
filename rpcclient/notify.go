@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/abesuite/abec/abejson"
 	"github.com/abesuite/abec/abeutil"
-	"time"
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
@@ -1282,6 +1284,9 @@ func (c *Client) Rescan(startBlock *chainhash.Hash,
 func (c *Client) RescanAbe(startBlock *chainhash.Hash) error {
 
 	return c.RescanAbeAsync(startBlock).Receive()
+}
+func (c *Client) GetAutMetadata(identifier ctautapi.AutId) (*ctautapi.AutMetadata, error) {
+	return c.GetAutMetadataAsync(identifier).Receive()
 }
 
 // RescanEndBlockAsync returns an instance of a type that can be used to get

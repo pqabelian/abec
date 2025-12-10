@@ -1311,6 +1311,13 @@ func (b *BlockChain) FetchCTAUTView(script *ctautapi.ExtAutScript) (*CTAUTViewpo
 	return view, err
 }
 
+func (b *BlockChain) FetchCTAUTMetadata(identifier ctautapi.AutId) (*ctautapi.AutMetadata, error) {
+	b.chainLock.RLock()
+	defer b.chainLock.RUnlock()
+
+	return b.fetchCTAUTMetadata(identifier)
+}
+
 func (b *BlockChain) fetchCTAUTMetadata(identifier ctautapi.AutId) (*ctautapi.AutMetadata, error) {
 	var metadata *ctautapi.AutMetadata
 	err := b.db.View(func(dbTx database.Tx) error {
