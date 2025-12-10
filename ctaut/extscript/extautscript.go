@@ -396,10 +396,10 @@ func (extAutScript *ExtAutScript) UpdateAutMetadata(autMetadata *script.AutMetad
 	updatedAutMetadata.ReregistrationThreshold = reregisterScript.ReregisterThreshold()
 	updatedAutMetadata.MintThreshold = reregisterScript.MintThreshold()
 
-	if autMetadata.PrivacyType != dao.PrivacyTypeUnlimited &&
-		autMetadata.PrivacyType != dao.PrivacyTypeLimitedPublic &&
-		autMetadata.PrivacyType != dao.PrivacyTypeLimitedHidden {
-		return nil, fmt.Errorf("unknown privacy type %d", autMetadata.PrivacyType)
+	if autMetadata.PrivacyType != script.AutPrivacyTypeUnlimited &&
+		autMetadata.PrivacyType != script.AutPrivacyTypeLimitedPublic &&
+		autMetadata.PrivacyType != script.AutPrivacyTypeLimitedHidden {
+		return nil, fmt.Errorf("unknown autMetadat privacy type %d", autMetadata.PrivacyType)
 	}
 	updatedAutMetadata.PrivacyType = reregisterScript.PrivacyType()
 
