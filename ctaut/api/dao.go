@@ -8,18 +8,10 @@ import (
 
 type HostOutPoint = dao.HostOutPoint
 type AutId = dao.AutId
-
-type AutPrivacyType = dao.AutPrivacyType
-
-const (
-	PrivacyTypeUnlimited     = dao.PrivacyTypeUnlimited
-	PrivacyTypeLimitedPublic = dao.PrivacyTypeLimitedPublic
-	PrivacyTypeLimitedHidden = dao.PrivacyTypeLimitedHidden
-)
+type AutIssuer = dao.AutIssuer
 
 type AutScriptType = script.AutScriptType
-type AutIssuer = dao.AutIssuer
-type PrivacyType = script.PrivacyType
+type AutPrivacyType = script.AutPrivacyType
 
 type AutScript = script.AutScript
 type RegistrationScript = script.RegistrationScript

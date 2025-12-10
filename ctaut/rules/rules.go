@@ -3,6 +3,7 @@ package rules
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/abesuite/abec/ctaut/script"
 
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
@@ -14,7 +15,7 @@ import (
 type HostOutPoint = dao.HostOutPoint
 type AutIssuer = dao.AutIssuer
 type AutToken = dao.AutToken
-type AutPrivacyType = dao.AutPrivacyType
+type AutPrivacyType = script.AutPrivacyType
 
 // RuleGetTxVersionFromAutScriptVersion defines a map from AutScriptVersion to host-Txo-Version.
 //
@@ -137,13 +138,13 @@ func RuleCheckOnAutPrivacyType(privacyType AutPrivacyType, autTxo *ctautwire.Aut
 		return err
 	}
 
-	if privacyType == dao.PrivacyTypeUnlimited {
+	if privacyType == script.PrivacyTypeUnlimited {
 		// nothing
-	} else if privacyType == dao.PrivacyTypeLimitedPublic {
+	} else if privacyType == script.PrivacyTypeLimitedPublic {
 		if autTxoType != abecryptox.AutTxoTypePublic {
 			return fmt.Errorf("expected public aut txo, but got %d", autTxoType)
 		}
-	} else if privacyType == dao.PrivacyTypeLimitedHidden {
+	} else if privacyType == script.PrivacyTypeLimitedHidden {
 		if autTxoType != abecryptox.AutTxoTypeHidden {
 			return fmt.Errorf("expected hidden aut txo, but got %d", autTxoType)
 		}

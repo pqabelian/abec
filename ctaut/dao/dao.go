@@ -100,14 +100,6 @@ func (autIssuer *AutIssuer) Clone() *AutIssuer {
 	return rst
 }
 
-type AutPrivacyType = uint8
-
-const (
-	PrivacyTypeUnlimited     = 0
-	PrivacyTypeLimitedPublic = 1
-	PrivacyTypeLimitedHidden = 2
-)
-
 // AutToken holds the information of token in memory, and would be used to conduct the RULE-CHECKS.
 type AutToken struct {
 	// AutToken's version inherits the version of the script which creates the AutToken.

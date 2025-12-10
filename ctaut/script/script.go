@@ -18,7 +18,6 @@ import (
 type HostOutPoint = dao.HostOutPoint
 type AutId = dao.AutId
 type AutIssuer = dao.AutIssuer
-type PrivacyType = dao.AutPrivacyType
 
 // AutMetadata maintains the metadata information of Abelian User Token (AUT) instance on Abelian
 // 1. Each AutInstance has a unique identifier, which is actually a hash of the Abelian-Tx
@@ -93,7 +92,7 @@ type AutMetadata struct {
 	MintThreshold uint8
 
 	// PrivacyType specifies the privacy type of the AutInstance.
-	PrivacyType PrivacyType
+	PrivacyType AutPrivacyType
 
 	// MintedAmount records the total minted amount of this AutInstance.
 	MintedAmount uint64
@@ -536,9 +535,9 @@ func (autMetadata *AutMetadata) SanityCheck() error {
 		return fmt.Errorf("invalid mint threshold (%d) for %d issuers", autMetadata.MintThreshold, len(autMetadata.Issuers))
 	}
 
-	if autMetadata.PrivacyType != dao.PrivacyTypeUnlimited &&
-		autMetadata.PrivacyType != dao.PrivacyTypeLimitedPublic &&
-		autMetadata.PrivacyType != dao.PrivacyTypeLimitedHidden {
+	if autMetadata.PrivacyType != PrivacyTypeUnlimited &&
+		autMetadata.PrivacyType != PrivacyTypeLimitedPublic &&
+		autMetadata.PrivacyType != PrivacyTypeLimitedHidden {
 		return fmt.Errorf("invalid privacy type (%d)", autMetadata.PrivacyType)
 	}
 
@@ -736,7 +735,7 @@ type RegistrationScript struct {
 	reregistrationExpireHeight int32
 	reregisterThreshold        uint8
 	mintThreshold              uint8
-	privacyType                PrivacyType
+	privacyType                AutPrivacyType
 
 	// the number of output AutRootTokens
 	outStartIndex      uint8
@@ -752,7 +751,7 @@ func NewRegistrationScript(version uint32,
 	autName []byte, autSymbol []byte, baseUnitName []byte, subUnitName []byte, unitScale uint64,
 	autMemo []byte, plannedTotalSupply uint64,
 	issuers []*AutIssuer, reregistrationExpireHeight int32, reregisterThreshold uint8, mintThreshold uint8,
-	privacyType PrivacyType,
+	privacyType AutPrivacyType,
 	outStarIndex uint8, outAutRootTokenNum uint8,
 	scriptMemo []byte) *RegistrationScript {
 
@@ -832,7 +831,7 @@ func (autScript *RegistrationScript) MintThreshold() uint8 {
 	return autScript.mintThreshold
 }
 
-func (autScript *RegistrationScript) PrivacyType() PrivacyType {
+func (autScript *RegistrationScript) PrivacyType() AutPrivacyType {
 	return autScript.privacyType
 }
 
@@ -1253,9 +1252,9 @@ func (autScript *RegistrationScript) SanityCheck() error {
 	}
 
 	// privacyType              uint8
-	if autScript.privacyType != dao.PrivacyTypeUnlimited &&
-		autScript.privacyType != dao.PrivacyTypeLimitedPublic &&
-		autScript.privacyType != dao.PrivacyTypeLimitedHidden {
+	if autScript.privacyType != PrivacyTypeUnlimited &&
+		autScript.privacyType != PrivacyTypeLimitedPublic &&
+		autScript.privacyType != PrivacyTypeLimitedHidden {
 		return fmt.Errorf("autScript.privacyType (%d) is not supported",
 			autScript.privacyType)
 	}
@@ -1330,7 +1329,7 @@ type ReRegistrationScript struct {
 	reregistrationExpireHeight int32
 	reregisterThreshold        uint8
 	mintThreshold              uint8
-	privacyType                PrivacyType
+	privacyType                AutPrivacyType
 
 	// inAutRootTokenNum is an additional field that ReRegistrationScript has while RegistrationScript doesn't.
 	inStartIndex      uint8
@@ -1347,7 +1346,7 @@ func NewReRegistrationScript(version uint32,
 	autIdentifier AutId,
 	autMemo []byte, plannedTotalSupply uint64,
 	issuers []*AutIssuer, reregistrationExpireHeight int32, reregisterThreshold uint8, mintThreshold uint8,
-	privacyType PrivacyType,
+	privacyType AutPrivacyType,
 	inStartIndex uint8, inAutRootTokenNum uint8,
 	outStartIndex uint8, outAutRootTokenNum uint8,
 	scriptMemo []byte) *ReRegistrationScript {
@@ -1405,7 +1404,7 @@ func (autScript *ReRegistrationScript) MintThreshold() uint8 {
 	return autScript.mintThreshold
 }
 
-func (autScript *ReRegistrationScript) PrivacyType() PrivacyType {
+func (autScript *ReRegistrationScript) PrivacyType() AutPrivacyType {
 	return autScript.privacyType
 }
 
@@ -1752,9 +1751,9 @@ func (autScript *ReRegistrationScript) SanityCheck() error {
 	}
 
 	// privacyType           uint8
-	if autScript.privacyType != dao.PrivacyTypeUnlimited &&
-		autScript.privacyType != dao.PrivacyTypeLimitedPublic &&
-		autScript.privacyType != dao.PrivacyTypeLimitedHidden {
+	if autScript.privacyType != PrivacyTypeUnlimited &&
+		autScript.privacyType != PrivacyTypeLimitedPublic &&
+		autScript.privacyType != PrivacyTypeLimitedHidden {
 		return fmt.Errorf("autScript.privacyType (%d) is not supported",
 			autScript.privacyType)
 	}

@@ -15,6 +15,14 @@ const (
 	AutScriptTypeBurn           AutScriptType = 4
 )
 
+type AutPrivacyType = uint8
+
+const (
+	PrivacyTypeUnlimited     = 0
+	PrivacyTypeLimitedPublic = 1
+	PrivacyTypeLimitedHidden = 2
+)
+
 const MaxAutScriptLength uint32 = 128 * 1024 // 128K, consistent with MaxAllowedTxMemoSize
 
 const AutIdentifierLength = chainhash.HashSize
