@@ -1271,6 +1271,11 @@ func (autScript *RegistrationScript) SanityCheck() error {
 		return fmt.Errorf("autScript.outAutRootTokenNum (%d) exceeds the allowed max number (%d)",
 			autScript.outAutRootTokenNum, MaxNumToken)
 	}
+	if int(autScript.outStartIndex)+int(autScript.outAutRootTokenNum) > math.MaxUint8 {
+		// The Index in (TxHash, Index) is designed to be uint8.
+		return fmt.Errorf("autScript.outStartIndex (%d) + autScript.outAutRootTokenNum (%d) exceeds %d",
+			autScript.outStartIndex, autScript.outAutRootTokenNum, math.MaxUint8)
+	}
 
 	// autScriptMemo                 []byte
 	if len(autScript.scriptMemo) > MaxScriptMemoLength {
@@ -1769,6 +1774,11 @@ func (autScript *ReRegistrationScript) SanityCheck() error {
 		return fmt.Errorf("autScript.inAutRootTokenNum (%d) exceeds the allowed max number (%d)",
 			autScript.inAutRootTokenNum, MaxNumToken)
 	}
+	if int(autScript.inStartIndex)+int(autScript.inAutRootTokenNum) > math.MaxUint8 {
+		// The number of TxIns is designed to be at most uint8.
+		return fmt.Errorf("autScript.inStartIndex (%d) + autScript.inAutRootTokenNum (%d) exceeds %d",
+			autScript.inStartIndex, autScript.inAutRootTokenNum, math.MaxUint8)
+	}
 
 	// outStartIndex         uint8
 
@@ -1780,6 +1790,11 @@ func (autScript *ReRegistrationScript) SanityCheck() error {
 	if int(autScript.outAutRootTokenNum) > MaxNumToken {
 		return fmt.Errorf("autScript.outAutRootTokenNum (%d) exceeds the allowed max number (%d)",
 			autScript.outAutRootTokenNum, MaxNumToken)
+	}
+	if int(autScript.outStartIndex)+int(autScript.outAutRootTokenNum) > math.MaxUint8 {
+		// The Index in (TxHash, Index) is designed to be uint8.
+		return fmt.Errorf("autScript.outStartIndex (%d) + autScript.outAutRootTokenNum (%d) exceeds %d",
+			autScript.outStartIndex, autScript.outAutRootTokenNum, math.MaxUint8)
 	}
 
 	// scriptMemo                 []byte
@@ -1924,7 +1939,7 @@ func (autScript *MintScript) NumConsumedTokens() int {
 }
 
 func (autScript *MintScript) NumGeneratedTokens() int {
-	return int(autScript.outHiddenAutTokenNum + autScript.outPublicAutTokenNum)
+	return int(autScript.outHiddenAutTokenNum) + int(autScript.outPublicAutTokenNum)
 }
 
 func (autScript *MintScript) serializeSize() int {
@@ -2148,7 +2163,11 @@ func (autScript *MintScript) SanityCheck() error {
 		return fmt.Errorf("autScript.inAutRootTokenNum (%d) exceeds the allowed max number (%d)",
 			autScript.inAutRootTokenNum, MaxNumToken)
 	}
-
+	if int(autScript.inStartIndex)+int(autScript.inAutRootTokenNum) > math.MaxUint8 {
+		// The number of TxIns is designed to be at most uint8.
+		return fmt.Errorf("autScript.inStartIndex (%d) + autScript.inAutRootTokenNum (%d) exceeds %d",
+			autScript.inStartIndex, autScript.inAutRootTokenNum, math.MaxUint8)
+	}
 	// outStartIndex    uint8
 
 	// outHiddenAutTokenNum uint8
@@ -2163,18 +2182,23 @@ func (autScript *MintScript) SanityCheck() error {
 			autScript.outPublicAutTokenNum, MaxNumToken)
 	}
 
-	if autScript.outHiddenAutTokenNum+autScript.outPublicAutTokenNum == 0 {
+	if int(autScript.outHiddenAutTokenNum)+int(autScript.outPublicAutTokenNum) == 0 {
 		return fmt.Errorf("autScript.outHiddenAutTokenNum (%d) + autScript.outPublicAutTokenNum (%d) is 0",
 			autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum)
 	}
 
-	if autScript.outHiddenAutTokenNum+autScript.outPublicAutTokenNum > MaxNumToken {
+	if int(autScript.outHiddenAutTokenNum)+int(autScript.outPublicAutTokenNum) > MaxNumToken {
 		return fmt.Errorf("autScript.outHiddenAutTokenNum (%d) + autScript.outPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
 			autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum, MaxNumToken)
 	}
+	if int(autScript.outStartIndex)+int(autScript.outHiddenAutTokenNum)+int(autScript.outPublicAutTokenNum) > math.MaxUint8 {
+		// The Index in (TxHash, Index) is designed to be uint8.
+		return fmt.Errorf("autScript.outStartIndex (%d) + autScript.outHiddenAutTokenNum (%d) + autScript.outPublicAutTokenNum (%d) exceeds %d",
+			autScript.outStartIndex, autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum, math.MaxUint8)
+	}
 
 	// serializedAutTxos    [][]byte
-	if len(autScript.serializedAutTxos) != int(autScript.outHiddenAutTokenNum+autScript.outPublicAutTokenNum) {
+	if len(autScript.serializedAutTxos) != int(autScript.outHiddenAutTokenNum)+int(autScript.outPublicAutTokenNum) {
 		return fmt.Errorf("the number of serializedAutTxos (%d) does equal script.outHiddenAutTokenNum (%d) + script.outPublicAutTokenNum (%d)",
 			len(autScript.serializedAutTxos), autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum)
 	}
@@ -2327,11 +2351,11 @@ func (autScript *TransferScript) WitnessHash() chainhash.Hash {
 }
 
 func (autScript *TransferScript) NumConsumedTokens() int {
-	return int(autScript.inHiddenAutTokenNum + autScript.inPublicAutTokenNum)
+	return int(autScript.inHiddenAutTokenNum) + int(autScript.inPublicAutTokenNum)
 }
 
 func (autScript *TransferScript) NumGeneratedTokens() int {
-	return int(autScript.outHiddenAutTokenNum + autScript.outPublicAutTokenNum)
+	return int(autScript.outHiddenAutTokenNum) + int(autScript.outPublicAutTokenNum)
 }
 
 func (autScript *TransferScript) serializeSize() int {
@@ -2555,14 +2579,20 @@ func (autScript *TransferScript) SanityCheck() error {
 			autScript.inPublicAutTokenNum, MaxNumToken)
 	}
 
-	if autScript.inHiddenAutTokenNum+autScript.inPublicAutTokenNum == 0 {
+	if int(autScript.inHiddenAutTokenNum)+int(autScript.inPublicAutTokenNum) == 0 {
 		return fmt.Errorf("autScript.inHiddenAutTokenNum (%d) + script.inPublicAutTokenNum (%d) is 0",
 			autScript.inHiddenAutTokenNum, autScript.inPublicAutTokenNum)
 	}
 
-	if autScript.inHiddenAutTokenNum+autScript.inPublicAutTokenNum > MaxNumToken {
+	if int(autScript.inHiddenAutTokenNum)+int(autScript.inPublicAutTokenNum) > MaxNumToken {
 		return fmt.Errorf("autScript.inHiddenAutTokenNum (%d) + script.inPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
 			autScript.inHiddenAutTokenNum, autScript.inPublicAutTokenNum, MaxNumToken)
+	}
+
+	if int(autScript.inStartIndex)+int(autScript.inHiddenAutTokenNum)+int(autScript.inPublicAutTokenNum) > math.MaxUint8 {
+		// The number of TxIns is designed to be at most uint8.
+		return fmt.Errorf("autScript.inStartIndex (%d) + autScript.inHiddenAutTokenNum (%d) + script.inPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
+			autScript.inStartIndex, autScript.inHiddenAutTokenNum, autScript.inPublicAutTokenNum, math.MaxUint8)
 	}
 
 	// outStartIndex uint8
@@ -2579,18 +2609,24 @@ func (autScript *TransferScript) SanityCheck() error {
 			autScript.outPublicAutTokenNum, MaxNumToken)
 	}
 
-	if autScript.outHiddenAutTokenNum+autScript.outPublicAutTokenNum == 0 {
+	if int(autScript.outHiddenAutTokenNum)+int(autScript.outPublicAutTokenNum) == 0 {
 		return fmt.Errorf("autScript.outHiddenAutTokenNum (%d) + script.outPublicAutTokenNum (%d) is 0",
 			autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum)
 	}
 
-	if autScript.outHiddenAutTokenNum+autScript.outPublicAutTokenNum > MaxNumToken {
+	if int(autScript.outHiddenAutTokenNum)+int(autScript.outPublicAutTokenNum) > MaxNumToken {
 		return fmt.Errorf("autScript.outHiddenAutTokenNum (%d) + autScript.outPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
 			autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum, MaxNumToken)
 	}
 
+	if int(autScript.outStartIndex)+int(autScript.outHiddenAutTokenNum)+int(autScript.outPublicAutTokenNum) > math.MaxUint8 {
+		// The Index in (TxHash, Index) is designed to be uint8.
+		return fmt.Errorf("autScript.outStartIndex (%d) + autScript.outHiddenAutTokenNum (%d) + autScript.outPublicAutTokenNum (%d) exceeds %d",
+			autScript.outStartIndex, autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum, math.MaxUint8)
+	}
+
 	// serializedAutTxos    [][]byte
-	if len(autScript.serializedAutTxos) != int(autScript.outHiddenAutTokenNum+autScript.outPublicAutTokenNum) {
+	if len(autScript.serializedAutTxos) != int(autScript.outHiddenAutTokenNum)+int(autScript.outPublicAutTokenNum) {
 		return fmt.Errorf("the number of serializedAutTxos (%d) does equal autScript.outHiddenAutTokenNum (%d) + autScript.outPublicAutTokenNum (%d)",
 			len(autScript.serializedAutTxos), autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum)
 	}
@@ -2744,11 +2780,11 @@ func (autScript *BurnScript) WitnessHash() chainhash.Hash {
 }
 
 func (autScript *BurnScript) NumConsumedTokens() int {
-	return int(autScript.inHiddenAutTokenNum + autScript.inPublicAutTokenNum)
+	return int(autScript.inHiddenAutTokenNum) + int(autScript.inPublicAutTokenNum)
 }
 
 func (autScript *BurnScript) NumGeneratedTokens() int {
-	return int(autScript.outHiddenAutTokenNum + autScript.outPublicAutTokenNum)
+	return int(autScript.outHiddenAutTokenNum) + int(autScript.outPublicAutTokenNum)
 }
 
 func (autScript *BurnScript) serializeSize() int {
@@ -2971,14 +3007,20 @@ func (autScript *BurnScript) SanityCheck() error {
 			autScript.inPublicAutTokenNum, MaxNumToken)
 	}
 
-	if autScript.inHiddenAutTokenNum+autScript.inPublicAutTokenNum == 0 {
+	if int(autScript.inHiddenAutTokenNum)+int(autScript.inPublicAutTokenNum) == 0 {
 		return fmt.Errorf("autScript.inHiddenAutTokenNum (%d) + autScript.inPublicAutTokenNum (%d) is 0",
 			autScript.inHiddenAutTokenNum, autScript.inPublicAutTokenNum)
 	}
 
-	if autScript.inHiddenAutTokenNum+autScript.inPublicAutTokenNum > MaxNumToken {
+	if int(autScript.inHiddenAutTokenNum)+int(autScript.inPublicAutTokenNum) > MaxNumToken {
 		return fmt.Errorf("autScript.inHiddenAutTokenNum (%d) + autScript.inPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
 			autScript.inHiddenAutTokenNum, autScript.inPublicAutTokenNum, MaxNumToken)
+	}
+
+	if int(autScript.inStartIndex)+int(autScript.inHiddenAutTokenNum)+int(autScript.inPublicAutTokenNum) > math.MaxUint8 {
+		// The number of TxIns is designed to be at most uint8.
+		return fmt.Errorf("autScript.inStartIndex (%d) + autScript.inHiddenAutTokenNum (%d) + script.inPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
+			autScript.inStartIndex, autScript.inHiddenAutTokenNum, autScript.inPublicAutTokenNum, math.MaxUint8)
 	}
 
 	// outStartIndex uint8
@@ -3000,18 +3042,24 @@ func (autScript *BurnScript) SanityCheck() error {
 	}
 
 	// This check can be removed. Keep here for alignment.
-	if autScript.outHiddenAutTokenNum+autScript.outPublicAutTokenNum == 0 {
+	if int(autScript.outHiddenAutTokenNum)+int(autScript.outPublicAutTokenNum) == 0 {
 		return fmt.Errorf("autScript.outHiddenAutTokenNum (%d) + autScript.outPublicAutTokenNum (%d) is 0",
 			autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum)
 	}
 
-	if autScript.outHiddenAutTokenNum+autScript.outPublicAutTokenNum > MaxNumToken {
+	if int(autScript.outHiddenAutTokenNum)+int(autScript.outPublicAutTokenNum) > MaxNumToken {
 		return fmt.Errorf("autScript.outHiddenAutTokenNum (%d) + autScript.outPublicAutTokenNum (%d) exceeds the allowed max number (%d)",
 			autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum, MaxNumToken)
 	}
 
+	if int(autScript.outStartIndex)+int(autScript.outHiddenAutTokenNum)+int(autScript.outPublicAutTokenNum) > math.MaxUint8 {
+		// The Index in (TxHash, Index) is designed to be uint8.
+		return fmt.Errorf("autScript.outStartIndex (%d) + autScript.outHiddenAutTokenNum (%d) + autScript.outPublicAutTokenNum (%d) exceeds %d",
+			autScript.outStartIndex, autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum, math.MaxUint8)
+	}
+
 	// serializedAutTxos    [][]byte
-	if len(autScript.serializedAutTxos) != int(autScript.outHiddenAutTokenNum+autScript.outPublicAutTokenNum) {
+	if len(autScript.serializedAutTxos) != int(autScript.outHiddenAutTokenNum)+int(autScript.outPublicAutTokenNum) {
 		return fmt.Errorf("the number of serializedAutTxos (%d) does equal autScript.outHiddenAutTokenNum (%d) + autScript.outPublicAutTokenNum (%d)",
 			len(autScript.serializedAutTxos), autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum)
 	}

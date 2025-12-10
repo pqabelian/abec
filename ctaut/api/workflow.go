@@ -42,8 +42,7 @@ func NewRegistrationScript(version uint32,
 func NewReRegistrationScript(version uint32,
 	autIdentifier AutId,
 	autMemo []byte, plannedTotalSupply uint64,
-	issuers []*AutIssuer, reregistrationExpireHeight int32,
-	reregisterThreshold uint8, mintThreshold uint8,
+	issuers []*AutIssuer, reregistrationExpireHeight int32, reregisterThreshold uint8, mintThreshold uint8,
 	privacyType AutPrivacyType,
 	inStartIndex uint8, inAutRootTokenNum uint8,
 	outStartIndex uint8, outAutRootTokenNum uint8,
@@ -81,7 +80,7 @@ func NewMintScript(version uint32,
 func NewTransferScript(version uint32,
 	autIdentifier AutId,
 	inStartIndex uint8, inHiddenAutTokenNum uint8, inPublicAutTokenNum uint8,
-	outStartIndex uint8, outHiddenAutTokenNum uint8, outPlainAutTokenNum uint8,
+	outStartIndex uint8, outHiddenAutTokenNum uint8, outPublicAutTokenNum uint8,
 	serializedAutTxos [][]byte,
 	scriptMemo []byte,
 	witnessHash chainhash.Hash) *TransferScript {
@@ -89,7 +88,7 @@ func NewTransferScript(version uint32,
 	return script.NewTransferScript(version,
 		autIdentifier,
 		inStartIndex, inHiddenAutTokenNum, inPublicAutTokenNum,
-		outStartIndex, outHiddenAutTokenNum, outPlainAutTokenNum,
+		outStartIndex, outHiddenAutTokenNum, outPublicAutTokenNum,
 		serializedAutTxos,
 		scriptMemo,
 		witnessHash)
@@ -98,8 +97,7 @@ func NewTransferScript(version uint32,
 func NewBurnScript(version uint32,
 	autIdentifier AutId,
 	inStartIndex uint8, inHiddenAutTokenNum uint8, inPublicAutTokenNum uint8,
-	outStartIndex uint8, outHiddenAutTokenNum uint8, outPublicAutTokenNum uint8,
-	serializedAutTxos [][]byte,
+	outStartIndex uint8, outHiddenAutTokenNum uint8, outPublicAutTokenNum uint8, serializedAutTxos [][]byte,
 	scriptMemo []byte,
 	witnessHash chainhash.Hash) *BurnScript {
 
@@ -166,7 +164,7 @@ func unpackageAutScript(packagedAutScript []byte) (AutScript, error) {
 		return nil, err
 	}
 	if versionRead > math.MaxUint32 {
-		return nil, fmt.Errorf("readed script version (%d) is too large", versionRead)
+		return nil, fmt.Errorf("read script version (%d) is too large", versionRead)
 	}
 	scriptVersion := uint32(versionRead)
 	if _, ok := ctautwire.AutScriptVersionSet[scriptVersion]; !ok {
@@ -247,65 +245,74 @@ func DetectAndAssembleExtAutScriptFromHostTx(msgTx *wire.MsgTxAbe) (*ExtAutScrip
 		// output
 		outStartIndex := autScriptInst.OutStartIndex()
 		outAutRootTokenNum := autScriptInst.OutAutRootTokenNum()
-		if outStartIndex+outAutRootTokenNum < outStartIndex || outStartIndex+outAutRootTokenNum < outAutRootTokenNum {
-			return nil, fmt.Errorf("outStartIndex (%d) + outAutRootTokenNum (%d) overflows", outStartIndex, outAutRootTokenNum)
-		}
 
-		lastOutIndex := outStartIndex + outAutRootTokenNum - 1
-		if lastOutIndex > uint8(len(msgTx.TxOuts)) {
-			return nil, fmt.Errorf("outStartIndex (%d) + outAutRootTokenNum (%d) exceeds the number of txOuts (%d)",
+		if int(outStartIndex)+int(outAutRootTokenNum) > len(msgTx.TxOuts) {
+			return nil, fmt.Errorf("outStartIndex (%d) + outAutRootTokenNum (%d) exceeds the number of TxOuts (%d)",
 				outStartIndex, outAutRootTokenNum, len(msgTx.TxOuts))
+		}
+		if int(outStartIndex)+int(outAutRootTokenNum) > math.MaxUint8 {
+			// This is redundant, since a valid Tx will have len(msgTx.TxOuts) < 255
+			return nil, fmt.Errorf("outStartIndex (%d) + outAutRootTokenNum (%d) exceeds allowed maximum value %d",
+				outStartIndex, outAutRootTokenNum, math.MaxUint8)
 		}
 		break
 
 	case *ReRegistrationScript:
 		inStartIndex := autScriptInst.InStartIndex()
 		inAutRootTokenNum := autScriptInst.InAutRootTokenNum()
-		if inStartIndex+inAutRootTokenNum < inStartIndex || inStartIndex+inAutRootTokenNum < inAutRootTokenNum {
-			return nil, fmt.Errorf("inStartIndex (%d) + inAutRootTokenNum (%d) overflows", inStartIndex, inAutRootTokenNum)
-		}
-		lastInIndex := inStartIndex + inAutRootTokenNum - 1
-		if lastInIndex > uint8(len(msgTx.TxIns)) {
-			return nil, fmt.Errorf("inStartIndex (%d) + inAutRootTokenNum (%d) exceeds the number of txIns (%d)",
+
+		if int(inStartIndex)+int(inAutRootTokenNum) > len(msgTx.TxIns) {
+			return nil, fmt.Errorf("inStartIndex (%d) + inAutRootTokenNum (%d) exceeds the number of TxIns (%d)",
 				inStartIndex, inAutRootTokenNum, len(msgTx.TxIns))
+		}
+		if int(inStartIndex)+int(inAutRootTokenNum) > math.MaxUint8 {
+			// This is redundant, since a valid Tx will have len(msgTx.TxIns) < 255
+			return nil, fmt.Errorf("inStartIndex (%d) + inAutRootTokenNum (%d) exceeds allowed maximum value %d",
+				inStartIndex, inAutRootTokenNum, math.MaxUint8)
 		}
 
 		outStartIndex := autScriptInst.OutStartIndex()
 		outAutRootTokenNum := autScriptInst.OutAutRootTokenNum()
-		if outStartIndex+outAutRootTokenNum < outStartIndex || outStartIndex+outAutRootTokenNum < outAutRootTokenNum {
-			return nil, fmt.Errorf("outStartIndex (%d) + outAutRootTokenNum (%d) overflows", outStartIndex, outAutRootTokenNum)
-		}
-		lastOutIndex := outStartIndex + outAutRootTokenNum - 1
-		if lastOutIndex > uint8(len(msgTx.TxOuts)) {
-			return nil, fmt.Errorf("outStartIndex (%d) + outAutRootTokenNum (%d) exceeds the number of txOuts (%d)",
+
+		if int(outStartIndex)+int(outAutRootTokenNum) > len(msgTx.TxOuts) {
+			return nil, fmt.Errorf("outStartIndex (%d) + outAutRootTokenNum (%d) exceeds the number of TxOuts (%d)",
 				outStartIndex, outAutRootTokenNum, len(msgTx.TxOuts))
 		}
+		if int(outStartIndex)+int(outAutRootTokenNum) > math.MaxUint8 {
+			// This is redundant, since a valid Tx will have len(msgTx.TxOuts) < 255
+			return nil, fmt.Errorf("outStartIndex (%d) + outAutRootTokenNum (%d) exceeds allowed maximum value",
+				outStartIndex, outAutRootTokenNum)
+		}
+
 		break
 
 	case *MintScript:
 		inStartIndex := autScriptInst.InStartIndex()
 		inAutRootTokenNum := autScriptInst.InAutRootTokenNum()
-		if inStartIndex+inAutRootTokenNum < inStartIndex || inStartIndex+inAutRootTokenNum < inAutRootTokenNum {
-			return nil, fmt.Errorf("inStartIndex (%d) + inAutRootTokenNum (%d) overflows", inStartIndex, inAutRootTokenNum)
-		}
-		lastInIndex := inStartIndex + inAutRootTokenNum - 1
-		if lastInIndex > uint8(len(msgTx.TxIns)) {
-			return nil, fmt.Errorf("inStartIndex (%d) + inAutRootTokenNum (%d) exceeds the number of txIns (%d)",
+
+		if int(inStartIndex)+int(inAutRootTokenNum) > len(msgTx.TxIns) {
+			return nil, fmt.Errorf("inStartIndex (%d) + inAutRootTokenNum (%d) exceeds the number of TxIns (%d)",
 				inStartIndex, inAutRootTokenNum, len(msgTx.TxIns))
+		}
+		if int(inStartIndex)+int(inAutRootTokenNum) > math.MaxUint8 {
+			// This is redundant, since a valid Tx will have len(msgTx.TxIns) < 255
+			return nil, fmt.Errorf("inStartIndex (%d) + inAutRootTokenNum (%d) exceeds allowed maximum value",
+				inStartIndex, inAutRootTokenNum)
 		}
 
 		outStartIndex := autScriptInst.OutStartIndex()
-		outCTAutTokenNum := autScriptInst.OutHiddenAutTokenNum()
-		outPlainAutTokenNum := autScriptInst.OutPublicAutTokenNum()
-		if outStartIndex+outCTAutTokenNum+outPlainAutTokenNum < outStartIndex ||
-			outStartIndex+outCTAutTokenNum+outPlainAutTokenNum < outCTAutTokenNum ||
-			outStartIndex+outCTAutTokenNum+outPlainAutTokenNum < outPlainAutTokenNum {
-			return nil, fmt.Errorf("outStartIndex (%d) + outCTAutTokenNum (%d) + outPlainAutTokenNum (%d) overflows", outStartIndex, outCTAutTokenNum, outPlainAutTokenNum)
+		outHiddenAutTokenNum := autScriptInst.OutHiddenAutTokenNum()
+		outPublicAutTokenNum := autScriptInst.OutPublicAutTokenNum()
+
+		if int(outStartIndex)+int(outHiddenAutTokenNum)+int(outPublicAutTokenNum) > len(msgTx.TxOuts) {
+			// The Index in (TxHash, Index) is designed to be uint8.
+			return nil, fmt.Errorf("outStartIndex (%d) + outHiddenAutTokenNum (%d) + outPublicAutTokenNum (%d) exceeds the number of TxOuts %d",
+				outStartIndex, outHiddenAutTokenNum, outPublicAutTokenNum, len(msgTx.TxOuts))
 		}
-		lastOutIndex := outStartIndex + outCTAutTokenNum + outPlainAutTokenNum - 1
-		if lastOutIndex > uint8(len(msgTx.TxOuts)) {
-			return nil, fmt.Errorf("outStartIndex (%d) + outCTAutTokenNum (%d) + outPlainAutTokenNum (%d) exceeds the number of txOuts (%d)",
-				outStartIndex, outCTAutTokenNum, outPlainAutTokenNum, len(msgTx.TxOuts))
+		if int(outStartIndex)+int(outHiddenAutTokenNum)+int(outPublicAutTokenNum) > math.MaxUint8 {
+			// This is redundant, since a valid Tx will have len(msgTx.TxOuts) < 255
+			return nil, fmt.Errorf("outStartIndex (%d) + outHiddenAutTokenNum (%d) + outPublicAutTokenNum (%d) exceeds allowed maximum value %d",
+				outStartIndex, outHiddenAutTokenNum, outPublicAutTokenNum, math.MaxUint8)
 		}
 
 		if msgTx.HasAutWitness() {
@@ -316,33 +323,35 @@ func DetectAndAssembleExtAutScriptFromHostTx(msgTx *wire.MsgTxAbe) (*ExtAutScrip
 			}
 		}
 		break
+
 	case *TransferScript:
 		inStartIndex := autScriptInst.InStartIndex()
 		inHiddenAutTokenNum := autScriptInst.InHiddenAutTokenNum()
 		inPublicAutTokenNum := autScriptInst.InPublicAutTokenNum()
-		if inStartIndex+inHiddenAutTokenNum+inPublicAutTokenNum < inStartIndex ||
-			inStartIndex+inHiddenAutTokenNum+inPublicAutTokenNum < inHiddenAutTokenNum ||
-			inStartIndex+inHiddenAutTokenNum+inPublicAutTokenNum < inPublicAutTokenNum {
-			return nil, fmt.Errorf("inStartIndex (%d) + inHiddenAutTokenNum (%d) + inPublicAutTokenNum (%d) overflows", inStartIndex, inHiddenAutTokenNum, inPublicAutTokenNum)
-		}
-		lastInIndex := inStartIndex + inHiddenAutTokenNum + inPublicAutTokenNum - 1
-		if lastInIndex > uint8(len(msgTx.TxIns)) {
-			return nil, fmt.Errorf("inStartIndex (%d) + inHiddenAutTokenNum (%d) + inPublicAutTokenNum (%d) exceeds the number of txIns (%d)",
+
+		if int(inStartIndex)+int(inHiddenAutTokenNum)+int(inPublicAutTokenNum) > len(msgTx.TxIns) {
+			return nil, fmt.Errorf("inStartIndex (%d) + inHiddenAutTokenNum (%d) + inPublicAutTokenNum(%d) exceeds the number of TxIns (%d)",
 				inStartIndex, inHiddenAutTokenNum, inPublicAutTokenNum, len(msgTx.TxIns))
+		}
+		if int(inStartIndex)+int(inHiddenAutTokenNum)+int(inPublicAutTokenNum) > math.MaxUint8 {
+			// This is redundant, since a valid Tx will have len(msgTx.TxIns) < 255
+			return nil, fmt.Errorf("inStartIndex (%d) + inHiddenAutTokenNum (%d) + inPublicAutTokenNum(%d) exceeds allowed maximum value %d",
+				inStartIndex, inHiddenAutTokenNum, inPublicAutTokenNum, math.MaxUint8)
 		}
 
 		outStartIndex := autScriptInst.OutStartIndex()
 		outHiddenAutTokenNum := autScriptInst.OutHiddenAutTokenNum()
 		outPublicAutTokenNum := autScriptInst.OutPublicAutTokenNum()
-		if outStartIndex+outHiddenAutTokenNum+outPublicAutTokenNum < outStartIndex ||
-			outStartIndex+outHiddenAutTokenNum+outPublicAutTokenNum < outHiddenAutTokenNum ||
-			outStartIndex+outHiddenAutTokenNum+outPublicAutTokenNum < outPublicAutTokenNum {
-			return nil, fmt.Errorf("outStartIndex (%d) + outHiddenAutTokenNum (%d) + outPublicAutTokenNum (%d) overflows", outStartIndex, outHiddenAutTokenNum, outPublicAutTokenNum)
-		}
-		lastOutIndex := outStartIndex + outHiddenAutTokenNum + outPublicAutTokenNum - 1
-		if lastOutIndex > uint8(len(msgTx.TxOuts)) {
-			return nil, fmt.Errorf("outStartIndex (%d) + outHiddenAutTokenNum (%d) + outPublicAutTokenNum (%d) exceeds the number of txOuts (%d)",
+
+		if int(outStartIndex)+int(outHiddenAutTokenNum)+int(outPublicAutTokenNum) > len(msgTx.TxOuts) {
+			// The Index in (TxHash, Index) is designed to be uint8.
+			return nil, fmt.Errorf("outStartIndex (%d) + outHiddenAutTokenNum (%d) + outPublicAutTokenNum (%d) exceeds the number of TxOuts %d",
 				outStartIndex, outHiddenAutTokenNum, outPublicAutTokenNum, len(msgTx.TxOuts))
+		}
+		if int(outStartIndex)+int(outHiddenAutTokenNum)+int(outPublicAutTokenNum) > math.MaxUint8 {
+			// This is redundant, since a valid Tx will have len(msgTx.TxOuts) < 255
+			return nil, fmt.Errorf("outStartIndex (%d) + outHiddenAutTokenNum (%d) + outPublicAutTokenNum (%d) exceeds allowed maximum value %d",
+				outStartIndex, outHiddenAutTokenNum, outPublicAutTokenNum, math.MaxUint8)
 		}
 
 		if msgTx.HasAutWitness() {
@@ -353,33 +362,35 @@ func DetectAndAssembleExtAutScriptFromHostTx(msgTx *wire.MsgTxAbe) (*ExtAutScrip
 			}
 		}
 		break
+
 	case *BurnScript:
 		inStartIndex := autScriptInst.InStartIndex()
 		inHiddenAutTokenNum := autScriptInst.InHiddenAutTokenNum()
 		inPublicAutTokenNum := autScriptInst.InPublicAutTokenNum()
-		if inStartIndex+inHiddenAutTokenNum+inPublicAutTokenNum < inStartIndex ||
-			inStartIndex+inHiddenAutTokenNum+inPublicAutTokenNum < inHiddenAutTokenNum ||
-			inStartIndex+inHiddenAutTokenNum+inPublicAutTokenNum < inPublicAutTokenNum {
-			return nil, fmt.Errorf("inStartIndex (%d) + inHiddenAutTokenNum (%d) + inPublicAutTokenNum (%d) overflows", inStartIndex, inHiddenAutTokenNum, inPublicAutTokenNum)
-		}
-		lastInIndex := inStartIndex + inHiddenAutTokenNum + inPublicAutTokenNum - 1
-		if lastInIndex > uint8(len(msgTx.TxIns)) {
-			return nil, fmt.Errorf("inStartIndex (%d) + inHiddenAutTokenNum (%d) + inPublicAutTokenNum (%d) exceeds the number of txIns (%d)",
+
+		if int(inStartIndex)+int(inHiddenAutTokenNum)+int(inPublicAutTokenNum) > len(msgTx.TxIns) {
+			return nil, fmt.Errorf("inStartIndex (%d) + inHiddenAutTokenNum (%d) + inPublicAutTokenNum(%d) exceeds the number of TxIns (%d)",
 				inStartIndex, inHiddenAutTokenNum, inPublicAutTokenNum, len(msgTx.TxIns))
+		}
+		if int(inStartIndex)+int(inHiddenAutTokenNum)+int(inPublicAutTokenNum) > math.MaxUint8 {
+			// This is redundant, since a valid Tx will have len(msgTx.TxIns) < 255
+			return nil, fmt.Errorf("inStartIndex (%d) + inHiddenAutTokenNum (%d) + inPublicAutTokenNum(%d) exceeds allowed maximum value %d",
+				inStartIndex, inHiddenAutTokenNum, inPublicAutTokenNum, math.MaxUint8)
 		}
 
 		outStartIndex := autScriptInst.OutStartIndex()
 		outHiddenAutTokenNum := autScriptInst.OutHiddenAutTokenNum()
 		outPublicAutTokenNum := autScriptInst.OutPublicAutTokenNum()
-		if outStartIndex+outHiddenAutTokenNum+outPublicAutTokenNum < outStartIndex ||
-			outStartIndex+outHiddenAutTokenNum+outPublicAutTokenNum < outHiddenAutTokenNum ||
-			outStartIndex+outHiddenAutTokenNum+outPublicAutTokenNum < outPublicAutTokenNum {
-			return nil, fmt.Errorf("outStartIndex (%d) + outHiddenAutTokenNum (%d) + outPublicAutTokenNum (%d) overflows", outStartIndex, outHiddenAutTokenNum, outPublicAutTokenNum)
-		}
-		lastOutIndex := outStartIndex + outHiddenAutTokenNum + outPublicAutTokenNum - 1
-		if lastOutIndex > uint8(len(msgTx.TxOuts)) {
-			return nil, fmt.Errorf("outStartIndex (%d) + outHiddenAutTokenNum (%d) + outPublicAutTokenNum (%d) exceeds the number of txOuts (%d)",
+
+		if int(outStartIndex)+int(outHiddenAutTokenNum)+int(outPublicAutTokenNum) > len(msgTx.TxOuts) {
+			// The Index in (TxHash, Index) is designed to be uint8.
+			return nil, fmt.Errorf("outStartIndex (%d) + outHiddenAutTokenNum (%d) + outPublicAutTokenNum (%d) exceeds the number of TxOuts %d",
 				outStartIndex, outHiddenAutTokenNum, outPublicAutTokenNum, len(msgTx.TxOuts))
+		}
+		if int(outStartIndex)+int(outHiddenAutTokenNum)+int(outPublicAutTokenNum) > math.MaxUint8 {
+			// This is redundant, since a valid Tx will have len(msgTx.TxOuts) < 255
+			return nil, fmt.Errorf("outStartIndex (%d) + outHiddenAutTokenNum (%d) + outPublicAutTokenNum (%d) exceeds allowed maximum value %d",
+				outStartIndex, outHiddenAutTokenNum, outPublicAutTokenNum, math.MaxUint8)
 		}
 
 		if msgTx.HasAutWitness() {
@@ -405,3 +416,5 @@ func DetectAndAssembleExtAutScriptFromHostTx(msgTx *wire.MsgTxAbe) (*ExtAutScrip
 
 	return extAutScript, nil
 }
+
+// end of cods
