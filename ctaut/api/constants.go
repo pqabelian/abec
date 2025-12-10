@@ -24,4 +24,10 @@ const (
 	AutScriptTypeBurn           = script.AutScriptTypeBurn
 )
 
+const (
+	AutPrivacyTypeUnlimited     = script.AutPrivacyTypeUnlimited
+	AutPrivacyTypeLimitedPublic = script.AutPrivacyTypeLimitedPublic
+	AutPrivacyTypeLimitedHidden = script.AutPrivacyTypeLimitedHidden
+)
+
 // end of codes
