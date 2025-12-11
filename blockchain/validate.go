@@ -1806,9 +1806,7 @@ func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *
 
 // checkCTAUTRegistrationTransactionInputs
 // aut review done 2025.12.11 todo: discuss
-// todo: remove tx *abeutil.TxAbe, since ctAutScript *ctautapi.ExtAutScript carries txMsg.
-// todo: remove ctAutScript *ctautapi.ExtAutScript
-// todo: use currentHeight
+// todo: remove ctAutScript *ctautapi.ExtAutScript; confirmed
 func checkCTAUTRegistrationTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abeutil.TxAbe, currentHeight int32,
 	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
 	if ctAutScript.Type() != ctautapi.AutScriptTypeRegistration {
@@ -1841,8 +1839,8 @@ func checkCTAUTRegistrationTransactionInputs(ctAutScript *ctautapi.ExtAutScript,
 }
 
 // checkCTAUTReRegistrationTransactionInputs
-// aut review done 2025.12.11 todo
-// todo: remove ctAutScript *ctautapi.ExtAutScript
+// aut review done 2025.12.11 todo：
+// todo: remove ctAutScript *ctautapi.ExtAutScript; confirmed
 func checkCTAUTReRegistrationTransactionInputs(extAutScript *ctautapi.ExtAutScript, tx *abeutil.TxAbe, currentHeight int32,
 	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
 	if extAutScript.Type() != ctautapi.AutScriptTypeReRegistration {
@@ -1888,6 +1886,185 @@ func checkCTAUTReRegistrationTransactionInputs(extAutScript *ctautapi.ExtAutScri
 
 	inStartIndex := reRegisterScript.InStartIndex()
 	inAutRootTokenNum := reRegisterScript.InAutRootTokenNum()
+
+	hostedTxIns := tx.MsgTx().TxIns
+	txHash := tx.Hash()
+
+	for i := 0; i < int(inAutRootTokenNum); i++ {
+		hostTxInIndex := int(inStartIndex) + i
+		if hostTxInIndex >= len(hostedTxIns) {
+			return fmt.Errorf("inStartIndex (%d) + i (%d < inAutRootTokenNum %d) exceeds the number of TxIns (%d)",
+				inStartIndex, i, inAutRootTokenNum, len(hostedTxIns))
+		}
+
+		hostTxIn := hostedTxIns[hostTxInIndex]
+
+		if hostTxIn == nil {
+			return fmt.Errorf("TxIns[%d] is nil]", i)
+		}
+
+		ringHash := hostTxIn.PreviousOutPointRing.Hash()
+		ringEntry := hostView.LookupEntry(ringHash)
+		if ringEntry == nil {
+			return fmt.Errorf("transaction %s try to re-register at height %d but "+
+				"the consumed UTXO at Ring %s not exist", tx.Hash(), currentHeight, hostTxIn.PreviousOutPointRing.Hash())
+		}
+
+		if ringEntry.outPointRing == nil {
+			return fmt.Errorf("lookuped ringEntry.outPointRing is nil")
+		}
+		ringId := ringEntry.OutPointRing().RingId()
+		if !ringId.IsEqual(&ringHash) {
+			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has ringId (%s)", ringHash.String(), ringId.String())
+		}
+
+		txoRing := ringEntry.TxoRing()
+		if txoRing == nil {
+			return fmt.Errorf("the TxoRing obtained by ringHash (%s) is nil ", ringHash.String())
+		}
+		if txoRing.OutPointRing == nil {
+			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) is nil ", ringHash.String())
+		}
+
+		if len(txoRing.OutPointRing.OutPoints) != 1 {
+			return fmt.Errorf("incorrect input for Aut with wrong ring size %d", len(txoRing.OutPointRing.OutPoints))
+		}
+
+		if len(txoRing.TxOuts) != len(txoRing.OutPointRing.OutPoints) {
+			return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
+				"len(txoRing.TxOuts) = %d and len(txoRing.OutPointRing.OutPoints) = %d ",
+				ringHash.String(), len(txoRing.TxOuts), len(txoRing.OutPointRing.OutPoints))
+		}
+
+		//if len(txoRing.OutPointRing.OutPoints) == 0 {
+		//	return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
+		//		"len(txoRing.OutPointRing.OutPoints) = 0 ",
+		//		ringHash.String())
+		//}
+		//
+		//if len(ringEntry.OutPointRing().OutPoints) == 0 {
+		//	return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
+		//		"len(txoRing.OutPointRing.OutPoints) = 0 ",
+		//		ringHash.String())
+		//}
+
+		//privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txoRing.TxOuts[0])
+		//if err != nil {
+		//	return err
+		//}
+		//
+		//if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+		//	return fmt.Errorf("expect privacy level %d but got %d",
+		//		abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
+		//}
+		//
+		//// fill out with the first item in ring
+		//hostOutPoint := txoRing.OutPointRing.OutPoints[0]
+		//coinAddress, err := rules.RuleCheckOnHostTxo(txoRing.TxOuts[0])
+		//if err != nil {
+		//	return fmt.Errorf("transaction %s try to consume UTXO at Ring %s is not a valid output", txHash,
+		//		hostTxIn.PreviousOutPointRing.Hash())
+		//}
+
+		coinAddress, err := rules.RuleCheckOnHostTxo(txoRing.TxOuts[0])
+		if err != nil {
+			return err
+		}
+		hostOutPoint := txoRing.OutPointRing.OutPoints[0]
+		hostOpStr := hostOutPoint.String()
+
+		if _, existOutpoint := instance.metadata.ActiveRootTokenSet[hostOpStr]; !existOutpoint {
+			return fmt.Errorf("transaction %s try to re-register with unknown root coin <%s:%d>",
+				tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
+		}
+
+		// check whether duplicate though it won't appear with the checking with hosted Abelian transaction
+		if _, ok := willConsumedRootTokenHostOutpoints[hostOpStr]; ok {
+			return fmt.Errorf("transaction %s try to mint with repeated root coin <%s:%d>",
+				tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
+		}
+		willConsumedRootTokenHostOutpoints[hostOpStr] = hostOutPoint
+
+		consumedTokenCoinAddressStr := hex.EncodeToString(coinAddress)
+
+		if _, ok := claimedIssuersByCoinAddress[consumedTokenCoinAddressStr]; !ok {
+			return fmt.Errorf("transaction %s try to mint at height %d with "+
+				"issue token but it do not exist in its registration", tx.Hash(), currentHeight)
+		}
+		if _, ok := consumedTokenIssuersByCoinAddress[consumedTokenCoinAddressStr]; !ok {
+			consumedTokenIssuersByCoinAddress[consumedTokenCoinAddressStr] = struct{}{}
+		} else {
+			// already in, does nothing
+			// repeat consumeTokenIssuers are allowed, just waste some AutRootTokens.
+		}
+	}
+
+	// check the threshold
+	if len(consumedTokenIssuersByCoinAddress) < int(instance.metadata.ReregistrationThreshold) {
+		return fmt.Errorf("transaction %s try to re-register instance but fail to meet the claimed re-registration threshold (%d/%d)",
+			tx.Hash(), len(consumedTokenIssuersByCoinAddress), instance.metadata.ReregistrationThreshold)
+	}
+
+	// check updated AUT info
+	// planned amount
+	if instance.metadata.MintedAmount > reRegisterScript.PlannedTotalSupply() {
+		return fmt.Errorf("transaction %s try to update the planned total amount to %d but "+
+			"the AUT entry has mint %d", tx.Hash(), reRegisterScript.PlannedTotalSupply(),
+			instance.metadata.MintedAmount)
+	}
+
+	// expiry
+	if reRegisterScript.ReregistrationExpireHeight() != ctautapi.InfiniteExpireHeight &&
+		reRegisterScript.ReregistrationExpireHeight() <= currentHeight {
+		return fmt.Errorf("transaction %s try to re-register the "+
+			"instance with expire height %d (current height %d)", tx.Hash(),
+			reRegisterScript.ReregistrationExpireHeight(), currentHeight)
+	}
+
+	return nil
+}
+
+// checkCTAUTMintTransactionInputs
+// aut review done 2025.12.11 todo
+// todo: rename, only check inputs?
+// todo: remove ctAutScript *ctautapi.ExtAutScript
+func checkCTAUTMintTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abeutil.TxAbe, currentHeight int32,
+	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
+	if ctAutScript.Type() != ctautapi.AutScriptTypeMint {
+		return fmt.Errorf("expected mint script, but got %d", ctAutScript.Type())
+	}
+	mintScript, ok := ctAutScript.AutScript.(*ctautapi.MintScript)
+	if !ok {
+		return fmt.Errorf("expected mint script, but got %d", ctAutScript.Type())
+	}
+
+	identifier := ctAutScript.AutIdentifier()
+	identifierKey := identifier.String()
+
+	instance, exist := ctautView.instances[identifierKey]
+	if !exist || instance == nil || instance.metadata == nil {
+		return errors.New("an non-registration AUT transaction try to operate on non-existing AUT entry")
+	}
+
+	claimedIssuersByCoinAddress := map[string]struct{}{}
+	for i := 0; i < len(instance.metadata.Issuers); i++ {
+		if instance.metadata.Issuers[i] == nil {
+			return fmt.Errorf("instance.metadata.Issuers[%d] is nil", i)
+		}
+		if len(instance.metadata.Issuers[i].CoinAddress()) == 0 {
+			return fmt.Errorf("instance.metadata.Issuers[%d]CoinAddress() is nil/empty", i)
+		}
+
+		issuerCoinAddressStr := hex.EncodeToString(instance.metadata.Issuers[i].CoinAddress())
+		claimedIssuersByCoinAddress[issuerCoinAddressStr] = struct{}{}
+	}
+
+	// duplicated input or double spending?
+	consumedTokenIussersByCoinAddress := map[string]struct{}{}
+	willConsumedRootTokenHostOutpoints := map[string]*ctautapi.HostOutPoint{}
+
+	inStartIndex := mintScript.InStartIndex()
+	inAutRootTokenNum := mintScript.InAutRootTokenNum()
 
 	hostedTxIns := tx.MsgTx().TxIns
 	txHash := tx.Hash()
@@ -1971,154 +2148,6 @@ func checkCTAUTReRegistrationTransactionInputs(extAutScript *ctautapi.ExtAutScri
 		if _, ok := claimedIssuersByCoinAddress[consumedTokenCoinAddressStr]; !ok {
 			return fmt.Errorf("transaction %s try to mint at height %d with "+
 				"issue token but it do not exist in its registration", tx.Hash(), currentHeight)
-		}
-		if _, ok := consumedTokenIssuersByCoinAddress[consumedTokenCoinAddressStr]; !ok {
-			consumedTokenIssuersByCoinAddress[consumedTokenCoinAddressStr] = struct{}{}
-		} else {
-			// already in, does nothing
-			// repeat consumeTokenIssuers are allowed, just waste some AutRootTokens.
-		}
-	}
-
-	// check the threshold
-	if len(consumedTokenIssuersByCoinAddress) < int(instance.metadata.ReregistrationThreshold) {
-		return fmt.Errorf("transaction %s try to re-register instance but fail to meet the claimed re-registration threshold (%d/%d)",
-			tx.Hash(), len(consumedTokenIssuersByCoinAddress), instance.metadata.ReregistrationThreshold)
-	}
-
-	// check updated AUT info
-	// planned amount
-	if instance.metadata.MintedAmount > reRegisterScript.PlannedTotalSupply() {
-		return fmt.Errorf("transaction %s try to update the planned total amount to %d but "+
-			"the AUT entry has mint %d", tx.Hash(), reRegisterScript.PlannedTotalSupply(),
-			instance.metadata.MintedAmount)
-	}
-
-	// expiry
-	if reRegisterScript.ReregistrationExpireHeight() != ctautapi.InfiniteExpireHeight &&
-		reRegisterScript.ReregistrationExpireHeight() <= currentHeight {
-		return fmt.Errorf("transaction %s try to re-register the "+
-			"instance with expire height %d (current height %d)", tx.Hash(),
-			reRegisterScript.ReregistrationExpireHeight(), currentHeight)
-	}
-
-	return nil
-}
-
-// todo: remove ctAutScript *ctautapi.ExtAutScript
-func checkCTAUTMintTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abeutil.TxAbe, txHeight int32,
-	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
-	if ctAutScript.Type() != ctautapi.AutScriptTypeMint {
-		return fmt.Errorf("expected mint script, but got %d", ctAutScript.Type())
-	}
-	mintScript, ok := ctAutScript.AutScript.(*ctautapi.MintScript)
-	if !ok {
-		return fmt.Errorf("expected mint script, but got %d", ctAutScript.Type())
-	}
-
-	identifier := ctAutScript.AutIdentifier()
-	identifierKey := identifier.String()
-
-	instance, exist := ctautView.instances[identifierKey]
-	if !exist || instance == nil || instance.metadata == nil {
-		return errors.New("an non-registration AUT transaction try to operate on non-existing AUT entry")
-	}
-
-	claimedIssuersByCoinAddress := map[string]struct{}{}
-	for i := 0; i < len(instance.metadata.Issuers); i++ {
-		issuerCoinAddressStr := hex.EncodeToString(instance.metadata.Issuers[i].CoinAddress())
-		claimedIssuersByCoinAddress[issuerCoinAddressStr] = struct{}{}
-	}
-
-	// duplicated input or double spending?
-	consumedTokenIussersByCoinAddress := map[string]struct{}{}
-	willConsumedRootTokenHostOutpoints := map[string]*ctautapi.HostOutPoint{}
-
-	inStartIndex := mintScript.InStartIndex()
-	inAutRootTokenNum := mintScript.InAutRootTokenNum()
-
-	hostedTxIns := tx.MsgTx().TxIns
-	txHash := tx.Hash()
-
-	for i := 0; i < int(inAutRootTokenNum); i++ {
-		hostIndex := int(inStartIndex) + i
-		hostTxIn := hostedTxIns[hostIndex]
-
-		if len(hostTxIn.PreviousOutPointRing.OutPoints) != 1 {
-			return fmt.Errorf("incorrect input for Aut with wrong ring size %d", len(hostTxIn.PreviousOutPointRing.OutPoints))
-		}
-		ringHash := hostTxIn.PreviousOutPointRing.Hash()
-		ringEntry := hostView.LookupEntry(ringHash)
-		if ringEntry == nil {
-			return fmt.Errorf("transaction %s try to re-register at height %d but "+
-				"the consumed UTXO at Ring %s not exist", tx.Hash(), txHeight, hostTxIn.PreviousOutPointRing.Hash())
-		}
-		ringId := ringEntry.OutPointRing().RingId()
-		if !ringId.IsEqual(&ringHash) {
-			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has ringId (%s)", ringHash.String(), ringId.String())
-		}
-
-		txoRing := ringEntry.TxoRing()
-		if txoRing == nil {
-			return fmt.Errorf("the TxoRing obtained by ringHash (%s) is nil ", ringHash.String())
-		}
-		if txoRing.OutPointRing == nil {
-			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) is nil ", ringHash.String())
-		}
-
-		if len(txoRing.OutPointRing.OutPoints) != len(txoRing.TxOuts) {
-			return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-				"len(txoRing.OutPointRing.OutPoints) = %d || len(txoRing.TxOuts) = %d ",
-				ringHash.String(), len(txoRing.OutPointRing.OutPoints), len(txoRing.TxOuts))
-		}
-
-		if len(txoRing.OutPointRing.OutPoints) == 0 {
-			return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-				"len(txoRing.OutPointRing.OutPoints) = 0 ",
-				ringHash.String())
-		}
-
-		if len(ringEntry.OutPointRing().OutPoints) == 0 {
-			return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-				"len(txoRing.OutPointRing.OutPoints) = 0 ",
-				ringHash.String())
-		}
-
-		privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txoRing.TxOuts[0])
-		if err != nil {
-			return err
-		}
-
-		if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
-			return fmt.Errorf("expect privacy level %d but got %d",
-				abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
-		}
-
-		// fill out with the first item in ring
-		hostOutPoint := txoRing.OutPointRing.OutPoints[0]
-		coinAddress, err := rules.RuleCheckOnHostTxo(txoRing.TxOuts[0])
-		if err != nil {
-			return fmt.Errorf("transaction %s try to consume UTXO at Ring %s is not a valid output", txHash,
-				hostTxIn.PreviousOutPointRing.Hash())
-		}
-
-		if _, existOutpoint := instance.metadata.ActiveRootTokenSet[hostOutPoint.String()]; !existOutpoint {
-			return fmt.Errorf("transaction %s try to re-register with unknown root coin <%s:%d>",
-				tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
-		}
-
-		// check whether duplicate though it won't appear with the checking with hosted Abelian transaction
-		if _, ok := willConsumedRootTokenHostOutpoints[hostOutPoint.String()]; ok {
-			return fmt.Errorf("transaction %s try to mint with repeated root coin <%s:%d>",
-				tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
-		}
-		willConsumedRootTokenHostOutpoints[hostOutPoint.String()] = hostOutPoint
-
-		consumedTokenCoinAddressStr := hex.EncodeToString(coinAddress)
-
-		if _, ok := claimedIssuersByCoinAddress[consumedTokenCoinAddressStr]; !ok {
-			return fmt.Errorf("transaction %s try to mint at height %d with "+
-				"issue token but it do not exist in its registration", tx.Hash(), txHeight)
 		}
 		if _, ok := consumedTokenIussersByCoinAddress[consumedTokenCoinAddressStr]; !ok {
 			consumedTokenIussersByCoinAddress[consumedTokenCoinAddressStr] = struct{}{}
@@ -2782,7 +2811,7 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abe
 // ValidateTxCTAUTScript
 // aut review done, 2025.12.11 todo
 func ValidateTxCTAUTScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint,
-	txHeight int32, chainParams *chaincfg.Params) error {
+	currentHeight int32, chainParams *chaincfg.Params) error {
 	if tx == nil {
 		return fmt.Errorf("ValidateCTAUTScript: a nil transaction")
 	}
@@ -2796,19 +2825,19 @@ func ValidateTxCTAUTScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostVie
 
 	switch extAutScript.AutScript.(type) {
 	case *ctautapi.RegistrationScript:
-		err = checkCTAUTRegistrationTransactionInputs(extAutScript, tx, txHeight, ctautView, hostView, chainParams)
+		err = checkCTAUTRegistrationTransactionInputs(extAutScript, tx, currentHeight, ctautView, hostView, chainParams)
 		if err != nil {
 			return err
 		}
 
 	case *ctautapi.ReRegistrationScript:
-		err = checkCTAUTReRegistrationTransactionInputs(extAutScript, tx, txHeight, ctautView, hostView, chainParams)
+		err = checkCTAUTReRegistrationTransactionInputs(extAutScript, tx, currentHeight, ctautView, hostView, chainParams)
 		if err != nil {
 			return err
 		}
 
 	case *ctautapi.MintScript:
-		err = checkCTAUTMintTransactionInputs(extAutScript, tx, txHeight, ctautView, hostView, chainParams)
+		err = checkCTAUTMintTransactionInputs(extAutScript, tx, currentHeight, ctautView, hostView, chainParams)
 		if err != nil {
 			return err
 		}
@@ -2832,7 +2861,7 @@ func ValidateTxCTAUTScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostVie
 		}
 
 	case *ctautapi.TransferScript:
-		err = checkCTAUTTransferTransactionInputs(extAutScript, tx, txHeight, ctautView, hostView, chainParams)
+		err = checkCTAUTTransferTransactionInputs(extAutScript, tx, currentHeight, ctautView, hostView, chainParams)
 		if err != nil {
 			return err
 		}
@@ -2857,7 +2886,7 @@ func ValidateTxCTAUTScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostVie
 
 	case *ctautapi.BurnScript:
 		// This branch is exactly the same checking as the previous one, except for all the differences in handling outputs
-		err = checkCTAUTBurnTransactionInputs(extAutScript, tx, txHeight, ctautView, hostView, chainParams)
+		err = checkCTAUTBurnTransactionInputs(extAutScript, tx, currentHeight, ctautView, hostView, chainParams)
 		if err != nil {
 			return err
 		}
