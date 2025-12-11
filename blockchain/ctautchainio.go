@@ -462,16 +462,15 @@ func serializeUnspentAutCoin(coin *CTAUTCoin) ([]byte, error) {
 		return nil, nil
 	}
 
-	size := 8 + // height
+	size := 4 + // height
 		4 + // version
 		len(coin.identifier) +
 		wire.VarIntSerializeSize(uint64(len(coin.script))) + len(coin.script)
 
 	buff := bytes.NewBuffer(make([]byte, 0, size))
 
-	headerCode := uint64(coin.blockHeight)
-	tmp := make([]byte, 8)
-	binary.LittleEndian.PutUint64(tmp, headerCode)
+	tmp := make([]byte, 4)
+	binary.LittleEndian.PutUint32(tmp, uint32(coin.blockHeight))
 	_, err := buff.Write(tmp)
 	if err != nil {
 		return nil, err
@@ -511,16 +510,16 @@ func deserializeUnspentAutCoin(serialized []byte) (*CTAUTCoin, error) {
 
 	reader := bytes.NewReader(serialized)
 
-	tmp := make([]byte, 8)
+	tmp := make([]byte, 4)
 	_, err := io.ReadFull(reader, tmp)
 	if err != nil {
 		return nil, err
 	}
-	headerCode := binary.LittleEndian.Uint64(tmp)
-	if int64(headerCode) > math.MaxInt32 {
-		return nil, AssertError(fmt.Sprintf("invalid header code %v", headerCode))
+	heightRead := binary.LittleEndian.Uint32(tmp)
+	if int64(heightRead) > math.MaxInt32 {
+		return nil, AssertError(fmt.Sprintf("read height (%d) is invalid", heightRead))
 	}
-	blockHeight := int32(headerCode)
+	blockHeight := int32(heightRead)
 
 	tmp = make([]byte, 4)
 	_, err = io.ReadFull(reader, tmp)
@@ -529,7 +528,7 @@ func deserializeUnspentAutCoin(serialized []byte) (*CTAUTCoin, error) {
 	}
 	version := binary.LittleEndian.Uint32(tmp)
 	if version > math.MaxUint32 {
-		return nil, AssertError(fmt.Sprintf("invalid version %v", version))
+		return nil, AssertError(fmt.Sprintf("read version %d is invalid", version))
 	}
 
 	var identifier ctautapi.AutId
