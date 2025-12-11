@@ -16,7 +16,7 @@ const (
 	//MaxAllowedTxMemoSize uint32 = 65536 // 2^16, 64K bytes
 	MaxAllowedTxMemoSize uint32 = 128 * 1024 // 2^17, 128K bytes
 	// MaxAllowedSerialNumberSize must have the same value as that in package abecryptoparam (for pqringct).
-	MaxAllowedSerialNumberSize uint32 = 64       // 512 bits = 64 bytes
-	MaxAllowedTxWitnessSize    uint32 = 16777216 // 2^24, 16M bytes
-	MaxAllowedAutWitnessSize   uint32 = 16777216 // 2^24, 16M bytes
+	MaxAllowedSerialNumberSize uint32 = 64               // 512 bits = 64 bytes
+	MaxAllowedTxWitnessSize    uint32 = 16 * 1024 * 1024 // 2^24, 16M bytes
+	MaxAllowedAutWitnessSize   uint32 = 16 * 1024 * 1024 // 2^24, 16M bytes
 )
