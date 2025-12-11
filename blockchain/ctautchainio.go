@@ -5,9 +5,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
-
 	ctautapi "github.com/abesuite/abec/ctaut/api"
+	"io"
+	"math"
 
 	//"reflect"
 	"sync"
@@ -51,6 +51,8 @@ var ctautOutpointKeyPool = sync.Pool{
 	},
 }
 
+// ctautOutpointKey
+// review done 2025.12.11
 func ctautOutpointKey(outpoint ctautapi.HostOutPoint) *[]byte {
 	// A VLQ employs an MSB encoding, so they are useful not only to reduce
 	// the amount of storage space, but also so iteration of utxos when
@@ -452,13 +454,16 @@ func dbRemoveSpendJournalEntryCTAUT(dbTx database.Tx, blockHash *chainhash.Hash)
 	return spendJournalBucket.Delete(blockHash[:])
 }
 
-func serializeCTAUTCoin(coin *CTAUTCoin) ([]byte, error) {
+// deserializeCTAUTCoin
+// review done 2025.12.11 todo
+func serializeUnspentAutCoin(coin *CTAUTCoin) ([]byte, error) {
 	// Spent outputs have no serialization.
 	if coin.IsSpent() {
 		return nil, nil
 	}
 
-	size := /* header code : [reserved] [height]*/ 8 +
+	size := 8 + // height
+		4 + // version
 		len(coin.identifier) +
 		wire.VarIntSerializeSize(uint64(len(coin.script))) + len(coin.script)
 
@@ -488,7 +493,7 @@ func serializeCTAUTCoin(coin *CTAUTCoin) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	serializedCTAUTCoin := buff.Bytes()
+	serializedUnspentAutCoin := buff.Bytes()
 
 	//deserializedCoin, err := deserializeCTAUTCoin(serializedCTAUTCoin)
 	//if err != nil {
@@ -497,24 +502,35 @@ func serializeCTAUTCoin(coin *CTAUTCoin) ([]byte, error) {
 	//if !reflect.DeepEqual(coin, deserializedCoin) {
 	//	return nil, fmt.Errorf("unmatched CTAUTCoin serialized/deserialized")
 	//}
-	return serializedCTAUTCoin, nil
+	return serializedUnspentAutCoin, nil
 }
-func deserializeCTAUTCoin(serialized []byte) (*CTAUTCoin, error) {
-	if len(serialized) < 8 {
-		return nil, errDeserialize("unexpected end of data after header")
+
+// deserializeCTAUTCoin
+// review done 2025.12.11 todo
+func deserializeUnspentAutCoin(serialized []byte) (*CTAUTCoin, error) {
+
+	reader := bytes.NewReader(serialized)
+
+	tmp := make([]byte, 8)
+	_, err := io.ReadFull(reader, tmp)
+	if err != nil {
+		return nil, err
 	}
-	// Deserialize the header code.
-	headerCode := binary.LittleEndian.Uint64(serialized)
+	headerCode := binary.LittleEndian.Uint64(tmp)
+	if int64(headerCode) > math.MaxInt32 {
+		return nil, AssertError(fmt.Sprintf("invalid header code %v", headerCode))
+	}
 	blockHeight := int32(headerCode)
 
-	reader := bytes.NewReader(serialized[8:])
-
-	tmp := make([]byte, 4)
-	_, err := io.ReadFull(reader, tmp[:])
+	tmp = make([]byte, 4)
+	_, err = io.ReadFull(reader, tmp)
 	if err != nil {
 		return nil, err
 	}
 	version := binary.LittleEndian.Uint32(tmp)
+	if version > math.MaxUint32 {
+		return nil, AssertError(fmt.Sprintf("invalid version %v", version))
+	}
 
 	var identifier ctautapi.AutId
 	_, err = io.ReadFull(reader, identifier[:])
@@ -530,6 +546,8 @@ func deserializeCTAUTCoin(serialized []byte) (*CTAUTCoin, error) {
 	return NewCTAUTCoin(version, identifier, script, blockHeight), nil
 }
 
+// dbFetchCTAUTCoin
+// review done 2025.12.11 todo
 func dbFetchCTAUTCoin(dbTx database.Tx, outpoint ctautapi.HostOutPoint) (*CTAUTCoin, error) {
 	// Fetch the unspent transaction output information for the passed
 	// transaction output.  Return now when there is no entry.
@@ -552,7 +570,7 @@ func dbFetchCTAUTCoin(dbTx database.Tx, outpoint ctautapi.HostOutPoint) (*CTAUTC
 	}
 
 	// Deserialize the utxo entry and return it.
-	coin, err := deserializeCTAUTCoin(serializedCoin)
+	coin, err := deserializeUnspentAutCoin(serializedCoin)
 	if err != nil {
 		// Ensure any deserialization errors are returned as database
 		// corruption errors.
@@ -570,6 +588,8 @@ func dbFetchCTAUTCoin(dbTx database.Tx, outpoint ctautapi.HostOutPoint) (*CTAUTC
 	return coin, nil
 }
 
+// dbFetchCTAUTMetadata
+// review done 2025.12.11
 func dbFetchCTAUTMetadata(dbTx database.Tx, key ctautapi.AutId) (*ctautapi.AutMetadata, error) {
 	// Fetch the unspent transaction output information for the passed
 	// transaction output.  Return now when there is no entry.
@@ -660,7 +680,7 @@ func dbPutCTAUTView(dbTx database.Tx, view *CTAUTViewpoint, blockHeight int32, b
 			}
 
 			// Serialize and store the coin.
-			serializedCoin, err := serializeCTAUTCoin(coin)
+			serializedCoin, err := serializeUnspentAutCoin(coin)
 			if err != nil {
 				return err
 			}
