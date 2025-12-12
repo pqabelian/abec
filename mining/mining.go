@@ -822,7 +822,7 @@ mempoolLoop:
 			continue
 		}
 
-		err = blockchain.ValidateTxCTAUTScript(
+		err = blockchain.ValidateTxAutScript(
 			tx,
 			ctAutView,
 			utxoRings,
@@ -982,7 +982,7 @@ mempoolLoop:
 		}
 
 		// TODO confirm blockCTAUTView is used correctly?
-		err = blockchain.ValidateTxCTAUTScript(tx,
+		err = blockchain.ValidateTxAutScript(tx,
 			blockCTAUTView,
 			blockUtxoRings,
 			nextBlockHeight,

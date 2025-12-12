@@ -1358,6 +1358,8 @@ func (mp *TxPool) fetchInputUtxoRingsAbe(tx *abeutil.TxAbe) (*blockchain.UtxoRin
 	return utxoRingView, nil
 }
 
+// fetchInputCTAUT
+// aut review done, 2025.12.11
 func (mp *TxPool) fetchInputCTAUT(tx *abeutil.TxAbe) (*blockchain.CTAUTViewpoint, error) {
 	extAutScript := tx.ExtAutScript()
 	if extAutScript == nil {
@@ -1893,8 +1895,8 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 		return nil, nil, err
 	}
 
-	// load all token andd me
-	err = blockchain.ValidateTxCTAUTScript(tx, ctAutView, utxoRingView, nextBlockHeight, mp.cfg.ChainParams)
+	// load all token and me
+	err = blockchain.ValidateTxAutScript(tx, ctAutView, utxoRingView, nextBlockHeight, mp.cfg.ChainParams)
 	if err != nil {
 		return nil, nil, txRuleError(wire.RejectCTAutBadForm, err.Error())
 	}

@@ -2565,118 +2565,9 @@ func getAutHostFromTxoRing(txoRing *wire.TxoRing, ringHash wire.RingId) (*wire.T
 	return txo, hostPoint, nil
 }
 
-// todo: tx could be removed, or script *ctautapi.ExtAutScript, since abeutil.TxAbe carries ExtAutScript
-// todo: remove script *ctautapi.ExtAutScript
-//func ValidateCTAUTScript(script *ctautapi.ExtAutScript, tx *abeutil.TxAbe, txHeight int32,
-//	ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
-//	if tx == nil {
-//		return fmt.Errorf("ValidateCTAUTScript: a nil transaction")
-//	}
-//	if script == nil {
-//		return fmt.Errorf("ValidateCTAUTScript: a nil ctaut transaction")
-//	}
-//
-//	//check whether the version of host transaction match the rule for script
-//	autScriptVersion := script.Version()
-//	//txVersion, err := ctautapi.GetTxVersionFromAutScriptVersion(autScriptVersion)
-//	//if err != nil {
-//	//	return fmt.Errorf("ValidateCTAUTScript: fail to get tx version from aut script version %d: %s",
-//	//		autScriptVersion, err)
-//	//}
-//	//if txVersion != tx.MsgTx().Version {
-//	//	return fmt.Errorf("ValidateCTAUTScript: the version (%d) of aut script failed to match the version (%d) of host transcation",
-//	//		autScriptVersion, tx.MsgTx().Version)
-//	//}
-//
-//	var err error
-//	switch script.AutScript.(type) {
-//	case *ctautapi.RegistrationScript:
-//		err = checkCTAUTRegistrationTransactionInputs(script, tx, txHeight, ctautView, hostView,chainParams)
-//		if err != nil {
-//			return err
-//		}
-//
-//	case *ctautapi.ReRegistrationScript:
-//		err = checkCTAUTReRegistrationTransactionInputs(script, tx, txHeight, ctautView, hostView,chainParams)
-//		if err != nil {
-//			return err
-//		}
-//
-//	case *ctautapi.MintScript:
-//		err = checkCTAUTMintTransactionInputs(script, tx, txHeight, ctautView, hostView,chainParams)
-//		if err != nil {
-//			return err
-//		}
-//
-//	case *ctautapi.TransferScript:
-//		// populate consumed tokens
-//		presetConsumedTokens, err := script.ConsumedTokens()
-//		if err != nil {
-//			return err
-//		}
-//		identifier := script.AutIdentifier()
-//		for i := 0; i < len(presetConsumedTokens); i++ {
-//			outpoint := presetConsumedTokens[i].HostOutPoint
-//			coin := ctautView.LookupCTAUTCoin(identifier, outpoint)
-//			if coin == nil {
-//				return fmt.Errorf("no such CTAUT coin found")
-//			}
-//
-//			err = abecryptox.AutRuleCheckOnTxInputVersion(coin.version, autScriptVersion)
-//			if err != nil {
-//				return fmt.Errorf("script with version %d failed to consume the token with version %d",
-//					autScriptVersion, coin.version)
-//			}
-//
-//			presetConsumedTokens[i].Version = coin.version
-//			presetConsumedTokens[i].ValueScript = coin.Script()
-//		}
-//
-//		err = checkCTAUTTransferTransactionInputs(script, tx, txHeight, ctautView, hostView,chainParams)
-//		if err != nil {
-//			return err
-//		}
-//
-//	case *ctautapi.BurnScript:
-//		// populate consumed tokens
-//		presetConsumedTokens, err := script.ConsumedTokens()
-//		if err != nil {
-//			return err
-//		}
-//		identifier := script.AutIdentifier()
-//		for i := 0; i < len(presetConsumedTokens); i++ {
-//			outpoint := presetConsumedTokens[i].HostOutPoint
-//			coin := ctautView.LookupCTAUTCoin(identifier, outpoint)
-//			if coin == nil {
-//				return fmt.Errorf("no such CTAUT coin found")
-//			}
-//
-//			err = abecryptox.AutRuleCheckOnTxInputVersion(coin.version, autScriptVersion)
-//			if err != nil {
-//				return fmt.Errorf("script with version %d failed to consume the token with version %d",
-//					autScriptVersion, coin.version)
-//			}
-//
-//			presetConsumedTokens[i].Version = coin.version
-//			presetConsumedTokens[i].ValueScript = coin.Script()
-//		}
-//
-//		// This branch is exactly the same checking as the previous one, except for all the differences in handling outputs
-//		err = checkCTAUTBurnTransactionInputs(script, tx, txHeight, ctautView, hostView,chainParams)
-//		if err != nil {
-//			return err
-//		}
-//
-//	default:
-//		return errors.New("unsupported AUT transaction type")
-//	}
-//
-//	return nil
-//}
-
-// ValidateTxCTAUTScript
+// ValidateTxAutScript
 // aut review done, 2025.12.11 todo
-func ValidateTxCTAUTScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint,
+func ValidateTxAutScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint,
 	currentHeight int32, chainParams *chaincfg.Params) error {
 	if tx == nil {
 		return fmt.Errorf("ValidateCTAUTScript: a nil transaction")
@@ -2896,7 +2787,7 @@ func (b *BlockChain) checkConnectBlockAbe(
 			return err
 		}
 
-		err = ValidateTxCTAUTScript(tx, ctautView, view, node.height, b.chainParams)
+		err = ValidateTxAutScript(tx, ctautView, view, node.height, b.chainParams)
 		if err != nil {
 			return err
 		}
