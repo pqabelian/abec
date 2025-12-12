@@ -46,15 +46,20 @@ const (
 // the block that contains the tx, whether or not it is spent, its public key
 // script, and how much it pays.
 // todo: AutEntry?
+// review done 2015.12.11
 type CTAUTInstance struct {
 	metadata *ctautapi.AutMetadata
 	coins    map[ctautapi.HostOutPoint]*CTAUTCoin
 }
 
+// NewCTAUTInstance
+// review done 2015.12.11
 func NewCTAUTInstance(metadata *ctautapi.AutMetadata, coins map[ctautapi.HostOutPoint]*CTAUTCoin) *CTAUTInstance {
 	return &CTAUTInstance{metadata: metadata, coins: coins}
 }
 
+// Add
+// review done 2015.12.11
 // todo: AddCion
 func (instance *CTAUTInstance) Add(outpiont ctautapi.HostOutPoint, coin *CTAUTCoin) {
 	if instance.coins == nil {
@@ -63,13 +68,20 @@ func (instance *CTAUTInstance) Add(outpiont ctautapi.HostOutPoint, coin *CTAUTCo
 	instance.coins[outpiont] = coin
 }
 
+// Metadata
+// review done 2015.12.11
 func (instance *CTAUTInstance) Metadata() *ctautapi.AutMetadata {
 	return instance.metadata
 }
+
+// AUTCoins
+// review done 2015.12.11
 func (instance *CTAUTInstance) AUTCoins() map[ctautapi.HostOutPoint]*CTAUTCoin {
 	return instance.coins
 }
 
+// SpendCoin
+// review done 2015.12.11
 func (instance *CTAUTInstance) SpendCoin(point ctautapi.HostOutPoint) (*CTAUTCoin, error) {
 	token, exist := instance.coins[point]
 	if !exist || token == nil {
@@ -84,6 +96,8 @@ func (instance *CTAUTInstance) SpendCoin(point ctautapi.HostOutPoint) (*CTAUTCoi
 	return token, nil
 }
 
+// CTAUTCoin
+// review done 2025.12.11
 type CTAUTCoin struct {
 	identifier ctautapi.AutId
 	// NOTE: Additions, deletions, or modifications to the order of the
@@ -92,8 +106,8 @@ type CTAUTCoin struct {
 	// specifically crafted to result in minimal padding.  There will be a
 	// lot of these in memory, so a few extra bytes of padding adds up.
 	version     uint32 // TODO
-	script      []byte
-	blockHeight int32 // Height of block containing tx.
+	script      []byte // todo: what is this? // rename to serializedAutTxo , valueScript?
+	blockHeight int32  // Height of block containing tx.
 
 	// packedFlags contains additional info about output such as whether it
 	// is a coinbase, whether it is spent, and whether it has been modified
@@ -102,33 +116,41 @@ type CTAUTCoin struct {
 	packedFlags ctAutFlags
 }
 
+// Version
+// review done 2025.12.11
 func (coin *CTAUTCoin) Version() uint32 {
 	return coin.version
 }
 
+// Script
+// review done 2025.12.11
 func (coin *CTAUTCoin) Script() []byte {
 	return coin.script
 }
 
 // isModified returns whether or not the output has been modified since it was
 // loaded.
+// review done 2025.12.11
 func (coin *CTAUTCoin) isModified() bool {
 	return coin.packedFlags&cafModified == cafModified
 }
 
 // IsSpent returns whether or not the output has been spent based upon the
 // current state of the unspent transaction output view it was obtained from.
+// review done 2025.12.11
 func (coin *CTAUTCoin) IsSpent() bool {
 	return coin.packedFlags&cafSpent == cafSpent
 }
 
 // BlockHeight returns the height of the block containing the output.
+// review done 2025.12.11
 func (coin *CTAUTCoin) BlockHeight() int32 {
 	return coin.blockHeight
 }
 
 // Spend marks the output as spent.  Spending an output that is already spent
 // has no effect.
+// todo: review
 func (coin *CTAUTCoin) Spend() {
 	// Nothing to do if the output is already spent.
 	if coin.IsSpent() {
@@ -140,6 +162,7 @@ func (coin *CTAUTCoin) Spend() {
 }
 
 // Clone returns a shallow copy of the utxo entry.
+// review done 2025.12.11
 func (coin *CTAUTCoin) Clone() *CTAUTCoin {
 	if coin == nil {
 		return nil
@@ -158,6 +181,7 @@ func (coin *CTAUTCoin) Clone() *CTAUTCoin {
 // todo: function name
 
 // NewCTAUTCoin returns a new CTAUTCoin built from the arguments.
+// todo: review
 func NewCTAUTCoin(version uint32, identifier ctautapi.AutId, script []byte, blockHeight int32) *CTAUTCoin {
 
 	return &CTAUTCoin{
@@ -169,7 +193,7 @@ func NewCTAUTCoin(version uint32, identifier ctautapi.AutId, script []byte, bloc
 	}
 }
 
-// AUTViewpoint represents a view into the set of unspent transaction outputs
+// CTAUTViewpoint represents a view into the set of unspent transaction outputs
 // from a specific point of view in the chain.  For example, it could be for
 // the end of the main chain, some point in the history of the main chain, or
 // down a side chain.
@@ -178,6 +202,8 @@ func NewCTAUTCoin(version uint32, identifier ctautapi.AutId, script []byte, bloc
 // script validation and double spend prevention.
 //
 //	todo: using AutIdentifier as key to store AutEntries.
+//
+// review done 2025.12.11
 type CTAUTViewpoint struct {
 	instances map[string]*CTAUTInstance
 	bestHash  chainhash.Hash
@@ -185,29 +211,36 @@ type CTAUTViewpoint struct {
 
 // BestHash returns the hash of the best block in the chain the view currently
 // respresents.
+// review done 2025.12.11
 func (view *CTAUTViewpoint) BestHash() *chainhash.Hash {
 	return &view.bestHash
 }
 
 // SetBestHash sets the hash of the best block in the chain the view currently
 // respresents.
+// review done 2025.12.11
 func (view *CTAUTViewpoint) SetBestHash(hash *chainhash.Hash) {
 	view.bestHash = *hash
 }
 
+// Instances
+// review done 2025.12.11
 func (view *CTAUTViewpoint) Instances() map[string]*CTAUTInstance {
 	return view.instances
 }
 
+// SetInstances
+// review done 2025.12.11
 func (view *CTAUTViewpoint) SetInstances(instances map[string]*CTAUTInstance) {
 	view.instances = instances
 }
 
-// LookupAutCoin returns information about a given transaction output according to
+// LookupCTAUTCoin returns information about a given transaction output according to
 // the current state of the view.  It will return nil if the passed output does
 // not exist in the view or is otherwise not available such as when it has been
 // disconnected during a reorg.
 // todo: function name LookupAutCoin
+// review done 2025.12.11
 func (view *CTAUTViewpoint) LookupCTAUTCoin(identifier ctautapi.AutId, outpoint ctautapi.HostOutPoint) *CTAUTCoin {
 	if view.instances == nil {
 		return nil
@@ -216,9 +249,15 @@ func (view *CTAUTViewpoint) LookupCTAUTCoin(identifier ctautapi.AutId, outpoint 
 	if !ok {
 		return nil
 	}
+	if instance == nil {
+		return nil
+	}
+
 	return instance.coins[outpoint]
 }
 
+// LookupCTAUTMetaInfo
+// review done 2025.12.11
 // todo: function name LookupAutDesc
 func (view *CTAUTViewpoint) LookupCTAUTMetaInfo(identifier ctautapi.AutId) *ctautapi.AutMetadata {
 	if view.instances == nil {
@@ -228,10 +267,14 @@ func (view *CTAUTViewpoint) LookupCTAUTMetaInfo(identifier ctautapi.AutId) *ctau
 	if !ok {
 		return nil
 	}
+	if instance == nil {
+		return nil
+	}
+
 	return instance.metadata
 }
 
-// addTxOut adds the specified output to the view if it is not provably
+// addCTAUTCoin adds the specified output to the view if it is not provably
 // unspendable.  When the view already has an entry for the output, it will be
 // marked unspent.  All fields will be updated for existing entries since it's
 // possible it has changed during a reorg.
@@ -251,6 +294,8 @@ func (view *CTAUTViewpoint) addCTAUTCoin(version uint32, identifier ctautapi.Aut
 	instance.coins[outpoint] = NewCTAUTCoin(version, identifier, script, blockHeight)
 	return nil
 }
+
+// todo: review the following codes
 
 // todo: remove txHash chainhash.Hash
 func (view *CTAUTViewpoint) connectRegistrationScript(script *ctautapi.ExtAutScript, txHash chainhash.Hash,
@@ -1011,6 +1056,8 @@ func (view *CTAUTViewpoint) commit() {
 // Upon completion of this function, the view will contain an entry for each
 // requested outpoint.  Spent outputs, or those which otherwise don't exist,
 // will result in a nil entry in the view.
+// review done 2025.12.11
+// todo: rename to a more accurate one
 func (view *CTAUTViewpoint) fetchCTAUTMain(db database.DB, outpoints map[ctautapi.HostOutPoint]struct{}, identifier ctautapi.AutId) error {
 	//if len(identifier) != ctaut.AutIdentifierLength {
 	//	return fmt.Errorf("invalid aut identifier:%v", identifier)
@@ -1035,6 +1082,7 @@ func (view *CTAUTViewpoint) fetchCTAUTMain(db database.DB, outpoints map[ctautap
 			if metadata != nil {
 				view.instances[autIdentifierKey] = &CTAUTInstance{
 					metadata: metadata,
+					// todo: initialize coins 2025.12.11; should use New function for CTAUTInstance
 				}
 			}
 		}
@@ -1253,13 +1301,14 @@ func NewCTAUTViewpoint() *CTAUTViewpoint {
 	}
 }
 
-// FetchAUTView loads unspent transaction outputs for the inputs referenced by
+// FetchCTAUTView loads unspent transaction outputs for the inputs referenced by
 // the passed transaction from the point of view of the end of the main chain.
 // It also attempts to fetch the utxos for the outputs of the transaction itself
 // so the returned view can be examined for duplicate transactions.
 //
 // This function is safe for concurrent access however the returned view is NOT.
 // refactored by Alice 2024.03.01
+// aut review done 2025.12.11
 func (b *BlockChain) FetchCTAUTView(script *ctautapi.ExtAutScript) (*CTAUTViewpoint, error) {
 	// Create a set of needed outputs based on those referenced by the
 	// inputs of the passed transaction and the outputs of the transaction

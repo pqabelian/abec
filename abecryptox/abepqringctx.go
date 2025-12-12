@@ -1208,6 +1208,7 @@ func pqringctxRuleCheckOnTxoVersionPrivacyLevel(pp *pqringctxapi.PublicParameter
 				"but the PrivacyLevel (%d) is not PrivacyLevelRINGCTPre",
 				txoVersion, privacyLevel)
 		}
+
 	default:
 		return fmt.Errorf("pqringctxRuleCheckOnTxoVersionPrivacyLevel: txoVersion (%d) is not supported",
 			txoVersion)
