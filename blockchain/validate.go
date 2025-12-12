@@ -2010,7 +2010,7 @@ func checkCTAUTReRegistrationTransactionInputs(tx *abeutil.TxAbe, currentHeight 
 }
 
 // checkCTAUTMintTransactionInputs
-// aut review done 2025.12.11 todo
+// aut review done 2025.12.12 todo: to discuss
 // todo: rename, only check inputs?
 func checkCTAUTMintTransactionInputs(tx *abeutil.TxAbe, currentHeight int32,
 	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
@@ -2199,37 +2199,52 @@ func checkCTAUTMintTransactionInputs(tx *abeutil.TxAbe, currentHeight int32,
 }
 
 // todo: remove ctAutScript *ctautapi.ExtAutScript
-func checkCTAUTTransferTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abeutil.TxAbe, txHeight int32,
+func checkCTAUTTransferTransactionInputs(tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
-	if ctAutScript.Type() != ctautapi.AutScriptTypeTransfer {
-		return fmt.Errorf("expected transfer script, but got %d", ctAutScript.Type())
-	}
-	transferScript, ok := ctAutScript.AutScript.(*ctautapi.TransferScript)
-	if !ok {
-		return fmt.Errorf("expected transfer script, but got %d", ctAutScript.Type())
+
+	if tx == nil {
+		return fmt.Errorf("tx is nil")
 	}
 
-	identifier := ctAutScript.AutIdentifier()
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		// the caller should check whether tx.ExtAutScript() is nil before calling this function
+		return fmt.Errorf("wrong call on checkCTAUTTransferTransactionInputs: tx.ExtAutScript is nil")
+	}
+
+	if extAutScript.Type() != ctautapi.AutScriptTypeTransfer {
+		return fmt.Errorf("expected transfer script, but got %d", extAutScript.Type())
+	}
+	transferScript, ok := extAutScript.AutScript.(*ctautapi.TransferScript)
+	if !ok {
+		return fmt.Errorf("expected transfer script, but got %d", extAutScript.Type())
+	}
+
+	identifier := extAutScript.AutIdentifier()
 	identifierKey := identifier.String()
-	scriptVersion := ctAutScript.Version()
+	scriptVersion := extAutScript.Version()
 
 	instance, exist := ctautView.instances[identifierKey]
 	if !exist || instance == nil || instance.metadata == nil {
-		return errors.New("an non-registration AUT transaction try to operate on non-existing AUT entry")
+		return fmt.Errorf("an non-registration AUT transaction try to operate on non-existing AUT entry")
 	}
 
 	inStartIndex := transferScript.InStartIndex()
 	inHiddenAutTokenNum := transferScript.InHiddenAutTokenNum()
 	inPublicAutTokenNum := transferScript.InPublicAutTokenNum()
 
-	hostedTxIns := tx.MsgTx().TxIns
+	hostTxIns := tx.MsgTx().TxIns
+
+	if int(inStartIndex)+int(inHiddenAutTokenNum)+int(inPublicAutTokenNum) > len(hostTxIns) {
+		return fmt.Errorf("inStartIndex (%d) + inHiddenAutTokenNum (%d) + inPublicAutTokenNum (%d) exceeds the number of TxIns (%d)",
+			inStartIndex, inHiddenAutTokenNum, inPublicAutTokenNum, len(hostTxIns))
+	}
 
 	willConsumedTokens := map[string]*ctautapi.HostOutPoint{}
-	autTransferTxIns := make([]*ctautwire.AutTxo, 0, inHiddenAutTokenNum+inPublicAutTokenNum)
+	autTransferTxIns := make([]*ctautwire.AutTxo, 0, int(inHiddenAutTokenNum)+int(inPublicAutTokenNum))
 
 	for i := 0; i < int(inHiddenAutTokenNum); i++ {
-		hostIndex := int(inStartIndex) + i
-		hostTxIn := hostedTxIns[hostIndex]
+		hostTxIn := hostTxIns[int(inStartIndex)+i]
 
 		if len(hostTxIn.PreviousOutPointRing.OutPoints) != 1 {
 			return fmt.Errorf("incorrect input for Aut with wrong ring size %d", len(hostTxIn.PreviousOutPointRing.OutPoints))
@@ -2320,8 +2335,7 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx 
 		autTransferTxIns = append(autTransferTxIns, autTxo)
 	}
 	for i := 0; i < int(inPublicAutTokenNum); i++ {
-		hostIndex := int(inStartIndex) + int(inHiddenAutTokenNum) + i
-		hostTxIn := hostedTxIns[hostIndex]
+		hostTxIn := hostTxIns[int(inStartIndex)+int(inHiddenAutTokenNum)+i]
 
 		if len(hostTxIn.PreviousOutPointRing.OutPoints) != 1 {
 			return fmt.Errorf("incorrect input for Aut with wrong ring size %d", len(hostTxIn.PreviousOutPointRing.OutPoints))
@@ -2418,9 +2432,9 @@ func checkCTAUTTransferTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx 
 		return fmt.Errorf("mismatch witness for script")
 	}
 
-	generatedTokens := ctAutScript.GeneratedTokens()
+	generatedTokens := extAutScript.GeneratedTokens()
 	trTx := &ctautwire.AutTransferTx{
-		Version:   ctAutScript.Version(),
+		Version:   extAutScript.Version(),
 		TxIns:     autTransferTxIns,
 		TxOuts:    make([]*ctautwire.AutTxo, 0, len(generatedTokens)),
 		TxWitness: tx.MsgTx().AutWitness,
@@ -2832,11 +2846,12 @@ func ValidateTxCTAUTScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostVie
 		}
 
 	case *ctautapi.MintScript:
-		err = checkCTAUTMintTransactionInputs(extAutScript, tx, currentHeight, ctautView, hostView, chainParams)
+		err = checkCTAUTMintTransactionInputs(tx, currentHeight, ctautView, hostView, chainParams)
 		if err != nil {
 			return err
 		}
 
+		// todo: move inside
 		// check privacy type
 		metadata := ctautView.LookupCTAUTMetaInfo(extAutScript.AutIdentifier())
 		privacyType := metadata.PrivacyType
