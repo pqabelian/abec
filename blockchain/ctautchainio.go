@@ -101,7 +101,7 @@ func (s *SpentCTAUTTokens) Type() SpentCTAUTType {
 type SpentCTAUTToken struct {
 	Version uint32
 	// Amount is the amount of the output.
-	Script []byte
+	ValueScript []byte
 
 	// Height is the height of the the block containing the creating tx.
 	Height int32
@@ -119,8 +119,8 @@ func spentCTAUTSerializeSize(stxo SpentCTAUT) (int, error) {
 
 			size += serializeSizeVLQ(uint64(token.Version))
 
-			size += serializeSizeVLQ(uint64(len(token.Script)))
-			size += len(token.Script)
+			size += serializeSizeVLQ(uint64(len(token.ValueScript)))
+			size += len(token.ValueScript)
 		}
 
 	case *UpdatedCTAUTInfo:
@@ -174,10 +174,10 @@ func putSpentCTAUT(target []byte, stxo SpentCTAUT) (int, error) {
 
 			offset += putVLQ(target[offset:], uint64(token.Version))
 
-			vlqSizeLen := putVLQ(target[offset:], uint64(len(token.Script)))
+			vlqSizeLen := putVLQ(target[offset:], uint64(len(token.ValueScript)))
 			offset += vlqSizeLen
-			copy(target[offset:], token.Script)
-			offset += len(token.Script)
+			copy(target[offset:], token.ValueScript)
+			offset += len(token.ValueScript)
 		}
 
 	case *UpdatedCTAUTInfo:
@@ -276,8 +276,8 @@ func decodeSpentCTAUT(serialized []byte) (SpentCTAUT, int, error) {
 			if offset+int(scriptSize) > len(serialized) {
 				return nil, offset, errDeserialize("unexpected end of data for reading script")
 			}
-			res[i].Script = make([]byte, scriptSize)
-			copy(res[i].Script, serialized[offset:offset+int(scriptSize)])
+			res[i].ValueScript = make([]byte, scriptSize)
+			copy(res[i].ValueScript, serialized[offset:offset+int(scriptSize)])
 			offset += int(scriptSize)
 		}
 		return &res, offset, nil

@@ -462,9 +462,9 @@ func (view *CTAUTViewpoint) connectMintScript(extAutScript *ctautapi.ExtAutScrip
 
 		if sctauts != nil {
 			var stxo = SpentCTAUTToken{
-				Version: mintScript.Version(),
-				Script:  nil,
-				Height:  blockHeight,
+				Version:     mintScript.Version(),
+				ValueScript: nil,
+				Height:      blockHeight,
 			}
 			currentSctauts = append(currentSctauts, stxo)
 		}
@@ -532,9 +532,9 @@ func (view *CTAUTViewpoint) connectTransferScript(extAutScript *ctautapi.ExtAutS
 		if sctauts != nil {
 			// Populate the stxo details using the utxo entry.
 			var stxo = SpentCTAUTToken{
-				Version: token.version,
-				Script:  token.valueScript,
-				Height:  blockHeight,
+				Version:     token.version,
+				ValueScript: token.valueScript,
+				Height:      blockHeight,
 			}
 			currentSctauts = append(currentSctauts, stxo)
 		}
@@ -585,9 +585,9 @@ func (view *CTAUTViewpoint) connectBurnScript(extAutScript *ctautapi.ExtAutScrip
 		if sctauts != nil {
 			// Populate the stxo details using the utxo entry.
 			var stxo = SpentCTAUTToken{
-				Version: token.version,
-				Script:  token.valueScript,
-				Height:  blockHeight,
+				Version:     token.version,
+				ValueScript: token.valueScript,
+				Height:      blockHeight,
 			}
 			currentSctauts = append(currentSctauts, stxo)
 		}
@@ -880,7 +880,7 @@ func (view *CTAUTViewpoint) disconnectTransferTransaction(db database.DB, extAut
 		if _, ok := instance.coins[*hostOutpoint]; ok {
 			return nil, fmt.Errorf("duplicate coins %s for AUT instance %s", hostOutpoint.String(), identifierKey)
 		}
-		instance.coins[*hostOutpoint] = NewCTAUTCoin(token.Version, identifier, token.Script, blockHeight)
+		instance.coins[*hostOutpoint] = NewCTAUTCoin(token.Version, identifier, token.ValueScript, blockHeight)
 	}
 
 	return nil, nil
@@ -955,7 +955,7 @@ func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, extAutScri
 		if _, ok := instance.coins[*hostOutpoint]; ok {
 			return nil, fmt.Errorf("duplicate coins %s for AUT instance %s", hostOutpoint.String(), identifierKey)
 		}
-		instance.coins[*hostOutpoint] = NewCTAUTCoin(token.Version, identifier, token.Script, blockHeight)
+		instance.coins[*hostOutpoint] = NewCTAUTCoin(token.Version, identifier, token.ValueScript, blockHeight)
 	}
 
 	return nil, nil
