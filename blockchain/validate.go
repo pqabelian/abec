@@ -2810,13 +2810,13 @@ func ValidateTxCTAUTScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostVie
 
 	switch extAutScript.AutScript.(type) {
 	case *ctautapi.RegistrationScript:
-		err = checkCTAUTRegistrationTransactionInputs(extAutScript, tx, currentHeight, ctautView, hostView, chainParams)
+		err = checkCTAUTRegistrationTransactionInputs(tx, currentHeight, ctautView, hostView, chainParams)
 		if err != nil {
 			return err
 		}
 
 	case *ctautapi.ReRegistrationScript:
-		err = checkCTAUTReRegistrationTransactionInputs(extAutScript, tx, currentHeight, ctautView, hostView, chainParams)
+		err = checkCTAUTReRegistrationTransactionInputs(tx, currentHeight, ctautView, hostView, chainParams)
 		if err != nil {
 			return err
 		}
