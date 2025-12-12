@@ -1920,35 +1920,16 @@ func validateAutReRegistrationScript(tx *abeutil.TxAbe, currentHeight int32,
 				"the consumed UTXO at Ring %s not exist", tx.Hash(), currentHeight, hostTxIn.PreviousOutPointRing.Hash())
 		}
 
-		txoRing := ringEntry.TxoRing()
-		if txoRing == nil {
-			return fmt.Errorf("the TxoRing obtained by ringHash (%s) is nil ", ringHash.String())
-		}
-		if txoRing.OutPointRing == nil {
-			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) is nil ", ringHash.String())
+		hostTxo, hostOutPoint, err := getAutHostFromTxoRing(ringEntry.TxoRing(), ringHash)
+		if err != nil {
+			return fmt.Errorf("error happens when calling getAutHostFromTxoRing on ringId %v: %v", ringHash, err)
 		}
 
-		ringId := txoRing.OutPointRing.RingId()
-		if !ringId.IsEqual(&ringHash) {
-			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has ringId (%s)", ringHash.String(), ringId.String())
-		}
-
-		if len(txoRing.OutPointRing.OutPoints) != 1 {
-			return fmt.Errorf("incorrect input for Aut with wrong ring size %d", len(txoRing.OutPointRing.OutPoints))
-		}
-
-		if len(txoRing.TxOuts) != len(txoRing.OutPointRing.OutPoints) {
-			return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-				"len(txoRing.TxOuts) = %d and len(txoRing.OutPointRing.OutPoints) = %d ",
-				ringHash.String(), len(txoRing.TxOuts), len(txoRing.OutPointRing.OutPoints))
-		}
-
-		coinAddress, err := ctautapi.RuleCheckOnHostTxo(txoRing.TxOuts[0])
+		coinAddress, err := ctautapi.RuleCheckOnHostTxo(hostTxo)
 		if err != nil {
 			return err
 		}
 
-		hostOutPoint := txoRing.OutPointRing.OutPoints[0]
 		if hostOutPoint == nil {
 			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has nil at position 0 ", ringHash.String())
 		}
@@ -2075,37 +2056,17 @@ func validateAutMintScript(tx *abeutil.TxAbe, currentHeight int32,
 				"the consumed UTXO at Ring %s not exist", tx.Hash(), currentHeight, hostTxIn.PreviousOutPointRing.Hash())
 		}
 
-		txoRing := ringEntry.TxoRing()
-		if txoRing == nil {
-			return fmt.Errorf("the TxoRing obtained by ringHash (%s) is nil ", ringHash.String())
-		}
-		if txoRing.OutPointRing == nil {
-			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) is nil ", ringHash.String())
-		}
-
-		ringId := txoRing.OutPointRing.RingId()
-		if !ringId.IsEqual(&ringHash) {
-			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has ringId (%s)", ringHash.String(), ringId.String())
-		}
-
-		if len(txoRing.OutPointRing.OutPoints) != 1 {
-			return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-				"len(txoRing.OutPointRing.OutPoints) (%d) != 1 ",
-				ringHash.String(), len(txoRing.OutPointRing.OutPoints))
-		}
-
-		if len(txoRing.TxOuts) != len(txoRing.OutPointRing.OutPoints) {
-			return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-				"len(txoRing.TxOuts) = %d while len(txoRing.OutPointRing.OutPoints) = %d",
-				ringHash.String(), len(txoRing.TxOuts), len(txoRing.OutPointRing.OutPoints))
+		hostTxo, hostOutPoint, err := getAutHostFromTxoRing(ringEntry.TxoRing(), ringHash)
+		if err != nil {
+			return fmt.Errorf("error happens when calling getAutHostFromTxoRing on ringId %v: %v", ringHash, err)
 		}
 
 		// fill out with the first item in ring
-		coinAddress, err := ctautapi.RuleCheckOnHostTxo(txoRing.TxOuts[0])
+		coinAddress, err := ctautapi.RuleCheckOnHostTxo(hostTxo)
 		if err != nil {
 			return err
 		}
-		hostOutPoint := txoRing.OutPointRing.OutPoints[0]
+
 		if hostOutPoint == nil {
 			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has nil at position 0 ", ringHash.String())
 		}
@@ -2263,38 +2224,17 @@ func validateAutTransferScript(tx *abeutil.TxAbe, txHeight int32,
 				"the consumed UTXO at Ring %s not exist", tx.Hash(), txHeight, hostTxIn.PreviousOutPointRing.Hash())
 		}
 
-		txoRing := ringEntry.TxoRing()
-		if txoRing == nil {
-			return fmt.Errorf("the TxoRing obtained by ringHash (%s) is nil ", ringHash.String())
-		}
-		if txoRing.OutPointRing == nil {
-			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) is nil ", ringHash.String())
-		}
-
-		ringId := txoRing.OutPointRing.RingId()
-		if !ringId.IsEqual(&ringHash) {
-			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has ringId (%s)", ringHash.String(), ringId.String())
-		}
-
-		if len(txoRing.OutPointRing.OutPoints) != 1 {
-			return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-				"len(txoRing.OutPointRing.OutPoints) %d != 1",
-				ringHash.String(), len(txoRing.OutPointRing.OutPoints))
-		}
-
-		if len(txoRing.TxOuts) != len(txoRing.OutPointRing.OutPoints) {
-			return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-				"len(txoRing.TxOuts) = %d while len(txoRing.OutPointRing.OutPoints) = %d",
-				ringHash.String(), len(txoRing.TxOuts), len(txoRing.OutPointRing.OutPoints))
+		hostTxo, hostOutPoint, err := getAutHostFromTxoRing(ringEntry.TxoRing(), ringHash)
+		if err != nil {
+			return fmt.Errorf("error happens when calling getAutHostFromTxoRing on ringId %v: %v", ringHash, err)
 		}
 
 		// fill out with the first item in ring
-		_, err := ctautapi.RuleCheckOnHostTxo(txoRing.TxOuts[0]) // perform host checks
+		_, err = ctautapi.RuleCheckOnHostTxo(hostTxo) // perform host checks
 		if err != nil {
 			return err
 		}
 
-		hostOutPoint := txoRing.OutPointRing.OutPoints[0]
 		if hostOutPoint == nil {
 			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has nil at position 0 ", ringHash.String())
 		}
@@ -2456,38 +2396,17 @@ func validateAutBurnScript(tx *abeutil.TxAbe, txHeight int32,
 				"the consumed UTXO at Ring %s not exist", tx.Hash(), txHeight, hostTxIn.PreviousOutPointRing.Hash())
 		}
 
-		txoRing := ringEntry.TxoRing()
-		if txoRing == nil {
-			return fmt.Errorf("the TxoRing obtained by ringHash (%s) is nil ", ringHash.String())
-		}
-		if txoRing.OutPointRing == nil {
-			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) is nil ", ringHash.String())
-		}
-
-		ringId := txoRing.OutPointRing.RingId()
-		if !ringId.IsEqual(&ringHash) {
-			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has ringId (%s)", ringHash.String(), ringId.String())
-		}
-
-		if len(txoRing.OutPointRing.OutPoints) != 1 {
-			return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-				"len(txoRing.OutPointRing.OutPoints) (%d) != 1 ",
-				ringHash.String(), len(txoRing.OutPointRing.OutPoints))
-		}
-
-		if len(txoRing.TxOuts) != len(txoRing.OutPointRing.OutPoints) {
-			return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-				"len(txoRing.TxOuts) = %d while len(txoRing.OutPointRing.OutPoints) = %d",
-				ringHash.String(), len(txoRing.TxOuts), len(txoRing.OutPointRing.OutPoints))
+		hostTxo, hostOutPoint, err := getAutHostFromTxoRing(ringEntry.TxoRing(), ringHash)
+		if err != nil {
+			return fmt.Errorf("error happens when calling getAutHostFromTxoRing on ringId %v: %v", ringHash, err)
 		}
 
 		// fill out with the first item in ring
-		_, err := ctautapi.RuleCheckOnHostTxo(txoRing.TxOuts[0]) // preform host checks
+		_, err = ctautapi.RuleCheckOnHostTxo(hostTxo) // preform host checks
 		if err != nil {
 			return err
 		}
 
-		hostOutPoint := txoRing.OutPointRing.OutPoints[0]
 		if hostOutPoint == nil {
 			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has nil at position 0 ", ringHash.String())
 		}
@@ -2612,6 +2531,38 @@ func validateAutBurnScript(tx *abeutil.TxAbe, txHeight int32,
 	}
 
 	return nil
+}
+
+// getAutHostFromTxoRing returns the host-Txo and host-OutPoint from the given txoRing,
+// which should have size  = 1.
+func getAutHostFromTxoRing(txoRing *wire.TxoRing, ringHash wire.RingId) (*wire.TxOutAbe, *ctautapi.HostOutPoint, error) {
+	if txoRing == nil {
+		return nil, nil, fmt.Errorf("the TxoRing is nil")
+	}
+	if txoRing.OutPointRing == nil {
+		return nil, nil, fmt.Errorf("the TxoRing.OutPointRing is nil")
+	}
+
+	ringId := txoRing.OutPointRing.RingId()
+	if !ringId.IsEqual(&ringHash) {
+		return nil, nil, fmt.Errorf("the TxoRing.OutPointRing has has ringId (%s), which does not match the expected %s",
+			ringId.String(), ringHash.String())
+	}
+
+	if len(txoRing.OutPointRing.OutPoints) != 1 {
+		return nil, nil, fmt.Errorf("the TxoRing has len(txoRing.OutPointRing.OutPoints) (%d) != 1 ",
+			len(txoRing.OutPointRing.OutPoints))
+	}
+
+	if len(txoRing.TxOuts) != len(txoRing.OutPointRing.OutPoints) {
+		return nil, nil, fmt.Errorf("the TxoRing has len(txoRing.TxOuts) = %d while len(txoRing.OutPointRing.OutPoints) = %d",
+			len(txoRing.TxOuts), len(txoRing.OutPointRing.OutPoints))
+	}
+
+	txo := txoRing.TxOuts[0]
+	hostPoint := txoRing.OutPointRing.OutPoints[0]
+
+	return txo, hostPoint, nil
 }
 
 // todo: tx could be removed, or script *ctautapi.ExtAutScript, since abeutil.TxAbe carries ExtAutScript

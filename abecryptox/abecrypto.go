@@ -454,6 +454,9 @@ func TxoCoinReceiveByKeys(abeTxo *wire.TxOutAbe, cryptoAddress []byte, cryptoVal
 // return an err if it is not a Pseudonym-Privacy Txo.
 // todo: review
 func PseudonymTxoCoinParse(abeTxo *wire.TxOutAbe) (coinAddress []byte, coinValue uint64, err error) {
+	if abeTxo == nil {
+		return nil, 0, fmt.Errorf("PseudonymTxoCoinParse: TxOut is nil")
+	}
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
 	if err != nil {
 		return nil, 0, err

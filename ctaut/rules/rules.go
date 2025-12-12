@@ -23,6 +23,9 @@ type AutPrivacyType = script.AutPrivacyType
 //
 // If the checks are passed, the coinAddress will be returned.
 func RuleCheckOnHostTxo(txOut *wire.TxOutAbe) ([]byte, error) {
+	if txOut == nil {
+		return nil, fmt.Errorf("the input txOut is nil")
+	}
 	privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
 	if err != nil {
 		return nil, fmt.Errorf("fail to extract the privacy level from TxOutAbe: %v", err)
