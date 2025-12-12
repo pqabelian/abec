@@ -2063,25 +2063,24 @@ func checkCTAUTMintTransactionInputs(tx *abeutil.TxAbe, currentHeight int32,
 	inStartIndex := mintScript.InStartIndex()
 	inAutRootTokenNum := mintScript.InAutRootTokenNum()
 
-	hostedTxIns := tx.MsgTx().TxIns
-	txHash := tx.Hash()
+	hostTxIns := tx.MsgTx().TxIns
+	if int(inStartIndex)+int(inAutRootTokenNum) > len(hostTxIns) {
+		return fmt.Errorf("inStartIndex %d + inAutRootTokenNum(%d) exceeds the number of TxIns (%d)",
+			inStartIndex, inAutRootTokenNum, len(hostTxIns))
+	}
 
 	for i := 0; i < int(inAutRootTokenNum); i++ {
-		hostIndex := int(inStartIndex) + i
-		hostTxIn := hostedTxIns[hostIndex]
+		hostTxIn := hostTxIns[int(inStartIndex)+i]
 
-		if len(hostTxIn.PreviousOutPointRing.OutPoints) != 1 {
-			return fmt.Errorf("incorrect input for Aut with wrong ring size %d", len(hostTxIn.PreviousOutPointRing.OutPoints))
+		if hostTxIn == nil {
+			return fmt.Errorf("TxIns[%d] is nil]", i)
 		}
+
 		ringHash := hostTxIn.PreviousOutPointRing.Hash()
 		ringEntry := hostView.LookupEntry(ringHash)
 		if ringEntry == nil {
 			return fmt.Errorf("transaction %s try to re-register at height %d but "+
 				"the consumed UTXO at Ring %s not exist", tx.Hash(), currentHeight, hostTxIn.PreviousOutPointRing.Hash())
-		}
-		ringId := ringEntry.OutPointRing().RingId()
-		if !ringId.IsEqual(&ringHash) {
-			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has ringId (%s)", ringHash.String(), ringId.String())
 		}
 
 		txoRing := ringEntry.TxoRing()
@@ -2092,53 +2091,42 @@ func checkCTAUTMintTransactionInputs(tx *abeutil.TxAbe, currentHeight int32,
 			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) is nil ", ringHash.String())
 		}
 
-		if len(txoRing.OutPointRing.OutPoints) != len(txoRing.TxOuts) {
+		ringId := txoRing.OutPointRing.RingId()
+		if !ringId.IsEqual(&ringHash) {
+			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has ringId (%s)", ringHash.String(), ringId.String())
+		}
+
+		if len(txoRing.OutPointRing.OutPoints) != 1 {
 			return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-				"len(txoRing.OutPointRing.OutPoints) = %d || len(txoRing.TxOuts) = %d ",
-				ringHash.String(), len(txoRing.OutPointRing.OutPoints), len(txoRing.TxOuts))
+				"len(txoRing.OutPointRing.OutPoints) (%d) != 1 ",
+				ringHash.String(), len(txoRing.OutPointRing.OutPoints))
 		}
 
-		if len(txoRing.OutPointRing.OutPoints) == 0 {
+		if len(txoRing.TxOuts) != len(txoRing.OutPointRing.OutPoints) {
 			return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-				"len(txoRing.OutPointRing.OutPoints) = 0 ",
-				ringHash.String())
-		}
-
-		if len(ringEntry.OutPointRing().OutPoints) == 0 {
-			return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-				"len(txoRing.OutPointRing.OutPoints) = 0 ",
-				ringHash.String())
-		}
-
-		privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txoRing.TxOuts[0])
-		if err != nil {
-			return err
-		}
-
-		if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
-			return fmt.Errorf("expect privacy level %d but got %d",
-				abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
+				"len(txoRing.TxOuts) = %d while len(txoRing.OutPointRing.OutPoints) = %d",
+				ringHash.String(), len(txoRing.TxOuts), len(txoRing.OutPointRing.OutPoints))
 		}
 
 		// fill out with the first item in ring
 		hostOutPoint := txoRing.OutPointRing.OutPoints[0]
 		coinAddress, err := rules.RuleCheckOnHostTxo(txoRing.TxOuts[0])
 		if err != nil {
-			return fmt.Errorf("transaction %s try to consume UTXO at Ring %s is not a valid output", txHash,
-				hostTxIn.PreviousOutPointRing.Hash())
+			return err
 		}
 
-		if _, existOutpoint := instance.metadata.ActiveRootTokenSet[hostOutPoint.String()]; !existOutpoint {
+		hostOPStr := hostOutPoint.String()
+		if _, existOutpoint := instance.metadata.ActiveRootTokenSet[hostOPStr]; !existOutpoint {
 			return fmt.Errorf("transaction %s try to re-register with unknown root coin <%s:%d>",
 				tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
 		}
 
 		// check whether duplicate though it won't appear with the checking with hosted Abelian transaction
-		if _, ok := willConsumedRootTokenHostOutpoints[hostOutPoint.String()]; ok {
+		if _, ok := willConsumedRootTokenHostOutpoints[hostOPStr]; ok {
 			return fmt.Errorf("transaction %s try to mint with repeated root coin <%s:%d>",
 				tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
 		}
-		willConsumedRootTokenHostOutpoints[hostOutPoint.String()] = hostOutPoint
+		willConsumedRootTokenHostOutpoints[hostOPStr] = hostOutPoint
 
 		consumedTokenCoinAddressStr := hex.EncodeToString(coinAddress)
 
@@ -2161,11 +2149,21 @@ func checkCTAUTMintTransactionInputs(tx *abeutil.TxAbe, currentHeight int32,
 	}
 
 	// check the supply
-	if instance.metadata.MintedAmount+mintScript.Vin() > instance.metadata.PlannedTotalSupply {
-		return fmt.Errorf("transaction %s try to mint coin exceed claimed planned %d with vin %d",
-			tx.Hash(), instance.metadata.PlannedTotalSupply, mintScript.Vin())
+	if instance.metadata.MintedAmount > instance.metadata.PlannedTotalSupply {
+		// just assert
+		return fmt.Errorf("the target AutInstance has mintedAmout (%d) exceeds the plannedTotalSupply (%d) ",
+			instance.metadata.MintedAmount, instance.metadata.PlannedTotalSupply)
+	}
+	maxAllowed := instance.metadata.PlannedTotalSupply - instance.metadata.MintedAmount // uint64, and >= 0
+
+	if mintScript.Vin() > maxAllowed {
+		return fmt.Errorf("transaction %s try to mint coin value %d, which exceeds the allowed value %d (= PlannedTotalSupply %d - MintedAmount %d)",
+			tx.Hash(), mintScript.Vin(), maxAllowed, instance.metadata.PlannedTotalSupply, instance.metadata.MintedAmount)
 	}
 
+	// todo: move the outside codes to here
+
+	// todo: review 2025.12.12
 	// todo: use a AutWitnessHash() function
 	witnessHash := ctautwire.AutWitnessHash(tx.MsgTx().AutWitness)
 	claimedWitnessHash := mintScript.WitnessHash()
@@ -2173,9 +2171,9 @@ func checkCTAUTMintTransactionInputs(tx *abeutil.TxAbe, currentHeight int32,
 		return fmt.Errorf("mismatch witness for script")
 	}
 
-	generatedTokens := ctAutScript.GeneratedTokens()
+	generatedTokens := extAutScript.GeneratedTokens()
 	cbTx := &ctautwire.AutCoinbaseTx{
-		Version:   ctAutScript.Version(),
+		Version:   extAutScript.Version(),
 		Vin:       mintScript.Vin(),
 		TxOuts:    make([]*ctautwire.AutTxo, len(generatedTokens)),
 		TxWitness: tx.MsgTx().AutWitness,
