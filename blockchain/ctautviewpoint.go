@@ -106,7 +106,7 @@ type CTAUTCoin struct {
 	// specifically crafted to result in minimal padding.  There will be a
 	// lot of these in memory, so a few extra bytes of padding adds up.
 	version     uint32 // TODO
-	script      []byte // todo: what is this? // rename to serializedAutTxo , valueScript?
+	valueScript []byte // serializedAutTxo is put into this field
 	blockHeight int32  // Height of block containing tx.
 
 	// packedFlags contains additional info about output such as whether it
@@ -125,7 +125,7 @@ func (coin *CTAUTCoin) Version() uint32 {
 // Script
 // review done 2025.12.11
 func (coin *CTAUTCoin) Script() []byte {
-	return coin.script
+	return coin.valueScript
 }
 
 // isModified returns whether or not the output has been modified since it was
@@ -168,11 +168,11 @@ func (coin *CTAUTCoin) Clone() *CTAUTCoin {
 		return nil
 	}
 
-	script := make([]byte, len(coin.script))
-	copy(script, coin.script)
+	valueScript := make([]byte, len(coin.valueScript))
+	copy(valueScript, coin.valueScript)
 	return &CTAUTCoin{
 		identifier:  coin.identifier,
-		script:      script,
+		valueScript: valueScript,
 		blockHeight: coin.blockHeight,
 		packedFlags: coin.packedFlags,
 	}
@@ -182,12 +182,12 @@ func (coin *CTAUTCoin) Clone() *CTAUTCoin {
 
 // NewCTAUTCoin returns a new CTAUTCoin built from the arguments.
 // todo: review
-func NewCTAUTCoin(version uint32, identifier ctautapi.AutId, script []byte, blockHeight int32) *CTAUTCoin {
+func NewCTAUTCoin(version uint32, identifier ctautapi.AutId, valueScript []byte, blockHeight int32) *CTAUTCoin {
 
 	return &CTAUTCoin{
 		version:     version,
 		identifier:  identifier,
-		script:      script,
+		valueScript: valueScript,
 		blockHeight: blockHeight,
 		packedFlags: cafModified,
 	}
@@ -533,7 +533,7 @@ func (view *CTAUTViewpoint) connectTransferScript(extAutScript *ctautapi.ExtAutS
 			// Populate the stxo details using the utxo entry.
 			var stxo = SpentCTAUTToken{
 				Version: token.version,
-				Script:  token.script,
+				Script:  token.valueScript,
 				Height:  blockHeight,
 			}
 			currentSctauts = append(currentSctauts, stxo)
@@ -586,7 +586,7 @@ func (view *CTAUTViewpoint) connectBurnScript(extAutScript *ctautapi.ExtAutScrip
 			// Populate the stxo details using the utxo entry.
 			var stxo = SpentCTAUTToken{
 				Version: token.version,
-				Script:  token.script,
+				Script:  token.valueScript,
 				Height:  blockHeight,
 			}
 			currentSctauts = append(currentSctauts, stxo)

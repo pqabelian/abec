@@ -264,6 +264,7 @@ func mergeUtxoRingView(viewA *blockchain.UtxoRingViewpoint, viewB *blockchain.Ut
 	viewA.SetEntries(viewAEntries)
 }
 
+// aut review done, 2025.12.12
 func mergeCTAUTView(viewA *blockchain.CTAUTViewpoint, viewB *blockchain.CTAUTViewpoint) {
 	if viewB == nil {
 		return

@@ -465,7 +465,7 @@ func serializeUnspentAutCoin(coin *CTAUTCoin) ([]byte, error) {
 	size := 4 + // version
 		4 + // height
 		len(coin.identifier) +
-		wire.VarIntSerializeSize(uint64(len(coin.script))) + len(coin.script)
+		wire.VarIntSerializeSize(uint64(len(coin.valueScript))) + len(coin.valueScript)
 
 	w := bytes.NewBuffer(make([]byte, 0, size))
 
@@ -488,7 +488,7 @@ func serializeUnspentAutCoin(coin *CTAUTCoin) ([]byte, error) {
 		return nil, err
 	}
 
-	err = wire.WriteVarBytes(w, 0, coin.script)
+	err = wire.WriteVarBytes(w, 0, coin.valueScript)
 	if err != nil {
 		return nil, err
 	}

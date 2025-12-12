@@ -2259,7 +2259,7 @@ func validateAutTransferScript(tx *abeutil.TxAbe, txHeight int32,
 		// does not need to consider the double spending on coin, since that is checked by hostOutPoint.
 
 		autTxo := &ctautwire.AutTxo{}
-		err = autTxo.Deserialize(coin.script)
+		err = autTxo.Deserialize(coin.valueScript)
 		if err != nil {
 			return err
 		}
@@ -2430,7 +2430,7 @@ func validateAutBurnScript(tx *abeutil.TxAbe, txHeight int32,
 		}
 
 		autTxo := &ctautwire.AutTxo{}
-		err = autTxo.Deserialize(coin.script)
+		err = autTxo.Deserialize(coin.valueScript)
 		if err != nil {
 			return err
 		}
