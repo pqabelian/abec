@@ -1859,7 +1859,7 @@ func checkCTAUTReRegistrationTransactionInputs(tx *abeutil.TxAbe, currentHeight 
 	extAutScript := tx.ExtAutScript()
 	if extAutScript == nil {
 		// the caller should check whether tx.ExtAutScript() is nil before calling this function
-		return fmt.Errorf("wrong call on checkCTAUTRegistrationTransactionInputs: tx.ExtAutScript is nil")
+		return fmt.Errorf("wrong call on checkCTAUTReRegistrationTransactionInputs: tx.ExtAutScript is nil")
 	}
 
 	if extAutScript.Type() != ctautapi.AutScriptTypeReRegistration {
@@ -2012,18 +2012,28 @@ func checkCTAUTReRegistrationTransactionInputs(tx *abeutil.TxAbe, currentHeight 
 // checkCTAUTMintTransactionInputs
 // aut review done 2025.12.11 todo
 // todo: rename, only check inputs?
-// todo: remove ctAutScript *ctautapi.ExtAutScript
-func checkCTAUTMintTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abeutil.TxAbe, currentHeight int32,
+func checkCTAUTMintTransactionInputs(tx *abeutil.TxAbe, currentHeight int32,
 	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
-	if ctAutScript.Type() != ctautapi.AutScriptTypeMint {
-		return fmt.Errorf("expected mint script, but got %d", ctAutScript.Type())
-	}
-	mintScript, ok := ctAutScript.AutScript.(*ctautapi.MintScript)
-	if !ok {
-		return fmt.Errorf("expected mint script, but got %d", ctAutScript.Type())
+
+	if tx == nil {
+		return fmt.Errorf("tx is nil")
 	}
 
-	identifier := ctAutScript.AutIdentifier()
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		// the caller should check whether tx.ExtAutScript() is nil before calling this function
+		return fmt.Errorf("wrong call on checkCTAUTMintTransactionInputs: tx.ExtAutScript is nil")
+	}
+
+	if extAutScript.Type() != ctautapi.AutScriptTypeMint {
+		return fmt.Errorf("expected mint script, but got %d", extAutScript.Type())
+	}
+	mintScript, ok := extAutScript.AutScript.(*ctautapi.MintScript)
+	if !ok {
+		return fmt.Errorf("expected mint script, but got %d", extAutScript.Type())
+	}
+
+	identifier := extAutScript.AutIdentifier()
 	identifierKey := identifier.String()
 
 	instance, exist := ctautView.instances[identifierKey]
@@ -2036,11 +2046,13 @@ func checkCTAUTMintTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abe
 		if instance.metadata.Issuers[i] == nil {
 			return fmt.Errorf("instance.metadata.Issuers[%d] is nil", i)
 		}
-		if len(instance.metadata.Issuers[i].CoinAddress()) == 0 {
+
+		coinAddress := instance.metadata.Issuers[i].CoinAddress()
+		if len(coinAddress) == 0 {
 			return fmt.Errorf("instance.metadata.Issuers[%d]CoinAddress() is nil/empty", i)
 		}
 
-		issuerCoinAddressStr := hex.EncodeToString(instance.metadata.Issuers[i].CoinAddress())
+		issuerCoinAddressStr := hex.EncodeToString(coinAddress)
 		claimedIssuersByCoinAddress[issuerCoinAddressStr] = struct{}{}
 	}
 
