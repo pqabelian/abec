@@ -1820,7 +1820,7 @@ func validateAutRegistrationScript(tx *abeutil.TxAbe, currentHeight int32,
 		return fmt.Errorf("expected registration script, but got %d", extAutScript.Type())
 	}
 
-	registrationScript, ok := extAutScript.AutScript.(*ctautapi.RegistrationScript)
+	_, ok := extAutScript.AutScript.(*ctautapi.RegistrationScript)
 	if !ok {
 		return fmt.Errorf("expected registration script, but got %d", extAutScript.Type())
 	}
@@ -1831,13 +1831,14 @@ func validateAutRegistrationScript(tx *abeutil.TxAbe, currentHeight int32,
 		return fmt.Errorf("an registration transaction try to register AUT instance with an existing AUT identifier")
 	}
 
-	// if the claimed height will expire soon, reject it
-	if registrationScript.ReregistrationExpireHeight() != ctautapi.InfiniteExpireHeight &&
-		registrationScript.ReregistrationExpireHeight() <= currentHeight {
-		return fmt.Errorf("transaction %s try to register an AUT "+
-			"instance with expire height %d , but current block height %d, it will expire soon", tx.Hash(),
-			registrationScript.ReregistrationExpireHeight(), currentHeight)
-	}
+	// allow use a ReregistrationExpireHeight that results no one can update/reregister.
+	//// if the claimed height will expire soon, reject it
+	//if registrationScript.ReregistrationExpireHeight() != ctautapi.InfiniteExpireHeight &&
+	//	registrationScript.ReregistrationExpireHeight() <= currentHeight {
+	//	return fmt.Errorf("transaction %s try to register an AUT "+
+	//		"instance with expire height %d , but current block height %d, it will expire soon", tx.Hash(),
+	//		registrationScript.ReregistrationExpireHeight(), currentHeight)
+	//}
 
 	return nil
 }
@@ -1975,13 +1976,14 @@ func validateAutReRegistrationScript(tx *abeutil.TxAbe, currentHeight int32,
 			autMetadata.MintedAmount)
 	}
 
-	// expiry
-	if reRegisterScript.ReregistrationExpireHeight() != ctautapi.InfiniteExpireHeight &&
-		reRegisterScript.ReregistrationExpireHeight() <= currentHeight {
-		return fmt.Errorf("transaction %s try to re-register the "+
-			"instance with expire height %d (current height %d)", tx.Hash(),
-			reRegisterScript.ReregistrationExpireHeight(), currentHeight)
-	}
+	// allow use a ReregistrationExpireHeight that results no one can update/reregister.
+	//// expiry
+	//if reRegisterScript.ReregistrationExpireHeight() != ctautapi.InfiniteExpireHeight &&
+	//	reRegisterScript.ReregistrationExpireHeight() <= currentHeight {
+	//	return fmt.Errorf("transaction %s try to re-register the "+
+	//		"instance with expire height %d (current height %d)", tx.Hash(),
+	//		reRegisterScript.ReregistrationExpireHeight(), currentHeight)
+	//}
 
 	return nil
 }
