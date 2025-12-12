@@ -2057,7 +2057,7 @@ func checkCTAUTMintTransactionInputs(tx *abeutil.TxAbe, currentHeight int32,
 	}
 
 	// duplicated input or double spending?
-	consumedTokenIussersByCoinAddress := map[string]struct{}{}
+	consumedTokenIssuersByCoinAddress := map[string]struct{}{}
 	willConsumedRootTokenHostOutpoints := map[string]*ctautapi.HostOutPoint{}
 
 	inStartIndex := mintScript.InStartIndex()
@@ -2146,8 +2146,8 @@ func checkCTAUTMintTransactionInputs(tx *abeutil.TxAbe, currentHeight int32,
 			return fmt.Errorf("transaction %s try to mint at height %d with "+
 				"issue token but it do not exist in its registration", tx.Hash(), currentHeight)
 		}
-		if _, ok := consumedTokenIussersByCoinAddress[consumedTokenCoinAddressStr]; !ok {
-			consumedTokenIussersByCoinAddress[consumedTokenCoinAddressStr] = struct{}{}
+		if _, ok := consumedTokenIssuersByCoinAddress[consumedTokenCoinAddressStr]; !ok {
+			consumedTokenIssuersByCoinAddress[consumedTokenCoinAddressStr] = struct{}{}
 		} else {
 			// already in, does nothing
 			// repeat consumeTokenIssuers are allowed, just waste some AutRootTokens.
@@ -2155,9 +2155,9 @@ func checkCTAUTMintTransactionInputs(tx *abeutil.TxAbe, currentHeight int32,
 	}
 
 	// check the threshold
-	if len(consumedTokenIussersByCoinAddress) < int(instance.metadata.MintThreshold) {
+	if len(consumedTokenIssuersByCoinAddress) < int(instance.metadata.MintThreshold) {
 		return fmt.Errorf("transaction %s try to mint tokens but fail to meet the claimed mint threshold (%d/%d)",
-			tx.Hash(), len(consumedTokenIussersByCoinAddress), instance.metadata.MintThreshold)
+			tx.Hash(), len(consumedTokenIssuersByCoinAddress), instance.metadata.MintThreshold)
 	}
 
 	// check the supply
