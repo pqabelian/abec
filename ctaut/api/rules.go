@@ -15,6 +15,11 @@ func RuleCheckOnHostTxo(txOut *wire.TxOutAbe) ([]byte, error) {
 	return rules.RuleCheckOnHostTxo(txOut)
 }
 
+// RuleCheckOnAutTxOutputPrivacyType checks whether the outputAutTxo's type match the autPrivacyType's requirements.
+func RuleCheckOnAutTxOutputPrivacyType(autPrivacyType AutPrivacyType, outputAutTxo *ctautwire.AutTxo) error {
+	return rules.RuleCheckOnAutTxOutputPrivacyType(autPrivacyType, outputAutTxo)
+}
+
 // RuleCheckOnAutTxInputVersion checks whether the inputAutTxo's version matches the autScriptVersion.
 func RuleCheckOnAutTxInputVersion(autScriptVersion uint32, inputAutTxo *ctautwire.AutTxo) error {
 	return rules.RuleCheckOnAutTxInputVersion(autScriptVersion, inputAutTxo)

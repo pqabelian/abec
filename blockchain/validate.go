@@ -1827,13 +1827,10 @@ func validateAutRegistrationScript(tx *abeutil.TxAbe, currentHeight int32,
 		return fmt.Errorf("expected registration script, but got %d", extAutScript.Type())
 	}
 
-	identifier := extAutScript.AutIdentifier()
-	identifierKey := identifier.String()
-
 	// ensure no the same identifier is registered
-	instance, exist := ctautView.instances[identifierKey]
-	if exist && instance != nil && instance.metadata != nil {
-		return errors.New("an registration transaction try to register AUT instance with an existing AUT identifier ")
+	autMetadata := ctautView.LookupCTAUTMetaInfo(extAutScript.AutIdentifier())
+	if autMetadata != nil {
+		return fmt.Errorf("an registration transaction try to register AUT instance with an existing AUT identifier")
 	}
 
 	// if the claimed height will expire soon, reject it
@@ -1869,32 +1866,30 @@ func validateAutReRegistrationScript(tx *abeutil.TxAbe, currentHeight int32,
 		return fmt.Errorf("expected re-registration script, but got %d", extAutScript.Type())
 	}
 
-	identifier := extAutScript.AutIdentifier()
-	identifierKey := identifier.String()
+	autMetadata := ctautView.LookupCTAUTMetaInfo(extAutScript.AutIdentifier())
 
-	instance, exist := ctautView.instances[identifierKey]
-	if !exist || instance == nil || instance.metadata == nil {
+	if autMetadata == nil {
 		return fmt.Errorf("an non-registration AUT transaction try to operate on non-existing AUT entry")
 	}
 
 	// sanity check: expiry
-	if instance.metadata.ReregistrationExpireHeight != ctautapi.InfiniteExpireHeight &&
-		instance.metadata.ReregistrationExpireHeight < currentHeight {
+	if autMetadata.ReregistrationExpireHeight != ctautapi.InfiniteExpireHeight &&
+		autMetadata.ReregistrationExpireHeight < currentHeight {
 		return fmt.Errorf("transaction %s try to re-register at height %d but "+
 			"the AUT entry claim its expire height %d when last registered", tx.Hash(), currentHeight,
-			instance.metadata.ReregistrationExpireHeight)
+			autMetadata.ReregistrationExpireHeight)
 	}
 
 	claimedIssuersByCoinAddress := map[string]struct{}{}
-	for i := 0; i < len(instance.metadata.Issuers); i++ {
-		if instance.metadata.Issuers[i] == nil {
+	for i := 0; i < len(autMetadata.Issuers); i++ {
+		if autMetadata.Issuers[i] == nil {
 			return fmt.Errorf("instance.metadata.Issuers[%d] is nil", i)
 		}
-		if len(instance.metadata.Issuers[i].CoinAddress()) == 0 {
+		if len(autMetadata.Issuers[i].CoinAddress()) == 0 {
 			return fmt.Errorf("instance.metadata.Issuers[%d].CoinAddress() is nil/empty", i)
 		}
 
-		issuerCoinAddressStr := hex.EncodeToString(instance.metadata.Issuers[i].CoinAddress())
+		issuerCoinAddressStr := hex.EncodeToString(autMetadata.Issuers[i].CoinAddress())
 		claimedIssuersByCoinAddress[issuerCoinAddressStr] = struct{}{}
 	}
 
@@ -1902,19 +1897,19 @@ func validateAutReRegistrationScript(tx *abeutil.TxAbe, currentHeight int32,
 	consumedTokenIssuersByCoinAddress := map[string]struct{}{}
 	willConsumedRootTokenHostOutpoints := map[string]*ctautapi.HostOutPoint{}
 
-	inStartIndex := reRegisterScript.InStartIndex()
-	inAutRootTokenNum := reRegisterScript.InAutRootTokenNum()
+	inStartIndex := int(reRegisterScript.InStartIndex())
+	inAutRootTokenNum := int(reRegisterScript.InAutRootTokenNum())
 
 	hostTxIns := tx.MsgTx().TxIns
 
-	if int(inStartIndex)+int(inAutRootTokenNum) > len(hostTxIns) {
+	if inStartIndex+inAutRootTokenNum > len(hostTxIns) {
 		return fmt.Errorf("inStartIndex (%d) + inAutRootTokenNum (%d) exceeds the number of TxIns (%d)",
 			inStartIndex, inAutRootTokenNum, len(hostTxIns))
 	}
 
-	for i := 0; i < int(inAutRootTokenNum); i++ {
+	for i := 0; i < inAutRootTokenNum; i++ {
 
-		hostTxIn := hostTxIns[int(inStartIndex)+i]
+		hostTxIn := hostTxIns[inStartIndex+i]
 
 		if hostTxIn == nil {
 			return fmt.Errorf("TxIns[%d] is nil]", i)
@@ -1957,7 +1952,7 @@ func validateAutReRegistrationScript(tx *abeutil.TxAbe, currentHeight int32,
 		hostOutPoint := txoRing.OutPointRing.OutPoints[0]
 		hostOpStr := hostOutPoint.String()
 
-		if _, existOutpoint := instance.metadata.ActiveRootTokenSet[hostOpStr]; !existOutpoint {
+		if _, existOutpoint := autMetadata.ActiveRootTokenSet[hostOpStr]; !existOutpoint {
 			return fmt.Errorf("transaction %s try to re-register with unknown root coin <%s:%d>",
 				tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
 		}
@@ -1984,17 +1979,17 @@ func validateAutReRegistrationScript(tx *abeutil.TxAbe, currentHeight int32,
 	}
 
 	// check the threshold
-	if len(consumedTokenIssuersByCoinAddress) < int(instance.metadata.ReregistrationThreshold) {
+	if len(consumedTokenIssuersByCoinAddress) < int(autMetadata.ReregistrationThreshold) {
 		return fmt.Errorf("transaction %s try to re-register instance but fail to meet the claimed re-registration threshold (%d/%d)",
-			tx.Hash(), len(consumedTokenIssuersByCoinAddress), instance.metadata.ReregistrationThreshold)
+			tx.Hash(), len(consumedTokenIssuersByCoinAddress), autMetadata.ReregistrationThreshold)
 	}
 
 	// check updated AUT info
 	// planned amount
-	if instance.metadata.MintedAmount > reRegisterScript.PlannedTotalSupply() {
+	if autMetadata.MintedAmount > reRegisterScript.PlannedTotalSupply() {
 		return fmt.Errorf("transaction %s try to update the planned total amount to %d but "+
 			"the AUT entry has mint %d", tx.Hash(), reRegisterScript.PlannedTotalSupply(),
-			instance.metadata.MintedAmount)
+			autMetadata.MintedAmount)
 	}
 
 	// expiry
@@ -2009,8 +2004,7 @@ func validateAutReRegistrationScript(tx *abeutil.TxAbe, currentHeight int32,
 }
 
 // validateAutMintScript
-// aut review done 2025.12.12 todo: to discuss
-// todo: rename, only check inputs? to validate?
+// aut review done 2025.12.12
 func validateAutMintScript(tx *abeutil.TxAbe, currentHeight int32,
 	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
 
@@ -2032,21 +2026,19 @@ func validateAutMintScript(tx *abeutil.TxAbe, currentHeight int32,
 		return fmt.Errorf("expected mint script, but got %d", extAutScript.Type())
 	}
 
-	identifier := extAutScript.AutIdentifier()
-	identifierKey := identifier.String()
+	autMetadata := ctautView.LookupCTAUTMetaInfo(extAutScript.AutIdentifier())
 
-	instance, exist := ctautView.instances[identifierKey]
-	if !exist || instance == nil || instance.metadata == nil {
-		return errors.New("an non-registration AUT transaction try to operate on non-existing AUT entry")
+	if autMetadata == nil {
+		return fmt.Errorf("an non-registration AUT transaction try to operate on non-existing AUT entry")
 	}
 
 	claimedIssuersByCoinAddress := map[string]struct{}{}
-	for i := 0; i < len(instance.metadata.Issuers); i++ {
-		if instance.metadata.Issuers[i] == nil {
+	for i := 0; i < len(autMetadata.Issuers); i++ {
+		if autMetadata.Issuers[i] == nil {
 			return fmt.Errorf("instance.metadata.Issuers[%d] is nil", i)
 		}
 
-		coinAddress := instance.metadata.Issuers[i].CoinAddress()
+		coinAddress := autMetadata.Issuers[i].CoinAddress()
 		if len(coinAddress) == 0 {
 			return fmt.Errorf("instance.metadata.Issuers[%d]CoinAddress() is nil/empty", i)
 		}
@@ -2059,17 +2051,17 @@ func validateAutMintScript(tx *abeutil.TxAbe, currentHeight int32,
 	consumedTokenIssuersByCoinAddress := map[string]struct{}{}
 	willConsumedRootTokenHostOutpoints := map[string]*ctautapi.HostOutPoint{}
 
-	inStartIndex := mintScript.InStartIndex()
-	inAutRootTokenNum := mintScript.InAutRootTokenNum()
+	inStartIndex := int(mintScript.InStartIndex())
+	inAutRootTokenNum := int(mintScript.InAutRootTokenNum())
 
 	hostTxIns := tx.MsgTx().TxIns
-	if int(inStartIndex)+int(inAutRootTokenNum) > len(hostTxIns) {
+	if inStartIndex+inAutRootTokenNum > len(hostTxIns) {
 		return fmt.Errorf("inStartIndex %d + inAutRootTokenNum(%d) exceeds the number of TxIns (%d)",
 			inStartIndex, inAutRootTokenNum, len(hostTxIns))
 	}
 
-	for i := 0; i < int(inAutRootTokenNum); i++ {
-		hostTxIn := hostTxIns[int(inStartIndex)+i]
+	for i := 0; i < inAutRootTokenNum; i++ {
+		hostTxIn := hostTxIns[inStartIndex+i]
 
 		if hostTxIn == nil {
 			return fmt.Errorf("TxIns[%d] is nil]", i)
@@ -2115,7 +2107,7 @@ func validateAutMintScript(tx *abeutil.TxAbe, currentHeight int32,
 		}
 
 		hostOPStr := hostOutPoint.String()
-		if _, existOutpoint := instance.metadata.ActiveRootTokenSet[hostOPStr]; !existOutpoint {
+		if _, existOutpoint := autMetadata.ActiveRootTokenSet[hostOPStr]; !existOutpoint {
 			return fmt.Errorf("transaction %s try to re-register with unknown root coin <%s:%d>",
 				tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
 		}
@@ -2142,25 +2134,43 @@ func validateAutMintScript(tx *abeutil.TxAbe, currentHeight int32,
 	}
 
 	// check the threshold
-	if len(consumedTokenIssuersByCoinAddress) < int(instance.metadata.MintThreshold) {
+	if len(consumedTokenIssuersByCoinAddress) < int(autMetadata.MintThreshold) {
 		return fmt.Errorf("transaction %s try to mint tokens but fail to meet the claimed mint threshold (%d/%d)",
-			tx.Hash(), len(consumedTokenIssuersByCoinAddress), instance.metadata.MintThreshold)
+			tx.Hash(), len(consumedTokenIssuersByCoinAddress), autMetadata.MintThreshold)
 	}
 
 	// check the supply
-	if instance.metadata.MintedAmount > instance.metadata.PlannedTotalSupply {
+	if autMetadata.MintedAmount > autMetadata.PlannedTotalSupply {
 		// just assert
 		return fmt.Errorf("the target AutInstance has mintedAmout (%d) exceeds the plannedTotalSupply (%d) ",
-			instance.metadata.MintedAmount, instance.metadata.PlannedTotalSupply)
+			autMetadata.MintedAmount, autMetadata.PlannedTotalSupply)
 	}
-	maxAllowed := instance.metadata.PlannedTotalSupply - instance.metadata.MintedAmount // uint64, and >= 0
+	maxAllowed := autMetadata.PlannedTotalSupply - autMetadata.MintedAmount // uint64, and >= 0
 
 	if mintScript.Vin() > maxAllowed {
 		return fmt.Errorf("transaction %s try to mint coin value %d, which exceeds the allowed value %d (= PlannedTotalSupply %d - MintedAmount %d)",
-			tx.Hash(), mintScript.Vin(), maxAllowed, instance.metadata.PlannedTotalSupply, instance.metadata.MintedAmount)
+			tx.Hash(), mintScript.Vin(), maxAllowed, autMetadata.PlannedTotalSupply, autMetadata.MintedAmount)
 	}
 
-	// todo: move the outside codes to here
+	// check privacy type of output tokens
+	privacyType := autMetadata.PrivacyType
+
+	for i, token := range extAutScript.GeneratedTokens() {
+		if token == nil {
+			return fmt.Errorf("extAutScript.GeneratedTokens[%d] is nil", i)
+		}
+
+		autTxo := &ctautwire.AutTxo{}
+		err := autTxo.Deserialize(token.ValueScript)
+		if err != nil {
+			return err
+		}
+
+		err = ctautapi.RuleCheckOnAutTxOutputPrivacyType(privacyType, autTxo)
+		if err != nil {
+			return err
+		}
+	}
 
 	// todo: review 2025.12.12
 	// todo: use a AutWitnessHash() function
@@ -2867,25 +2877,6 @@ func ValidateTxCTAUTScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostVie
 		err = validateAutMintScript(tx, currentHeight, ctautView, hostView, chainParams)
 		if err != nil {
 			return err
-		}
-
-		// todo: move inside
-		// check privacy type
-		metadata := ctautView.LookupCTAUTMetaInfo(extAutScript.AutIdentifier())
-		privacyType := metadata.PrivacyType
-
-		generatedTokens := extAutScript.GeneratedTokens()
-		for _, token := range generatedTokens {
-			autTxo := &ctautwire.AutTxo{}
-			err = autTxo.Deserialize(token.ValueScript)
-			if err != nil {
-				return err
-			}
-
-			err = rules.RuleCheckOnAutTxOutputPrivacyType(privacyType, autTxo)
-			if err != nil {
-				return err
-			}
 		}
 
 	case *ctautapi.TransferScript:
