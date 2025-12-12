@@ -2198,7 +2198,8 @@ func checkCTAUTMintTransactionInputs(tx *abeutil.TxAbe, currentHeight int32,
 	return nil
 }
 
-// todo: remove ctAutScript *ctautapi.ExtAutScript
+// checkCTAUTTransferTransactionInputs
+// aut review done 2025.12.12 todo: discuss
 func checkCTAUTTransferTransactionInputs(tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
 
@@ -2462,20 +2463,32 @@ func checkCTAUTTransferTransactionInputs(tx *abeutil.TxAbe, txHeight int32,
 	return nil
 }
 
-// todo: remove ctAutScript *ctautapi.ExtAutScript
-func checkCTAUTBurnTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abeutil.TxAbe, txHeight int32,
+// checkCTAUTTransferTransactionInputs
+// aut review done 2025.12.12 todo: discuss
+func checkCTAUTBurnTransactionInputs(tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
-	if ctAutScript.Type() != ctautapi.AutScriptTypeBurn {
-		return fmt.Errorf("expected burn script, but got %d", ctAutScript.Type())
-	}
-	burnScript, ok := ctAutScript.AutScript.(*ctautapi.BurnScript)
-	if !ok {
-		return fmt.Errorf("expected burn script, but got %d", ctAutScript.Type())
+
+	if tx == nil {
+		return fmt.Errorf("tx is nil")
 	}
 
-	identifier := ctAutScript.AutIdentifier()
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		// the caller should check whether tx.ExtAutScript() is nil before calling this function
+		return fmt.Errorf("wrong call on checkCTAUTBurnTransactionInputs: tx.ExtAutScript is nil")
+	}
+
+	if extAutScript.Type() != ctautapi.AutScriptTypeBurn {
+		return fmt.Errorf("expected burn script, but got %d", extAutScript.Type())
+	}
+	burnScript, ok := extAutScript.AutScript.(*ctautapi.BurnScript)
+	if !ok {
+		return fmt.Errorf("expected burn script, but got %d", extAutScript.Type())
+	}
+
+	identifier := extAutScript.AutIdentifier()
 	identifierKey := identifier.String()
-	scriptVersion := ctAutScript.Version()
+	scriptVersion := extAutScript.Version()
 
 	instance, exist := ctautView.instances[identifierKey]
 	if !exist || instance == nil || instance.metadata == nil {
@@ -2486,14 +2499,18 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abe
 	inHiddenAutTokenNum := burnScript.InHiddenAutTokenNum()
 	inPublicAutTokenNum := burnScript.InPublicAutTokenNum()
 
-	hostedTxIns := tx.MsgTx().TxIns
+	hostTxIns := tx.MsgTx().TxIns
+
+	if int(inStartIndex)+int(inHiddenAutTokenNum)+int(inPublicAutTokenNum) > len(hostTxIns) {
+		return fmt.Errorf("inStartIndex (%d) + inHiddenAutTokenNum (%d) + inPublicAutTokenNum (%d) exceeds the number of TxIns (%d)",
+			inStartIndex, inHiddenAutTokenNum, inPublicAutTokenNum, len(hostTxIns))
+	}
 
 	willConsumedTokens := map[string]*ctautapi.HostOutPoint{}
-	autTransferTxIns := make([]*ctautwire.AutTxo, 0, inHiddenAutTokenNum+inPublicAutTokenNum)
+	autTransferTxIns := make([]*ctautwire.AutTxo, 0, int(inHiddenAutTokenNum)+int(inPublicAutTokenNum))
 
 	for i := 0; i < int(inHiddenAutTokenNum); i++ {
-		hostIndex := int(inStartIndex) + i
-		hostTxIn := hostedTxIns[hostIndex]
+		hostTxIn := hostTxIns[int(inStartIndex)+i]
 
 		if len(hostTxIn.PreviousOutPointRing.OutPoints) != 1 {
 			return fmt.Errorf("incorrect input for Aut with wrong ring size %d", len(hostTxIn.PreviousOutPointRing.OutPoints))
@@ -2586,7 +2603,7 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abe
 
 	for i := 0; i < int(inPublicAutTokenNum); i++ {
 		hostIndex := int(inStartIndex) + int(inHiddenAutTokenNum) + i
-		hostTxIn := hostedTxIns[hostIndex]
+		hostTxIn := hostTxIns[hostIndex]
 
 		if len(hostTxIn.PreviousOutPointRing.OutPoints) != 1 {
 			return fmt.Errorf("incorrect input for Aut with wrong ring size %d", len(hostTxIn.PreviousOutPointRing.OutPoints))
@@ -2684,9 +2701,9 @@ func checkCTAUTBurnTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abe
 		return fmt.Errorf("mismatch witness for script")
 	}
 
-	generatedTokens := ctAutScript.GeneratedTokens()
+	generatedTokens := extAutScript.GeneratedTokens()
 	trTx := &ctautwire.AutTransferTx{
-		Version:   ctAutScript.Version(),
+		Version:   extAutScript.Version(),
 		TxIns:     autTransferTxIns,
 		TxOuts:    make([]*ctautwire.AutTxo, 0, len(generatedTokens)),
 		TxWitness: tx.MsgTx().AutWitness,
