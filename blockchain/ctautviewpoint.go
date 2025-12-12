@@ -278,7 +278,7 @@ func (view *CTAUTViewpoint) LookupCTAUTMetaInfo(identifier ctautapi.AutId) *ctau
 // unspendable.  When the view already has an entry for the output, it will be
 // marked unspent.  All fields will be updated for existing entries since it's
 // possible it has changed during a reorg.
-func (view *CTAUTViewpoint) addCTAUTCoin(version uint32, identifier ctautapi.AutId, outpoint ctautapi.HostOutPoint, script []byte, blockHeight int32) error {
+func (view *CTAUTViewpoint) addCTAUTCoin(version uint32, identifier ctautapi.AutId, outpoint ctautapi.HostOutPoint, valueScript []byte, blockHeight int32) error {
 	// if the tx is not existing in the utxoentry, create a new one. otherwise update the height of view
 	// Update existing entries.  All fields are updated because it's
 	// possible (although extremely unlikely) that the existing entry is
@@ -291,7 +291,7 @@ func (view *CTAUTViewpoint) addCTAUTCoin(version uint32, identifier ctautapi.Aut
 	if instance.coins == nil {
 		instance.coins = make(map[ctautapi.HostOutPoint]*CTAUTCoin)
 	}
-	instance.coins[outpoint] = NewCTAUTCoin(version, identifier, script, blockHeight)
+	instance.coins[outpoint] = NewCTAUTCoin(version, identifier, valueScript, blockHeight)
 	return nil
 }
 

@@ -534,12 +534,12 @@ func deserializeUnspentAutCoin(serialized []byte) (*CTAUTCoin, error) {
 		return nil, err
 	}
 
-	script, err := wire.ReadVarBytes(r, 0, ctautapi.MaxAutValueScriptLength, "script")
+	valueScript, err := wire.ReadVarBytes(r, 0, ctautapi.MaxAutValueScriptLength, "valueScript")
 	if err != nil {
 		return nil, err
 	}
 
-	return NewCTAUTCoin(version, identifier, script, blockHeight), nil
+	return NewCTAUTCoin(version, identifier, valueScript, blockHeight), nil
 }
 
 // dbFetchCTAUTCoin
