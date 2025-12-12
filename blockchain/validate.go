@@ -1875,7 +1875,7 @@ func checkCTAUTReRegistrationTransactionInputs(tx *abeutil.TxAbe, currentHeight 
 
 	instance, exist := ctautView.instances[identifierKey]
 	if !exist || instance == nil || instance.metadata == nil {
-		return errors.New("an non-registration AUT transaction try to operate on non-existing AUT entry")
+		return fmt.Errorf("an non-registration AUT transaction try to operate on non-existing AUT entry")
 	}
 
 	// sanity check: expiry
@@ -1951,7 +1951,7 @@ func checkCTAUTReRegistrationTransactionInputs(tx *abeutil.TxAbe, currentHeight 
 				ringHash.String(), len(txoRing.TxOuts), len(txoRing.OutPointRing.OutPoints))
 		}
 
-		coinAddress, err := rules.RuleCheckOnHostTxo(txoRing.TxOuts[0])
+		coinAddress, err := ctautapi.RuleCheckOnHostTxo(txoRing.TxOuts[0])
 		if err != nil {
 			return err
 		}
@@ -2110,7 +2110,7 @@ func checkCTAUTMintTransactionInputs(tx *abeutil.TxAbe, currentHeight int32,
 
 		// fill out with the first item in ring
 		hostOutPoint := txoRing.OutPointRing.OutPoints[0]
-		coinAddress, err := rules.RuleCheckOnHostTxo(txoRing.TxOuts[0])
+		coinAddress, err := ctautapi.RuleCheckOnHostTxo(txoRing.TxOuts[0])
 		if err != nil {
 			return err
 		}
@@ -2243,21 +2243,14 @@ func checkCTAUTTransferTransactionInputs(tx *abeutil.TxAbe, txHeight int32,
 	willConsumedTokens := map[string]*ctautapi.HostOutPoint{}
 	autTransferTxIns := make([]*ctautwire.AutTxo, 0, int(inHiddenAutTokenNum)+int(inPublicAutTokenNum))
 
-	for i := 0; i < int(inHiddenAutTokenNum); i++ {
+	for i := 0; i < int(inHiddenAutTokenNum)+int(inPublicAutTokenNum); i++ {
 		hostTxIn := hostTxIns[int(inStartIndex)+i]
 
-		if len(hostTxIn.PreviousOutPointRing.OutPoints) != 1 {
-			return fmt.Errorf("incorrect input for Aut with wrong ring size %d", len(hostTxIn.PreviousOutPointRing.OutPoints))
-		}
 		ringHash := hostTxIn.PreviousOutPointRing.Hash()
 		ringEntry := hostView.LookupEntry(ringHash)
 		if ringEntry == nil {
 			return fmt.Errorf("transaction %s try to re-register at height %d but "+
 				"the consumed UTXO at Ring %s not exist", tx.Hash(), txHeight, hostTxIn.PreviousOutPointRing.Hash())
-		}
-		ringId := ringEntry.OutPointRing().RingId()
-		if !ringId.IsEqual(&ringHash) {
-			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has ringId (%s)", ringHash.String(), ringId.String())
 		}
 
 		txoRing := ringEntry.TxoRing()
@@ -2268,132 +2261,36 @@ func checkCTAUTTransferTransactionInputs(tx *abeutil.TxAbe, txHeight int32,
 			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) is nil ", ringHash.String())
 		}
 
-		if len(txoRing.OutPointRing.OutPoints) != len(txoRing.TxOuts) {
-			return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-				"len(txoRing.OutPointRing.OutPoints) = %d || len(txoRing.TxOuts) = %d ",
-				ringHash.String(), len(txoRing.OutPointRing.OutPoints), len(txoRing.TxOuts))
-		}
-
-		if len(txoRing.OutPointRing.OutPoints) == 0 {
-			return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-				"len(txoRing.OutPointRing.OutPoints) = 0 ",
-				ringHash.String())
-		}
-
-		if len(ringEntry.OutPointRing().OutPoints) == 0 {
-			return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-				"len(txoRing.OutPointRing.OutPoints) = 0 ",
-				ringHash.String())
-		}
-
-		privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txoRing.TxOuts[0])
-		if err != nil {
-			return err
-		}
-
-		if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
-			return fmt.Errorf("expect privacy level %d but got %d",
-				abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
-		}
-
-		// fill out with the first item in ring
-		hostOutPoint := txoRing.OutPointRing.OutPoints[0]
-		if _, ok = willConsumedTokens[hostOutPoint.String()]; ok {
-			return fmt.Errorf("transaction %s try to double spend the token <%s:%d>",
-				tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
-		}
-		willConsumedTokens[hostOutPoint.String()] = hostOutPoint
-
-		coin := ctautView.LookupCTAUTCoin(identifier, *hostOutPoint)
-		if coin == nil {
-			return fmt.Errorf("no such CTAUT coin found")
-		}
-		if coin.IsSpent() {
-			return fmt.Errorf("transaction %s try to consume spent CTAUT coin <%s:%d>",
-				tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
-		}
-
-		autTxo := &ctautwire.AutTxo{}
-		err = autTxo.Deserialize(coin.script)
-		if err != nil {
-			return err
-		}
-		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
-		if err != nil {
-			return fmt.Errorf("fail to get last aut txo type: %v", err)
-		}
-		if autTxoType != abecryptox.AutTxoTypeHidden {
-			return fmt.Errorf("expect aut txo type %d but got %d",
-				abecryptox.AutTxoTypeHidden, autTxoType)
-		}
-
-		err = rules.RuleCheckOnAutTxInputVersion(scriptVersion, autTxo)
-		if err != nil {
-			return err
-		}
-
-		autTransferTxIns = append(autTransferTxIns, autTxo)
-	}
-	for i := 0; i < int(inPublicAutTokenNum); i++ {
-		hostTxIn := hostTxIns[int(inStartIndex)+int(inHiddenAutTokenNum)+i]
-
-		if len(hostTxIn.PreviousOutPointRing.OutPoints) != 1 {
-			return fmt.Errorf("incorrect input for Aut with wrong ring size %d", len(hostTxIn.PreviousOutPointRing.OutPoints))
-		}
-		ringHash := hostTxIn.PreviousOutPointRing.Hash()
-		ringEntry := hostView.LookupEntry(ringHash)
-		if ringEntry == nil {
-			return fmt.Errorf("transaction %s try to re-register at height %d but "+
-				"the consumed UTXO at Ring %s not exist", tx.Hash(), txHeight, hostTxIn.PreviousOutPointRing.Hash())
-		}
-		ringId := ringEntry.OutPointRing().RingId()
+		ringId := txoRing.OutPointRing.RingId()
 		if !ringId.IsEqual(&ringHash) {
 			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has ringId (%s)", ringHash.String(), ringId.String())
 		}
 
-		txoRing := ringEntry.TxoRing()
-		if txoRing == nil {
-			return fmt.Errorf("the TxoRing obtained by ringHash (%s) is nil ", ringHash.String())
-		}
-		if txoRing.OutPointRing == nil {
-			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) is nil ", ringHash.String())
-		}
-
-		if len(txoRing.OutPointRing.OutPoints) != len(txoRing.TxOuts) {
+		if len(txoRing.OutPointRing.OutPoints) != 1 {
 			return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-				"len(txoRing.OutPointRing.OutPoints) = %d || len(txoRing.TxOuts) = %d ",
-				ringHash.String(), len(txoRing.OutPointRing.OutPoints), len(txoRing.TxOuts))
+				"len(txoRing.OutPointRing.OutPoints) %d != 1",
+				ringHash.String(), len(txoRing.OutPointRing.OutPoints))
 		}
 
-		if len(txoRing.OutPointRing.OutPoints) == 0 {
+		if len(txoRing.TxOuts) != len(txoRing.OutPointRing.OutPoints) {
 			return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-				"len(txoRing.OutPointRing.OutPoints) = 0 ",
-				ringHash.String())
-		}
-
-		if len(ringEntry.OutPointRing().OutPoints) == 0 {
-			return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-				"len(txoRing.OutPointRing.OutPoints) = 0 ",
-				ringHash.String())
-		}
-
-		privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txoRing.TxOuts[0])
-		if err != nil {
-			return err
-		}
-
-		if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
-			return fmt.Errorf("expect privacy level %d but got %d",
-				abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
+				"len(txoRing.TxOuts) = %d while len(txoRing.OutPointRing.OutPoints) = %d",
+				ringHash.String(), len(txoRing.TxOuts), len(txoRing.OutPointRing.OutPoints))
 		}
 
 		// fill out with the first item in ring
 		hostOutPoint := txoRing.OutPointRing.OutPoints[0]
-		if _, ok = willConsumedTokens[hostOutPoint.String()]; ok {
+		_, err := ctautapi.RuleCheckOnHostTxo(txoRing.TxOuts[0]) // perform host checks
+		if err != nil {
+			return err
+		}
+
+		hostOPStr := hostOutPoint.String()
+		if _, ok = willConsumedTokens[hostOPStr]; ok {
 			return fmt.Errorf("transaction %s try to double spend the token <%s:%d>",
 				tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
 		}
-		willConsumedTokens[hostOutPoint.String()] = hostOutPoint
+		willConsumedTokens[hostOPStr] = hostOutPoint
 
 		coin := ctautView.LookupCTAUTCoin(identifier, *hostOutPoint)
 		if coin == nil {
@@ -2403,22 +2300,33 @@ func checkCTAUTTransferTransactionInputs(tx *abeutil.TxAbe, txHeight int32,
 			return fmt.Errorf("transaction %s try to consume spent CTAUT coin <%s:%d>",
 				tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
 		}
+		// does not need to consider the double spending on coin, since that is checked by hostOutPoint.
 
 		autTxo := &ctautwire.AutTxo{}
 		err = autTxo.Deserialize(coin.script)
 		if err != nil {
 			return err
 		}
+
+		// inputAutTxo's Type match
 		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
 		if err != nil {
 			return fmt.Errorf("fail to get last aut txo type: %v", err)
 		}
-		if autTxoType != abecryptox.AutTxoTypePublic {
-			return fmt.Errorf("expect aut txo type %d but got %d",
-				abecryptox.AutTxoTypePublic, autTxoType)
+		if i < int(inHiddenAutTokenNum) {
+			if autTxoType != abecryptox.AutTxoTypeHidden {
+				return fmt.Errorf("expect aut txo type %d but got %d",
+					abecryptox.AutTxoTypeHidden, autTxoType)
+			}
+		} else {
+			// >= inHiddenAutTokenNum
+			if autTxoType != abecryptox.AutTxoTypePublic {
+				return fmt.Errorf("expect aut txo type %d but got %d",
+					abecryptox.AutTxoTypePublic, autTxoType)
+			}
 		}
 
-		err = rules.RuleCheckOnAutTxInputVersion(scriptVersion, autTxo)
+		err = ctautapi.RuleCheckOnAutTxInputVersion(scriptVersion, autTxo)
 		if err != nil {
 			return err
 		}
@@ -2426,6 +2334,101 @@ func checkCTAUTTransferTransactionInputs(tx *abeutil.TxAbe, txHeight int32,
 		autTransferTxIns = append(autTransferTxIns, autTxo)
 	}
 
+	//for i := 0; i < int(inPublicAutTokenNum); i++ {
+	//	hostTxIn := hostTxIns[int(inStartIndex)+int(inHiddenAutTokenNum)+i]
+	//
+	//	if len(hostTxIn.PreviousOutPointRing.OutPoints) != 1 {
+	//		return fmt.Errorf("incorrect input for Aut with wrong ring size %d", len(hostTxIn.PreviousOutPointRing.OutPoints))
+	//	}
+	//	ringHash := hostTxIn.PreviousOutPointRing.Hash()
+	//	ringEntry := hostView.LookupEntry(ringHash)
+	//	if ringEntry == nil {
+	//		return fmt.Errorf("transaction %s try to re-register at height %d but "+
+	//			"the consumed UTXO at Ring %s not exist", tx.Hash(), txHeight, hostTxIn.PreviousOutPointRing.Hash())
+	//	}
+	//	ringId := ringEntry.OutPointRing().RingId()
+	//	if !ringId.IsEqual(&ringHash) {
+	//		return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has ringId (%s)", ringHash.String(), ringId.String())
+	//	}
+	//
+	//	txoRing := ringEntry.TxoRing()
+	//	if txoRing == nil {
+	//		return fmt.Errorf("the TxoRing obtained by ringHash (%s) is nil ", ringHash.String())
+	//	}
+	//	if txoRing.OutPointRing == nil {
+	//		return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) is nil ", ringHash.String())
+	//	}
+	//
+	//	if len(txoRing.OutPointRing.OutPoints) != len(txoRing.TxOuts) {
+	//		return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
+	//			"len(txoRing.OutPointRing.OutPoints) = %d || len(txoRing.TxOuts) = %d ",
+	//			ringHash.String(), len(txoRing.OutPointRing.OutPoints), len(txoRing.TxOuts))
+	//	}
+	//
+	//	if len(txoRing.OutPointRing.OutPoints) == 0 {
+	//		return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
+	//			"len(txoRing.OutPointRing.OutPoints) = 0 ",
+	//			ringHash.String())
+	//	}
+	//
+	//	if len(ringEntry.OutPointRing().OutPoints) == 0 {
+	//		return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
+	//			"len(txoRing.OutPointRing.OutPoints) = 0 ",
+	//			ringHash.String())
+	//	}
+	//
+	//	privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txoRing.TxOuts[0])
+	//	if err != nil {
+	//		return err
+	//	}
+	//
+	//	if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+	//		return fmt.Errorf("expect privacy level %d but got %d",
+	//			abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
+	//	}
+	//
+	//	// fill out with the first item in ring
+	//	hostOutPoint := txoRing.OutPointRing.OutPoints[0]
+	//	if _, ok = willConsumedTokens[hostOutPoint.String()]; ok {
+	//		return fmt.Errorf("transaction %s try to double spend the token <%s:%d>",
+	//			tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
+	//	}
+	//	willConsumedTokens[hostOutPoint.String()] = hostOutPoint
+	//
+	//	coin := ctautView.LookupCTAUTCoin(identifier, *hostOutPoint)
+	//	if coin == nil {
+	//		return fmt.Errorf("no such CTAUT coin found")
+	//	}
+	//	if coin.IsSpent() {
+	//		return fmt.Errorf("transaction %s try to consume spent CTAUT coin <%s:%d>",
+	//			tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
+	//	}
+	//
+	//	autTxo := &ctautwire.AutTxo{}
+	//	err = autTxo.Deserialize(coin.script)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	autTxoType, err := abecryptox.GetAutTxoType(autTxo)
+	//	if err != nil {
+	//		return fmt.Errorf("fail to get last aut txo type: %v", err)
+	//	}
+	//	if autTxoType != abecryptox.AutTxoTypePublic {
+	//		return fmt.Errorf("expect aut txo type %d but got %d",
+	//			abecryptox.AutTxoTypePublic, autTxoType)
+	//	}
+	//
+	//	err = rules.RuleCheckOnAutTxInputVersion(scriptVersion, autTxo)
+	//	if err != nil {
+	//		return err
+	//	}
+	//
+	//	autTransferTxIns = append(autTransferTxIns, autTxo)
+	//}
+
+	// todo: 2025.12.12 check the outputs
+
+	// todo: 2025.12.12 sometimes not check autwitness
 	witnessHash := ctautwire.AutWitnessHash(tx.MsgTx().AutWitness)
 	claimedWitnessHash := transferScript.WitnessHash()
 	if !witnessHash.IsEqual(&claimedWitnessHash) {
@@ -2871,11 +2874,12 @@ func ValidateTxCTAUTScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostVie
 		}
 
 	case *ctautapi.TransferScript:
-		err = checkCTAUTTransferTransactionInputs(extAutScript, tx, currentHeight, ctautView, hostView, chainParams)
+		err = checkCTAUTTransferTransactionInputs(tx, currentHeight, ctautView, hostView, chainParams)
 		if err != nil {
 			return err
 		}
 
+		// todo: move inside
 		// check privacy type
 		metadata := ctautView.LookupCTAUTMetaInfo(extAutScript.AutIdentifier())
 		privacyType := metadata.PrivacyType

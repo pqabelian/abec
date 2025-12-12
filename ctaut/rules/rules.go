@@ -142,6 +142,7 @@ func RuleCheckOnAutTxOutputPrivacyType(autPrivacyType AutPrivacyType, outputAutT
 	return nil
 }
 
+// RuleCheckOnAutTxInputVersion checks whether the inputAutTxo's version matches the autScriptVersion.
 func RuleCheckOnAutTxInputVersion(autScriptVersion uint32, inputAutTxo *ctautwire.AutTxo) error {
 	// TODO check the type of the input autTxo?
 	//autTxoType, err := abecryptox.GetAutTxoType(autTxo)
