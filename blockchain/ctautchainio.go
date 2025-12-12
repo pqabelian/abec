@@ -455,44 +455,44 @@ func dbRemoveSpendJournalEntryCTAUT(dbTx database.Tx, blockHash *chainhash.Hash)
 }
 
 // deserializeCTAUTCoin
-// review done 2025.12.11 todo
+// review done 2025.12.11
 func serializeUnspentAutCoin(coin *CTAUTCoin) ([]byte, error) {
 	// Spent outputs have no serialization.
 	if coin.IsSpent() {
 		return nil, nil
 	}
 
-	size := 4 + // height
-		4 + // version
+	size := 4 + // version
+		4 + // height
 		len(coin.identifier) +
 		wire.VarIntSerializeSize(uint64(len(coin.script))) + len(coin.script)
 
-	buff := bytes.NewBuffer(make([]byte, 0, size))
+	w := bytes.NewBuffer(make([]byte, 0, size))
 
 	tmp := make([]byte, 4)
-	binary.LittleEndian.PutUint32(tmp, uint32(coin.blockHeight))
-	_, err := buff.Write(tmp)
+	binary.LittleEndian.PutUint32(tmp, coin.version)
+	_, err := w.Write(tmp)
 	if err != nil {
 		return nil, err
 	}
 
 	tmp = make([]byte, 4)
-	binary.LittleEndian.PutUint32(tmp, coin.version)
-	_, err = buff.Write(tmp)
+	binary.LittleEndian.PutUint32(tmp, uint32(coin.blockHeight))
+	_, err = w.Write(tmp)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = buff.Write(coin.identifier[:])
+	_, err = w.Write(coin.identifier[:])
 	if err != nil {
 		return nil, err
 	}
 
-	err = wire.WriteVarBytes(buff, 0, coin.script)
+	err = wire.WriteVarBytes(w, 0, coin.script)
 	if err != nil {
 		return nil, err
 	}
-	serializedUnspentAutCoin := buff.Bytes()
+	serializedUnspentAutCoin := w.Bytes()
 
 	//deserializedCoin, err := deserializeCTAUTCoin(serializedCTAUTCoin)
 	//if err != nil {
@@ -505,13 +505,20 @@ func serializeUnspentAutCoin(coin *CTAUTCoin) ([]byte, error) {
 }
 
 // deserializeCTAUTCoin
-// review done 2025.12.11 todo
+// review done 2025.12.11
 func deserializeUnspentAutCoin(serialized []byte) (*CTAUTCoin, error) {
 
-	reader := bytes.NewReader(serialized)
+	r := bytes.NewReader(serialized)
 
 	tmp := make([]byte, 4)
-	_, err := io.ReadFull(reader, tmp)
+	_, err := io.ReadFull(r, tmp)
+	if err != nil {
+		return nil, err
+	}
+	version := binary.LittleEndian.Uint32(tmp)
+
+	tmp = make([]byte, 4)
+	_, err = io.ReadFull(r, tmp)
 	if err != nil {
 		return nil, err
 	}
@@ -521,23 +528,13 @@ func deserializeUnspentAutCoin(serialized []byte) (*CTAUTCoin, error) {
 	}
 	blockHeight := int32(heightRead)
 
-	tmp = make([]byte, 4)
-	_, err = io.ReadFull(reader, tmp)
-	if err != nil {
-		return nil, err
-	}
-	version := binary.LittleEndian.Uint32(tmp)
-	if version > math.MaxUint32 {
-		return nil, AssertError(fmt.Sprintf("read version %d is invalid", version))
-	}
-
 	var identifier ctautapi.AutId
-	_, err = io.ReadFull(reader, identifier[:])
+	_, err = io.ReadFull(r, identifier[:])
 	if err != nil {
 		return nil, err
 	}
 
-	script, err := wire.ReadVarBytes(reader, 0, ctautapi.MaxAutValueScriptLength, "script")
+	script, err := wire.ReadVarBytes(r, 0, ctautapi.MaxAutValueScriptLength, "script")
 	if err != nil {
 		return nil, err
 	}
