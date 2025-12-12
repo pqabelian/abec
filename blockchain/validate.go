@@ -1947,7 +1947,11 @@ func validateAutReRegistrationScript(tx *abeutil.TxAbe, currentHeight int32,
 		if err != nil {
 			return err
 		}
+
 		hostOutPoint := txoRing.OutPointRing.OutPoints[0]
+		if hostOutPoint == nil {
+			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has nil at position 0 ", ringHash.String())
+		}
 		hostOpStr := hostOutPoint.String()
 
 		if _, existOutpoint := autMetadata.ActiveRootTokenSet[hostOpStr]; !existOutpoint {
@@ -2097,10 +2101,13 @@ func validateAutMintScript(tx *abeutil.TxAbe, currentHeight int32,
 		}
 
 		// fill out with the first item in ring
-		hostOutPoint := txoRing.OutPointRing.OutPoints[0]
 		coinAddress, err := ctautapi.RuleCheckOnHostTxo(txoRing.TxOuts[0])
 		if err != nil {
 			return err
+		}
+		hostOutPoint := txoRing.OutPointRing.OutPoints[0]
+		if hostOutPoint == nil {
+			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has nil at position 0 ", ringHash.String())
 		}
 
 		hostOPStr := hostOutPoint.String()
@@ -2282,10 +2289,14 @@ func validateAutTransferScript(tx *abeutil.TxAbe, txHeight int32,
 		}
 
 		// fill out with the first item in ring
-		hostOutPoint := txoRing.OutPointRing.OutPoints[0]
 		_, err := ctautapi.RuleCheckOnHostTxo(txoRing.TxOuts[0]) // perform host checks
 		if err != nil {
 			return err
+		}
+
+		hostOutPoint := txoRing.OutPointRing.OutPoints[0]
+		if hostOutPoint == nil {
+			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has nil at position 0 ", ringHash.String())
 		}
 
 		hostOPStr := hostOutPoint.String()
@@ -2471,10 +2482,14 @@ func validateAutBurnScript(tx *abeutil.TxAbe, txHeight int32,
 		}
 
 		// fill out with the first item in ring
-		hostOutPoint := txoRing.OutPointRing.OutPoints[0]
 		_, err := ctautapi.RuleCheckOnHostTxo(txoRing.TxOuts[0]) // preform host checks
 		if err != nil {
 			return err
+		}
+
+		hostOutPoint := txoRing.OutPointRing.OutPoints[0]
+		if hostOutPoint == nil {
+			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has nil at position 0 ", ringHash.String())
 		}
 
 		hostOPStr := hostOutPoint.String()
