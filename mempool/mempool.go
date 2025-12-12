@@ -229,9 +229,6 @@ type TxPool struct {
 	outpointsAbe     map[chainhash.Hash]map[string]*abeutil.TxAbe                    //TODO(abe):why use two layers map                 //	corresponding to btc's outpoints, using hash rather then TxIn as the key for map
 	orphansByPrevAbe map[chainhash.Hash]map[string]map[chainhash.Hash]*abeutil.TxAbe // corresponding to btc's orphansByPrev //TODO type transfer??? []byte -> string
 
-	expiredHeightAUT map[int32]map[chainhash.Hash]*TxDescAbe
-	//registeredAUTName map[string]chainhash.Hash
-
 	txMonitorMu  sync.Mutex
 	txMonitoring bool
 }
@@ -762,26 +759,6 @@ func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 		atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
 	}
 
-	extAutScript := tx.ExtAutScript()
-	//if err != nil {
-	//	This should not happen, since mempool should accept tx which has error on extracting AutTransaction.
-	//log.Warnf("removeTransactionAbe: error happens when extracting AutTransaction from Tx %s: %v", tx.Hash(), err)
-	//return
-	//}
-	if extAutScript != nil {
-		if extAutScript.Type() == ctautapi.AutScriptTypeRegistration {
-			ctAutScript := extAutScript.AutScript.(*ctautapi.RegistrationScript)
-			expireHeight := ctAutScript.ReregistrationExpireHeight()
-			if expireHeight != ctautapi.InfiniteExpireHeight {
-				willExpiredCTAut := mp.expiredHeightAUT[expireHeight]
-				delete(willExpiredCTAut, *tx.Hash())
-				if len(willExpiredCTAut) > 0 {
-					mp.expiredHeightAUT[ctAutScript.ReregistrationExpireHeight()] = willExpiredCTAut
-				}
-			}
-		}
-		// TODO for re-register also?
-	}
 }
 
 // RemoveTransactionAbe removes the passed transaction from the mempool. When the
@@ -914,38 +891,6 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 	/*	if mp.cfg.AddrIndex != nil {
 		mp.cfg.AddrIndex.AddUnconfirmedTx(tx, utxoView)
 	}*/
-
-	extAutScript := tx.ExtAutScript()
-	//if err != nil {
-	// This should not happen, since before addTransactionAbe, the transaction should have been checked
-	//log.Warnf("addTransactionAbe: fail to add Tx %s to mempool, since error happens when extracting AutTransaction: %v", tx.Hash(), err)
-	//return nil, errors.New("fail to extract CT-AUT transaction")
-	//}
-	if extAutScript != nil {
-		switch extAutScriptInst := extAutScript.AutScript.(type) {
-		case *ctautapi.RegistrationScript:
-			expireHeight := extAutScriptInst.ReregistrationExpireHeight()
-			if expireHeight != ctautapi.InfiniteExpireHeight {
-				if mp.expiredHeightAUT[expireHeight] == nil {
-					mp.expiredHeightAUT[expireHeight] = map[chainhash.Hash]*TxDescAbe{}
-				}
-				mp.expiredHeightAUT[expireHeight][*txD.Tx.Hash()] = txD
-			}
-
-			//identifier := autTransaction.Identifier()
-			//mp.registeredAUTName[hex.EncodeToString(identifier[:])] = *tx.Hash()
-		case *ctautapi.ReRegistrationScript:
-			expireHeight := extAutScriptInst.ReregistrationExpireHeight()
-			if expireHeight != ctautapi.InfiniteExpireHeight {
-				if mp.expiredHeightAUT[expireHeight] == nil {
-					mp.expiredHeightAUT[expireHeight] = map[chainhash.Hash]*TxDescAbe{}
-				}
-				mp.expiredHeightAUT[expireHeight][*txD.Tx.Hash()] = txD
-			}
-		default:
-			// nothing to do
-		}
-	}
 
 	// Record this tx for fee estimation if enabled.
 	if mp.cfg.FeeEstimator != nil {
@@ -2213,15 +2158,6 @@ func (mp *TxPool) RemoveTransactionAbeByRingHash(hash chainhash.Hash) {
 	mp.mtx.Unlock()
 }
 
-func (mp *TxPool) RemoveExpiredAUTTransaction(height int32) {
-	mp.mtx.Lock()
-	removeTransactions := mp.expiredHeightAUT[height]
-	for _, txAbe := range removeTransactions {
-		mp.removeTransactionAbe(txAbe.Tx)
-	}
-	mp.mtx.Unlock()
-}
-
 func (mp *TxPool) ClearOutdatedTransaction(nextHeight int32) {
 	log.Debugf("Clean outdated transaction in mempool")
 	mp.mtx.Lock()
@@ -2281,8 +2217,5 @@ func New(cfg *Config) *TxPool {
 		orphansAbe:       make(map[chainhash.Hash]*orphanTxAbe),
 		outpointsAbe:     make(map[chainhash.Hash]map[string]*abeutil.TxAbe),
 		orphansByPrevAbe: make(map[chainhash.Hash]map[string]map[chainhash.Hash]*abeutil.TxAbe),
-
-		expiredHeightAUT: make(map[int32]map[chainhash.Hash]*TxDescAbe),
-		//registeredAUTName: make(map[string]chainhash.Hash),
 	}
 }
