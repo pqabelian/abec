@@ -1805,20 +1805,30 @@ func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *
 }
 
 // checkCTAUTRegistrationTransactionInputs
-// aut review done 2025.12.11 todo: discuss
-// todo: remove ctAutScript *ctautapi.ExtAutScript; confirmed
-func checkCTAUTRegistrationTransactionInputs(ctAutScript *ctautapi.ExtAutScript, tx *abeutil.TxAbe, currentHeight int32,
+// aut review done 2025.12.12
+func checkCTAUTRegistrationTransactionInputs(tx *abeutil.TxAbe, currentHeight int32,
 	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
-	if ctAutScript.Type() != ctautapi.AutScriptTypeRegistration {
-		return fmt.Errorf("expected registration script, but got %d", ctAutScript.Type())
+
+	if tx == nil {
+		return fmt.Errorf("tx is nil")
 	}
 
-	registrationScript, ok := ctAutScript.AutScript.(*ctautapi.RegistrationScript)
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		// the caller should check whether tx.ExtAutScript() is nil before calling this function
+		return fmt.Errorf("wrong call on checkCTAUTRegistrationTransactionInputs: tx.ExtAutScript is nil")
+	}
+
+	if extAutScript.Type() != ctautapi.AutScriptTypeRegistration {
+		return fmt.Errorf("expected registration script, but got %d", extAutScript.Type())
+	}
+
+	registrationScript, ok := extAutScript.AutScript.(*ctautapi.RegistrationScript)
 	if !ok {
-		return fmt.Errorf("expected registration script, but got %d", ctAutScript.Type())
+		return fmt.Errorf("expected registration script, but got %d", extAutScript.Type())
 	}
 
-	identifier := ctAutScript.AutIdentifier()
+	identifier := extAutScript.AutIdentifier()
 	identifierKey := identifier.String()
 
 	// ensure no the same identifier is registered
@@ -1839,10 +1849,19 @@ func checkCTAUTRegistrationTransactionInputs(ctAutScript *ctautapi.ExtAutScript,
 }
 
 // checkCTAUTReRegistrationTransactionInputs
-// aut review done 2025.12.11 todo：
-// todo: remove ctAutScript *ctautapi.ExtAutScript; confirmed
-func checkCTAUTReRegistrationTransactionInputs(extAutScript *ctautapi.ExtAutScript, tx *abeutil.TxAbe, currentHeight int32,
+// aut review done 2025.12.11
+func checkCTAUTReRegistrationTransactionInputs(tx *abeutil.TxAbe, currentHeight int32,
 	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
+	if tx == nil {
+		return fmt.Errorf("tx is nil")
+	}
+
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		// the caller should check whether tx.ExtAutScript() is nil before calling this function
+		return fmt.Errorf("wrong call on checkCTAUTRegistrationTransactionInputs: tx.ExtAutScript is nil")
+	}
+
 	if extAutScript.Type() != ctautapi.AutScriptTypeReRegistration {
 		return fmt.Errorf("expected re-registration script, but got %d", extAutScript.Type())
 	}
@@ -1887,17 +1906,16 @@ func checkCTAUTReRegistrationTransactionInputs(extAutScript *ctautapi.ExtAutScri
 	inStartIndex := reRegisterScript.InStartIndex()
 	inAutRootTokenNum := reRegisterScript.InAutRootTokenNum()
 
-	hostedTxIns := tx.MsgTx().TxIns
-	txHash := tx.Hash()
+	hostTxIns := tx.MsgTx().TxIns
+
+	if int(inStartIndex)+int(inAutRootTokenNum) > len(hostTxIns) {
+		return fmt.Errorf("inStartIndex (%d) + inAutRootTokenNum (%d) exceeds the number of TxIns (%d)",
+			inStartIndex, inAutRootTokenNum, len(hostTxIns))
+	}
 
 	for i := 0; i < int(inAutRootTokenNum); i++ {
-		hostTxInIndex := int(inStartIndex) + i
-		if hostTxInIndex >= len(hostedTxIns) {
-			return fmt.Errorf("inStartIndex (%d) + i (%d < inAutRootTokenNum %d) exceeds the number of TxIns (%d)",
-				inStartIndex, i, inAutRootTokenNum, len(hostedTxIns))
-		}
 
-		hostTxIn := hostedTxIns[hostTxInIndex]
+		hostTxIn := hostTxIns[int(inStartIndex)+i]
 
 		if hostTxIn == nil {
 			return fmt.Errorf("TxIns[%d] is nil]", i)
@@ -1910,20 +1928,17 @@ func checkCTAUTReRegistrationTransactionInputs(extAutScript *ctautapi.ExtAutScri
 				"the consumed UTXO at Ring %s not exist", tx.Hash(), currentHeight, hostTxIn.PreviousOutPointRing.Hash())
 		}
 
-		if ringEntry.outPointRing == nil {
-			return fmt.Errorf("lookuped ringEntry.outPointRing is nil")
-		}
-		ringId := ringEntry.OutPointRing().RingId()
-		if !ringId.IsEqual(&ringHash) {
-			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has ringId (%s)", ringHash.String(), ringId.String())
-		}
-
 		txoRing := ringEntry.TxoRing()
 		if txoRing == nil {
 			return fmt.Errorf("the TxoRing obtained by ringHash (%s) is nil ", ringHash.String())
 		}
 		if txoRing.OutPointRing == nil {
 			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) is nil ", ringHash.String())
+		}
+
+		ringId := txoRing.OutPointRing.RingId()
+		if !ringId.IsEqual(&ringHash) {
+			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has ringId (%s)", ringHash.String(), ringId.String())
 		}
 
 		if len(txoRing.OutPointRing.OutPoints) != 1 {
@@ -1935,36 +1950,6 @@ func checkCTAUTReRegistrationTransactionInputs(extAutScript *ctautapi.ExtAutScri
 				"len(txoRing.TxOuts) = %d and len(txoRing.OutPointRing.OutPoints) = %d ",
 				ringHash.String(), len(txoRing.TxOuts), len(txoRing.OutPointRing.OutPoints))
 		}
-
-		//if len(txoRing.OutPointRing.OutPoints) == 0 {
-		//	return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-		//		"len(txoRing.OutPointRing.OutPoints) = 0 ",
-		//		ringHash.String())
-		//}
-		//
-		//if len(ringEntry.OutPointRing().OutPoints) == 0 {
-		//	return fmt.Errorf("the TxoRing obtained by ringHash (%s) has  "+
-		//		"len(txoRing.OutPointRing.OutPoints) = 0 ",
-		//		ringHash.String())
-		//}
-
-		//privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txoRing.TxOuts[0])
-		//if err != nil {
-		//	return err
-		//}
-		//
-		//if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
-		//	return fmt.Errorf("expect privacy level %d but got %d",
-		//		abecryptoxkey.PrivacyLevelPSEUDONYMCT, privacyLevel)
-		//}
-		//
-		//// fill out with the first item in ring
-		//hostOutPoint := txoRing.OutPointRing.OutPoints[0]
-		//coinAddress, err := rules.RuleCheckOnHostTxo(txoRing.TxOuts[0])
-		//if err != nil {
-		//	return fmt.Errorf("transaction %s try to consume UTXO at Ring %s is not a valid output", txHash,
-		//		hostTxIn.PreviousOutPointRing.Hash())
-		//}
 
 		coinAddress, err := rules.RuleCheckOnHostTxo(txoRing.TxOuts[0])
 		if err != nil {
