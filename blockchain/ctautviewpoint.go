@@ -122,9 +122,9 @@ func (coin *CTAUTCoin) Version() uint32 {
 	return coin.version
 }
 
-// Script
+// ValueScript
 // review done 2025.12.11
-func (coin *CTAUTCoin) Script() []byte {
+func (coin *CTAUTCoin) ValueScript() []byte {
 	return coin.valueScript
 }
 
