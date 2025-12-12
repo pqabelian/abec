@@ -1803,9 +1803,9 @@ func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *
 	return nil
 }
 
-// checkCTAUTRegistrationTransactionInputs
+// validateAutRegistrationScript
 // aut review done 2025.12.12
-func checkCTAUTRegistrationTransactionInputs(tx *abeutil.TxAbe, currentHeight int32,
+func validateAutRegistrationScript(tx *abeutil.TxAbe, currentHeight int32,
 	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
 
 	if tx == nil {
@@ -1815,7 +1815,7 @@ func checkCTAUTRegistrationTransactionInputs(tx *abeutil.TxAbe, currentHeight in
 	extAutScript := tx.ExtAutScript()
 	if extAutScript == nil {
 		// the caller should check whether tx.ExtAutScript() is nil before calling this function
-		return fmt.Errorf("wrong call on checkCTAUTRegistrationTransactionInputs: tx.ExtAutScript is nil")
+		return fmt.Errorf("wrong call on validateAutRegistrationScript: tx.ExtAutScript is nil")
 	}
 
 	if extAutScript.Type() != ctautapi.AutScriptTypeRegistration {
@@ -1847,9 +1847,9 @@ func checkCTAUTRegistrationTransactionInputs(tx *abeutil.TxAbe, currentHeight in
 	return nil
 }
 
-// checkCTAUTReRegistrationTransactionInputs
+// validateAutReRegistrationScript
 // aut review done 2025.12.11
-func checkCTAUTReRegistrationTransactionInputs(tx *abeutil.TxAbe, currentHeight int32,
+func validateAutReRegistrationScript(tx *abeutil.TxAbe, currentHeight int32,
 	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
 	if tx == nil {
 		return fmt.Errorf("tx is nil")
@@ -1858,7 +1858,7 @@ func checkCTAUTReRegistrationTransactionInputs(tx *abeutil.TxAbe, currentHeight 
 	extAutScript := tx.ExtAutScript()
 	if extAutScript == nil {
 		// the caller should check whether tx.ExtAutScript() is nil before calling this function
-		return fmt.Errorf("wrong call on checkCTAUTReRegistrationTransactionInputs: tx.ExtAutScript is nil")
+		return fmt.Errorf("wrong call on validateAutReRegistrationScript: tx.ExtAutScript is nil")
 	}
 
 	if extAutScript.Type() != ctautapi.AutScriptTypeReRegistration {
@@ -2008,10 +2008,10 @@ func checkCTAUTReRegistrationTransactionInputs(tx *abeutil.TxAbe, currentHeight 
 	return nil
 }
 
-// checkCTAUTMintTransactionInputs
+// validateAutMintScript
 // aut review done 2025.12.12 todo: to discuss
 // todo: rename, only check inputs? to validate?
-func checkCTAUTMintTransactionInputs(tx *abeutil.TxAbe, currentHeight int32,
+func validateAutMintScript(tx *abeutil.TxAbe, currentHeight int32,
 	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
 
 	if tx == nil {
@@ -2021,7 +2021,7 @@ func checkCTAUTMintTransactionInputs(tx *abeutil.TxAbe, currentHeight int32,
 	extAutScript := tx.ExtAutScript()
 	if extAutScript == nil {
 		// the caller should check whether tx.ExtAutScript() is nil before calling this function
-		return fmt.Errorf("wrong call on checkCTAUTMintTransactionInputs: tx.ExtAutScript is nil")
+		return fmt.Errorf("wrong call on validateAutMintScript: tx.ExtAutScript is nil")
 	}
 
 	if extAutScript.Type() != ctautapi.AutScriptTypeMint {
@@ -2197,9 +2197,9 @@ func checkCTAUTMintTransactionInputs(tx *abeutil.TxAbe, currentHeight int32,
 	return nil
 }
 
-// checkCTAUTTransferTransactionInputs
+// validateAutTransferScript
 // aut review done 2025.12.12 todo: discuss
-func checkCTAUTTransferTransactionInputs(tx *abeutil.TxAbe, txHeight int32,
+func validateAutTransferScript(tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
 
 	if tx == nil {
@@ -2209,7 +2209,7 @@ func checkCTAUTTransferTransactionInputs(tx *abeutil.TxAbe, txHeight int32,
 	extAutScript := tx.ExtAutScript()
 	if extAutScript == nil {
 		// the caller should check whether tx.ExtAutScript() is nil before calling this function
-		return fmt.Errorf("wrong call on checkCTAUTTransferTransactionInputs: tx.ExtAutScript is nil")
+		return fmt.Errorf("wrong call on validateAutTransferScript: tx.ExtAutScript is nil")
 	}
 
 	if extAutScript.Type() != ctautapi.AutScriptTypeTransfer {
@@ -2462,9 +2462,9 @@ func checkCTAUTTransferTransactionInputs(tx *abeutil.TxAbe, txHeight int32,
 	return nil
 }
 
-// checkCTAUTTransferTransactionInputs
+// validateAutBurnScript
 // aut review done 2025.12.12 todo: discuss
-func checkCTAUTBurnTransactionInputs(tx *abeutil.TxAbe, txHeight int32,
+func validateAutBurnScript(tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
 
 	if tx == nil {
@@ -2474,7 +2474,7 @@ func checkCTAUTBurnTransactionInputs(tx *abeutil.TxAbe, txHeight int32,
 	extAutScript := tx.ExtAutScript()
 	if extAutScript == nil {
 		// the caller should check whether tx.ExtAutScript() is nil before calling this function
-		return fmt.Errorf("wrong call on checkCTAUTBurnTransactionInputs: tx.ExtAutScript is nil")
+		return fmt.Errorf("wrong call on validateAutBurnScript: tx.ExtAutScript is nil")
 	}
 
 	if extAutScript.Type() != ctautapi.AutScriptTypeBurn {
@@ -2852,19 +2852,19 @@ func ValidateTxCTAUTScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostVie
 
 	switch extAutScript.AutScript.(type) {
 	case *ctautapi.RegistrationScript:
-		err = checkCTAUTRegistrationTransactionInputs(tx, currentHeight, ctautView, hostView, chainParams)
+		err = validateAutRegistrationScript(tx, currentHeight, ctautView, hostView, chainParams)
 		if err != nil {
 			return err
 		}
 
 	case *ctautapi.ReRegistrationScript:
-		err = checkCTAUTReRegistrationTransactionInputs(tx, currentHeight, ctautView, hostView, chainParams)
+		err = validateAutReRegistrationScript(tx, currentHeight, ctautView, hostView, chainParams)
 		if err != nil {
 			return err
 		}
 
 	case *ctautapi.MintScript:
-		err = checkCTAUTMintTransactionInputs(tx, currentHeight, ctautView, hostView, chainParams)
+		err = validateAutMintScript(tx, currentHeight, ctautView, hostView, chainParams)
 		if err != nil {
 			return err
 		}
@@ -2889,7 +2889,7 @@ func ValidateTxCTAUTScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostVie
 		}
 
 	case *ctautapi.TransferScript:
-		err = checkCTAUTTransferTransactionInputs(tx, currentHeight, ctautView, hostView, chainParams)
+		err = validateAutTransferScript(tx, currentHeight, ctautView, hostView, chainParams)
 		if err != nil {
 			return err
 		}
@@ -2915,7 +2915,7 @@ func ValidateTxCTAUTScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostVie
 
 	case *ctautapi.BurnScript:
 		// This branch is exactly the same checking as the previous one, except for all the differences in handling outputs
-		err = checkCTAUTBurnTransactionInputs(tx, currentHeight, ctautView, hostView, chainParams)
+		err = validateAutBurnScript(tx, currentHeight, ctautView, hostView, chainParams)
 		if err != nil {
 			return err
 		}
