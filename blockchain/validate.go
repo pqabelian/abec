@@ -605,7 +605,7 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 
 	extAutScript := tx.ExtAutScript()
 	if extAutScript != nil {
-		// todo: As all the LOCAL extAutScript has only one entrance (in abeutil.NewTx()), where these checks on GeneratedTokens have been performed.
+		// 2025.12.13 As all the LOCAL extAutScript has only one entrance (in abeutil.NewTx()), where these checks on GeneratedTokens have been performed.
 
 		// The following checks have been performed when generating ExtAutScript
 		// (1) the match between extAutScript.AutScriptVersion and the host-Tx-Version
@@ -959,7 +959,7 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 //
 // todo: (EthashPoW)
 // reviewed on 2024.01.03 by Alice
-// review 2025.12. todo
+// review 2025.12.13
 func checkBlockSanityAbe(block *abeutil.BlockAbe, powConsensus *consensus.PowConsensus, chainParams *chaincfg.Params, timeSource MedianTimeSource, flags BehaviorFlags) error {
 	powLimit := chainParams.PowLimit
 	msgBlock := block.MsgBlock()
@@ -1058,18 +1058,32 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, powConsensus *consensus.PowCon
 	// Do some preliminary checks on each transaction to ensure they are
 	// sane before continuing.
 	//
-	for _, tx := range transactions {
+	autScriptTypeMap := make(map[ctautapi.AutId]ctautapi.AutScriptType, len(transactions))
+	// RULES: In each block,
+	// - (1) the RegistrationScripts should not register the AutInstances with the same AutIdentifier
+	// - (2) for an AutIdentifier, there is at most one RegistrationScript/ReRegistrationScript/MintScript.
+
+	for i, tx := range transactions {
 		// todo_DONE(MLP): reviewed on 2024.01.03 by Alice.
 		err := CheckTransactionSanityAbe(tx)
 		if err != nil {
 			return err
 		}
-	}
 
-	// todo: aut 2025.12.12
-	// RULES: In each block,
-	// - (1) the RegistrationScripts should not register the AutInstances with the same AutIdentifier
-	// - (2) for an AutIdentifier, there is at most one RegistrationScript/ReRegistrationScript/MintScript.
+		extAutScript := tx.ExtAutScript()
+		if extAutScript != nil {
+			autScriptType := extAutScript.Type()
+			// AutScriptTypeRegistration does not need to check, since it is guaranteed by the identifier mechansim.
+			if autScriptType == ctautapi.AutScriptTypeReRegistration || autScriptType == ctautapi.AutScriptTypeMint {
+				if existType, ok := autScriptTypeMap[extAutScript.AutIdentifier()]; ok {
+					return fmt.Errorf("the %d -th tx carries an AutScript with type=%d, while there is already one with type=%d",
+						i, autScriptType, existType)
+				}
+				autScriptTypeMap[extAutScript.AutIdentifier()] = autScriptType
+			}
+		}
+
+	}
 
 	// Build merkle tree and ensure the calculated merkle root matches the
 	// entry in the block header.  This also has the effect of caching all
@@ -3000,7 +3014,6 @@ func (b *BlockChain) checkConnectBlockAbe(
 		return err
 	}
 
-	// todo: 2025.12.12 note that this function is check, does this need to be fetched?
 	// 1. fetch ctaut input from blockchain
 	err = ctautView.fetchConsumedCTAUTTokens(b.db, block, view)
 	if err != nil {
@@ -3088,6 +3101,7 @@ func (b *BlockChain) checkConnectBlockAbe(
 		// spent txout in the order each transaction spends them.
 		// todo_DONE(MLP): reviewed on 2024.01.04
 		// view.connectTransaction() checks the double-spending among one block
+		// todo: 2025.12.13 add (ctautView, sctauts) as paramter to view.connectTransaction()
 		err = view.connectTransaction(tx, &node.hash, stxos)
 		if err != nil {
 			return err
@@ -3109,16 +3123,14 @@ func (b *BlockChain) checkConnectBlockAbe(
 			totalNeutrinoOut += txOut.ValueScript
 		}*/
 	totalNeutrinoOut := transactions[0].MsgTx().TxFee // for coinbase transaction, TxFee is used to represent the Value_in
-
-	expectedNeutrinoOut := CalcBlockSubsidy(node.height, b.chainParams) + totalFees
-	// todo: 2025.12.13
-	//subsidy := CalcBlockSubsidy(node.height, b.chainParams)
-	//expectedNeutrinoOut := subsidy + totalFees
-	//if expectedNeutrinoOut < subsidy || expectedNeutrinoOut < totalFees {
-	//	str := fmt.Sprintf("subsidy (%d) + totalFees (%d) results overflow",
-	//		subsidy, totalFees)
-	//	return ruleerror.NewRuleError(ruleerror.ErrBadCoinbaseValue, str)
-	//}
+	
+	subsidy := CalcBlockSubsidy(node.height, b.chainParams)
+	expectedNeutrinoOut := subsidy + totalFees
+	if expectedNeutrinoOut < subsidy || expectedNeutrinoOut < totalFees {
+		str := fmt.Sprintf("subsidy (%d) + totalFees (%d) results overflow",
+			subsidy, totalFees)
+		return ruleerror.NewRuleError(ruleerror.ErrBadCoinbaseValue, str)
+	}
 
 	if totalNeutrinoOut > expectedNeutrinoOut {
 		str := fmt.Sprintf("coinbase transaction for block pays %v "+

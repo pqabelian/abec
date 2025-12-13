@@ -861,7 +861,8 @@ func initNewUtxoRingEntry(version uint32, ringBlockHeight int32, blockhashs []*c
 // script validation and double spend prevention.
 
 type UtxoRingViewpoint struct {
-	entries  map[chainhash.Hash]*UtxoRingEntry
+	entries map[chainhash.Hash]*UtxoRingEntry
+	// todo: add autEntries, 2025.12.13
 	bestHash chainhash.Hash
 }
 
@@ -1119,6 +1120,7 @@ func (view *UtxoRingViewpoint) connectTransaction(tx *abeutil.TxAbe, blockhash *
 	if isCb {
 		/*		// Add the transaction's outputs as available utxos.
 				view.AddTxOuts(tx, blockHeight)*/
+		// aut does not need handle, either.
 		return nil
 	}
 

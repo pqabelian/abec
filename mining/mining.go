@@ -4,6 +4,7 @@ import (
 	"container/heap"
 	"encoding/binary"
 	"fmt"
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 
 	"github.com/abesuite/abec/blockchain/consensus"
 
@@ -750,6 +751,8 @@ func (g *BlkTmplGenerator) NewBlockTemplate(consensusApplied wire.ConsensusProto
 	blockHeaderOverhead := wire.GetBlockHeaderSize(nextBlockVersion)
 	blockHeaderOverhead += wire.MaxVarIntPayload
 
+	autScriptTypeMap := make(map[ctautapi.AutId]ctautapi.AutScriptType, len(sourceTxns))
+
 mempoolLoop:
 	for _, txDesc := range sourceTxns {
 		// A block can't have more than one coinbase or contain
@@ -836,6 +839,21 @@ mempoolLoop:
 					"which is not available",
 					tx.Hash(), txIn.String())
 				continue mempoolLoop
+			}
+		}
+
+		extAutScript := tx.ExtAutScript()
+		if extAutScript != nil {
+			autScriptType := extAutScript.Type()
+			// AutScriptTypeRegistration does not need to check, since it is guaranteed by the identifier mechansim.
+			if autScriptType == ctautapi.AutScriptTypeReRegistration || autScriptType == ctautapi.AutScriptTypeMint {
+				if existType, ok := autScriptTypeMap[extAutScript.AutIdentifier()]; ok {
+					log.Tracef("Skipping tx %s because "+
+						"it carries an AutScript with type=%d, while there is already one with type=%d",
+						tx.Hash(), autScriptType, existType)
+					continue
+				}
+				autScriptTypeMap[extAutScript.AutIdentifier()] = autScriptType
 			}
 		}
 
