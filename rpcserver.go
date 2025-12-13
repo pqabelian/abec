@@ -1825,9 +1825,12 @@ func handleGetAutMetadata(s *rpcServer, cmd interface{}, closeChan <-chan struct
 	for i := 0; i < len(metadata.Issuers); i++ {
 		issuers = append(issuers, metadata.Issuers[i].String())
 	}
-	activeRootTokenSet := make([]*wire.OutPointAbe, 0, len(metadata.ActiveRootTokenSet))
+	activeRootTokenSet := make([]*abejson.OutPointAbe, 0, len(metadata.ActiveRootTokenSet))
 	for _, point := range metadata.ActiveRootTokenSet {
-		activeRootTokenSet = append(activeRootTokenSet, point)
+		activeRootTokenSet = append(activeRootTokenSet, &abejson.OutPointAbe{
+			Txid:  point.TxHash.String(),
+			Index: point.Index,
+		})
 	}
 	metadaReply := abejson.GetAutMetadataResult{
 		Version:                    metadata.Version,

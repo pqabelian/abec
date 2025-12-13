@@ -863,7 +863,18 @@ func (r FutureGetAutMetadataResult) Receive() (*ctautapi.AutMetadata, error) {
 	activeRootTokenSet := make(map[string]*ctautapi.HostOutPoint, len(result.ActiveRootTokenSet))
 	for i := 0; i < len(result.ActiveRootTokenSet); i++ {
 		outpoint := result.ActiveRootTokenSet[i]
-		activeRootTokenSet[outpoint.String()] = outpoint
+		txHash, err := chainhash.NewHashFromStr(outpoint.Txid)
+		if err != nil {
+			return nil, err
+		}
+		hostOutPoint := &ctautapi.HostOutPoint{
+			TxHash: *txHash,
+			Index:  outpoint.Index,
+		}
+		if err != nil {
+			return nil, err
+		}
+		activeRootTokenSet[hostOutPoint.String()] = hostOutPoint
 	}
 
 	autMetadata := &ctautapi.AutMetadata{

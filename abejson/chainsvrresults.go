@@ -47,10 +47,10 @@ type GetAutMetadataResult struct {
 	MintThreshold              uint8    `json:"mintThreshold"`
 	PrivacyType                uint8    `json:"privacyType"`
 
-	MintedAmount         uint64              `json:"mintedAmount"`
-	BurnedAmount         uint64              `json:"burnedAmount"`
-	UpdateScriptVersions []uint32            `json:"updateScriptVersions"`
-	ActiveRootTokenSet   []*wire.OutPointAbe `json:"activeRootTokenSet"`
+	MintedAmount         uint64         `json:"mintedAmount"`
+	BurnedAmount         uint64         `json:"burnedAmount"`
+	UpdateScriptVersions []uint32       `json:"updateScriptVersions"`
+	ActiveRootTokenSet   []*OutPointAbe `json:"activeRootTokenSet"`
 }
 
 // GetBlockStatsResult models the data from the getblockstats command.
