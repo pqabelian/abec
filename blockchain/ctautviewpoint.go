@@ -331,7 +331,7 @@ func (view *CTAUTViewpoint) connectRegistrationScript(script *ctautapi.ExtAutScr
 		*sctauts = append(*sctauts, stxo)
 	}
 
-	log.Debugf("In transaction %s, CT-AUT with identifier %s with following configuration is registered:", txHash, identifierKey)
+	log.Debugf("In transaction %s, CT-AUT with identifier %s with following configuration is registered:", txHash, identifier.String())
 	log.Debugf("\t Version: %d", newAutMetadata.Version)
 	log.Debugf("\t Name: %v:", hex.EncodeToString(newAutMetadata.AutName))
 	log.Debugf("\t Symbol: %v", hex.EncodeToString(newAutMetadata.AutSymbol))
