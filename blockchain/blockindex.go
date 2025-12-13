@@ -134,6 +134,7 @@ type blockNode struct {
 // calculating the height and workSum from the respective fields on the parent.
 // This function is NOT safe for concurrent access.
 // todo: Aconcagua review
+// review done 2025.12.12
 func (b *BlockChain) newBlockNode(blockHeader *wire.BlockHeader, parent *blockNode) (*blockNode, error) {
 	//var node blockNode
 	//err := b.initBlockNode(&node, blockHeader, parent)
