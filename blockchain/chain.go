@@ -1580,20 +1580,20 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 				return err
 			}
 
-			err = view.connectTransactions(block, nil)
-			if err != nil {
-				return err
-			}
-
 			err = ctautView.fetchConsumedCTAUTTokens(b.db, block, view)
 			if err != nil {
 				return err
 			}
 
-			err = ctautView.connectTransactions(block, nil)
+			err = view.connectTransactions(block, nil, ctautView, nil)
 			if err != nil {
 				return err
 			}
+
+			//err = ctautView.connectTransactions(block, nil)
+			//if err != nil {
+			//	return err
+			//}
 			/*			newBest = n
 						continue*/
 		} else {
@@ -1778,16 +1778,16 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		// to it.  Also, provide an stxo slice so the spent txout
 		// details are generated.
 		stxos := make([]*SpentTxOutAbe, 0, countSpentOutputsAbe(block))
-		err = view.connectTransactions(block, &stxos)
+		sctauts := make([]SpentCTAUT, 0, countSpentOutputsCTAUT(block))
+		err = view.connectTransactions(block, &stxos, ctautView, &sctauts)
 		if err != nil {
 			return err
 		}
 
-		sctauts := make([]SpentCTAUT, 0, countSpentOutputsCTAUT(block))
-		err = ctautView.connectTransactions(block, &sctauts)
-		if err != nil {
-			return err
-		}
+		//err = ctautView.connectTransactions(block, &sctauts)
+		//if err != nil {
+		//	return err
+		//}
 
 		//	Abe to do: new UtxoRings if n.height % 3 == 2
 		//	TODO: when BlockNumPerRingGroup or TxoRingSize change, it may cause fork.
@@ -1912,20 +1912,22 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 			if err != nil {
 				return false, err
 			}
-			// todo_DONE(MLP): reviewed on 2024.01.04
-			err = view.connectTransactions(block, &stxos)
-			if err != nil {
-				return false, err
-			}
 
 			err = ctautView.fetchConsumedCTAUTTokens(b.db, block, view)
 			if err != nil {
 				return false, err
 			}
-			err = ctautView.connectTransactions(block, &sctauts)
+			// todo_DONE(MLP): reviewed on 2024.01.04
+
+			err = view.connectTransactions(block, &stxos, ctautView, &sctauts)
 			if err != nil {
 				return false, err
 			}
+
+			//err = ctautView.connectTransactions(block, &sctauts)
+			//if err != nil {
+			//	return false, err
+			//}
 		}
 
 		//	TODO: generating new UtxoRingEntry if currentblock.height%2 = 0

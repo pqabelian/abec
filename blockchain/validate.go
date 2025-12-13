@@ -3102,15 +3102,15 @@ func (b *BlockChain) checkConnectBlockAbe(
 		// todo_DONE(MLP): reviewed on 2024.01.04
 		// view.connectTransaction() checks the double-spending among one block
 		// todo: 2025.12.13 add (ctautView, sctauts) as paramter to view.connectTransaction()
-		err = view.connectTransaction(tx, &node.hash, stxos)
+		err = view.connectTransaction(tx, &node.hash, stxos, node.height, ctautView, sctauts)
 		if err != nil {
 			return err
 		}
 
-		err = ctautView.connectTransaction(tx, node.height, sctauts)
-		if err != nil {
-			return err
-		}
+		//err = ctautView.connectTransaction(tx, node.height, sctauts)
+		//if err != nil {
+		//	return err
+		//}
 	}
 
 	// The total output values of the coinbase transaction must not exceed
@@ -3123,7 +3123,7 @@ func (b *BlockChain) checkConnectBlockAbe(
 			totalNeutrinoOut += txOut.ValueScript
 		}*/
 	totalNeutrinoOut := transactions[0].MsgTx().TxFee // for coinbase transaction, TxFee is used to represent the Value_in
-	
+
 	subsidy := CalcBlockSubsidy(node.height, b.chainParams)
 	expectedNeutrinoOut := subsidy + totalFees
 	if expectedNeutrinoOut < subsidy || expectedNeutrinoOut < totalFees {

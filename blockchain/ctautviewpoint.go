@@ -289,6 +289,49 @@ func (view *CTAUTViewpoint) LookupCTAUTMetaInfo(identifier ctautapi.AutId) *ctau
 
 	return instance.metadata
 }
+func (view *CTAUTViewpoint) SpendRootToken(identifier ctautapi.AutId, outpoint ctautapi.HostOutPoint) error {
+	if view.instances == nil {
+		return fmt.Errorf("no instance for identifier %v", identifier.String())
+	}
+
+	instance, ok := view.instances[identifier.String()]
+	if !ok {
+		return fmt.Errorf("no instance for identifier %v", identifier.String())
+	}
+	if instance == nil || instance.metadata == nil {
+		return fmt.Errorf("no instance for identifier %v", identifier.String())
+	}
+
+	metadata := instance.metadata
+	opStr := outpoint.String()
+	if _, ok := metadata.ActiveRootTokenSet[opStr]; !ok {
+		return fmt.Errorf("no root token %s for identifier %v", opStr, identifier.String())
+	}
+	delete(metadata.ActiveRootTokenSet, opStr)
+
+	return nil
+}
+
+func (view *CTAUTViewpoint) SpendCTAUTCoin(identifier ctautapi.AutId, outpoint ctautapi.HostOutPoint) error {
+	if view.instances == nil {
+		return fmt.Errorf("no instance for identifier %v", identifier.String())
+	}
+
+	instance, ok := view.instances[identifier.String()]
+	if !ok {
+		return fmt.Errorf("no instance for identifier %v", identifier.String())
+	}
+	if instance == nil {
+		return fmt.Errorf("no instance for identifier %v", identifier.String())
+	}
+
+	_, err := instance.SpendCoin(outpoint)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
 
 // addCTAUTCoin adds the specified output to the view if it is not provably
 // unspendable.  When the view already has an entry for the output, it will be
@@ -1265,43 +1308,6 @@ func (view *CTAUTViewpoint) fetchConsumedCTAUTTokens(db database.DB, block *abeu
 		}
 	}
 
-	return nil
-}
-
-// todo: remove txHash *chainhash.Hash?
-// todo: 2025.12.12 discuss, use tx rather than script; why use conncetXXX?
-func (view *CTAUTViewpoint) SpendCTAutScript(script *ctautapi.ExtAutScript, txHash *chainhash.Hash, blockHeight int32) error {
-	var err error
-	switch script.AutScript.(type) {
-	case *ctautapi.RegistrationScript:
-		err = view.connectRegistrationScript(script, *txHash, blockHeight, nil)
-		if err != nil {
-			return err
-		}
-	case *ctautapi.ReRegistrationScript:
-		err = view.connectReRegistrationScript(script, *txHash, blockHeight, nil)
-		if err != nil {
-			return err
-		}
-	case *ctautapi.MintScript:
-		err = view.connectMintScript(script, *txHash, blockHeight, nil)
-		if err != nil {
-			return err
-		}
-	case *ctautapi.TransferScript:
-		err = view.connectTransferScript(script, *txHash, blockHeight, nil)
-		if err != nil {
-			return err
-		}
-	case *ctautapi.BurnScript:
-		err = view.connectBurnScript(script, *txHash, blockHeight, nil)
-		if err != nil {
-			return err
-		}
-
-	default:
-		return fmt.Errorf("aut transaction %s with unknown type %d", *txHash, script.Type())
-	}
 	return nil
 }
 
