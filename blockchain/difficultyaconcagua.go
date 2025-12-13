@@ -308,7 +308,7 @@ func (b *BlockChain) calcNextRequiredDifficultyVectorAconcagua(lastNode *blockNo
 		log.Infof("Difficulty adjustment at height %d : avgHRSecond(%v) is too large, adjust to maxAllowed value (%v)",
 			lastNode.height+1, avgHRSecond, maxAllowedHRSecond)
 
-	} else if avgHR.Cmp(minAllowedHRSecond) < 0 {
+	} else if avgHRSecond.Cmp(minAllowedHRSecond) < 0 {
 		targetHRSecond = minAllowedHRSecond
 
 		log.Infof("Difficulty adjustment at height %d : avgHRSecond(%v) is too small, adjust to minAllowed value (%v)",
