@@ -46,6 +46,7 @@ func NewPowConsensus(ethashConfig ethashpow.EthashConfig) *PowConsensus {
 // VerifySeal verifies whether the passed wire.BlockHeader is valid with respect to the passed target.
 //
 // targetSecond may be used only when header.Version >= wire.BlockVersionAconcagua.
+// review done 2025.12.12
 func (powConsensus *PowConsensus) VerifySeal(header *wire.BlockHeader, target *big.Int, targetSecond *big.Int) error {
 	if header == nil {
 		return fmt.Errorf("PowConsensus.VerifySeal: the input header is nil")

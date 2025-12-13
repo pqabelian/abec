@@ -19,6 +19,7 @@ func NewNakamotoPowInit() *NakamotoPowInit {
 
 // VerifySeal verifies whether the passed wire.BlockHeader is valid with respect the passed target,
 // in the NakamotoPow consensus.
+// review done 2025.12.12
 func (nakamotoPowInit *NakamotoPowInit) VerifySeal(header *wire.BlockHeader, target *big.Int) error {
 	if header == nil {
 		return fmt.Errorf("NakamotoPowInit VerifySeal: the input header is nil")

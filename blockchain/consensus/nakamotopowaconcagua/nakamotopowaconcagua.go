@@ -20,6 +20,7 @@ func NewNakamotoPowAconcagua() *NakamotoPowAconcagua {
 
 // VerifySeal verifies whether the passed wire.BlockHeader is valid with respect the passed target,
 // in the NakamotoPowAconcagua consensus.
+// review done 2025.12.12
 func (nakamotoPowAconcagua *NakamotoPowAconcagua) VerifySeal(header *wire.BlockHeader, target *big.Int) error {
 	if header == nil {
 		return fmt.Errorf("NakamotoPowAconcagua VerifySeal: the input header is nil")
@@ -68,6 +69,7 @@ func (nakamotoPowAconcagua *NakamotoPowAconcagua) VerifySeal(header *wire.BlockH
 // NakamotoPowAconcagua uses HeaderContentHash to build SealHashPreImage to mine/find the valid SealHash.
 //
 // See (bh *BlockHeader) HeaderContent(), sealHashPreImage(), and VerifySeal().
+// review done 2025.12.12
 func HeaderContentHash(header *wire.BlockHeader) (*chainhash.Hash, error) {
 	if header == nil {
 		return nil, fmt.Errorf("nakamotopowaconcagua.HeaderContentHash: the input header is nil")
@@ -108,6 +110,7 @@ func SealHashFast(header *wire.BlockHeader) chainhash.Hash {
 // helper functions
 
 // sealHashPreImage returns the content of header that is used to compute SealHash.
+// review done 2025.12.12
 func sealHashPreImage(header *wire.BlockHeader) ([]byte, error) {
 	if header == nil {
 		return nil, fmt.Errorf("NakamotoPowAconcagua sealHashPreImage: the input header is nil")

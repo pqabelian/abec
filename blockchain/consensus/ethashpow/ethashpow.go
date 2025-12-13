@@ -38,6 +38,7 @@ var (
 // either using the usual ethash cache for it, or alternatively using a full DAG to make it faster.
 // VerifySeal() define the consensus rules.
 // As the target rule may depend on the blockchain, EthashPow leaves the difficulty computation to blockchain module.
+// review done 2025.12.12
 func (ethashPow *EthashPow) VerifySeal(header *wire.BlockHeader, target *big.Int) error {
 
 	if header.Version < wire.BlockVersionEthashPow {
@@ -128,6 +129,7 @@ func (ethashPow *EthashPow) VerifySeal(header *wire.BlockHeader, target *big.Int
 // can use (HeaderContentHash, NonceExt, MixDigest) to compute SealHash fast (without expensive computation) to have a quick verification.
 //
 // See (bh *BlockHeader) HeaderContent() and VerifySealFast().
+// review done 2025.12.12
 func HeaderContentHash(header *wire.BlockHeader) (*chainhash.Hash, error) {
 	headerContent, err := header.HeaderContent()
 	if err != nil {
