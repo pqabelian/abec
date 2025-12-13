@@ -4,9 +4,9 @@ import (
 	"container/heap"
 	"encoding/binary"
 	"fmt"
-	ctautapi "github.com/abesuite/abec/ctaut/api"
 
 	"github.com/abesuite/abec/blockchain/consensus"
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 
 	"time"
 
@@ -486,7 +486,7 @@ func spendTransaction(utxoView *blockchain.UtxoViewpoint, tx *abeutil.Tx, height
 
 // todo(ABE): the block is unknown yet, use hainhash.ZeroHash as the block hash consuming the serialNumber
 // Move this function to blockchain package
-func spendTransactionAbe(tx *abeutil.TxAbe, utxoRingView *blockchain.UtxoRingViewpoint, blockHeight int32) error {
+func spendTransactionAbe(tx *abeutil.TxAbe, utxoRingView *blockchain.UtxoRingViewpoint, ctautView *blockchain.CTAUTViewpoint, blockHeight int32) error {
 	for _, txIn := range tx.MsgTx().TxIns {
 		entry := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())
 		if entry != nil {
@@ -497,6 +497,10 @@ func spendTransactionAbe(tx *abeutil.TxAbe, utxoRingView *blockchain.UtxoRingVie
 
 	// todo: spendAutScript
 	// set AutRootToken spent for Rereg and Mint; set AutCoinSpent for Transfer and Burn.
+	err := spendTransactionAUTScript(tx, ctautView, blockHeight)
+	if err != nil {
+		return err
+	}
 
 	// todo: 2025.12.12 how about add spendTransactionAutScript here
 	// todo: what is the function of this spend function? to prepare data for double-spending check?
@@ -508,16 +512,57 @@ func spendTransactionAbe(tx *abeutil.TxAbe, utxoRingView *blockchain.UtxoRingVie
 
 // todo: aut review done 2025.12.12
 func spendTransactionAUTScript(tx *abeutil.TxAbe, ctAutView *blockchain.CTAUTViewpoint, blockHeight int32) error {
-	ctautScript := tx.ExtAutScript()
-
-	// CTAUT
-	if ctautScript != nil {
-		// todo: discuss, why has a separate function
-		err := ctAutView.SpendCTAutScript(ctautScript, tx.Hash(), blockHeight)
-		if err != nil {
-			return err
-		}
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		return nil
 	}
+
+	var err error
+	switch scriptInst := extAutScript.AutScript.(type) {
+	case *ctautapi.RegistrationScript:
+		// nothing to do here for registration
+
+	case *ctautapi.ReRegistrationScript:
+		// remove root token
+		consumedHostOutpoints := extAutScript.ConsumedHostOutpoints()
+		for i := 0; i < len(consumedHostOutpoints); i++ {
+			err = ctAutView.SpendRootToken(scriptInst.AutIdentifier(), *consumedHostOutpoints[i])
+			if err != nil {
+				return err
+			}
+		}
+	case *ctautapi.MintScript:
+		// remove root token
+		consumedHostOutpoints := extAutScript.ConsumedHostOutpoints()
+		for i := 0; i < len(consumedHostOutpoints); i++ {
+			err = ctAutView.SpendRootToken(scriptInst.AutIdentifier(), *consumedHostOutpoints[i])
+			if err != nil {
+				return err
+			}
+		}
+	case *ctautapi.TransferScript:
+		// remove aut coin
+		consumedHostOutpoints := extAutScript.ConsumedHostOutpoints()
+		for i := 0; i < len(consumedHostOutpoints); i++ {
+			err = ctAutView.SpendCTAUTCoin(scriptInst.AutIdentifier(), *consumedHostOutpoints[i])
+			if err != nil {
+				return err
+			}
+		}
+	case *ctautapi.BurnScript:
+		// remove aut coin
+		consumedHostOutpoints := extAutScript.ConsumedHostOutpoints()
+		for i := 0; i < len(consumedHostOutpoints); i++ {
+			err = ctAutView.SpendCTAUTCoin(scriptInst.AutIdentifier(), *consumedHostOutpoints[i])
+			if err != nil {
+				return err
+			}
+		}
+
+	default:
+		return fmt.Errorf("script with unknown  type %d", extAutScript.Type())
+	}
+
 	return nil
 }
 
@@ -1010,18 +1055,10 @@ mempoolLoop:
 		// an entry for it to ensure any transactions which reference
 		// this one have it available as an input and can ensure they
 		// aren't double spending.
-		err = spendTransactionAbe(tx, blockUtxoRings, nextBlockHeight)
+		err = spendTransactionAbe(tx, blockUtxoRings, blockCTAUTView, nextBlockHeight)
 		if err != nil {
 			log.Debugf("Skipping tx %s due to error in "+
 				"spendTransactionAbe: %v", tx.Hash(), err)
-			continue
-		}
-
-		// todo: this function here is unnecessary, since it is use to check double-spending among different Txs.
-		err = spendTransactionAUTScript(tx, blockCTAUTView, nextBlockHeight)
-		if err != nil {
-			log.Debugf("Skipping tx %s due to error in "+
-				"spendTransactionAUTScriptAbe: %v", tx.Hash(), err)
 			continue
 		}
 

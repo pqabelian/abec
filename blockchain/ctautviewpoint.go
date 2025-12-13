@@ -276,6 +276,49 @@ func (view *CTAUTViewpoint) LookupCTAUTMetaInfo(identifier ctautapi.AutId) *ctau
 
 	return instance.metadata
 }
+func (view *CTAUTViewpoint) SpendRootToken(identifier ctautapi.AutId, outpoint ctautapi.HostOutPoint) error {
+	if view.instances == nil {
+		return fmt.Errorf("no instance for identifier %v", identifier.String())
+	}
+
+	instance, ok := view.instances[identifier.String()]
+	if !ok {
+		return fmt.Errorf("no instance for identifier %v", identifier.String())
+	}
+	if instance == nil || instance.metadata == nil {
+		return fmt.Errorf("no instance for identifier %v", identifier.String())
+	}
+
+	metadata := instance.metadata
+	opStr := outpoint.String()
+	if _, ok := metadata.ActiveRootTokenSet[opStr]; !ok {
+		return fmt.Errorf("no root token %s for identifier %v", opStr, identifier.String())
+	}
+	delete(metadata.ActiveRootTokenSet, opStr)
+
+	return nil
+}
+
+func (view *CTAUTViewpoint) SpendCTAUTCoin(identifier ctautapi.AutId, outpoint ctautapi.HostOutPoint) error {
+	if view.instances == nil {
+		return fmt.Errorf("no instance for identifier %v", identifier.String())
+	}
+
+	instance, ok := view.instances[identifier.String()]
+	if !ok {
+		return fmt.Errorf("no instance for identifier %v", identifier.String())
+	}
+	if instance == nil {
+		return fmt.Errorf("no instance for identifier %v", identifier.String())
+	}
+
+	_, err := instance.SpendCoin(outpoint)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
 
 // addCTAUTCoin adds the specified output to the view if it is not provably
 // unspendable.  When the view already has an entry for the output, it will be
