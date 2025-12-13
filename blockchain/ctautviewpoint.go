@@ -233,9 +233,22 @@ func (view *CTAUTViewpoint) SetInstances(instances map[string]*CTAUTInstance) {
 	view.instances = instances
 }
 
-func (view *CTAUTViewpoint) PutInstance(instance *CTAUTInstance) {
+func (view *CTAUTViewpoint) PutInstance(instance *CTAUTInstance) error {
+	if instance == nil {
+		return fmt.Errorf("attempting to put a nil instance")
+	}
+	if instance.metadata == nil {
+		return fmt.Errorf("attempting to put an instance with nil metadata")
+	}
+
+	if view.instances == nil {
+		view.instances = make(map[string]*CTAUTInstance)
+	}
+
 	identifierKey := instance.metadata.AutIdentifier.String()
 	view.instances[identifierKey] = instance
+
+	return nil
 }
 
 // LookupCTAUTCoin returns information about a given transaction output according to
@@ -318,7 +331,9 @@ func (view *CTAUTViewpoint) connectRegistrationScript(script *ctautapi.ExtAutScr
 		return err
 	}
 	newInstance := NewCTAUTInstance(newAutMetadata, nil)
-	view.PutInstance(newInstance)
+	if err = view.PutInstance(newInstance); err != nil {
+		return err
+	}
 
 	if sctauts != nil {
 		// Populate the stxo details using the utxo entry.
@@ -331,7 +346,7 @@ func (view *CTAUTViewpoint) connectRegistrationScript(script *ctautapi.ExtAutScr
 		*sctauts = append(*sctauts, stxo)
 	}
 
-	log.Debugf("In transaction %s, CT-AUT with identifier %s with following configuration is registered:", txHash, identifierKey)
+	log.Debugf("In transaction %s, CT-AUT with identifier %s with following configuration is registered:", txHash, identifier.String())
 	log.Debugf("\t Version: %d", newAutMetadata.Version)
 	log.Debugf("\t Name: %v:", hex.EncodeToString(newAutMetadata.AutName))
 	log.Debugf("\t Symbol: %v", hex.EncodeToString(newAutMetadata.AutSymbol))
