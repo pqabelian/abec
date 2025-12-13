@@ -1704,6 +1704,14 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 		}
 		return nil, nil, err
 	}
+	// cache any token for checking
+	ctAutView, err := mp.fetchInputCTAUT(tx)
+	if err != nil {
+		if cerr, ok := err.(ruleerror.RuleError); ok {
+			return nil, nil, chainRuleError(cerr)
+		}
+		return nil, nil, err
+	}
 
 	//	todo (ABE)
 	// Transaction is an orphan if any of the referenced transaction outputs
@@ -1727,7 +1735,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	// rules in blockchain for what transactions are allowed into blocks.
 	// Also returns the fees associated with the transaction which will be
 	// used later.
-	err = blockchain.CheckTransactionInputsAbe(tx, nextBlockHeight, utxoRingView, mp.cfg.ChainParams)
+	err = blockchain.CheckTransactionInputsAbe(tx, nextBlockHeight, utxoRingView, ctAutView, mp.cfg.ChainParams)
 	if err != nil {
 		if cerr, ok := err.(ruleerror.RuleError); ok {
 			return nil, nil, chainRuleError(cerr)
@@ -1829,23 +1837,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 		str := fmt.Sprintf("transaction %v has invalid CTAUT script", txHash)
 		return nil, nil, txRuleError(wire.RejectCTAutBadForm, str)
 	}
-
-	// == CT-AUT checking rule ==
-	// cache any token for checking
-	ctAutView, err := mp.fetchInputCTAUT(tx)
-	if err != nil {
-		if cerr, ok := err.(ruleerror.RuleError); ok {
-			return nil, nil, chainRuleError(cerr)
-		}
-		return nil, nil, err
-	}
-
-	// load all token and me
-	err = blockchain.ValidateTxAutScript(tx, ctAutView, utxoRingView, nextBlockHeight, mp.cfg.ChainParams)
-	if err != nil {
-		return nil, nil, txRuleError(wire.RejectCTAutBadForm, err.Error())
-	}
-
+	
 	txD, err := mp.addTransactionAbe(utxoRingView, ctAutView, tx, bestHeight, txFee, fromDiskCache)
 	if err != nil {
 		return nil, nil, err
