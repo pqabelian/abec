@@ -2,8 +2,6 @@ package v2
 
 import (
 	"bytes"
-	"crypto/md5"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"sort"
@@ -12,26 +10,35 @@ import (
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/ctaut/script"
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 	ctautwire "github.com/abesuite/abec/ctaut/wire"
 	"github.com/abesuite/abec/wire"
 )
 
 const TxVersionForCTAUT = wire.TxVersion_Height_464000_Aconcagua
 const AutScriptVersion = ctautwire.AutScriptVersion_1
-const AutIdentifierLength = script.AutIdentifierLength
 
-type AutScriptType = script.AutScriptType
+type ExtAutScript = ctautapi.ExtAutScript
+
+type AutScriptType = ctautapi.AutScriptType
 
 const (
-	AutScriptTypeRegistration   AutScriptType = script.AutScriptTypeRegistration
-	AutScriptTypeReRegistration AutScriptType = script.AutScriptTypeReRegistration
-	AutScriptTypeMint           AutScriptType = script.AutScriptTypeMint
-	AutScriptTypeTransfer       AutScriptType = script.AutScriptTypeTransfer
-	AutScriptTypeBurn           AutScriptType = script.AutScriptTypeBurn
+	AutScriptTypeRegistration   AutScriptType = ctautapi.AutScriptTypeRegistration
+	AutScriptTypeReRegistration AutScriptType = ctautapi.AutScriptTypeReRegistration
+	AutScriptTypeMint           AutScriptType = ctautapi.AutScriptTypeMint
+	AutScriptTypeTransfer       AutScriptType = ctautapi.AutScriptTypeTransfer
+	AutScriptTypeBurn           AutScriptType = ctautapi.AutScriptTypeBurn
 )
 
-type AutId = script.AutId
+type AutPrivacyType = ctautapi.AutPrivacyType
+
+const (
+	AutPrivacyTypeUnlimited     AutPrivacyType = ctautapi.AutPrivacyTypeUnlimited
+	AutPrivacyTypeLimitedPublic AutPrivacyType = ctautapi.AutPrivacyTypeLimitedPublic
+	AutPrivacyTypeLimitedHidden AutPrivacyType = ctautapi.AutPrivacyTypeLimitedHidden
+)
+
+type AutId = ctautapi.AutId
 
 func NewAutId(autIdentifier string) (AutId, error) {
 	hash, err := chainhash.NewHashFromStr(autIdentifier)
@@ -41,122 +48,100 @@ func NewAutId(autIdentifier string) (AutId, error) {
 	return *hash, nil
 }
 
-type AutScript = script.AutScript
-type HostOutPoint = script.HostOutPoint
-type Metadata struct {
-	Version         uint32
-	CTAutIdentifier string
-	CTAutName       string
-	CTAutSymbol     string
-	BaseUnitName    string
-	SubUnitName     string
-	UnitScale       uint64
-	CTAutMemo       string
+type AutScript = ctautapi.AutScript
+type HostOutPoint = ctautapi.HostOutPoint
 
-	PlannedTotalSupply         uint64
-	Issuers                    []string
-	ReregistrationExpireHeight int32
-	ReregistrationThreshold    uint8
-	MintThreshold              uint8
-
-	MintedAmount uint64
-	BurnedAmount uint64
-	RootTokenSet map[HostOutPoint]struct{}
+func NewHostOutPoint(txHash string, index uint8) (*HostOutPoint, error) {
+	hash, err := chainhash.NewHashFromStr(txHash)
+	if err != nil {
+		return nil, err
+	}
+	return &HostOutPoint{
+		TxHash: *hash,
+		Index:  index,
+	}, nil
 }
 
-type CTAUTRegisterScript = script.RegistrationScript
+type Metadata = ctautapi.AutMetadata
+type AutIssuer = ctautapi.AutIssuer
+
+func NewAutIssuerFromCoinAddress(coinAddress []byte) *AutIssuer {
+	return ctautapi.NewAutIssuerFromCoinAddress(coinAddress)
+}
+
+type CTAUTRegisterScript = ctautapi.RegistrationScript
 
 func NewRegistrationScript(
 	version uint32,
-	ctAutName []byte,
-	ctAutSymbol []byte,
-	baseUnitName []byte,
-	subUnitName []byte,
-	unitScale uint64,
-	ctAutMemo []byte,
-	plannedTotalSupply uint64,
-	issuerCoinAddresses [][]byte,
-	reregistrationExpireHeight int32,
-	reregisterThreshold uint8,
-	mintThreshold uint8,
-	outAutRootTokenNum uint8,
+	ctAutName []byte, ctAutSymbol []byte, baseUnitName []byte, subUnitName []byte, unitScale uint64,
+	ctAutMemo []byte, plannedTotalSupply uint64,
+	issuerCoinAddresses [][]byte, reregistrationExpireHeight int32, reregisterThreshold uint8, mintThreshold uint8,
+	privacyType AutPrivacyType,
+	outStartIndex uint8, outAutRootTokenNum uint8,
 	memo []byte,
 ) ([]byte, []byte, error) {
-	issuers := make([]*script.AutIssuer, len(issuerCoinAddresses))
+	issuers := make([]*ctautapi.AutIssuer, len(issuerCoinAddresses))
 	for i := 0; i < len(issuers); i++ {
-		issuers[i] = script.NewAutIssuer(issuerCoinAddresses[i])
+		issuers[i] = ctautapi.NewAutIssuerFromCoinAddress(issuerCoinAddresses[i])
 	}
-	script := script.NewRegistrationScript(
+	script := ctautapi.NewRegistrationScript(
 		version,
-		ctAutName,
-		ctAutSymbol,
-		baseUnitName,
-		subUnitName,
-		unitScale,
-		ctAutMemo,
-		plannedTotalSupply,
-		issuers,
-		reregistrationExpireHeight,
-		reregisterThreshold,
-		mintThreshold,
-		outAutRootTokenNum,
+		ctAutName, ctAutSymbol, baseUnitName, subUnitName, unitScale,
+		ctAutMemo, plannedTotalSupply,
+		issuers, reregistrationExpireHeight, reregisterThreshold, mintThreshold,
+		privacyType,
+		outStartIndex, outAutRootTokenNum,
 		memo)
-	registerScript, err := script.Serialize()
+	packagedAutScript, err := ctautapi.PackageAutScript(script)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return registerScript, nil, nil
+	return packagedAutScript, nil, nil
 }
 
-type CTAUTReRegisterScript = script.ReRegistrationScript
+type CTAUTReRegisterScript = ctautapi.ReRegistrationScript
 
 func NewReRegistrationScript(
 	version uint32,
 	ctAutIdentifier AutId,
-	ctAutMemo []byte,
-	plannedTotalSupply uint64,
-	issuerCoinAddresses [][]byte,
-	reregistrationExpireHeight int32,
-	reregisterThreshold uint8,
-	mintThreshold uint8,
-	inAutRootTokenNum uint8,
-	outAutRootTokenNum uint8,
+	ctAutMemo []byte, plannedTotalSupply uint64,
+	issuerCoinAddresses [][]byte, reregistrationExpireHeight int32, reregisterThreshold uint8, mintThreshold uint8,
+	privacyType AutPrivacyType,
+	inStartIndex uint8, inAutRootTokenNum uint8,
+	outStartIndex uint8, outAutRootTokenNum uint8,
 	memo []byte,
 ) ([]byte, []byte, error) {
-	issuers := make([]*script.AutIssuer, len(issuerCoinAddresses))
+	issuers := make([]*ctautapi.AutIssuer, len(issuerCoinAddresses))
 	for i := 0; i < len(issuers); i++ {
-		issuers[i] = script.NewAutIssuer(issuerCoinAddresses[i])
+		issuers[i] = ctautapi.NewAutIssuerFromCoinAddress(issuerCoinAddresses[i])
 	}
-	script := script.NewReRegistrationScript(
+	script := ctautapi.NewReRegistrationScript(
 		version,
 		ctAutIdentifier,
-		ctAutMemo,
-		plannedTotalSupply,
-		issuers,
-		reregistrationExpireHeight,
-		reregisterThreshold,
-		mintThreshold,
-		inAutRootTokenNum,
-		outAutRootTokenNum,
+		ctAutMemo, plannedTotalSupply,
+		issuers, reregistrationExpireHeight, reregisterThreshold, mintThreshold,
+		privacyType,
+		inStartIndex, inAutRootTokenNum,
+		outStartIndex, outAutRootTokenNum,
 		memo,
 	)
-	reRegisterScript, err := script.Serialize()
+	packagedAutScript, err := ctautapi.PackageAutScript(script)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return reRegisterScript, nil, nil
+	return packagedAutScript, nil, nil
 }
 
-type CTAUTMintScript = script.MintScript
+type CTAUTMintScript = ctautapi.MintScript
 
 func NewMintScript(
 	version uint32,
 	ctAutIdentifier AutId,
 	vin uint64,
-	inAutRootTokenNum uint8,
-	autTxOutputDescs []*AutTxOutputDesc,
+	inStartIndex uint8, inAutRootTokenNum uint8,
+	outStartIndex uint8, autTxOutputDescs []*AutTxOutputDesc, /*outCTAutTokenNum uint8, outPlainAutTokenNum uint8,*/
 	memo []byte,
 ) ([]byte, []byte, error) {
 	var outCTAutTokenNum uint8
@@ -175,7 +160,6 @@ func NewMintScript(
 
 		outputDescs[i] = abecryptox.NewAutTxOutDesc(autTxoType, autTxOutputDescs[i].value,
 			autTxOutputDescs[i].coinValuePublicKey)
-
 	}
 
 	autCoinbaseTx, err := abecryptox.AutCoinbaseTxGen(AutScriptVersion, vin, outputDescs)
@@ -192,30 +176,29 @@ func NewMintScript(
 	}
 
 	witnessHash := ctautwire.AutWitnessHash(autCoinbaseTx.TxWitness)
-	script := script.NewMintScript(
+	script := ctautapi.NewMintScript(
 		version,
 		ctAutIdentifier,
 		vin,
-		inAutRootTokenNum,
-		outCTAutTokenNum,
-		outPlainAutTokenNum,
+		inStartIndex, inAutRootTokenNum,
+		outStartIndex, outCTAutTokenNum, outPlainAutTokenNum,
 		valueScripts,
-		witnessHash,
-		memo)
-	mintScript, err := script.Serialize()
+		memo,
+		witnessHash)
+	packagedAutScript, err := ctautapi.PackageAutScript(script)
 	if err != nil {
 		return nil, nil, err
 	}
-	return mintScript, autCoinbaseTx.TxWitness, nil
+	return packagedAutScript, autCoinbaseTx.TxWitness, nil
 }
 
-type CTAUTTransferScript = script.TransferScript
+type CTAUTTransferScript = ctautapi.TransferScript
 
 func NewTransferScript(
 	version uint32,
 	ctAutIdentifier AutId,
-	autInputDescs []*AutTxInputDesc,
-	autOutputDescs []*AutTxOutputDesc,
+	inStartIndex uint8, autInputDescs []*AutTxInputDesc, /* inHiddenAutTokenNum uint8, inPublicAutTokenNum uint8,*/
+	outStartIndex uint8, autOutputDescs []*AutTxOutputDesc, /* outHiddenAutTokenNum uint8, outPublicAutTokenNum uint8*/
 	memo []byte,
 ) ([]byte, []byte, error) {
 
@@ -274,18 +257,19 @@ func NewTransferScript(
 		return nil, nil, err
 	}
 
-	fmt.Printf("version %d\n", autTransferTx.Version)
-	for i := 0; i < len(autTransferTx.TxIns); i++ {
-		fmt.Printf("\t input[%d].version %d\n", i, autTransferTx.TxIns[i].Version)
-		digest := md5.Sum(autTransferTx.TxIns[i].TxoScript)
-		fmt.Printf("\t input[%d].txoscript %s\n", i, hex.EncodeToString(digest[:]))
-	}
-	for i := 0; i < len(autTransferTx.TxOuts); i++ {
-		fmt.Printf("\t output[%d].version %d\n", i, autTransferTx.TxOuts[i].Version)
-		digest := md5.Sum(autTransferTx.TxOuts[i].TxoScript)
-		fmt.Printf("\t output[%d].txoscript %s\n", i, hex.EncodeToString(digest[:]))
-	}
+	//fmt.Printf("version %d\n", autTransferTx.Version)
+	//for i := 0; i < len(autTransferTx.TxIns); i++ {
+	//	fmt.Printf("\t input[%d].version %d\n", i, autTransferTx.TxIns[i].Version)
+	//	digest := md5.Sum(autTransferTx.TxIns[i].TxoScript)
+	//	fmt.Printf("\t input[%d].txoscript %s\n", i, hex.EncodeToString(digest[:]))
+	//}
+	//for i := 0; i < len(autTransferTx.TxOuts); i++ {
+	//	fmt.Printf("\t output[%d].version %d\n", i, autTransferTx.TxOuts[i].Version)
+	//	digest := md5.Sum(autTransferTx.TxOuts[i].TxoScript)
+	//	fmt.Printf("\t output[%d].txoscript %s\n", i, hex.EncodeToString(digest[:]))
+	//}
 
+	// TODO would be remove
 	err = abecryptox.AutTransferTxVerify(autTransferTx)
 	if err != nil {
 		panic(err)
@@ -302,31 +286,29 @@ func NewTransferScript(
 	}
 	witnessHash := ctautwire.AutWitnessHash(autTransferTx.TxWitness)
 
-	script := script.NewTransferScript(
+	script := ctautapi.NewTransferScript(
 		version,
 		ctAutIdentifier,
-		inCTAutTokenNum,
-		inPlainAutTokenNum,
-		outCTAutTokenNum,
-		outPlainAutTokenNum,
+		inStartIndex, inCTAutTokenNum, inPlainAutTokenNum,
+		outStartIndex, outCTAutTokenNum, outPlainAutTokenNum,
 		valueScripts,
-		witnessHash,
 		memo,
+		witnessHash,
 	)
-	transferScript, err := script.Serialize()
+	packagedAutScript, err := ctautapi.PackageAutScript(script)
 	if err != nil {
 		return nil, nil, err
 	}
-	return transferScript, autTransferTx.TxWitness, nil
+	return packagedAutScript, autTransferTx.TxWitness, nil
 }
 
-type CTAUTBurnScript = script.BurnScript
+type CTAUTBurnScript = ctautapi.BurnScript
 
 func NewBurnScript(
 	version uint32,
 	ctAutIdentifier AutId,
-	autInputDescs []*AutTxInputDesc,
-	autOutputDescs []*AutTxOutputDesc,
+	inStartIndex uint8, autInputDescs []*AutTxInputDesc, /* inHiddenAutTokenNum uint8, inPublicAutTokenNum uint8,*/
+	outStartIndex uint8, autOutputDescs []*AutTxOutputDesc, /* outHiddenAutTokenNum uint8, outPublicAutTokenNum uint8*/
 	memo []byte,
 ) ([]byte, []byte, error) {
 	var inCTAutTokenNum uint8 = 0
@@ -383,6 +365,8 @@ func NewBurnScript(
 	if err != nil {
 		return nil, nil, err
 	}
+
+	// TODO would be remove
 	err = abecryptox.AutTransferTxVerify(autTransferTx)
 	if err != nil {
 		panic(err)
@@ -397,22 +381,20 @@ func NewBurnScript(
 	}
 	witnessHash := ctautwire.AutWitnessHash(autTransferTx.TxWitness)
 
-	script := script.NewBurnScript(
+	script := ctautapi.NewBurnScript(
 		version,
 		ctAutIdentifier,
-		inCTAutTokenNum,
-		inPlainAutTokenNum,
-		outCTAutTokenNum,
-		outPlainAutTokenNum,
+		inStartIndex, inCTAutTokenNum, inPlainAutTokenNum,
+		outStartIndex, outCTAutTokenNum, outPlainAutTokenNum,
 		valueScripts,
-		witnessHash,
 		memo,
+		witnessHash,
 	)
-	burnScript, err := script.Serialize()
+	packagedAutScript, err := ctautapi.PackageAutScript(script)
 	if err != nil {
 		return nil, nil, err
 	}
-	return burnScript, autTransferTx.TxWitness, nil
+	return packagedAutScript, autTransferTx.TxWitness, nil
 }
 
 type AutTxInputDesc struct {
@@ -498,307 +480,20 @@ func ExtractAutTokenValue(version uint32, valueScript []byte, cryptoValuePublicK
 	return value, autTxoType, nil
 }
 
-// todo: remove this api?
-//func ParseAutScript(txVersion uint32, txID string, memo []byte) (AutScript, error) {
-//	txHash, err := chainhash.NewHashFromStr(txID)
-//	if err != nil {
-//		return nil, err
-//	}
-//	return script.ParseAutScript(txVersion, *txHash, memo)
-//}
-
-func RegisteredAutMetadata(autScript AutScript, scriptVersion uint32, txID string, serializedTxOuts [][]byte) (*Metadata, error) {
-	if autScript == nil {
-		return nil, errors.New("aut script is nil")
-	}
-	if autScript.Type() != script.AutScriptTypeRegistration {
-		return nil, errors.New("aut script type is not Registration")
-	}
-
-	//txHash, err := chainhash.NewHashFromStr(txID)
-	//if err != nil {
-	//	return nil, fmt.Errorf("invalid txid")
-	//}
-
-	abeTxos := make([]*wire.TxOutAbe, len(serializedTxOuts))
-	for i := 0; i < len(serializedTxOuts); i++ {
-		abeTxo := &wire.TxOutAbe{}
-		err := wire.ReadTxOutAbe(bytes.NewReader(serializedTxOuts[i]), 0, scriptVersion, abeTxo)
-		if err != nil {
-			return nil, err
-		}
-		abeTxos[i] = abeTxo
-	}
-
-	registerScript := autScript.(*script.RegistrationScript)
-	identifier := registerScript.AutIdentifier()
-
-	issuers := registerScript.Issuers()
-	issuerStrs := make([]string, len(issuers))
-	for i := 0; i < len(issuers); i++ {
-		issuerStrs[i] = hex.EncodeToString(issuers[i].CoinAddress())
-	}
-	//rootTokens, err := script.GetGeneratedAutTokens(autScript, *txHash, abeTxos)
-	//if err != nil {
-	//	return nil, fmt.Errorf("fail to get root token: %s", err)
-	//}
-	//issuers := make([]string, 0, len(serializedTxOuts))
-	//issuerMapping := map[string]struct{}{}
-	//for i := 0; i < len(rootTokens); i++ {
-	//	key := hex.EncodeToString(rootTokens[i].CoinAddress)
-	//	if _, ok := issuerMapping[key]; !ok {
-	//		issuerMapping[key] = struct{}{}
-	//		issuers = append(issuers, key)
-	//	}
-	//}
-
-	metadata := &Metadata{
-		Version:                    registerScript.Version(),
-		CTAutIdentifier:            identifier.String(),
-		CTAutName:                  hex.EncodeToString(registerScript.AutName()),
-		CTAutSymbol:                hex.EncodeToString(registerScript.AutSymbol()),
-		BaseUnitName:               hex.EncodeToString(registerScript.BaseUnitName()),
-		SubUnitName:                hex.EncodeToString(registerScript.SubUnitName()),
-		UnitScale:                  registerScript.UnitScale(),
-		CTAutMemo:                  hex.EncodeToString(registerScript.AutMemo()),
-		PlannedTotalSupply:         registerScript.PlannedTotalSupply(),
-		Issuers:                    issuerStrs,
-		ReregistrationExpireHeight: registerScript.ReregistrationExpireHeight(),
-		MintThreshold:              registerScript.MintThreshold(),
-		ReregistrationThreshold:    registerScript.ReregisterThreshold(),
-		MintedAmount:               0,
-		BurnedAmount:               0,
-		//RootTokenSet:            make(map[HostOutPoint]struct{}, len(rootTokens)),
-	}
-
-	return metadata, nil
-}
-
-func UpdateAutMetadata(autScript AutScript, txVersion uint32, txID string, serializedTxOuts [][]byte, metadata *Metadata) error {
-	if autScript == nil {
-		return errors.New("ctaut script is nil")
-	}
-	if metadata == nil {
-		return errors.New("metadata is nil")
-	}
-
-	identifier := autScript.AutIdentifier()
-	if identifier.String() != metadata.CTAutIdentifier {
-		return errors.New("ctaut script identifier is not equal to metadata identifier")
-	}
-
-	abeTxos := make([]*wire.TxOutAbe, len(serializedTxOuts))
-	for i := 0; i < len(serializedTxOuts); i++ {
-		abeTxo := &wire.TxOutAbe{}
-		err := wire.ReadTxOutAbe(bytes.NewReader(serializedTxOuts[i]), 0, txVersion, abeTxo)
-		if err != nil {
-			return err
-		}
-		abeTxos[i] = abeTxo
-	}
-	txHash, err := chainhash.NewHashFromStr(txID)
+func ExtractAutScriptFromHostTx(serializedTx []byte) (*ExtAutScript, error) {
+	msgTx := wire.MsgTxAbe{}
+	err := msgTx.Deserialize(bytes.NewReader(serializedTx))
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	switch ctAutScript := autScript.(type) {
-	case *script.RegistrationScript:
-		return errors.New("ctaut script type is Registration")
-	case *script.ReRegistrationScript:
-		metadata.CTAutMemo = hex.EncodeToString(ctAutScript.AutMemo())
-		metadata.PlannedTotalSupply = ctAutScript.PlannedTotalSupply()
-
-		//rootTokens, err := script.GetGeneratedAutTokens(autScript, *txHash, abeTxos)
-		//if err != nil {
-		//	return fmt.Errorf("fail to get root token: %s", err)
-		//}
-		//metadata.IssuerTokens = make([]string, 0, len(serializedTxOuts))
-		//issuerMapping := map[string]struct{}{}
-		//for i := 0; i < len(rootTokens); i++ {
-		//	key := hex.EncodeToString(rootTokens[i].CoinAddress)
-		//	if _, ok := issuerMapping[key]; !ok {
-		//		issuerMapping[key] = struct{}{}
-		//		metadata.IssuerTokens = append(metadata.IssuerTokens, key)
-		//	}
-		//}
-		issuers := ctAutScript.Issuers()
-		metadata.Issuers = make([]string, len(issuers))
-		for i := 0; i < len(issuers); i++ {
-			metadata.Issuers[i] = hex.EncodeToString(issuers[i].CoinAddress())
-		}
-
-		metadata.MintThreshold = ctAutScript.MintThreshold()
-		metadata.ReregistrationThreshold = ctAutScript.ReregisterThreshold()
-		metadata.ReregistrationExpireHeight = ctAutScript.ReregistrationExpireHeight()
-
-		//metadata.RootTokenSet = make(map[HostOutPoint]struct{}, len(rootTokens))
-		//for i := 0; i < len(rootTokens); i++ {
-		//	metadata.RootTokenSet[rootTokens[i].HostOutPoint] = struct{}{}
-		//}
-		return nil
-	case *script.MintScript:
-		metadata.MintedAmount += ctAutScript.Vin()
-
-		return nil
-	case *script.TransferScript:
-		// nothing to update
-
-		return nil
-	case *script.BurnScript:
-		// the last token would be view as burned
-		tokens, err := script.GetGeneratedAutTokens(ctAutScript, *txHash, abeTxos)
-		if err != nil {
-			return err
-		}
-
-		if len(tokens) == 0 {
-			return errors.New("no tokens generated, should not happend")
-		}
-
-		autTxo := &ctautwire.AutTxo{}
-		err = autTxo.Deserialize(tokens[len(tokens)-1].ValueScript)
-		if err != nil {
-			return err
-		}
-		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
-		if err != nil {
-			return err
-		}
-		if autTxoType == abecryptox.AutTxoTypeHidden {
-			return errors.New("burned token should not be hidden")
-		}
-
-		value, err := abecryptox.ExtractAutTxoValue(autTxo, nil, nil)
-		if err != nil {
-			return err
-		}
-
-		metadata.BurnedAmount += value
-		return nil
-
-	default:
-		return errors.New("ctaut script type is not supported")
-	}
-}
-
-func GetGeneratedOutpoints(autScript AutScript, txVersion uint32, txID string, serializedTxOuts [][]byte) (uint32, []*OutPoint, [][]byte, error) {
-	if autScript == nil {
-		return 0, nil, nil, nil
-	}
-	abeTxos := make([]*wire.TxOutAbe, len(serializedTxOuts))
-	for i := 0; i < len(serializedTxOuts); i++ {
-		abeTxo := &wire.TxOutAbe{}
-		err := wire.ReadTxOutAbe(bytes.NewReader(serializedTxOuts[i]), 0, txVersion, abeTxo)
-		if err != nil {
-			return 0, nil, nil, err
-		}
-		abeTxos[i] = abeTxo
-	}
-	txHash, err := chainhash.NewHashFromStr(txID)
-	if err != nil {
-		return 0, nil, nil, err
-	}
-
-	generatedTokens, err := script.GetGeneratedAutTokens(autScript, *txHash, abeTxos)
-	if err != nil {
-		return 0, nil, nil, err
-	}
-
-	res := make([]*OutPoint, len(generatedTokens))
-	valueScripts := make([][]byte, len(generatedTokens))
-	for i := 0; i < len(generatedTokens); i++ {
-		token := generatedTokens[i]
-		res[i], err = NewOutPointFromTxIdStr(token.HostOutPoint.TxHash.String(), uint8(token.HostOutPoint.Index))
-		if err != nil {
-			return 0, nil, nil, err
-		}
-		valueScripts[i] = token.ValueScript
-	}
-	return autScript.Version(), res, valueScripts, nil
-}
-func GetConsumedOutpoints(serializedTx []byte, rings map[string]*TxoRing) ([]*OutPoint, error) {
 	tx, err := abeutil.NewTxAbeFromBytes(serializedTx)
 	if err != nil {
 		return nil, err
 	}
-
-	// Note that tx will carry ExtAutScript (if has)
 	extAutScript := tx.ExtAutScript()
-
-	//extAutScript, err := ctautapi.DetectAndAssembleExtAutScriptFromHostTx(tx.MsgTx())
-	//if err != nil {
-	//	return nil, err
-	//}
-
-	if extAutScript == nil {
-		return nil, nil
-	}
-	// TODO need a new function to get consumed outpoint
-	//err = extAutScript.AssembleInputAutTokensStep1(func(ringHash chainhash.Hash) (*wire.TxoRing, error) {
-	//	ring := rings[ringHash.String()]
-	//	if ring == nil {
-	//		return nil, fmt.Errorf("no such txo ring found")
-	//	}
-	//
-	//	if ring.OutPointRing == nil {
-	//		return nil, fmt.Errorf("ring's OutPointRing is nil")
-	//	}
-	//	outPointRing := &wire.OutPointRing{
-	//		Version: ring.Version,
-	//	}
-	//	outPointRing.BlockHashs = make([]*chainhash.Hash, len(ring.OutPointRing.BlockIDs))
-	//	for i := 0; i < len(ring.OutPointRing.BlockIDs); i++ {
-	//		// todo: confirm whether this work
-	//		outPointRing.BlockHashs[i], err = chainhash.NewHashFromStr(ring.OutPointRing.BlockIDs[i])
-	//		if err != nil {
-	//			return nil, err
-	//		}
-	//	}
-	//	outPointRing.OutPoints = make([]*wire.OutPointAbe, len(ring.OutPointRing.OutPoints))
-	//	for i := 0; i < len(ring.OutPointRing.OutPoints); i++ {
-	//		outPointRing.OutPoints[i] = &wire.OutPointAbe{}
-	//		copy(outPointRing.OutPoints[i].TxHash[:], ring.OutPointRing.OutPoints[i].TxId[:])
-	//		outPointRing.OutPoints[i].Index = ring.OutPointRing.OutPoints[i].Index
-	//	}
-	//
-	//	txOuts := make([]*wire.TxOutAbe, len(ring.SerializedTxOuts))
-	//	for i := 0; i < len(ring.SerializedTxOuts); i++ {
-	//		txOut := &wire.TxOutAbe{}
-	//		err = wire.ReadTxOutAbe(bytes.NewReader(ring.SerializedTxOuts[i]), 0, ring.Version, txOut)
-	//		if err != nil {
-	//			return nil, err
-	//		}
-	//		txOuts[i] = txOut
-	//	}
-	//
-	//	txoRing := &wire.TxoRing{
-	//		Version:         ring.Version,
-	//		RingBlockHeight: ring.RingBlockHeight,
-	//		OutPointRing:    outPointRing,
-	//		TxOuts:          txOuts,
-	//		IsCoinbase:      ring.IsCoinbase,
-	//	}
-	//	return txoRing, nil
-	//})
-	if err != nil {
-		return nil, err
-	}
-	// todo: only step1, will return error
-	consumedTokens, err := extAutScript.ConsumedTokens()
-	if err != nil {
-		return nil, err
-	}
-	res := make([]*OutPoint, len(consumedTokens))
-	for i := 0; i < len(consumedTokens); i++ {
-		token := consumedTokens[i]
-		res[i], err = NewOutPointFromTxIdStr(token.HostOutPoint.TxHash.String(), uint8(token.HostOutPoint.Index))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return res, nil
+	return extAutScript, nil
 }
+
 func CreateTransferTxByRootSeedForCTAUT(serializedTransferTxRequestDesc []byte, autWitness []byte, rootSeeds []*CryptoRootSeed) (serializedTxFull []byte, txId *TxId, err error) {
 	txRequestDesc, err := deserializeTransferTxRequestDesc(serializedTransferTxRequestDesc)
 	if err != nil {
@@ -1016,14 +711,4 @@ func CreateTransferTxByCryptoKeysForCTAUT(serializedTransferTxRequestDesc []byte
 	trTxId := TxId(transferTxMsg.TxId())
 
 	return buf.Bytes(), &trTxId, nil
-}
-
-func AutIdentifierKey(txID string) (res [script.AutIdentifierLength]byte, err error) {
-	txHash, err := chainhash.NewHashFromStr(txID)
-	if err != nil {
-		return res, err
-	}
-	copy(res[:], txHash[:])
-	return res, nil
-
 }
