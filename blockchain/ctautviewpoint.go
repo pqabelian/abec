@@ -1296,43 +1296,6 @@ func (view *CTAUTViewpoint) fetchConsumedCTAUTTokens(db database.DB, block *abeu
 	return nil
 }
 
-// todo: remove txHash *chainhash.Hash?
-// todo: 2025.12.12 discuss, use tx rather than script; why use conncetXXX?
-func (view *CTAUTViewpoint) SpendCTAutScript(script *ctautapi.ExtAutScript, txHash *chainhash.Hash, blockHeight int32) error {
-	var err error
-	switch script.AutScript.(type) {
-	case *ctautapi.RegistrationScript:
-		err = view.connectRegistrationScript(script, *txHash, blockHeight, nil)
-		if err != nil {
-			return err
-		}
-	case *ctautapi.ReRegistrationScript:
-		err = view.connectReRegistrationScript(script, *txHash, blockHeight, nil)
-		if err != nil {
-			return err
-		}
-	case *ctautapi.MintScript:
-		err = view.connectMintScript(script, *txHash, blockHeight, nil)
-		if err != nil {
-			return err
-		}
-	case *ctautapi.TransferScript:
-		err = view.connectTransferScript(script, *txHash, blockHeight, nil)
-		if err != nil {
-			return err
-		}
-	case *ctautapi.BurnScript:
-		err = view.connectBurnScript(script, *txHash, blockHeight, nil)
-		if err != nil {
-			return err
-		}
-
-	default:
-		return fmt.Errorf("aut transaction %s with unknown type %d", *txHash, script.Type())
-	}
-	return nil
-}
-
 func (view *CTAUTViewpoint) AddMetadata(metadata *ctautapi.AutMetadata) error {
 	identifierKey := metadata.AutIdentifier.String()
 	if view.instances[identifierKey] != nil {
