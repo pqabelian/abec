@@ -543,14 +543,14 @@ func deserializeUnspentAutCoin(serialized []byte) (*CTAUTCoin, error) {
 }
 
 // dbFetchCTAUTCoin
-// review done 2025.12.11 todo
+// review done 2025.12.12
 func dbFetchCTAUTCoin(dbTx database.Tx, outpoint ctautapi.HostOutPoint) (*CTAUTCoin, error) {
 	// Fetch the unspent transaction output information for the passed
 	// transaction output.  Return now when there is no entry.
 	key := ctautOutpointKey(outpoint)
 	ctAutTokenBucket := dbTx.Metadata().Bucket(ctAutTokenBucketName)
 	if ctAutTokenBucket == nil {
-		return nil, errors.New("bucket for ctaut coin is not exist")
+		return nil, fmt.Errorf("bucket for aut coin does not exist")
 	}
 	serializedCoin := ctAutTokenBucket.Get(*key)
 	recycleCTAUTOutpointKey(key)
@@ -589,6 +589,7 @@ func dbFetchCTAUTCoin(dbTx database.Tx, outpoint ctautapi.HostOutPoint) (*CTAUTC
 func dbFetchCTAUTMetadata(dbTx database.Tx, key ctautapi.AutId) (*ctautapi.AutMetadata, error) {
 	// Fetch the unspent transaction output information for the passed
 	// transaction output.  Return now when there is no entry.
+	// todo: 2025.12.12 why not use the database-key mechanism?
 	autInfoBucket := dbTx.Metadata().Bucket(ctAutInstanceBucketName)
 	serializedAUTInfo := autInfoBucket.Get(key[:])
 	if serializedAUTInfo == nil {

@@ -351,6 +351,14 @@ func (entry *UtxoRingEntry) IsSpent(serialNumber []byte) bool {
 		}
 	}
 
+	// added on 2025.12
+	if entry.outPointRing == nil || len(entry.outPointRing.OutPoints) == 0 {
+		return true
+	}
+	if len(entry.serialNumbers) == len(entry.outPointRing.OutPoints) {
+		return true
+	}
+
 	return false
 }
 
@@ -678,8 +686,13 @@ func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 // has no effect.
 // The caller should check double-spending before calling this function
 // todo_DONE(MLP): reviewed on 2024.01.04
+// review done 2025.12.13; todo confirm
 func (entry *UtxoRingEntry) Spend(serialNumber []byte, blockHash *chainhash.Hash) {
 	//	Abe to do: double spending?
+	if len(serialNumber) == 0 || blockHash == nil {
+		return
+	}
+
 	for i, sn := range entry.serialNumbers {
 		if bytes.Compare(sn, serialNumber) == 0 {
 			if blockHash.IsEqual(entry.consumingBlockHashs[i]) {
@@ -701,7 +714,12 @@ func (entry *UtxoRingEntry) Spend(serialNumber []byte, blockHash *chainhash.Hash
 // UnSpend
 // normally, the unspent serialNumber should be the last one, as this function should be called in reverse order
 // reviewed on 2024.01.05
+// review done 2025.12.13; todo confirm
 func (entry *UtxoRingEntry) UnSpend(serialNumber []byte, blockHash *chainhash.Hash) bool {
+	if len(serialNumber) == 0 || blockHash == nil {
+		return false
+	}
+
 	for i, sn := range entry.serialNumbers {
 		if bytes.Equal(sn, serialNumber) && blockHash.IsEqual(entry.consumingBlockHashs[i]) {
 			// remove the matched serial number and the consumed block hash
@@ -895,6 +913,7 @@ func (view *UtxoRingViewpoint) commit() {
 // the block are added to the view and entries that are already in the view are
 // not modified.
 // reviewed on 2024.01.04
+// review done 2025.12.12; fetch all the ringEntries that the transactions in a block will take as input.
 func (view *UtxoRingViewpoint) fetchInputUtxoRings(db database.DB, block *abeutil.BlockAbe) error {
 	/*	// Build a map of in-flight transactions because some of the inputs in
 		// this block could be referencing other transactions earlier in this
@@ -967,6 +986,7 @@ func (view *UtxoRingViewpoint) fetchInputUtxoRings(db database.DB, block *abeuti
 //	Abe todo: to get the UtxoRings for main chain, should fetch from db
 //
 // reviewed on 2024.01.04
+// review done 2025.12.12
 func (view *UtxoRingViewpoint) fetchUtxoRingsMain(db database.DB, outPointRings map[chainhash.Hash]struct{}) error {
 	// Nothing to do if there are no requested outputs.
 	if len(outPointRings) == 0 {
@@ -1087,6 +1107,8 @@ func (b *BlockChain) FetchUtxoRingView(tx *abeutil.TxAbe) (*UtxoRingViewpoint, e
 // Only the blocks with height%3 ==0 will trigger the generation of new TxoRings.
 // todo_DONE(MLP): reviewed on 2024.01.04
 // TODO change function name, such as connectTransactionInputs
+// todo: 2025.12.13 for ctaut part, new AutTokens will be generated.
+// todo: put the AutScript logic here?
 func (view *UtxoRingViewpoint) connectTransaction(tx *abeutil.TxAbe, blockhash *chainhash.Hash, stxos *[]*SpentTxOutAbe) error {
 	// Coinbase transactions don't have any inputs to spend.
 	isCb, err := tx.IsCoinBase()
@@ -1129,6 +1151,10 @@ func (view *UtxoRingViewpoint) connectTransaction(tx *abeutil.TxAbe, blockhash *
 			*stxos = append(*stxos, stxo)
 		}
 
+		// todo: add autScript logic here 2025.12.13
+		// todo: spentInputToken (just a double-check)
+		// todo: sauttxos
+
 		// Mark the entry as spent.  This is not done until after the
 		// relevant details have been accessed since spending it might
 		// clear the fields from memory in the future.
@@ -1140,6 +1166,7 @@ func (view *UtxoRingViewpoint) connectTransaction(tx *abeutil.TxAbe, blockhash *
 
 	// Add the transaction's outputs as available utxos.
 	//	view.AddTxOuts(tx, blockHeight)
+	// todo: add output AutToken here? 2025.12.15
 	return nil
 }
 

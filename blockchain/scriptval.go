@@ -133,7 +133,9 @@ func newTxValidator(utxoRingView *UtxoRingViewpoint, witnessCache *txscript.Witn
 // to be discussed
 // ValidateTransactionScriptsAbe validates the input abeutil.TxAbe.
 // todo_DONE(MLP): reviewed on 2024.01.04
-func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingViewpoint, witnessCache *txscript.WitnessCache) error {
+// todo: 2025.12.12 aut should have such a standalone ValidTxAutScriptWitness(),
+// which is dedicated to valid AutWitness, bu calling crypto-layer.
+func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingViewpoint, autView *CTAUTViewpoint, witnessCache *txscript.WitnessCache) error {
 	// If transaction witness has already been validated and stored in cache, just return.
 	if witnessCache.Exists(*tx.Hash()) {
 		return nil
@@ -188,6 +190,11 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 	//	str := fmt.Sprintf("transaction %s verify failed", tx.Hash())
 	//	return ruleError(ErrScriptValidation, str)
 	//}
+
+	err = validateTxAutScriptWitness(tx, autView, utxoRingView)
+	if err != nil {
+		return err
+	}
 
 	// Add transaction into witness cache.
 	witnessCache.Add(*tx.Hash())

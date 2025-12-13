@@ -636,6 +636,7 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 //   - BFNoPoWCheck: The check to ensure the pow hash is less than the target difficulty is not performed.
 //
 // todo: Aconcagua review
+// review done 2025.12.12
 func checkProofOfWork(header *wire.BlockHeader, powConsensus *consensus.PowConsensus, powLimit *big.Int, flags BehaviorFlags) error {
 	// The target difficulty must be larger than zero.
 	target := CompactToBig(header.Bits)
@@ -794,6 +795,7 @@ func CountP2SHSigOps(tx *abeutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint)
 // are needed to pass along to checkProofOfWork.
 // todo: (EthashPoW)
 // reviewed on 2024.01.03, by Alice
+// review done 2025.12.12
 func checkBlockHeaderSanity(header *wire.BlockHeader, powConsensus *consensus.PowConsensus, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
 	// Ensure the proof of work bits in the block header is in min/max range
 	// and the block hash is less than the target value described by the
@@ -957,6 +959,7 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 //
 // todo: (EthashPoW)
 // reviewed on 2024.01.03 by Alice
+// review 2025.12. todo
 func checkBlockSanityAbe(block *abeutil.BlockAbe, powConsensus *consensus.PowConsensus, chainParams *chaincfg.Params, timeSource MedianTimeSource, flags BehaviorFlags) error {
 	powLimit := chainParams.PowLimit
 	msgBlock := block.MsgBlock()
@@ -1062,6 +1065,11 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, powConsensus *consensus.PowCon
 			return err
 		}
 	}
+
+	// todo: aut 2025.12.12
+	// RULES: In each block,
+	// - (1) the RegistrationScripts should not register the AutInstances with the same AutIdentifier
+	// - (2) for an AutIdentifier, there is at most one RegistrationScript/ReRegistrationScript/MintScript.
 
 	// Build merkle tree and ensure the calculated merkle root matches the
 	// entry in the block header.  This also has the effect of caching all
@@ -1213,6 +1221,7 @@ func checkSerializedHeightAbe(coinbaseTx *abeutil.TxAbe, wantHeight int32) error
 //
 // This function MUST be called with the chain state lock held (for writes).
 // todo: Aconcagua review
+// review done 2025.12.12
 func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNode *blockNode, flags BehaviorFlags) error {
 
 	if header == nil {
@@ -1356,6 +1365,7 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 //
 // refactored on 2024.01.03 by Alice
 // reviewed on 2024.01.03 by Alice
+// review done 2025.12.12
 func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blockNode, flags BehaviorFlags) error {
 	// Perform all block header related validation checks.
 	header := &block.MsgBlock().Header
@@ -1746,7 +1756,8 @@ func CheckTransactionInputs(tx *abeutil.Tx, txHeight int32, utxoView *UtxoViewpo
 //     Abe todo
 //
 // todo_DONE(MLP): review on 2024.01.04
-func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
+// todo_done: reviewed on 2025.12.12
+func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *UtxoRingViewpoint, ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
 	// Coinbase transactions have no inputs.
 	isCb, err := IsCoinBaseAbe(tx)
 	if err != nil {
@@ -1798,12 +1809,17 @@ func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *
 		}
 	}
 
+	err = checkTxAutScriptInputsOutputs(tx, ctautView, utxoRingView, txHeight, chainParams)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 // validateAutRegistrationScript
 // aut review done 2025.12.12
-func validateAutRegistrationScript(tx *abeutil.TxAbe, currentHeight int32,
+func checkAutRegistrationScriptInputsOutputs(tx *abeutil.TxAbe, currentHeight int32,
 	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
 
 	if tx == nil {
@@ -1845,7 +1861,8 @@ func validateAutRegistrationScript(tx *abeutil.TxAbe, currentHeight int32,
 
 // validateAutReRegistrationScript
 // aut review done 2025.12.11
-func validateAutReRegistrationScript(tx *abeutil.TxAbe, currentHeight int32,
+// todo: check hostView[ringhash].unspent
+func checkAutReRegistrationScriptInputsOutputs(tx *abeutil.TxAbe, currentHeight int32,
 	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
 	if tx == nil {
 		return fmt.Errorf("tx is nil")
@@ -1921,6 +1938,7 @@ func validateAutReRegistrationScript(tx *abeutil.TxAbe, currentHeight int32,
 				"the consumed UTXO at Ring %s not exist", tx.Hash(), currentHeight, hostTxIn.PreviousOutPointRing.Hash())
 		}
 
+		// todo: enhance this function: take ringEntry as input, and return additionally isSpent.
 		hostTxo, hostOutPoint, err := getAutHostFromTxoRing(ringEntry.TxoRing(), ringHash)
 		if err != nil {
 			return fmt.Errorf("error happens when calling getAutHostFromTxoRing on ringId %v: %v", ringHash, err)
@@ -1988,9 +2006,9 @@ func validateAutReRegistrationScript(tx *abeutil.TxAbe, currentHeight int32,
 	return nil
 }
 
-// validateAutMintScript
+// checkAutMintScriptInputsOutputs
 // aut review done 2025.12.12
-func validateAutMintScript(tx *abeutil.TxAbe, currentHeight int32,
+func checkAutMintScriptInputsOutputs(tx *abeutil.TxAbe, currentHeight int32,
 	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
 
 	if tx == nil {
@@ -2172,9 +2190,68 @@ func validateAutMintScript(tx *abeutil.TxAbe, currentHeight int32,
 	return nil
 }
 
+func validateAutMintScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint) error {
+
+	if tx == nil {
+		return fmt.Errorf("tx is nil")
+	}
+
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		// the caller should check whether tx.ExtAutScript() is nil before calling this function
+		return fmt.Errorf("wrong call on validateAutMintScript: tx.ExtAutScript is nil")
+	}
+
+	if extAutScript.Type() != ctautapi.AutScriptTypeMint {
+		return fmt.Errorf("expected mint script, but got %d", extAutScript.Type())
+	}
+	mintScript, ok := extAutScript.AutScript.(*ctautapi.MintScript)
+	if !ok {
+		return fmt.Errorf("expected mint script, but got %d", extAutScript.Type())
+	}
+
+	if !tx.MsgTx().HasAutWitness() {
+		return fmt.Errorf("transaction %s has no aut witness", tx.Hash())
+	}
+	witnessHash := ctautwire.AutWitnessHash(tx.MsgTx().AutWitness)
+
+	claimedWitnessHash := mintScript.WitnessHash()
+	if !witnessHash.IsEqual(&claimedWitnessHash) {
+		return fmt.Errorf("mismatch witness for script")
+	}
+
+	generatedTokens := extAutScript.GeneratedTokens()
+	autTxOuts := make([]*ctautwire.AutTxo, len(generatedTokens))
+	for i, outputToken := range generatedTokens {
+
+		autTxo := &ctautwire.AutTxo{}
+		err := autTxo.Deserialize(outputToken.ValueScript)
+		if err != nil {
+			return err
+		}
+
+		autTxOuts[i] = autTxo
+	}
+
+	cbTx := &ctautwire.AutCoinbaseTx{
+		Version:   extAutScript.Version(),
+		Vin:       mintScript.Vin(),
+		TxOuts:    autTxOuts,
+		TxWitness: tx.MsgTx().AutWitness,
+	}
+
+	err := abecryptox.AutCoinbaseTxVerify(cbTx)
+	if err != nil {
+		return fmt.Errorf("transaction %s try to mint but the witness verfied fail with %s",
+			tx.Hash(), err)
+	}
+
+	return nil
+}
+
 // validateAutTransferScript
 // aut review done 2025.12.12 todo: discuss
-func validateAutTransferScript(tx *abeutil.TxAbe, txHeight int32,
+func checkAutTransferScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
 
 	if tx == nil {
@@ -2250,9 +2327,13 @@ func validateAutTransferScript(tx *abeutil.TxAbe, txHeight int32,
 
 		coin := ctautView.LookupCTAUTCoin(autIdentifier, *hostOutPoint)
 		if coin == nil {
+			// This is checking the case of spend-unexist.
+			// Double-spending check is performed through the host on TxIn.
 			return fmt.Errorf("no such AUT coin found")
 		}
 		if coin.IsSpent() {
+			// 2025.12.13 This is actually an assert, which should not happen.
+			// Double-spending check is performed through the host on TxIn.
 			return fmt.Errorf("transaction %s try to consume spent AUT coin <%s:%d>",
 				tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
 		}
@@ -2344,9 +2425,87 @@ func validateAutTransferScript(tx *abeutil.TxAbe, txHeight int32,
 	return nil
 }
 
-// validateAutBurnScript
+// validateAutTransferScriptWitness
+//
+// This function should be called after checkAutTransferScriptInputOutputs() is performed.
+func validateAutTransferScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint) error {
+
+	if tx == nil {
+		return fmt.Errorf("tx is nil")
+	}
+
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		// the caller should check whether tx.ExtAutScript() is nil before calling this function
+		return fmt.Errorf("wrong call on validateAutTransferScript: tx.ExtAutScript is nil")
+	}
+
+	if extAutScript.Type() != ctautapi.AutScriptTypeTransfer {
+		return fmt.Errorf("expected transfer script, but got %d", extAutScript.Type())
+	}
+	transferScript, ok := extAutScript.AutScript.(*ctautapi.TransferScript)
+	if !ok {
+		return fmt.Errorf("expected transfer script, but got %d", extAutScript.Type())
+	}
+
+	if !tx.MsgTx().HasAutWitness() {
+		return fmt.Errorf("transaction %s has no aut witness", tx.Hash())
+	}
+	witnessHash := ctautwire.AutWitnessHash(tx.MsgTx().AutWitness)
+
+	claimedWitnessHash := transferScript.WitnessHash()
+	if !witnessHash.IsEqual(&claimedWitnessHash) {
+		return fmt.Errorf("mismatch witness for script")
+	}
+
+	autIdentifier := extAutScript.AutIdentifier()
+	hostOutPoints := extAutScript.ConsumedHostOutpoints()
+	autTxIns := make([]*ctautwire.AutTxo, len(hostOutPoints))
+	for i, hostOutPoint := range hostOutPoints {
+		coin := ctautView.LookupCTAUTCoin(autIdentifier, *hostOutPoint)
+		if coin == nil {
+			return fmt.Errorf("no such AUT coin found")
+		}
+		autTxo := &ctautwire.AutTxo{}
+		err := autTxo.Deserialize(coin.valueScript)
+		if err != nil {
+			return err
+		}
+		autTxIns[i] = autTxo
+	}
+
+	generatedTokens := extAutScript.GeneratedTokens()
+	autTxOuts := make([]*ctautwire.AutTxo, len(generatedTokens))
+	for i, outputToken := range generatedTokens {
+
+		autTxo := &ctautwire.AutTxo{}
+		err := autTxo.Deserialize(outputToken.ValueScript)
+		if err != nil {
+			return err
+		}
+
+		autTxOuts[i] = autTxo
+	}
+
+	trTx := &ctautwire.AutTransferTx{
+		Version:   extAutScript.Version(),
+		TxIns:     autTxIns,
+		TxOuts:    autTxOuts,
+		TxWitness: tx.MsgTx().AutWitness,
+	}
+
+	err := abecryptox.AutTransferTxVerify(trTx)
+	if err != nil {
+		return fmt.Errorf(`transaction %s try to transfer tokens but the witness verfied fail with %s`,
+			tx.Hash(), err)
+	}
+
+	return nil
+}
+
+// checkAutBurnScriptInputsOutputs
 // aut review done 2025.12.12 todo: discuss
-func validateAutBurnScript(tx *abeutil.TxAbe, txHeight int32,
+func checkAutBurnScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
 
 	if tx == nil {
@@ -2535,6 +2694,85 @@ func validateAutBurnScript(tx *abeutil.TxAbe, txHeight int32,
 	return nil
 }
 
+// validateAutBurnScriptWitness
+//
+// This function should be called after checkAutBrunScriptInputOutputs() is performed.
+func validateAutBurnScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint) error {
+
+	if tx == nil {
+		return fmt.Errorf("tx is nil")
+	}
+
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		// the caller should check whether tx.ExtAutScript() is nil before calling this function
+		return fmt.Errorf("wrong call on validateAutBurnScript: tx.ExtAutScript is nil")
+	}
+
+	if extAutScript.Type() != ctautapi.AutScriptTypeBurn {
+		return fmt.Errorf("expected burn script, but got %d", extAutScript.Type())
+	}
+	burnScript, ok := extAutScript.AutScript.(*ctautapi.BurnScript)
+	if !ok {
+		return fmt.Errorf("expected burn script, but got %d", extAutScript.Type())
+	}
+
+	if !tx.MsgTx().HasAutWitness() {
+		return fmt.Errorf("transaction %s has no aut witness", tx.Hash())
+	}
+	witnessHash := ctautwire.AutWitnessHash(tx.MsgTx().AutWitness)
+	claimedWitnessHash := burnScript.WitnessHash()
+	if !witnessHash.IsEqual(&claimedWitnessHash) {
+		return fmt.Errorf("mismatch witness for script")
+	}
+
+	autIdentifier := extAutScript.AutIdentifier()
+	hostOutPoints := extAutScript.ConsumedHostOutpoints()
+	autTxIns := make([]*ctautwire.AutTxo, len(hostOutPoints))
+	for i, hostOutPoint := range hostOutPoints {
+		coin := ctautView.LookupCTAUTCoin(autIdentifier, *hostOutPoint)
+		if coin == nil {
+			return fmt.Errorf("no such AUT coin found")
+		}
+
+		autTxo := &ctautwire.AutTxo{}
+		err := autTxo.Deserialize(coin.valueScript)
+		if err != nil {
+			return err
+		}
+
+		autTxIns[i] = autTxo
+	}
+
+	generatedTokens := extAutScript.GeneratedTokens()
+	autTxOuts := make([]*ctautwire.AutTxo, len(generatedTokens))
+	for i, outputToken := range generatedTokens {
+
+		autTxo := &ctautwire.AutTxo{}
+		err := autTxo.Deserialize(outputToken.ValueScript)
+		if err != nil {
+			return err
+		}
+
+		autTxOuts[i] = autTxo
+	}
+
+	trTx := &ctautwire.AutTransferTx{
+		Version:   extAutScript.Version(),
+		TxIns:     autTxIns,
+		TxOuts:    autTxOuts,
+		TxWitness: tx.MsgTx().AutWitness,
+	}
+
+	err := abecryptox.AutTransferTxVerify(trTx)
+	if err != nil {
+		return fmt.Errorf(`transaction %s try to burn tokens but the witness verfied fail with %s`,
+			tx.Hash(), err)
+	}
+
+	return nil
+}
+
 // getAutHostFromTxoRing returns the host-Txo and host-OutPoint from the given txoRing,
 // which should have size  = 1.
 func getAutHostFromTxoRing(txoRing *wire.TxoRing, ringHash wire.RingId) (*wire.TxOutAbe, *ctautapi.HostOutPoint, error) {
@@ -2567,12 +2805,12 @@ func getAutHostFromTxoRing(txoRing *wire.TxoRing, ringHash wire.RingId) (*wire.T
 	return txo, hostPoint, nil
 }
 
-// ValidateTxAutScript
-// aut review done, 2025.12.11 todo
-func ValidateTxAutScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint,
+// checkTxAutScriptInputsOutputs
+// aut review done, 2025.12.13 done
+func checkTxAutScriptInputsOutputs(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint,
 	currentHeight int32, chainParams *chaincfg.Params) error {
 	if tx == nil {
-		return fmt.Errorf("ValidateCTAUTScript: a nil transaction")
+		return fmt.Errorf("checkTxAutScriptInputsOutputs: a nil transaction")
 	}
 
 	extAutScript := tx.ExtAutScript()
@@ -2584,32 +2822,76 @@ func ValidateTxAutScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostView 
 
 	switch extAutScript.AutScript.(type) {
 	case *ctautapi.RegistrationScript:
-		err = validateAutRegistrationScript(tx, currentHeight, ctautView, hostView, chainParams)
+		err = checkAutRegistrationScriptInputsOutputs(tx, currentHeight, ctautView, hostView, chainParams)
 		if err != nil {
 			return err
 		}
 
 	case *ctautapi.ReRegistrationScript:
-		err = validateAutReRegistrationScript(tx, currentHeight, ctautView, hostView, chainParams)
+		err = checkAutReRegistrationScriptInputsOutputs(tx, currentHeight, ctautView, hostView, chainParams)
 		if err != nil {
 			return err
 		}
 
 	case *ctautapi.MintScript:
-		err = validateAutMintScript(tx, currentHeight, ctautView, hostView, chainParams)
+		err = checkAutMintScriptInputsOutputs(tx, currentHeight, ctautView, hostView, chainParams)
 		if err != nil {
 			return err
 		}
 
 	case *ctautapi.TransferScript:
-		err = validateAutTransferScript(tx, currentHeight, ctautView, hostView, chainParams)
+		err = checkAutTransferScriptInputsOutputs(tx, currentHeight, ctautView, hostView, chainParams)
 		if err != nil {
 			return err
 		}
 
 	case *ctautapi.BurnScript:
 		// This branch is exactly the same checking as the previous one, except for all the differences in handling outputs
-		err = validateAutBurnScript(tx, currentHeight, ctautView, hostView, chainParams)
+		err = checkAutBurnScriptInputsOutputs(tx, currentHeight, ctautView, hostView, chainParams)
+		if err != nil {
+			return err
+		}
+
+	default:
+		return errors.New("unsupported AUT transaction type")
+	}
+
+	return nil
+}
+
+// validateTxAutScriptWitness
+// aut review done, 2025.12.13 done todo
+func validateTxAutScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint) error {
+	if tx == nil {
+		return fmt.Errorf("validateTxAutScriptWitness: a nil transaction")
+	}
+
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		return nil
+	}
+
+	var err error
+
+	switch extAutScript.AutScript.(type) {
+	case *ctautapi.RegistrationScript, *ctautapi.ReRegistrationScript:
+		break
+
+	case *ctautapi.MintScript:
+		err = validateAutMintScriptWitness(tx, ctautView, hostView)
+		if err != nil {
+			return err
+		}
+
+	case *ctautapi.TransferScript:
+		err = validateAutTransferScriptWitness(tx, ctautView, hostView)
+		if err != nil {
+			return err
+		}
+
+	case *ctautapi.BurnScript:
+		// This branch is exactly the same checking as the previous one, except for all the differences in handling outputs
+		err = validateAutBurnScriptWitness(tx, ctautView, hostView)
 		if err != nil {
 			return err
 		}
@@ -2653,6 +2935,7 @@ func ValidateTxAutScript(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostView 
 //	  7. Set new best height for utxo ring view
 //
 // todo_DONE(MLP): reviewed on 2024.01.04
+// todo: review 2025.12.12
 func (b *BlockChain) checkConnectBlockAbe(
 	node *blockNode, block *abeutil.BlockAbe,
 	view *UtxoRingViewpoint, stxos *[]*SpentTxOutAbe,
@@ -2717,6 +3000,7 @@ func (b *BlockChain) checkConnectBlockAbe(
 		return err
 	}
 
+	// todo: 2025.12.12 note that this function is check, does this need to be fetched?
 	// 1. fetch ctaut input from blockchain
 	err = ctautView.fetchConsumedCTAUTTokens(b.db, block, view)
 	if err != nil {
@@ -2784,12 +3068,7 @@ func (b *BlockChain) checkConnectBlockAbe(
 	for _, tx := range transactions[1:] {
 		// todo_DONE(MLP): reviewed on 2024.01.04
 		// Did not check/prevent the case that two transactions in a block spend the same coin. It will be handled later.
-		err = CheckTransactionInputsAbe(tx, node.height, view, b.chainParams)
-		if err != nil {
-			return err
-		}
-
-		err = ValidateTxAutScript(tx, ctautView, view, node.height, b.chainParams)
+		err = CheckTransactionInputsAbe(tx, node.height, view, ctautView, b.chainParams)
 		if err != nil {
 			return err
 		}
@@ -2832,6 +3111,15 @@ func (b *BlockChain) checkConnectBlockAbe(
 	totalNeutrinoOut := transactions[0].MsgTx().TxFee // for coinbase transaction, TxFee is used to represent the Value_in
 
 	expectedNeutrinoOut := CalcBlockSubsidy(node.height, b.chainParams) + totalFees
+	// todo: 2025.12.13
+	//subsidy := CalcBlockSubsidy(node.height, b.chainParams)
+	//expectedNeutrinoOut := subsidy + totalFees
+	//if expectedNeutrinoOut < subsidy || expectedNeutrinoOut < totalFees {
+	//	str := fmt.Sprintf("subsidy (%d) + totalFees (%d) results overflow",
+	//		subsidy, totalFees)
+	//	return ruleerror.NewRuleError(ruleerror.ErrBadCoinbaseValue, str)
+	//}
+
 	if totalNeutrinoOut > expectedNeutrinoOut {
 		str := fmt.Sprintf("coinbase transaction for block pays %v "+
 			"which is more than expected value of %v",

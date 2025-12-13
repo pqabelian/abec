@@ -265,6 +265,7 @@ func mergeUtxoRingView(viewA *blockchain.UtxoRingViewpoint, viewB *blockchain.Ut
 }
 
 // aut review done, 2025.12.12
+// todo: confirm
 func mergeCTAUTView(viewA *blockchain.CTAUTViewpoint, viewB *blockchain.CTAUTViewpoint) {
 	if viewB == nil {
 		return
@@ -281,10 +282,12 @@ func mergeCTAUTView(viewA *blockchain.CTAUTViewpoint, viewB *blockchain.CTAUTVie
 			continue
 		}
 
+		// todo: 2025.12.13 handle metadata
+
 		// do not change AUT info
 		// but add all coin to viewA
 		for outpoint, coin := range instanceInViewB.AUTCoins() {
-			instanceInViewA.Add(outpoint, coin)
+			instanceInViewA.PutCoin(outpoint, coin)
 		}
 		viewAInstances[identifierKey] = instanceInViewA
 	}
@@ -459,8 +462,8 @@ func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, txVersion uint32, cry
 	if err != nil {
 		return nil, err
 	}
-	msgTx.TxWitness = make([]byte, txWitnessSizeApprox)
-	msgTx.AutWitness = nil // coinbaseTx should not carry AutTx.
+	msgTx.TxWitness = make([]byte, txWitnessSizeApprox) // todo: make sure len(msgTx.TxWitness) != 0 so that msgTx.HasWitness == true
+	msgTx.AutWitness = nil                              // coinbaseTx should not carry AutTx.
 
 	return msgTx, nil
 }
@@ -482,22 +485,33 @@ func spendTransaction(utxoView *blockchain.UtxoViewpoint, tx *abeutil.Tx, height
 
 // todo(ABE): the block is unknown yet, use hainhash.ZeroHash as the block hash consuming the serialNumber
 // Move this function to blockchain package
-// todo: remove ctautScript *ctautapi.ExtAutScript
 func spendTransactionAbe(tx *abeutil.TxAbe, utxoRingView *blockchain.UtxoRingViewpoint, blockHeight int32) error {
 	for _, txIn := range tx.MsgTx().TxIns {
 		entry := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())
 		if entry != nil {
 			entry.Spend(txIn.SerialNumber, &chainhash.ZeroHash) // TODO(review)
+			// todo: spend Aut here?
 		}
 	}
 
+	// todo: spendAutScript
+	// set AutRootToken spent for Rereg and Mint; set AutCoinSpent for Transfer and Burn.
+
+	// todo: 2025.12.12 how about add spendTransactionAutScript here
+	// todo: what is the function of this spend function? to prepare data for double-spending check?
+	// todo: note that the double-spending check for aut is simple, since its double-spending-proof is guaranteed by the host-tx.
+	// todo: fot aut, it only needs to prevent spend-unexist.
+
 	return nil
 }
+
+// todo: aut review done 2025.12.12
 func spendTransactionAUTScript(tx *abeutil.TxAbe, ctAutView *blockchain.CTAUTViewpoint, blockHeight int32) error {
 	ctautScript := tx.ExtAutScript()
 
 	// CTAUT
 	if ctautScript != nil {
+		// todo: discuss, why has a separate function
 		err := ctAutView.SpendCTAutScript(ctautScript, tx.Hash(), blockHeight)
 		if err != nil {
 			return err
@@ -784,15 +798,25 @@ mempoolLoop:
 		}
 
 		// Fetch all of the utxoRings referenced by this transaction.
-		utxoRings, err := g.chain.FetchUtxoRingView(tx)
+		utxoRingView, err := g.chain.FetchUtxoRingView(tx)
 		if err != nil {
 			log.Warnf("Unable to fetch utxoRing view for tx %s: %v",
 				tx.Hash(), err)
 			continue
 		}
 
+		// aut review done, 2025.12.12
+		ctAutView, err := g.chain.FetchCTAUTView(tx.ExtAutScript())
+		if err != nil {
+			log.Debugf("Skipping tx %s because it "+
+				"contains an invalid CTAUT transaction: %v",
+				tx.Hash(), err)
+			continue
+		}
+
 		// TODO replace with this one?
-		err = blockchain.CheckTransactionInputsAbe(tx, nextBlockHeight, utxoRings, g.chainParams)
+		// Note that here use a utxoRings read from mainchain to call CheckTransactionInputsAbe
+		err = blockchain.CheckTransactionInputsAbe(tx, nextBlockHeight, utxoRingView, ctAutView, g.chainParams)
 		if err != nil {
 			log.Tracef("Skipping tx %s because it "+
 				"references unspent output %s "+
@@ -803,8 +827,9 @@ mempoolLoop:
 		// ToDo(MLP):todo
 		// If utxoRing of one of the transaction inputs does not exist,
 		// skip this transaction.
+		// 2025.12.12 Note that this check has actually performed in the above CheckTransactionInputsAbe
 		for _, txIn := range tx.MsgTx().TxIns {
-			entry := utxoRings.LookupEntry(txIn.PreviousOutPointRing.Hash())
+			entry := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())
 			if entry == nil || entry.IsSpent(txIn.SerialNumber) {
 				log.Tracef("Skipping tx %s because it "+
 					"references unspent output %s "+
@@ -814,34 +839,11 @@ mempoolLoop:
 			}
 		}
 
-		// TODO fetch
-		ctAutView, err := g.chain.FetchCTAUTView(tx.ExtAutScript())
-		if err != nil {
-			log.Debugf("Skipping tx %s because it "+
-				"contains an invalid CTAUT transaction: %v",
-				tx.Hash(), err)
-			continue
-		}
-
-		err = blockchain.ValidateTxAutScript(
-			tx,
-			ctAutView,
-			utxoRings,
-			nextBlockHeight,
-			g.chainParams,
-		)
-		if err != nil {
-			log.Debugf("Skipping tx %s because it "+
-				"contains an invalid CTAUT transaction: %v",
-				tx.Hash(), err)
-			continue
-		}
-
 		prioItem := &txPrioItemAbe{tx: tx}
 		// Calculate the final transaction priority using the input
 		// value age sum as well as the adjusted transaction size.
 		// Current formula is: sum(inputAge) / adjustedTxSize
-		prioItem.priority = CalcPriorityAbe(tx.MsgTx(), utxoRings, nextBlockHeight)
+		prioItem.priority = CalcPriorityAbe(tx.MsgTx(), utxoRingView, nextBlockHeight)
 
 		// Calculate the fee in Neutrino/kB.
 		prioItem.feePerKB = txDesc.FeePerKB
@@ -858,7 +860,7 @@ mempoolLoop:
 		//mergeUtxoView(blockUtxos, utxos)
 		// if blockUtxoRings.Entries() has the same utxoRing,
 		// just replace, as the utxoRing in utxoRings is queried from the latest database
-		mergeUtxoRingView(blockUtxoRings, utxoRings)
+		mergeUtxoRingView(blockUtxoRings, utxoRingView)
 		mergeCTAUTView(blockCTAUTView, ctAutView)
 	}
 
@@ -870,7 +872,7 @@ mempoolLoop:
 	//	todo(ABE): ABE does not use weight, while use size only.
 	// blockWeight := (blockHeaderOverhead * blockchain.WitnessScaleFactor) + uint32(blockchain.GetTransactionWeightAbe(coinbaseTx))
 	blockSize := uint32((blockHeaderOverhead) + coinbaseTx.MsgTx().SerializeSize())
-	blockFullSize := uint32((blockHeaderOverhead) + coinbaseTx.MsgTx().SerializeSize())
+	blockFullSize := uint32((blockHeaderOverhead) + coinbaseTx.MsgTx().SerializeSizeFull())
 	totalFee := uint64(0)
 
 	// Choose which transactions make it into the block.
@@ -964,7 +966,10 @@ mempoolLoop:
 		// Ensure the transaction inputs pass all of the necessary
 		// preconditions before allowing it to be added to the block.
 		//	todo(ABE): check double spending
-		err := blockchain.CheckTransactionInputsAbe(tx, nextBlockHeight, blockUtxoRings, g.chainParams)
+		// 2025.12.12 here use blockUtxoRings to check the double-spending and spend-unexist,
+		// to prevent double-spend among different transactions,
+		// which is achieved together with later spendTransactionAbe().
+		err := blockchain.CheckTransactionInputsAbe(tx, nextBlockHeight, blockUtxoRings, blockCTAUTView, g.chainParams)
 		if err != nil {
 			log.Debugf("Skipping tx %s due to error in "+
 				"CheckTransactionInputs: %v", tx.Hash(), err)
@@ -975,23 +980,10 @@ mempoolLoop:
 			In particular, for each tx in mp.pool, there is an additional filed, to identify whether the tx's witness has been verified.
 			Other information, e.g., the inputs's double-spending may change, but as long as the txhash does not change, the witness does not need to verify again
 		*/
-		err = blockchain.ValidateTransactionScriptsAbe(tx, blockUtxoRings, g.witnessCache)
+		err = blockchain.ValidateTransactionScriptsAbe(tx, blockUtxoRings, blockCTAUTView, g.witnessCache)
 		if err != nil {
 			log.Debugf("Skipping tx %s due to error in "+
 				"ValidateTransactionScripts: %v", tx.Hash(), err)
-			continue
-		}
-
-		// TODO confirm blockCTAUTView is used correctly?
-		err = blockchain.ValidateTxAutScript(tx,
-			blockCTAUTView,
-			blockUtxoRings,
-			nextBlockHeight,
-			g.chainParams,
-		)
-		if err != nil {
-			log.Debugf("Skipping tx %s due to error in "+
-				"CheckTransactionInputsAUT: %v", tx.Hash(), err)
 			continue
 		}
 
@@ -1006,6 +998,8 @@ mempoolLoop:
 				"spendTransactionAbe: %v", tx.Hash(), err)
 			continue
 		}
+
+		// todo: this function here is unnecessary, since it is use to check double-spending among different Txs.
 		err = spendTransactionAUTScript(tx, blockCTAUTView, nextBlockHeight)
 		if err != nil {
 			log.Debugf("Skipping tx %s due to error in "+

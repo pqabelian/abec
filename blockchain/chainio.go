@@ -862,6 +862,7 @@ func outpointKey(outpoint wire.OutPoint) *[]byte {
 }
 
 func outPointRingKey(outPointRingHash chainhash.Hash) *[]byte {
+	// todo: 2025.12.12 what is the size for key? bug
 	key := outpointKeyPool.Get().(*[]byte)
 	copy(*key, outPointRingHash[:])
 	return key
@@ -1070,6 +1071,7 @@ func dbFetchUtxoEntry(dbTx database.Tx, outpoint wire.OutPoint) (*UtxoEntry, err
 
 // dbFetchUtxoRingEntry
 // reviewed on 2024.01.04
+// review done 2025.12.12
 func dbFetchUtxoRingEntry(dbTx database.Tx, outPointRingHash chainhash.Hash) (*UtxoRingEntry, error) {
 	// Fetch the unspent transaction output information for the passed
 	// transaction output.  Return nil when there is no entry.

@@ -3,7 +3,6 @@ package blockchain
 import (
 	"bytes"
 	"encoding/hex"
-	"errors"
 	"fmt"
 
 	"github.com/abesuite/abec/abecryptox"
@@ -58,10 +57,9 @@ func NewCTAUTInstance(metadata *ctautapi.AutMetadata, coins map[ctautapi.HostOut
 	return &CTAUTInstance{metadata: metadata, coins: coins}
 }
 
-// Add
-// review done 2015.12.11
-// todo: AddCion
-func (instance *CTAUTInstance) Add(outpiont ctautapi.HostOutPoint, coin *CTAUTCoin) {
+// PutCoin
+// review done 2015.12.13
+func (instance *CTAUTInstance) PutCoin(outpiont ctautapi.HostOutPoint, coin *CTAUTCoin) {
 	if instance.coins == nil {
 		instance.coins = make(map[ctautapi.HostOutPoint]*CTAUTCoin)
 	}
@@ -81,14 +79,14 @@ func (instance *CTAUTInstance) AUTCoins() map[ctautapi.HostOutPoint]*CTAUTCoin {
 }
 
 // SpendCoin
-// review done 2015.12.11
+// review done 2015.12.12 todo:
 func (instance *CTAUTInstance) SpendCoin(point ctautapi.HostOutPoint) (*CTAUTCoin, error) {
 	token, exist := instance.coins[point]
 	if !exist || token == nil {
-		return nil, errors.New("non-exist aut coin")
+		return nil, fmt.Errorf("attempting to spend a non-exist aut coin")
 	}
 	if token.IsSpent() {
-		return nil, errors.New("spent aut coin")
+		return nil, fmt.Errorf("attempting spend a spent aut coin")
 	}
 
 	token.Spend()
@@ -203,7 +201,7 @@ func NewCTAUTCoin(version uint32, identifier ctautapi.AutId, valueScript []byte,
 //
 //	todo: using AutIdentifier as key to store AutEntries.
 //
-// review done 2025.12.11
+// review done 2025.12.11, todo: add Add and Lookup AutInstance methods.
 type CTAUTViewpoint struct {
 	instances map[string]*CTAUTInstance
 	bestHash  chainhash.Hash
@@ -307,6 +305,20 @@ func (view *CTAUTViewpoint) connectRegistrationScript(script *ctautapi.ExtAutScr
 	identifier := script.AutIdentifier()
 	identifierKey := identifier.String()
 	instance, exist := view.instances[identifierKey]
+	// todo: refactor 2025.12.13
+	//autMetadata := view.LookupCTAUTMetaInfo(identifier)
+	//if autMetadata != nil {
+	//	return fmt.Errorf("an registration AUT transaction %s try to register AUT entry with an existing AUT identified by %s",
+	//		txHash, identifier.String())
+	//}
+	//newAutMetadata, err := script.CreateAutMetadata()
+	//if err != nil {
+	//	return err
+	//}
+	//instance = NewCTAUTInstance(newAutMetadata, nil)
+	//view.instances[identifierKey] = instance // todo: add a new method to AddInstance?
+	//
+
 	// TODO(CTAUT) assert rule need match the initialization
 	if exist && instance != nil && instance.metadata != nil {
 		return fmt.Errorf("an registration AUT transaction %s try to register AUT entry with an existing AUT identified by %s",
@@ -360,6 +372,7 @@ func (view *CTAUTViewpoint) connectRegistrationScript(script *ctautapi.ExtAutScr
 }
 
 // todo: remove txHash chainhash.Hash
+// todo: review 2025.12.12; note that no input no output
 func (view *CTAUTViewpoint) connectReRegistrationScript(script *ctautapi.ExtAutScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
 	if script.Type() != ctautapi.AutScriptTypeReRegistration {
 		return fmt.Errorf("expected re-registration script, but got %d", script.Type())
@@ -378,6 +391,7 @@ func (view *CTAUTViewpoint) connectReRegistrationScript(script *ctautapi.ExtAutS
 	metadata := instance.metadata
 	previousMetadata := metadata.Clone()
 
+	// todo: 2025.12.12 use a new variable for updatedMetadata
 	metadata, err := script.UpdateAutMetadata(metadata)
 	if err != nil {
 		return err
@@ -428,6 +442,7 @@ func (view *CTAUTViewpoint) connectReRegistrationScript(script *ctautapi.ExtAutS
 }
 
 // todo: remove txHash chainhash.Hash
+// todo: review 2025.12.12
 func (view *CTAUTViewpoint) connectMintScript(extAutScript *ctautapi.ExtAutScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
 	if extAutScript.Type() != ctautapi.AutScriptTypeMint {
 		return fmt.Errorf("expected mint script, but got %d", extAutScript.Type())
@@ -471,6 +486,7 @@ func (view *CTAUTViewpoint) connectMintScript(extAutScript *ctautapi.ExtAutScrip
 
 	}
 	// TODO AUT actually do need to use saut to record
+	// todo: 2025.12.12 why first currentSctauts then sctauts; sctauts is a strange structure
 	if sctauts != nil {
 		sctaut := SpentCTAUTTokens(currentSctauts)
 		*sctauts = append(*sctauts, &sctaut)
@@ -478,6 +494,7 @@ func (view *CTAUTViewpoint) connectMintScript(extAutScript *ctautapi.ExtAutScrip
 
 	// Double check
 	// 1. check whether minted amount is exceed planned
+	// todo: 2025.12.12 use PlannedTotalSupply
 	wouldMintedAmount := mintScript.Vin()
 	if info.MintedAmount+wouldMintedAmount < info.MintedAmount {
 		return fmt.Errorf("an mint AUT transaction %s try to mint AUT exceed planned amount %d for AUT identified by %s",
@@ -486,9 +503,13 @@ func (view *CTAUTViewpoint) connectMintScript(extAutScript *ctautapi.ExtAutScrip
 	info.MintedAmount += wouldMintedAmount
 
 	// 2. add generated token
+	// todo: 2025.12.12 is making a reuseable function for differnet callers? for Spend, does not need to generate outputTokens
+	// todo: not that his may cause/allow the spending of pending AutTxo.
+	// todo: the available autTokens should be first decided by corresponding TxIn of the host-Tx, then double-checked by AutTokens.
+	// so, they should be always melt together.
 	generatedTokens := extAutScript.GeneratedTokens()
 	for _, token := range generatedTokens {
-		view.instances[identifierKey].Add(
+		view.instances[identifierKey].PutCoin(
 			token.HostOutPoint,
 			NewCTAUTCoin(token.Version, identifier, token.ValueScript, blockHeight),
 		)
@@ -501,6 +522,7 @@ func (view *CTAUTViewpoint) connectMintScript(extAutScript *ctautapi.ExtAutScrip
 	return nil
 }
 
+// todo: review 2025.12.12
 // todo: remove txHash chainhash.Hash
 func (view *CTAUTViewpoint) connectTransferScript(extAutScript *ctautapi.ExtAutScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
 	if extAutScript.Type() != ctautapi.AutScriptTypeTransfer {
@@ -510,6 +532,7 @@ func (view *CTAUTViewpoint) connectTransferScript(extAutScript *ctautapi.ExtAutS
 	identifier := extAutScript.AutIdentifier()
 	identifierKey := identifier.String()
 	instance, exist := view.instances[identifierKey]
+	// todo: view adds a LookupAutInstance method.
 	// TODO(CTAUT) assert rule need match the initialization
 	if !exist || instance == nil || instance.metadata == nil {
 		return fmt.Errorf("an non-registration AUT transaction %s try to operate on non-existing AUT entry identified by %s",
@@ -545,15 +568,17 @@ func (view *CTAUTViewpoint) connectTransferScript(extAutScript *ctautapi.ExtAutS
 		*sctauts = append(*sctauts, &sctaut)
 	}
 
+	// todo: for connect, this part is useful.
 	generatedTokens := extAutScript.GeneratedTokens()
 	for i := 0; i < len(generatedTokens); i++ {
 		coin := NewCTAUTCoin(generatedTokens[i].Version, identifier, generatedTokens[i].ValueScript, blockHeight)
-		view.instances[identifierKey].Add(generatedTokens[i].HostOutPoint, coin)
+		view.instances[identifierKey].PutCoin(generatedTokens[i].HostOutPoint, coin)
 	}
 
 	return nil
 }
 
+// todo: review 2025.12.12
 // todo: remove txHash chainhash.Hash
 func (view *CTAUTViewpoint) connectBurnScript(extAutScript *ctautapi.ExtAutScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
 	if extAutScript.Type() != ctautapi.AutScriptTypeBurn {
@@ -603,7 +628,7 @@ func (view *CTAUTViewpoint) connectBurnScript(extAutScript *ctautapi.ExtAutScrip
 	// Rule: the last output would be viewed as destroyed/burned
 	for i := 0; i < len(generatedToken)-1; i++ {
 		coin := NewCTAUTCoin(generatedToken[i].Version, identifier, generatedToken[i].ValueScript, blockHeight)
-		view.instances[identifierKey].Add(generatedToken[i].HostOutPoint, coin)
+		view.instances[identifierKey].PutCoin(generatedToken[i].HostOutPoint, coin)
 	}
 	burnedToken := generatedToken[len(generatedToken)-1]
 	// update the burned amount
@@ -617,6 +642,7 @@ func (view *CTAUTViewpoint) connectBurnScript(extAutScript *ctautapi.ExtAutScrip
 		return err
 	}
 
+	// todo: use more naive computation
 	if view.instances[identifierKey].metadata.BurnedAmount+burnedValue < view.instances[identifierKey].metadata.BurnedAmount {
 		return fmt.Errorf("a CT-AUT burn script in transaction %s try to burn token overflow the burned amount %d for AUT identified by %s",
 			txHash, view.instances[identifierKey].metadata.BurnedAmount, identifierKey)
@@ -687,6 +713,7 @@ func (view *CTAUTViewpoint) connectTransaction(tx *abeutil.TxAbe, blockHeight in
 // spend as spent, and setting the best hash for the view to the passed block.
 // In addition, when the 'stxos' argument is not nil, it will be updated to
 // append an entry for each spent txout.
+// todo: 2025.12.13 put into hostview.connectTransactions, or remove, since the connectTransaction is put into hostview.connectTransaction
 func (view *CTAUTViewpoint) connectTransactions(block *abeutil.BlockAbe, sctauts *[]SpentCTAUT) error {
 	for _, tx := range block.Transactions() {
 		err := view.connectTransaction(tx, block.MsgBlock().Header.Height, sctauts)
@@ -1056,7 +1083,9 @@ func (view *CTAUTViewpoint) commit() {
 // Upon completion of this function, the view will contain an entry for each
 // requested outpoint.  Spent outputs, or those which otherwise don't exist,
 // will result in a nil entry in the view.
-// review done 2025.12.11
+//
+// This function fetches autCoins of AutInstance with identifier, as well as the AutInstance's metadata.
+// review done 2025.12.12
 // todo: rename to a more accurate one
 func (view *CTAUTViewpoint) fetchCTAUTMain(db database.DB, outpoints map[ctautapi.HostOutPoint]struct{}, identifier ctautapi.AutId) error {
 	//if len(identifier) != ctaut.AutIdentifierLength {
@@ -1085,6 +1114,9 @@ func (view *CTAUTViewpoint) fetchCTAUTMain(db database.DB, outpoints map[ctautap
 					// todo: initialize coins 2025.12.11; should use New function for CTAUTInstance
 				}
 			}
+		} else {
+			// 2025.12.13 Note that view is a memory object, it is assumed that it is more fresh than the database.
+			// So, if view contains the AutInstance, it does not load it from database.
 		}
 
 		if view.instances[autIdentifierKey] != nil {
@@ -1095,6 +1127,7 @@ func (view *CTAUTViewpoint) fetchCTAUTMain(db database.DB, outpoints map[ctautap
 				// when the view has corresponding outpoints, do not
 				// fetch from database, it means that outpoint has fetched
 				if view.instances[autIdentifierKey].coins[outpoint] != nil {
+					// memory is more fresh than database
 					continue
 				}
 
@@ -1104,11 +1137,11 @@ func (view *CTAUTViewpoint) fetchCTAUTMain(db database.DB, outpoints map[ctautap
 				}
 				// assert
 				if coin == nil {
-					return fmt.Errorf("invalid fetch for point (%s, %d) for CTAUT instance %s",
+					return fmt.Errorf("invalid fetch for point (%s, %d) for AUT instance %s",
 						outpoint.TxHash, outpoint.Index, autIdentifierKey)
 				}
 				if !bytes.Equal(coin.identifier[:], identifier[:]) {
-					return fmt.Errorf("invalid fetch for point (%s, %d) for CTAUT instance %s",
+					return fmt.Errorf("invalid fetch for point (%s, %d) for AUT instance %s",
 						outpoint.TxHash, outpoint.Index, autIdentifierKey)
 				}
 				view.instances[autIdentifierKey].coins[outpoint] = coin
@@ -1205,18 +1238,22 @@ func (view *CTAUTViewpoint) fetchCTAUTToken(db database.DB, identifier ctautapi.
 // database as needed.  In particular, referenced entries that are earlier in
 // the block are added to the view and entries that are already in the view are
 // not modified.
+// todo: review 2025.12.12
 func (view *CTAUTViewpoint) fetchConsumedCTAUTTokens(db database.DB, block *abeutil.BlockAbe, hostView *UtxoRingViewpoint) error {
+	// todo: use block.ExtAutScripts() 2025.12.12
 	for _, tx := range block.Transactions()[1:] {
 		// Loop through all of the transaction inputs (except for the coinbase
 		// which has no inputs) collecting them into sets of what is needed and
 		// what is already known (in-flight).
 		ctAutScript := tx.ExtAutScript()
 		if ctAutScript == nil {
+			// todo: bug, should continue
 			return nil
 		}
 
 		consumedHostOutpoints := ctAutScript.ConsumedHostOutpoints()
 		neededSet := make(map[ctautapi.HostOutPoint]struct{}, len(consumedHostOutpoints))
+		// todo: should not use the following if, so that AutMetadata that AutScriptTypeReregister and AutScriptTypeMint are also fetched
 		if ctAutScript.Type() == ctautapi.AutScriptTypeTransfer || ctAutScript.Type() == ctautapi.AutScriptTypeBurn {
 			for i := 0; i < len(consumedHostOutpoints); i++ {
 				neededSet[*consumedHostOutpoints[i]] = struct{}{}
@@ -1232,6 +1269,7 @@ func (view *CTAUTViewpoint) fetchConsumedCTAUTTokens(db database.DB, block *abeu
 }
 
 // todo: remove txHash *chainhash.Hash?
+// todo: 2025.12.12 discuss, use tx rather than script; why use conncetXXX?
 func (view *CTAUTViewpoint) SpendCTAutScript(script *ctautapi.ExtAutScript, txHash *chainhash.Hash, blockHeight int32) error {
 	var err error
 	switch script.AutScript.(type) {
@@ -1308,7 +1346,7 @@ func NewCTAUTViewpoint() *CTAUTViewpoint {
 //
 // This function is safe for concurrent access however the returned view is NOT.
 // refactored by Alice 2024.03.01
-// aut review done 2025.12.11
+// aut review done 2025.12.12 todo: discuss and confirm
 func (b *BlockChain) FetchCTAUTView(script *ctautapi.ExtAutScript) (*CTAUTViewpoint, error) {
 	// Create a set of needed outputs based on those referenced by the
 	// inputs of the passed transaction and the outputs of the transaction
@@ -1325,10 +1363,13 @@ func (b *BlockChain) FetchCTAUTView(script *ctautapi.ExtAutScript) (*CTAUTViewpo
 	case *ctautapi.RegistrationScript:
 		// nothing
 		// all root coin would be fetched with instance
-	case *ctautapi.MintScript:
+		// AutRootTokens exist in a special manner,
+		// say, they do not have corresponding "real coins" stored in blockchain data,
+		// and only virtually exist in AutMetadata.
+	case *ctautapi.ReRegistrationScript:
 		// nothing
 		// all root coin would be fetched with instance
-	case *ctautapi.ReRegistrationScript:
+	case *ctautapi.MintScript:
 		// nothing
 		// all root coin would be fetched with instance
 	case *ctautapi.TransferScript:
