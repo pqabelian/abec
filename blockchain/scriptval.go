@@ -2,12 +2,13 @@ package blockchain
 
 import (
 	"fmt"
+	"runtime"
+	"time"
+
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain/ruleerror"
 	"github.com/abesuite/abec/txscript"
-	"runtime"
-	"time"
 )
 
 // txValidateItem holds a transaction to validate.
@@ -24,6 +25,7 @@ type txValidator struct {
 	quitChan     chan struct{}
 	resultChan   chan error
 	utxoRingView *UtxoRingViewpoint
+	autView      *CTAUTViewpoint
 	witnessCache *txscript.WitnessCache
 }
 
@@ -47,7 +49,7 @@ out:
 	for {
 		select {
 		case txVI := <-v.validateChan:
-			err := ValidateTransactionScriptsAbe(txVI.tx, v.utxoRingView, v.witnessCache)
+			err := ValidateTransactionScriptsAbe(txVI.tx, v.utxoRingView, v.autView, v.witnessCache)
 
 			v.sendResult(err)
 
@@ -118,12 +120,13 @@ func (v *txValidator) Validate(items []*txValidateItem) error {
 
 // newTxValidator returns a new instance of txValidator to be used for
 // validating transaction scripts asynchronously.
-func newTxValidator(utxoRingView *UtxoRingViewpoint, witnessCache *txscript.WitnessCache) *txValidator {
+func newTxValidator(utxoRingView *UtxoRingViewpoint, autView *CTAUTViewpoint, witnessCache *txscript.WitnessCache) *txValidator {
 	return &txValidator{
 		validateChan: make(chan *txValidateItem),
 		quitChan:     make(chan struct{}),
 		resultChan:   make(chan error),
 		utxoRingView: utxoRingView,
+		autView:      autView,
 		witnessCache: witnessCache,
 	}
 }
@@ -203,7 +206,7 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 
 // checkBlockScriptsAbe validates the witness of each transaction in blocks
 // todo_DONE(MLP): reviewed on 2024.01.04
-func checkBlockScriptsAbe(block *abeutil.BlockAbe, utxoRingView *UtxoRingViewpoint, witnessCache *txscript.WitnessCache) error {
+func checkBlockScriptsAbe(block *abeutil.BlockAbe, utxoRingView *UtxoRingViewpoint, autView *CTAUTViewpoint, witnessCache *txscript.WitnessCache) error {
 
 	//	Collect all transactions and required information for validation.
 	allTxs := block.Transactions()
@@ -226,7 +229,7 @@ func checkBlockScriptsAbe(block *abeutil.BlockAbe, utxoRingView *UtxoRingViewpoi
 
 	start := time.Now()
 
-	validator := newTxValidator(utxoRingView, witnessCache)
+	validator := newTxValidator(utxoRingView, autView, witnessCache)
 	if err := validator.Validate(txValItems); err != nil {
 		return err
 	}

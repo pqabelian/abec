@@ -3214,7 +3214,7 @@ func (b *BlockChain) checkConnectBlockAbe(
 	if witnessCheck {
 		log.Debugf("Check the witness for block %s in height %d", block.Hash(), block.Height())
 		// todo_DONE(MLP): reviewed on 2024.01.04
-		err := checkBlockScriptsAbe(block, view, b.witnessCache)
+		err := checkBlockScriptsAbe(block, view, ctautView, b.witnessCache)
 		if err != nil {
 			return err
 		}

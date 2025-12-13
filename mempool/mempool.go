@@ -1832,7 +1832,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 			"due to no witness", txHash)
 		return nil, nil, txRuleError(wire.RejectInvalid, str)
 	}
-	err = blockchain.ValidateTransactionScriptsAbe(tx, utxoRingView, mp.cfg.WitnessCache)
+	err = blockchain.ValidateTransactionScriptsAbe(tx, utxoRingView, ctAutView, mp.cfg.WitnessCache)
 	if err != nil {
 		str := fmt.Sprintf("transaction %v has invalid CTAUT script", txHash)
 		return nil, nil, txRuleError(wire.RejectCTAutBadForm, str)
