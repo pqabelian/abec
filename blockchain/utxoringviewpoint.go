@@ -1110,7 +1110,10 @@ func (b *BlockChain) FetchUtxoRingView(tx *abeutil.TxAbe) (*UtxoRingViewpoint, e
 // TODO change function name, such as connectTransactionInputs
 // todo: 2025.12.13 for ctaut part, new AutTokens will be generated.
 // todo: put the AutScript logic here?
-func (view *UtxoRingViewpoint) connectTransaction(tx *abeutil.TxAbe, blockhash *chainhash.Hash, stxos *[]*SpentTxOutAbe) error {
+func (view *UtxoRingViewpoint) connectTransaction(
+	tx *abeutil.TxAbe, blockhash *chainhash.Hash, stxos *[]*SpentTxOutAbe,
+	blockHeight int32, ctautView *CTAUTViewpoint, sctauts *[]SpentCTAUT,
+) error {
 	// Coinbase transactions don't have any inputs to spend.
 	isCb, err := tx.IsCoinBase()
 	if err != nil {
@@ -1169,6 +1172,12 @@ func (view *UtxoRingViewpoint) connectTransaction(tx *abeutil.TxAbe, blockhash *
 	// Add the transaction's outputs as available utxos.
 	//	view.AddTxOuts(tx, blockHeight)
 	// todo: add output AutToken here? 2025.12.15
+
+	err = ctautView.connectTransaction(tx, blockHeight, sctauts)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -1178,9 +1187,12 @@ func (view *UtxoRingViewpoint) connectTransaction(tx *abeutil.TxAbe, blockhash *
 // In addition, when the 'stxos' argument is not nil, it will be updated to
 // append an entry for each spent txout.
 // todo_DONE(MLP): reviewed on 2024.01.04
-func (view *UtxoRingViewpoint) connectTransactions(block *abeutil.BlockAbe, stxos *[]*SpentTxOutAbe) error {
+func (view *UtxoRingViewpoint) connectTransactions(
+	block *abeutil.BlockAbe, stxos *[]*SpentTxOutAbe,
+	ctautView *CTAUTViewpoint, sctauts *[]SpentCTAUT,
+) error {
 	for _, tx := range block.Transactions() {
-		err := view.connectTransaction(tx, block.Hash(), stxos)
+		err := view.connectTransaction(tx, block.Hash(), stxos, block.Height(), ctautView, sctauts)
 		if err != nil {
 			return err
 		}
