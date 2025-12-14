@@ -952,6 +952,7 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 //  6. No duplicate transactions (same tx hash).
 //  7. Preliminary check on each transaction (CheckTransactionSanityAbe).
 //  8. The merkle root is correctly computed with the given transactions.
+//  9. In each block, for an AutInstance, at most one AutScriptTypeReRegistration or AutScriptTypeMint is allowed.
 //
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkBlockHeaderSanity.
@@ -1060,7 +1061,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, powConsensus *consensus.PowCon
 	autScriptTypeMap := make(map[string]ctautapi.AutScriptType, len(transactions))
 	// RULES: In each block,
 	// - (1) the RegistrationScripts should not register the AutInstances with the same AutIdentifier
-	// - (2) for an AutIdentifier, there is at most one RegistrationScript/ReRegistrationScript/MintScript.
+	// - (2) for an AutInstance, there is at most one ReRegistrationScript or MintScript.
 
 	for i, tx := range transactions {
 		// todo_DONE(MLP): reviewed on 2024.01.03 by Alice.
