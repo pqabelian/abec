@@ -1182,13 +1182,11 @@ func (view *CTAUTViewpoint) fetchCTAUTMain(db database.DB, outpoints map[ctautap
 					return err
 				}
 				// assert
-				if coin == nil {
-					return fmt.Errorf("invalid fetch for point (%s, %d) for AUT instance %s",
-						outpoint.TxHash, outpoint.Index, autIdentifierKey)
-				}
-				if !bytes.Equal(coin.identifier[:], identifier[:]) {
-					return fmt.Errorf("invalid fetch for point (%s, %d) for AUT instance %s",
-						outpoint.TxHash, outpoint.Index, autIdentifierKey)
+				if coin != nil {
+					if !bytes.Equal(coin.identifier[:], identifier[:]) {
+						return fmt.Errorf("invalid fetch for point (%s, %d) for AUT instance %s",
+							outpoint.TxHash, outpoint.Index, autIdentifierKey)
+					}
 				}
 				view.instances[autIdentifierKey].coins[outpoint] = coin
 			}
