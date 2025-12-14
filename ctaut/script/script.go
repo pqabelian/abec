@@ -258,7 +258,7 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 	}
 
 	// PrivacyType                AutPrivacyType
-	if err = w.WriteByte(autMetadata.PrivacyType); err != nil {
+	if err = w.WriteByte(uint8(autMetadata.PrivacyType)); err != nil {
 		return nil, err
 	}
 
@@ -409,9 +409,11 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 	}
 
 	// PrivacyType                AutPrivacyType
-	if autMetadata.PrivacyType, err = r.ReadByte(); err != nil {
+	privacyTypeRead, err := r.ReadByte()
+	if err != nil {
 		return err
 	}
+	autMetadata.PrivacyType = AutPrivacyType(privacyTypeRead)
 
 	// MintedAmount               uint64
 	if autMetadata.MintedAmount, err = wire.ReadVarInt(r, 0); err != nil {
@@ -992,7 +994,7 @@ func (autScript *RegistrationScript) Serialize() ([]byte, error) {
 	}
 
 	// privacyType                AutPrivacyType
-	if err = w.WriteByte(autScript.privacyType); err != nil {
+	if err = w.WriteByte(uint8(autScript.privacyType)); err != nil {
 		return nil, err
 	}
 
@@ -1117,9 +1119,11 @@ func (autScript *RegistrationScript) Deserialize(serializedScript []byte) error 
 	}
 
 	// privacyType                AutPrivacyType
-	if autScript.privacyType, err = r.ReadByte(); err != nil {
+	privacyTypeRead, err := r.ReadByte()
+	if err != nil {
 		return err
 	}
+	autScript.privacyType = AutPrivacyType(privacyTypeRead)
 
 	// outStartIndex         uint8
 	if autScript.outStartIndex, err = r.ReadByte(); err != nil {
@@ -1545,7 +1549,7 @@ func (autScript *ReRegistrationScript) Serialize() ([]byte, error) {
 	}
 
 	// privacyType                AutPrivacyType
-	if err = w.WriteByte(autScript.privacyType); err != nil {
+	if err = w.WriteByte(uint8(autScript.privacyType)); err != nil {
 		return nil, err
 	}
 
@@ -1656,9 +1660,11 @@ func (autScript *ReRegistrationScript) Deserialize(serializedScript []byte) erro
 	}
 
 	// privacyType                AutPrivacyType
-	if autScript.privacyType, err = r.ReadByte(); err != nil {
+	privacyTypeRead, err := r.ReadByte()
+	if err != nil {
 		return err
 	}
+	autScript.privacyType = AutPrivacyType(privacyTypeRead)
 
 	// inStartIndex               uint8
 	if autScript.inStartIndex, err = r.ReadByte(); err != nil {

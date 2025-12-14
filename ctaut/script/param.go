@@ -31,12 +31,12 @@ func (autScriptType AutScriptType) String() string {
 	return fmt.Sprintf("Unknown AutScriptType (%d)", uint8(autScriptType))
 }
 
-type AutPrivacyType = uint8
+type AutPrivacyType uint8
 
 const (
-	AutPrivacyTypeUnlimited     = 0
-	AutPrivacyTypeLimitedPublic = 1
-	AutPrivacyTypeLimitedHidden = 2
+	AutPrivacyTypeUnlimited     AutPrivacyType = 0
+	AutPrivacyTypeLimitedPublic AutPrivacyType = 1
+	AutPrivacyTypeLimitedHidden AutPrivacyType = 2
 )
 
 const MaxAutScriptLength uint32 = 128 * 1024 // 128K, consistent with MaxAllowedTxMemoSize
