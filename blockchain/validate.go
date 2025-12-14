@@ -1057,7 +1057,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, powConsensus *consensus.PowCon
 	// Do some preliminary checks on each transaction to ensure they are
 	// sane before continuing.
 	//
-	autScriptTypeMap := make(map[ctautapi.AutId]ctautapi.AutScriptType, len(transactions))
+	autScriptTypeMap := make(map[string]ctautapi.AutScriptType, len(transactions))
 	// RULES: In each block,
 	// - (1) the RegistrationScripts should not register the AutInstances with the same AutIdentifier
 	// - (2) for an AutIdentifier, there is at most one RegistrationScript/ReRegistrationScript/MintScript.
@@ -1071,14 +1071,16 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, powConsensus *consensus.PowCon
 
 		extAutScript := tx.ExtAutScript()
 		if extAutScript != nil {
+			// RULE: In each block, for an AutInstance, at most one AutScriptTypeReRegistration or AutScriptTypeMint is allowed.
 			autScriptType := extAutScript.Type()
-			// AutScriptTypeRegistration does not need to check, since it is guaranteed by the identifier mechansim.
+			// AutScriptTypeRegistration does not need to check, since it is guaranteed by the identifier mechanism.
 			if autScriptType == ctautapi.AutScriptTypeReRegistration || autScriptType == ctautapi.AutScriptTypeMint {
-				if existType, ok := autScriptTypeMap[extAutScript.AutIdentifier()]; ok {
-					return fmt.Errorf("the %d -th tx carries an AutScript with type=%d, while there is already one with type=%d",
-						i, autScriptType, existType)
+				autIdentifierKey := extAutScript.AutIdentifier().String()
+				if existType, ok := autScriptTypeMap[autIdentifierKey]; ok {
+					return fmt.Errorf("the %d -th tx carries an AutScript with type=%s, while there is already one with type=%s",
+						i, autScriptType.String(), existType.String())
 				}
-				autScriptTypeMap[extAutScript.AutIdentifier()] = autScriptType
+				autScriptTypeMap[autIdentifierKey] = autScriptType
 			}
 		}
 

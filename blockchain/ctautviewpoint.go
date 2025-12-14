@@ -1323,7 +1323,7 @@ func (view *CTAUTViewpoint) AddMetadata(metadata *ctautapi.AutMetadata) error {
 		return fmt.Errorf("duplicate AUT instance %s", identifierKey)
 	}
 
-	view.instances[metadata.AutIdentifier.String()] = &CTAUTInstance{
+	view.instances[identifierKey] = &CTAUTInstance{
 		metadata: metadata,
 	}
 	return nil

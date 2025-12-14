@@ -796,7 +796,7 @@ func (g *BlkTmplGenerator) NewBlockTemplate(consensusApplied wire.ConsensusProto
 	blockHeaderOverhead := wire.GetBlockHeaderSize(nextBlockVersion)
 	blockHeaderOverhead += wire.MaxVarIntPayload
 
-	autScriptTypeMap := make(map[ctautapi.AutId]ctautapi.AutScriptType, len(sourceTxns))
+	autScriptTypeMap := make(map[string]ctautapi.AutScriptType, len(sourceTxns))
 
 mempoolLoop:
 	for _, txDesc := range sourceTxns {
@@ -866,9 +866,7 @@ mempoolLoop:
 		// Note that here use a utxoRings read from mainchain to call CheckTransactionInputsAbe
 		err = blockchain.CheckTransactionInputsAbe(tx, nextBlockHeight, utxoRingView, ctAutView, g.chainParams)
 		if err != nil {
-			log.Tracef("Skipping tx %s because it "+
-				"references unspent output %s "+
-				"which is not available",
+			log.Tracef("Skipping tx %s because the inptts check failed: %v ",
 				tx.Hash(), err)
 			continue mempoolLoop
 		}
@@ -887,18 +885,20 @@ mempoolLoop:
 			}
 		}
 
+		// RULE: In each block, for an AutInstance, at most one AutScriptTypeReRegistration or AutScriptTypeMint is allowed.
 		extAutScript := tx.ExtAutScript()
 		if extAutScript != nil {
 			autScriptType := extAutScript.Type()
 			// AutScriptTypeRegistration does not need to check, since it is guaranteed by the identifier mechansim.
 			if autScriptType == ctautapi.AutScriptTypeReRegistration || autScriptType == ctautapi.AutScriptTypeMint {
-				if existType, ok := autScriptTypeMap[extAutScript.AutIdentifier()]; ok {
-					log.Tracef("Skipping tx %s because "+
-						"it carries an AutScript with type=%d, while there is already one with type=%d",
-						tx.Hash(), autScriptType, existType)
+				autIdentifierKey := extAutScript.AutIdentifier().String()
+				if existType, ok := autScriptTypeMap[autIdentifierKey]; ok {
+					log.Debugf("Skipping tx %s because "+
+						"it carries an AutScript with type= %s, while there is already one with type=%s",
+						tx.Hash(), autScriptType.String(), existType.String())
 					continue
 				}
-				autScriptTypeMap[extAutScript.AutIdentifier()] = autScriptType
+				autScriptTypeMap[autIdentifierKey] = autScriptType
 			}
 		}
 

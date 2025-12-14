@@ -1,11 +1,12 @@
 package script
 
 import (
+	"fmt"
 	"github.com/abesuite/abec/chainhash"
 	ctautwire "github.com/abesuite/abec/ctaut/wire"
 )
 
-type AutScriptType = uint8
+type AutScriptType uint8
 
 const (
 	AutScriptTypeRegistration   AutScriptType = 0
@@ -14,6 +15,21 @@ const (
 	AutScriptTypeTransfer       AutScriptType = 3
 	AutScriptTypeBurn           AutScriptType = 4
 )
+
+var autScriptTypeStrings = map[AutScriptType]string{
+	AutScriptTypeRegistration:   "AutScriptTypeRegistration",
+	AutScriptTypeReRegistration: "AutScriptTypeReRegistration",
+	AutScriptTypeTransfer:       "AutScriptTypeTransfer",
+	AutScriptTypeMint:           "AutScriptTypeMint",
+	AutScriptTypeBurn:           "AutScriptTypeBurn",
+}
+
+func (autScriptType AutScriptType) String() string {
+	if str, ok := autScriptTypeStrings[autScriptType]; ok {
+		return str
+	}
+	return fmt.Sprintf("Unknown AutScriptType (%d)", uint8(autScriptType))
+}
 
 type AutPrivacyType = uint8
 

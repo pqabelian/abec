@@ -919,7 +919,7 @@ func (autScript *RegistrationScript) Serialize() ([]byte, error) {
 	}
 
 	// scriptType                 AutScriptType
-	if err = w.WriteByte(autScript.Type()); err != nil {
+	if err = w.WriteByte(uint8(autScript.Type())); err != nil {
 		return nil, err
 	}
 
@@ -1032,9 +1032,11 @@ func (autScript *RegistrationScript) Deserialize(serializedScript []byte) error 
 	autScript.version = uint32(version)
 
 	// scriptType                 AutScriptType
-	if autScript.scriptType, err = r.ReadByte(); err != nil {
+	scriptTypeRead, err := r.ReadByte()
+	if err != nil {
 		return err
 	}
+	autScript.scriptType = AutScriptType(scriptTypeRead)
 
 	// autIdentifier              AutId
 	if _, err = io.ReadFull(r, autScript.autIdentifier[:]); err != nil {
@@ -1495,7 +1497,7 @@ func (autScript *ReRegistrationScript) Serialize() ([]byte, error) {
 	}
 
 	// scriptType                 AutScriptType
-	if err = w.WriteByte(autScript.Type()); err != nil {
+	if err = w.WriteByte(uint8(autScript.Type())); err != nil {
 		return nil, err
 	}
 
@@ -1594,10 +1596,11 @@ func (autScript *ReRegistrationScript) Deserialize(serializedScript []byte) erro
 	autScript.version = uint32(version)
 
 	// scriptType                 AutScriptType
-	autScript.scriptType, err = r.ReadByte()
+	scriptTypeRead, err := r.ReadByte()
 	if err != nil {
 		return err
 	}
+	autScript.scriptType = AutScriptType(scriptTypeRead)
 
 	// autIdentifier              AutId
 	if _, err = io.ReadFull(r, autScript.autIdentifier[:]); err != nil {
@@ -1981,7 +1984,7 @@ func (autScript *MintScript) Serialize() ([]byte, error) {
 	}
 
 	// scriptType                 AutScriptType
-	if err = w.WriteByte(autScript.Type()); err != nil {
+	if err = w.WriteByte(uint8(autScript.Type())); err != nil {
 		return nil, err
 	}
 
@@ -2063,9 +2066,11 @@ func (autScript *MintScript) Deserialize(serializedScript []byte) error {
 	autScript.version = uint32(version)
 
 	// scriptType                 AutScriptType
-	if autScript.scriptType, err = r.ReadByte(); err != nil {
+	scriptTypeRead, err := r.ReadByte()
+	if err != nil {
 		return err
 	}
+	autScript.scriptType = AutScriptType(scriptTypeRead)
 
 	// autIdentifier              AutId
 	if _, err = io.ReadFull(r, autScript.autIdentifier[:]); err != nil {
@@ -2397,7 +2402,7 @@ func (autScript *TransferScript) Serialize() ([]byte, error) {
 	}
 
 	// scriptType                 AutScriptType
-	if err = w.WriteByte(autScript.Type()); err != nil {
+	if err = w.WriteByte(uint8(autScript.Type())); err != nil {
 		return nil, err
 	}
 
@@ -2479,9 +2484,11 @@ func (autScript *TransferScript) Deserialize(serializedScript []byte) error {
 	autScript.version = uint32(version)
 
 	// scriptType                 AutScriptType
-	if autScript.scriptType, err = r.ReadByte(); err != nil {
+	scriptTypeRead, err := r.ReadByte()
+	if err != nil {
 		return err
 	}
+	autScript.scriptType = AutScriptType(scriptTypeRead)
 
 	// autIdentifier              AutId
 	if _, err = io.ReadFull(r, autScript.autIdentifier[:]); err != nil {
@@ -2826,7 +2833,7 @@ func (autScript *BurnScript) Serialize() ([]byte, error) {
 	}
 
 	// scriptType                 AutScriptType
-	if err = w.WriteByte(autScript.Type()); err != nil {
+	if err = w.WriteByte(uint8(autScript.Type())); err != nil {
 		return nil, err
 	}
 
@@ -2908,9 +2915,11 @@ func (autScript *BurnScript) Deserialize(serializedScript []byte) error {
 	autScript.version = uint32(version)
 
 	// scriptType                 AutScriptType
-	if autScript.scriptType, err = r.ReadByte(); err != nil {
+	scriptTypeRead, err := r.ReadByte()
+	if err != nil {
 		return err
 	}
+	autScript.scriptType = AutScriptType(scriptTypeRead)
 
 	// autIdentifier              AutId
 	if _, err = io.ReadFull(r, autScript.autIdentifier[:]); err != nil {
@@ -3125,10 +3134,11 @@ func DeserializeAutScriptV1(serializedAutScript []byte) (AutScript, error) {
 		return nil, fmt.Errorf("the read version %d is not AutScriptVersion_1", scriptVersion)
 	}
 
-	scriptType, err := r.ReadByte()
+	scriptTypeRead, err := r.ReadByte()
 	if err != nil {
 		return nil, err
 	}
+	scriptType := AutScriptType(scriptTypeRead)
 
 	var autScript AutScript
 	switch scriptType {
