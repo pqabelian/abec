@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -2169,38 +2168,6 @@ func checkAutMintScriptInputsOutputs(tx *abeutil.TxAbe, currentHeight int32,
 		}
 	}
 
-	// todo: review 2025.12.12
-	// todo: use a AutWitnessHash() function
-	witnessHash := ctautwire.AutWitnessHash(tx.MsgTx().AutWitness)
-	claimedWitnessHash := mintScript.WitnessHash()
-	if !witnessHash.IsEqual(&claimedWitnessHash) {
-		return fmt.Errorf("mismatch witness for script")
-	}
-
-	generatedTokens := extAutScript.GeneratedTokens()
-	cbTx := &ctautwire.AutCoinbaseTx{
-		Version:   extAutScript.Version(),
-		Vin:       mintScript.Vin(),
-		TxOuts:    make([]*ctautwire.AutTxo, len(generatedTokens)),
-		TxWitness: tx.MsgTx().AutWitness,
-	}
-
-	// for outputs, fill out the script
-	for i := 0; i < len(generatedTokens); i++ {
-		autTxo := &ctautwire.AutTxo{}
-		err := autTxo.Deserialize(generatedTokens[i].ValueScript)
-		if err != nil {
-			return err
-		}
-		cbTx.TxOuts[i] = autTxo
-	}
-
-	err := abecryptox.AutCoinbaseTxVerify(cbTx)
-	if err != nil {
-		return fmt.Errorf("transaction %s try to mint but the witness verfied fail with %s",
-			tx.Hash(), err)
-	}
-
 	return nil
 }
 
@@ -2305,8 +2272,6 @@ func checkAutTransferScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
 	}
 
 	willConsumedTokens := map[string]*ctautapi.HostOutPoint{}
-	autTransferTxIns := make([]*ctautwire.AutTxo, 0, inHiddenAutTokenNum+inPublicAutTokenNum)
-
 	for i := 0; i < inHiddenAutTokenNum+inPublicAutTokenNum; i++ {
 		hostTxIn := hostTxIns[inStartIndex+i]
 
@@ -2381,8 +2346,6 @@ func checkAutTransferScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
 		if err != nil {
 			return err
 		}
-
-		autTransferTxIns = append(autTransferTxIns, autTxo)
 	}
 
 	// check the output AutTxo's privacy type
@@ -2403,37 +2366,6 @@ func checkAutTransferScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
 		if err != nil {
 			return err
 		}
-	}
-
-	// todo: 2025.12.12 sometimes not check autwitness
-	witnessHash := ctautwire.AutWitnessHash(tx.MsgTx().AutWitness)
-	claimedWitnessHash := transferScript.WitnessHash()
-	if !witnessHash.IsEqual(&claimedWitnessHash) {
-		return fmt.Errorf("mismatch witness for script")
-	}
-
-	generatedTokens := extAutScript.GeneratedTokens()
-	trTx := &ctautwire.AutTransferTx{
-		Version:   extAutScript.Version(),
-		TxIns:     autTransferTxIns,
-		TxOuts:    make([]*ctautwire.AutTxo, 0, len(generatedTokens)),
-		TxWitness: tx.MsgTx().AutWitness,
-	}
-
-	for i := 0; i < len(generatedTokens); i++ {
-		autTxo := &ctautwire.AutTxo{}
-		err := autTxo.Deserialize(generatedTokens[i].ValueScript)
-		if err != nil {
-			return err
-		}
-
-		trTx.TxOuts = append(trTx.TxOuts, autTxo)
-	}
-
-	err := abecryptox.AutTransferTxVerify(trTx)
-	if err != nil {
-		return fmt.Errorf(`transaction %s try to transfer tokens but the witness verfied fail with %s`,
-			tx.Hash(), err)
 	}
 
 	return nil
@@ -2559,8 +2491,6 @@ func checkAutBurnScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
 	}
 
 	willConsumedTokens := map[string]*ctautapi.HostOutPoint{}
-	autTransferTxIns := make([]*ctautwire.AutTxo, 0, inHiddenAutTokenNum+inPublicAutTokenNum)
-
 	for i := 0; i < inHiddenAutTokenNum+inPublicAutTokenNum; i++ {
 		hostTxIn := hostTxIns[inStartIndex+i]
 
@@ -2630,18 +2560,12 @@ func checkAutBurnScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
 		if err != nil {
 			return err
 		}
-
-		autTransferTxIns = append(autTransferTxIns, autTxo)
 	}
 
 	// check privacy type
 	// special case: ignore the last one token when checking the privacy type rule, and it must be public
 	outputTokens := extAutScript.GeneratedTokens()
 	for i, outputToken := range outputTokens {
-		if i == len(outputTokens)-1 {
-			break
-		}
-
 		if outputToken == nil {
 			return fmt.Errorf("extAutScript.GeneratedTokens()[%d] is nil", i)
 		}
@@ -2652,57 +2576,22 @@ func checkAutBurnScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
 			return err
 		}
 
-		err = ctautapi.RuleCheckOnAutTxOutputPrivacyType(autMetadata.PrivacyType, autTxo)
-		if err != nil {
-			return err
+		if i == len(outputTokens)-1 {
+			// for the burned token, it must be public, whatever the AutInstance's privacy type.
+			autTxoType, err := abecryptox.GetAutTxoType(autTxo)
+			if err != nil {
+				return fmt.Errorf("fail to get last aut txo type: %v", err)
+			}
+			if autTxoType != abecryptox.AutTxoTypePublic {
+				return fmt.Errorf("the burned token must have typr = AutTxoTypePublic (%d), rather than %d",
+					abecryptox.AutTxoTypePublic, autTxoType)
+			}
+		} else {
+			err = ctautapi.RuleCheckOnAutTxOutputPrivacyType(autMetadata.PrivacyType, autTxo)
+			if err != nil {
+				return err
+			}
 		}
-	}
-
-	willBurnToken := outputTokens[len(outputTokens)-1]
-	if willBurnToken == nil {
-		return fmt.Errorf("extAutScript.GeneratedTokens()[%d] is nil", len(outputTokens)-1)
-	}
-	autTxo := &ctautwire.AutTxo{}
-	err := autTxo.Deserialize(willBurnToken.ValueScript)
-	if err != nil {
-		return err
-	}
-
-	err = ctautapi.RuleCheckOnAutTxOutputPrivacyType(ctautapi.AutPrivacyTypeLimitedPublic, autTxo)
-	if err != nil {
-		return err
-	}
-
-	// todo: sometimes not check AutWitness
-	// todo replace with inner implement
-	witnessHash := ctautwire.AutWitnessHash(tx.MsgTx().AutWitness)
-	claimedWitnessHash := burnScript.WitnessHash()
-	if !witnessHash.IsEqual(&claimedWitnessHash) {
-		return fmt.Errorf("mismatch witness for script")
-	}
-
-	generatedTokens := extAutScript.GeneratedTokens()
-	trTx := &ctautwire.AutTransferTx{
-		Version:   extAutScript.Version(),
-		TxIns:     autTransferTxIns,
-		TxOuts:    make([]*ctautwire.AutTxo, 0, len(generatedTokens)),
-		TxWitness: tx.MsgTx().AutWitness,
-	}
-
-	for i := 0; i < len(generatedTokens); i++ {
-		autTxo := &ctautwire.AutTxo{}
-		err := autTxo.Deserialize(generatedTokens[i].ValueScript)
-		if err != nil {
-			return err
-		}
-
-		trTx.TxOuts = append(trTx.TxOuts, autTxo)
-	}
-
-	err = abecryptox.AutTransferTxVerify(trTx)
-	if err != nil {
-		return fmt.Errorf(`transaction %s try to burn tokens but the witness verfied fail with %s`,
-			tx.Hash(), err)
 	}
 
 	return nil
@@ -2832,45 +2721,26 @@ func checkTxAutScriptInputsOutputs(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint,
 		return nil
 	}
 
-	var err error
-
 	switch extAutScript.AutScript.(type) {
 	case *ctautapi.RegistrationScript:
-		err = checkAutRegistrationScriptInputsOutputs(tx, currentHeight, ctautView, hostView, chainParams)
-		if err != nil {
-			return err
-		}
+		return checkAutRegistrationScriptInputsOutputs(tx, currentHeight, ctautView, hostView, chainParams)
 
 	case *ctautapi.ReRegistrationScript:
-		err = checkAutReRegistrationScriptInputsOutputs(tx, currentHeight, ctautView, hostView, chainParams)
-		if err != nil {
-			return err
-		}
+		return checkAutReRegistrationScriptInputsOutputs(tx, currentHeight, ctautView, hostView, chainParams)
 
 	case *ctautapi.MintScript:
-		err = checkAutMintScriptInputsOutputs(tx, currentHeight, ctautView, hostView, chainParams)
-		if err != nil {
-			return err
-		}
+		return checkAutMintScriptInputsOutputs(tx, currentHeight, ctautView, hostView, chainParams)
 
 	case *ctautapi.TransferScript:
-		err = checkAutTransferScriptInputsOutputs(tx, currentHeight, ctautView, hostView, chainParams)
-		if err != nil {
-			return err
-		}
+		return checkAutTransferScriptInputsOutputs(tx, currentHeight, ctautView, hostView, chainParams)
 
 	case *ctautapi.BurnScript:
 		// This branch is exactly the same checking as the previous one, except for all the differences in handling outputs
-		err = checkAutBurnScriptInputsOutputs(tx, currentHeight, ctautView, hostView, chainParams)
-		if err != nil {
-			return err
-		}
+		return checkAutBurnScriptInputsOutputs(tx, currentHeight, ctautView, hostView, chainParams)
 
 	default:
-		return errors.New("unsupported AUT transaction type")
+		return fmt.Errorf("unsupported AUT Script type")
 	}
-
-	return nil
 }
 
 // validateTxAutScriptWitness
@@ -2885,36 +2755,24 @@ func validateTxAutScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, ho
 		return nil
 	}
 
-	var err error
-
 	switch extAutScript.AutScript.(type) {
 	case *ctautapi.RegistrationScript, *ctautapi.ReRegistrationScript:
-		break
+		// no witness to verify
+		return nil
 
 	case *ctautapi.MintScript:
-		err = validateAutMintScriptWitness(tx, ctautView, hostView)
-		if err != nil {
-			return err
-		}
+		return validateAutMintScriptWitness(tx, ctautView, hostView)
 
 	case *ctautapi.TransferScript:
-		err = validateAutTransferScriptWitness(tx, ctautView, hostView)
-		if err != nil {
-			return err
-		}
+		return validateAutTransferScriptWitness(tx, ctautView, hostView)
 
 	case *ctautapi.BurnScript:
 		// This branch is exactly the same checking as the previous one, except for all the differences in handling outputs
-		err = validateAutBurnScriptWitness(tx, ctautView, hostView)
-		if err != nil {
-			return err
-		}
+		return validateAutBurnScriptWitness(tx, ctautView, hostView)
 
 	default:
-		return errors.New("unsupported AUT transaction type")
+		return fmt.Errorf("unsupported Aut Script type")
 	}
-
-	return nil
 }
 
 // checkConnectBlockAbe performs several checks to confirm connecting the passed

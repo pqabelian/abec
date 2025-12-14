@@ -258,6 +258,10 @@ func (view *CTAUTViewpoint) PutInstance(instance *CTAUTInstance) error {
 // todo: function name LookupAutCoin
 // review done 2025.12.11
 func (view *CTAUTViewpoint) LookupCTAUTCoin(identifier ctautapi.AutId, outpoint ctautapi.HostOutPoint) *CTAUTCoin {
+	if view == nil {
+		return nil
+	}
+
 	if view.instances == nil {
 		return nil
 	}
@@ -276,6 +280,10 @@ func (view *CTAUTViewpoint) LookupCTAUTCoin(identifier ctautapi.AutId, outpoint 
 // review done 2025.12.11
 // todo: function name LookupAutDesc
 func (view *CTAUTViewpoint) LookupCTAUTMetaInfo(identifier ctautapi.AutId) *ctautapi.AutMetadata {
+	if view == nil {
+		return nil
+	}
+
 	if view.instances == nil {
 		return nil
 	}
