@@ -229,6 +229,8 @@ type TxPool struct {
 	outpointsAbe     map[chainhash.Hash]map[string]*abeutil.TxAbe                    //TODO(abe):why use two layers map                 //	corresponding to btc's outpoints, using hash rather then TxIn as the key for map
 	orphansByPrevAbe map[chainhash.Hash]map[string]map[chainhash.Hash]*abeutil.TxAbe // corresponding to btc's orphansByPrev //TODO type transfer??? []byte -> string
 
+	autScriptTypeMap map[ctautapi.AutId]ctautapi.AutScriptType
+
 	txMonitorMu  sync.Mutex
 	txMonitoring bool
 }
@@ -742,6 +744,13 @@ func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 			ringHash := txIn.PreviousOutPointRing.Hash()
 			if _, ringExists := mp.outpointsAbe[ringHash]; ringExists {
 				delete(mp.outpointsAbe[ringHash], hex.EncodeToString(txIn.SerialNumber))
+			}
+		}
+
+		if txDesc.Tx.ExtAutScript() != nil {
+			extAutScript := txDesc.Tx.ExtAutScript()
+			if extAutScript.Type() == ctautapi.AutScriptTypeReRegistration || extAutScript.Type() == ctautapi.AutScriptTypeMint {
+				delete(mp.autScriptTypeMap, extAutScript.AutIdentifier())
 			}
 		}
 
@@ -1837,7 +1846,22 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 		str := fmt.Sprintf("transaction %v has invalid CTAUT script", txHash)
 		return nil, nil, txRuleError(wire.RejectCTAutBadForm, str)
 	}
-	
+
+	if tx.ExtAutScript() != nil {
+		extAutScript := tx.ExtAutScript()
+		autScriptType := extAutScript.Type()
+		if autScriptType == ctautapi.AutScriptTypeReRegistration || autScriptType == ctautapi.AutScriptTypeMint {
+			if existType, ok := mp.autScriptTypeMap[extAutScript.AutIdentifier()]; ok {
+				return nil, nil, txRuleError(
+					wire.RejectInvalid,
+					fmt.Sprintf("transaction %s carries an AutScript with type=%d, while there is already one with type=%d",
+						tx.Hash(), autScriptType, existType),
+				)
+			}
+			mp.autScriptTypeMap[extAutScript.AutIdentifier()] = autScriptType
+		}
+	}
+
 	txD, err := mp.addTransactionAbe(utxoRingView, ctAutView, tx, bestHeight, txFee, fromDiskCache)
 	if err != nil {
 		return nil, nil, err
@@ -2209,5 +2233,7 @@ func New(cfg *Config) *TxPool {
 		orphansAbe:       make(map[chainhash.Hash]*orphanTxAbe),
 		outpointsAbe:     make(map[chainhash.Hash]map[string]*abeutil.TxAbe),
 		orphansByPrevAbe: make(map[chainhash.Hash]map[string]map[chainhash.Hash]*abeutil.TxAbe),
+
+		autScriptTypeMap: make(map[ctautapi.AutId]ctautapi.AutScriptType),
 	}
 }
