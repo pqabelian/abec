@@ -521,6 +521,10 @@ func spendTransactionAbe(tx *abeutil.TxAbe, utxoRingView *blockchain.UtxoRingVie
 
 // todo: aut review done 2025.12.12
 func spendTransactionAUTScript(tx *abeutil.TxAbe, ctAutView *blockchain.CTAUTViewpoint, blockHeight int32) error {
+	if tx == nil {
+		return fmt.Errorf("spendTransactionAUTScript: tx is nil")
+	}
+
 	extAutScript := tx.ExtAutScript()
 	if extAutScript == nil {
 		return nil
@@ -533,22 +537,28 @@ func spendTransactionAUTScript(tx *abeutil.TxAbe, ctAutView *blockchain.CTAUTVie
 
 	case *ctautapi.ReRegistrationScript:
 		// remove root token
-		consumedHostOutpoints := extAutScript.ConsumedHostOutpoints()
-		for i := 0; i < len(consumedHostOutpoints); i++ {
-			err = ctAutView.SpendRootToken(scriptInst.AutIdentifier(), *consumedHostOutpoints[i])
+		for i, consumedHostOutPoint := range extAutScript.ConsumedHostOutpoints() {
+			if consumedHostOutPoint == nil {
+				return fmt.Errorf("spendTransactionAUTScript: ReRegistrationScript.consumedHostOutpoints[%d] is nil", i)
+			}
+			err = ctAutView.SpendRootToken(scriptInst.AutIdentifier(), *consumedHostOutPoint)
 			if err != nil {
 				return err
 			}
 		}
+
 	case *ctautapi.MintScript:
 		// remove root token
-		consumedHostOutpoints := extAutScript.ConsumedHostOutpoints()
-		for i := 0; i < len(consumedHostOutpoints); i++ {
-			err = ctAutView.SpendRootToken(scriptInst.AutIdentifier(), *consumedHostOutpoints[i])
+		for i, consumedHostOutPoint := range extAutScript.ConsumedHostOutpoints() {
+			if consumedHostOutPoint == nil {
+				return fmt.Errorf("spendTransactionAUTScript: MintScript.consumedHostOutpoints[%d] is nil", i)
+			}
+			err = ctAutView.SpendRootToken(scriptInst.AutIdentifier(), *consumedHostOutPoint)
 			if err != nil {
 				return err
 			}
 		}
+
 	case *ctautapi.TransferScript:
 		// remove aut coin
 		consumedHostOutpoints := extAutScript.ConsumedHostOutpoints()
@@ -1097,6 +1107,8 @@ mempoolLoop:
 		// an entry for it to ensure any transactions which reference
 		// this one have it available as an input and can ensure they
 		// aren't double spending.
+		// 2025.12.15 Note that the previous CheckTransactionInputsAbe has guaranteed
+		// the operations on Host_Txs in spendTransactionAbe will be always successfully executed.
 		err = spendTransactionAbe(tx, blockUtxoRings, blockCTAUTView, nextBlockHeight)
 		if err != nil {
 			log.Debugf("Skipping tx %s due to error in "+

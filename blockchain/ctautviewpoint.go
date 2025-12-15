@@ -305,6 +305,9 @@ func (view *CTAUTViewpoint) LookupCTAUTMetaInfo(identifier ctautapi.AutId) *ctau
 
 	return instance.metadata
 }
+
+// SpendRootToken
+// au review done 2025.12.15
 func (view *CTAUTViewpoint) SpendRootToken(identifier ctautapi.AutId, outpoint ctautapi.HostOutPoint) error {
 	if view.instances == nil {
 		return fmt.Errorf("no instance for identifier %v", identifier.String())

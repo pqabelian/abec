@@ -686,7 +686,7 @@ func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 // has no effect.
 // The caller should check double-spending before calling this function
 // todo_DONE(MLP): reviewed on 2024.01.04
-// review done 2025.12.13; todo confirm
+// review done 2025.12.13;
 func (entry *UtxoRingEntry) Spend(serialNumber []byte, blockHash *chainhash.Hash) {
 	//	Abe to do: double spending?
 	if len(serialNumber) == 0 || blockHash == nil {
