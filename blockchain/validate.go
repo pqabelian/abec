@@ -952,9 +952,7 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 //  6. No duplicate transactions (same tx hash).
 //  7. Preliminary check on each transaction (CheckTransactionSanityAbe).
 //  8. The merkle root is correctly computed with the given transactions.
-//  9. In each block, for an AutInstance,
-//     (9.a) an AutScriptTypeReRegistration could not co-exist with other AutScriptTypeReRegistration or AutScriptTypeMint; and
-//     (9.b) an AutScriptTypeMint could not exist with AutScriptTypeReRegistration.
+//  9. In each block, for an AutInstance, there is at most ONE AutScriptTypeReRegistration or AutScriptTypeMint.
 //
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkBlockHeaderSanity.
@@ -1060,8 +1058,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, powConsensus *consensus.PowCon
 	// Do some preliminary checks on each transaction to ensure they are
 	// sane before continuing.
 	//
-	autScriptTypeMapRereg := make(map[string]int, len(transactions))
-	autScriptTypeMapMint := make(map[string]int, len(transactions))
+	autScriptTypeMapReregMint := make(map[string]*abeutil.TxAbe, len(transactions))
 
 	for i, tx := range transactions {
 		// todo_DONE(MLP): reviewed on 2024.01.03 by Alice.
@@ -1072,37 +1069,22 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, powConsensus *consensus.PowCon
 
 		extAutScript := tx.ExtAutScript()
 		if extAutScript != nil {
-			// RULE: In each block, for an AutInstance,
-			// an AutScriptTypeReRegistration could not co-exist with other AutScriptTypeReRegistration or AutScriptTypeMint; and
-			// an AutScriptTypeMint could not exist with AutScriptTypeReRegistration.
+			// RULE: In each block, for an AutInstance, there is at most ONE AutScriptTypeReRegistration or AutScriptTypeMint.
+			// This is because AutScriptTypeReRegistration and AutScriptTypeMint updates the corresponding AutInstance,
+			// and each block should allow at most ONE such operation.
 			autIdentifierKey := extAutScript.AutIdentifier().String()
 			autScriptType := extAutScript.Type()
 			// AutScriptTypeRegistration does not need to check, since it is guaranteed by the identifier mechanism.
-			if autScriptType == ctautapi.AutScriptTypeReRegistration {
-				if existIndex, ok := autScriptTypeMapRereg[autIdentifierKey]; ok {
-					return fmt.Errorf("the %d -th tx carries an AutReRegistrationScript of AutInsatnce (%s), while the %d -th tx also carries one",
-						i, autIdentifierKey, existIndex)
-				}
-				if existIndex, ok := autScriptTypeMapMint[autIdentifierKey]; ok {
-					return fmt.Errorf("the %d -th tx carries an AutReRegistrationScript of AutInsatnce (%s), while the %d -th tx carries an AutMintScript",
-						i, autIdentifierKey, existIndex)
-				}
-				// allowed case, as there is not any AutScriptTypeReRegistration or AutMintScript of the same AutInstance.
-				autScriptTypeMapRereg[autIdentifierKey] = i
-
-			} else if autScriptType == ctautapi.AutScriptTypeMint {
-				if existIndex, ok := autScriptTypeMapRereg[autIdentifierKey]; ok {
-					return fmt.Errorf("the %d -th tx carries an AutMintScript of AutInsatnce (%s), while the %d -th tx carries an AutReRegistrationScript",
-						i, autIdentifierKey, existIndex)
+			if autScriptType == ctautapi.AutScriptTypeReRegistration || autScriptType == ctautapi.AutScriptTypeMint {
+				if prevTx, ok := autScriptTypeMapReregMint[autIdentifierKey]; ok {
+					return fmt.Errorf("the %d -th tx (hash=%v) carries an AutScript(type=%s) of AutInsatnce (%s), "+
+						"while a previous tx (hash=%v) already carries an AutScript(type=%s)",
+						i, tx.Hash(), autScriptType.String(), autIdentifierKey, prevTx.Hash(), prevTx.ExtAutScript().Type().String())
 				}
 
-				// allowed case, as there is not any AutScriptTypeReRegistration of the same AutInstance.
-				// put the index of the latest AutScriptTypeMint, whatever there is or not previous one.
-				autScriptTypeMapMint[autIdentifierKey] = i
-			} else {
-				// other types (Registration, Transfer, Burn) do not have any limitation.
+				autScriptTypeMapReregMint[autIdentifierKey] = tx
+
 			}
-
 		}
 
 	}

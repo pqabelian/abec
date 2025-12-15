@@ -815,8 +815,7 @@ func (g *BlkTmplGenerator) NewBlockTemplate(consensusApplied wire.ConsensusProto
 	blockHeaderOverhead := wire.GetBlockHeaderSize(nextBlockVersion)
 	blockHeaderOverhead += wire.MaxVarIntPayload
 
-	autScriptTypeMapRereg := make(map[string]int, len(sourceTxns))
-	autScriptTypeMapMint := make(map[string]int, len(sourceTxns))
+	autScriptTypeMapReregMint := make(map[string]*abeutil.TxAbe, len(sourceTxns))
 
 mempoolLoop:
 	for _, txDesc := range sourceTxns {
@@ -904,54 +903,26 @@ mempoolLoop:
 				continue mempoolLoop
 			}
 		}
-
-		// Rule: In each block, for an AutInstance,
-		// an AutScriptTypeReRegistration could not co-exist with other AutScriptTypeReRegistration or AutScriptTypeMint; and
-		// an AutScriptTypeMint could not exist with AutScriptTypeReRegistration.
+		
 		extAutScript := tx.ExtAutScript()
 		if extAutScript != nil {
+			// RULE: In each block, for an AutInstance, there is at most ONE AutScriptTypeReRegistration or AutScriptTypeMint.
+			// This is because AutScriptTypeReRegistration and AutScriptTypeMint updates the corresponding AutInstance,
+			// and each block should allow at most ONE such operation.
 			autIdentifierKey := extAutScript.AutIdentifier().String()
 			autScriptType := extAutScript.Type()
 			// AutScriptTypeRegistration does not need to check, since it is guaranteed by the identifier mechanism.
-			if autScriptType == ctautapi.AutScriptTypeReRegistration {
-				if _, ok := autScriptTypeMapRereg[autIdentifierKey]; ok {
-					log.Debugf("Skipping tx %v because "+
-						"it carries an AutReRegistrationScript, while a previous tx also carries an AutReRegistrationScript of the same AutInsatnce (%s)",
-						tx.Hash(), autIdentifierKey)
-					continue
-				}
-				if _, ok := autScriptTypeMapMint[autIdentifierKey]; ok {
-					log.Debugf("Skipping tx %v because "+
-						"it carries an AutReRegistrationScript, while a previous tx carries an AutMintScript of the same AutInsatnce (%s)",
-						tx.Hash(), autIdentifierKey)
+			if autScriptType == ctautapi.AutScriptTypeReRegistration || autScriptType == ctautapi.AutScriptTypeMint {
+				if prevTx, ok := autScriptTypeMapReregMint[autIdentifierKey]; ok {
+					log.Debugf("sking tx (hash=%v) because it carries an AutScript(type=%s) of AutInsatnce (%s), "+
+						"while a previous tx (hash=%v) already carries an AutScript(type=%s)",
+						tx.Hash(), autScriptType.String(), autIdentifierKey, prevTx.Hash(), prevTx.ExtAutScript().Type().String())
 					continue
 				}
 
-				// allowed case, as there is not any AutScriptTypeReRegistration or AutMintScript for this AutInstance.
-				autScriptTypeMapRereg[autIdentifierKey] = 1
+				autScriptTypeMapReregMint[autIdentifierKey] = tx
 
-			} else if autScriptType == ctautapi.AutScriptTypeMint {
-				if _, ok := autScriptTypeMapRereg[autIdentifierKey]; ok {
-					log.Debugf("Skipping tx %v because "+
-						"it carries an AutMintScript, while a previous tx carries an AutReRegistrationScript of the same AutInstance (%s)",
-						tx.Hash(), autIdentifierKey)
-					continue
-				}
-
-				// allowed case, as there is not any AutScriptTypeReRegistration of the same AutInstance.
-				// set the number of AutMintScripts of the same AutInstance.
-				if count, ok := autScriptTypeMapMint[autIdentifierKey]; ok {
-					autScriptTypeMapMint[autIdentifierKey] = count + 1
-					log.Debugf(" tx (%v) carries AutMintScript, now toatl %d txs of AutInstance (%s) carry AutMintScript",
-						tx.Hash(), count, autIdentifierKey)
-				} else {
-					autScriptTypeMapMint[autIdentifierKey] = 1
-				}
-
-			} else {
-				// other type scripts (Registration, Transfer, Burn) do not have any limitation.
 			}
-
 		}
 
 		prioItem := &txPrioItemAbe{tx: tx}
