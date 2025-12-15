@@ -2195,6 +2195,7 @@ func checkAutMintScriptInputsOutputs(tx *abeutil.TxAbe, currentHeight int32,
 	return nil
 }
 
+// review done 2025.12.15
 func validateAutMintScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint) error {
 
 	if tx == nil {
@@ -2204,7 +2205,7 @@ func validateAutMintScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, 
 	extAutScript := tx.ExtAutScript()
 	if extAutScript == nil {
 		// the caller should check whether tx.ExtAutScript() is nil before calling this function
-		return fmt.Errorf("wrong call on validateAutMintScript: tx.ExtAutScript is nil")
+		return fmt.Errorf("wrong call on validateAutMintScriptWitness: tx.ExtAutScript is nil")
 	}
 
 	if extAutScript.Type() != ctautapi.AutScriptTypeMint {
@@ -2228,6 +2229,9 @@ func validateAutMintScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, 
 	generatedTokens := extAutScript.GeneratedTokens()
 	autTxOuts := make([]*ctautwire.AutTxo, len(generatedTokens))
 	for i, outputToken := range generatedTokens {
+		if outputToken == nil {
+			return fmt.Errorf("validateAutMintScriptWitness: %d-th generatedToken is nil", i)
+		}
 
 		autTxo := &ctautwire.AutTxo{}
 		err := autTxo.Deserialize(outputToken.ValueScript)
@@ -2247,7 +2251,7 @@ func validateAutMintScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, 
 
 	err := abecryptox.AutCoinbaseTxVerify(cbTx)
 	if err != nil {
-		return fmt.Errorf("transaction %s try to mint but the witness verfied fail with %s",
+		return fmt.Errorf("transaction %s try to mint but the witness verfied fail with %v",
 			tx.Hash(), err)
 	}
 
@@ -2400,6 +2404,7 @@ func checkAutTransferScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
 // validateAutTransferScriptWitness
 //
 // This function should be called after checkAutTransferScriptInputOutputs() is performed.
+// review done 2025.12.15
 func validateAutTransferScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint) error {
 
 	if tx == nil {
@@ -2409,7 +2414,7 @@ func validateAutTransferScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoi
 	extAutScript := tx.ExtAutScript()
 	if extAutScript == nil {
 		// the caller should check whether tx.ExtAutScript() is nil before calling this function
-		return fmt.Errorf("wrong call on validateAutTransferScript: tx.ExtAutScript is nil")
+		return fmt.Errorf("wrong call on validateAutTransferScriptWitness: tx.ExtAutScript is nil")
 	}
 
 	if extAutScript.Type() != ctautapi.AutScriptTypeTransfer {
@@ -2434,9 +2439,12 @@ func validateAutTransferScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoi
 	hostOutPoints := extAutScript.ConsumedHostOutpoints()
 	autTxIns := make([]*ctautwire.AutTxo, len(hostOutPoints))
 	for i, hostOutPoint := range hostOutPoints {
+		if hostOutPoint == nil {
+			return fmt.Errorf("%d -th ConsumedHostOutpoint is nil", i)
+		}
 		coin := ctautView.LookupCTAUTCoin(autIdentifier, *hostOutPoint)
 		if coin == nil {
-			return fmt.Errorf("no such AUT coin found")
+			return fmt.Errorf("no such aut coin for (%s:%s) found", autIdentifier.String(), hostOutPoint.String())
 		}
 		autTxo := &ctautwire.AutTxo{}
 		err := autTxo.Deserialize(coin.valueScript)
@@ -2449,7 +2457,9 @@ func validateAutTransferScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoi
 	generatedTokens := extAutScript.GeneratedTokens()
 	autTxOuts := make([]*ctautwire.AutTxo, len(generatedTokens))
 	for i, outputToken := range generatedTokens {
-
+		if outputToken == nil {
+			return fmt.Errorf("%d -th generatedToken is nil", i)
+		}
 		autTxo := &ctautwire.AutTxo{}
 		err := autTxo.Deserialize(outputToken.ValueScript)
 		if err != nil {
@@ -2468,7 +2478,7 @@ func validateAutTransferScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoi
 
 	err := abecryptox.AutTransferTxVerify(trTx)
 	if err != nil {
-		return fmt.Errorf(`transaction %s try to transfer tokens but the witness verfied fail with %s`,
+		return fmt.Errorf("transaction %s try to transfer tokens but the witness verfied fail with %v",
 			tx.Hash(), err)
 	}
 
@@ -2628,6 +2638,7 @@ func checkAutBurnScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
 // validateAutBurnScriptWitness
 //
 // This function should be called after checkAutBrunScriptInputOutputs() is performed.
+// review done 2025.12.15
 func validateAutBurnScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint) error {
 
 	if tx == nil {
@@ -2637,7 +2648,7 @@ func validateAutBurnScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, 
 	extAutScript := tx.ExtAutScript()
 	if extAutScript == nil {
 		// the caller should check whether tx.ExtAutScript() is nil before calling this function
-		return fmt.Errorf("wrong call on validateAutBurnScript: tx.ExtAutScript is nil")
+		return fmt.Errorf("wrong call on validateAutBurnScriptWitness: tx.ExtAutScript is nil")
 	}
 
 	if extAutScript.Type() != ctautapi.AutScriptTypeBurn {
@@ -2661,9 +2672,13 @@ func validateAutBurnScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, 
 	hostOutPoints := extAutScript.ConsumedHostOutpoints()
 	autTxIns := make([]*ctautwire.AutTxo, len(hostOutPoints))
 	for i, hostOutPoint := range hostOutPoints {
+		if hostOutPoint == nil {
+			return fmt.Errorf("the %d -th input ConsumedHostOutpoint is nil ", i)
+		}
+
 		coin := ctautView.LookupCTAUTCoin(autIdentifier, *hostOutPoint)
 		if coin == nil {
-			return fmt.Errorf("no such AUT coin found")
+			return fmt.Errorf("no Aut coin for (%s:%s) found", autIdentifier.String(), hostOutPoint.String())
 		}
 
 		autTxo := &ctautwire.AutTxo{}
@@ -2678,6 +2693,10 @@ func validateAutBurnScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, 
 	generatedTokens := extAutScript.GeneratedTokens()
 	autTxOuts := make([]*ctautwire.AutTxo, len(generatedTokens))
 	for i, outputToken := range generatedTokens {
+
+		if outputToken == nil {
+			return fmt.Errorf("the %d -th generatedToken is nil", i)
+		}
 
 		autTxo := &ctautwire.AutTxo{}
 		err := autTxo.Deserialize(outputToken.ValueScript)
@@ -2697,7 +2716,7 @@ func validateAutBurnScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, 
 
 	err := abecryptox.AutTransferTxVerify(trTx)
 	if err != nil {
-		return fmt.Errorf(`transaction %s try to burn tokens but the witness verfied fail with %s`,
+		return fmt.Errorf("transaction %s try to burn tokens but the witness verfied fail with %v",
 			tx.Hash(), err)
 	}
 
@@ -2772,7 +2791,7 @@ func checkTxAutScriptInputsOutputs(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint,
 }
 
 // validateTxAutScriptWitness
-// aut review done, 2025.12.13 done todo
+// aut review done, 2025.12.15 done
 func validateTxAutScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint) error {
 	if tx == nil {
 		return fmt.Errorf("validateTxAutScriptWitness: a nil transaction")
@@ -2799,7 +2818,7 @@ func validateTxAutScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, ho
 		return validateAutBurnScriptWitness(tx, ctautView, hostView)
 
 	default:
-		return fmt.Errorf("unsupported Aut Script type")
+		return fmt.Errorf("validateTxAutScriptWitness: unsupported Aut Script type")
 	}
 }
 

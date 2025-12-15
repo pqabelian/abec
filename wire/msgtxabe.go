@@ -610,6 +610,8 @@ func (msg *MsgTxAbe) HasTxWitness() bool {
 	return true
 }
 
+// HasAutWitness
+// review done 2025.12.15
 func (msg *MsgTxAbe) HasAutWitness() bool {
 	if len(msg.AutWitness) == 0 {
 		return false

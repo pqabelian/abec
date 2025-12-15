@@ -168,6 +168,11 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 	txInLen := len(tx.MsgTx().TxIns)
 	abeTxInDetail := make([]*abecryptox.AbeTxInDetail, txInLen)
 	for i := 0; i < txInLen; i++ {
+		if tx.MsgTx().TxIns[i] == nil {
+			str := fmt.Sprintf("the %d -th TxIn of tx %v is nil/empty", i, tx.Hash())
+			return ruleerror.NewRuleError(ruleerror.ErrMissingTxOut, str)
+		}
+
 		utxoRing := utxoRingView.LookupEntry(tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash())
 		if utxoRing == nil {
 			str := fmt.Sprintf("unable to find unspent "+

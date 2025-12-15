@@ -34,6 +34,10 @@ func AutCoinbaseTxGen(autScriptVersion uint32, vin uint64, autTxOutputDescs []*A
 
 // AutCoinbaseTxVerify verifies whether the input autCoinbaseTx *wire.AutCoinbaseTx is valid.
 func AutCoinbaseTxVerify(autCoinbaseTx *wire.AutCoinbaseTx) error {
+	if autCoinbaseTx == nil {
+		return fmt.Errorf("AutCoinbaseTxVerify: nil tx")
+	}
+	
 	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autCoinbaseTx.Version)
 	if err != nil {
 		return err
