@@ -208,8 +208,8 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 	}
 
 	// bypass adjust difficulty when hit configured Fake PoW scope
-	if b.fakePoWHeightScopes != nil {
-		for _, scope := range b.fakePoWHeightScopes {
+	if b.FakePoWHeightScopes() != nil {
+		for _, scope := range b.FakePoWHeightScopes() {
 			nextHeight := lastNode.height + 1
 			if scope.StartHeight <= nextHeight && nextHeight < scope.EndHeight {
 				return lastNode.bits, nil
@@ -244,9 +244,9 @@ func (b *BlockChain) calcNextRequiredDifficultyDSA(lastNode *blockNode, newBlock
 	}
 
 	// bypass adjust difficulty when hit configured Fake PoW scope
-	if b.fakePoWHeightScopes != nil {
-		for _, scope := range b.fakePoWHeightScopes {
-			nextHeight := lastNode.height + 1
+	if b.FakePoWHeightScopes() != nil {
+		nextHeight := lastNode.height + 1
+		for _, scope := range b.FakePoWHeightScopes() {
 			if scope.StartHeight <= nextHeight && nextHeight < scope.EndHeight {
 				return lastNode.bits, nil
 			}
@@ -436,8 +436,8 @@ func (b *BlockChain) calcNextRequiredDifficultyInit(lastNode *blockNode, newBloc
 	}
 
 	// bypass adjust difficulty when hit configured Fake PoW scope
-	if b.fakePoWHeightScopes != nil {
-		for _, scope := range b.fakePoWHeightScopes {
+	if b.FakePoWHeightScopes() != nil {
+		for _, scope := range b.FakePoWHeightScopes() {
 			nextHeight := lastNode.height + 1
 			if scope.StartHeight <= nextHeight && nextHeight < scope.EndHeight {
 				return lastNode.bits, nil
