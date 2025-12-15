@@ -309,6 +309,9 @@ func (view *CTAUTViewpoint) LookupCTAUTMetaInfo(identifier ctautapi.AutId) *ctau
 // SpendRootToken
 // au review done 2025.12.15
 func (view *CTAUTViewpoint) SpendRootToken(identifier ctautapi.AutId, outpoint ctautapi.HostOutPoint) error {
+	if view == nil {
+		return fmt.Errorf("the receiver view is nil")
+	}
 	if view.instances == nil {
 		return fmt.Errorf("no instance for identifier %v", identifier.String())
 	}
@@ -331,7 +334,91 @@ func (view *CTAUTViewpoint) SpendRootToken(identifier ctautapi.AutId, outpoint c
 	return nil
 }
 
+// AddMintAmount adds the input mintAmount to the mintedAmount.
+func (view *CTAUTViewpoint) AddMintAmount(identifier ctautapi.AutId, mintAmount uint64) error {
+	if view == nil {
+		return fmt.Errorf("the receiver view is nil")
+	}
+
+	if mintAmount > ctautapi.MaxAmount {
+		return fmt.Errorf("the input mintAmount %d exceeds max allowed %d", mintAmount, ctautapi.MaxAmount)
+	}
+
+	if view.instances == nil {
+		return fmt.Errorf("no instance for identifier %v", identifier.String())
+	}
+
+	instance, ok := view.instances[identifier.String()]
+	if !ok {
+		return fmt.Errorf("no instance for identifier %v", identifier.String())
+	}
+	if instance == nil || instance.metadata == nil {
+		return fmt.Errorf("no instance for identifier %v", identifier.String())
+	}
+
+	metadata := instance.metadata
+
+	totalMinted := metadata.MintedAmount + mintAmount
+	if totalMinted < metadata.MintedAmount || totalMinted < mintAmount {
+		return fmt.Errorf("the metadata.MintedAmount (%d) + input mintAmount (%d) incurs overflow",
+			metadata.MintedAmount, mintAmount)
+	}
+	if totalMinted > metadata.PlannedTotalSupply {
+		// Note that due to the design on MaxAmount, overflow will not happen here.
+		return fmt.Errorf("the metadata.MintedAmount (%d) + input mintAmount (%d) exceeds PlannedTotalSupply %d",
+			metadata.MintedAmount, mintAmount, metadata.PlannedTotalSupply)
+	}
+
+	metadata.MintedAmount = totalMinted
+
+	return nil
+}
+
+// AddMintAmount adds the input mintAmount to the mintedAmount.
+func (view *CTAUTViewpoint) AddBurnAmount(identifier ctautapi.AutId, burnAmount uint64) error {
+	if view == nil {
+		return fmt.Errorf("the receiver view is nil")
+	}
+
+	if burnAmount > ctautapi.MaxAmount {
+		return fmt.Errorf("the input burnAmount %d exceeds max allowed %d", burnAmount, ctautapi.MaxAmount)
+	}
+
+	if view.instances == nil {
+		return fmt.Errorf("no instance for identifier %v", identifier.String())
+	}
+
+	instance, ok := view.instances[identifier.String()]
+	if !ok {
+		return fmt.Errorf("no instance for identifier %v", identifier.String())
+	}
+	if instance == nil || instance.metadata == nil {
+		return fmt.Errorf("no instance for identifier %v", identifier.String())
+	}
+
+	metadata := instance.metadata
+
+	totalBurned := metadata.BurnedAmount + burnAmount
+	if totalBurned < metadata.BurnedAmount || totalBurned < burnAmount {
+		return fmt.Errorf("the metadata.BurnedAmount (%d) + input burnAmount (%d) incurs overflow",
+			metadata.BurnedAmount, burnAmount)
+	}
+	if totalBurned > metadata.MintedAmount {
+		// Note that due to the design on MaxAmount, overflow will not happen here.
+		return fmt.Errorf("the metadata.BurnedAmount (%d) + input burnAmount (%d) exceeds metadata.MintedAmount %d",
+			metadata.BurnedAmount, burnAmount, metadata.MintedAmount)
+	}
+
+	metadata.BurnedAmount = totalBurned
+
+	return nil
+}
+
 func (view *CTAUTViewpoint) SpendCTAUTCoin(identifier ctautapi.AutId, outpoint ctautapi.HostOutPoint) error {
+	if view == nil {
+		return nil
+	}
+
 	if view.instances == nil {
 		return fmt.Errorf("no instance for identifier %v", identifier.String())
 	}

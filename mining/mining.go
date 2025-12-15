@@ -4,6 +4,7 @@ import (
 	"container/heap"
 	"encoding/binary"
 	"fmt"
+	ctautwire "github.com/abesuite/abec/ctaut/wire"
 
 	"github.com/abesuite/abec/blockchain/consensus"
 	ctautapi "github.com/abesuite/abec/ctaut/api"
@@ -493,8 +494,13 @@ func spendTransaction(utxoView *blockchain.UtxoViewpoint, tx *abeutil.Tx, height
 	return nil
 }
 
+// spendTransactionAbe is a local helper function in mining (like inline function), should not be call by other place.
 // todo(ABE): the block is unknown yet, use hainhash.ZeroHash as the block hash consuming the serialNumber
 // Move this function to blockchain package
+// Note the checks before calling this function will guarantee that
+// the operations in spendTransactionAbe will always succeed, say never return err.
+// Even in case error happens, it only may cause that some later tx can't be added into the constructing block template,
+// will not cause other bad results.
 func spendTransactionAbe(tx *abeutil.TxAbe, utxoRingView *blockchain.UtxoRingViewpoint, ctautView *blockchain.CTAUTViewpoint, blockHeight int32) error {
 	for _, txIn := range tx.MsgTx().TxIns {
 		entry := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())
@@ -505,7 +511,10 @@ func spendTransactionAbe(tx *abeutil.TxAbe, utxoRingView *blockchain.UtxoRingVie
 	}
 
 	// todo: spendAutScript
-	// set AutRootToken spent for Rereg and Mint; set AutCoinSpent for Transfer and Burn.
+	// set AutRootToken spent for Rereg;
+	// ste AutRootToken spent and update mintedAmount and Mint;
+	// set AutCoin spent for Transfer;
+	// set AutCoin spent and updated burnedAMount.
 	err := spendTransactionAUTScript(tx, ctautView, blockHeight)
 	if err != nil {
 		return err
@@ -520,6 +529,12 @@ func spendTransactionAbe(tx *abeutil.TxAbe, utxoRingView *blockchain.UtxoRingVie
 }
 
 // todo: aut review done 2025.12.12
+// spendTransactionAUTScript is a subroutine of spendTransactionAbe.
+//
+// Note the checks before calling spendTransactionAbe will guarantee that
+// the operations in spendTransactionAUTScript will always succeed, say never return err.
+// Even in case error happens, it only may cause that some later tx can't be added into the constructing block template,
+// will not cause other bad results.
 func spendTransactionAUTScript(tx *abeutil.TxAbe, ctAutView *blockchain.CTAUTViewpoint, blockHeight int32) error {
 	if tx == nil {
 		return fmt.Errorf("spendTransactionAUTScript: tx is nil")
@@ -559,23 +574,60 @@ func spendTransactionAUTScript(tx *abeutil.TxAbe, ctAutView *blockchain.CTAUTVie
 			}
 		}
 
+		// update MintedAmount
+		err = ctAutView.AddMintAmount(scriptInst.AutIdentifier(), scriptInst.Vin())
+		if err != nil {
+			return err
+		}
+
 	case *ctautapi.TransferScript:
 		// remove aut coin
-		consumedHostOutpoints := extAutScript.ConsumedHostOutpoints()
-		for i := 0; i < len(consumedHostOutpoints); i++ {
-			err = ctAutView.SpendCTAUTCoin(scriptInst.AutIdentifier(), *consumedHostOutpoints[i])
+		for i, consumedHostOutPoint := range extAutScript.ConsumedHostOutpoints() {
+			if consumedHostOutPoint == nil {
+				return fmt.Errorf("spendTransactionAUTScript: TransferScript.consumedHostOutpoints[%d] is nil", i)
+			}
+
+			err = ctAutView.SpendCTAUTCoin(scriptInst.AutIdentifier(), *consumedHostOutPoint)
 			if err != nil {
 				return err
 			}
 		}
+
 	case *ctautapi.BurnScript:
 		// remove aut coin
-		consumedHostOutpoints := extAutScript.ConsumedHostOutpoints()
-		for i := 0; i < len(consumedHostOutpoints); i++ {
-			err = ctAutView.SpendCTAUTCoin(scriptInst.AutIdentifier(), *consumedHostOutpoints[i])
+		for i, consumedHostOutPoint := range extAutScript.ConsumedHostOutpoints() {
+			if consumedHostOutPoint == nil {
+				return fmt.Errorf("spendTransactionAUTScript: BurnScript.consumedHostOutpoints[%d] is nil", i)
+			}
+
+			err = ctAutView.SpendCTAUTCoin(scriptInst.AutIdentifier(), *consumedHostOutPoint)
 			if err != nil {
 				return err
 			}
+		}
+
+		// update burnedAmount
+		generatedTokens := extAutScript.GeneratedTokens()
+		if len(generatedTokens) == 0 {
+			return fmt.Errorf("spendTransactionAUTScript: BurnScript.GeneratedTokens is empty")
+		}
+		outputToken := generatedTokens[len(generatedTokens)-1]
+		if outputToken == nil {
+			return fmt.Errorf("spendTransactionAUTScript: the last of BurnScript.GeneratedTokens is nil")
+		}
+		autTxo := &ctautwire.AutTxo{}
+		if err = autTxo.Deserialize(outputToken.ValueScript); err != nil {
+			return err
+		}
+
+		burnAmount, err := abecryptox.ExtractAutTxoValue(autTxo, nil, nil)
+		if err != nil {
+			return err
+		}
+
+		err = ctAutView.AddBurnAmount(scriptInst.AutIdentifier(), burnAmount)
+		if err != nil {
+			return err
 		}
 
 	default:
@@ -903,7 +955,7 @@ mempoolLoop:
 				continue mempoolLoop
 			}
 		}
-		
+
 		extAutScript := tx.ExtAutScript()
 		if extAutScript != nil {
 			// RULE: In each block, for an AutInstance, there is at most ONE AutScriptTypeReRegistration or AutScriptTypeMint.
