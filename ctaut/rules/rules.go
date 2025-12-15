@@ -124,6 +124,10 @@ func RuleCheckOnAutTxoVersionType(autScriptVersion uint32, autTxo *ctautwire.Aut
 
 // RuleCheckOnAutTxOutputPrivacyType checks whether the outputAutTxo's type match the autPrivacyType's requirements.
 func RuleCheckOnAutTxOutputPrivacyType(autPrivacyType AutPrivacyType, outputAutTxo *ctautwire.AutTxo) error {
+	if outputAutTxo == nil {
+		return fmt.Errorf("RuleCheckOnAutTxOutputPrivacyType: nil outputAutTxo")
+	}
+
 	outAutTxoType, err := abecryptox.GetAutTxoType(outputAutTxo)
 	if err != nil {
 		return err
@@ -147,6 +151,10 @@ func RuleCheckOnAutTxOutputPrivacyType(autPrivacyType AutPrivacyType, outputAutT
 
 // RuleCheckOnAutTxInputVersion checks whether the inputAutTxo's version matches the autScriptVersion.
 func RuleCheckOnAutTxInputVersion(autScriptVersion uint32, inputAutTxo *ctautwire.AutTxo) error {
+	if inputAutTxo == nil {
+		return fmt.Errorf("RuleCheckOnAutTxInputVersion: nil inputAutTxo")
+	}
+
 	// TODO check the type of the input autTxo?
 	//autTxoType, err := abecryptox.GetAutTxoType(autTxo)
 	//if err != nil {

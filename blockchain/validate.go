@@ -1921,14 +1921,14 @@ func checkAutReRegistrationScriptInputsOutputs(tx *abeutil.TxAbe, currentHeight 
 	autMetadata := ctautView.LookupCTAUTMetaInfo(extAutScript.AutIdentifier())
 
 	if autMetadata == nil {
-		return fmt.Errorf("an non-registration AUT transaction try to operate on non-existing AUT entry")
+		return fmt.Errorf("a Reregistration Aut script attempts to operate on non-existing AutInstance")
 	}
 
 	// sanity check: expiry
 	if autMetadata.ReregistrationExpireHeight != ctautapi.InfiniteExpireHeight &&
 		autMetadata.ReregistrationExpireHeight < currentHeight {
-		return fmt.Errorf("transaction %s try to re-register at height %d but "+
-			"the AUT entry claim its expire height %d when last registered", tx.Hash(), currentHeight,
+		return fmt.Errorf("transaction %s carries a re-register at height %d but "+
+			"the AutInstance claims its expire height %d", tx.Hash(), currentHeight,
 			autMetadata.ReregistrationExpireHeight)
 	}
 
@@ -2026,7 +2026,7 @@ func checkAutReRegistrationScriptInputsOutputs(tx *abeutil.TxAbe, currentHeight 
 	// planned amount
 	if autMetadata.MintedAmount > reRegisterScript.PlannedTotalSupply() {
 		return fmt.Errorf("transaction %s try to update the planned total amount to %d but "+
-			"the AUT entry has mint %d", tx.Hash(), reRegisterScript.PlannedTotalSupply(),
+			"the AutInstance has mint %d", tx.Hash(), reRegisterScript.PlannedTotalSupply(),
 			autMetadata.MintedAmount)
 	}
 
@@ -2067,7 +2067,8 @@ func checkAutMintScriptInputsOutputs(tx *abeutil.TxAbe, currentHeight int32,
 
 	autMetadata := ctautView.LookupCTAUTMetaInfo(extAutScript.AutIdentifier())
 	if autMetadata == nil {
-		return fmt.Errorf("an non-registration AUT transaction try to operate on non-existing AUT entry")
+		return fmt.Errorf("tx %v carries an AutMinScript which attempts to operate on non-existing AutInstance %s",
+			tx.Hash(), extAutScript.AutIdentifier().String())
 	}
 
 	claimedIssuersByCoinAddress := map[string]struct{}{}
@@ -2163,7 +2164,7 @@ func checkAutMintScriptInputsOutputs(tx *abeutil.TxAbe, currentHeight int32,
 	// check the supply
 	if autMetadata.MintedAmount > autMetadata.PlannedTotalSupply {
 		// just assert
-		return fmt.Errorf("the target AutInstance has mintedAmout (%d) exceeds the plannedTotalSupply (%d) ",
+		return fmt.Errorf("the target AutInstance has mintedAmout (%d) which exceeds the plannedTotalSupply (%d) ",
 			autMetadata.MintedAmount, autMetadata.PlannedTotalSupply)
 	}
 	maxAllowed := autMetadata.PlannedTotalSupply - autMetadata.MintedAmount // uint64, and >= 0
@@ -2254,7 +2255,7 @@ func validateAutMintScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, 
 }
 
 // validateAutTransferScript
-// aut review done 2025.12.12 todo: discuss
+// aut review done 2025.12.12
 func checkAutTransferScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
 
@@ -2280,7 +2281,8 @@ func checkAutTransferScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
 	autIdentifier := extAutScript.AutIdentifier()
 	autMetadata := ctautView.LookupCTAUTMetaInfo(autIdentifier)
 	if autMetadata == nil {
-		return fmt.Errorf("an non-registration AUT transaction try to operate on non-existing AUT entry")
+		return fmt.Errorf("tx %v carries an AutTransferScript attempts to operate on non-existing AutInstance %s",
+			tx.Hash(), autIdentifier.String())
 	}
 
 	inStartIndex := int(transferScript.InStartIndex())
@@ -2322,8 +2324,8 @@ func checkAutTransferScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
 
 		hostOPStr := hostOutPoint.String()
 		if _, ok = willConsumedTokens[hostOPStr]; ok {
-			return fmt.Errorf("transaction %s try to double spend the token <%s:%d>",
-				tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
+			return fmt.Errorf("AutTransferScript in transaction %v attempts to double spend the token <%s:%s>",
+				tx.Hash(), autIdentifier.String(), hostOutPoint.String())
 		}
 		willConsumedTokens[hostOPStr] = hostOutPoint
 
@@ -2331,13 +2333,14 @@ func checkAutTransferScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
 		if coin == nil {
 			// This is checking the case of spend-unexist.
 			// Double-spending check is performed through the host on TxIn.
-			return fmt.Errorf("no such AUT coin found")
+			return fmt.Errorf("AutTransferScript in transaction %v attepmts to spend an Aut Coin that does not exist (%s:%s)",
+				tx.Hash(), autIdentifier.String(), hostOutPoint.String())
 		}
 		if coin.IsSpent() {
 			// 2025.12.13 This is actually an assert, which should not happen.
 			// Double-spending check is performed through the host on TxIn.
-			return fmt.Errorf("transaction %s try to consume spent AUT coin <%s:%d>",
-				tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
+			return fmt.Errorf("AutTransferScript in transaction %v attempts to double spend the token <%s:%s>",
+				tx.Hash(), autIdentifier.String(), hostOutPoint.String())
 		}
 		// does not need to consider the double spending on coin, since that is checked by hostOutPoint.
 
@@ -2499,7 +2502,8 @@ func checkAutBurnScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
 	autIdentifier := extAutScript.AutIdentifier()
 	autMetadata := ctautView.LookupCTAUTMetaInfo(autIdentifier)
 	if autMetadata == nil {
-		return fmt.Errorf("an non-registration AUT transaction try to operate on non-existing AUT entry")
+		return fmt.Errorf("tx %v carries an AutBurnScript which attempts to operate on non-existing AutInstance %s",
+			tx.Hash(), autIdentifier.String())
 	}
 
 	inStartIndex := int(burnScript.InStartIndex())
@@ -2541,18 +2545,19 @@ func checkAutBurnScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
 
 		hostOPStr := hostOutPoint.String()
 		if _, ok = willConsumedTokens[hostOPStr]; ok {
-			return fmt.Errorf("transaction %s try to double spend the token <%s:%d>",
-				tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
+			return fmt.Errorf("AutBurnScript in transaction %v attempts to double spend the token <%s:%s>",
+				tx.Hash(), autIdentifier.String(), hostOutPoint.String())
 		}
 		willConsumedTokens[hostOPStr] = hostOutPoint
 
 		coin := ctautView.LookupCTAUTCoin(autIdentifier, *hostOutPoint)
 		if coin == nil {
-			return fmt.Errorf("no such AUT coin found")
+			return fmt.Errorf("AutBurnScript in transaction %v attempts to spend a non-existing Aut coin <%s:%s>",
+				tx.Hash(), autIdentifier.String(), hostOutPoint.String())
 		}
 		if coin.IsSpent() {
-			return fmt.Errorf("transaction %s try to consume spent AUT coin <%s:%d>",
-				tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
+			return fmt.Errorf("AutBurnScript in transaction %v attempts to double spend the token <%s:%s>",
+				tx.Hash(), autIdentifier.String(), hostOutPoint.String())
 		}
 
 		autTxo := &ctautwire.AutTxo{}

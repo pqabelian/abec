@@ -591,6 +591,9 @@ func dbFetchCTAUTMetadata(dbTx database.Tx, key ctautapi.AutId) (*ctautapi.AutMe
 	// transaction output.  Return now when there is no entry.
 	// todo: 2025.12.12 why not use the database-key mechanism?
 	autInfoBucket := dbTx.Metadata().Bucket(ctAutInstanceBucketName)
+	if autInfoBucket == nil {
+		return nil, fmt.Errorf("bucket for aut instance does not exist")
+	}
 	serializedAUTInfo := autInfoBucket.Get(key[:])
 	if serializedAUTInfo == nil {
 		return nil, nil

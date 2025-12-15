@@ -100,6 +100,10 @@ func AutTransferTxVerify(autTransferTx *wire.AutTransferTx) error {
 func GetAutTxoType(autTxo *wire.AutTxo) (AutTxoType, error) {
 	// TODO: add map aut script version to crypto scheme
 	// or aut script version -> tx version -> crypto scheme?
+	if autTxo == nil {
+		return AutTxoTypeHidden, fmt.Errorf("GetAutTxoType: the input autTxo is nil")
+	}
+
 	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autTxo.Version)
 	if err != nil {
 		return AutTxoTypeHidden, err
