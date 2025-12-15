@@ -288,11 +288,12 @@ func mergeCTAUTView(viewA *blockchain.CTAUTViewpoint, viewB *blockchain.CTAUTVie
 		// As a result, for an identifierKey, if instanceInViewA exits in viewA, the autMetaData in viewB should be the same as that in ViewA.
 		// But the coin in viewB should be different ones from those in viewA.
 
-		// Here we do not need to update ViewA's autMetaData
-		// For safe, here we still set ViewA's autMetaData to be the same as that of viewB.
-		//if instanceInViewB.Metadata() != nil {
-		//	instanceInViewA.SetAutMetadata(instanceInViewB.Metadata().Clone())
-		//}
+		// Here we do not need to update ViewA's autMetaData if it is not nil.
+		if instanceInViewA.Metadata() == nil {
+			if instanceInViewB.Metadata() != nil {
+				instanceInViewA.SetAutMetadata(instanceInViewB.Metadata().Clone())
+			}
+		}
 
 		// add all coin to viewA
 		for outpoint, coin := range instanceInViewB.AUTCoins() {
