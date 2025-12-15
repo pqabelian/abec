@@ -66,6 +66,14 @@ func (instance *CTAUTInstance) PutCoin(outpiont ctautapi.HostOutPoint, coin *CTA
 	instance.coins[outpiont] = coin
 }
 
+func (instance *CTAUTInstance) SetAutMetadata(autMetadata *ctautapi.AutMetadata) {
+	if instance == nil {
+		return
+	}
+
+	instance.metadata = autMetadata
+}
+
 // Metadata
 // review done 2015.12.11
 func (instance *CTAUTInstance) Metadata() *ctautapi.AutMetadata {

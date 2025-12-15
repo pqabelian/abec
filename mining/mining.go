@@ -266,7 +266,6 @@ func mergeUtxoRingView(viewA *blockchain.UtxoRingViewpoint, viewB *blockchain.Ut
 }
 
 // aut review done, 2025.12.12
-// todo: confirm
 func mergeCTAUTView(viewA *blockchain.CTAUTViewpoint, viewB *blockchain.CTAUTViewpoint) {
 	if viewB == nil {
 		return
@@ -283,10 +282,19 @@ func mergeCTAUTView(viewA *blockchain.CTAUTViewpoint, viewB *blockchain.CTAUTVie
 			continue
 		}
 
-		// todo: 2025.12.13 handle metadata
+		// Note that this function is only a helper function in newBlockTemplate:
+		// viewB is FRESHLY fetched from database for each Tx and IS NOT modified before it is merged into viewA, and
+		// viewA is obtained by merging these viewBs and IS NOT modified.
+		// As a result, for an identifierKey, if instanceInViewA exits in viewA, the autMetaData in viewB should be the same as that in ViewA.
+		// But the coin in viewB should be different ones from those in viewA.
 
-		// do not change AUT info
-		// but add all coin to viewA
+		// Here we do not need to update ViewA's autMetaData
+		// For safe, here we still set ViewA's autMetaData to be the same as that of viewB.
+		//if instanceInViewB.Metadata() != nil {
+		//	instanceInViewA.SetAutMetadata(instanceInViewB.Metadata().Clone())
+		//}
+
+		// add all coin to viewA
 		for outpoint, coin := range instanceInViewB.AUTCoins() {
 			instanceInViewA.PutCoin(outpoint, coin)
 		}
@@ -896,13 +904,13 @@ mempoolLoop:
 			// AutScriptTypeRegistration does not need to check, since it is guaranteed by the identifier mechanism.
 			if autScriptType == ctautapi.AutScriptTypeReRegistration {
 				if _, ok := autScriptTypeMapRereg[autIdentifierKey]; ok {
-					log.Debugf("Skipping tx %s because "+
-						"it carries an AutReRegistrationScript, while a previous tx also carries an AutReRegistrationScript of the same AutINsatnce (%s)",
+					log.Debugf("Skipping tx %v because "+
+						"it carries an AutReRegistrationScript, while a previous tx also carries an AutReRegistrationScript of the same AutInsatnce (%s)",
 						tx.Hash(), autIdentifierKey)
 					continue
 				}
 				if _, ok := autScriptTypeMapMint[autIdentifierKey]; ok {
-					log.Debugf("Skipping tx %s because "+
+					log.Debugf("Skipping tx %v because "+
 						"it carries an AutReRegistrationScript, while a previous tx carries an AutMintScript of the same AutInsatnce (%s)",
 						tx.Hash(), autIdentifierKey)
 					continue
@@ -913,7 +921,7 @@ mempoolLoop:
 
 			} else if autScriptType == ctautapi.AutScriptTypeMint {
 				if _, ok := autScriptTypeMapRereg[autIdentifierKey]; ok {
-					log.Debugf("Skipping tx %s because "+
+					log.Debugf("Skipping tx %v because "+
 						"it carries an AutMintScript, while a previous tx carries an AutReRegistrationScript of the same AutInstance (%s)",
 						tx.Hash(), autIdentifierKey)
 					continue
@@ -923,7 +931,7 @@ mempoolLoop:
 				// set the number of AutMintScripts of the same AutInstance.
 				if count, ok := autScriptTypeMapMint[autIdentifierKey]; ok {
 					autScriptTypeMapMint[autIdentifierKey] = count + 1
-					log.Debugf(" tx (%s) carries AutMintScript, now toatl %d txs of AutInstance (%s) carry AutMintScript",
+					log.Debugf(" tx (%v) carries AutMintScript, now toatl %d txs of AutInstance (%s) carry AutMintScript",
 						tx.Hash(), count, autIdentifierKey)
 				} else {
 					autScriptTypeMapMint[autIdentifierKey] = 1
