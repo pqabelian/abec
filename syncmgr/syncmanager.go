@@ -2,13 +2,15 @@ package syncmgr
 
 import (
 	"container/list"
-	"github.com/abesuite/abec/blockchain/consensus"
-	"github.com/abesuite/abec/blockchain/ruleerror"
 	"math/rand"
 	"net"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/abesuite/abec/blockchain/consensus"
+	"github.com/abesuite/abec/blockchain/ruleerror"
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
@@ -2171,16 +2173,26 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 		// transaction are NOT removed recursively because they are still
 		// valid.
 		//	todo(ABE): mempool will not contain the transactions that double-spend those in mainchain.
+		affectedAutIdentifiers := make(map[ctautapi.AutId]struct{})
 		for _, tx := range block.Transactions()[1:] {
 			sm.txMemPool.RemoveTransactionAbe(tx)    // remove this transaction from the mempool
 			sm.txMemPool.RemoveDoubleSpendsAbe(tx)   // remove the transactions that spend the same outpoint
 			sm.txMemPool.RemoveOrphanAbe(tx)         // remove this transaction from the orphan pool
 			sm.peerNotifier.TransactionConfirmed(tx) // the transaction is confirmed
 			sm.txMemPool.ProcessOrphansAbe(tx)       //	remove the orphans that double-spend the txIns of tx
+
+			extAutScript := tx.ExtAutScript()
+			if extAutScript != nil {
+				identifier := extAutScript.AutIdentifier()
+				affectedAutIdentifiers[identifier] = struct{}{}
+			}
+
 			//sm.peerNotifier.AnnounceNewTransactions(acceptedTxs)
 			//todo(ABE): for ABE, sm does not need to sm.peerNotifier.AnnounceNewTransactions(acceptedTx),
 			// as tx is propagated with blocks, and may be announced when verify the block.
 		}
+
+		sm.txMemPool.ReValidateAutTransactions(affectedAutIdentifiers)
 
 		// Register block with the fee estimator, if it exists.
 		if sm.feeEstimator != nil {
