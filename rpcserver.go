@@ -1846,7 +1846,7 @@ func handleGetAutMetadata(s *rpcServer, cmd interface{}, closeChan <-chan struct
 		ReregistrationExpireHeight: metadata.ReregistrationExpireHeight,
 		ReRegistrationThreshold:    metadata.ReregistrationThreshold,
 		MintThreshold:              metadata.MintThreshold,
-		PrivacyType:                metadata.PrivacyType,
+		PrivacyType:                uint8(metadata.PrivacyType),
 		MintedAmount:               metadata.MintedAmount,
 		BurnedAmount:               metadata.BurnedAmount,
 		UpdateScriptVersions:       metadata.UpdateScriptVersions,

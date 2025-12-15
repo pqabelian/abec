@@ -229,7 +229,8 @@ type TxPool struct {
 	outpointsAbe     map[chainhash.Hash]map[string]*abeutil.TxAbe                    //TODO(abe):why use two layers map                 //	corresponding to btc's outpoints, using hash rather then TxIn as the key for map
 	orphansByPrevAbe map[chainhash.Hash]map[string]map[chainhash.Hash]*abeutil.TxAbe // corresponding to btc's orphansByPrev //TODO type transfer??? []byte -> string
 
-	autScriptTypeMap map[ctautapi.AutId]ctautapi.AutScriptType
+	autScriptTypeMapRereg map[ctautapi.AutId]*abeutil.TxAbe
+	autScriptTypeMapMint  map[ctautapi.AutId]map[chainhash.Hash]*abeutil.TxAbe
 
 	txMonitorMu  sync.Mutex
 	txMonitoring bool
@@ -749,8 +750,14 @@ func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 
 		if txDesc.Tx.ExtAutScript() != nil {
 			extAutScript := txDesc.Tx.ExtAutScript()
-			if extAutScript.Type() == ctautapi.AutScriptTypeReRegistration || extAutScript.Type() == ctautapi.AutScriptTypeMint {
-				delete(mp.autScriptTypeMap, extAutScript.AutIdentifier())
+			autScriptType := extAutScript.Type()
+			identifier := extAutScript.AutIdentifier()
+			if autScriptType == ctautapi.AutScriptTypeReRegistration {
+				delete(mp.autScriptTypeMapRereg, identifier)
+			} else if autScriptType == ctautapi.AutScriptTypeMint {
+				delete(mp.autScriptTypeMapMint[identifier], *txHash)
+			} else {
+				// other types of AutScript does not need to be removed from autScriptTypeMap
 			}
 		}
 
@@ -1650,7 +1657,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	// one more than the current height.
 	bestHeight := mp.cfg.BestHeight()
 	nextBlockHeight := bestHeight + 1
-	mp.clearOutdatedTransaction(nextBlockHeight)
+	//mp.clearOutdatedTransaction(nextBlockHeight)
 
 	if nextBlockHeight >= mp.cfg.ChainParams.BlockHeightAconcaguaCommit {
 		if tx.MsgTx().Version < wire.TxVersion_Height_464000_Aconcagua {
@@ -1850,15 +1857,41 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	if tx.ExtAutScript() != nil {
 		extAutScript := tx.ExtAutScript()
 		autScriptType := extAutScript.Type()
-		if autScriptType == ctautapi.AutScriptTypeReRegistration || autScriptType == ctautapi.AutScriptTypeMint {
-			if existType, ok := mp.autScriptTypeMap[extAutScript.AutIdentifier()]; ok {
+		identifier := extAutScript.AutIdentifier()
+		if autScriptType == ctautapi.AutScriptTypeReRegistration {
+			// 1. exist re-register script would be mutually exclusive with later re-register script
+			if _, ok := mp.autScriptTypeMapRereg[identifier]; ok {
 				return nil, nil, txRuleError(
 					wire.RejectInvalid,
-					fmt.Sprintf("transaction %s carries an AutScript with type=%d, while there is already one with type=%d",
-						tx.Hash(), autScriptType, existType),
+					fmt.Sprintf("transaction %s carries an AutScript with type=%d, while there is already one",
+						tx.Hash(), autScriptType),
 				)
 			}
-			mp.autScriptTypeMap[extAutScript.AutIdentifier()] = autScriptType
+			// 2. exist mint script would be mutually exclusive with later re-register script
+			if count, ok := mp.autScriptTypeMapMint[identifier]; ok {
+				return nil, nil, txRuleError(
+					wire.RejectInvalid,
+					fmt.Sprintf("transaction %s carries an AutScript with type=%d, while there are already %d Autscript for minting",
+						tx.Hash(), autScriptType, count),
+				)
+			}
+			mp.autScriptTypeMapRereg[identifier] = tx
+		} else if autScriptType == ctautapi.AutScriptTypeMint {
+			// 1. exist re-register script would be mutually exclusive with later mint script
+			if _, ok := mp.autScriptTypeMapRereg[identifier]; ok {
+				return nil, nil, txRuleError(
+					wire.RejectInvalid,
+					fmt.Sprintf("transaction %s carries an AutScript with type=%d, while there is already one for re-registering",
+						tx.Hash(), autScriptType),
+				)
+			}
+			// 2. exist mint script would NOT be mutually exclusive with later mint script
+			if _, ok := mp.autScriptTypeMapMint[identifier]; !ok {
+				mp.autScriptTypeMapMint[identifier] = map[chainhash.Hash]*abeutil.TxAbe{}
+			}
+			mp.autScriptTypeMapMint[identifier][*txHash] = tx
+		} else {
+			// other type scripts do not have any limitations
 		}
 	}
 
@@ -2213,8 +2246,33 @@ func (mp *TxPool) clearOutdatedTransaction(nextHeight int32) {
 	default:
 		// nothing
 	}
+}
 
-	// TODO(ctaut) delete transaction try to register or re-register after it claimed expiry height
+func (mp *TxPool) ReValidateAutTransactions(identifiers map[ctautapi.AutId]struct{}) {
+	// Protect concurrent access.
+	mp.mtx.Lock()
+	defer mp.mtx.Unlock()
+
+	for identifier := range identifiers {
+		txMap, ok := mp.autScriptTypeMapMint[identifier]
+		if !ok {
+			continue
+		}
+
+		for _, tx := range txMap {
+			mp.removeTransactionAbe(tx)
+			missingParents, _, err := mp.maybeAcceptTransactionAbe(tx, true, false, true, false)
+			if err != nil {
+				log.Errorf("maybeAcceptTransactionAbe for transaction %s error: %v", tx.Hash(), err)
+				continue
+			}
+			if len(missingParents) == 0 {
+				log.Debugf("transaction %s is successfully to re-validated", tx.Hash())
+			} else {
+				log.Debugf("transaction %s fail to re-validate due to missing parents", tx.Hash())
+			}
+		}
+	}
 }
 
 // New returns a new memory pool for validating and storing standalone
@@ -2234,6 +2292,7 @@ func New(cfg *Config) *TxPool {
 		outpointsAbe:     make(map[chainhash.Hash]map[string]*abeutil.TxAbe),
 		orphansByPrevAbe: make(map[chainhash.Hash]map[string]map[chainhash.Hash]*abeutil.TxAbe),
 
-		autScriptTypeMap: make(map[ctautapi.AutId]ctautapi.AutScriptType),
+		autScriptTypeMapRereg: make(map[ctautapi.AutId]*abeutil.TxAbe),
+		autScriptTypeMapMint:  make(map[ctautapi.AutId]map[chainhash.Hash]*abeutil.TxAbe),
 	}
 }

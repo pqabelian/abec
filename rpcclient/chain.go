@@ -891,7 +891,7 @@ func (r FutureGetAutMetadataResult) Receive() (*ctautapi.AutMetadata, error) {
 		ReregistrationExpireHeight: result.ReregistrationExpireHeight,
 		ReregistrationThreshold:    result.ReRegistrationThreshold,
 		MintThreshold:              result.MintThreshold,
-		PrivacyType:                result.PrivacyType,
+		PrivacyType:                ctautapi.AutPrivacyType(result.PrivacyType),
 		MintedAmount:               result.MintedAmount,
 		BurnedAmount:               result.BurnedAmount,
 		ActiveRootTokenSet:         activeRootTokenSet,
