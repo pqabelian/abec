@@ -891,9 +891,6 @@ mempoolLoop:
 		// an AutScriptTypeMint could not exist with AutScriptTypeReRegistration.
 		extAutScript := tx.ExtAutScript()
 		if extAutScript != nil {
-			// RULE: In each block, for an AutInstance,
-			// an AutScriptTypeReRegistration could not co-exist with other AutScriptTypeReRegistration or AutScriptTypeMint; and
-			// an AutScriptTypeMint could not exist with AutScriptTypeReRegistration.
 			autIdentifierKey := extAutScript.AutIdentifier().String()
 			autScriptType := extAutScript.Type()
 			// AutScriptTypeRegistration does not need to check, since it is guaranteed by the identifier mechanism.
@@ -910,6 +907,8 @@ mempoolLoop:
 						tx.Hash(), autIdentifierKey)
 					continue
 				}
+
+				// allowed case, as there is not any AutScriptTypeReRegistration or AutMintScript for this AutInstance.
 				autScriptTypeMapRereg[autIdentifierKey] = 1
 
 			} else if autScriptType == ctautapi.AutScriptTypeMint {
@@ -920,7 +919,8 @@ mempoolLoop:
 					continue
 				}
 
-				// allowed case
+				// allowed case, as there is not any AutScriptTypeReRegistration of the same AutInstance.
+				// set the number of AutMintScripts of the same AutInstance.
 				if count, ok := autScriptTypeMapMint[autIdentifierKey]; ok {
 					autScriptTypeMapMint[autIdentifierKey] = count + 1
 					log.Debugf(" tx (%s) carries AutMintScript, now toatl %d txs of AutInstance (%s) carry AutMintScript",
@@ -930,7 +930,7 @@ mempoolLoop:
 				}
 
 			} else {
-				// other type scripts do not have any limitation.
+				// other type scripts (Registration, Transfer, Burn) do not have any limitation.
 			}
 
 		}
