@@ -2587,6 +2587,7 @@ func checkAutBurnScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
 
 	// check privacy type
 	// special case: ignore the last one token when checking the privacy type rule, and it must be public
+	var burnedValue uint64
 	outputTokens := extAutScript.GeneratedTokens()
 	for i, outputToken := range outputTokens {
 		if outputToken == nil {
@@ -2609,12 +2610,29 @@ func checkAutBurnScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
 				return fmt.Errorf("the burned token must have typr = AutTxoTypePublic (%d), rather than %d",
 					abecryptox.AutTxoTypePublic, autTxoType)
 			}
+			burnedValue, err = abecryptox.ExtractAutTxoValue(autTxo, nil, nil)
+			if err != nil {
+				return err
+			}
 		} else {
 			err = ctautapi.RuleCheckOnAutTxOutputPrivacyType(autMetadata.PrivacyType, autTxo)
 			if err != nil {
 				return err
 			}
 		}
+	}
+
+	// check the supply
+	if autMetadata.BurnedAmount > autMetadata.MintedAmount {
+		// just assert
+		return fmt.Errorf("the target AutInstance has burnedAmout (%d) which exceeds the mintedAmount (%d) ",
+			autMetadata.BurnedAmount, autMetadata.MintedAmount)
+	}
+	maxAllowed := autMetadata.MintedAmount - autMetadata.BurnedAmount // uint64, and >= 0
+
+	if burnedValue > maxAllowed {
+		return fmt.Errorf("transaction %s try to burn coin value %d, which exceeds the allowed value %d (= MintedAmount %d - BunredAmount %d)",
+			tx.Hash(), burnedValue, maxAllowed, autMetadata.MintedAmount, autMetadata.BurnedAmount)
 	}
 
 	return nil
