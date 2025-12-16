@@ -159,6 +159,7 @@ type Policy struct {
 
 	// MinRelayTxFee defines the minimum transaction fee in BTC/kB to be
 	// considered a non-zero fee.
+	//  MinRelayTxFee -> MinRelayTxFeePerKB?
 	MinRelayTxFee abeutil.Amount
 
 	// RejectReplacement, if true, rejects accepting replacement
@@ -1804,6 +1805,7 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 	// are exempted.
 	if isNew && !mp.cfg.Policy.DisableRelayPriority && txFee < minFee {
 		// priority = sum of all txo confirmation / serialize size
+		// TODO
 		currentPriority := mining.CalcPriorityAbe(tx.MsgTx(), utxoRingView,
 			nextBlockHeight)
 		if currentPriority <= mining.MinHighPriority {
@@ -1857,29 +1859,29 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 		identifier := extAutScript.AutIdentifier()
 		if autScriptType == ctautapi.AutScriptTypeReRegistration {
 			// 1. exist re-register script would be mutually exclusive with later re-register script
-			if _, ok := mp.autScriptTypeMapRereg[identifier]; ok {
+			if existTx, ok := mp.autScriptTypeMapRereg[identifier]; ok {
 				return nil, nil, txRuleError(
 					wire.RejectInvalid,
-					fmt.Sprintf("transaction %s carries an AutScript with type=%d, while there is already one",
-						tx.Hash(), autScriptType),
+					fmt.Sprintf("transaction %s carries an AutScript with type=%d, while there is already a transaction %s for re-registering",
+						tx.Hash(), autScriptType, existTx.Hash()),
 				)
 			}
 			// 2. exist mint script would be mutually exclusive with later re-register script
-			if count, ok := mp.autScriptTypeMapMint[identifier]; ok {
+			if existTxs, ok := mp.autScriptTypeMapMint[identifier]; ok {
 				return nil, nil, txRuleError(
 					wire.RejectInvalid,
-					fmt.Sprintf("transaction %s carries an AutScript with type=%d, while there are already %d Autscript for minting",
-						tx.Hash(), autScriptType, count),
+					fmt.Sprintf("transaction %s carries an AutScript with type=%d, while there is %d transaction(s) for minting",
+						tx.Hash(), autScriptType, len(existTxs)),
 				)
 			}
 			mp.autScriptTypeMapRereg[identifier] = tx
 		} else if autScriptType == ctautapi.AutScriptTypeMint {
 			// 1. exist re-register script would be mutually exclusive with later mint script
-			if _, ok := mp.autScriptTypeMapRereg[identifier]; ok {
+			if existTx, ok := mp.autScriptTypeMapRereg[identifier]; ok {
 				return nil, nil, txRuleError(
 					wire.RejectInvalid,
-					fmt.Sprintf("transaction %s carries an AutScript with type=%s, while there is already one for re-registering",
-						tx.Hash(), autScriptType.String()),
+					fmt.Sprintf("transaction %s carries an AutScript with type=%s, while there is already a transaction %d for re-registering",
+						tx.Hash(), autScriptType.String(), existTx.Hash()),
 				)
 			}
 
