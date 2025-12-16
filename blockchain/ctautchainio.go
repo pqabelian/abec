@@ -101,6 +101,9 @@ func (s *SpentCTAUTTokens) Type() SpentCTAUTType {
 
 type SpentCTAUTToken struct {
 	Version uint32
+
+	HostOutPoint ctautapi.HostOutPoint
+
 	// Amount is the amount of the output.
 	ValueScript []byte
 
@@ -119,6 +122,8 @@ func spentCTAUTSerializeSize(stxo SpentCTAUT) (int, error) {
 			size += serializeSizeVLQ(headerCode)
 
 			size += serializeSizeVLQ(uint64(token.Version))
+			size += chainhash.HashSize
+			size += 1
 
 			size += serializeSizeVLQ(uint64(len(token.ValueScript)))
 			size += len(token.ValueScript)
@@ -174,6 +179,11 @@ func putSpentCTAUT(target []byte, stxo SpentCTAUT) (int, error) {
 			offset += putVLQ(target[offset:], headerCode)
 
 			offset += putVLQ(target[offset:], uint64(token.Version))
+
+			copy(target[offset:], token.HostOutPoint.TxHash[:])
+			offset += chainhash.HashSize
+			target[offset] = token.HostOutPoint.Index
+			offset += 1
 
 			vlqSizeLen := putVLQ(target[offset:], uint64(len(token.ValueScript)))
 			offset += vlqSizeLen
@@ -271,6 +281,11 @@ func decodeSpentCTAUT(serialized []byte) (SpentCTAUT, int, error) {
 					"header code")
 			}
 			res[i].Version = uint32(version)
+
+			copy(res[i].HostOutPoint.TxHash[:], serialized[offset:offset+chainhash.HashSize])
+			offset += chainhash.HashSize
+			res[i].HostOutPoint.Index = serialized[offset]
+			offset += 1
 
 			scriptSize, bytesRead := deserializeVLQ(serialized[offset:])
 			offset += bytesRead

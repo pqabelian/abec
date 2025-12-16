@@ -678,9 +678,10 @@ func (view *CTAUTViewpoint) connectMintScript(extAutScript *ctautapi.ExtAutScrip
 		// todo: the sctatus for mint is different from that for reregistration? how to rollback? use UpdatedCTAUTInfo?
 		if sctauts != nil {
 			var stxo = SpentCTAUTToken{
-				Version:     mintScript.Version(),
-				ValueScript: nil,
-				Height:      blockHeight,
+				Version:      mintScript.Version(),
+				HostOutPoint: *hostOutpoint,
+				ValueScript:  nil,
+				Height:       blockHeight,
 			}
 			currentSctauts = append(currentSctauts, stxo)
 		}
@@ -773,9 +774,10 @@ func (view *CTAUTViewpoint) connectTransferScript(extAutScript *ctautapi.ExtAutS
 		if sctauts != nil {
 			// Populate the stxo details using the utxo entry.
 			var stxo = SpentCTAUTToken{
-				Version:     consumedToken.version,
-				ValueScript: consumedToken.valueScript,
-				Height:      blockHeight,
+				Version:      consumedToken.version,
+				HostOutPoint: *hostOutpoint,
+				ValueScript:  consumedToken.valueScript,
+				Height:       blockHeight,
 			}
 			currentSctauts = append(currentSctauts, stxo)
 		}
@@ -841,9 +843,10 @@ func (view *CTAUTViewpoint) connectBurnScript(extAutScript *ctautapi.ExtAutScrip
 		if sctauts != nil {
 			// Populate the stxo details using the utxo entry.
 			var stxo = SpentCTAUTToken{
-				Version:     consumedToken.version,
-				ValueScript: consumedToken.valueScript,
-				Height:      blockHeight,
+				Version:      consumedToken.version,
+				HostOutPoint: *hostOutpoint,
+				ValueScript:  consumedToken.valueScript,
+				Height:       blockHeight,
 			}
 			currentSctauts = append(currentSctauts, stxo)
 		}
@@ -1144,6 +1147,7 @@ func (view *CTAUTViewpoint) disconnectTransferTransaction(db database.DB, extAut
 		if _, ok := instance.coins[*hostOutpoint]; ok {
 			return nil, fmt.Errorf("duplicate coins %s for AUT instance %s", hostOutpoint.String(), identifierKey)
 		}
+		// TODO assert?
 		instance.coins[*hostOutpoint] = NewCTAUTCoin(token.Version, identifier, token.ValueScript, blockHeight)
 	}
 
@@ -1219,6 +1223,7 @@ func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, extAutScri
 		if _, ok := instance.coins[*hostOutpoint]; ok {
 			return nil, fmt.Errorf("duplicate coins %s for AUT instance %s", hostOutpoint.String(), identifierKey)
 		}
+		// TODO assert?
 		instance.coins[*hostOutpoint] = NewCTAUTCoin(token.Version, identifier, token.ValueScript, blockHeight)
 	}
 
