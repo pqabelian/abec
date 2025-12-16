@@ -589,7 +589,7 @@ func (autMetadata *AutMetadata) SanityCheck() error {
 	return nil
 }
 
-// Clone returns a shallow copy of the AutMetadata entry.
+// Clone returns a deep copy of the AutMetadata entry.
 func (autMetadata *AutMetadata) Clone() *AutMetadata {
 	if autMetadata == nil {
 		return nil
