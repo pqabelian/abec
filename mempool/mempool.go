@@ -840,7 +840,8 @@ func (mp *TxPool) RemoveDoubleSpendsAbe(tx *abeutil.TxAbe) {
 // helper for maybeAcceptTransactionAbe.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, ctautView *blockchain.CTAUTViewpoint,
+func (mp *TxPool) addTransactionAbe(
+	utxoRingView *blockchain.UtxoRingViewpoint, ctautView *blockchain.CTAUTViewpoint,
 	tx *abeutil.TxAbe, height int32, fee uint64, fromDiskCache bool) (*TxDescAbe, error) {
 	// Add the transaction to the pool and mark the referenced outpoints
 	// as spent by the pool.
@@ -858,8 +859,8 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 	// To avoid out of memory, if the transaction in mempool is more than MaxTransactionInMemoryNum
 	// transaction would be stored in disk
 	// When the transaction is loaded from disk, ignore this mechanism
+	txHash := tx.Hash()
 	if !fromDiskCache && mp.cfg.AllowDiskCacheTx && len(mp.poolAbe) >= MaxTransactionInMemoryNum {
-		txHash := tx.Hash()
 		log.Infof("save transaction %s into disk", txHash)
 		// To avoid that transaction always is cached in disk after triggering cache transaction,
 		// when the transaction in mempool is less than MinTransactionInMemoryNum, we would load
@@ -883,17 +884,17 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 		binary.LittleEndian.PutUint64(content, uint64(len(txContent)))
 		copy(content[8:], txContent)
 		if _, err := mp.cfg.TxCacheRotator.Write(txHash.String(), content); err == nil {
-			mp.diskPool[*tx.Hash()] = struct{}{}
+			mp.diskPool[*txHash] = struct{}{}
 			log.Infof("successful to save transaction %s into disk, current mempool:%d, current cached in disk:%d", txHash, len(mp.poolAbe), len(mp.diskPool))
 			return txD, nil
 		}
 		log.Warnf("Fail to cache transaction %s using disk, save it at memory", txHash)
 	}
 
-	mp.poolAbe[*tx.Hash()] = txD
+	mp.poolAbe[*txHash] = txD
 	if fromDiskCache {
-		log.Infof("successful to load transaction %s from disk, current mempool:%d", tx.Hash(), len(mp.poolAbe))
-		delete(mp.diskPool, *tx.Hash())
+		log.Infof("successful to load transaction %s from disk, current mempool:%d", txHash, len(mp.poolAbe))
+		delete(mp.diskPool, *txHash)
 	}
 
 	if mp.outpointsAbe == nil {
@@ -914,7 +915,21 @@ func (mp *TxPool) addTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, 
 	/*	if mp.cfg.AddrIndex != nil {
 		mp.cfg.AddrIndex.AddUnconfirmedTx(tx, utxoView)
 	}*/
-
+	if tx.ExtAutScript() != nil {
+		extAutScript := tx.ExtAutScript()
+		autScriptType := extAutScript.Type()
+		identifier := extAutScript.AutIdentifier()
+		if autScriptType == ctautapi.AutScriptTypeReRegistration {
+			mp.autScriptTypeMapRereg[identifier] = tx
+		} else if autScriptType == ctautapi.AutScriptTypeMint {
+			if _, ok := mp.autScriptTypeMapMint[identifier]; !ok {
+				mp.autScriptTypeMapMint[identifier] = map[chainhash.Hash]*abeutil.TxAbe{}
+			}
+			mp.autScriptTypeMapMint[identifier][*txHash] = tx
+		} else {
+			// other type scripts do not have any limitations
+		}
+	}
 	// Record this tx for fee estimation if enabled.
 	if mp.cfg.FeeEstimator != nil {
 		mp.cfg.FeeEstimator.ObserveTransaction(txD)
@@ -1874,7 +1889,6 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 						tx.Hash(), autScriptType, len(existTxs)),
 				)
 			}
-			mp.autScriptTypeMapRereg[identifier] = tx
 		} else if autScriptType == ctautapi.AutScriptTypeMint {
 			// 1. exist re-register script would be mutually exclusive with later mint script
 			if existTx, ok := mp.autScriptTypeMapRereg[identifier]; ok {
@@ -1886,10 +1900,6 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 			}
 
 			// 2. exist mint script would NOT be mutually exclusive with later mint script
-			if _, ok := mp.autScriptTypeMapMint[identifier]; !ok {
-				mp.autScriptTypeMapMint[identifier] = map[chainhash.Hash]*abeutil.TxAbe{}
-			}
-			mp.autScriptTypeMapMint[identifier][*txHash] = tx
 		} else {
 			// other type scripts do not have any limitations
 		}
