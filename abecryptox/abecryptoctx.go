@@ -37,7 +37,7 @@ func AutCoinbaseTxVerify(autCoinbaseTx *wire.AutCoinbaseTx) error {
 	if autCoinbaseTx == nil {
 		return fmt.Errorf("AutCoinbaseTxVerify: nil tx")
 	}
-	
+
 	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autCoinbaseTx.Version)
 	if err != nil {
 		return err
@@ -152,7 +152,7 @@ func ExtractAutTxoValue(autTxo *wire.AutTxo, cryptoValuePublicKey []byte, crypto
 		return pqringctxExtractValueFromAutTxo(abecryptoxparam.PQRingCTXPP, cryptoScheme, autTxo, cryptoValuePublicKey, cryptoValueSecretKey)
 
 	default:
-		return 0, fmt.Errorf("PseudonymTxoCoinParse: the cryptoScheme (%d) implied by abeTxo.Version is not supported", cryptoScheme)
+		return 0, fmt.Errorf("ExtractAutTxoValue: the cryptoScheme (%d) implied by abeTxo.Version is not supported", cryptoScheme)
 	}
 
 }

@@ -87,14 +87,26 @@ func (instance *CTAUTInstance) AUTCoins() map[ctautapi.HostOutPoint]*CTAUTCoin {
 }
 
 // SpendCoin
-// review done 2015.12.12 todo:
+// review done 2015.12.16
+// The spentCoin's status-change is already in instance.coins,
+// and the returned CTAUTCoin is just for the ease of the caller to directly obtain the coin.
+// It is expected that the caller should not modify the returned CTAUTCoin.
 func (instance *CTAUTInstance) SpendCoin(point ctautapi.HostOutPoint) (*CTAUTCoin, error) {
+	if instance == nil {
+		return nil, fmt.Errorf("the receiver instance for SpendCoin is nil")
+	}
+
+	if instance.coins == nil {
+		return nil, fmt.Errorf("the instance has no coins")
+	}
+
 	token, exist := instance.coins[point]
 	if !exist || token == nil {
-		return nil, fmt.Errorf("attempting to spend a non-exist aut coin")
+		return nil, fmt.Errorf("attempting to spend a non-exist aut coin on outpoint %s", point.String())
 	}
+
 	if token.IsSpent() {
-		return nil, fmt.Errorf("attempting spend a spent aut coin")
+		return nil, fmt.Errorf("attempting spend a spent aut coin on outpoint %s", point.String())
 	}
 
 	token.Spend()
@@ -335,15 +347,12 @@ func (view *CTAUTViewpoint) SpendRootToken(identifier ctautapi.AutId, outpoint c
 }
 
 // AddMintAmount adds the input mintAmount to the mintedAmount.
+// review done 2025.12.16
 func (view *CTAUTViewpoint) AddMintAmount(identifier ctautapi.AutId, mintAmount uint64) error {
 	if view == nil {
 		return fmt.Errorf("the receiver view is nil")
 	}
 
-	if mintAmount > ctautapi.MaxAmount {
-		return fmt.Errorf("the input mintAmount %d exceeds max allowed %d", mintAmount, ctautapi.MaxAmount)
-	}
-
 	if view.instances == nil {
 		return fmt.Errorf("no instance for identifier %v", identifier.String())
 	}
@@ -358,32 +367,31 @@ func (view *CTAUTViewpoint) AddMintAmount(identifier ctautapi.AutId, mintAmount 
 
 	metadata := instance.metadata
 
-	totalMinted := metadata.MintedAmount + mintAmount
-	if totalMinted < metadata.MintedAmount || totalMinted < mintAmount {
-		return fmt.Errorf("the metadata.MintedAmount (%d) + input mintAmount (%d) incurs overflow",
-			metadata.MintedAmount, mintAmount)
+	if metadata.MintedAmount > metadata.PlannedTotalSupply {
+		// just an assertion
+		return fmt.Errorf("autInstance (%v) has MintedAmount (%d) while its PlannedTotalSupply is %d ",
+			identifier, metadata.MintedAmount, metadata.PlannedTotalSupply)
 	}
-	if totalMinted > metadata.PlannedTotalSupply {
-		// Note that due to the design on MaxAmount, overflow will not happen here.
-		return fmt.Errorf("the metadata.MintedAmount (%d) + input mintAmount (%d) exceeds PlannedTotalSupply %d",
-			metadata.MintedAmount, mintAmount, metadata.PlannedTotalSupply)
+	maxAllowed := metadata.PlannedTotalSupply - metadata.MintedAmount // uint64, >=0
+
+	if mintAmount > maxAllowed {
+		return fmt.Errorf("autInstance (%v) has MintedAmount (%d) and PlannedTotalSupply (%d), "+
+			"fail to attempt add mintAmount (%d)",
+			identifier, metadata.MintedAmount, metadata.PlannedTotalSupply, mintAmount)
 	}
 
-	metadata.MintedAmount = totalMinted
+	metadata.MintedAmount = metadata.MintedAmount + mintAmount
 
 	return nil
 }
 
-// AddMintAmount adds the input mintAmount to the mintedAmount.
+// AddBurnAmount adds the input mintAmount to the mintedAmount.
+// aut review done 2025.12.16
 func (view *CTAUTViewpoint) AddBurnAmount(identifier ctautapi.AutId, burnAmount uint64) error {
 	if view == nil {
 		return fmt.Errorf("the receiver view is nil")
 	}
 
-	if burnAmount > ctautapi.MaxAmount {
-		return fmt.Errorf("the input burnAmount %d exceeds max allowed %d", burnAmount, ctautapi.MaxAmount)
-	}
-
 	if view.instances == nil {
 		return fmt.Errorf("no instance for identifier %v", identifier.String())
 	}
@@ -398,25 +406,29 @@ func (view *CTAUTViewpoint) AddBurnAmount(identifier ctautapi.AutId, burnAmount 
 
 	metadata := instance.metadata
 
-	totalBurned := metadata.BurnedAmount + burnAmount
-	if totalBurned < metadata.BurnedAmount || totalBurned < burnAmount {
-		return fmt.Errorf("the metadata.BurnedAmount (%d) + input burnAmount (%d) incurs overflow",
-			metadata.BurnedAmount, burnAmount)
+	// Note that the metadata.BurnedAmount is limited by the TransferRule,
+	// so that it actually never violates the following check.
+	// Don't worry the case : a pending tx increases the MintedAmount and fail to mined in block, some txs burned more than the allowed value.
+	if metadata.BurnedAmount > metadata.MintedAmount {
+		return fmt.Errorf("instnace (%v) has BurnedAmount (%d) while its MintedAmount is %d",
+			identifier, metadata.BurnedAmount, metadata.MintedAmount)
 	}
-	if totalBurned > metadata.MintedAmount {
-		// Note that due to the design on MaxAmount, overflow will not happen here.
-		return fmt.Errorf("the metadata.BurnedAmount (%d) + input burnAmount (%d) exceeds metadata.MintedAmount %d",
-			metadata.BurnedAmount, burnAmount, metadata.MintedAmount)
+	maxAllowed := metadata.MintedAmount - metadata.BurnedAmount // uint64, >=0
+	if burnAmount > maxAllowed {
+		return fmt.Errorf("instnace (%v) has BurnedAmount (%d) and MintedAmount (%d), fail to attempt add burnAmount (%d)",
+			identifier, metadata.BurnedAmount, metadata.MintedAmount, burnAmount)
 	}
 
-	metadata.BurnedAmount = totalBurned
+	metadata.BurnedAmount = metadata.BurnedAmount + burnAmount
 
 	return nil
 }
 
+// SpendCTAUTCoin
+// aut review done, 2025.12.16
 func (view *CTAUTViewpoint) SpendCTAUTCoin(identifier ctautapi.AutId, outpoint ctautapi.HostOutPoint) error {
 	if view == nil {
-		return nil
+		return fmt.Errorf("the receiver view is nil")
 	}
 
 	if view.instances == nil {

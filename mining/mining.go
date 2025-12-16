@@ -494,13 +494,14 @@ func spendTransaction(utxoView *blockchain.UtxoViewpoint, tx *abeutil.Tx, height
 	return nil
 }
 
-// spendTransactionAbe is a local helper function in mining (like inline function), should not be call by other place.
-// todo(ABE): the block is unknown yet, use hainhash.ZeroHash as the block hash consuming the serialNumber
-// Move this function to blockchain package
+// spendTransactionAbe is a local helper function in mining (like inline function), should not be called by other place.
 // Note the checks before calling this function will guarantee that
 // the operations in spendTransactionAbe will always succeed, say never return err.
 // Even in case error happens, it only may cause that some later tx can't be added into the constructing block template,
-// will not cause other bad results.
+// will not cause other worse results.
+// todo(ABE): the block is unknown yet, use hainhash.ZeroHash as the block hash consuming the serialNumber
+// Move this function to blockchain package
+// aut review done 2025.12.16
 func spendTransactionAbe(tx *abeutil.TxAbe, utxoRingView *blockchain.UtxoRingViewpoint, ctautView *blockchain.CTAUTViewpoint, blockHeight int32) error {
 	for _, txIn := range tx.MsgTx().TxIns {
 		entry := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())
@@ -528,13 +529,13 @@ func spendTransactionAbe(tx *abeutil.TxAbe, utxoRingView *blockchain.UtxoRingVie
 	return nil
 }
 
-// todo: aut review done 2025.12.12
 // spendTransactionAUTScript is a subroutine of spendTransactionAbe.
 //
 // Note the checks before calling spendTransactionAbe will guarantee that
 // the operations in spendTransactionAUTScript will always succeed, say never return err.
 // Even in case error happens, it only may cause that some later tx can't be added into the constructing block template,
 // will not cause other bad results.
+// aut review done 2025.12.16
 func spendTransactionAUTScript(tx *abeutil.TxAbe, ctAutView *blockchain.CTAUTViewpoint, blockHeight int32) error {
 	if tx == nil {
 		return fmt.Errorf("spendTransactionAUTScript: tx is nil")
@@ -611,12 +612,12 @@ func spendTransactionAUTScript(tx *abeutil.TxAbe, ctAutView *blockchain.CTAUTVie
 		if len(generatedTokens) == 0 {
 			return fmt.Errorf("spendTransactionAUTScript: BurnScript.GeneratedTokens is empty")
 		}
-		outputToken := generatedTokens[len(generatedTokens)-1]
-		if outputToken == nil {
+		burnedToken := generatedTokens[len(generatedTokens)-1]
+		if burnedToken == nil {
 			return fmt.Errorf("spendTransactionAUTScript: the last of BurnScript.GeneratedTokens is nil")
 		}
 		autTxo := &ctautwire.AutTxo{}
-		if err = autTxo.Deserialize(outputToken.ValueScript); err != nil {
+		if err = autTxo.Deserialize(burnedToken.ValueScript); err != nil {
 			return err
 		}
 
@@ -631,7 +632,7 @@ func spendTransactionAUTScript(tx *abeutil.TxAbe, ctAutView *blockchain.CTAUTVie
 		}
 
 	default:
-		return fmt.Errorf("script with unknown  type %d", extAutScript.Type())
+		return fmt.Errorf("script with unknown type %d", extAutScript.Type())
 	}
 
 	return nil
@@ -963,7 +964,10 @@ mempoolLoop:
 			// and each block should allow at most ONE such operation.
 			autIdentifierKey := extAutScript.AutIdentifier().String()
 			autScriptType := extAutScript.Type()
-			// AutScriptTypeRegistration does not need to check, since it is guaranteed by the identifier mechanism.
+			// AutScriptTypeRegistration does not need this check, since it is guaranteed by the identifier mechanism.
+			// AutScriptTypeBurn does not need this limitation, since it is only a special transferScript,
+			// although it modifies the BurnedAmount of the AutInstance.
+			// Note that this modification is still inside the AutInstance.
 			if autScriptType == ctautapi.AutScriptTypeReRegistration || autScriptType == ctautapi.AutScriptTypeMint {
 				if prevTx, ok := autScriptTypeMapReregMint[autIdentifierKey]; ok {
 					log.Debugf("sking tx (hash=%v) because it carries an AutScript(type=%s) of AutInsatnce (%s), "+
@@ -1130,8 +1134,11 @@ mempoolLoop:
 		// an entry for it to ensure any transactions which reference
 		// this one have it available as an input and can ensure they
 		// aren't double spending.
-		// 2025.12.15 Note that the previous CheckTransactionInputsAbe has guaranteed
-		// the operations on Host_Txs in spendTransactionAbe will be always successfully executed.
+		// 2025.12.15 Note that the previous CheckTransactionInputsAbe and ValidateTransactionScriptsAbe
+		// have guaranteed
+		// (a) the operations on Host_Txs in spendTransactionAbe will be always successfully executed,
+		// (b) the operations on AutMetadata nd AutToken in spendTransactionAbe will be always successfully executed.
+		// Even error happens, it may cause some later transaction not to be added, without worse results.
 		err = spendTransactionAbe(tx, blockUtxoRings, blockCTAUTView, nextBlockHeight)
 		if err != nil {
 			log.Debugf("Skipping tx %s due to error in "+
