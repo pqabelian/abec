@@ -229,8 +229,15 @@ type TxPool struct {
 	outpointsAbe     map[chainhash.Hash]map[string]*abeutil.TxAbe                    //TODO(abe):why use two layers map                 //	corresponding to btc's outpoints, using hash rather then TxIn as the key for map
 	orphansByPrevAbe map[chainhash.Hash]map[string]map[chainhash.Hash]*abeutil.TxAbe // corresponding to btc's orphansByPrev //TODO type transfer??? []byte -> string
 
+	// 1. exist re-register script would be mutually exclusive with later re-register script
+	// 2. exist re-register script would be mutually exclusive with later mint script
 	autScriptTypeMapRereg map[ctautapi.AutId]*abeutil.TxAbe
-	autScriptTypeMapMint  map[ctautapi.AutId]map[chainhash.Hash]*abeutil.TxAbe
+
+	// 1. exist mint script would be mutually exclusive with later re-register script
+	// 2. exist mint script would NOT be mutually exclusive with later mint script,
+	//	but when minted amount in mempool exceed max supply, the later mint script would be rejected
+	autScriptTypeMapMint       map[ctautapi.AutId]map[chainhash.Hash]*abeutil.TxAbe
+	autScriptTypeMapMintAmount map[ctautapi.AutId]uint64
 
 	txMonitorMu  sync.Mutex
 	txMonitoring bool
@@ -755,6 +762,13 @@ func (mp *TxPool) removeTransactionAbe(tx *abeutil.TxAbe) {
 			if autScriptType == ctautapi.AutScriptTypeReRegistration {
 				delete(mp.autScriptTypeMapRereg, identifier)
 			} else if autScriptType == ctautapi.AutScriptTypeMint {
+				mintAutScript, ok := extAutScript.AutScript.(*ctautapi.MintScript)
+				if !ok {
+					log.Errorf("fail to assert mint sccript, this should not happen")
+				} else {
+					mintedAmount := mintAutScript.Vin()
+					mp.autScriptTypeMapMintAmount[identifier] -= mintedAmount
+				}
 				delete(mp.autScriptTypeMapMint[identifier], *txHash)
 			} else {
 				// other types of AutScript does not need to be removed from autScriptTypeMap
@@ -1881,15 +1895,50 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 			if _, ok := mp.autScriptTypeMapRereg[identifier]; ok {
 				return nil, nil, txRuleError(
 					wire.RejectInvalid,
-					fmt.Sprintf("transaction %s carries an AutScript with type=%d, while there is already one for re-registering",
-						tx.Hash(), autScriptType),
+					fmt.Sprintf("transaction %s carries an AutScript with type=%s, while there is already one for re-registering",
+						tx.Hash(), autScriptType.String()),
 				)
 			}
 			// 2. exist mint script would NOT be mutually exclusive with later mint script
+			metadata := ctAutView.LookupCTAUTMetaInfo(identifier)
+			if metadata == nil {
+				return nil, nil, txRuleError(
+					wire.RejectInvalid,
+					fmt.Sprintf("transaction %s carries an AutScript with type=%s but identifier is not found",
+						tx.Hash(), autScriptType.String()),
+				)
+			}
+			mintAutScript, ok := extAutScript.AutScript.(*ctautapi.MintScript)
+			if !ok {
+				return nil, nil, txRuleError(
+					wire.RejectInvalid,
+					fmt.Sprintf("transaction %s carries an AutScript with type=%s but assert is fail",
+						tx.Hash(), autScriptType.String()),
+				)
+			}
+			mintedAmount := mintAutScript.Vin()
+			if metadata.MintedAmount+mintedAmount > metadata.PlannedTotalSupply {
+				return nil, nil, txRuleError(
+					wire.RejectInvalid,
+					fmt.Sprintf("transaction %s carries an AutScript with type=%s but it would exceed max supply",
+						tx.Hash(), autScriptType.String()),
+				)
+			}
+			if recordMintedAmount, ok := mp.autScriptTypeMapMintAmount[identifier]; ok {
+				if recordMintedAmount+mintedAmount > metadata.PlannedTotalSupply {
+					return nil, nil, txRuleError(
+						wire.RejectInvalid,
+						fmt.Sprintf("transaction %s carries an AutScript with type=%s but it would exceed max supply",
+							tx.Hash(), autScriptType.String()),
+					)
+				}
+			}
+
 			if _, ok := mp.autScriptTypeMapMint[identifier]; !ok {
 				mp.autScriptTypeMapMint[identifier] = map[chainhash.Hash]*abeutil.TxAbe{}
 			}
 			mp.autScriptTypeMapMint[identifier][*txHash] = tx
+			mp.autScriptTypeMapMintAmount[identifier] += mintedAmount
 		} else {
 			// other type scripts do not have any limitations
 		}
@@ -2292,7 +2341,8 @@ func New(cfg *Config) *TxPool {
 		outpointsAbe:     make(map[chainhash.Hash]map[string]*abeutil.TxAbe),
 		orphansByPrevAbe: make(map[chainhash.Hash]map[string]map[chainhash.Hash]*abeutil.TxAbe),
 
-		autScriptTypeMapRereg: make(map[ctautapi.AutId]*abeutil.TxAbe),
-		autScriptTypeMapMint:  make(map[ctautapi.AutId]map[chainhash.Hash]*abeutil.TxAbe),
+		autScriptTypeMapRereg:      make(map[ctautapi.AutId]*abeutil.TxAbe),
+		autScriptTypeMapMint:       make(map[ctautapi.AutId]map[chainhash.Hash]*abeutil.TxAbe),
+		autScriptTypeMapMintAmount: make(map[ctautapi.AutId]uint64),
 	}
 }
