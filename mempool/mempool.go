@@ -1341,15 +1341,6 @@ func (mp *TxPool) fetchInputCTAUT(tx *abeutil.TxAbe) (*blockchain.CTAUTViewpoint
 	return ctAutView, nil
 }
 
-func (mp *TxPool) fetchInputCTAUTToken(ctautView *blockchain.CTAUTViewpoint, identifier ctautapi.AutId, outpoint *ctautapi.HostOutPoint) (*blockchain.CTAUTCoin, error) {
-	autToken := ctautView.LookupCTAUTCoin(identifier, *outpoint)
-	if autToken != nil {
-		return autToken, nil
-	}
-
-	return autToken, nil
-}
-
 // FetchTransaction returns the requested transaction from the transaction pool.
 // This only fetches from the main transaction pool and does not include
 // orphans.

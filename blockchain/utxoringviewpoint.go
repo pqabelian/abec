@@ -690,6 +690,7 @@ func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 func (entry *UtxoRingEntry) Spend(serialNumber []byte, blockHash *chainhash.Hash) {
 	//	Abe to do: double spending?
 	if len(serialNumber) == 0 || blockHash == nil {
+		// 2025.12.16 This is only for logic-completeness, the caller will/should guarantee this will not happen.
 		return
 	}
 
@@ -1108,8 +1109,7 @@ func (b *BlockChain) FetchUtxoRingView(tx *abeutil.TxAbe) (*UtxoRingViewpoint, e
 // Only the blocks with height%3 ==0 will trigger the generation of new TxoRings.
 // todo_DONE(MLP): reviewed on 2024.01.04
 // TODO change function name, such as connectTransactionInputs
-// todo: 2025.12.13 for ctaut part, new AutTokens will be generated.
-// todo: put the AutScript logic here?
+// 2025.12.13 for ctaut part, new AutTokens will be generated (but it will not cause the spending of pending AutTokens, based on the host-mechanism).
 func (view *UtxoRingViewpoint) connectTransaction(
 	tx *abeutil.TxAbe, blockhash *chainhash.Hash, stxos *[]*SpentTxOutAbe,
 	blockHeight int32, ctautView *CTAUTViewpoint, sctauts *[]SpentCTAUT,
@@ -1173,7 +1173,7 @@ func (view *UtxoRingViewpoint) connectTransaction(
 	//	view.AddTxOuts(tx, blockHeight)
 	// todo: add output AutToken here? 2025.12.15
 
-	err = ctautView.connectTransaction(tx, blockHeight, sctauts)
+	err = ctautView.connectTransactionAutScript(tx, blockHeight, sctauts)
 	if err != nil {
 		return err
 	}
@@ -1187,6 +1187,7 @@ func (view *UtxoRingViewpoint) connectTransaction(
 // In addition, when the 'stxos' argument is not nil, it will be updated to
 // append an entry for each spent txout.
 // todo_DONE(MLP): reviewed on 2024.01.04
+// todo: refactor in the codebase 2025.12.16
 func (view *UtxoRingViewpoint) connectTransactions(
 	block *abeutil.BlockAbe, stxos *[]*SpentTxOutAbe,
 	ctautView *CTAUTViewpoint, sctauts *[]SpentCTAUT,
@@ -1201,6 +1202,8 @@ func (view *UtxoRingViewpoint) connectTransactions(
 	// Update the best hash for view to include this block since all of its
 	// transactions have been connected.
 	view.SetBestHash(block.Hash())
+	ctautView.SetBestHash(block.Hash())
+
 	return nil
 }
 
