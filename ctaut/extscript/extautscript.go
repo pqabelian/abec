@@ -335,8 +335,18 @@ func (extAutScript *ExtAutScript) CreateAutMetadata() (*script.AutMetadata, erro
 
 // UpdateAutMetadata updates an AutMetadata using the ReRegistrationScript.
 //
+// In particular, The AutMetadata's ActiveRootTokens are updated.
+//
 // The returned AutMetadata is a new object, rather than the input AutMetadata.
+// aut review done, 2025.12.16
 func (extAutScript *ExtAutScript) UpdateAutMetadata(autMetadata *script.AutMetadata) (*script.AutMetadata, error) {
+	if extAutScript == nil {
+		return nil, fmt.Errorf("UpdateAutMetadata: the receiver extAutScript of is nil")
+	}
+	if autMetadata == nil {
+		return nil, fmt.Errorf("UpdateAutMetadata: the int autMetadata is nil")
+	}
+
 	// assert
 	if extAutScript.Type() != script.AutScriptTypeReRegistration {
 		return nil, fmt.Errorf("wrong call on UpdateAutMetadata: should be called only by re-registration script")
@@ -360,6 +370,7 @@ func (extAutScript *ExtAutScript) UpdateAutMetadata(autMetadata *script.AutMetad
 	updatedAutMetadata := autMetadata.Clone()
 
 	//consumedTokens := extAutScript.consumedTokens
+	// double-spend check	begin
 	consumedHostOutpoints := extAutScript.consumedHostOutpoints
 	for i := 0; i < len(consumedHostOutpoints); i++ {
 		hostOutpoint := consumedHostOutpoints[i]
@@ -369,8 +380,11 @@ func (extAutScript *ExtAutScript) UpdateAutMetadata(autMetadata *script.AutMetad
 				"with non-existing/spent root token (%s,%d) for AutInstance identified by %s",
 				hostOutpoint.TxHash, hostOutpoint.Index, updatedAutMetadata.AutIdentifier)
 		}
+
+		// delete to detect double-spend in one transaction
 		delete(updatedAutMetadata.ActiveRootTokenSet, opStr)
 	}
+	// double-spend check	end
 
 	// follow defined rules in AutScriptVersion
 	updatedAutMetadata.Version += 1
@@ -396,12 +410,13 @@ func (extAutScript *ExtAutScript) UpdateAutMetadata(autMetadata *script.AutMetad
 	updatedAutMetadata.ReregistrationThreshold = reregisterScript.ReregisterThreshold()
 	updatedAutMetadata.MintThreshold = reregisterScript.MintThreshold()
 
-	if autMetadata.PrivacyType != script.AutPrivacyTypeUnlimited &&
-		autMetadata.PrivacyType != script.AutPrivacyTypeLimitedPublic &&
-		autMetadata.PrivacyType != script.AutPrivacyTypeLimitedHidden {
-		return nil, fmt.Errorf("unknown autMetadat privacy type %d", autMetadata.PrivacyType)
+	newPrivacyType := reregisterScript.PrivacyType()
+	if newPrivacyType != script.AutPrivacyTypeUnlimited &&
+		newPrivacyType != script.AutPrivacyTypeLimitedPublic &&
+		newPrivacyType != script.AutPrivacyTypeLimitedHidden {
+		return nil, fmt.Errorf("unknown autMetadat privacy type %d", newPrivacyType)
 	}
-	updatedAutMetadata.PrivacyType = reregisterScript.PrivacyType()
+	updatedAutMetadata.PrivacyType = newPrivacyType
 
 	// set the new AutRootTokens
 	updatedAutMetadata.ActiveRootTokenSet = make(map[string]*HostOutPoint, len(extAutScript.generatedTokens))
@@ -412,7 +427,7 @@ func (extAutScript *ExtAutScript) UpdateAutMetadata(autMetadata *script.AutMetad
 	}
 
 	// check
-	updateScriptVersionMax := updatedAutMetadata.UpdateScriptVersions[len(autMetadata.UpdateScriptVersions)-1]
+	updateScriptVersionMax := updatedAutMetadata.UpdateScriptVersions[len(updatedAutMetadata.UpdateScriptVersions)-1]
 	if reregisterScript.Version() < updateScriptVersionMax {
 		return nil, fmt.Errorf("the version of re-register script %d should be not smaller than the largest version (%d) in UpdateScriptVersions",
 			reregisterScript.Version(), updateScriptVersionMax,
