@@ -477,7 +477,7 @@ func BuildTxoRingsAconcagua(blockNumPerRingGroup int, txoRingSize int, blocks []
 		} else {
 			rstTxoRings[ringId] = txoRing
 		}
-		log.Debugf("BuildTxoRingsAconcagua: cbTxoRingsWithTxVersionMLPAUTRCT[%d], ring size = %d, ring id = %s", i, len(txoRing.TxOuts), txoRing.RingId())
+		log.Debugf("BuildTxoRingsAconcagua: cbTxoRingsWithTxVersionAconcaguaRCT[%d], ring size = %d, ring id = %s", i, len(txoRing.TxOuts), txoRing.RingId())
 		for index, outpoint := range txoRing.OutPointRing.OutPoints {
 			log.Debugf("\t[%d] (%s,%d)", index, outpoint.TxHash, outpoint.Index)
 		}
@@ -490,7 +490,7 @@ func BuildTxoRingsAconcagua(blockNumPerRingGroup int, txoRingSize int, blocks []
 		} else {
 			rstTxoRings[ringId] = txoRing
 		}
-		log.Debugf("BuildTxoRingsAconcagua: trTxoRingsWithTxVersionMLPAUTRCT[%d], ring size = %d, ring id = %s", i, len(txoRing.TxOuts), txoRing.RingId())
+		log.Debugf("BuildTxoRingsAconcagua: trTxoRingsWithTxVersionAconcaguaRCT[%d], ring size = %d, ring id = %s", i, len(txoRing.TxOuts), txoRing.RingId())
 		for index, outpoint := range txoRing.OutPointRing.OutPoints {
 			log.Debugf("\t[%d] (%s,%d)", index, outpoint.TxHash, outpoint.Index)
 		}
@@ -503,7 +503,7 @@ func BuildTxoRingsAconcagua(blockNumPerRingGroup int, txoRingSize int, blocks []
 		} else {
 			rstTxoRings[ringId] = txoRing
 		}
-		log.Debugf("BuildTxoRingsAconcagua: cbTxoRingsWithTxVersionMLPAUTSDN[%d], ring size = %d, ring id = %s", i, len(txoRing.TxOuts), txoRing.RingId())
+		log.Debugf("BuildTxoRingsAconcagua: cbTxoRingsWithTxVersionAconcaguaSDN[%d], ring size = %d, ring id = %s", i, len(txoRing.TxOuts), txoRing.RingId())
 		for index, outpoint := range txoRing.OutPointRing.OutPoints {
 			log.Debugf("\t[%d] (%s,%d)", index, outpoint.TxHash, outpoint.Index)
 		}
@@ -516,7 +516,7 @@ func BuildTxoRingsAconcagua(blockNumPerRingGroup int, txoRingSize int, blocks []
 		} else {
 			rstTxoRings[ringId] = txoRing
 		}
-		log.Debugf("BuildTxoRingsAconcagua: trTxoRingsWithTxVersionMLPAUTSDN[%d], ring size = %d, ring id = %s", i, len(txoRing.TxOuts), txoRing.RingId())
+		log.Debugf("BuildTxoRingsAconcagua: trTxoRingsWithTxVersionAconcaguaSDN[%d], ring size = %d, ring id = %s", i, len(txoRing.TxOuts), txoRing.RingId())
 		for index, outpoint := range txoRing.OutPointRing.OutPoints {
 			log.Debugf("\t[%d] (%s,%d)", index, outpoint.TxHash, outpoint.Index)
 		}

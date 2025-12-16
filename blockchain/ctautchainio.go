@@ -5,9 +5,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	ctautapi "github.com/abesuite/abec/ctaut/api"
 	"io"
 	"math"
+
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 
 	//"reflect"
 	"sync"
@@ -658,6 +659,29 @@ func dbPutCTAUTView(dbTx database.Tx, view *CTAUTViewpoint, blockHeight int32, b
 		err = ctAutInfoBucket.Put(identifier[:], serializedCTAUTInfo)
 		if err != nil {
 			return err
+		}
+		log.Debugf("the metadata for CTAUT instance identified by %s is stored at height %d (block hash %s) with following configuration:",
+			identifierKey, blockHeight, blockHash)
+		metadata := instance.metadata
+		log.Debugf("\t Version: %d", metadata.Version)
+		log.Debugf("\t Memo: %v", metadata.AutMemo)
+		log.Debugf("\t PlannedTotalSupply: %v", metadata.PlannedTotalSupply)
+		log.Debugf("\t ReregistrationExpireHeight: %v", metadata.ReregistrationExpireHeight)
+		log.Debugf("\t ReregistrationThreshold: %v", metadata.ReregistrationThreshold)
+		log.Debugf("\t MintThreshold: %v", metadata.MintThreshold)
+		log.Debugf("\t UnitScale: %v", metadata.UnitScale)
+		log.Debugf("\t PrivacyType: %v", metadata.PrivacyType)
+		log.Debugf("\t Current Issuers: len = %d", len(metadata.Issuers))
+		for i := 0; i < len(metadata.Issuers); i++ {
+			log.Debugf("\t\t [%d] %s", i, metadata.Issuers[i].String())
+		}
+		log.Debugf("\t Active RootCoin: len = %d", len(metadata.ActiveRootTokenSet))
+		for point := range metadata.ActiveRootTokenSet {
+			log.Debugf("%s", point)
+		}
+		log.Debugf("\t Updated Version: len = %d", len(metadata.UpdateScriptVersions))
+		for i := 0; i < len(metadata.UpdateScriptVersions); i++ {
+			log.Debugf("\t\t %d", metadata.UpdateScriptVersions[i])
 		}
 
 		for outpoint, coin := range instance.coins {
