@@ -413,7 +413,7 @@ func CheckTransactionSanity(tx *abeutil.Tx) error {
 //  8. If the transaction contain AUT script, it should be conducted well-formed before
 //
 // todo_DONE(MLP): reviewed on 2024.01.03 by Alice.
-// aut review done 2025.12.16 todo
+// aut review done 2025.12.16
 func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 	// A transaction must have at least one input.
 	msgTx := tx.MsgTx()
