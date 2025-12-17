@@ -516,7 +516,7 @@ func (view *CTAUTViewpoint) connectRegistrationScript(extAutScript *ctautapi.Ext
 		// Populate the stxo details.
 		// Note that for New AutInetance, the SpentAutInstance should have GeneratedHeight=SpentHeight.
 		saut := NewSpentAutInstance(blockHeight, blockHeight,
-			false, nil, newAutMetadata.Clone())
+			ctautapi.AutScriptTypeRegistration, nil, newAutMetadata.Clone())
 		*sctauts = append(*sctauts, saut)
 	}
 
@@ -588,7 +588,7 @@ func (view *CTAUTViewpoint) connectReRegistrationScript(extAutScript *ctautapi.E
 	if sctauts != nil {
 		// Populate the saut.
 		saut := NewSpentAutInstance(blockHeight, oldMetadata.UpdatedHeight,
-			true, oldMetadata.Clone(), newMetadata.Clone())
+			ctautapi.AutScriptTypeReRegistration, oldMetadata.Clone(), newMetadata.Clone())
 		*sctauts = append(*sctauts, saut)
 	}
 
@@ -691,7 +691,7 @@ func (view *CTAUTViewpoint) connectMintScript(extAutScript *ctautapi.ExtAutScrip
 	}
 	// TODO AUT actually do need to use saut to record
 	if sctauts != nil {
-		spentAutTokenList := NewSpentAutTokenList(blockHeight, txSpentAutTokens)
+		spentAutTokenList := NewSpentAutTokenList(blockHeight, ctautapi.AutScriptTypeMint, txSpentAutTokens)
 		*sctauts = append(*sctauts, spentAutTokenList)
 	}
 
@@ -781,7 +781,7 @@ func (view *CTAUTViewpoint) connectTransferScript(extAutScript *ctautapi.ExtAutS
 	}
 	if sctauts != nil {
 		// Populate the stxo details using the utxo entry.
-		spentAutTokenList := NewSpentAutTokenList(blockHeight, txSpentAutTokens)
+		spentAutTokenList := NewSpentAutTokenList(blockHeight, ctautapi.AutScriptTypeTransfer, txSpentAutTokens)
 		*sctauts = append(*sctauts, spentAutTokenList)
 	}
 
@@ -846,7 +846,7 @@ func (view *CTAUTViewpoint) connectBurnScript(extAutScript *ctautapi.ExtAutScrip
 	}
 	if sctauts != nil {
 		// Populate the stxo details using the utxo entry.
-		spentAutTokenList := NewSpentAutTokenList(blockHeight, txSpentAutTokens)
+		spentAutTokenList := NewSpentAutTokenList(blockHeight, ctautapi.AutScriptTypeBurn, txSpentAutTokens)
 		*sctauts = append(*sctauts, spentAutTokenList)
 	}
 
