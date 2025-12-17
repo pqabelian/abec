@@ -1178,13 +1178,7 @@ func pqringctxGetTxWitnessTrTxSerializeSizeByDesc(pp *pqringctxapi.PublicParamet
 func pqringctxRuleCheckOnTxoVersionPrivacyLevel(pp *pqringctxapi.PublicParameter, txoVersion uint32, privacyLevel abecryptoxkey.PrivacyLevel) error {
 	switch txoVersion {
 	case wire.TxVersion_Height_0:
-		if privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre {
-			// allowed cases
-		} else {
-			return fmt.Errorf("pqringctxRuleCheckOnTxoVersionPrivacyLevel: txoVersion is %d, "+
-				"but the PrivacyLevel (%d) is not PrivacyLevelRINGCTPre",
-				txoVersion, privacyLevel)
-		}
+		return fmt.Errorf("pqringctxRuleCheckOnTxoVersionPrivacyLevel should not be called with txVersion (%d)", txoVersion)
 
 	case wire.TxVersion_Height_MLPAUT_300000:
 		if privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre ||
@@ -1224,13 +1218,7 @@ func pqringctxRuleCheckOnTxInputVersion(pp *pqringctxapi.PublicParameter, txInpu
 
 	switch txVersion {
 	case wire.TxVersion_Height_0:
-		if txInputVersion == wire.TxVersion_Height_0 {
-			// allowed cases
-		} else {
-			return fmt.Errorf("pqringctxRuleCheckOnTxInputVersion: (txInputVersion, txVersion) (%d, %d), "+
-				"is not allowed/supported",
-				txInputVersion, txVersion)
-		}
+		return fmt.Errorf("pqringctxRuleCheckOnTxInputVersion should not be called with txVersion (%d)", txVersion)
 
 	case wire.TxVersion_Height_MLPAUT_300000:
 		if txInputVersion == wire.TxVersion_Height_0 ||
