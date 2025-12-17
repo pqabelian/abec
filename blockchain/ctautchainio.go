@@ -125,6 +125,9 @@ type SpentAutToken struct {
 
 	HostOutPoint ctautapi.HostOutPoint
 
+	//	IsRootToken implies whether the spentToken is RootToken (or normalToken)
+	IsRootToken bool
+
 	// Amount is the amount of the output.
 	ValueScript []byte
 }
@@ -148,11 +151,12 @@ func NewSpentAutTokenList(spentHeight int32, spentAutTokens []*SpentAutToken) *S
 	}
 }
 
-func NewSpentAutToken(generatedHeight int32, version uint32, hostOutPoint ctautapi.HostOutPoint, valueScript []byte) *SpentAutToken {
+func NewSpentAutToken(generatedHeight int32, version uint32, hostOutPoint ctautapi.HostOutPoint, isRootToken bool, valueScript []byte) *SpentAutToken {
 	return &SpentAutToken{
 		GeneratedHeight: generatedHeight,
 		Version:         version,
 		HostOutPoint:    hostOutPoint,
+		IsRootToken:     isRootToken,
 		ValueScript:     valueScript,
 	}
 }
@@ -170,6 +174,7 @@ func (spentAutToken *SpentAutToken) serializeSize() int {
 	size := wire.VarIntSerializeSize(uint64(spentAutToken.GeneratedHeight))                                   // GeneratedHeight int32
 	size += wire.VarIntSerializeSize(uint64(spentAutToken.Version))                                           // Version uint32
 	size += spentAutToken.HostOutPoint.SerializeSize()                                                        // HostOutPoint ctautapi.HostOutPoint
+	size += 1                                                                                                 // IsRootToken     bool
 	size += wire.VarIntSerializeSize(uint64(len(spentAutToken.ValueScript))) + len(spentAutToken.ValueScript) // ValueScript []byte
 
 	return size
@@ -191,6 +196,25 @@ func (spentAutToken *SpentAutToken) write(w io.Writer) error {
 	// HostOutPoint ctautapi.HostOutPoint
 	if err = wire.WriteOutPointAbe(w, 0, 0, &spentAutToken.HostOutPoint); err != nil {
 		return err
+	}
+
+	if spentAutToken.IsRootToken {
+		if _, err = w.Write([]byte{0x01}); err != nil {
+			return err
+		}
+
+		if len(spentAutToken.ValueScript) != 0 {
+			return fmt.Errorf("spentAutToken.IsRootToken == TRUE, but the ValueScript is not nil/empty")
+		}
+
+	} else {
+		if _, err = w.Write([]byte{0x00}); err != nil {
+			return err
+		}
+
+		if len(spentAutToken.ValueScript) == 0 {
+			return fmt.Errorf("spentAutToken.IsRootToken == FALSE, but the ValueScript is nil/empty")
+		}
 	}
 
 	// ValueScript []byte
@@ -229,9 +253,33 @@ func (spentAutToken *SpentAutToken) read(r io.Reader) error {
 		return err
 	}
 
+	// IsRootToken     bool
+	byteTemp := make([]byte, 1)
+	_, err = io.ReadFull(r, byteTemp)
+	if err != nil {
+		return err
+	}
+	if byteTemp[0] == 0x01 {
+		spentAutToken.IsRootToken = true
+	} else if byteTemp[0] == 0x00 {
+		spentAutToken.IsRootToken = false
+	} else {
+		return fmt.Errorf("read IsRootToken (%d) is NOT 0 or 1", byteTemp[0])
+	}
+
 	// ValueScript []byte
 	if spentAutToken.ValueScript, err = wire.ReadVarBytes(r, 0, ctautapi.MaxAutValueScriptLength, "SpentAutToken.ValueScript"); err != nil {
 		return err
+	}
+
+	if spentAutToken.IsRootToken {
+		if len(spentAutToken.ValueScript) != 0 {
+			return fmt.Errorf("spentAutToken.IsRootToken == TRUE, but the ValueScript is not nil/empty")
+		}
+	} else {
+		if len(spentAutToken.ValueScript) == 0 {
+			return fmt.Errorf("spentAutToken.IsRootToken == FALSE, but the ValueScript is nil/empty")
+		}
 	}
 
 	return nil
