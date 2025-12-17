@@ -182,6 +182,153 @@ func (autMetadata *AutMetadata) SerializeSize() (int, error) {
 }
 
 // Serialize serializes AutMetadata to []byte.
+func (autMetadata *AutMetadata) Write(w io.Writer) error {
+	if autMetadata == nil {
+		return fmt.Errorf("autMetadata is nil")
+	}
+	var err error
+
+	// Version                    uint32
+	if err = wire.WriteVarInt(w, 0, uint64(autMetadata.Version)); err != nil {
+		return err
+	}
+
+	// AutIdentifier              AutId
+	if _, err = w.Write(autMetadata.AutIdentifier[:]); err != nil {
+		return err
+	}
+
+	// UpdatedHeight              int32
+	if err = wire.WriteVarInt(w, 0, uint64(autMetadata.UpdatedHeight)); err != nil {
+		return err
+	}
+
+	// AutName                    []byte
+	if err = wire.WriteVarBytes(w, 0, autMetadata.AutName); err != nil {
+		return err
+	}
+
+	// AutSymbol                  []byte
+	if err = wire.WriteVarBytes(w, 0, autMetadata.AutSymbol); err != nil {
+		return err
+	}
+
+	// BaseUnitName               []byte
+	if err = wire.WriteVarBytes(w, 0, autMetadata.BaseUnitName); err != nil {
+		return err
+	}
+
+	// SubUnitName                []byte
+	if err = wire.WriteVarBytes(w, 0, autMetadata.SubUnitName); err != nil {
+		return err
+	}
+
+	// UnitScale                  uint64
+	if err = wire.WriteVarInt(w, 0, autMetadata.UnitScale); err != nil {
+		return err
+	}
+
+	// AutMemo                    []byte
+	if err = wire.WriteVarBytes(w, 0, autMetadata.AutMemo); err != nil {
+		return err
+	}
+
+	// PlannedTotalSupply         uint64
+	if err = wire.WriteVarInt(w, 0, autMetadata.PlannedTotalSupply); err != nil {
+		return err
+	}
+
+	// Issuers               []*AutIssuer
+	if err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.Issuers))); err != nil {
+		return err
+	}
+	for i := 0; i < len(autMetadata.Issuers); i++ {
+		if autMetadata.Issuers[i] == nil {
+			return fmt.Errorf("autMetadata.Issuers[%d] is nil", i)
+		}
+		if err = autMetadata.Issuers[i].Write(w); err != nil {
+			return fmt.Errorf("error happens when writing issuer: %v", err)
+		}
+	}
+
+	// ReregistrationExpireHeight int32
+	if err = wire.WriteVarInt(w, 0, uint64(autMetadata.ReregistrationExpireHeight)); err != nil {
+		return err
+	}
+
+	// ReregistrationThreshold    uint8
+
+	if _, err = w.Write([]byte{autMetadata.ReregistrationThreshold}); err != nil {
+		return err
+	}
+
+	// MintThreshold              uint8
+	if _, err = w.Write([]byte{autMetadata.MintThreshold}); err != nil {
+		return err
+	}
+
+	// PrivacyType                AutPrivacyType
+	if _, err = w.Write([]byte{uint8(autMetadata.PrivacyType)}); err != nil {
+		return err
+	}
+
+	// MintedAmount               uint64
+	if err = wire.WriteVarInt(w, 0, autMetadata.MintedAmount); err != nil {
+		return err
+	}
+
+	// BurnedAmount               uint64
+	if err = wire.WriteVarInt(w, 0, autMetadata.BurnedAmount); err != nil {
+		return err
+	}
+
+	// ActiveRootTokenSet         map[string]*HostOutPoint
+	if err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.ActiveRootTokenSet))); err != nil {
+		return err
+	}
+	for opStr, hostOutPoint := range autMetadata.ActiveRootTokenSet {
+		if hostOutPoint == nil {
+			return fmt.Errorf("autMetadata.ActiveRootTokenSet[%s] is nil", opStr)
+		}
+		if err = wire.WriteOutPointAbe(w, 0, 0, hostOutPoint); err != nil {
+			return fmt.Errorf("error happens when writing active root token: %v", err)
+		}
+	}
+
+	// UpdateScriptVersions            []uint32
+	if err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.UpdateScriptVersions))); err != nil {
+		return err
+	}
+	for i := 0; i < len(autMetadata.UpdateScriptVersions); i++ {
+		if err = wire.WriteVarInt(w, 0, uint64(autMetadata.UpdateScriptVersions[i])); err != nil {
+			return err
+		}
+	}
+
+	// UpdateHistoryHeights       []int32
+	if err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.UpdateHistoryHeights))); err != nil {
+		return err
+	}
+	for i := 0; i < len(autMetadata.UpdateHistoryHeights); i++ {
+		if err = wire.WriteVarInt(w, 0, uint64(autMetadata.UpdateHistoryHeights[i])); err != nil {
+			return err
+		}
+	}
+
+	//// todo: the following codes are necessary or only for test?
+	//tmpMetadata := &AutMetadata{}
+	//err = tmpMetadata.Deserialize(serializedMetadata)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//if !reflect.DeepEqual(autMetadata, tmpMetadata) {
+	//	return nil, errors.New("metadata not match after serialization")
+	//}
+
+	return nil
+}
+
+// Serialize serializes AutMetadata to []byte.
 func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 	if autMetadata == nil {
 		return nil, fmt.Errorf("autMetadata is nil")
@@ -192,134 +339,12 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Serialize the header code followed by the compressed unspent
-	// transaction output.
+
 	w := bytes.NewBuffer(make([]byte, 0, size))
 
-	// Version                    uint32
-	if err = wire.WriteVarInt(w, 0, uint64(autMetadata.Version)); err != nil {
+	err = autMetadata.Write(w)
+	if err != nil {
 		return nil, err
-	}
-
-	// AutIdentifier              AutId
-	if _, err = w.Write(autMetadata.AutIdentifier[:]); err != nil {
-		return nil, err
-	}
-
-	// UpdatedHeight              int32
-	if err = wire.WriteVarInt(w, 0, uint64(autMetadata.UpdatedHeight)); err != nil {
-		return nil, err
-	}
-
-	// AutName                    []byte
-	if err = wire.WriteVarBytes(w, 0, autMetadata.AutName); err != nil {
-		return nil, err
-	}
-
-	// AutSymbol                  []byte
-	if err = wire.WriteVarBytes(w, 0, autMetadata.AutSymbol); err != nil {
-		return nil, err
-	}
-
-	// BaseUnitName               []byte
-	if err = wire.WriteVarBytes(w, 0, autMetadata.BaseUnitName); err != nil {
-		return nil, err
-	}
-
-	// SubUnitName                []byte
-	if err = wire.WriteVarBytes(w, 0, autMetadata.SubUnitName); err != nil {
-		return nil, err
-	}
-
-	// UnitScale                  uint64
-	if err = wire.WriteVarInt(w, 0, autMetadata.UnitScale); err != nil {
-		return nil, err
-	}
-
-	// AutMemo                    []byte
-	if err = wire.WriteVarBytes(w, 0, autMetadata.AutMemo); err != nil {
-		return nil, err
-	}
-
-	// PlannedTotalSupply         uint64
-	if err = wire.WriteVarInt(w, 0, autMetadata.PlannedTotalSupply); err != nil {
-		return nil, err
-	}
-
-	// Issuers               []*AutIssuer
-	if err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.Issuers))); err != nil {
-		return nil, err
-	}
-	for i := 0; i < len(autMetadata.Issuers); i++ {
-		if autMetadata.Issuers[i] == nil {
-			return nil, fmt.Errorf("autMetadata.Issuers[%d] is nil", i)
-		}
-		if err = autMetadata.Issuers[i].Write(w); err != nil {
-			return nil, fmt.Errorf("error happens when writing issuer: %v", err)
-		}
-	}
-
-	// ReregistrationExpireHeight int32
-	if err = wire.WriteVarInt(w, 0, uint64(autMetadata.ReregistrationExpireHeight)); err != nil {
-		return nil, err
-	}
-
-	// ReregistrationThreshold    uint8
-	if err = w.WriteByte(autMetadata.ReregistrationThreshold); err != nil {
-		return nil, err
-	}
-
-	// MintThreshold              uint8
-	if err = w.WriteByte(autMetadata.MintThreshold); err != nil {
-		return nil, err
-	}
-
-	// PrivacyType                AutPrivacyType
-	if err = w.WriteByte(uint8(autMetadata.PrivacyType)); err != nil {
-		return nil, err
-	}
-
-	// MintedAmount               uint64
-	if err = wire.WriteVarInt(w, 0, autMetadata.MintedAmount); err != nil {
-		return nil, err
-	}
-
-	// BurnedAmount               uint64
-	if err = wire.WriteVarInt(w, 0, autMetadata.BurnedAmount); err != nil {
-		return nil, err
-	}
-
-	// ActiveRootTokenSet         map[string]*HostOutPoint
-	if err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.ActiveRootTokenSet))); err != nil {
-		return nil, err
-	}
-	for opStr, hostOutPoint := range autMetadata.ActiveRootTokenSet {
-		if hostOutPoint == nil {
-			return nil, fmt.Errorf("autMetadata.ActiveRootTokenSet[%s] is nil", opStr)
-		}
-		if err = wire.WriteOutPointAbe(w, 0, 0, hostOutPoint); err != nil {
-			return nil, fmt.Errorf("error happens when writing active root token: %v", err)
-		}
-	}
-
-	// UpdateScriptVersions            []uint32
-	if err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.UpdateScriptVersions))); err != nil {
-		return nil, err
-	}
-	for i := 0; i < len(autMetadata.UpdateScriptVersions); i++ {
-		if err = wire.WriteVarInt(w, 0, uint64(autMetadata.UpdateScriptVersions[i])); err != nil {
-			return nil, err
-		}
-	}
-
-	// UpdateHistoryHeights       []int32
-	if err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.UpdateHistoryHeights))); err != nil {
-		return nil, err
-	}
-	for i := 0; i < len(autMetadata.UpdateHistoryHeights); i++ {
-		if err = wire.WriteVarInt(w, 0, uint64(autMetadata.UpdateHistoryHeights[i])); err != nil {
-			return nil, err
-		}
 	}
 
 	serializedMetadata := w.Bytes()
@@ -338,12 +363,10 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 }
 
 // Deserialize deserializes serializedMetadata to an AutMetadata.
-func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
+func (autMetadata *AutMetadata) Read(r io.Reader) error {
 	if autMetadata == nil {
 		return fmt.Errorf("autMetadata is nil")
 	}
-
-	r := bytes.NewReader(serializedMetadata)
 
 	// Version                    uint32
 	version, err := wire.ReadVarInt(r, 0)
@@ -437,21 +460,28 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 	autMetadata.ReregistrationExpireHeight = int32(temp)
 
 	// ReregistrationThreshold    uint8
-	if autMetadata.ReregistrationThreshold, err = r.ReadByte(); err != nil {
-		return err
-	}
-
-	// MintThreshold              uint8
-	if autMetadata.MintThreshold, err = r.ReadByte(); err != nil {
-		return err
-	}
-
-	// PrivacyType                AutPrivacyType
-	privacyTypeRead, err := r.ReadByte()
+	byteTemp := make([]byte, 1)
+	_, err = io.ReadFull(r, byteTemp)
 	if err != nil {
 		return err
 	}
-	autMetadata.PrivacyType = AutPrivacyType(privacyTypeRead)
+	autMetadata.ReregistrationThreshold = byteTemp[0]
+
+	// MintThreshold              uint8
+	byteTemp = make([]byte, 1)
+	_, err = io.ReadFull(r, byteTemp)
+	if err != nil {
+		return err
+	}
+	autMetadata.MintThreshold = byteTemp[0]
+
+	// PrivacyType                AutPrivacyType
+	byteTemp = make([]byte, 1)
+	_, err = io.ReadFull(r, byteTemp)
+	if err != nil {
+		return err
+	}
+	autMetadata.PrivacyType = AutPrivacyType(byteTemp[0])
 
 	// MintedAmount               uint64
 	if autMetadata.MintedAmount, err = wire.ReadVarInt(r, 0); err != nil {
@@ -526,6 +556,21 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 			return fmt.Errorf("the read UpdatedHistoryVersion (%d) is not in the scope [0, %d]", heightReadTemp, math.MaxInt32)
 		}
 		autMetadata.UpdateHistoryHeights[i] = int32(heightReadTemp)
+	}
+
+	return autMetadata.SanityCheck()
+}
+
+func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
+	if autMetadata == nil {
+		return fmt.Errorf("autMetadata is nil")
+	}
+
+	r := bytes.NewReader(serializedMetadata)
+
+	err := autMetadata.Read(r)
+	if err != nil {
+		return err
 	}
 
 	return autMetadata.SanityCheck()
