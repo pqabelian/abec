@@ -1119,7 +1119,7 @@ func (b *BlockChain) FetchUtxoRingView(tx *abeutil.TxAbe) (*UtxoRingViewpoint, e
 // review done 2025.12.16
 func (view *UtxoRingViewpoint) connectTransaction(
 	tx *abeutil.TxAbe, blockhash *chainhash.Hash, stxos *[]*SpentTxOutAbe,
-	blockHeight int32, ctautView *CTAUTViewpoint, sctauts *[]SpentCTAUT,
+	blockHeight int32, ctautView *CTAUTViewpoint, sctauts *[]SpentAut,
 ) error {
 	// Coinbase transactions don't have any inputs to spend.
 	isCb, err := tx.IsCoinBase()
@@ -1198,7 +1198,7 @@ func (view *UtxoRingViewpoint) connectTransaction(
 // todo: refactor in the codebase 2025.12.16
 func (view *UtxoRingViewpoint) connectTransactions(
 	block *abeutil.BlockAbe, stxos *[]*SpentTxOutAbe,
-	ctautView *CTAUTViewpoint, sctauts *[]SpentCTAUT,
+	ctautView *CTAUTViewpoint, sctauts *[]SpentAut,
 ) error {
 	for _, tx := range block.Transactions() {
 		err := view.connectTransaction(tx, block.Hash(), stxos, block.Height(), ctautView, sctauts)

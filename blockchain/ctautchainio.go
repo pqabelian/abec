@@ -979,7 +979,7 @@ func deserializeSpendJournalEntryCTAUT(serialized []byte, scripts []*ctautapi.Ex
 }
 
 // aut review done 2025.12.16 todo
-func dbPutSpendJournalEntryCTAUT(dbTx database.Tx, blockHash *chainhash.Hash, sauts []SpentCTAUT) error {
+func dbPutSpendJournalEntryCTAUT(dbTx database.Tx, blockHash *chainhash.Hash, sauts []SpentAut) error {
 	spendJournalBucket := dbTx.Metadata().Bucket(ctAutSpendJournalBucketName)
 	serialized, err := serializeSpendJournalEntryCTAUT(sauts)
 	if err != nil {

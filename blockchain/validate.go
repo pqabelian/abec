@@ -2867,7 +2867,7 @@ func validateTxAutScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, ho
 func (b *BlockChain) checkConnectBlockAbe(
 	node *blockNode, block *abeutil.BlockAbe,
 	view *UtxoRingViewpoint, stxos *[]*SpentTxOutAbe,
-	ctautView *CTAUTViewpoint, sctauts *[]SpentCTAUT,
+	ctautView *CTAUTViewpoint, sctauts *[]SpentAut,
 ) error {
 	// If the side chain blocks end up in the database, a call to
 	// CheckBlockSanity should be done here in case a previous version

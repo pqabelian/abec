@@ -481,7 +481,7 @@ func (view *CTAUTViewpoint) addCTAUTCoin(version uint32, identifier ctautapi.Aut
 // todo: remove txHash chainhash.Hash
 // aut review done 2025.12.16
 func (view *CTAUTViewpoint) connectRegistrationScript(extAutScript *ctautapi.ExtAutScript, txHash chainhash.Hash,
-	blockHeight int32, sctauts *[]SpentCTAUT) error {
+	blockHeight int32, sctauts *[]SpentAut) error {
 
 	if view == nil {
 		return fmt.Errorf("connectRegistrationScript: the receiver view is nil")
@@ -513,18 +513,16 @@ func (view *CTAUTViewpoint) connectRegistrationScript(extAutScript *ctautapi.Ext
 	}
 
 	if sctauts != nil {
-		// Populate the stxo details using the utxo entry.
-		var stxo = &UpdatedCTAUTInfo{
-			Before:           nil,
-			After:            newAutMetadata.Clone(),
-			Height:           blockHeight,
-			IsReRegistration: false,
-		}
-		*sctauts = append(*sctauts, stxo)
+		// Populate the stxo details.
+		// Note that for New AutInetance, the SpentAutInstance should have GeneratedHeight=SpentHeight.
+		saut := NewSpentAutInstance(blockHeight, blockHeight,
+			false, nil, newAutMetadata.Clone())
+		*sctauts = append(*sctauts, saut)
 	}
 
 	log.Debugf("In transaction %s, CT-AUT with identifier %s with following configuration is registered:", txHash, identifier.String())
 	log.Debugf("\t Version: %d", newAutMetadata.Version)
+	log.Debugf("\t UpdatedHeight: %d", newAutMetadata.UpdatedHeight)
 	log.Debugf("\t Name: %v:", hex.EncodeToString(newAutMetadata.AutName))
 	log.Debugf("\t Symbol: %v", hex.EncodeToString(newAutMetadata.AutSymbol))
 	log.Debugf("\t BaseUnitName: %v", hex.EncodeToString(newAutMetadata.BaseUnitName))
@@ -548,13 +546,17 @@ func (view *CTAUTViewpoint) connectRegistrationScript(extAutScript *ctautapi.Ext
 	for i := 0; i < len(newAutMetadata.UpdateScriptVersions); i++ {
 		log.Debugf("\t\t %d", newAutMetadata.UpdateScriptVersions[i])
 	}
+	log.Debugf("\t Updated Hieght: len = %d", len(newAutMetadata.UpdateHistoryHeights))
+	for i := 0; i < len(newAutMetadata.UpdateHistoryHeights); i++ {
+		log.Debugf("\t\t %d", newAutMetadata.UpdateHistoryHeights[i])
+	}
 	return nil
 }
 
 // connectReRegistrationScript
 // todo: remove txHash chainhash.Hash
 // review 2025.12.12 done
-func (view *CTAUTViewpoint) connectReRegistrationScript(extAutScript *ctautapi.ExtAutScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
+func (view *CTAUTViewpoint) connectReRegistrationScript(extAutScript *ctautapi.ExtAutScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentAut) error {
 	if view == nil {
 		return fmt.Errorf("connectReRegistrationScript: the receiver view is nil")
 	}
@@ -584,14 +586,10 @@ func (view *CTAUTViewpoint) connectReRegistrationScript(extAutScript *ctautapi.E
 	// Note that, by the above 2 lines codes, newMetadata's ActiveRootTokens are those specified by AutReRegistrationScript.
 
 	if sctauts != nil {
-		// Populate the stxo details using the utxo entry.
-		var stxo = &UpdatedCTAUTInfo{
-			Before:           oldMetadata.Clone(),
-			After:            newMetadata.Clone(),
-			Height:           blockHeight,
-			IsReRegistration: true,
-		}
-		*sctauts = append(*sctauts, stxo)
+		// Populate the saut.
+		saut := NewSpentAutInstance(blockHeight, oldMetadata.UpdatedHeight,
+			true, oldMetadata.Clone(), newMetadata.Clone())
+		*sctauts = append(*sctauts, saut)
 	}
 
 	// update aut metadata
@@ -602,7 +600,8 @@ func (view *CTAUTViewpoint) connectReRegistrationScript(extAutScript *ctautapi.E
 	view.instances[identifierKey] = autInstance
 
 	log.Debugf("Re-register AUT with identifier %s with following configuration:", identifierKey)
-	log.Debugf("\t Version: %d --> %d", oldMetadata.Version)
+	log.Debugf("\t Version: %d --> %d", oldMetadata.Version, newMetadata.Version)
+	log.Debugf("\t UpdatedHeight: %d --> %d", oldMetadata.UpdatedHeight, newMetadata.UpdatedHeight)
 	log.Debugf("\t Memo: %v -> %v", oldMetadata.AutMemo, newMetadata.AutMemo)
 	log.Debugf("\t PlannedTotalSupply: %v -> %v", oldMetadata.PlannedTotalSupply, newMetadata.PlannedTotalSupply)
 	log.Debugf("\t ReregistrationExpireHeight: %v -> %v", oldMetadata.ReregistrationExpireHeight, newMetadata.ReregistrationExpireHeight)
@@ -630,13 +629,18 @@ func (view *CTAUTViewpoint) connectReRegistrationScript(extAutScript *ctautapi.E
 	for i := 0; i < len(newMetadata.UpdateScriptVersions); i++ {
 		log.Debugf("\t\t %d", newMetadata.UpdateScriptVersions[i])
 	}
+	log.Debugf("\t Updated Heights: len = %d", len(newMetadata.UpdateHistoryHeights))
+	for i := 0; i < len(newMetadata.UpdateHistoryHeights); i++ {
+		log.Debugf("\t\t %d", newMetadata.UpdateHistoryHeights[i])
+	}
+
 	return nil
 }
 
 // connectMintScript
 // todo: remove txHash chainhash.Hash
 // review 2025.12.16 done
-func (view *CTAUTViewpoint) connectMintScript(extAutScript *ctautapi.ExtAutScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
+func (view *CTAUTViewpoint) connectMintScript(extAutScript *ctautapi.ExtAutScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentAut) error {
 	if view == nil {
 		return fmt.Errorf("connectMintScript: the receiver view is nil")
 	}
@@ -661,10 +665,11 @@ func (view *CTAUTViewpoint) connectMintScript(extAutScript *ctautapi.ExtAutScrip
 			"but it is not found in database", txHash.String(), identifier.String())
 	}
 	oldMetadata := autInstance.metadata
+	rootTokenVersion := oldMetadata.UpdateScriptVersions[len(oldMetadata.UpdateScriptVersions)-1]
 
 	newMetadata := oldMetadata.Clone()
 
-	currentSctauts := make([]SpentCTAUTToken, 0, mintScript.NumConsumedTokens())
+	txSpentAutTokens := make([]*SpentAutToken, 0, mintScript.NumConsumedTokens())
 	consumedHostOutpoints := extAutScript.ConsumedHostOutpoints()
 	for i := 0; i < len(consumedHostOutpoints); i++ {
 		hostOutpoint := consumedHostOutpoints[i]
@@ -678,20 +683,16 @@ func (view *CTAUTViewpoint) connectMintScript(extAutScript *ctautapi.ExtAutScrip
 
 		// todo: the sctatus for mint is different from that for reregistration? how to rollback? use UpdatedCTAUTInfo?
 		if sctauts != nil {
-			var stxo = SpentCTAUTToken{
-				Version:      mintScript.Version(),
-				HostOutPoint: *hostOutpoint,
-				ValueScript:  nil,
-				Height:       blockHeight,
-			}
-			currentSctauts = append(currentSctauts, stxo)
+			spentAutToken := NewSpentAutToken(oldMetadata.UpdatedHeight, rootTokenVersion,
+				*hostOutpoint, true, nil)
+			txSpentAutTokens = append(txSpentAutTokens, spentAutToken)
 		}
 
 	}
 	// TODO AUT actually do need to use saut to record
 	if sctauts != nil {
-		sctaut := SpentCTAUTTokens(currentSctauts)
-		*sctauts = append(*sctauts, &sctaut)
+		spentAutTokenList := NewSpentAutTokenList(blockHeight, txSpentAutTokens)
+		*sctauts = append(*sctauts, spentAutTokenList)
 	}
 
 	// Double check
@@ -737,7 +738,7 @@ func (view *CTAUTViewpoint) connectMintScript(extAutScript *ctautapi.ExtAutScrip
 // connectTransferScript
 // review 2025.12.12 done
 // todo: remove txHash chainhash.Hash
-func (view *CTAUTViewpoint) connectTransferScript(extAutScript *ctautapi.ExtAutScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
+func (view *CTAUTViewpoint) connectTransferScript(extAutScript *ctautapi.ExtAutScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentAut) error {
 	if view == nil {
 		return fmt.Errorf("connectTransferScript: the receiver view is nil")
 	}
@@ -760,7 +761,7 @@ func (view *CTAUTViewpoint) connectTransferScript(extAutScript *ctautapi.ExtAutS
 	}
 
 	consumedHostOutpoints := extAutScript.ConsumedHostOutpoints()
-	currentSctauts := make([]SpentCTAUTToken, 0, len(consumedHostOutpoints))
+	txSpentAutTokens := make([]*SpentAutToken, 0, len(consumedHostOutpoints))
 	for i := 0; i < len(consumedHostOutpoints); i++ {
 		hostOutpoint := consumedHostOutpoints[i]
 
@@ -772,20 +773,16 @@ func (view *CTAUTViewpoint) connectTransferScript(extAutScript *ctautapi.ExtAutS
 		}
 
 		if sctauts != nil {
-			// Populate the stxo details using the utxo entry.
-			var stxo = SpentCTAUTToken{
-				Version:      consumedToken.version,
-				HostOutPoint: *hostOutpoint,
-				ValueScript:  consumedToken.valueScript,
-				Height:       blockHeight,
-			}
-			currentSctauts = append(currentSctauts, stxo)
+			// Populate the sAutToken
+			spentAutToken := NewSpentAutToken(consumedToken.blockHeight, consumedToken.version,
+				*hostOutpoint, false, consumedToken.valueScript)
+			txSpentAutTokens = append(txSpentAutTokens, spentAutToken)
 		}
 	}
 	if sctauts != nil {
 		// Populate the stxo details using the utxo entry.
-		sctaut := SpentCTAUTTokens(currentSctauts)
-		*sctauts = append(*sctauts, &sctaut)
+		spentAutTokenList := NewSpentAutTokenList(blockHeight, txSpentAutTokens)
+		*sctauts = append(*sctauts, spentAutTokenList)
 	}
 
 	generatedTokens := extAutScript.GeneratedTokens()
@@ -806,7 +803,7 @@ func (view *CTAUTViewpoint) connectTransferScript(extAutScript *ctautapi.ExtAutS
 
 // review 2025.12.12 done
 // todo: remove txHash chainhash.Hash
-func (view *CTAUTViewpoint) connectBurnScript(extAutScript *ctautapi.ExtAutScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentCTAUT) error {
+func (view *CTAUTViewpoint) connectBurnScript(extAutScript *ctautapi.ExtAutScript, txHash chainhash.Hash, blockHeight int32, sctauts *[]SpentAut) error {
 	if view == nil {
 		return fmt.Errorf("connectBurnScript: the receiver view is nil")
 	}
@@ -829,7 +826,7 @@ func (view *CTAUTViewpoint) connectBurnScript(extAutScript *ctautapi.ExtAutScrip
 	newMetadata := autInstance.metadata.Clone()
 
 	consumedHostOutpoints := extAutScript.ConsumedHostOutpoints()
-	currentSctauts := make([]SpentCTAUTToken, 0, len(consumedHostOutpoints))
+	txSpentAutTokens := make([]*SpentAutToken, 0, len(consumedHostOutpoints))
 	for i := 0; i < len(consumedHostOutpoints); i++ {
 		hostOutpoint := consumedHostOutpoints[i]
 
@@ -841,20 +838,16 @@ func (view *CTAUTViewpoint) connectBurnScript(extAutScript *ctautapi.ExtAutScrip
 		}
 
 		if sctauts != nil {
-			// Populate the stxo details using the utxo entry.
-			var stxo = SpentCTAUTToken{
-				Version:      consumedToken.version,
-				HostOutPoint: *hostOutpoint,
-				ValueScript:  consumedToken.valueScript,
-				Height:       blockHeight,
-			}
-			currentSctauts = append(currentSctauts, stxo)
+			// Populate the spentAutToken.
+			spentAutToken := NewSpentAutToken(consumedToken.blockHeight, consumedToken.version,
+				*hostOutpoint, false, consumedToken.valueScript)
+			txSpentAutTokens = append(txSpentAutTokens, spentAutToken)
 		}
 	}
 	if sctauts != nil {
 		// Populate the stxo details using the utxo entry.
-		sctaut := SpentCTAUTTokens(currentSctauts)
-		*sctauts = append(*sctauts, &sctaut)
+		spentAutTokenList := NewSpentAutTokenList(blockHeight, txSpentAutTokens)
+		*sctauts = append(*sctauts, spentAutTokenList)
 	}
 
 	// Output Tokens
@@ -923,7 +916,7 @@ func (view *CTAUTViewpoint) connectBurnScript(extAutScript *ctautapi.ExtAutScrip
 // view does not contain the required utxos.
 // TODO Check consistence with mining.spendTransactionAbe
 // aut review done 2025.12.16
-func (view *CTAUTViewpoint) connectTransactionAutScript(tx *abeutil.TxAbe, blockHeight int32, sctauts *[]SpentCTAUT) error {
+func (view *CTAUTViewpoint) connectTransactionAutScript(tx *abeutil.TxAbe, blockHeight int32, sctauts *[]SpentAut) error {
 	extAutScript := tx.ExtAutScript()
 	if extAutScript == nil {
 		return nil

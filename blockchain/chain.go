@@ -850,7 +850,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *abeutil.Block,
 // todo: aut review done 2025.12.16
 func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 	view *UtxoRingViewpoint, stxos []*SpentTxOutAbe,
-	ctautView *CTAUTViewpoint, sctauts []SpentCTAUT,
+	ctautView *CTAUTViewpoint, sctauts []SpentAut,
 ) error {
 
 	// Make sure it's extending the end of the best chain.
@@ -1783,7 +1783,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		// to it.  Also, provide an stxo slice so the spent txout
 		// details are generated.
 		stxos := make([]*SpentTxOutAbe, 0, countSpentOutputsAbe(block))
-		sctauts := make([]SpentCTAUT, 0, countSpentOutputsCTAUT(block))
+		sctauts := make([]SpentAut, 0, countSpentOutputsCTAUT(block))
 		err = view.connectTransactions(block, &stxos, ctautView, &sctauts)
 		if err != nil {
 			return err
@@ -1891,7 +1891,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 
 		ctautView := NewCTAUTViewpoint()
 		ctautView.SetBestHash(parentHash)
-		sctauts := make([]SpentCTAUT, 0, countSpentOutputsCTAUT(block))
+		sctauts := make([]SpentAut, 0, countSpentOutputsCTAUT(block))
 
 		if !fastAdd || b.nodeType == wire.FullNode {
 			// todo_DONE(MLP): reviewed on 2024.01.04
