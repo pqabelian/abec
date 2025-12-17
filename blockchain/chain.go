@@ -944,7 +944,8 @@ func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 		}
 
 		// TODO check spendjournal logic
-		err = dbPutSpendJournalEntryCTAUT(dbTx, block.Hash(), sctauts)
+		// err = dbPutSpendJournalEntryCTAUT(dbTx, block.Hash(), sctauts)
+		err = dbPutSpendJournalEntryAut(dbTx, block, sctauts)
 		if err != nil {
 			return err
 		}

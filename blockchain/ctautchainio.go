@@ -1192,7 +1192,7 @@ func deserializeSpendJournalEntryAut(serializedSpentAuts []byte, block *abeutil.
 }
 
 // aut review done 2025.12.16 todo
-func dbPutSpendJournalEntryCTAUT(dbTx database.Tx, blockHash *chainhash.Hash, sauts []SpentAut) error {
+func dbPutSpendJournalEntryCTAUT(dbTx database.Tx, blockHash *chainhash.Hash, sauts []SpentCTAUT) error {
 	spendJournalBucket := dbTx.Metadata().Bucket(ctAutSpendJournalBucketName)
 	serialized, err := serializeSpendJournalEntryCTAUT(sauts)
 	if err != nil {
@@ -1205,9 +1205,10 @@ func dbPutSpendJournalEntryCTAUT(dbTx database.Tx, blockHash *chainhash.Hash, sa
 	return spendJournalBucket.Put(blockHash[:], serialized)
 }
 
-func dbPutSpendJournalEntryAut(dbTx database.Tx, blockHash *chainhash.Hash, sauts []SpentAut) error {
+func dbPutSpendJournalEntryAut(dbTx database.Tx, block *abeutil.BlockAbe, sauts []SpentAut) error {
 	spendJournalBucket := dbTx.Metadata().Bucket(ctAutSpendJournalBucketName)
-	serialized, err := serializeSpendJournalEntryAut(sauts)
+
+	serialized, err := serializeSpendJournalEntryAut(sauts, block)
 	if err != nil {
 		return err
 	}
@@ -1215,6 +1216,7 @@ func dbPutSpendJournalEntryAut(dbTx database.Tx, blockHash *chainhash.Hash, saut
 		return nil
 	}
 
+	blockHash := block.Hash()
 	return spendJournalBucket.Put(blockHash[:], serialized)
 }
 
