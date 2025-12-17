@@ -319,6 +319,7 @@ func (spentTxo *SpentTxOutAbe) Serialize(w io.Writer) error {
 
 // Deserialize
 // todo_DONE(MLP): reviewed on 2024.01.04
+// aut review done, 2025.12.16
 func (spentTxo *SpentTxOutAbe) Deserialize(r io.Reader) error {
 	var err error
 	spentTxo.SerialNumber, err = wire.ReadVarBytes(r, 0, abecryptoxparam.MaxAllowedSerialNumberSize, "SpentTxOutAbe.SerialNumber")
@@ -326,6 +327,7 @@ func (spentTxo *SpentTxOutAbe) Deserialize(r io.Reader) error {
 		return err
 	}
 
+	// todo: spentTxo should new its UtxoRing here, 2025.12.16, refactor in the future
 	err = spentTxo.UtxoRing.Deserialize(r)
 	if err != nil {
 		return err
@@ -523,6 +525,8 @@ func deserializeSpendJournalEntry(serialized []byte, txns []*wire.MsgTx) ([]Spen
 }
 
 // Abe to do
+// aut review done 2025.12.16 todo:
+// todo: add comments: the caller need to use correct txns, say, the txs[1:] of a block.
 func deserializeSpendJournalEntryAbe(serialized []byte, txns []*wire.MsgTxAbe) ([]*SpentTxOutAbe, error) {
 	// Calculate the total number of stxos.
 	var numStxos int
@@ -550,6 +554,7 @@ func deserializeSpendJournalEntryAbe(serialized []byte, txns []*wire.MsgTxAbe) (
 	// reverse order to match the serialization order.
 	stxoIdx := numStxos - 1
 	stxos := make([]*SpentTxOutAbe, numStxos)
+	// todo: it is unnecessary to use such a complicated counter, 2025.12.16
 	for txIdx := len(txns) - 1; txIdx > -1; txIdx-- {
 		tx := txns[txIdx]
 
@@ -559,7 +564,7 @@ func deserializeSpendJournalEntryAbe(serialized []byte, txns []*wire.MsgTxAbe) (
 			txIn := tx.TxIns[txInIdx]
 			stxo := &SpentTxOutAbe{
 				SerialNumber: nil,
-				UtxoRing:     new(UtxoRingEntry),
+				UtxoRing:     new(UtxoRingEntry), // todo: should improve stxo.Deserialize, and here does not need new(). 2025.12.16
 			}
 
 			err := stxo.Deserialize(br)
@@ -603,13 +608,14 @@ func serializeSpendJournalEntry(stxos []SpentTxOut) []byte {
 // Abe to do
 // serializeSpendJournalEntryAbe
 // todo_DONE(MLP): reviewed on 2024.01.04
+// aut review done 2025.12.16
 func serializeSpendJournalEntryAbe(stxos []*SpentTxOutAbe) ([]byte, error) {
 	if len(stxos) == 0 {
 		return nil, nil
 	}
 
 	// Calculate the size needed to serialize the entire journal entry.
-	var size int
+	size := 0
 	for _, stxo := range stxos {
 		size += stxo.SerializeSize()
 	}
@@ -617,6 +623,8 @@ func serializeSpendJournalEntryAbe(stxos []*SpentTxOutAbe) ([]byte, error) {
 	buf := bytes.NewBuffer(make([]byte, 0, size))
 	// Serialize each individual stxo directly into the slice in reverse
 	// order one after the other.
+	// todo: 2025.12.16 it is bad that count is not serialized.
+	// todo: 2025.12.17 it is unnecessary to serialize in reverse order. Just need make sure deserialize and serialize match.
 	for i := len(stxos) - 1; i >= 0; i-- {
 		err := stxos[i].Serialize(buf)
 		if err != nil {
@@ -693,6 +701,7 @@ func dbPutSpendJournalEntry(dbTx database.Tx, blockHash *chainhash.Hash, stxos [
 }
 
 // todo_DONE(MLP): reviewed on 2024.01.04
+// aut review done 2025.12.16
 func dbPutSpendJournalEntryAbe(dbTx database.Tx, blockHash *chainhash.Hash, stxos []*SpentTxOutAbe) error {
 	spendBucket := dbTx.Metadata().Bucket(spendJournalBucketName)
 	serialized, err := serializeSpendJournalEntryAbe(stxos)
@@ -863,6 +872,7 @@ func outpointKey(outpoint wire.OutPoint) *[]byte {
 
 func outPointRingKey(outPointRingHash chainhash.Hash) *[]byte {
 	// todo: 2025.12.12 what is the size for key? bug
+	// todo: it is confirmed that outpointKeyPool is used only by outPointRingKey, will refactor in the future.
 	key := outpointKeyPool.Get().(*[]byte)
 	copy(*key, outPointRingHash[:])
 	return key
@@ -876,6 +886,8 @@ func recycleOutpointKey(key *[]byte) {
 
 // recycleOutPointRingKey puts the provided byte slice, which should have been
 // obtained via the outpointKey function, back on the free list.
+// todo: 2025.12.16 confirm this can work the wrong outPointRingKey well
+// todo: for safe, will refactor in the future.
 func recycleOutPointRingKey(key *[]byte) {
 	outPointRingKeyPool.Put(key)
 }
@@ -930,6 +942,7 @@ func serializeUtxoEntry(entry *UtxoEntry) ([]byte, error) {
 }
 
 // Abe to do
+// aut review done 2025.12.16
 func serializeUtxoRingEntry(entry *UtxoRingEntry) ([]byte, error) {
 
 	buf := bytes.NewBuffer(make([]byte, 0, entry.SerializeSize()))
@@ -1157,6 +1170,7 @@ func dbPutUtxoView(dbTx database.Tx, view *UtxoViewpoint) error {
 // particular, only the entries that have been marked as modified are written
 // to the database.
 // todo_DONE(MLP): reviewed on 2024.01.04
+// aut review done 2025.12.16
 func dbPutUtxoRingView(dbTx database.Tx, view *UtxoRingViewpoint) error {
 	utxoRingBucket := dbTx.Metadata().Bucket(utxoRingSetBucketName)
 
@@ -1189,6 +1203,7 @@ func dbPutUtxoRingView(dbTx database.Tx, view *UtxoRingViewpoint) error {
 		}
 		key := outPointRingKey(outPointRingHash)
 		err = utxoRingBucket.Put(*key, serialized)
+		// todo: 2025.12.17 why not recycle; research in the future
 		// NOTE: The key is intentionally not recycled here since the
 		// database interface contract prohibits modifications.  It will
 		// be garbage collected normally when the database is done with
@@ -1279,6 +1294,7 @@ func dbRemoveAUTInfo(dbTx database.Tx, infoToDel map[string]struct{}, blockHeigh
 // dbPutBlockIndex uses an existing database transaction to update or add the
 // block index entries for the hash to height and height to hash mappings for
 // the provided values.
+// aut review done 2025.12.16
 func dbPutBlockIndex(dbTx database.Tx, hash *chainhash.Hash, height int32) error {
 	// Serialize the height for use in the index entries.
 	var serializedHeight [4]byte
@@ -1379,6 +1395,7 @@ type bestChainState struct {
 // serializeBestChainState returns the serialization of the passed block best
 // chain state.  This is data to be stored in the chain state bucket.
 // todo: Aconcagua Review
+// aut review done 2025.12.16
 func serializeBestChainState(state bestChainState) []byte {
 	// Calculate the full size needed to serialize the chain state.
 	workSumBytes := state.workSum.Bytes()
@@ -1422,6 +1439,7 @@ func serializeBestChainState(state bestChainState) []byte {
 // every block is connected or disconnected form the main chain.
 // block.
 // todo: Aconcagua Review
+// aut review done 2025.12.16
 func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
 	// Ensure the serialized data has enough bytes to properly deserialize
 	// the hash, height, total transactions, and work sum length.
@@ -1473,6 +1491,7 @@ func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
 
 	if offset == uint32(len(serializedData)) {
 		// This is a state stored before Aconcagua upgrade
+		state.workSumSecondScaled = big.NewInt(0)
 		return state, nil
 	}
 
@@ -1505,6 +1524,7 @@ func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
 // dbPutBestState uses an existing database transaction to update the best chain
 // state with the given parameters.
 // todo: Aconcagua review
+// aut review done 2025.12.16
 func dbPutBestState(dbTx database.Tx, snapshot *BestState, workSum *big.Int, workSumSecondScaled *big.Int) error {
 	// Serialize the current best chain state.
 	serializedData := serializeBestChainState(bestChainState{
@@ -2099,6 +2119,7 @@ func dbFetchBlockByNode(dbTx database.Tx, node *blockNode) (*abeutil.Block, erro
 	return block, nil
 }
 
+// aut review 2025.12.16
 func dbFetchBlockByNodeAbe(dbTx database.Tx, node *blockNode) (*abeutil.BlockAbe, error) {
 	// Load the raw block bytes from the database.
 	blockBytes, witnesses, err := dbTx.FetchBlockAbe(&node.hash)
@@ -2136,6 +2157,7 @@ func dbFetchBlockByNodeAbe(dbTx database.Tx, node *blockNode) (*abeutil.BlockAbe
 
 // dbStoreBlockNode stores the block header and validation status to the block
 // index bucket. This overwrites the current entry if there exists one.
+// aut review done 2025.12.16
 func dbStoreBlockNode(dbTx database.Tx, node *blockNode) error {
 	// Serialize block data to be stored.
 	//	todo: (EthashPoW) use MaxBlockHeaderPayload rather than blockHdrSize, to avoid misunderstanding

@@ -2857,7 +2857,7 @@ func validateTxAutScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, ho
 //	  7. Set new best height for utxo ring view
 //
 // todo_DONE(MLP): reviewed on 2024.01.04
-// todo: review 2025.12.12
+// aut review done 2025.12.16
 func (b *BlockChain) checkConnectBlockAbe(
 	node *blockNode, block *abeutil.BlockAbe,
 	view *UtxoRingViewpoint, stxos *[]*SpentTxOutAbe,

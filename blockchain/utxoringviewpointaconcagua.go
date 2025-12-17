@@ -83,6 +83,7 @@ func (view *UtxoRingViewpoint) newUTxoRingEntriesAconcagua(db database.DB, node 
 //
 // This function is backward compatible with the function BuildTxoRingsMLP,
 // so that the call on BuildTxoRingsMLP can be replaced by the call on this function.
+// aut review done 2025.12.16
 func BuildTxoRingsAconcagua(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.BlockAbe) (txoRings map[wire.RingId]*wire.TxoRing, err error) {
 	//blockNum := blockNumPerRingGroup
 

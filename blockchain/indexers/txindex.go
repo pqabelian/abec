@@ -267,7 +267,8 @@ func dbAddTxIndexEntries(dbTx database.Tx, block *abeutil.Block, blockID uint32)
 	return nil
 }
 
-//	Abe to do
+// Abe to do
+// aut review done 2025.12.17 todo
 func dbAddTxIndexEntriesAbe(dbTx database.Tx, block *abeutil.BlockAbe, blockID uint32) error {
 	// The offset and length of the transactions within the serialized
 	// block.
@@ -323,7 +324,7 @@ func dbRemoveTxIndexEntries(dbTx database.Tx, block *abeutil.Block) error {
 	return nil
 }
 
-//	ToDo(ABE):
+// ToDo(ABE):
 func dbRemoveTxIndexEntriesAbe(dbTx database.Tx, block *abeutil.BlockAbe) error {
 	for _, tx := range block.Transactions() {
 		err := dbRemoveTxIndexEntry(dbTx, tx.Hash())
@@ -465,6 +466,8 @@ func (idx *TxIndex) ConnectBlock(dbTx database.Tx, block *abeutil.Block,
 }
 
 //	todo(ABE.MUST)
+//
+// aut review done 2025.12.17 todo
 func (idx *TxIndex) ConnectBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe,
 	stxos []*blockchain.SpentTxOutAbe) error {
 
@@ -507,7 +510,7 @@ func (idx *TxIndex) DisconnectBlock(dbTx database.Tx, block *abeutil.Block,
 	return nil
 }
 
-//	ToDo(ABE.MUST):
+// ToDo(ABE.MUST):
 func (idx *TxIndex) DisconnectBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe,
 	stxos []*blockchain.SpentTxOutAbe) error {
 

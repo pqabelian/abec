@@ -148,6 +148,7 @@ func (b *BlockChain) processOrphansAbe(hash *chainhash.Hash, flags BehaviorFlags
 //     todo (EthashPoW): 202207
 //
 // todo_DONE(MLP): reviewed on 2024.01.05
+// todo: review done 2025.12.16
 func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, powConsensus *consensus.PowConsensus, flags BehaviorFlags) (bool, bool, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
@@ -178,7 +179,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, powConsensus *cons
 	// todo_DONE(MLP): reviewed on 2024.01.03, by Alice
 	// from higher level to low:
 	// block header firstly -> block size -> transaction hash -> merkle root -> every transaction
-	// 1. block header santity:
+	// 1. block header sanity, including pow on blockheader
 	// 2. size of serialized block
 	// 3. only on coinbase transaction
 	// 4. no duplicated transaction

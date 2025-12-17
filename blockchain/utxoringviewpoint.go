@@ -157,6 +157,7 @@ func BuildTxoRings(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.
 // Here txoRingSize is set as an input parameter, to avoid using the global parameter TxoRingSize.
 // txoRingSize is set by the caller which may decides the value of txoRingSize based on the wire/protocol version.
 // reviewed on 2024.01.04
+// aut review done 2025.12.16
 func buildTxoRingsFromTxos(ringMemberTxos []*RingMemberTxo, ringBlockHeight int32, blockhashs []*chainhash.Hash, txoRingSize int, isCoinBase bool) (txoRings []*wire.TxoRing, err error) {
 
 	if len(ringMemberTxos) == 0 {
@@ -424,6 +425,8 @@ func (entry *UtxoRingEntry) ConsumingBlockHashs() []*chainhash.Hash {
 	return entry.consumingBlockHashs
 }
 
+// SerializeSize
+// aut review done 2025.12.16
 func (entry *UtxoRingEntry) SerializeSize() int {
 
 	//	utxoRingHeaderCode
@@ -472,6 +475,7 @@ func (entry *UtxoRingEntry) SerializeSize() int {
 
 // Serialize
 // todo_DONE(MLP): reviewed on 2024.01.04
+// aut review done 2025.12.16
 func (entry *UtxoRingEntry) Serialize(w io.Writer) error {
 	//	utxoRingHeaderCode
 	//	blockHeight and IsCoinBase
@@ -562,6 +566,7 @@ func (entry *UtxoRingEntry) Serialize(w io.Writer) error {
 
 // Deserialize
 // reviewed on 2024.01.01
+// aut review done 2025.12.16
 func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 	//	utxoRingHeaderCode
 	//	blockHeight and IsCoinBase
@@ -898,6 +903,7 @@ func (view *UtxoRingViewpoint) SetEntries(entries map[chainhash.Hash]*UtxoRingEn
 
 // commit prunes all entries marked modified that are now fully spent and marks
 // all entries as unmodified.
+// aut review done: process the data in memory.
 func (view *UtxoRingViewpoint) commit() {
 	for outPointHash, entry := range view.entries {
 		if entry == nil || (entry.isModified() && entry.IsAllSpent()) {
@@ -1110,6 +1116,7 @@ func (b *BlockChain) FetchUtxoRingView(tx *abeutil.TxAbe) (*UtxoRingViewpoint, e
 // todo_DONE(MLP): reviewed on 2024.01.04
 // TODO change function name, such as connectTransactionInputs
 // 2025.12.13 for ctaut part, new AutTokens will be generated (but it will not cause the spending of pending AutTokens, based on the host-mechanism).
+// review done 2025.12.16
 func (view *UtxoRingViewpoint) connectTransaction(
 	tx *abeutil.TxAbe, blockhash *chainhash.Hash, stxos *[]*SpentTxOutAbe,
 	blockHeight int32, ctautView *CTAUTViewpoint, sctauts *[]SpentCTAUT,
@@ -1187,6 +1194,7 @@ func (view *UtxoRingViewpoint) connectTransaction(
 // In addition, when the 'stxos' argument is not nil, it will be updated to
 // append an entry for each spent txout.
 // todo_DONE(MLP): reviewed on 2024.01.04
+// aut review done, 2025.12.16
 // todo: refactor in the codebase 2025.12.16
 func (view *UtxoRingViewpoint) connectTransactions(
 	block *abeutil.BlockAbe, stxos *[]*SpentTxOutAbe,
@@ -1650,6 +1658,7 @@ func (view *UtxoRingViewpoint) NewUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 
 // NewTxoRing constructs a new wire.TxoRing from the inputs.
 // reviewed on 2024.01.04
+// aut review done 2025.12.16
 func NewTxoRing(version uint32, ringBlockHeight int32, blockhashs []*chainhash.Hash, ringMemberTxos []*RingMemberTxo, isCoinBase bool) (*wire.TxoRing, error) {
 
 	ringSize := len(ringMemberTxos)

@@ -263,7 +263,7 @@ func WriteOutPointRing(w io.Writer, pver uint32, version uint32, opr *OutPointRi
 	return nil
 }
 func ReadOutPointRing(r io.Reader, pver uint32, version uint32, opr *OutPointRing) error {
-	err := readElement(r, &opr.Version)
+	err := readElement(r, &opr.Version) // todo: not symmetric with the write 2025.12.16
 	if err != nil {
 		return err
 	}

@@ -54,6 +54,7 @@ var ctautOutpointKeyPool = sync.Pool{
 
 // ctautOutpointKey
 // review done 2025.12.11
+// aut review done 2025.12.16
 func ctautOutpointKey(outpoint ctautapi.HostOutPoint) *[]byte {
 	// A VLQ employs an MSB encoding, so they are useful not only to reduce
 	// the amount of storage space, but also so iteration of utxos when
@@ -70,10 +71,11 @@ func recycleCTAUTOutpointKey(key *[]byte) {
 	ctautOutpointKeyPool.Put(key)
 }
 
-type SpentCTAUTType int
+// aut review done 2025.12.17
+type SpentCTAUTType uint8
 
-const ConsumeCTAUTToken SpentCTAUTType = 0
 const UpdateCTAUTInfo SpentCTAUTType = 1
+const ConsumeCTAUTToken SpentCTAUTType = 0
 
 type SpentCTAUT interface {
 	Type() SpentCTAUTType
@@ -93,12 +95,15 @@ func (s *UpdatedCTAUTInfo) Type() SpentCTAUTType {
 	return UpdateCTAUTInfo
 }
 
+// SpentCTAUTTokens implements the interface SpentCTAUT.
 type SpentCTAUTTokens []SpentCTAUTToken
 
 func (s *SpentCTAUTTokens) Type() SpentCTAUTType {
 	return ConsumeCTAUTToken
 }
 
+// SpentCTAUTToken does not implement the interface SpentCTAUT.
+// aut review done 2025.12.17
 type SpentCTAUTToken struct {
 	Version uint32
 
@@ -111,6 +116,7 @@ type SpentCTAUTToken struct {
 	Height int32
 }
 
+// aut review done 2025.12.17 todo
 func spentCTAUTSerializeSize(stxo SpentCTAUT) (int, error) {
 	size := 1 // 1 for type
 	switch updated := stxo.(type) {
@@ -118,24 +124,33 @@ func spentCTAUTSerializeSize(stxo SpentCTAUT) (int, error) {
 		tokens := *updated
 		size += serializeSizeVLQ(uint64(len(tokens)))
 		for _, token := range tokens {
+
+			// height
 			headerCode := uint64(token.Height)
 			size += serializeSizeVLQ(headerCode)
 
+			// version
 			size += serializeSizeVLQ(uint64(token.Version))
+
+			// hostOutPoint
 			size += chainhash.HashSize
 			size += 1
 
+			// ValueScript
 			size += serializeSizeVLQ(uint64(len(token.ValueScript)))
 			size += len(token.ValueScript)
 		}
 
 	case *UpdatedCTAUTInfo:
 		headerCode := uint64(updated.Height)
+		// todo: encode headerCode by appending IsReRegistration ? if use 1 byte to flag IsReRegistration,
+		// here could use varintsize? or directly use uint32?
 		size += serializeSizeVLQ(headerCode)
 
-		size += 1
+		size += 1 // type
+
 		// +1 to represent nil for before
-		size += 1
+		size += 1 // isReregistration
 		if updated.Before != nil {
 			serializedBefore, err := updated.Before.Serialize()
 			if err != nil {
@@ -163,6 +178,8 @@ func spentCTAUTSerializeSize(stxo SpentCTAUT) (int, error) {
 	}
 	return size, nil
 }
+
+// todo: aut review done 2025.12.17; how about use serialize/deserialize or reader/writer
 func putSpentCTAUT(target []byte, stxo SpentCTAUT) (int, error) {
 	var err error
 	offset := 0
@@ -192,11 +209,13 @@ func putSpentCTAUT(target []byte, stxo SpentCTAUT) (int, error) {
 		}
 
 	case *UpdatedCTAUTInfo:
+		// todo: use a number to denote the type? how about define a type? 2025.12.17
 		offset += putVLQ(target[offset:], 1)
 
 		headerCode := uint64(updated.Height)
 		offset += putVLQ(target[offset:], headerCode)
 
+		// todo: use 0/1? 2025.12.17
 		target[offset] = 0x00
 		if updated.IsReRegistration {
 			target[offset] = 0x01
@@ -204,6 +223,7 @@ func putSpentCTAUT(target []byte, stxo SpentCTAUT) (int, error) {
 		offset += 1
 
 		// +1 to represent nil
+		// todo: double check the consistence between before and IsReRegistration
 		var serializedBefore []byte
 		if updated.Before != nil {
 			serializedBefore, err = updated.Before.Serialize()
@@ -248,6 +268,8 @@ func putSpentCTAUT(target []byte, stxo SpentCTAUT) (int, error) {
 	}
 	return offset, nil
 }
+
+// todo: how about use serialize/deserialize or write/read? 2025.12.17
 func decodeSpentCTAUT(serialized []byte) (SpentCTAUT, int, error) {
 	// Ensure there are bytes to decode.
 	if len(serialized) == 0 {
@@ -361,12 +383,13 @@ func decodeSpentCTAUT(serialized []byte) (SpentCTAUT, int, error) {
 	}
 }
 
+// aut review done 2025.12.16 todo
 func serializeSpendJournalEntryCTAUT(stxos []SpentCTAUT) ([]byte, error) {
 	if len(stxos) == 0 {
 		return nil, nil
 	}
 
-	var size int
+	size := 0
 	for i := range stxos {
 		tmpSize, err := spentCTAUTSerializeSize(stxos[i])
 		if err != nil {
@@ -375,10 +398,12 @@ func serializeSpendJournalEntryCTAUT(stxos []SpentCTAUT) ([]byte, error) {
 		size += tmpSize
 
 	}
-	serialized := make([]byte, size)
+	serialized := make([]byte, size) // todo: this requires that the size must be very ACCURATE.
+	// todo: how about define serialize and deserialize for SpentCTAUT
 
 	// Serialize each individual stxo directly into the slice in reverse
 	// order one after the other.
+	// todo: it is unnecessary to use a reverse order.
 	var offset int
 	for i := len(stxos) - 1; i > -1; i-- {
 		tmpOffset, err := putSpentCTAUT(serialized[offset:], stxos[i])
@@ -429,6 +454,7 @@ func deserializeSpendJournalEntryCTAUT(serialized []byte, scripts []*ctautapi.Ex
 	return stxos, nil
 }
 
+// aut review done 2025.12.16 todo
 func dbPutSpendJournalEntryCTAUT(dbTx database.Tx, blockHash *chainhash.Hash, sauts []SpentCTAUT) error {
 	spendJournalBucket := dbTx.Metadata().Bucket(ctAutSpendJournalBucketName)
 	serialized, err := serializeSpendJournalEntryCTAUT(sauts)
@@ -472,6 +498,9 @@ func dbRemoveSpendJournalEntryCTAUT(dbTx database.Tx, blockHash *chainhash.Hash)
 
 // deserializeCTAUTCoin
 // review done 2025.12.11
+// aut review done
+// todo: 2025.12.16 confirm that this function should not be call when coin.IsSpent() is TRUE. confirm done
+// todo: 2025.12.17 add hostOutPoint field in CTAUTCoin.
 func serializeUnspentAutCoin(coin *CTAUTCoin) ([]byte, error) {
 	// Spent outputs have no serialization.
 	if coin.IsSpent() {
@@ -522,6 +551,7 @@ func serializeUnspentAutCoin(coin *CTAUTCoin) ([]byte, error) {
 
 // deserializeCTAUTCoin
 // review done 2025.12.11
+// aut review done 2025.12.16
 func deserializeUnspentAutCoin(serialized []byte) (*CTAUTCoin, error) {
 
 	r := bytes.NewReader(serialized)
@@ -555,6 +585,8 @@ func deserializeUnspentAutCoin(serialized []byte) (*CTAUTCoin, error) {
 		return nil, err
 	}
 
+	// todo: confirm that each time a coin is read from database, it will be regarded as "modified", confirmed; research in the future
+	// and as a result, if it is not spent, it will be "written" back to database, even if it is actually not modified.
 	return NewCTAUTCoin(version, identifier, valueScript, blockHeight), nil
 }
 
@@ -660,10 +692,20 @@ func dbRemoveCTAUTInstance(dbTx database.Tx, instanceToDel map[string]struct{}, 
 	return nil
 }
 
+// aut review done 2025.12.16
 func dbPutCTAUTView(dbTx database.Tx, view *CTAUTViewpoint, blockHeight int32, blockHash chainhash.Hash) error {
 	ctAutInfoBucket := dbTx.Metadata().Bucket(ctAutInstanceBucketName)
 	ctAutTokenBucket := dbTx.Metadata().Bucket(ctAutTokenBucketName)
 	for identifierKey, instance := range view.instances {
+		if instance == nil {
+			log.Warnf("dbPutCTAUTView: the AutInstance for identifier %s is nil", identifierKey)
+			continue
+		}
+		if instance.metadata == nil {
+			log.Warnf("dbPutCTAUTView: the AutInstance.metadata for identifier %s is nil", identifierKey)
+			continue
+		}
+
 		identifier := instance.metadata.AutIdentifier
 
 		// Serialize and store the utxo entry.
@@ -675,6 +717,7 @@ func dbPutCTAUTView(dbTx database.Tx, view *CTAUTViewpoint, blockHeight int32, b
 		if err != nil {
 			return err
 		}
+
 		log.Debugf("the metadata for CTAUT instance identified by %s is stored at height %d (block hash %s) with following configuration:",
 			identifierKey, blockHeight, blockHash)
 		metadata := instance.metadata
@@ -723,8 +766,10 @@ func dbPutCTAUTView(dbTx database.Tx, view *CTAUTViewpoint, blockHeight int32, b
 			if err != nil {
 				return err
 			}
+			// todo: check whether serializedCoin is nil? 2025.12.17 refactor in the future
 			key := ctautOutpointKey(outpoint)
 			err = ctAutTokenBucket.Put(*key, serializedCoin)
+			// todo: why above spent recycle the key, research in the future.
 			// NOTE: The key is intentionally not recycled here since the
 			// database interface contract prohibits modifications.  It will
 			// be garbage collected normally when the database is done with

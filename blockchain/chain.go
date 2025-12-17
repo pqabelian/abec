@@ -847,6 +847,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *abeutil.Block,
 //  4. Send NTBlockConnected notification
 //
 // todo_DONE(MLP): reviewed on 2024.01.04
+// todo: aut review done 2025.12.16
 func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 	view *UtxoRingViewpoint, stxos []*SpentTxOutAbe,
 	ctautView *CTAUTViewpoint, sctauts []SpentCTAUT,
@@ -898,7 +899,7 @@ func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 	curTotalTxns := b.stateSnapshot.TotalTxns
 	b.stateLock.RUnlock()
 	numTxns := uint64(len(block.MsgBlock().Transactions))
-	blockSize := uint64(block.MsgBlock().SerializeSize())
+	blockSize := uint64(block.MsgBlock().SerializeSize()) // todo: 2025.12.16 txFullSize is used, know and will refactor later
 	//	todo(ABE): ABE does not use weight, while use size only.
 	//	blockWeight := uint64(GetBlockWeightAbe(block))
 	blockWeight := blockSize
@@ -1301,26 +1302,29 @@ func countSpentOutputsAbe(block *abeutil.BlockAbe) int {
 	return numSpent
 }
 
+// aut review done 2025.12.16
 func countSpentOutputsCTAUT(block *abeutil.BlockAbe) int {
-	// TODO replace with block.ExtAutScripts()
+	return len(block.ExtAutScripts())
 
-	// Exclude the transfer transaction which is not an AUT transaction
-	var num = 0
-	for _, tx := range block.Transactions()[1:] {
-		//if autTx, isAUTTx := tx.AUTTransaction(); isAUTTx {
-		//	if autTx.Type() < aut.ReRegistration {
-		//		// it seems that we do not need saut for those type
-		//	}
-		//	num++
-		//}
-
-		autTx := tx.ExtAutScript()
-		if autTx != nil {
-			num++
-		}
-
-	}
-	return num
+	//// TODO replace with block.ExtAutScripts()
+	//
+	//// Exclude the transfer transaction which is not an AUT transaction
+	//var num = 0
+	//for _, tx := range block.Transactions()[1:] {
+	//	//if autTx, isAUTTx := tx.AUTTransaction(); isAUTTx {
+	//	//	if autTx.Type() < aut.ReRegistration {
+	//	//		// it seems that we do not need saut for those type
+	//	//	}
+	//	//	num++
+	//	//}
+	//
+	//	autTx := tx.ExtAutScript()
+	//	if autTx != nil {
+	//		num++
+	//	}
+	//
+	//}
+	//return num
 }
 
 // reorganizeChainAbe reorganizes the block chain by disconnecting the nodes in the
@@ -1349,6 +1353,7 @@ func countSpentOutputsCTAUT(block *abeutil.BlockAbe) int {
 //	  6. Detach each block and attach each block really
 //
 // todo_DONE(MLP): reviewed on 2024.01.05
+// aut review done 2025.12.17 todo
 func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) error {
 	// Nothing to do if no reorganize nodes were provided.
 	if detachNodes.Len() == 0 && attachNodes.Len() == 0 {
@@ -1855,6 +1860,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 //	    3. Reorganize the chain (reorganizeChainAbe)
 //
 // todo_DONE(MLP): reviewed on 2024.01.05
+// todo: aut review 2025.12.16
 func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAbe, flags BehaviorFlags) (bool, error) {
 	fastAdd := flags&BFFastAdd == BFFastAdd
 
@@ -1898,9 +1904,11 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 				return false, err
 			}
 
+			// err == nil || (err == RuleError)
 			flushIndexState()
 
 			if err != nil {
+				// err == RuleError
 				return false, err
 			}
 		} else {
@@ -1919,6 +1927,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 			}
 			// todo_DONE(MLP): reviewed on 2024.01.04
 
+			// update the view and ctautView, as well as fill stxos and sctauts
 			err = view.connectTransactions(block, &stxos, ctautView, &sctauts)
 			if err != nil {
 				return false, err
@@ -1951,6 +1960,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 		// Connect the block to the main chain.
 		//	ToDo(ABE): Here stxos is used as input, all precious are setting stxos
 		//	todo_DONE(MLP): reviewed on 2024.01.04
+		// WRITE to database: the view and ctautView, as well as fill stxos and sctauts
 		err := b.connectBlockAbe(node, block, view, stxos, ctautView, sctauts)
 		if err != nil {
 			// If we got hit with a rule error, then we'll mark

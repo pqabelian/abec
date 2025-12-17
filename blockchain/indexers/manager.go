@@ -567,6 +567,7 @@ func (m *Manager) ConnectBlock(dbTx database.Tx, block *abeutil.Block,
 
 // Abe to do
 // Really Need TO DO
+// aut review done 2025.12.17 todo
 func (m *Manager) ConnectBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe,
 	stxos []*blockchain.SpentTxOutAbe) error {
 

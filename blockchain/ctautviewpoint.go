@@ -67,6 +67,8 @@ func (instance *CTAUTInstance) PutCoin(outpiont ctautapi.HostOutPoint, coin *CTA
 	instance.coins[outpiont] = coin
 }
 
+// SetAutMetadata
+// review done 2015.12.16
 func (instance *CTAUTInstance) SetAutMetadata(autMetadata *ctautapi.AutMetadata) {
 	if instance == nil {
 		return
@@ -117,6 +119,7 @@ func (instance *CTAUTInstance) SpendCoin(point ctautapi.HostOutPoint) (*CTAUTCoi
 
 // CTAUTCoin
 // review done 2025.12.11
+// todo: 2025.12.17 add hostOutPoint field in CTAUTCoin.
 type CTAUTCoin struct {
 	identifier ctautapi.AutId
 	// NOTE: Additions, deletions, or modifications to the order of the
@@ -169,7 +172,7 @@ func (coin *CTAUTCoin) BlockHeight() int32 {
 
 // Spend marks the output as spent.  Spending an output that is already spent
 // has no effect.
-// todo: review
+// aut review done 2025.12.16
 func (coin *CTAUTCoin) Spend() {
 	// Nothing to do if the output is already spent.
 	if coin.IsSpent() {
@@ -200,7 +203,7 @@ func (coin *CTAUTCoin) Clone() *CTAUTCoin {
 // todo: function name
 
 // NewCTAUTCoin returns a new CTAUTCoin built from the arguments.
-// todo: review
+// aut review done 2025.12.16
 func NewCTAUTCoin(version uint32, identifier ctautapi.AutId, valueScript []byte, blockHeight int32) *CTAUTCoin {
 
 	return &CTAUTCoin{
@@ -475,8 +478,6 @@ func (view *CTAUTViewpoint) addCTAUTCoin(version uint32, identifier ctautapi.Aut
 	return nil
 }
 
-// todo: review the following codes
-
 // todo: remove txHash chainhash.Hash
 // aut review done 2025.12.16
 func (view *CTAUTViewpoint) connectRegistrationScript(extAutScript *ctautapi.ExtAutScript, txHash chainhash.Hash,
@@ -688,7 +689,6 @@ func (view *CTAUTViewpoint) connectMintScript(extAutScript *ctautapi.ExtAutScrip
 
 	}
 	// TODO AUT actually do need to use saut to record
-	// todo: 2025.12.12 why first currentSctauts then sctauts; sctauts is a strange structure
 	if sctauts != nil {
 		sctaut := SpentCTAUTTokens(currentSctauts)
 		*sctauts = append(*sctauts, &sctaut)
@@ -967,6 +967,7 @@ func (view *CTAUTViewpoint) connectTransactionAutScript(tx *abeutil.TxAbe, block
 	return nil
 }
 
+// todo: review the following codes
 func (view *CTAUTViewpoint) disconnectRegistrationTransaction(db database.DB, script *ctautapi.ExtAutScript,
 	blockHeight int32, sctaut SpentCTAUT) (map[string]struct{}, error) {
 	if script.Type() != ctautapi.AutScriptTypeRegistration {
@@ -1304,6 +1305,7 @@ func (view *CTAUTViewpoint) disconnectCTAUTScripts(db database.DB, block *abeuti
 
 // commit prunes all entries marked modified that are now fully spent and marks
 // all entries as unmodified.
+// aut review done, 2025.12.17; make data in memory to be consistent with that in database.
 func (view *CTAUTViewpoint) commit() {
 	for _, instance := range view.instances {
 		for outpoint, coin := range instance.coins {
