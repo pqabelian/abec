@@ -81,6 +81,8 @@ const SpentAutTypeAutTokenList SpentAutType = 1
 type SpentAut interface {
 	SpentType() SpentAutType
 	SerializeSize() (int, error)
+	write(io.Writer) error
+	read(io.Reader) error
 	Serialize() ([]byte, error)
 	Deserialize([]byte) error
 }
@@ -392,21 +394,6 @@ func (spentAutInstance *SpentAutInstance) write(w io.Writer) error {
 	return nil
 }
 
-func (spentAutInstance *SpentAutInstance) Serialize() ([]byte, error) {
-	size, err := spentAutInstance.SerializeSize()
-	if err != nil {
-		return nil, err
-	}
-	w := bytes.NewBuffer(make([]byte, 0, size))
-
-	err = spentAutInstance.write(w)
-	if err != nil {
-		return nil, err
-	}
-
-	return w.Bytes(), nil
-}
-
 func (spentAutInstance *SpentAutInstance) read(r io.Reader) error {
 
 	// spentType SpentAutType
@@ -485,6 +472,21 @@ func (spentAutInstance *SpentAutInstance) read(r io.Reader) error {
 	return nil
 }
 
+func (spentAutInstance *SpentAutInstance) Serialize() ([]byte, error) {
+	size, err := spentAutInstance.SerializeSize()
+	if err != nil {
+		return nil, err
+	}
+	w := bytes.NewBuffer(make([]byte, 0, size))
+
+	err = spentAutInstance.write(w)
+	if err != nil {
+		return nil, err
+	}
+
+	return w.Bytes(), nil
+}
+
 func (spentAutInstance *SpentAutInstance) Deserialize(serialized []byte) error {
 
 	r := bytes.NewReader(serialized)
@@ -540,21 +542,6 @@ func (spentAutTokenList *SpentAutTokenList) write(w io.Writer) error {
 	return nil
 }
 
-func (spentAutTokenList *SpentAutTokenList) Serialize() ([]byte, error) {
-	size, err := spentAutTokenList.SerializeSize()
-	if err != nil {
-		return nil, err
-	}
-	w := bytes.NewBuffer(make([]byte, 0, size))
-
-	err = spentAutTokenList.write(w)
-	if err != nil {
-		return nil, err
-	}
-
-	return w.Bytes(), nil
-}
-
 func (spentAutTokenList *SpentAutTokenList) read(r io.Reader) error {
 
 	// spentType SpentAutType
@@ -599,6 +586,21 @@ func (spentAutTokenList *SpentAutTokenList) read(r io.Reader) error {
 	}
 
 	return nil
+}
+
+func (spentAutTokenList *SpentAutTokenList) Serialize() ([]byte, error) {
+	size, err := spentAutTokenList.SerializeSize()
+	if err != nil {
+		return nil, err
+	}
+	w := bytes.NewBuffer(make([]byte, 0, size))
+
+	err = spentAutTokenList.write(w)
+	if err != nil {
+		return nil, err
+	}
+
+	return w.Bytes(), nil
 }
 
 func (spentAutTokenList *SpentAutTokenList) Deserialize(serialized []byte) error {
@@ -1024,6 +1026,100 @@ func deserializeSpendJournalEntryCTAUT(serialized []byte, scripts []*ctautapi.Ex
 	}
 
 	return stxos, nil
+}
+
+// serializeSpendJournalEntryAut
+//
+// The parameter block implies that the []spendAut for a block is serialized to a []byte.
+func serializeSpendJournalEntryAut(sauts []SpentAut, block *abeutil.BlockAbe) ([]byte, error) {
+
+	numSauts := len(sauts)
+
+	if len(block.ExtAutScripts()) != numSauts {
+		return nil, AssertError(fmt.Sprintf("the block (%s) carries %d ExtAutScripts, but the passed SpentAut has size %d",
+			block.Hash(), len(block.ExtAutScripts()), numSauts))
+	}
+
+	if numSauts == 0 {
+		return nil, nil
+	}
+
+	size := wire.VarIntSerializeSize(uint64(numSauts))
+	for _, saut := range sauts {
+		tmpSize, err := saut.SerializeSize()
+		if err != nil {
+			return nil, err
+		}
+		size += tmpSize
+	}
+
+	w := bytes.NewBuffer(make([]byte, 0, size))
+
+	err := wire.WriteVarInt(w, 0, uint64(numSauts))
+	if err != nil {
+		return nil, err
+	}
+
+	for _, saut := range sauts {
+		err = saut.write(w)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return w.Bytes(), nil
+}
+
+func deserializeSpendJournalEntryAut(serializedSpentAuts []byte, block *abeutil.BlockAbe) ([]SpentAut, error) {
+
+	extAutScripts := block.ExtAutScripts()
+
+	// When a block has no spent txouts there is nothing to serialize.
+	if len(extAutScripts) == 0 {
+		return nil, nil
+	}
+
+	r := bytes.NewBuffer(serializedSpentAuts)
+	count, err := wire.ReadVarInt(r, 0)
+	if err != nil {
+		return nil, err
+	}
+	if uint64(len(extAutScripts)) != count {
+		return nil, AssertError(fmt.Sprintf("the block (%s) expects %d spentAut, but the read count from the serialziedSpentAuts is %d",
+			block.Hash().String(), len(extAutScripts), count))
+	}
+
+	rstSpentAuts := make([]SpentAut, count)
+	for i, extAutScript := range extAutScripts {
+		if extAutScript == nil {
+			return nil, AssertError(fmt.Sprintf("the %d-th ExtAutScript of block (%s) is nil", i, block.Hash().String()))
+		}
+		switch extAutScript.Type() {
+		case ctautapi.AutScriptTypeRegistration, ctautapi.AutScriptTypeReRegistration:
+			spentAutInstance := &SpentAutInstance{}
+			err = spentAutInstance.read(r)
+			if err != nil {
+				return nil, err
+			}
+			rstSpentAuts[i] = spentAutInstance
+
+		case ctautapi.AutScriptTypeMint, ctautapi.AutScriptTypeTransfer, ctautapi.AutScriptTypeBurn:
+			spentAutTokenList := &SpentAutTokenList{}
+			err = spentAutTokenList.read(r)
+			if err != nil {
+				return nil, err
+			}
+			rstSpentAuts[i] = spentAutTokenList
+
+		default:
+			return nil, AssertError(fmt.Sprintf("the %d-th ExtAutScript of block (%s) has unknown ScriptType %d",
+				i, block.Hash().String(), extAutScript.Type()))
+
+		}
+
+	}
+
+	return rstSpentAuts, nil
 }
 
 // aut review done 2025.12.16 todo
