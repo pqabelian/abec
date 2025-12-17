@@ -130,7 +130,7 @@ type AutMetadata struct {
 	UpdateHistoryHeights []int32
 }
 
-func (autMetadata *AutMetadata) serializeSize() (int, error) {
+func (autMetadata *AutMetadata) SerializeSize() (int, error) {
 	n := wire.VarIntSerializeSize(uint64(autMetadata.Version)) + // version
 		chainhash.HashSize + // identifier, fixed length
 		wire.VarIntSerializeSize(uint64(autMetadata.UpdatedHeight)) + // UpdatedHeight
