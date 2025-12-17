@@ -188,7 +188,7 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 	}
 
 	// Calculate the size needed to serialize AUT autMetadata.
-	size, err := autMetadata.serializeSize()
+	size, err := autMetadata.SerializeSize()
 	if err != nil {
 		return nil, err
 	}
