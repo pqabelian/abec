@@ -312,6 +312,11 @@ func (spentAutInstance *SpentAutInstance) Serialize() ([]byte, error) {
 			return nil, err
 		}
 
+		if spentAutInstance.SpentHeight <= spentAutInstance.GeneratedHeight {
+			return nil, fmt.Errorf("for a spentAutInstance for AutReRegistrationScript, SpentHeight (%d) <= GeneratedHeight (%d) is out of design",
+				spentAutInstance.SpentHeight, spentAutInstance.GeneratedHeight)
+		}
+
 	} else {
 		err = w.WriteByte(0x00) // IsReRegistration == FALSE
 		if err != nil {
@@ -320,6 +325,11 @@ func (spentAutInstance *SpentAutInstance) Serialize() ([]byte, error) {
 
 		if spentAutInstance.Before != nil {
 			return nil, fmt.Errorf("spentAutInstance.IsReRegistration is FALSE, while spentAutInstance.Before is not nil")
+		}
+
+		if spentAutInstance.SpentHeight != spentAutInstance.GeneratedHeight {
+			return nil, fmt.Errorf("for a spentAutInstance for AutRegistrationScript, SpentHeight (%d) != GeneratedHeight (%d) is out of design",
+				spentAutInstance.SpentHeight, spentAutInstance.GeneratedHeight)
 		}
 	}
 
@@ -385,9 +395,19 @@ func (spentAutInstance *SpentAutInstance) Deserialize(serialized []byte) error {
 			return err
 		}
 
+		if spentAutInstance.SpentHeight <= spentAutInstance.GeneratedHeight {
+			return fmt.Errorf("for a spentAutInstance for AutReRegistrationScript, SpentHeight (%d) <= GeneratedHeight (%d) is out of design",
+				spentAutInstance.SpentHeight, spentAutInstance.GeneratedHeight)
+		}
+
 	} else if isReRegistrationRead == 0x00 {
 		spentAutInstance.IsReRegistration = false
 		spentAutInstance.Before = nil
+
+		if spentAutInstance.SpentHeight != spentAutInstance.GeneratedHeight {
+			return fmt.Errorf("for a spentAutInstance for AutRegistrationScript, SpentHeight (%d) != GeneratedHeight (%d) is out of design",
+				spentAutInstance.SpentHeight, spentAutInstance.GeneratedHeight)
+		}
 
 	} else {
 		return fmt.Errorf("the read isReRegistration is not 0x00 or 0x01")
@@ -436,7 +456,12 @@ func (spentAutTokenList *SpentAutTokenList) Serialize() ([]byte, error) {
 	if err = wire.WriteVarInt(w, 0, uint64(len(spentAutTokenList.SpentAutTokens))); err != nil {
 		return nil, err
 	}
-	for _, spentAutToken := range spentAutTokenList.SpentAutTokens {
+	for i, spentAutToken := range spentAutTokenList.SpentAutTokens {
+		if spentAutTokenList.SpentHeight <= spentAutToken.GeneratedHeight {
+			return nil, fmt.Errorf("th %d -th spentAutToken has GeneratedHeight = %d, while spentAutTokenList.SpentHeight is %d, whic is out of design",
+				i, spentAutToken.GeneratedHeight, spentAutToken.GeneratedHeight)
+		}
+
 		if err = spentAutToken.write(w); err != nil {
 			return nil, err
 		}
@@ -479,6 +504,12 @@ func (spentAutTokenList *SpentAutTokenList) Deserialize(serialized []byte) error
 		if err = spentAutToken.read(r); err != nil {
 			return err
 		}
+
+		if spentAutTokenList.SpentHeight <= spentAutToken.GeneratedHeight {
+			return fmt.Errorf("th %d -th spentAutToken has GeneratedHeight = %d, while spentAutTokenList.SpentHeight is %d, which is out of design",
+				i, spentAutToken.GeneratedHeight, spentAutToken.GeneratedHeight)
+		}
+
 		spentAutTokenList.SpentAutTokens[i] = spentAutToken
 	}
 
