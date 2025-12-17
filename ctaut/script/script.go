@@ -2237,6 +2237,15 @@ func (autScript *MintScript) SanityCheck() error {
 				return fmt.Errorf("autScript.outHiddenAutTokenNum = %d, autScript.outPublicAutTokenNum =%d, but %d -th AutTxo has type %d (not AutTxoTypePublic)",
 					autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum, autTxoType, abecryptox.AutTxoTypePublic)
 			}
+
+			autTxoValue, err := abecryptox.ExtractAutTxoValue(autTxo, nil, nil)
+			if err != nil {
+				return err
+			}
+			if autTxoValue == 0 {
+				return fmt.Errorf("autScript.outHiddenAutTokenNum = %d, autScript.outPublicAutTokenNum =%d, but %d -th AutTxo has value 0",
+					autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum, i)
+			}
 		}
 	}
 
@@ -2666,6 +2675,15 @@ func (autScript *TransferScript) SanityCheck() error {
 			if autTxoType != abecryptox.AutTxoTypePublic {
 				return fmt.Errorf("autScript.outHiddenAutTokenNum = %d, script.outPublicAutTokenNum =%d, but %d -th AutTxo has type %d (not AutTxoTypePublic)",
 					autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum, autTxoType, abecryptox.AutTxoTypePublic)
+			}
+
+			autTxoValue, err := abecryptox.ExtractAutTxoValue(autTxo, nil, nil)
+			if err != nil {
+				return err
+			}
+			if autTxoValue == 0 {
+				return fmt.Errorf("autScript.outHiddenAutTokenNum = %d, autScript.outPublicAutTokenNum =%d, but %d -th AutTxo has value 0",
+					autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum, i)
 			}
 		}
 	}
@@ -3101,6 +3119,15 @@ func (autScript *BurnScript) SanityCheck() error {
 			if autTxoType != abecryptox.AutTxoTypePublic {
 				return fmt.Errorf("autScript.outHiddenAutTokenNum = %d, script.outPublicAutTokenNum =%d, but %d -th AutTxo has type %d (not AutTxoTypePublic)",
 					autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum, autTxoType, abecryptox.AutTxoTypePublic)
+			}
+
+			autTxoValue, err := abecryptox.ExtractAutTxoValue(autTxo, nil, nil)
+			if err != nil {
+				return err
+			}
+			if autTxoValue == 0 {
+				return fmt.Errorf("autScript.outHiddenAutTokenNum = %d, autScript.outPublicAutTokenNum =%d, but %d -th AutTxo has value 0",
+					autScript.outHiddenAutTokenNum, autScript.outPublicAutTokenNum, i)
 			}
 		}
 	}

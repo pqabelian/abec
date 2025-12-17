@@ -2171,7 +2171,7 @@ func checkAutMintScriptInputsOutputs(tx *abeutil.TxAbe, currentHeight int32,
 			return err
 		}
 
-		err = ctautapi.RuleCheckOnAutTxOutputPrivacyType(autMetadata.PrivacyType, autTxo)
+		err = ctautapi.RuleCheckOnAutTxOutputPrivacyTypeAndValue(autMetadata.PrivacyType, autTxo)
 		if err != nil {
 			return err
 		}
@@ -2377,7 +2377,7 @@ func checkAutTransferScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
 			return err
 		}
 
-		err = ctautapi.RuleCheckOnAutTxOutputPrivacyType(autMetadata.PrivacyType, autTxo)
+		err = ctautapi.RuleCheckOnAutTxOutputPrivacyTypeAndValue(autMetadata.PrivacyType, autTxo)
 		if err != nil {
 			return err
 		}
@@ -2615,7 +2615,7 @@ func checkAutBurnScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
 				return err
 			}
 		} else {
-			err = ctautapi.RuleCheckOnAutTxOutputPrivacyType(autMetadata.PrivacyType, autTxo)
+			err = ctautapi.RuleCheckOnAutTxOutputPrivacyTypeAndValue(autMetadata.PrivacyType, autTxo)
 			if err != nil {
 				return err
 			}

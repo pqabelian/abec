@@ -3,6 +3,7 @@ package rules
 import (
 	"encoding/hex"
 	"fmt"
+
 	"github.com/abesuite/abec/ctaut/script"
 
 	"github.com/abesuite/abec/abecryptox"
@@ -122,8 +123,8 @@ func RuleCheckOnAutTxoVersionType(autScriptVersion uint32, autTxo *ctautwire.Aut
 	return nil
 }
 
-// RuleCheckOnAutTxOutputPrivacyType checks whether the outputAutTxo's type match the autPrivacyType's requirements.
-func RuleCheckOnAutTxOutputPrivacyType(autPrivacyType AutPrivacyType, outputAutTxo *ctautwire.AutTxo) error {
+// RuleCheckOnAutTxOutputPrivacyTypeAndValue checks whether the outputAutTxo's type match the autPrivacyType's requirements.
+func RuleCheckOnAutTxOutputPrivacyTypeAndValue(autPrivacyType AutPrivacyType, outputAutTxo *ctautwire.AutTxo) error {
 	if outputAutTxo == nil {
 		return fmt.Errorf("RuleCheckOnAutTxOutputPrivacyType: nil outputAutTxo")
 	}
@@ -146,6 +147,19 @@ func RuleCheckOnAutTxOutputPrivacyType(autPrivacyType AutPrivacyType, outputAutT
 	} else {
 		return fmt.Errorf("unknown aut privacy type %d", autPrivacyType)
 	}
+
+	if outAutTxoType != abecryptox.AutTxoTypePublic {
+		return nil
+	}
+	// disallow 0-value
+	value, err := abecryptox.ExtractAutTxoValue(outputAutTxo, nil, nil)
+	if err != nil {
+		return fmt.Errorf("fail to extract aut txo value with public: %v", err)
+	}
+	if value == 0 {
+		return fmt.Errorf("aut txo value should not be 0")
+	}
+
 	return nil
 }
 
