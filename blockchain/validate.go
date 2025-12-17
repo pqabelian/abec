@@ -1917,6 +1917,12 @@ func checkAutReRegistrationScriptInputsOutputs(tx *abeutil.TxAbe, currentHeight 
 			autMetadata.ReregistrationExpireHeight)
 	}
 
+	if currentHeight <= autMetadata.UpdatedHeight {
+		return fmt.Errorf("transaction %s carries a re-register at height %d, "+
+			"which is not greater than the AutInstance last UpdateHeight %d",
+			tx.Hash(), currentHeight, autMetadata.UpdatedHeight)
+	}
+
 	claimedIssuersByCoinAddress := map[string]struct{}{}
 	for i := 0; i < len(autMetadata.Issuers); i++ {
 		if autMetadata.Issuers[i] == nil {

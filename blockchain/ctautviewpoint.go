@@ -503,7 +503,7 @@ func (view *CTAUTViewpoint) connectRegistrationScript(extAutScript *ctautapi.Ext
 			txHash.String(), identifier.String())
 	}
 
-	newAutMetadata, err := extAutScript.CreateAutMetadata()
+	newAutMetadata, err := extAutScript.CreateAutMetadata(blockHeight)
 	if err != nil {
 		return err
 	}
@@ -577,7 +577,7 @@ func (view *CTAUTViewpoint) connectReRegistrationScript(extAutScript *ctautapi.E
 
 	oldMetadata := autInstance.metadata
 
-	newMetadata, err := extAutScript.UpdateAutMetadata(oldMetadata.Clone())
+	newMetadata, err := extAutScript.UpdateAutMetadata(oldMetadata.Clone(), blockHeight)
 	if err != nil {
 		return err
 	}

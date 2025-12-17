@@ -286,7 +286,7 @@ func (extAutScript *ExtAutScript) GeneratedTokens() []*AutToken {
 }
 
 // CreateAutMetadata create a new AutMetadata from the RegistrationScript.
-func (extAutScript *ExtAutScript) CreateAutMetadata() (*script.AutMetadata, error) {
+func (extAutScript *ExtAutScript) CreateAutMetadata(createdHeight int32) (*script.AutMetadata, error) {
 
 	if extAutScript.Type() != script.AutScriptTypeRegistration {
 		return nil, fmt.Errorf("wrong call on CreateMetadata: should be called only by registration script")
@@ -301,6 +301,10 @@ func (extAutScript *ExtAutScript) CreateAutMetadata() (*script.AutMetadata, erro
 		return nil, fmt.Errorf("registerScript sanity check failed: %v", err)
 	}
 
+	if createdHeight < 0 {
+		return nil, fmt.Errorf("CreateAutMetadata: the created height must be greater than zero")
+	}
+
 	rootTokenSet := map[string]*HostOutPoint{}
 	for i := 0; i < len(extAutScript.generatedTokens); i++ {
 		hostOutPoint := extAutScript.generatedTokens[i].HostOutPoint
@@ -311,6 +315,7 @@ func (extAutScript *ExtAutScript) CreateAutMetadata() (*script.AutMetadata, erro
 	newAutMetadata := &script.AutMetadata{
 		Version:                    ctautwire.AutMetadataVersionInitValue,
 		AutIdentifier:              extAutScript.msgTx.TxHash(),
+		UpdatedHeight:              createdHeight,
 		AutName:                    registerScript.AutName(),
 		AutSymbol:                  registerScript.AutSymbol(),
 		BaseUnitName:               registerScript.BaseUnitName(),
@@ -339,7 +344,7 @@ func (extAutScript *ExtAutScript) CreateAutMetadata() (*script.AutMetadata, erro
 //
 // The returned AutMetadata is a new object, rather than the input AutMetadata.
 // aut review done, 2025.12.16
-func (extAutScript *ExtAutScript) UpdateAutMetadata(autMetadata *script.AutMetadata) (*script.AutMetadata, error) {
+func (extAutScript *ExtAutScript) UpdateAutMetadata(autMetadata *script.AutMetadata, updatedHeight int32) (*script.AutMetadata, error) {
 	if extAutScript == nil {
 		return nil, fmt.Errorf("UpdateAutMetadata: the receiver extAutScript of is nil")
 	}
@@ -359,6 +364,13 @@ func (extAutScript *ExtAutScript) UpdateAutMetadata(autMetadata *script.AutMetad
 
 	if err := reregisterScript.SanityCheck(); err != nil {
 		return nil, fmt.Errorf("reregisterScript sanity check failed: %v", err)
+	}
+
+	if updatedHeight < 0 {
+		return nil, fmt.Errorf("UpdateAutMetadata: the updated height must be greater than zero")
+	}
+	if updatedHeight <= autMetadata.UpdatedHeight {
+		return nil, fmt.Errorf("UpdateAutMetadata: the updated height must be greater than the original height")
 	}
 
 	identifier := extAutScript.AutIdentifier()
@@ -388,6 +400,8 @@ func (extAutScript *ExtAutScript) UpdateAutMetadata(autMetadata *script.AutMetad
 
 	// follow defined rules in AutScriptVersion
 	updatedAutMetadata.Version += 1
+
+	updatedAutMetadata.UpdatedHeight = updatedHeight
 
 	updatedAutMetadata.AutMemo = reregisterScript.AutMemo()
 
@@ -426,7 +440,7 @@ func (extAutScript *ExtAutScript) UpdateAutMetadata(autMetadata *script.AutMetad
 		updatedAutMetadata.ActiveRootTokenSet[opStr] = &hostOutPoint
 	}
 
-	// check
+	// UpdateScriptVersions
 	updateScriptVersionMax := updatedAutMetadata.UpdateScriptVersions[len(updatedAutMetadata.UpdateScriptVersions)-1]
 	if reregisterScript.Version() < updateScriptVersionMax {
 		return nil, fmt.Errorf("the version of re-register script %d should be not smaller than the largest version (%d) in UpdateScriptVersions",
@@ -434,6 +448,17 @@ func (extAutScript *ExtAutScript) UpdateAutMetadata(autMetadata *script.AutMetad
 		)
 	}
 	updatedAutMetadata.UpdateScriptVersions = append(updatedAutMetadata.UpdateScriptVersions, reregisterScript.Version())
+
+	// UpdateScriptVersions
+	updateHistoryHeightMax := updatedAutMetadata.UpdateHistoryHeights[len(updatedAutMetadata.UpdateHistoryHeights)-1]
+	if updatedHeight <= updateHistoryHeightMax {
+		return nil, fmt.Errorf("the updatedHeight %d must be greater than the largest updated height (%d) in UpdateHistoryHeights",
+			updatedHeight, updateHistoryHeightMax,
+		)
+	}
+	updatedAutMetadata.UpdateHistoryHeights = append(updatedAutMetadata.UpdateHistoryHeights, updatedHeight)
+
+	//
 
 	return updatedAutMetadata, nil
 }

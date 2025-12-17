@@ -48,6 +48,9 @@ type AutMetadata struct {
 	// is used as the AutInstance identifier.
 	AutIdentifier AutId
 
+	// UpdatedHeight records the last height at which this AutInstance is created/updated by Registration and Reregistration.
+	UpdatedHeight int32
+
 	// AutName, the name of the AutInstance, gives
 	// the full, descriptive and human-readable name of the token ,e.g. "Post-Quantum USD".
 	// It could be used to improve usability, but MUST NOT be assumed that the value must be present.
@@ -122,11 +125,15 @@ type AutMetadata struct {
 	// Currently, there is no rules
 	// Future, this field could be used to as conditions for upgrading script.
 	UpdateScriptVersions []uint32
+
+	// UpdateHistoryHeights records all the heights at which the AutInstance is created/updated by Registration and Reregistration.
+	UpdateHistoryHeights []int32
 }
 
 func (autMetadata *AutMetadata) serializeSize() (int, error) {
-	n := wire.VarIntSerializeSize(uint64(autMetadata.Version)) + //version
+	n := wire.VarIntSerializeSize(uint64(autMetadata.Version)) + // version
 		chainhash.HashSize + // identifier, fixed length
+		wire.VarIntSerializeSize(uint64(autMetadata.UpdatedHeight)) + // UpdatedHeight
 		wire.VarIntSerializeSize(uint64(len(autMetadata.AutName))) + len(autMetadata.AutName) + // name, variable length
 		wire.VarIntSerializeSize(uint64(len(autMetadata.AutSymbol))) + len(autMetadata.AutSymbol) + // symbol, variable length
 		wire.VarIntSerializeSize(uint64(len(autMetadata.BaseUnitName))) + len(autMetadata.BaseUnitName) + // base unit, variable length
@@ -166,6 +173,11 @@ func (autMetadata *AutMetadata) serializeSize() (int, error) {
 		n += wire.VarIntSerializeSize(uint64(autMetadata.UpdateScriptVersions[i]))
 	}
 
+	n += wire.VarIntSerializeSize(uint64(len(autMetadata.UpdateHistoryHeights)))
+	for i := 0; i < len(autMetadata.UpdateHistoryHeights); i++ {
+		n += wire.VarIntSerializeSize(uint64(autMetadata.UpdateHistoryHeights[i]))
+	}
+
 	return n, nil
 }
 
@@ -191,6 +203,11 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 
 	// AutIdentifier              AutId
 	if _, err = w.Write(autMetadata.AutIdentifier[:]); err != nil {
+		return nil, err
+	}
+
+	// UpdatedHeight              int32
+	if err = wire.WriteVarInt(w, 0, uint64(autMetadata.UpdatedHeight)); err != nil {
 		return nil, err
 	}
 
@@ -295,6 +312,16 @@ func (autMetadata *AutMetadata) Serialize() ([]byte, error) {
 		}
 	}
 
+	// UpdateHistoryHeights       []int32
+	if err = wire.WriteVarInt(w, 0, uint64(len(autMetadata.UpdateHistoryHeights))); err != nil {
+		return nil, err
+	}
+	for i := 0; i < len(autMetadata.UpdateHistoryHeights); i++ {
+		if err = wire.WriteVarInt(w, 0, uint64(autMetadata.UpdateHistoryHeights[i])); err != nil {
+			return nil, err
+		}
+	}
+
 	serializedMetadata := w.Bytes()
 
 	//// todo: the following codes are necessary or only for test?
@@ -332,6 +359,17 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 	if _, err = io.ReadFull(r, autMetadata.AutIdentifier[:]); err != nil {
 		return err
 	}
+
+	// UpdatedHeight              int32
+	UpdatedHeightRead, err := wire.ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	tempUpdatedHeight := int64(UpdatedHeightRead)
+	if tempUpdatedHeight > math.MaxInt32 || tempUpdatedHeight < 0 {
+		return fmt.Errorf("the read UpdatedHeight (%d) is not in the scope [0, %d]", tempUpdatedHeight, math.MaxInt32)
+	}
+	autMetadata.UpdatedHeight = int32(tempUpdatedHeight)
 
 	// AutName                    []byte
 	if autMetadata.AutName, err = wire.ReadVarBytes(r, 0, MaxAutNameLength, "autName"); err != nil {
@@ -468,6 +506,28 @@ func (autMetadata *AutMetadata) Deserialize(serializedMetadata []byte) error {
 		autMetadata.UpdateScriptVersions[i] = uint32(version)
 	}
 
+	updateHistoryHeightNum, err := wire.ReadVarInt(r, 0)
+	if err != nil {
+		return err
+	}
+	if updateHistoryHeightNum != updateScriptVersionNum {
+		// this is a designed rule.
+		return fmt.Errorf("updateHistoryHeightNum (%d) is not equla updateScriptVersionNum (%d)",
+			updateHistoryHeightNum, updateScriptVersionNum)
+	}
+	autMetadata.UpdateHistoryHeights = make([]int32, updateHistoryHeightNum)
+	for i := 0; i < len(autMetadata.UpdateHistoryHeights); i++ {
+		heightRead, err := wire.ReadVarInt(r, 0)
+		if err != nil {
+			return err
+		}
+		heightReadTemp := int64(heightRead)
+		if heightReadTemp > math.MaxInt32 || heightReadTemp < 0 {
+			return fmt.Errorf("the read UpdatedHistoryVersion (%d) is not in the scope [0, %d]", heightReadTemp, math.MaxInt32)
+		}
+		autMetadata.UpdateHistoryHeights[i] = int32(heightReadTemp)
+	}
+
 	return autMetadata.SanityCheck()
 }
 
@@ -479,6 +539,10 @@ func (autMetadata *AutMetadata) SanityCheck() error {
 
 	if autMetadata.Version < ctautwire.AutMetadataVersionInitValue {
 		return fmt.Errorf("invalid autMetadata.Version (%d)", autMetadata.Version)
+	}
+
+	if autMetadata.UpdatedHeight < 0 {
+		return fmt.Errorf("invalid autMetadata.UpdatedHeight (%d)", autMetadata.UpdatedHeight)
 	}
 
 	if len(autMetadata.AutName) > MaxAutNameLength {
@@ -563,6 +627,7 @@ func (autMetadata *AutMetadata) SanityCheck() error {
 		}
 	}
 
+	// UpdateScriptVersions
 	if uint64(len(autMetadata.UpdateScriptVersions)) != uint64(autMetadata.Version) {
 		return fmt.Errorf("len(autMetadata.UpdateScriptVersions) (%d) != autMetadata.Version (%d)",
 			len(autMetadata.UpdateScriptVersions), autMetadata.Version)
@@ -586,6 +651,26 @@ func (autMetadata *AutMetadata) SanityCheck() error {
 		}
 	}
 
+	// UpdateHistoryHeights
+	if len(autMetadata.UpdateHistoryHeights) != len(autMetadata.UpdateScriptVersions) {
+		return fmt.Errorf("len(autMetadata.UpdateHistoryHeights) (%d) != len(autMetadata.UpdateScriptVersions) (%d)",
+			len(autMetadata.UpdateHistoryHeights), len(autMetadata.UpdateScriptVersions))
+	}
+
+	// now len(autMetadata.UpdateHistoryHeights) >= 1
+	if autMetadata.UpdateHistoryHeights[0] < 0 {
+		return fmt.Errorf("invalid UpdateHistoryHeights (%d) at position %d",
+			autMetadata.UpdateHistoryHeights[0], 0)
+	}
+
+	for i := 1; i < len(autMetadata.UpdateHistoryHeights); i++ {
+		if autMetadata.UpdateHistoryHeights[i] <= autMetadata.UpdateHistoryHeights[i-1] {
+			return fmt.Errorf("invalid UpdateHistoryHeights version (%d) at position %d : "+
+				"not larger than the UpdateHistoryHeights (%d) at position %d",
+				autMetadata.UpdateHistoryHeights[i], i, autMetadata.UpdateHistoryHeights[i-1], i-1)
+		}
+	}
+
 	return nil
 }
 
@@ -598,6 +683,7 @@ func (autMetadata *AutMetadata) Clone() *AutMetadata {
 	cloned := &AutMetadata{
 		Version:       autMetadata.Version,
 		AutIdentifier: AutId{},
+		UpdatedHeight: autMetadata.UpdatedHeight,
 
 		AutName:            make([]byte, len(autMetadata.AutName)),
 		AutSymbol:          make([]byte, len(autMetadata.AutSymbol)),
@@ -618,6 +704,7 @@ func (autMetadata *AutMetadata) Clone() *AutMetadata {
 		BurnedAmount:         autMetadata.BurnedAmount,
 		ActiveRootTokenSet:   make(map[string]*HostOutPoint, len(autMetadata.ActiveRootTokenSet)),
 		UpdateScriptVersions: make([]uint32, len(autMetadata.UpdateScriptVersions)),
+		UpdateHistoryHeights: make([]int32, len(autMetadata.UpdateHistoryHeights)),
 	}
 
 	copy(cloned.AutIdentifier[:], autMetadata.AutIdentifier[:])
@@ -646,6 +733,10 @@ func (autMetadata *AutMetadata) Clone() *AutMetadata {
 
 	for i := 0; i < len(autMetadata.UpdateScriptVersions); i++ {
 		cloned.UpdateScriptVersions[i] = autMetadata.UpdateScriptVersions[i]
+	}
+
+	for i := 0; i < len(autMetadata.UpdateHistoryHeights); i++ {
+		cloned.UpdateHistoryHeights[i] = autMetadata.UpdateHistoryHeights[i]
 	}
 
 	return cloned
