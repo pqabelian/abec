@@ -80,6 +80,7 @@ const SpentAutTypeAutTokenList SpentAutType = 1
 
 type SpentAut interface {
 	SpentType() SpentAutType
+	SerializeSize() (int, error)
 	Serialize() ([]byte, error)
 	Deserialize([]byte) error
 }
@@ -285,7 +286,7 @@ func (spentAutToken *SpentAutToken) read(r io.Reader) error {
 	return nil
 }
 
-func (spentAutInstance *SpentAutInstance) serializeSize() (int, error) {
+func (spentAutInstance *SpentAutInstance) SerializeSize() (int, error) {
 	size := 1                                                                  // spentType        SpentAutType
 	size += wire.VarIntSerializeSize(uint64(spentAutInstance.SpentHeight))     // SpentHeight int32
 	size += wire.VarIntSerializeSize(uint64(spentAutInstance.GeneratedHeight)) // GeneratedHeight int32
@@ -321,71 +322,84 @@ func (spentAutInstance *SpentAutInstance) serializeSize() (int, error) {
 	return size, nil
 }
 
-func (spentAutInstance *SpentAutInstance) Serialize() ([]byte, error) {
-	size, err := spentAutInstance.serializeSize()
-	if err != nil {
-		return nil, err
-	}
-	w := bytes.NewBuffer(make([]byte, 0, size))
+func (spentAutInstance *SpentAutInstance) write(w io.Writer) error {
+
+	var err error
 
 	// spentType SpentAutType
-	if err = w.WriteByte(uint8(spentAutInstance.spentType)); err != nil {
-		return nil, err
+	_, err = w.Write([]byte{uint8(spentAutInstance.spentType)})
+	if err != nil {
+		return err
 	}
 
 	// SpentHeight int32
 	if err = wire.WriteVarInt(w, 0, uint64(spentAutInstance.SpentHeight)); err != nil {
-		return nil, err
+		return err
 	}
 
 	// GeneratedHeight int32
 	if err = wire.WriteVarInt(w, 0, uint64(spentAutInstance.GeneratedHeight)); err != nil {
-		return nil, err
+		return err
 	}
 
 	// IsReRegistration bool
 	// Before * ctautapi.AutMetadata
 	if spentAutInstance.IsReRegistration {
-		err = w.WriteByte(0x01) // IsReRegistration == TRUE
+		_, err = w.Write([]byte{0x01}) // IsReRegistration == TRUE
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		if spentAutInstance.Before == nil {
-			return nil, fmt.Errorf("spentAutInstance.IsReRegistration is TRUE, while spentAutInstance.Before is nil")
+			return fmt.Errorf("spentAutInstance.IsReRegistration is TRUE, while spentAutInstance.Before is nil")
 		}
 
 		err = spentAutInstance.Before.Write(w)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		if spentAutInstance.SpentHeight <= spentAutInstance.GeneratedHeight {
-			return nil, fmt.Errorf("for a spentAutInstance for AutReRegistrationScript, SpentHeight (%d) <= GeneratedHeight (%d) is out of design",
+			return fmt.Errorf("for a spentAutInstance for AutReRegistrationScript, SpentHeight (%d) <= GeneratedHeight (%d) is out of design",
 				spentAutInstance.SpentHeight, spentAutInstance.GeneratedHeight)
 		}
 
 	} else {
-		err = w.WriteByte(0x00) // IsReRegistration == FALSE
+		_, err = w.Write([]byte{0x00}) // IsReRegistration == FALSE
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		if spentAutInstance.Before != nil {
-			return nil, fmt.Errorf("spentAutInstance.IsReRegistration is FALSE, while spentAutInstance.Before is not nil")
+			return fmt.Errorf("spentAutInstance.IsReRegistration is FALSE, while spentAutInstance.Before is not nil")
 		}
 
 		if spentAutInstance.SpentHeight != spentAutInstance.GeneratedHeight {
-			return nil, fmt.Errorf("for a spentAutInstance for AutRegistrationScript, SpentHeight (%d) != GeneratedHeight (%d) is out of design",
+			return fmt.Errorf("for a spentAutInstance for AutRegistrationScript, SpentHeight (%d) != GeneratedHeight (%d) is out of design",
 				spentAutInstance.SpentHeight, spentAutInstance.GeneratedHeight)
 		}
 	}
 
 	// After  *ctautapi.AutMetadata
 	if spentAutInstance.After == nil {
-		return nil, fmt.Errorf("spentAutInstance.After is nil")
+		return fmt.Errorf("spentAutInstance.After is nil")
 	}
 	err = spentAutInstance.After.Write(w)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (spentAutInstance *SpentAutInstance) Serialize() ([]byte, error) {
+	size, err := spentAutInstance.SerializeSize()
+	if err != nil {
+		return nil, err
+	}
+	w := bytes.NewBuffer(make([]byte, 0, size))
+
+	err = spentAutInstance.write(w)
 	if err != nil {
 		return nil, err
 	}
@@ -393,16 +407,15 @@ func (spentAutInstance *SpentAutInstance) Serialize() ([]byte, error) {
 	return w.Bytes(), nil
 }
 
-func (spentAutInstance *SpentAutInstance) Deserialize(serialized []byte) error {
-
-	r := bytes.NewReader(serialized)
+func (spentAutInstance *SpentAutInstance) read(r io.Reader) error {
 
 	// spentType SpentAutType
-	spentTypeRead, err := r.ReadByte()
+	tmpByte := make([]byte, 1)
+	_, err := io.ReadFull(r, tmpByte)
 	if err != nil {
 		return err
 	}
-	spentAutInstance.spentType = SpentAutType(spentTypeRead)
+	spentAutInstance.spentType = SpentAutType(tmpByte[0])
 	if spentAutInstance.spentType != SpentAutTypeAutInstance {
 		return fmt.Errorf("the read spentType (%d) is not SpentAutTypeAutInstance", spentAutInstance.spentType)
 	}
@@ -431,11 +444,12 @@ func (spentAutInstance *SpentAutInstance) Deserialize(serialized []byte) error {
 
 	// IsReRegistration bool
 	// Before *ctautapi.AutMetadata
-	isReRegistrationRead, err := r.ReadByte()
+	tmpByte = make([]byte, 1)
+	_, err = io.ReadFull(r, tmpByte)
 	if err != nil {
 		return err
 	}
-	if isReRegistrationRead == 0x01 {
+	if tmpByte[0] == 0x01 {
 		spentAutInstance.IsReRegistration = true
 		spentAutInstance.Before = &ctautapi.AutMetadata{}
 		err = spentAutInstance.Before.Read(r)
@@ -448,7 +462,7 @@ func (spentAutInstance *SpentAutInstance) Deserialize(serialized []byte) error {
 				spentAutInstance.SpentHeight, spentAutInstance.GeneratedHeight)
 		}
 
-	} else if isReRegistrationRead == 0x00 {
+	} else if tmpByte[0] == 0x00 {
 		spentAutInstance.IsReRegistration = false
 		spentAutInstance.Before = nil
 
@@ -471,7 +485,19 @@ func (spentAutInstance *SpentAutInstance) Deserialize(serialized []byte) error {
 	return nil
 }
 
-func (spentAutTokenList *SpentAutTokenList) serializeSize() (int, error) {
+func (spentAutInstance *SpentAutInstance) Deserialize(serialized []byte) error {
+
+	r := bytes.NewReader(serialized)
+
+	err := spentAutInstance.read(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (spentAutTokenList *SpentAutTokenList) SerializeSize() (int, error) {
 	size := 1                                                               // spentType        SpentAutType
 	size += wire.VarIntSerializeSize(uint64(spentAutTokenList.SpentHeight)) // SpentHeight int32
 
@@ -483,50 +509,61 @@ func (spentAutTokenList *SpentAutTokenList) serializeSize() (int, error) {
 	return size, nil
 }
 
+func (spentAutTokenList *SpentAutTokenList) write(w io.Writer) error {
+
+	// spentType SpentAutType
+	_, err := w.Write([]byte{uint8(spentAutTokenList.spentType)})
+	if err != nil {
+		return err
+	}
+
+	// SpentHeight int32
+	if err = wire.WriteVarInt(w, 0, uint64(spentAutTokenList.SpentHeight)); err != nil {
+		return err
+	}
+
+	// SpentAutTokens []SpentAutToken
+	if err = wire.WriteVarInt(w, 0, uint64(len(spentAutTokenList.SpentAutTokens))); err != nil {
+		return err
+	}
+	for i, spentAutToken := range spentAutTokenList.SpentAutTokens {
+		if spentAutTokenList.SpentHeight <= spentAutToken.GeneratedHeight {
+			return fmt.Errorf("th %d -th spentAutToken has GeneratedHeight = %d, while spentAutTokenList.SpentHeight is %d, whic is out of design",
+				i, spentAutToken.GeneratedHeight, spentAutToken.GeneratedHeight)
+		}
+
+		if err = spentAutToken.write(w); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (spentAutTokenList *SpentAutTokenList) Serialize() ([]byte, error) {
-	size, err := spentAutTokenList.serializeSize()
+	size, err := spentAutTokenList.SerializeSize()
 	if err != nil {
 		return nil, err
 	}
 	w := bytes.NewBuffer(make([]byte, 0, size))
 
-	// spentType SpentAutType
-	if err = w.WriteByte(uint8(spentAutTokenList.spentType)); err != nil {
+	err = spentAutTokenList.write(w)
+	if err != nil {
 		return nil, err
-	}
-
-	// SpentHeight int32
-	if err = wire.WriteVarInt(w, 0, uint64(spentAutTokenList.SpentHeight)); err != nil {
-		return nil, err
-	}
-
-	// SpentAutTokens []SpentAutToken
-	if err = wire.WriteVarInt(w, 0, uint64(len(spentAutTokenList.SpentAutTokens))); err != nil {
-		return nil, err
-	}
-	for i, spentAutToken := range spentAutTokenList.SpentAutTokens {
-		if spentAutTokenList.SpentHeight <= spentAutToken.GeneratedHeight {
-			return nil, fmt.Errorf("th %d -th spentAutToken has GeneratedHeight = %d, while spentAutTokenList.SpentHeight is %d, whic is out of design",
-				i, spentAutToken.GeneratedHeight, spentAutToken.GeneratedHeight)
-		}
-
-		if err = spentAutToken.write(w); err != nil {
-			return nil, err
-		}
 	}
 
 	return w.Bytes(), nil
 }
 
-func (spentAutTokenList *SpentAutTokenList) Deserialize(serialized []byte) error {
-	r := bytes.NewReader(serialized)
+func (spentAutTokenList *SpentAutTokenList) read(r io.Reader) error {
 
 	// spentType SpentAutType
-	spentTypeRead, err := r.ReadByte()
+	tmpByte := make([]byte, 1)
+	_, err := io.ReadFull(r, tmpByte)
 	if err != nil {
 		return err
 	}
-	spentAutTokenList.spentType = SpentAutType(spentTypeRead)
+	spentAutTokenList.spentType = SpentAutType(tmpByte[0])
 	if spentAutTokenList.spentType != SpentAutTypeAutTokenList {
 		return fmt.Errorf("the read spentType (%d) is not SpentAutTypeAutTokenList", spentAutTokenList.spentType)
 	}
@@ -559,6 +596,17 @@ func (spentAutTokenList *SpentAutTokenList) Deserialize(serialized []byte) error
 		}
 
 		spentAutTokenList.SpentAutTokens[i] = spentAutToken
+	}
+
+	return nil
+}
+
+func (spentAutTokenList *SpentAutTokenList) Deserialize(serialized []byte) error {
+	r := bytes.NewReader(serialized)
+
+	err := spentAutTokenList.read(r)
+	if err != nil {
+		return err
 	}
 
 	return nil
