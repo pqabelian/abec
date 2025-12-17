@@ -119,7 +119,7 @@ func (instance *CTAUTInstance) SpendCoin(point ctautapi.HostOutPoint) (*CTAUTCoi
 
 // CTAUTCoin
 // review done 2025.12.11
-// todo: 2025.12.17 add hostOutPoint field in CTAUTCoin.
+// todo: 2025.12.17 add hostOutPoint field in CTAUTCoin: not add at 2025.12;
 type CTAUTCoin struct {
 	identifier ctautapi.AutId
 	// NOTE: Additions, deletions, or modifications to the order of the
