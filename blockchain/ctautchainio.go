@@ -1148,6 +1148,7 @@ func serializeSpendJournalEntryAut(sauts []SpentAut, block *abeutil.BlockAbe) ([
 	return w.Bytes(), nil
 }
 
+// aut review done 2025.12.18
 func deserializeSpendJournalEntryAut(serializedSpentAuts []byte, block *abeutil.BlockAbe) ([]SpentAut, error) {
 
 	extAutScripts := block.ExtAutScripts()
@@ -1228,6 +1229,7 @@ func dbPutSpendJournalEntryCTAUT(dbTx database.Tx, blockHash *chainhash.Hash, sa
 	return spendJournalBucket.Put(blockHash[:], serialized)
 }
 
+// aut review done 2025.12.18
 func dbPutSpendJournalEntryAut(dbTx database.Tx, block *abeutil.BlockAbe, sauts []SpentAut) error {
 	spendJournalBucket := dbTx.Metadata().Bucket(ctAutSpendJournalBucketName)
 
@@ -1267,6 +1269,32 @@ func dbFetchSpendJournalEntryCTAUT(dbTx database.Tx, block *abeutil.BlockAbe) ([
 
 	return stxos, nil
 }
+
+// aut review done 2025.12.18
+func dbFetchSpendJournalEntryAut(dbTx database.Tx, block *abeutil.BlockAbe) ([]SpentAut, error) {
+	// Exclude the coinbase transaction since it can't spend anything.
+	spendJournalBucket := dbTx.Metadata().Bucket(ctAutSpendJournalBucketName)
+	serialized := spendJournalBucket.Get(block.Hash()[:])
+
+	sauts, err := deserializeSpendJournalEntryAut(serialized, block)
+	if err != nil {
+		// Ensure any deserialization errors are returned as database
+		// corruption errors.
+		if isDeserializeErr(err) {
+			return nil, database.Error{
+				ErrorCode: database.ErrCorruption,
+				Description: fmt.Sprintf("corrupt spend "+
+					"information for %v: %v", block.Hash(),
+					err),
+			}
+		}
+
+		return nil, err
+	}
+
+	return sauts, nil
+}
+
 func dbRemoveSpendJournalEntryCTAUT(dbTx database.Tx, blockHash *chainhash.Hash) error {
 	spendJournalBucket := dbTx.Metadata().Bucket(ctAutSpendJournalBucketName)
 	return spendJournalBucket.Delete(blockHash[:])
