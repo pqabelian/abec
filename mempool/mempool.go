@@ -1877,16 +1877,16 @@ func (mp *TxPool) maybeAcceptTransactionAbe(tx *abeutil.TxAbe, isNew, rateLimit,
 			if existTx, ok := mp.autScriptTypeMapRereg[identifier]; ok {
 				return nil, nil, txRuleError(
 					wire.RejectInvalid,
-					fmt.Sprintf("transaction %s carries an AutScript with type=%d, while there is already a transaction %s for re-registering",
-						tx.Hash(), autScriptType, existTx.Hash()),
+					fmt.Sprintf("transaction %s carries an AutScript with type=%s, while there is already a transaction %s for re-registering",
+						tx.Hash(), autScriptType.String(), existTx.Hash()),
 				)
 			}
 			// 2. exist mint script would be mutually exclusive with later re-register script
-			if existTxs, ok := mp.autScriptTypeMapMint[identifier]; ok {
+			if existTxs, ok := mp.autScriptTypeMapMint[identifier]; ok && len(existTxs) != 0 {
 				return nil, nil, txRuleError(
 					wire.RejectInvalid,
-					fmt.Sprintf("transaction %s carries an AutScript with type=%d, while there is %d transaction(s) for minting",
-						tx.Hash(), autScriptType, len(existTxs)),
+					fmt.Sprintf("transaction %s carries an AutScript with type=%s, while there is %d transaction(s) for minting",
+						tx.Hash(), autScriptType.String(), len(existTxs)),
 				)
 			}
 		} else if autScriptType == ctautapi.AutScriptTypeMint {
