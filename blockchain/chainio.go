@@ -1221,6 +1221,7 @@ func dbPutUtxoRingView(dbTx database.Tx, view *UtxoRingViewpoint) error {
 }
 
 // Abe add
+// aut revewi done 2025.12.18
 func dbRemoveUtxoRingView(dbTx database.Tx, view *UtxoRingViewpoint) error {
 	utxoRingBucket := dbTx.Metadata().Bucket(utxoRingSetBucketName)
 

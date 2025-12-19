@@ -476,6 +476,8 @@ func (entry *UtxoRingEntry) SerializeSize() int {
 // Serialize
 // todo_DONE(MLP): reviewed on 2024.01.04
 // aut review done 2025.12.16
+// aut review done 2025.12.18
+// Note (2025.12.18): the packedFlags is not serialized, since it is a temporary fieild.
 func (entry *UtxoRingEntry) Serialize(w io.Writer) error {
 	//	utxoRingHeaderCode
 	//	blockHeight and IsCoinBase
@@ -721,6 +723,8 @@ func (entry *UtxoRingEntry) Spend(serialNumber []byte, blockHash *chainhash.Hash
 // normally, the unspent serialNumber should be the last one, as this function should be called in reverse order
 // reviewed on 2024.01.05
 // review done 2025.12.13; todo confirm
+// aut review don 2025.12.18
+// todo: 2025.12.18, consider future: is it necessary to export? how about unSpend?
 func (entry *UtxoRingEntry) UnSpend(serialNumber []byte, blockHash *chainhash.Hash) bool {
 	if len(serialNumber) == 0 || blockHash == nil {
 		return false
@@ -742,6 +746,7 @@ func (entry *UtxoRingEntry) UnSpend(serialNumber []byte, blockHash *chainhash.Ha
 
 // Clone returns a shallow copy of the utxo entry.
 // reviewed on 2024.01/04
+// aut review done 2025.12.18
 func (entry *UtxoRingEntry) Clone() *UtxoRingEntry {
 	if entry == nil {
 		return nil
@@ -769,6 +774,8 @@ func (entry *UtxoRingEntry) Clone() *UtxoRingEntry {
 	return &utxoRingClone
 }
 
+// IsSame
+// aut review done 2025.12.18
 func (entry *UtxoRingEntry) IsSame(obj *UtxoRingEntry) bool {
 	if entry == nil {
 		if obj == nil {
@@ -1223,6 +1230,7 @@ func (view *UtxoRingViewpoint) connectTransactions(
 //	Abe to do: use the spendJournal to collect and update utxoRing
 //
 // todo_DONE(MLP): reviewed on 2024.01.05
+// aut review done 2025.12.18
 func (view *UtxoRingViewpoint) disconnectTransactions(db database.DB, block *abeutil.BlockAbe, stxos []*SpentTxOutAbe) error {
 	// Sanity check the correct number of stxos are provided.
 	if len(stxos) != countSpentOutputsAbe(block) {
@@ -1245,6 +1253,7 @@ func (view *UtxoRingViewpoint) disconnectTransactions(db database.DB, block *abe
 					"spent transaction out information: fail to unspend")
 			}
 			if !utxoRingEntry.IsSame(stxo.UtxoRing) {
+				// 2025.12.18 Note that this is checking whether the unSpend results in a correct/expected previous status.
 				return AssertError("disconnectTransactions called with bad " +
 					"spent transaction out information: the resulting Utxo of unspending is different from the one in STXO")
 			}
@@ -1255,6 +1264,11 @@ func (view *UtxoRingViewpoint) disconnectTransactions(db database.DB, block *abe
 			//	actually, can directly use the following codes to unspend
 			//	the above codes in if{} has the same effect, but with the strictest check.
 			//	At initial development, the strictest check may help find potential situations
+
+			// 2025.12.18 As the view is obtained by "fetch from spentJournal", rather than "fetch from database",
+			// here is assuming that the spendJournal was CORRECTLY generated.
+			// todo: 2025.12.18 future research "read from database and compare"
+
 			loadUtxoRing := stxo.UtxoRing.Clone()
 			loadUtxoRing.packedFlags |= tfModified
 			view.entries[loadUtxoRing.outPointRing.Hash()] = loadUtxoRing
