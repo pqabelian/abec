@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
@@ -20,11 +19,11 @@ type ctAutFlags uint8
 const (
 	// TODO(CTAUT) Remove this flag
 	// cafSpent indicates that a txout is spent.
-	cafSpent ctAutFlags = 1 << iota
+	cafModified ctAutFlags = 1 << 0
 
 	// atfModified indicates that a txout has been modified since it was
 	// loaded.
-	cafModified
+	cafSpent ctAutFlags = 1 << 1
 )
 
 // data structure
@@ -515,7 +514,7 @@ func (view *CTAUTViewpoint) connectRegistrationScript(extAutScript *ctautapi.Ext
 	if sctauts != nil {
 		// Populate the stxo details.
 		// Note that for New AutInetance, the SpentAutInstance should have GeneratedHeight=SpentHeight.
-		saut := NewSpentAutInstance(blockHeight, blockHeight,
+		saut := NewSpentAutInstance(extAutScript.AutIdentifier(), blockHeight, blockHeight,
 			ctautapi.AutScriptTypeRegistration, nil, newAutMetadata.Clone())
 		*sctauts = append(*sctauts, saut)
 	}
@@ -587,7 +586,7 @@ func (view *CTAUTViewpoint) connectReRegistrationScript(extAutScript *ctautapi.E
 
 	if sctauts != nil {
 		// Populate the saut.
-		saut := NewSpentAutInstance(blockHeight, oldMetadata.UpdatedHeight,
+		saut := NewSpentAutInstance(extAutScript.AutIdentifier(), blockHeight, oldMetadata.UpdatedHeight,
 			ctautapi.AutScriptTypeReRegistration, oldMetadata.Clone(), newMetadata.Clone())
 		*sctauts = append(*sctauts, saut)
 	}
@@ -683,7 +682,8 @@ func (view *CTAUTViewpoint) connectMintScript(extAutScript *ctautapi.ExtAutScrip
 
 		// todo: the sctatus for mint is different from that for reregistration? how to rollback? use UpdatedCTAUTInfo?
 		if sctauts != nil {
-			spentAutToken := NewSpentAutToken(oldMetadata.UpdatedHeight, rootTokenVersion,
+			// Note that RootToken are associated with Metadata, without standalone entities, use Metadata's information RootToken's.
+			spentAutToken := NewSpentAutToken(oldMetadata.UpdatedHeight, oldMetadata.AutIdentifier, rootTokenVersion,
 				*hostOutpoint, true, nil)
 			txSpentAutTokens = append(txSpentAutTokens, spentAutToken)
 		}
@@ -691,7 +691,7 @@ func (view *CTAUTViewpoint) connectMintScript(extAutScript *ctautapi.ExtAutScrip
 	}
 	// TODO AUT actually do need to use saut to record
 	if sctauts != nil {
-		spentAutTokenList := NewSpentAutTokenList(blockHeight, ctautapi.AutScriptTypeMint, txSpentAutTokens)
+		spentAutTokenList := NewSpentAutTokenList(extAutScript.AutIdentifier(), blockHeight, ctautapi.AutScriptTypeMint, txSpentAutTokens)
 		*sctauts = append(*sctauts, spentAutTokenList)
 	}
 
@@ -774,14 +774,14 @@ func (view *CTAUTViewpoint) connectTransferScript(extAutScript *ctautapi.ExtAutS
 
 		if sctauts != nil {
 			// Populate the sAutToken
-			spentAutToken := NewSpentAutToken(consumedToken.blockHeight, consumedToken.version,
+			spentAutToken := NewSpentAutToken(consumedToken.blockHeight, consumedToken.identifier, consumedToken.version,
 				*hostOutpoint, false, consumedToken.valueScript)
 			txSpentAutTokens = append(txSpentAutTokens, spentAutToken)
 		}
 	}
 	if sctauts != nil {
 		// Populate the stxo details using the utxo entry.
-		spentAutTokenList := NewSpentAutTokenList(blockHeight, ctautapi.AutScriptTypeTransfer, txSpentAutTokens)
+		spentAutTokenList := NewSpentAutTokenList(extAutScript.AutIdentifier(), blockHeight, ctautapi.AutScriptTypeTransfer, txSpentAutTokens)
 		*sctauts = append(*sctauts, spentAutTokenList)
 	}
 
@@ -839,14 +839,14 @@ func (view *CTAUTViewpoint) connectBurnScript(extAutScript *ctautapi.ExtAutScrip
 
 		if sctauts != nil {
 			// Populate the spentAutToken.
-			spentAutToken := NewSpentAutToken(consumedToken.blockHeight, consumedToken.version,
+			spentAutToken := NewSpentAutToken(consumedToken.blockHeight, consumedToken.identifier, consumedToken.version,
 				*hostOutpoint, false, consumedToken.valueScript)
 			txSpentAutTokens = append(txSpentAutTokens, spentAutToken)
 		}
 	}
 	if sctauts != nil {
 		// Populate the stxo details using the utxo entry.
-		spentAutTokenList := NewSpentAutTokenList(blockHeight, ctautapi.AutScriptTypeBurn, txSpentAutTokens)
+		spentAutTokenList := NewSpentAutTokenList(extAutScript.AutIdentifier(), blockHeight, ctautapi.AutScriptTypeBurn, txSpentAutTokens)
 		*sctauts = append(*sctauts, spentAutTokenList)
 	}
 
@@ -960,90 +960,144 @@ func (view *CTAUTViewpoint) connectTransactionAutScript(tx *abeutil.TxAbe, block
 	return nil
 }
 
-// todo: review the following codes
-func (view *CTAUTViewpoint) disconnectRegistrationTransaction(db database.DB, script *ctautapi.ExtAutScript,
-	blockHeight int32, sctaut SpentCTAUT) (map[string]struct{}, error) {
-	if script.Type() != ctautapi.AutScriptTypeRegistration {
-		return nil, fmt.Errorf("expected registration script, but got %d", script.Type())
+// aut review done 2025.12.18
+func (view *CTAUTViewpoint) disconnectAutScriptRegistration(db database.DB, extAutScript *ctautapi.ExtAutScript,
+	blockHeight int32, sctaut SpentAut) (*ctautapi.AutId, error) {
+
+	if extAutScript == nil {
+		return nil, fmt.Errorf("disconnectAutScriptRegistration: the input extAutScript nil")
 	}
 
-	identifier := script.AutIdentifier()
+	if extAutScript.Type() != ctautapi.AutScriptTypeRegistration {
+		return nil, fmt.Errorf("disconnectAutScriptRegistration: expected registration script, but got %s", extAutScript.Type().String())
+	}
+	_, ok := extAutScript.AutScript.(*ctautapi.RegistrationScript)
+	if !ok {
+		return nil, fmt.Errorf("fail to type extAutScript.AutScript to RegistrationScript")
+	}
+
+	identifier := extAutScript.AutIdentifier()
 	identifierKey := identifier.String()
 
+	// 2025.12.18 Note that if the AutInstance has been fetched previously, the view will not fetch it from database.
 	err := view.fetchCTAUTMain(db, nil, identifier)
 	if err != nil {
 		return nil, err
 	}
 
-	unregisteredCTAUT := map[string]struct{}{}
-
 	// ensure the instance does exist
 	instance, exist := view.instances[identifierKey]
 	if !exist || instance == nil || instance.metadata == nil {
-		return nil, fmt.Errorf("fail to find the registered AUT instance identified by %s",
+		return nil, fmt.Errorf("fail to find the registered Aut instance %s",
 			identifierKey)
 	}
 
-	// for updated information
-	updatedAUTInfo, ok := sctaut.(*UpdatedCTAUTInfo)
+	// use spentAut journal to restore
+	spentAutInstance, ok := sctaut.(*SpentAutInstance)
 	if !ok {
-		return nil, fmt.Errorf("invalid updated information")
+		return nil, fmt.Errorf("invalid spentAutInstance information")
 	}
 	// assert
-	if updatedAUTInfo.IsReRegistration {
-		return nil, fmt.Errorf("invalid updated information: not for registration")
-	}
-	if updatedAUTInfo.Height != blockHeight {
-		return nil, fmt.Errorf("invalid updated information: mismatch block height")
+	if spentAutInstance.SpentHeight != blockHeight {
+		return nil, AssertError(fmt.Sprintf("disconnectAutScriptRegistration: for AutInstance (%s), spentAutInstance.SpentHeight (%d) != blockHeight (%d)",
+			identifier.String(), spentAutInstance.SpentHeight, blockHeight))
 	}
 
-	unregisteredCTAUT[identifierKey] = struct{}{}
+	err = spentAutInstance.ScriptMatchCheck(extAutScript)
+	if err != nil {
+		return nil, err
+	}
 
-	return unregisteredCTAUT, nil
+	// all the coins should have been set "spent"
+	for hostOutPoint, coin := range instance.coins {
+		if coin == nil {
+			return nil, AssertError(fmt.Sprintf("disconnectAutScriptRegistration: for AutInstance (%s), the coin on %s is nil",
+				identifier.String(), hostOutPoint.String()))
+		}
+		if !coin.IsSpent() {
+			return nil, AssertError(fmt.Sprintf("disconnectAutScriptRegistration: for AutInstance (%s), the coin on %s is not spent",
+				identifier.String(), hostOutPoint.String()))
+		}
+	}
+
+	// return the autIdentifier
+	autIdentifierToDel := &ctautapi.AutId{}
+	copy(autIdentifierToDel[:], identifier[:])
+
+	return autIdentifierToDel, nil
 }
 
-func (view *CTAUTViewpoint) disconnectReRegistrationTransaction(db database.DB, script *ctautapi.ExtAutScript,
-	blockHeight int32, sctaut SpentCTAUT) (map[string]struct{}, error) {
-	if script.Type() != ctautapi.AutScriptTypeReRegistration {
-		return nil, fmt.Errorf("expected re-registration script, but got %d", script.Type())
+// aut review done 2025.12.18
+func (view *CTAUTViewpoint) disconnectAutScriptReRegistration(db database.DB, extAutScript *ctautapi.ExtAutScript,
+	blockHeight int32, sctaut SpentAut) error {
+
+	if extAutScript == nil {
+		return fmt.Errorf("disconnectAutScriptReRegistration: the input extAutScript nil")
 	}
 
-	identifier := script.AutIdentifier()
+	if extAutScript.Type() != ctautapi.AutScriptTypeReRegistration {
+		return fmt.Errorf("disconnectAutScriptReRegistration: expected re-registration script, but got %s",
+			extAutScript.Type().String())
+	}
+	_, ok := extAutScript.AutScript.(*ctautapi.ReRegistrationScript)
+	if !ok {
+		return fmt.Errorf("fail to type extAutScript.AutScript to ReRegistrationScript")
+	}
+
+	identifier := extAutScript.AutIdentifier()
 	identifierKey := identifier.String()
 
+	// ReRegistrationScript does not generate AutCoins.
+	// if the view contain the autInstance, does not refresh it.
 	err := view.fetchCTAUTMain(db, nil, identifier)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// ensure the instance does exist
 	instance, exist := view.instances[identifierKey]
 	if !exist || instance == nil || instance.metadata == nil {
-		return nil, fmt.Errorf("fail to find the registered AUT instance identified by %s",
-			identifierKey)
+		return fmt.Errorf("disconnectAutScriptReRegistration: fail to find the Aut instance %s", identifierKey)
 	}
 
-	updatedAUTInfo, ok := sctaut.(*UpdatedCTAUTInfo)
+	// use spentAut journal to restore
+	spentAutInstance, ok := sctaut.(*SpentAutInstance)
 	if !ok {
-		return nil, fmt.Errorf("invalid updated information")
+		return fmt.Errorf("invalid spentAutInstance information")
 	}
+
 	// assert
-	if !updatedAUTInfo.IsReRegistration {
-		return nil, fmt.Errorf("invalid updated information")
+	if spentAutInstance.SpentHeight != blockHeight {
+		return AssertError(fmt.Sprintf("disconnectAutScriptReRegistration: for AutInstance (%s), spentAutInstance.SpentHeight (%d) != blockHeight (%d)",
+			identifier.String(), spentAutInstance.SpentHeight, blockHeight))
 	}
-	if updatedAUTInfo.Height != blockHeight {
-		return nil, fmt.Errorf("invalid updated information")
+
+	err = spentAutInstance.ScriptMatchCheck(extAutScript)
+	if err != nil {
+		return err
 	}
 
 	// rollback with spend journal directly
-	instance.metadata = updatedAUTInfo.Before.Clone()
-	return nil, nil
+	instance.metadata = spentAutInstance.Before.Clone()
+	view.instances[identifierKey] = instance
+	return nil
 }
 
-func (view *CTAUTViewpoint) disconnectMintTransaction(db database.DB, extAutScript *ctautapi.ExtAutScript,
-	blockHeight int32, sctaut SpentCTAUT) (map[string]struct{}, error) {
+// aut review done 2025.12.18
+func (view *CTAUTViewpoint) disconnectAutScriptMint(db database.DB, extAutScript *ctautapi.ExtAutScript,
+	blockHeight int32, sctaut SpentAut) error {
+
+	if extAutScript == nil {
+		return fmt.Errorf("disconnectAutScriptMint: the input extAutScript nil")
+	}
+
 	if extAutScript.Type() != ctautapi.AutScriptTypeMint {
-		return nil, fmt.Errorf("expected mint script, but got %d", extAutScript.Type())
+		return fmt.Errorf("disconnectAutScriptMint: expected mint script, but got %d", extAutScript.Type())
+	}
+
+	mintScript, ok := extAutScript.AutScript.(*ctautapi.MintScript)
+	if !ok {
+		return fmt.Errorf("fail to type extAutScript.AutScript to ReRegistrationScript")
 	}
 
 	identifier := extAutScript.AutIdentifier()
@@ -1051,106 +1105,212 @@ func (view *CTAUTViewpoint) disconnectMintTransaction(db database.DB, extAutScri
 
 	// fetch outpoint from database if not exist with instance in batch
 	outpoints := map[ctautapi.HostOutPoint]struct{}{}
-	generatedTokens := extAutScript.GeneratedTokens()
-	for _, token := range generatedTokens {
-		outpoints[token.HostOutPoint] = struct{}{}
+	for _, scriptOutputToken := range extAutScript.GeneratedTokens() {
+		outpoints[scriptOutputToken.HostOutPoint] = struct{}{}
 	}
 	err := view.fetchCTAUTMain(db, outpoints, identifier)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// ensure the instance does exist
 	instance, exist := view.instances[identifierKey]
 	if !exist || instance == nil || instance.metadata == nil {
-		return nil, fmt.Errorf("fail to find the registered AUT instance identified by %s",
-			identifierKey)
+		return fmt.Errorf("disconnectAutScriptMint: fail to find the AutInstance %s", identifierKey)
 	}
 
-	// abolish generate CTAUT coins
-	for _, token := range generatedTokens {
-		if _, exist := instance.coins[token.HostOutPoint]; !exist {
-			return nil, fmt.Errorf("unknown coins %s for AUT instance %s", token.HostOutPoint, identifierKey)
+	if instance.coins == nil {
+		// Implies that no coins to rollback, which is out of design
+		return fmt.Errorf("disconnectAutScriptMint: Aut instance %s has no coins", identifierKey)
+	}
+
+	// fetch back the generated coins to delete later
+	// abolish generate aut coins
+	for i, scriptOutputToken := range extAutScript.GeneratedTokens() {
+		coin, exist := instance.coins[scriptOutputToken.HostOutPoint]
+		if !exist {
+			return fmt.Errorf("disconnectAutScriptMint: the %d -th output Token (%s) of the AutScript do not have coin in AutInstance %s",
+				i, scriptOutputToken.HostOutPoint.String(), identifierKey)
 		}
-		instance.coins[token.HostOutPoint].Spend()
+
+		if coin == nil {
+			return fmt.Errorf("disconnectAutScriptMint: the %d -th output Token (%s) of the AutScript maps to a nil coin in AutInstance %s",
+				i, scriptOutputToken.HostOutPoint.String(), identifierKey)
+		}
+
+		if coin.IsSpent() {
+			return fmt.Errorf("disconnectAutScriptMint: the %d -th output Token (%s) of the AutScript maps to a SPENT coin in AutInstance %s",
+				i, scriptOutputToken.HostOutPoint.String(), identifierKey)
+		}
+
+		// 2025.12.18 Note that here set the coins to be "spent", so that later they will be deleted from database.
+		coin.Spend()
+
+		instance.PutCoin(scriptOutputToken.HostOutPoint, coin)
 	}
 
-	// restore consumed CTAUT root coins
-	consumedHostOutpoints := extAutScript.ConsumedHostOutpoints()
-	for i := 0; i < len(consumedHostOutpoints); i++ {
-		hostOutpoint := consumedHostOutpoints[i]
-
-		copiedAUTPoint := &ctautapi.HostOutPoint{}
-		copy(copiedAUTPoint.TxHash[:], hostOutpoint.TxHash[:])
-		copiedAUTPoint.Index = hostOutpoint.Index
-
-		instance.metadata.ActiveRootTokenSet[copiedAUTPoint.String()] = copiedAUTPoint
-		log.Debugf("try to resume consumed root coin (%s,%d) for AUT identified by %s",
-			hostOutpoint.TxHash.String(), hostOutpoint.Index, identifierKey)
+	// restore consumed aut root coins using the spentAut journal
+	spentAutTokenList, ok := sctaut.(*SpentAutTokenList)
+	if !ok {
+		return fmt.Errorf("disconnectAutScriptMint: invalid SpentAutTokenList information")
 	}
 
-	return nil, nil
+	// assert
+	if spentAutTokenList.SpentHeight != blockHeight {
+		return AssertError(fmt.Sprintf("disconnectAutScriptMint: for AutInstance (%s), spentAutTokenList.SpentHeight (%d) != blockHeight (%d)",
+			identifier.String(), spentAutTokenList.SpentHeight, blockHeight))
+	}
+
+	err = spentAutTokenList.ScriptMatchCheck(extAutScript)
+	if err != nil {
+		return err
+	}
+
+	// Note that spentAutTokenList.ScriptMatchCheck(extAutScript) has been called previously
+	// todo: 2025.12.19 add Put method to avoid such nil checks
+	if instance.metadata.ActiveRootTokenSet == nil {
+		instance.metadata.ActiveRootTokenSet = make(map[string]*ctautapi.HostOutPoint)
+	}
+	for i := len(spentAutTokenList.SpentAutTokens) - 1; i >= 0; i-- {
+		spentAutToken := spentAutTokenList.SpentAutTokens[i]
+
+		// HostOutPoint    api.HostOutPoint
+		hostOutPoint := spentAutToken.HostOutPoint.Clone()
+		hostOpStr := hostOutPoint.String()
+		if _, ok := instance.metadata.ActiveRootTokenSet[hostOpStr]; ok {
+			return fmt.Errorf("fail to put %d -th spentAutToken back to ActiveRootTokenSet: there is stll another one", i)
+		}
+		instance.metadata.ActiveRootTokenSet[hostOpStr] = hostOutPoint
+
+		log.Debugf("try to resume consumed root coin %s for AutInstance %s", hostOpStr, identifierKey)
+	}
+
+	// sub the mintedAmount
+	if instance.metadata.MintedAmount < mintScript.Vin() {
+		return fmt.Errorf("the AutInstance has MintedAmount= %d, while the disconnecting MintScript is atteming to rollback %d",
+			instance.metadata.MintedAmount, mintScript.Vin())
+	}
+	instance.metadata.MintedAmount = instance.metadata.MintedAmount - mintScript.Vin()
+
+	// explicitly pub back
+	view.instances[identifierKey] = instance
+	return nil
 }
-func (view *CTAUTViewpoint) disconnectTransferTransaction(db database.DB, extAutScript *ctautapi.ExtAutScript,
-	blockHeight int32, sctaut SpentCTAUT) (map[string]struct{}, error) {
+
+// aut review done 2025.12.19
+func (view *CTAUTViewpoint) disconnectAutScriptTransfer(db database.DB, extAutScript *ctautapi.ExtAutScript,
+	blockHeight int32, sctaut SpentAut) error {
+
+	if extAutScript == nil {
+		return fmt.Errorf("disconnectAutScriptTransfer: the input extAutScript nil")
+	}
+
 	if extAutScript.Type() != ctautapi.AutScriptTypeTransfer {
-		return nil, fmt.Errorf("expected transfer script, but got %d", extAutScript.Type())
+		return fmt.Errorf("expected transfer script, but got %d", extAutScript.Type())
+	}
+	_, ok := extAutScript.AutScript.(*ctautapi.TransferScript)
+	if !ok {
+		return fmt.Errorf("fail to type extAutScript.AutScript to TransferScript")
 	}
 
 	identifier := extAutScript.AutIdentifier()
 	identifierKey := identifier.String()
 
-	// fetch generate outpoint from database if not exist with instance in batch
+	// fetch generated coins from database if not exist with instance in batch
 	outpoints := map[ctautapi.HostOutPoint]struct{}{}
 	generatedTokens := extAutScript.GeneratedTokens()
 	for _, token := range generatedTokens {
 		outpoints[token.HostOutPoint] = struct{}{}
 	}
+
+	// Note that if a coin generated by this tx are consumed by a block/tx which was rollback in previous step,
+	// it should have in the view and being unspend, the fetch will not "refresh" it.
 	err := view.fetchCTAUTMain(db, outpoints, identifier)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	instance, exist := view.instances[identifierKey]
 	if !exist || instance == nil || instance.metadata == nil {
-		return nil, fmt.Errorf("fail to find the registered AUT instance identified by %s",
-			identifierKey)
+		return fmt.Errorf("fail to find the Aut %s", identifierKey)
 	}
 
-	for _, token := range generatedTokens {
-		if _, exist := instance.coins[token.HostOutPoint]; !exist {
-			return nil, fmt.Errorf("unknown tokens %s for AUT instance %s", token.HostOutPoint, identifierKey)
+	if instance.coins == nil {
+		// Implies that no coins to rollback, which is out of design
+		return fmt.Errorf("disconnectAutScriptTransfer: Aut instance %s has no coins", identifierKey)
+	}
+
+	// fetch back the generated outputs to delete later
+	// Note that now the autInstance MUST exist.
+	for _, outputToken := range generatedTokens {
+		if _, exist := instance.coins[outputToken.HostOutPoint]; !exist {
+			return fmt.Errorf("unknown tokens %s for Aut instance %s", outputToken.HostOutPoint.String(), identifierKey)
 		}
-		instance.coins[token.HostOutPoint].Spend()
+
+		coin := instance.coins[outputToken.HostOutPoint]
+		if coin == nil {
+			return fmt.Errorf("coin %s for AutInstance %s is nil", outputToken.HostOutPoint.String(), identifierKey)
+		}
+		if coin.IsSpent() {
+			return fmt.Errorf("coin %s for AutInstance %s is spent, out of design for disconnection",
+				outputToken.HostOutPoint.String(), identifierKey)
+		}
+
+		// will be deleted due its spent status
+		coin.Spend()
+		instance.PutCoin(outputToken.HostOutPoint, coin)
 	}
 
-	consumedAutTokens, ok := sctaut.(*SpentCTAUTTokens)
+	// restore the consumed coins using the spentAut journal
+	spentAutTokenList, ok := sctaut.(*SpentAutTokenList)
 	if !ok {
-		return nil, fmt.Errorf("invalid updated information")
-	}
-	consumedHostOutpoints := extAutScript.ConsumedHostOutpoints()
-	// assert
-	if len(consumedHostOutpoints) != len(*consumedAutTokens) {
-		return nil, fmt.Errorf("mismatched spend journal")
-	}
-	// TODO(CTAUT) consider order?
-	for i := len(*consumedAutTokens) - 1; i >= 0; i-- {
-		// TODO it seems there is no way to get script other than here
-		token := (*consumedAutTokens)[i]
-		hostOutpoint := consumedHostOutpoints[i]
-		if _, ok := instance.coins[*hostOutpoint]; ok {
-			return nil, fmt.Errorf("duplicate coins %s for AUT instance %s", hostOutpoint.String(), identifierKey)
-		}
-		// TODO assert?
-		instance.coins[*hostOutpoint] = NewCTAUTCoin(token.Version, identifier, token.ValueScript, blockHeight)
+		return fmt.Errorf("invalid spentAutTokenList")
 	}
 
-	return nil, nil
+	// assert
+	if spentAutTokenList.SpentHeight != blockHeight {
+		return AssertError(fmt.Sprintf("disconnectAutScriptTransfer: for AutInstance (%s), spentAutTokenList.SpentHeight (%d) != blockHeight (%d)",
+			identifier.String(), spentAutTokenList.SpentHeight, blockHeight))
+	}
+
+	err = spentAutTokenList.ScriptMatchCheck(extAutScript)
+	if err != nil {
+		return err
+	}
+
+	// Note that spentAutTokenList.ScriptMatchCheck(extAutScript) has been called previously
+	for i := len(spentAutTokenList.SpentAutTokens) - 1; i >= 0; i-- {
+		spentAutToken := spentAutTokenList.SpentAutTokens[i]
+		consumedCoin := NewCTAUTCoin(spentAutToken.Version, spentAutToken.autIdentifier, spentAutToken.ValueScript, spentAutToken.GeneratedHeight)
+		consumedCoin.packedFlags = cafModified
+
+		// HostOutPoint    api.HostOutPoint
+		hostOutPoint := spentAutToken.HostOutPoint.Clone()
+		instance.PutCoin(*hostOutPoint, consumedCoin)
+
+		log.Debugf("try to resume consumed coin %s for AutInstance %s", hostOutPoint.String(), identifierKey)
+	}
+
+	// explicitly put back
+	view.instances[identifierKey] = instance
+
+	return nil
 }
-func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, extAutScript *ctautapi.ExtAutScript,
-	blockHeight int32, sctaut SpentCTAUT) (map[string]struct{}, error) {
+
+// aut review done 2025.12.18
+func (view *CTAUTViewpoint) disconnectAutScriptBurn(db database.DB, extAutScript *ctautapi.ExtAutScript,
+	blockHeight int32, sctaut SpentAut) error {
+
+	if extAutScript == nil {
+		return fmt.Errorf("disconnectAutScriptBurn: the input extAutScript nil")
+	}
+
 	if extAutScript.Type() != ctautapi.AutScriptTypeBurn {
-		return nil, fmt.Errorf("expected burn script, but got %d", extAutScript.Type())
+		return fmt.Errorf("expected burn script, but got %d", extAutScript.Type())
+	}
+	_, ok := extAutScript.AutScript.(*ctautapi.BurnScript)
+	if !ok {
+		return fmt.Errorf("fail to type extAutScript.AutScript to BurnScript")
 	}
 
 	identifier := extAutScript.AutIdentifier()
@@ -1166,62 +1326,98 @@ func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, extAutScri
 	}
 	err := view.fetchCTAUTMain(db, outpoints, identifier)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	instance, exist := view.instances[identifierKey]
-	// TODO(CTAUT) assert rule need match the initialization
 	if !exist || instance == nil || instance.metadata == nil {
-		return nil, fmt.Errorf("fail to find the registered AUT instance identified by %s",
+		return fmt.Errorf("fail to find the registered AUT instance identified by %s",
 			identifierKey)
 	}
 
-	// the last generated token would be burned
-	for i := len(generatedTokens) - 2; i >= 0; i-- {
-		coin := generatedTokens[i]
-		if _, exist := instance.coins[coin.HostOutPoint]; !exist {
-			return nil, fmt.Errorf("unknown coins %s for AUT instance %s", coin.HostOutPoint.String(), identifierKey)
-		}
-		instance.coins[coin.HostOutPoint].Spend()
+	if instance.coins == nil {
+		// Implies that no coins to rollback
+		// Note that this is possible, since this is a BurnScript
+		// do nothing
+		// to avoid handle this case, we use instance.PutCoin()
 	}
+
+	// fetch back the generated outputs to delete later
+	// Note that spentAutTokenList.ScriptMatchCheck(extAutScript) has been called previously
+	// the last generated token would be burned
+	for i := 0; i < len(generatedTokens)-1; i++ {
+		outputToken := generatedTokens[i]
+
+		coin := instance.coins[outputToken.HostOutPoint]
+		if coin == nil {
+			return fmt.Errorf("coin %s for AutInstance %s is nil", outputToken.HostOutPoint.String(), identifierKey)
+		}
+		if coin.IsSpent() {
+			return fmt.Errorf("coin %s for AutInstance %s is spent, out of design for disconnection",
+				outputToken.HostOutPoint.String(), identifierKey)
+		}
+
+		// will be deleted due its spent status
+		coin.Spend()
+		instance.PutCoin(outputToken.HostOutPoint, coin)
+	}
+
+	// update the burned amount
 	burnedToken := generatedTokens[len(generatedTokens)-1]
 	if _, exist := instance.coins[burnedToken.HostOutPoint]; exist {
-		return nil, fmt.Errorf("should not exist coin %s for AUT instance %s", burnedToken.HostOutPoint.String(), identifierKey)
+		return fmt.Errorf("should not exist coin %s for Aut instance %s, since it should be a burned one",
+			burnedToken.HostOutPoint.String(), identifierKey)
 	}
-	// update the burned amount
 	autTxo := &ctautwire.AutTxo{}
 	err = autTxo.Deserialize(burnedToken.ValueScript)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	burnedValue, err := abecryptox.ExtractAutTxoValue(autTxo, nil, nil)
+	burnValue, err := abecryptox.ExtractAutTxoValue(autTxo, nil, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	instance.metadata.BurnedAmount -= burnedValue
 
-	consumedAutTokens, ok := sctaut.(*SpentCTAUTTokens)
+	if instance.metadata.BurnedAmount < burnValue {
+		return fmt.Errorf("the AutInstance has BurnedAmount=%d, while the disconnecting BurnScript is atteming to rollback %d",
+			instance.metadata.BurnedAmount, burnValue)
+	}
+	instance.metadata.BurnedAmount = instance.metadata.BurnedAmount - burnValue
+
+	// retore the consumed coins using the spentAut journal
+	spentAutTokenList, ok := sctaut.(*SpentAutTokenList)
 	if !ok {
-		return nil, fmt.Errorf("invalid updated information")
-	}
-	consumedHostOutpoints := extAutScript.ConsumedHostOutpoints()
-	// assert
-	if len(consumedHostOutpoints) != len(*consumedAutTokens) {
-		return nil, fmt.Errorf("mismatched spend journal")
-	}
-	// TODO(CTAUT) consider order?
-	for i := len(*consumedAutTokens) - 1; i >= 0; i-- {
-		// TODO it seems there is no way to get script other than here
-		token := (*consumedAutTokens)[i]
-		hostOutpoint := consumedHostOutpoints[i]
-		if _, ok := instance.coins[*hostOutpoint]; ok {
-			return nil, fmt.Errorf("duplicate coins %s for AUT instance %s", hostOutpoint.String(), identifierKey)
-		}
-		// TODO assert?
-		instance.coins[*hostOutpoint] = NewCTAUTCoin(token.Version, identifier, token.ValueScript, blockHeight)
+		return fmt.Errorf("invalid spentAutTokenList")
 	}
 
-	return nil, nil
+	// assert
+	if spentAutTokenList.SpentHeight != blockHeight {
+		return AssertError(fmt.Sprintf("disconnectAutScriptBurn: for AutInstance (%s), spentAutTokenList.SpentHeight (%d) != blockHeight (%d)",
+			identifier.String(), spentAutTokenList.SpentHeight, blockHeight))
+	}
+
+	err = spentAutTokenList.ScriptMatchCheck(extAutScript)
+	if err != nil {
+		return err
+	}
+
+	// Note that spentAutTokenList.ScriptMatchCheck(extAutScript) has been called previously
+	for i := len(spentAutTokenList.SpentAutTokens) - 1; i >= 0; i-- {
+		spentAutToken := spentAutTokenList.SpentAutTokens[i]
+		consumedCoin := NewCTAUTCoin(spentAutToken.Version, spentAutToken.autIdentifier, spentAutToken.ValueScript, spentAutToken.GeneratedHeight)
+		consumedCoin.packedFlags = cafModified
+
+		// HostOutPoint    api.HostOutPoint
+		hostOutPoint := spentAutToken.HostOutPoint.Clone()
+		instance.PutCoin(*hostOutPoint, consumedCoin)
+
+		log.Debugf("try to resume consumed coin %s for AutInstance %s", hostOutPoint.String(), identifierKey)
+	}
+
+	// explicitly put back
+	view.instances[identifierKey] = instance
+
+	return nil
 }
 
 // disconnectCTAUTScripts updates the view by removing all of the transactions
@@ -1230,70 +1426,73 @@ func (view *CTAUTViewpoint) disconnectBurnTransaction(db database.DB, extAutScri
 // view to the block before the passed block.
 //
 // NOTE: saut must not be modified anyway!!!
-func (view *CTAUTViewpoint) disconnectCTAUTScripts(db database.DB, block *abeutil.BlockAbe,
-	sauts []SpentCTAUT, hostView *UtxoRingViewpoint,
+// aut review done 2025.12.18
+//
+// Note that as view carries all the new/recovered status except the AutInstance to be unregistered,
+// the returned map[string]struct{} carries the autIdentifierkeys for the AutInstance to be unregistered.
+func (view *CTAUTViewpoint) disconnectAutScripts(db database.DB, block *abeutil.BlockAbe,
+	sauts []SpentAut, hostView *UtxoRingViewpoint,
 ) (map[string]struct{}, error) {
 
 	// Sanity check the correct number of sauts are provided.
-	if len(sauts) != countSpentOutputsCTAUT(block) {
-		return nil, AssertError("disconnectCTAUTScripts called with bad " +
-			"spent transaction out information")
+	if len(sauts) != countSpentAuts(block) {
+		return nil, AssertError("disconnectAutScripts called with bad spentAut information")
 	}
 
 	blockHeight := block.Height()
 	// Loop backwards through all ctAutScripts so everything is unspent in
 	// reverse order.  This is necessary since ctAutScripts later in a block
 	// can spend from previous ones.
-	ctAutScripts := block.ExtAutScripts()
-	unregisteredCTAUTs := map[string]struct{}{}
-	for index := len(ctAutScripts) - 1; index >= 0; index-- {
-		ctAutScript := ctAutScripts[index]
+	extAutScripts := block.ExtAutScripts()
+	unregisteredAutInstances := map[string]struct{}{}
+	for index := len(extAutScripts) - 1; index >= 0; index-- {
+		extAutScript := extAutScripts[index]
 
-		switch ctAutScript.AutScript.(type) {
+		switch extAutScript.AutScript.(type) {
 		case *ctautapi.RegistrationScript:
-			unregisteredInstances, err := view.disconnectRegistrationTransaction(db, ctAutScript, blockHeight, sauts[index])
+			autIdToDel, err := view.disconnectAutScriptRegistration(db, extAutScript, blockHeight, sauts[index])
 			if err != nil {
-				return nil, AssertError(fmt.Sprintf("disconnectTransactions called with bad "+
-					"spent transaction out information: %s", err))
+				return nil, fmt.Errorf("disconnectAutScriptRegistration fail: %v", err)
 			}
-			for identifier := range unregisteredInstances {
-				unregisteredCTAUTs[identifier] = struct{}{}
+			autIdKeyToDel := autIdToDel.String()
+			if _, ok := unregisteredAutInstances[autIdKeyToDel]; ok {
+				return nil, AssertError(fmt.Sprintf("disconnectAutScriptRegistration claims to unregister an AutIntance %s which has been claimed to unregister by a previous AutScript-rollback",
+					autIdKeyToDel))
 			}
+			unregisteredAutInstances[autIdKeyToDel] = struct{}{}
+
 		case *ctautapi.ReRegistrationScript:
-			_, err := view.disconnectReRegistrationTransaction(db, ctAutScript, blockHeight, sauts[index])
+			err := view.disconnectAutScriptReRegistration(db, extAutScript, blockHeight, sauts[index])
 			if err != nil {
-				return nil, AssertError(fmt.Sprintf("disconnectTransactions called with bad "+
-					"spent transaction out information: %s", err))
+				return nil, fmt.Errorf("disconnectAutScriptReRegistration fail: %v", err)
 			}
+
 		case *ctautapi.MintScript:
-			_, err := view.disconnectMintTransaction(db, ctAutScript, blockHeight, sauts[index])
+			err := view.disconnectAutScriptMint(db, extAutScript, blockHeight, sauts[index])
 			if err != nil {
-				return nil, AssertError(fmt.Sprintf("disconnectTransactions called with bad "+
-					"spent transaction out information: %s", err))
+				return nil, fmt.Errorf("disconnectAutScriptMint fail: %v", err)
 			}
 
 		case *ctautapi.TransferScript:
-			_, err := view.disconnectTransferTransaction(db, ctAutScript, blockHeight, sauts[index])
+			err := view.disconnectAutScriptTransfer(db, extAutScript, blockHeight, sauts[index])
 			if err != nil {
-				return nil, AssertError(fmt.Sprintf("disconnectTransactions called with bad "+
-					"spent transaction out information: %s", err))
+				return nil, fmt.Errorf("disconnectAutScriptTransfer fail: %v", err)
 			}
 
 		case *ctautapi.BurnScript:
-			_, err := view.disconnectBurnTransaction(db, ctAutScript, blockHeight, sauts[index])
+			err := view.disconnectAutScriptBurn(db, extAutScript, blockHeight, sauts[index])
 			if err != nil {
-				return nil, AssertError(fmt.Sprintf("disconnectTransactions called with bad "+
-					"spent transaction out information: %s", err))
+				return nil, fmt.Errorf("disconnectAutScriptTransfer fail: %v", err)
 			}
 		default:
-			return nil, AssertError("disconnectTransactions called with unknown AUT transaction type")
+			return nil, AssertError("disconnectTransactions called with unknown AutScript type")
 		}
 	}
 
 	// Update the best hash for view to the previous block since all of the
 	// ctAutScripts for the current block have been disconnected.
 	view.SetBestHash(&block.MsgBlock().Header.PrevBlock)
-	return unregisteredCTAUTs, nil
+	return unregisteredAutInstances, nil
 }
 
 // commit prunes all entries marked modified that are now fully spent and marks
@@ -1324,6 +1523,9 @@ func (view *CTAUTViewpoint) commit() {
 // This function fetches autCoins of AutInstance with identifier, as well as the AutInstance's metadata.
 // review done 2025.12.16
 // todo: rename to a more accurate one
+// Note:
+// (1) if metadata has been in the view, it will not be fetched from database.
+// (2) if the the token for an HostOutPoint has been in the view, it will not be fetched from database;
 func (view *CTAUTViewpoint) fetchCTAUTMain(db database.DB, outpoints map[ctautapi.HostOutPoint]struct{}, identifier ctautapi.AutId) error {
 	//if len(identifier) != ctaut.AutIdentifierLength {
 	//	return fmt.Errorf("invalid aut identifier:%v", identifier)
@@ -1339,49 +1541,65 @@ func (view *CTAUTViewpoint) fetchCTAUTMain(db database.DB, outpoints map[ctautap
 	autIdentifierKey := identifier.String()
 	return db.View(func(dbTx database.Tx) error {
 		// firstly, fetch the meta information for specified identifier
-		if _, ok := view.instances[autIdentifierKey]; !ok {
+		instance, ok := view.instances[autIdentifierKey]
+		if !ok {
 			// fetch aut info with root coin
 			metadata, err := dbFetchCTAUTMetadata(dbTx, identifier)
 			if err != nil {
 				return err
 			}
 			if metadata != nil {
-				view.instances[autIdentifierKey] = &CTAUTInstance{
-					metadata: metadata,
-					// todo: initialize coins 2025.12.11; should use New function for CTAUTInstance
-				}
+				instance = NewCTAUTInstance(metadata, nil)
+				view.instances[autIdentifierKey] = instance
+			} else {
+				instance = nil
 			}
+
 		} else {
+			// 2025.12.18 It MUST NOT appear that instance != nil && instance.metadata==nil
+			if instance == nil {
+				return AssertError(fmt.Sprintf("fetchCTAUTMain: for autIdentifier (%s), the instance exists but being nil", autIdentifierKey))
+			}
+			if instance.metadata == nil {
+				return AssertError(fmt.Sprintf("fetchCTAUTMain: for autIdentifier (%s), the instance exists but the metadat is nil", autIdentifierKey))
+			}
+
 			// 2025.12.13 Note that view is a memory object, it is assumed that it is more fresh than the database.
 			// So, if view contains the AutInstance, it does not load it from database.
 		}
 
-		if view.instances[autIdentifierKey] != nil {
-			if view.instances[autIdentifierKey].coins == nil {
-				view.instances[autIdentifierKey].coins = make(map[ctautapi.HostOutPoint]*CTAUTCoin, len(outpoints))
-			}
-			for outpoint := range outpoints {
-				// when the view has corresponding outpoints, do not
-				// fetch from database, it means that outpoint has fetched
-				if view.instances[autIdentifierKey].coins[outpoint] != nil {
-					// memory is more fresh than database
-					continue
-				}
+		if instance == nil {
+			return nil
+		}
 
-				coin, err := dbFetchCTAUTCoin(dbTx, outpoint)
-				if err != nil {
-					return err
-				}
+		if instance.coins == nil {
+			instance.coins = make(map[ctautapi.HostOutPoint]*CTAUTCoin, len(outpoints))
+		}
+		for outpoint := range outpoints {
+			// when the view has corresponding outpoints, do not
+			// fetch from database, it means that outpoint has fetched
+			if instance.coins[outpoint] != nil {
+				// memory is more fresh than database
+				continue
+			}
+
+			coin, err := dbFetchCTAUTCoin(dbTx, outpoint)
+			if err != nil {
+				return err
+			}
+
+			if coin != nil {
 				// assert
-				if coin != nil {
-					if !bytes.Equal(coin.identifier[:], identifier[:]) {
-						return fmt.Errorf("invalid fetch for point (%s, %d) for AUT instance %s",
-							outpoint.TxHash, outpoint.Index, autIdentifierKey)
-					}
+				if !bytes.Equal(coin.identifier[:], identifier[:]) {
+					return fmt.Errorf("invalid fetch for point (%s, %d) for AUT instance %s",
+						outpoint.TxHash, outpoint.Index, autIdentifierKey)
 				}
-				view.instances[autIdentifierKey].coins[outpoint] = coin
+				instance.coins[outpoint] = coin
 			}
 		}
+
+		view.instances[autIdentifierKey] = instance
+
 		return nil
 	})
 }
