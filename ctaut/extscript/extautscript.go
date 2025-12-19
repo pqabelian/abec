@@ -334,6 +334,7 @@ func (extAutScript *ExtAutScript) CreateAutMetadata(createdHeight int32) (*scrip
 		BurnedAmount:         0,
 		ActiveRootTokenSet:   rootTokenSet,
 		UpdateScriptVersions: []uint32{registerScript.Version()},
+		UpdateHistoryHeights: []int32{createdHeight},
 	}
 	return newAutMetadata, nil
 }
