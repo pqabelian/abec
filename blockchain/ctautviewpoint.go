@@ -2,7 +2,6 @@ package blockchain
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abeutil"
@@ -519,36 +518,6 @@ func (view *CTAUTViewpoint) connectRegistrationScript(extAutScript *ctautapi.Ext
 		*sctauts = append(*sctauts, saut)
 	}
 
-	log.Debugf("In transaction %s, CT-AUT with identifier %s with following configuration is registered:", txHash, identifier.String())
-	log.Debugf("\t Version: %d", newAutMetadata.Version)
-	log.Debugf("\t UpdatedHeight: %d", newAutMetadata.UpdatedHeight)
-	log.Debugf("\t Name: %v:", hex.EncodeToString(newAutMetadata.AutName))
-	log.Debugf("\t Symbol: %v", hex.EncodeToString(newAutMetadata.AutSymbol))
-	log.Debugf("\t BaseUnitName: %v", hex.EncodeToString(newAutMetadata.BaseUnitName))
-	log.Debugf("\t SubUnitName: %v", hex.EncodeToString(newAutMetadata.SubUnitName))
-	log.Debugf("\t UnitScale: %v", newAutMetadata.UnitScale)
-	log.Debugf("\t Memo: %v", newAutMetadata.AutMemo)
-	log.Debugf("\t PlannedTotalSupply: %v", newAutMetadata.PlannedTotalSupply)
-	log.Debugf("\t ReregistrationExpireHeight: %v", newAutMetadata.ReregistrationExpireHeight)
-	log.Debugf("\t ReregistrationThreshold: %v", newAutMetadata.ReregistrationThreshold)
-	log.Debugf("\t MintThreshold: %v", newAutMetadata.MintThreshold)
-	log.Debugf("\t PrivacyType: %v", newAutMetadata.PrivacyType)
-	log.Debugf("\t Totoal %d issuers", len(newAutMetadata.Issuers))
-	for i := 0; i < len(newAutMetadata.Issuers); i++ {
-		log.Debugf("\t\t [%d] %s", i, newAutMetadata.Issuers[i].String())
-	}
-	log.Debugf("\t Enabled RootCoin: len = %d", len(newAutMetadata.ActiveRootTokenSet))
-	for point := range newAutMetadata.ActiveRootTokenSet {
-		log.Debugf("\t\t %s", point)
-	}
-	log.Debugf("\t Updated Version: len = %d", len(newAutMetadata.UpdateScriptVersions))
-	for i := 0; i < len(newAutMetadata.UpdateScriptVersions); i++ {
-		log.Debugf("\t\t %d", newAutMetadata.UpdateScriptVersions[i])
-	}
-	log.Debugf("\t Updated Hieght: len = %d", len(newAutMetadata.UpdateHistoryHeights))
-	for i := 0; i < len(newAutMetadata.UpdateHistoryHeights); i++ {
-		log.Debugf("\t\t %d", newAutMetadata.UpdateHistoryHeights[i])
-	}
 	return nil
 }
 
@@ -1551,7 +1520,7 @@ func (view *CTAUTViewpoint) fetchCTAUTMain(db database.DB, outpoints map[ctautap
 				continue
 			}
 
-			coin, err := dbFetchCTAUTCoin(dbTx, outpoint)
+			coin, err := dbFetchCTAUTCoin(dbTx, outpoint, identifier)
 			if err != nil {
 				return err
 			}
@@ -1627,7 +1596,7 @@ func (view *CTAUTViewpoint) fetchCTAUTToken(db database.DB, identifier ctautapi.
 		instance.coins = map[ctautapi.HostOutPoint]*CTAUTCoin{}
 	}
 	err = db.View(func(dbTx database.Tx) error {
-		coin, err = dbFetchCTAUTCoin(dbTx, outpoint)
+		coin, err = dbFetchCTAUTCoin(dbTx, outpoint, identifier)
 		if err != nil {
 			return err
 		}
@@ -1823,7 +1792,7 @@ func (b *BlockChain) fetchCTAUTToken(identifier ctautapi.AutId, outpoint ctautap
 	var coin *CTAUTCoin
 	err := b.db.View(func(dbTx database.Tx) error {
 		var err error
-		coin, err = dbFetchCTAUTCoin(dbTx, outpoint)
+		coin, err = dbFetchCTAUTCoin(dbTx, outpoint, identifier)
 		return err
 	})
 	if err != nil {
