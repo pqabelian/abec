@@ -1,6 +1,9 @@
 package api
 
-import "github.com/abesuite/abec/ctaut/script"
+import (
+	"github.com/abesuite/abec/ctaut/script"
+	ctautwire "github.com/abesuite/abec/ctaut/wire"
+)
 
 // All CT-AUT Script must start with the following specified prefix.
 // Any that starts with this prefix but does not have valid script content will be rejected.
@@ -29,5 +32,7 @@ const (
 	AutPrivacyTypeLimitedPublic = script.AutPrivacyTypeLimitedPublic
 	AutPrivacyTypeLimitedHidden = script.AutPrivacyTypeLimitedHidden
 )
+
+const AutMetadataVersionInitValue = ctautwire.AutMetadataVersionInitValue
 
 // end of codes

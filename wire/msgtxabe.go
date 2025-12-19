@@ -70,6 +70,20 @@ func (outPoint *OutPointAbe) Clone() *OutPointAbe {
 	return newOutPoint
 }
 
+func (outPoint *OutPointAbe) IsEqual(obj *OutPointAbe) bool {
+	if outPoint == nil {
+		return false
+	}
+	if obj == nil {
+		return false
+	}
+
+	if outPoint.TxHash.IsEqual(&obj.TxHash) && outPoint.Index == obj.Index {
+		return true
+	}
+	return false
+}
+
 func (outPoint *OutPointAbe) OutPointId() OutPointId {
 	// For safety, we do not cache outPointId. 2023.12.08
 	//if outPoint.outPointId == nil {

@@ -113,6 +113,7 @@ type AutMetadata struct {
 	// and the new generated AutRootTokens are set to be the ActiveRootTokens.
 	// When a MintScript is executed, some ActiveRootTokens are consumed, and the remaining ActiveRootTokens keep active,
 	// that is, each time a MintScript is executed, some RootTokens are removed from ActiveRootTokenSet
+	// todo: add PutActiveRootToken() method 2025.12.18
 	ActiveRootTokenSet map[string]*HostOutPoint
 
 	// UpdateScriptVersions records all versions of the scripts that creates/updates the AutMetadata,
