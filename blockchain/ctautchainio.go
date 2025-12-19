@@ -107,8 +107,8 @@ type SpentAutInstance struct {
 	//	SpendingScriptType implies scriptType which generates this SpentJournalItem.
 	spendingScriptType ctautapi.AutScriptType
 
-	Before *ctautapi.AutMetadata
 	After  *ctautapi.AutMetadata
+	Before *ctautapi.AutMetadata
 }
 
 // SpentAutTokenList implements the interface SpentAut.
@@ -140,23 +140,20 @@ type SpentAutToken struct {
 
 	HostOutPoint ctautapi.HostOutPoint
 
-	//	IsRootToken implies whether the spentToken is RootToken (or normalToken)
-	IsRootToken bool
-
 	// Amount is the amount of the output.
 	ValueScript []byte
 }
 
 func NewSpentAutInstance(spentAutIdentifier ctautapi.AutId, spentHeight int32, generatedHeight int32, spendingScriptType ctautapi.AutScriptType,
-	before *ctautapi.AutMetadata, after *ctautapi.AutMetadata) *SpentAutInstance {
+	after *ctautapi.AutMetadata, before *ctautapi.AutMetadata) *SpentAutInstance {
 	return &SpentAutInstance{
 		spentType:          SpentAutTypeAutInstance,
 		spentAutIdentifier: spentAutIdentifier,
 		SpentHeight:        spentHeight,
 		GeneratedHeight:    generatedHeight,
 		spendingScriptType: spendingScriptType,
-		Before:             before,
 		After:              after,
+		Before:             before,
 	}
 }
 
@@ -172,13 +169,12 @@ func NewSpentAutTokenList(spentAutIdentifier ctautapi.AutId, spentHeight int32, 
 }
 
 func NewSpentAutToken(generatedHeight int32, autIdentifier ctautapi.AutId, version uint32,
-	hostOutPoint ctautapi.HostOutPoint, isRootToken bool, valueScript []byte) *SpentAutToken {
+	hostOutPoint ctautapi.HostOutPoint, valueScript []byte) *SpentAutToken {
 	return &SpentAutToken{
 		GeneratedHeight: generatedHeight,
 		autIdentifier:   autIdentifier,
 		Version:         version,
 		HostOutPoint:    hostOutPoint,
-		IsRootToken:     isRootToken,
 		ValueScript:     valueScript,
 	}
 }
@@ -218,7 +214,6 @@ func (spentAutToken *SpentAutToken) serializeSize() (int, error) {
 	size += chainhash.HashSize                                                                                // autIdentifier   api.AutId
 	size += wire.VarIntSerializeSize(uint64(spentAutToken.Version))                                           // Version uint32
 	size += spentAutToken.HostOutPoint.SerializeSize()                                                        // HostOutPoint ctautapi.HostOutPoint
-	size += 1                                                                                                 // IsRootToken     bool
 	size += wire.VarIntSerializeSize(uint64(len(spentAutToken.ValueScript))) + len(spentAutToken.ValueScript) // ValueScript []byte
 
 	return size, nil
@@ -248,23 +243,6 @@ func (spentAutToken *SpentAutToken) write(w io.Writer) error {
 	// HostOutPoint ctautapi.HostOutPoint
 	if err = wire.WriteOutPointAbe(w, 0, 0, &spentAutToken.HostOutPoint); err != nil {
 		return err
-	}
-
-	if spentAutToken.IsRootToken {
-		if _, err = w.Write([]byte{0x01}); err != nil {
-			return err
-		}
-
-		// spentAutToken.ValueScript
-		// Note that sanityCheck() has been called at start.
-
-	} else {
-		if _, err = w.Write([]byte{0x00}); err != nil {
-			return err
-		}
-
-		// spentAutToken.ValueScript
-		// Note that sanityCheck() has been called at start.
 	}
 
 	// ValueScript []byte
@@ -313,20 +291,6 @@ func (spentAutToken *SpentAutToken) read(r io.Reader) error {
 		return err
 	}
 
-	// IsRootToken     bool
-	byteTemp := make([]byte, 1)
-	_, err = io.ReadFull(r, byteTemp)
-	if err != nil {
-		return err
-	}
-	if byteTemp[0] == 0x01 {
-		spentAutToken.IsRootToken = true
-	} else if byteTemp[0] == 0x00 {
-		spentAutToken.IsRootToken = false
-	} else {
-		return fmt.Errorf("read IsRootToken (%d) is NOT 0 or 1", byteTemp[0])
-	}
-
 	// ValueScript []byte
 	if spentAutToken.ValueScript, err = wire.ReadVarBytes(r, 0, ctautapi.MaxAutValueScriptLength, "SpentAutToken.ValueScript"); err != nil {
 		return err
@@ -358,17 +322,9 @@ func (spentAutToken *SpentAutToken) sanityCheck() error {
 
 	// HostOutPoint ctautapi.HostOutPoint
 
-	// IsRootToken     bool
 	// ValueScript []byte
-
-	if spentAutToken.IsRootToken {
-		if len(spentAutToken.ValueScript) != 0 {
-			return fmt.Errorf("spentAutToken.IsRootToken == TRUE, but the ValueScript is not nil/empty")
-		}
-	} else {
-		if len(spentAutToken.ValueScript) == 0 {
-			return fmt.Errorf("spentAutToken.IsRootToken == FALSE, but the ValueScript is nil/empty")
-		}
+	if len(spentAutToken.ValueScript) == 0 {
+		return fmt.Errorf("spentAutToken.ValueScript is nil/empty")
 	}
 
 	return nil
@@ -386,12 +342,20 @@ func (spentAutInstance *SpentAutInstance) SerializeSize() (int, error) {
 	size += wire.VarIntSerializeSize(uint64(spentAutInstance.GeneratedHeight)) // GeneratedHeight int32
 	size += 1                                                                  // SpendingScriptType api.AutScriptType
 
+	// Not the SanityCheck() has been called at the start.
+	// After  *ctautapi.AutMetadata
+	afterSize, err := spentAutInstance.After.SerializeSize()
+	if err != nil {
+		return 0, err
+	}
+	size += afterSize
+
 	switch spentAutInstance.spendingScriptType {
 	case ctautapi.AutScriptTypeRegistration:
 		// Not the SanityCheck() has been called at the start.
 		// Before *ctautapi.AutMetadata
 
-	case ctautapi.AutScriptTypeReRegistration:
+	case ctautapi.AutScriptTypeReRegistration, ctautapi.AutScriptTypeMint:
 		// Not the SanityCheck() has been called at the start.
 		// Before *ctautapi.AutMetadata
 		beforeSize, err := spentAutInstance.Before.SerializeSize()
@@ -401,17 +365,10 @@ func (spentAutInstance *SpentAutInstance) SerializeSize() (int, error) {
 		size += beforeSize
 
 	default:
-		return 0, fmt.Errorf("spentAutInstance.SpendingScriptType is %s, out of design", spentAutInstance.spendingScriptType.String())
+		return 0, fmt.Errorf("spentAutInstance.SpendingScriptType is %s, out of design",
+			spentAutInstance.spendingScriptType.String())
 
 	}
-
-	// Not the SanityCheck() has been called at the start.
-	// After  *ctautapi.AutMetadata
-	afterSize, err := spentAutInstance.After.SerializeSize()
-	if err != nil {
-		return 0, err
-	}
-	size += afterSize
 
 	return size, nil
 }
@@ -451,13 +408,20 @@ func (spentAutInstance *SpentAutInstance) write(w io.Writer) error {
 		return err
 	}
 
+	// After  *ctautapi.AutMetadata
+	// Not the SanityCheck() has been called at the start.
+	err = spentAutInstance.After.Write(w)
+	if err != nil {
+		return err
+	}
+
 	// Before * ctautapi.AutMetadata
 	switch spentAutInstance.spendingScriptType {
 	case ctautapi.AutScriptTypeRegistration:
 		// Not the SanityCheck() has been called at the start.
 		// Before  *ctautapi.AutMetadata
 
-	case ctautapi.AutScriptTypeReRegistration:
+	case ctautapi.AutScriptTypeReRegistration, ctautapi.AutScriptTypeMint:
 		// Not the SanityCheck() has been called at the start.
 		// Before  *ctautapi.AutMetadata
 		err = spentAutInstance.Before.Write(w)
@@ -466,14 +430,8 @@ func (spentAutInstance *SpentAutInstance) write(w io.Writer) error {
 		}
 
 	default:
-		return fmt.Errorf("spentAutInstance.spendingScriptType is %s, out of design", spentAutInstance.spendingScriptType.String())
-	}
-
-	// After  *ctautapi.AutMetadata
-	// Not the SanityCheck() has been called at the start.
-	err = spentAutInstance.After.Write(w)
-	if err != nil {
-		return err
+		return fmt.Errorf("spentAutInstance.spendingScriptType is %s, out of design",
+			spentAutInstance.spendingScriptType.String())
 	}
 
 	return nil
@@ -491,9 +449,6 @@ func (spentAutInstance *SpentAutInstance) read(r io.Reader) error {
 		return err
 	}
 	spentAutInstance.spentType = SpentAutType(tmpByte[0])
-	if spentAutInstance.spentType != SpentAutTypeAutInstance {
-		return fmt.Errorf("the read spentType (%d) is not SpentAutTypeAutInstance", spentAutInstance.spentType)
-	}
 
 	// spentAutIdentifier api.AutId
 	_, err = io.ReadFull(r, spentAutInstance.spentAutIdentifier[:])
@@ -531,12 +486,19 @@ func (spentAutInstance *SpentAutInstance) read(r io.Reader) error {
 	}
 	spentAutInstance.spendingScriptType = ctautapi.AutScriptType(tmpByte[0])
 
+	// After  *ctautapi.AutMetadata
+	spentAutInstance.After = &ctautapi.AutMetadata{}
+	err = spentAutInstance.After.Read(r)
+	if err != nil {
+		return err
+	}
+
 	// Before * ctautapi.AutMetadata
 	switch spentAutInstance.spendingScriptType {
 	case ctautapi.AutScriptTypeRegistration:
 		spentAutInstance.Before = nil
 
-	case ctautapi.AutScriptTypeReRegistration:
+	case ctautapi.AutScriptTypeReRegistration, ctautapi.AutScriptTypeMint:
 		spentAutInstance.Before = &ctautapi.AutMetadata{}
 		err = spentAutInstance.Before.Read(r)
 		if err != nil {
@@ -544,14 +506,8 @@ func (spentAutInstance *SpentAutInstance) read(r io.Reader) error {
 		}
 
 	default:
-		return fmt.Errorf("spentAutInstance.spendingScriptType is %s, out of design", spentAutInstance.spendingScriptType.String())
-	}
-
-	// After  *ctautapi.AutMetadata
-	spentAutInstance.After = &ctautapi.AutMetadata{}
-	err = spentAutInstance.After.Read(r)
-	if err != nil {
-		return err
+		return fmt.Errorf("spentAutInstance.spendingScriptType is %s, out of design",
+			spentAutInstance.spendingScriptType.String())
 	}
 
 	err = spentAutInstance.SanityCheck()
@@ -584,47 +540,6 @@ func (spentAutInstance *SpentAutInstance) SanityCheck() error {
 		return fmt.Errorf("the GeneratedHeight (%d) is < 0", spentAutInstance.GeneratedHeight)
 	}
 
-	// SpendingScriptType api.AutScriptType
-	// Before * ctautapi.AutMetadata
-	switch spentAutInstance.spendingScriptType {
-	case ctautapi.AutScriptTypeRegistration:
-		if spentAutInstance.Before != nil {
-			return fmt.Errorf("spentAutInstance.spendingScriptType is AutScriptTypeRegistration, but spentAutInstance.Before is nil")
-		}
-
-		if spentAutInstance.SpentHeight != spentAutInstance.GeneratedHeight {
-			return fmt.Errorf("spentAutInstance.spendingScriptType is AutScriptTypeRegistration, but SpentHeight (%d) != GeneratedHeight (%d), out of design",
-				spentAutInstance.SpentHeight, spentAutInstance.GeneratedHeight)
-		}
-
-	case ctautapi.AutScriptTypeReRegistration:
-		if spentAutInstance.Before == nil {
-			return fmt.Errorf("spentAutInstance.spendingScriptType is AutScriptTypeReRegistration, but spentAutInstance.Before is nil")
-		}
-		if spentAutInstance.SpentHeight <= spentAutInstance.GeneratedHeight {
-			return fmt.Errorf("spentAutInstance.spendingScriptType is AutScriptTypeReRegistration, but SpentHeight (%d) <= GeneratedHeight (%d), out of design",
-				spentAutInstance.SpentHeight, spentAutInstance.GeneratedHeight)
-		}
-
-		err := spentAutInstance.Before.SanityCheck()
-		if err != nil {
-			return err
-		}
-
-		if !bytes.Equal(spentAutInstance.spentAutIdentifier[:], spentAutInstance.Before.AutIdentifier[:]) {
-			return fmt.Errorf("spentAutInstance.spentAutIdentifier is %s, but spentAutInstance.Before.AutIdentifier is %s",
-				spentAutInstance.spentAutIdentifier.String(), spentAutInstance.Before.AutIdentifier.String())
-		}
-
-		if spentAutInstance.GeneratedHeight != spentAutInstance.Before.UpdatedHeight {
-			return fmt.Errorf("spentAutInstance.spendingScriptType is AutScriptTypeReRegistration, but spentAutInstance.GeneratedHeight (%d) != spentAutInstance.Before.UpdatedHeight (%d), out of design",
-				spentAutInstance.GeneratedHeight, spentAutInstance.Before.UpdatedHeight)
-		}
-
-	default:
-		return fmt.Errorf("spentAutInstance.spendingScriptType is %s, out of design", spentAutInstance.spendingScriptType.String())
-	}
-
 	// After  *ctautapi.AutMetadata
 	if spentAutInstance.After == nil {
 		return fmt.Errorf("spentAutInstance.After is nil")
@@ -634,14 +549,254 @@ func (spentAutInstance *SpentAutInstance) SanityCheck() error {
 		return err
 	}
 
+	// spentAutInstance and spentAutInstance.After
 	if !bytes.Equal(spentAutInstance.spentAutIdentifier[:], spentAutInstance.After.AutIdentifier[:]) {
 		return fmt.Errorf("spentAutInstance.spentAutIdentifier is %s, but spentAutInstance.Before.AutIdentifier is %s",
 			spentAutInstance.spentAutIdentifier.String(), spentAutInstance.After.AutIdentifier.String())
 	}
 
-	if spentAutInstance.SpentHeight != spentAutInstance.After.UpdatedHeight {
-		return fmt.Errorf("spentAutInstance.SpentHeight (%d) != spentAutInstance.After.UpdatedHeight (%d), out of design",
-			spentAutInstance.SpentHeight, spentAutInstance.After.UpdatedHeight)
+	// SpendingScriptType api.AutScriptType
+	// Before * ctautapi.AutMetadata
+	switch spentAutInstance.spendingScriptType {
+	case ctautapi.AutScriptTypeRegistration:
+		if spentAutInstance.Before != nil {
+			return fmt.Errorf("AutScriptTypeRegistration: AutInstance %s, spentAutInstance.Before is NOT nil",
+				spentAutInstance.spentAutIdentifier.String())
+		}
+
+		// Before==Nil spentAutInstance.GeneratedHeight == spentAutInstance.SpentHeight == spentAutInstance.After.UpdatedHeight
+		if spentAutInstance.GeneratedHeight != spentAutInstance.After.UpdatedHeight {
+			return fmt.Errorf("AutScriptTypeRegistration: AutInstance %s, spentAutInstance.GeneratedHeight (%d) != spentAutInstance.SpentHeight (%d)",
+				spentAutInstance.spentAutIdentifier.String(), spentAutInstance.GeneratedHeight, spentAutInstance.SpentHeight)
+		}
+		if spentAutInstance.SpentHeight != spentAutInstance.After.UpdatedHeight {
+			return fmt.Errorf("AutScriptTypeRegistration: AutInstance %s, spentAutInstance.SpentHeight (%d) != spentAutInstance.After.UpdatedHeight (%d), out of design",
+				spentAutInstance.spentAutIdentifier.String(), spentAutInstance.SpentHeight, spentAutInstance.After.UpdatedHeight)
+		}
+
+		// After needs to satisfy
+
+		// Version
+		if spentAutInstance.After.Version != ctautapi.AutMetadataVersionInitValue {
+			return fmt.Errorf("AutScriptTypeRegistration: AutInstance %s, spentAutInstance.After.Version (%d) != ctautapi.AutMetadataVersionInitValue (%d)",
+				spentAutInstance.spentAutIdentifier.String(), spentAutInstance.After.Version, ctautapi.AutMetadataVersionInitValue)
+		}
+
+		// AutIdentifier
+		// checked outside above
+
+		// UpdatedHeight
+		// checked outside above
+
+		// MintedAmount
+		if spentAutInstance.After.MintedAmount != 0 {
+			return fmt.Errorf("AutScriptTypeRegistration: AutInstance %s, spentAutInstance.After.MintedAmount (%d) is not 0",
+				spentAutInstance.spentAutIdentifier.String(), spentAutInstance.After.MintedAmount)
+		}
+
+		// BurnedAmount
+		if spentAutInstance.After.BurnedAmount != 0 {
+			return fmt.Errorf("AutScriptTypeRegistration: AutInstance %s, spentAutInstance.After.BurnedAmount (%d) is not 0",
+				spentAutInstance.spentAutIdentifier.String(), spentAutInstance.After.BurnedAmount)
+		}
+
+		// ActiveRootTokenSet
+		if len(spentAutInstance.After.ActiveRootTokenSet) == 0 {
+			return fmt.Errorf("AutScriptTypeRegistration: AutInstance %s, spentAutInstance.After.ActiveRootTokenSet is empty",
+				spentAutInstance.spentAutIdentifier.String())
+		}
+
+		// UpdateScriptVersions
+		// checked in SanityCheck
+
+		// UpdateHistoryHeights
+		// checked in SanityCheck
+
+	case ctautapi.AutScriptTypeReRegistration:
+		if spentAutInstance.Before == nil {
+			return fmt.Errorf("AutScriptTypeReRegistration: AutInsatnce %s, spentAutInstance.Before is nil",
+				spentAutInstance.spentAutIdentifier.String())
+		}
+
+		err = spentAutInstance.Before.SanityCheck()
+		if err != nil {
+			return err
+		}
+
+		// spentAutInstance and spentAutInstance.Before
+		if !bytes.Equal(spentAutInstance.spentAutIdentifier[:], spentAutInstance.Before.AutIdentifier[:]) {
+			return fmt.Errorf("AutScriptTypeReRegistration: spentAutInstance.spentAutIdentifier is %s, but spentAutInstance.Before.AutIdentifier is %s",
+				spentAutInstance.spentAutIdentifier.String(), spentAutInstance.Before.AutIdentifier.String())
+		}
+
+		// need: spentAutInstance.GeneratedHeight == spentAutInstance.Before.UpdatedHeight
+		if spentAutInstance.GeneratedHeight != spentAutInstance.Before.UpdatedHeight {
+			return fmt.Errorf("AutScriptTypeReRegistration: AutInsatnce %s, spentAutInstance.GeneratedHeight (%d) != spentAutInstance.Before.UpdatedHeight (%d)",
+				spentAutInstance.spendingScriptType.String(), spentAutInstance.GeneratedHeight, spentAutInstance.Before.UpdatedHeight)
+		}
+		// need: spentAutInstance.SpentHeight == spentAutInstance.After.UpdatedHeight
+		if spentAutInstance.SpentHeight != spentAutInstance.After.UpdatedHeight {
+			return fmt.Errorf("AutScriptTypeReRegistration: AutInsatnce %s, spentAutInstance.SpentHeight (%d) != spentAutInstance.After.UpdatedHeight (%d)",
+				spentAutInstance.SpentHeight, spentAutInstance.After.UpdatedHeight)
+		}
+
+		// spentAutInstance.After and spentAutInstance.Before
+		// Version
+		if spentAutInstance.After.Version != spentAutInstance.Before.Version+1 {
+			return fmt.Errorf("AutScriptTypeReRegistration: AutInsatnce %s, spentAutInstance.After.Version (%d) != spentAutInstance.Before.Version (%d) +1",
+				spentAutInstance.spendingScriptType.String(), spentAutInstance.After.Version, spentAutInstance.Before.Version)
+		}
+
+		// AutIdentifier
+		// checked above: "=="
+
+		// UpdatedHeight
+		if spentAutInstance.After.UpdatedHeight <= spentAutInstance.Before.UpdatedHeight {
+			return fmt.Errorf("AutScriptTypeReRegistration: AutInsatnce %s, spentAutInstance.After.UpdatedHeight (%d) <= spentAutInstance.Before.UpdatedHeight (%d)",
+				spentAutInstance.spendingScriptType.String(), spentAutInstance.After.UpdatedHeight, spentAutInstance.Before.UpdatedHeight)
+		}
+		// Note now it holds that
+		// spentAutInstance.Before.UpdatedHeight = spentAutInstance.GeneratedHeight < spentAutInstance.SpentHeight = spentAutInstance.After.UpdatedHeight
+
+		// PlannedTotalSupply
+		// MintedAmount
+		if spentAutInstance.After.PlannedTotalSupply < spentAutInstance.Before.MintedAmount {
+			return fmt.Errorf("AutScriptTypeReRegistration: AutInsatnce %s, spentAutInstance.After.PlannedTotalSupply (%d) < spentAutInstance.Before.MintedAmount (%d)",
+				spentAutInstance.spendingScriptType.String(), spentAutInstance.After.PlannedTotalSupply, spentAutInstance.Before.MintedAmount)
+		}
+		// ActiveRootTokenSet
+		if len(spentAutInstance.After.ActiveRootTokenSet) == 0 {
+			// should produce new
+			return fmt.Errorf("AutScriptTypeReRegistration: AutInsatnce %s, spentAutInstance.After.ActiveRootTokenSet is empty",
+				spentAutInstance.spendingScriptType.String())
+		}
+		if len(spentAutInstance.Before.ActiveRootTokenSet) == 0 {
+			// should have some to be consumed to generate the after
+			return fmt.Errorf("AutScriptTypeReRegistration: AutInsatnce %s, spentAutInstance.Before.ActiveRootTokenSet is empty",
+				spentAutInstance.spendingScriptType.String())
+		}
+		// spentAutInstance.After.ActiveRootTokenSet and spentAutInstance.Before.ActiveRootTokenSet have no common
+		for _, rootTokenOp := range spentAutInstance.After.ActiveRootTokenSet {
+			if _, ok := spentAutInstance.Before.ActiveRootTokenSet[rootTokenOp.String()]; ok {
+				return fmt.Errorf("AutScriptTypeReRegistration: AutInsatnce %s, spentAutInstance.Before.ActiveRootTokenSet and spentAutInstance.Before.ActiveRootTokenSet has commond %s",
+					spentAutInstance.spendingScriptType.String(), rootTokenOp.String())
+			}
+		}
+		for _, rootTokenOp := range spentAutInstance.Before.ActiveRootTokenSet {
+			if _, ok := spentAutInstance.After.ActiveRootTokenSet[rootTokenOp.String()]; ok {
+				return fmt.Errorf("AutScriptTypeReRegistration: AutInsatnce %s, spentAutInstance.Before.ActiveRootTokenSet and spentAutInstance.After.ActiveRootTokenSet has commond %s",
+					spentAutInstance.spendingScriptType.String(), rootTokenOp.String())
+			}
+		}
+
+		// UpdateScriptVersions
+		// UpdateHistoryHeights
+		// Note that spentAutInstance.After.Version = spentAutInstance.Before.Version + 1
+		for i := uint32(0); i < spentAutInstance.Before.Version; i++ {
+			if spentAutInstance.After.UpdateScriptVersions[i] != spentAutInstance.Before.UpdateScriptVersions[i] {
+				return fmt.Errorf("AutScriptTypeReRegistration: AutInsatnce %s, spentAutInstance.After.UpdateScriptVersions[%d] (%d) != spentAutInstance.Before.UpdateScriptVersions[%d] (%d)",
+					spentAutInstance.spendingScriptType.String(), i, spentAutInstance.After.UpdateScriptVersions[i], i, spentAutInstance.Before.UpdateScriptVersions[i])
+			}
+			if spentAutInstance.After.UpdateHistoryHeights[i] != spentAutInstance.Before.UpdateHistoryHeights[i] {
+				return fmt.Errorf("AutScriptTypeReRegistration: AutInsatnce %s, spentAutInstance.After.UpdateHistoryHeights[%d] (%d) != spentAutInstance.Before.UpdateHistoryHeights[%d] (%d)",
+					spentAutInstance.spendingScriptType.String(), i, spentAutInstance.After.UpdateHistoryHeights[i], i, spentAutInstance.Before.UpdateHistoryHeights[i])
+			}
+		}
+
+	case ctautapi.AutScriptTypeMint:
+		if spentAutInstance.Before == nil {
+			return fmt.Errorf("AutScriptTypeMint: AutInsatnce %s, spentAutInstance.Before is nil",
+				spentAutInstance.spentAutIdentifier.String())
+		}
+
+		err = spentAutInstance.Before.SanityCheck()
+		if err != nil {
+			return err
+		}
+
+		// spentAutInstance and spentAutInstance.Before
+		if !bytes.Equal(spentAutInstance.spentAutIdentifier[:], spentAutInstance.Before.AutIdentifier[:]) {
+			return fmt.Errorf("AutScriptTypeMint: spentAutInstance.spentAutIdentifier is %s, but spentAutInstance.Before.AutIdentifier is %s",
+				spentAutInstance.spentAutIdentifier.String(), spentAutInstance.Before.AutIdentifier.String())
+		}
+
+		// need: spentAutInstance.GeneratedHeight == spentAutInstance.Before.UpdatedHeight
+		if spentAutInstance.GeneratedHeight != spentAutInstance.Before.UpdatedHeight {
+			return fmt.Errorf("AutScriptTypeMint: AutInsatnce %s, spentAutInstance.GeneratedHeight (%d) != spentAutInstance.Before.UpdatedHeight (%d)",
+				spentAutInstance.spendingScriptType.String(), spentAutInstance.GeneratedHeight, spentAutInstance.Before.UpdatedHeight)
+		}
+		// need: spentAutInstance.SpentHeight > spentAutInstance.Before.UpdatedHeight
+		if spentAutInstance.SpentHeight <= spentAutInstance.Before.UpdatedHeight {
+			return fmt.Errorf("AutScriptTypeMint: AutInsatnce %s, spentAutInstance.GeneratedHeight (%d) <= spentAutInstance.Before.UpdatedHeight (%d)",
+				spentAutInstance.spendingScriptType.String(), spentAutInstance.GeneratedHeight, spentAutInstance.Before.UpdatedHeight)
+		}
+
+		// spentAutInstance.After and spentAutInstance.Before
+		// Version
+		// Ming does not update the version
+		if spentAutInstance.After.Version != spentAutInstance.Before.Version {
+			return fmt.Errorf("AutScriptTypeMint: AutInsatnce %s, spentAutInstance.After.Version (%d) != spentAutInstance.Before.Version (%d)",
+				spentAutInstance.spendingScriptType.String(), spentAutInstance.After.Version, spentAutInstance.Before.Version)
+		}
+
+		// AutIdentifier
+		// checked above: "=="
+
+		// UpdatedHeight
+		// Mint does not update the UpdatedHeight
+		if spentAutInstance.After.UpdatedHeight != spentAutInstance.Before.UpdatedHeight {
+			return fmt.Errorf("AutScriptTypeMint: AutInsatnce %s, spentAutInstance.After.UpdatedHeight (%d) <= spentAutInstance.Before.UpdatedHeight (%d)",
+				spentAutInstance.spendingScriptType.String(), spentAutInstance.After.UpdatedHeight, spentAutInstance.Before.UpdatedHeight)
+		}
+		// Note now it holds that
+		// spentAutInstance.Before.UpdatedHeight == spentAutInstance.After.UpdatedHeight = spentAutInstance.GeneratedHeight < spentAutInstance.SpentHeight
+
+		// PlannedTotalSupply
+		// Mint does not update the PlannedTotalSupply
+		if spentAutInstance.After.PlannedTotalSupply != spentAutInstance.Before.PlannedTotalSupply {
+			return fmt.Errorf("AutScriptTypeMint: AutInsatnce %s, spentAutInstance.After.PlannedTotalSupply (%d) != spentAutInstance.Before.PlannedTotalSupply (%d)",
+				spentAutInstance.spendingScriptType.String(), spentAutInstance.After.PlannedTotalSupply, spentAutInstance.Before.PlannedTotalSupply)
+		}
+		// MintedAmount
+		if spentAutInstance.After.MintedAmount <= spentAutInstance.Before.MintedAmount {
+			return fmt.Errorf("AutScriptTypeMint: AutInsatnce %s, spentAutInstance.After.MintedAmount (%d) <= spentAutInstance.Before.MintedAmount (%d)",
+				spentAutInstance.spendingScriptType.String(), spentAutInstance.After.MintedAmount, spentAutInstance.Before.MintedAmount)
+		}
+
+		// ActiveRootTokenSet
+		// spentAutInstance.After.ActiveRootTokenSet could be any case.
+		// spentAutInstance.Before.ActiveRootTokenSet could not empty.
+		if len(spentAutInstance.Before.ActiveRootTokenSet) == 0 {
+			// should have some to be consumed to generate the after
+			return fmt.Errorf("AutScriptTypeMint: AutInsatnce %s, spentAutInstance.Before.ActiveRootTokenSet is empty",
+				spentAutInstance.spendingScriptType.String())
+		}
+		// spentAutInstance.After.ActiveRootTokenSet should be subset of spentAutInstance.Before.ActiveRootTokenSet
+		for _, rootTokenOp := range spentAutInstance.After.ActiveRootTokenSet {
+			if _, ok := spentAutInstance.Before.ActiveRootTokenSet[rootTokenOp.String()]; !ok {
+				return fmt.Errorf("AutScriptTypeMint: AutInsatnce %s, rootToken %s is in spentAutInstance.After.ActiveRootTokenSet but not in spentAutInstance.Before.ActiveRootTokenSet has commond %s",
+					spentAutInstance.spendingScriptType.String(), rootTokenOp.String())
+			}
+		}
+
+		// UpdateScriptVersions
+		// UpdateHistoryHeights
+		// Note that spentAutInstance.After.Version = spentAutInstance.Before.Version + 1
+		for i := uint32(0); i < spentAutInstance.Before.Version; i++ {
+			if spentAutInstance.After.UpdateScriptVersions[i] != spentAutInstance.Before.UpdateScriptVersions[i] {
+				return fmt.Errorf("AutScriptTypeMint: AutInsatnce %s, spentAutInstance.After.UpdateScriptVersions[%d] (%d) != spentAutInstance.Before.UpdateScriptVersions[%d] (%d)",
+					spentAutInstance.spendingScriptType.String(),
+					i, spentAutInstance.After.UpdateScriptVersions[i], i, spentAutInstance.Before.UpdateScriptVersions[i])
+			}
+			if spentAutInstance.After.UpdateHistoryHeights[i] != spentAutInstance.Before.UpdateHistoryHeights[i] {
+				return fmt.Errorf("AutScriptTypeMint: AutInsatnce %s, spentAutInstance.After.UpdateHistoryHeights[%d] (%d) != spentAutInstance.Before.UpdateHistoryHeights[%d] (%d)",
+					spentAutInstance.spendingScriptType.String(),
+					i, spentAutInstance.After.UpdateHistoryHeights[i], i, spentAutInstance.Before.UpdateHistoryHeights[i])
+			}
+		}
+
+	default:
+		return fmt.Errorf("spentAutInstance.spendingScriptType is %s, out of design", spentAutInstance.spendingScriptType.String())
 	}
 
 	return nil
@@ -703,49 +858,6 @@ func (spentAutInstance *SpentAutInstance) ScriptMatchCheck(extAutScript *ctautap
 			spentAutInstance.spentAutIdentifier.String(), scriptAutIdentifier.String())
 	}
 
-	// spendingScriptType api.AutScriptType
-	// Before             *api.AutMetadata
-	switch extAutScript.AutScript.(type) {
-	case *ctautapi.RegistrationScript:
-		if spentAutInstance.spendingScriptType != ctautapi.AutScriptTypeRegistration {
-			return fmt.Errorf("the AutScript is RegistrationScript, but the spentAutInstance.spendingScriptType is %s",
-				spentAutInstance.spendingScriptType.String())
-		}
-
-		// spentAutInstance.Before
-		// is nil, no checks
-
-	case *ctautapi.ReRegistrationScript:
-		if spentAutInstance.spendingScriptType != ctautapi.AutScriptTypeReRegistration {
-			return fmt.Errorf("the AutScript is AutScriptTypeReRegistration, but the spentAutInstance.spendingScriptType is %s",
-				spentAutInstance.spendingScriptType.String())
-		}
-
-		// spentAutInstance.Before
-		// Note that previous spentAutInstance.SanityCheck() has guaranteed that spentAutInstance.Before is not nil
-		// extAutScript.ConsumedHostOutpoints() should be in spentAutInstance.Before.ActiveRootTokenSet
-		tempBefore := spentAutInstance.Before.Clone() // not need, but for code safe in future maintain
-		for i, scriptInputOutPoint := range extAutScript.ConsumedHostOutpoints() {
-			scriptInputOutPointStr := scriptInputOutPoint.String()
-			rootTokenOP, ok := tempBefore.ActiveRootTokenSet[scriptInputOutPointStr]
-			if !ok {
-				return fmt.Errorf("extAutScript.ConsumedHostOutpoints[%d] (%s) does not map to any item in spentAutInstance.Before.ActiveRootTokenSet",
-					i, scriptInputOutPointStr)
-			}
-			if rootTokenOP == nil {
-				return fmt.Errorf("extAutScript.ConsumedHostOutpoints[%d] (%s) map to nil in spentAutInstance.Before.ActiveRootTokenSet",
-					i, scriptInputOutPointStr)
-			}
-			if !scriptInputOutPoint.IsEqual(rootTokenOP) {
-				return fmt.Errorf("extAutScript.ConsumedHostOutpoints[%d] (%s) map to a different item (%s) in spentAutInstance.Before.ActiveRootTokenSet",
-					i, scriptInputOutPointStr, rootTokenOP.String())
-			}
-		}
-
-	default:
-		return fmt.Errorf("the input parameter extAutScript is not RegistrationScript or ReRegistrationScript")
-	}
-
 	// spentAutInstance.After.ActiveRootTokenSet should be consistent with extAutScript.GeneratedTokens()
 	if len(extAutScript.GeneratedTokens()) == 0 {
 		return fmt.Errorf("extAutScript.GeneratedTokens is nil/empty")
@@ -754,7 +866,7 @@ func (spentAutInstance *SpentAutInstance) ScriptMatchCheck(extAutScript *ctautap
 		return fmt.Errorf("len(spentAutInstance.After.ActiveRootTokenSet) %d != len(extAutScript.GeneratedTokens()) %d",
 			len(spentAutInstance.After.ActiveRootTokenSet), len(extAutScript.GeneratedTokens()))
 	}
-	tempAfter := spentAutInstance.After.Clone()
+	tempAfter := spentAutInstance.After.Clone() // make sure spentAutInstance.After is not modified
 	for i, scriptOutputToken := range extAutScript.GeneratedTokens() {
 		if scriptOutputToken == nil {
 			return fmt.Errorf("extAutScript.GeneratedTokens[%d] is nil", i)
@@ -775,6 +887,82 @@ func (spentAutInstance *SpentAutInstance) ScriptMatchCheck(extAutScript *ctautap
 				i, outputTokenOPStr, rootTokenOP.String())
 		}
 		delete(tempAfter.ActiveRootTokenSet, outputTokenOPStr)
+	}
+
+	// spendingScriptType api.AutScriptType
+	// Before             *api.AutMetadata
+	switch autScriptInst := extAutScript.AutScript.(type) {
+	case *ctautapi.RegistrationScript:
+		if spentAutInstance.spendingScriptType != ctautapi.AutScriptTypeRegistration {
+			return fmt.Errorf("the AutScript is RegistrationScript, but the spentAutInstance.spendingScriptType is %s",
+				spentAutInstance.spendingScriptType.String())
+		}
+
+		// spentAutInstance.Before
+		// is nil, no checks
+
+	case *ctautapi.ReRegistrationScript:
+		if spentAutInstance.spendingScriptType != ctautapi.AutScriptTypeReRegistration {
+			return fmt.Errorf("the AutScript is AutScriptTypeReRegistration, but the spentAutInstance.spendingScriptType is %s",
+				spentAutInstance.spendingScriptType.String())
+		}
+
+		// spentAutInstance.Before
+		// Note that previous spentAutInstance.SanityCheck() has guaranteed that spentAutInstance.Before is not nil
+		// extAutScript.ConsumedHostOutpoints() should be in spentAutInstance.Before.ActiveRootTokenSet
+		tempBefore := spentAutInstance.Before.Clone() // make sure spentAutInstance.After is not modified
+		for i, scriptInputOutPoint := range extAutScript.ConsumedHostOutpoints() {
+			scriptInputOutPointStr := scriptInputOutPoint.String()
+			rootTokenOP, ok := tempBefore.ActiveRootTokenSet[scriptInputOutPointStr]
+			if !ok {
+				return fmt.Errorf("extAutScript.ConsumedHostOutpoints[%d] (%s) does not map to any item in spentAutInstance.Before.ActiveRootTokenSet",
+					i, scriptInputOutPointStr)
+			}
+			if rootTokenOP == nil {
+				return fmt.Errorf("extAutScript.ConsumedHostOutpoints[%d] (%s) map to nil in spentAutInstance.Before.ActiveRootTokenSet",
+					i, scriptInputOutPointStr)
+			}
+			if !scriptInputOutPoint.IsEqual(rootTokenOP) {
+				return fmt.Errorf("extAutScript.ConsumedHostOutpoints[%d] (%s) map to a different item (%s) in spentAutInstance.Before.ActiveRootTokenSet",
+					i, scriptInputOutPointStr, rootTokenOP.String())
+			}
+		}
+
+	case *ctautapi.MintScript:
+		if spentAutInstance.spendingScriptType != ctautapi.AutScriptTypeMint {
+			return fmt.Errorf("the AutScript is AutScriptTypeMint, but the spentAutInstance.spendingScriptType is %s",
+				spentAutInstance.spendingScriptType.String())
+		}
+
+		// spentAutInstance.Before
+		// Note that previous spentAutInstance.SanityCheck() has guaranteed that spentAutInstance.Before is not nil
+		// extAutScript.ConsumedHostOutpoints() should be in spentAutInstance.Before.ActiveRootTokenSet
+		tempBefore := spentAutInstance.Before.Clone() // make sure spentAutInstance.After is not modified
+		for i, scriptInputOutPoint := range extAutScript.ConsumedHostOutpoints() {
+			scriptInputOutPointStr := scriptInputOutPoint.String()
+			rootTokenOP, ok := tempBefore.ActiveRootTokenSet[scriptInputOutPointStr]
+			if !ok {
+				return fmt.Errorf("extAutScript.ConsumedHostOutpoints[%d] (%s) does not map to any item in spentAutInstance.Before.ActiveRootTokenSet",
+					i, scriptInputOutPointStr)
+			}
+			if rootTokenOP == nil {
+				return fmt.Errorf("extAutScript.ConsumedHostOutpoints[%d] (%s) map to nil in spentAutInstance.Before.ActiveRootTokenSet",
+					i, scriptInputOutPointStr)
+			}
+			if !scriptInputOutPoint.IsEqual(rootTokenOP) {
+				return fmt.Errorf("extAutScript.ConsumedHostOutpoints[%d] (%s) map to a different item (%s) in spentAutInstance.Before.ActiveRootTokenSet",
+					i, scriptInputOutPointStr, rootTokenOP.String())
+			}
+		}
+
+		// mintAmount
+		if spentAutInstance.Before.MintedAmount+autScriptInst.Vin() != spentAutInstance.After.MintedAmount {
+			return fmt.Errorf("spentAutInstance.Before.MintedAmount (%d) + autScriptInst.Vin() (%d) != spentAutInstance.After.MintedAmount (%d)",
+				spentAutInstance.Before.MintedAmount, autScriptInst.Vin(), spentAutInstance.After.MintedAmount)
+		}
+
+	default:
+		return fmt.Errorf("the input parameter extAutScript is not RegistrationScript or ReRegistrationScript")
 	}
 
 	return nil
@@ -929,10 +1117,9 @@ func (spentAutTokenList *SpentAutTokenList) SanityCheck() error {
 	}
 
 	// spendingScriptType api.AutScriptType
-	if spentAutTokenList.spendingScriptType != ctautapi.AutScriptTypeMint &&
-		spentAutTokenList.spendingScriptType != ctautapi.AutScriptTypeTransfer &&
+	if spentAutTokenList.spendingScriptType != ctautapi.AutScriptTypeTransfer &&
 		spentAutTokenList.spendingScriptType != ctautapi.AutScriptTypeBurn {
-		return fmt.Errorf("the spendingScriptType (%s) is not AutScriptTypeMint, AutScriptTypeTransfer, or AutScriptTypeBurn",
+		return fmt.Errorf("the spendingScriptType (%s) is not AutScriptTypeTransfer or AutScriptTypeBurn",
 			spentAutTokenList.spendingScriptType.String())
 	}
 
@@ -954,21 +1141,6 @@ func (spentAutTokenList *SpentAutTokenList) SanityCheck() error {
 		if spentAutToken.GeneratedHeight >= spentAutTokenList.SpentHeight {
 			return fmt.Errorf("th %d -th spentAutToken (%s) has GeneratedHeight = %d, while spentAutTokenList.SpentHeight is %d, which is out of design",
 				i, spentAutToken.HostOutPoint.String(), spentAutToken.GeneratedHeight, spentAutToken.GeneratedHeight)
-		}
-
-		if spentAutToken.IsRootToken {
-			if spentAutTokenList.spendingScriptType != ctautapi.AutScriptTypeMint {
-				return fmt.Errorf("th %d -th spentAutToken (%s) is RootToken, but the spentAutTokenList.spendingScriptType(%s) is not AutScriptTypeMint",
-					i, spentAutToken.HostOutPoint.String(), spentAutTokenList.spendingScriptType.String())
-			}
-
-		} else {
-			if spentAutTokenList.spendingScriptType != ctautapi.AutScriptTypeTransfer &&
-				spentAutTokenList.spendingScriptType != ctautapi.AutScriptTypeBurn {
-				return fmt.Errorf("th %d -th spentAutToken (%s) is NOT RootToken, "+
-					"but the spentAutTokenList.SpendingScriptType(%s) is NOT AutScriptTypeTransfer or AutScriptTypeBurn",
-					i, spentAutToken.HostOutPoint.String(), spentAutTokenList.spendingScriptType.String())
-			}
 		}
 
 	}
@@ -1037,13 +1209,6 @@ func (spentAutTokenList *SpentAutTokenList) ScriptMatchCheck(extAutScript *ctaut
 	// spendingScriptType api.AutScriptType
 	// SpentAutTokens     []*SpentAutToken
 	switch extAutScript.AutScript.(type) {
-	case *ctautapi.MintScript:
-		// spendingScriptType api.AutScriptType
-		if spentAutTokenList.spendingScriptType != ctautapi.AutScriptTypeMint {
-			return fmt.Errorf("the AutScript is MintScript, but the spentAutInstance.spendingScriptType is %s",
-				spentAutTokenList.spendingScriptType.String())
-		}
-
 	case *ctautapi.TransferScript:
 		// spendingScriptType api.AutScriptType
 		if spentAutTokenList.spendingScriptType != ctautapi.AutScriptTypeTransfer {
@@ -1174,33 +1339,11 @@ func deserializeSpendJournalEntryAut(serializedSpentAuts []byte, block *abeutil.
 		}
 		scriptType := extAutScript.Type()
 		switch scriptType {
-		case ctautapi.AutScriptTypeRegistration, ctautapi.AutScriptTypeReRegistration:
-			spentAutInstance := &SpentAutInstance{}
-			err = spentAutInstance.read(r)
-			if err != nil {
-				return nil, err
-			}
+		case ctautapi.AutScriptTypeRegistration, ctautapi.AutScriptTypeReRegistration, ctautapi.AutScriptTypeMint:
+			rstSpentAuts[i] = &SpentAutInstance{}
 
-			err = spentAutInstance.ScriptMatchCheck(extAutScript)
-			if err != nil {
-				return nil, err
-			}
-
-			rstSpentAuts[i] = spentAutInstance
-
-		case ctautapi.AutScriptTypeMint, ctautapi.AutScriptTypeTransfer, ctautapi.AutScriptTypeBurn:
-			spentAutTokenList := &SpentAutTokenList{}
-			err = spentAutTokenList.read(r)
-			if err != nil {
-				return nil, err
-			}
-
-			err = spentAutTokenList.ScriptMatchCheck(extAutScript)
-			if err != nil {
-				return nil, err
-			}
-
-			rstSpentAuts[i] = spentAutTokenList
+		case ctautapi.AutScriptTypeTransfer, ctautapi.AutScriptTypeBurn:
+			rstSpentAuts[i] = &SpentAutTokenList{}
 
 		default:
 			return nil, AssertError(fmt.Sprintf("the %d-th ExtAutScript of block (%s) has unknown ScriptType %s",
@@ -1208,6 +1351,15 @@ func deserializeSpendJournalEntryAut(serializedSpentAuts []byte, block *abeutil.
 
 		}
 
+		err = rstSpentAuts[i].read(r)
+		if err != nil {
+			return nil, err
+		}
+
+		err = rstSpentAuts[i].ScriptMatchCheck(extAutScript)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return rstSpentAuts, nil

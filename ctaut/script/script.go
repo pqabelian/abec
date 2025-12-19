@@ -615,7 +615,7 @@ func (autMetadata *AutMetadata) SanityCheck() error {
 		return fmt.Errorf("invalid length (%d) for aut memo", len(autMetadata.AutMemo))
 	}
 
-	if autMetadata.PlannedTotalSupply > MaxAmount {
+	if autMetadata.PlannedTotalSupply > MaxAmount || autMetadata.PlannedTotalSupply == 0 {
 		return fmt.Errorf("invalid planned total supply (%d)", autMetadata.PlannedTotalSupply)
 	}
 
@@ -715,6 +715,12 @@ func (autMetadata *AutMetadata) SanityCheck() error {
 				"not larger than the UpdateHistoryHeights (%d) at position %d",
 				autMetadata.UpdateHistoryHeights[i], i, autMetadata.UpdateHistoryHeights[i-1], i-1)
 		}
+	}
+
+	// Note that autMetadata.Version == len(autMetadata.UpdateScriptVersions) == len(autMetadata.UpdateHistoryHeights)
+	if autMetadata.UpdatedHeight != autMetadata.UpdateHistoryHeights[autMetadata.Version-1] {
+		return fmt.Errorf("autMetadata.UpdatedHeight is %d, while the last history updatedHeight at autMetadata.UpdateHistoryHeights[%d] is %d",
+			autMetadata.UpdatedHeight, autMetadata.Version-1, autMetadata.UpdateHistoryHeights[autMetadata.Version-1])
 	}
 
 	return nil

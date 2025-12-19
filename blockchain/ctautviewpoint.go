@@ -515,7 +515,7 @@ func (view *CTAUTViewpoint) connectRegistrationScript(extAutScript *ctautapi.Ext
 		// Populate the stxo details.
 		// Note that for New AutInetance, the SpentAutInstance should have GeneratedHeight=SpentHeight.
 		saut := NewSpentAutInstance(extAutScript.AutIdentifier(), blockHeight, blockHeight,
-			ctautapi.AutScriptTypeRegistration, nil, newAutMetadata.Clone())
+			ctautapi.AutScriptTypeRegistration, newAutMetadata.Clone(), nil)
 		*sctauts = append(*sctauts, saut)
 	}
 
@@ -587,7 +587,7 @@ func (view *CTAUTViewpoint) connectReRegistrationScript(extAutScript *ctautapi.E
 	if sctauts != nil {
 		// Populate the saut.
 		saut := NewSpentAutInstance(extAutScript.AutIdentifier(), blockHeight, oldMetadata.UpdatedHeight,
-			ctautapi.AutScriptTypeReRegistration, oldMetadata.Clone(), newMetadata.Clone())
+			ctautapi.AutScriptTypeReRegistration, newMetadata.Clone(), oldMetadata.Clone())
 		*sctauts = append(*sctauts, saut)
 	}
 
@@ -664,11 +664,10 @@ func (view *CTAUTViewpoint) connectMintScript(extAutScript *ctautapi.ExtAutScrip
 			"but it is not found in database", txHash.String(), identifier.String())
 	}
 	oldMetadata := autInstance.metadata
-	rootTokenVersion := oldMetadata.UpdateScriptVersions[len(oldMetadata.UpdateScriptVersions)-1]
 
 	newMetadata := oldMetadata.Clone()
 
-	txSpentAutTokens := make([]*SpentAutToken, 0, mintScript.NumConsumedTokens())
+	// remove the consumed RootTokens
 	consumedHostOutpoints := extAutScript.ConsumedHostOutpoints()
 	for i := 0; i < len(consumedHostOutpoints); i++ {
 		hostOutpoint := consumedHostOutpoints[i]
@@ -679,27 +678,12 @@ func (view *CTAUTViewpoint) connectMintScript(extAutScript *ctautapi.ExtAutScrip
 				txHash.String(), identifier.String(), hostOutpoint.String())
 		}
 		delete(newMetadata.ActiveRootTokenSet, hostOpStr)
-
-		// todo: the sctatus for mint is different from that for reregistration? how to rollback? use UpdatedCTAUTInfo?
-		if sctauts != nil {
-			// Note that RootToken are associated with Metadata, without standalone entities, use Metadata's information RootToken's.
-			spentAutToken := NewSpentAutToken(oldMetadata.UpdatedHeight, oldMetadata.AutIdentifier, rootTokenVersion,
-				*hostOutpoint, true, nil)
-			txSpentAutTokens = append(txSpentAutTokens, spentAutToken)
-		}
-
-	}
-	// TODO AUT actually do need to use saut to record
-	if sctauts != nil {
-		spentAutTokenList := NewSpentAutTokenList(extAutScript.AutIdentifier(), blockHeight, ctautapi.AutScriptTypeMint, txSpentAutTokens)
-		*sctauts = append(*sctauts, spentAutTokenList)
 	}
 
-	// Double check
-	// 1. check whether minted amount is exceed planned
+	// add mintAmount
 	if newMetadata.MintedAmount > newMetadata.PlannedTotalSupply {
-		return fmt.Errorf("the AutInstance (%s) has MintedAmount (%d), while its PlannedTotalSupply is %d",
-			identifier.String(), newMetadata.MintedAmount, newMetadata.PlannedTotalSupply)
+		return AssertError(fmt.Sprintf("the AutInstance (%s) has MintedAmount (%d), while its PlannedTotalSupply is %d",
+			identifier.String(), newMetadata.MintedAmount, newMetadata.PlannedTotalSupply))
 	}
 	maxAllowedToMint := newMetadata.PlannedTotalSupply - newMetadata.MintedAmount // uint64, >=0
 	if mintScript.Vin() > maxAllowedToMint {
@@ -709,6 +693,12 @@ func (view *CTAUTViewpoint) connectMintScript(extAutScript *ctautapi.ExtAutScrip
 	}
 
 	newMetadata.MintedAmount = newMetadata.MintedAmount + mintScript.Vin()
+
+	if sctauts != nil {
+		saut := NewSpentAutInstance(extAutScript.AutIdentifier(), blockHeight, oldMetadata.UpdatedHeight,
+			ctautapi.AutScriptTypeReRegistration, newMetadata.Clone(), oldMetadata.Clone())
+		*sctauts = append(*sctauts, saut)
+	}
 
 	// 2. add generated token
 	// Not that this will not cause the spending of pending AutTxo, due to the host-mechanism.
@@ -775,7 +765,7 @@ func (view *CTAUTViewpoint) connectTransferScript(extAutScript *ctautapi.ExtAutS
 		if sctauts != nil {
 			// Populate the sAutToken
 			spentAutToken := NewSpentAutToken(consumedToken.blockHeight, consumedToken.identifier, consumedToken.version,
-				*hostOutpoint, false, consumedToken.valueScript)
+				*hostOutpoint, consumedToken.valueScript)
 			txSpentAutTokens = append(txSpentAutTokens, spentAutToken)
 		}
 	}
@@ -840,10 +830,11 @@ func (view *CTAUTViewpoint) connectBurnScript(extAutScript *ctautapi.ExtAutScrip
 		if sctauts != nil {
 			// Populate the spentAutToken.
 			spentAutToken := NewSpentAutToken(consumedToken.blockHeight, consumedToken.identifier, consumedToken.version,
-				*hostOutpoint, false, consumedToken.valueScript)
+				*hostOutpoint, consumedToken.valueScript)
 			txSpentAutTokens = append(txSpentAutTokens, spentAutToken)
 		}
 	}
+
 	if sctauts != nil {
 		// Populate the stxo details using the utxo entry.
 		spentAutTokenList := NewSpentAutTokenList(extAutScript.AutIdentifier(), blockHeight, ctautapi.AutScriptTypeBurn, txSpentAutTokens)
@@ -1095,7 +1086,7 @@ func (view *CTAUTViewpoint) disconnectAutScriptMint(db database.DB, extAutScript
 		return fmt.Errorf("disconnectAutScriptMint: expected mint script, but got %d", extAutScript.Type())
 	}
 
-	mintScript, ok := extAutScript.AutScript.(*ctautapi.MintScript)
+	_, ok := extAutScript.AutScript.(*ctautapi.MintScript)
 	if !ok {
 		return fmt.Errorf("fail to type extAutScript.AutScript to ReRegistrationScript")
 	}
@@ -1149,48 +1140,25 @@ func (view *CTAUTViewpoint) disconnectAutScriptMint(db database.DB, extAutScript
 		instance.PutCoin(scriptOutputToken.HostOutPoint, coin)
 	}
 
-	// restore consumed aut root coins using the spentAut journal
-	spentAutTokenList, ok := sctaut.(*SpentAutTokenList)
+	// use spentAut journal to restore
+	spentAutInstance, ok := sctaut.(*SpentAutInstance)
 	if !ok {
 		return fmt.Errorf("disconnectAutScriptMint: invalid SpentAutTokenList information")
 	}
 
 	// assert
-	if spentAutTokenList.SpentHeight != blockHeight {
+	if spentAutInstance.SpentHeight != blockHeight {
 		return AssertError(fmt.Sprintf("disconnectAutScriptMint: for AutInstance (%s), spentAutTokenList.SpentHeight (%d) != blockHeight (%d)",
-			identifier.String(), spentAutTokenList.SpentHeight, blockHeight))
+			identifier.String(), spentAutInstance.SpentHeight, blockHeight))
 	}
 
-	err = spentAutTokenList.ScriptMatchCheck(extAutScript)
+	err = spentAutInstance.ScriptMatchCheck(extAutScript)
 	if err != nil {
 		return err
 	}
 
-	// Note that spentAutTokenList.ScriptMatchCheck(extAutScript) has been called previously
-	// todo: 2025.12.19 add Put method to avoid such nil checks
-	if instance.metadata.ActiveRootTokenSet == nil {
-		instance.metadata.ActiveRootTokenSet = make(map[string]*ctautapi.HostOutPoint)
-	}
-	for i := len(spentAutTokenList.SpentAutTokens) - 1; i >= 0; i-- {
-		spentAutToken := spentAutTokenList.SpentAutTokens[i]
-
-		// HostOutPoint    api.HostOutPoint
-		hostOutPoint := spentAutToken.HostOutPoint.Clone()
-		hostOpStr := hostOutPoint.String()
-		if _, ok := instance.metadata.ActiveRootTokenSet[hostOpStr]; ok {
-			return fmt.Errorf("fail to put %d -th spentAutToken back to ActiveRootTokenSet: there is stll another one", i)
-		}
-		instance.metadata.ActiveRootTokenSet[hostOpStr] = hostOutPoint
-
-		log.Debugf("try to resume consumed root coin %s for AutInstance %s", hostOpStr, identifierKey)
-	}
-
-	// sub the mintedAmount
-	if instance.metadata.MintedAmount < mintScript.Vin() {
-		return fmt.Errorf("the AutInstance has MintedAmount= %d, while the disconnecting MintScript is atteming to rollback %d",
-			instance.metadata.MintedAmount, mintScript.Vin())
-	}
-	instance.metadata.MintedAmount = instance.metadata.MintedAmount - mintScript.Vin()
+	// rollback with spend journal directly
+	instance.metadata = spentAutInstance.Before.Clone()
 
 	// explicitly pub back
 	view.instances[identifierKey] = instance
