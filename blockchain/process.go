@@ -2,12 +2,13 @@ package blockchain
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain/consensus"
 	"github.com/abesuite/abec/blockchain/ruleerror"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/database"
-	"time"
 )
 
 // BehaviorFlags is a bitmask defining tweaks to the normal behavior when
@@ -217,15 +218,109 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, powConsensus *cons
 			// check ensures the proof of work is at least the minimum
 			// expected based on elapsed time since the last checkpoint and
 			// maximum adjustment allowed by the retarget rules.
-			duration := blockHeader.Timestamp.Sub(checkpointTime)
-			requiredTarget := CompactToBig(b.calcEasiestDifficulty(
-				checkpointNode.bits, duration))
-			currentTarget := CompactToBig(blockHeader.Bits)
-			if currentTarget.Cmp(requiredTarget) > 0 {
-				str := fmt.Sprintf("block target difficulty of %064x "+
-					"is too low when compared to the previous "+
-					"checkpoint", currentTarget)
-				return false, false, ruleerror.NewRuleError(ruleerror.ErrDifficultyTooLow, str)
+			//       DSA         Aconcagua
+			// [     ] [           ] [         ]
+			if blockHeader.Height >= b.chainParams.BlockHeightAconcagua {
+				if checkpointNode.height >= b.chainParams.BlockHeightAconcagua {
+					duration := blockHeader.Timestamp.Sub(checkpointTime)
+					requiredTarget := CompactToBig(
+						b.calcEasiestDifficultyDSA(checkpointNode.bits, duration),
+					)
+					currentTarget := CompactToBig(blockHeader.Bits)
+					if currentTarget.Cmp(requiredTarget) > 0 {
+						str := fmt.Sprintf("block target difficulty of %064x "+
+							"is too low when compared to the previous "+
+							"checkpoint", currentTarget)
+						return false, false, ruleerror.NewRuleError(ruleerror.ErrDifficultyTooLow, str)
+					}
+
+					requiredTargetSecond := CompactToBig(
+						b.calcEasiestDifficultyDSA(checkpointNode.bitsSecond, duration),
+					)
+					currentTargetTargetSecond := CompactToBig(blockHeader.BitsSecond)
+					if currentTargetTargetSecond.Cmp(requiredTargetSecond) > 0 {
+						str := fmt.Sprintf("block target difficulty second of %064x "+
+							"is too low when compared to the previous "+
+							"checkpoint", currentTargetTargetSecond)
+						return false, false, ruleerror.NewRuleError(ruleerror.ErrDifficultyTooLow, str)
+					}
+				} else {
+					// checkpointNode.height < b.chainParams.BlockHeightAconcagua
+					// from checkpoint block to dsa block should be checked before
+					blockAconcagua, err := b.BlockByHeight(b.chainParams.BlockHeightAconcagua)
+					if err != nil {
+						return false, false, err
+					}
+					blockHeaderAconcagua := &blockAconcagua.MsgBlock().Header
+					duration := blockHeader.Timestamp.Sub(blockHeaderAconcagua.Timestamp)
+					requiredTarget := CompactToBig(
+						b.calcEasiestDifficultyDSA(blockHeaderAconcagua.Bits, duration),
+					)
+					currentTarget := CompactToBig(blockHeader.Bits)
+					if currentTarget.Cmp(requiredTarget) > 0 {
+						str := fmt.Sprintf("block target difficulty of %064x "+
+							"is too low when compared to the previous "+
+							"checkpoint", currentTarget)
+						return false, false, ruleerror.NewRuleError(ruleerror.ErrDifficultyTooLow, str)
+					}
+
+					requiredTargetSecond := CompactToBig(
+						b.calcEasiestDifficultyDSA(blockHeaderAconcagua.BitsSecond, duration),
+					)
+					currentTargetTargetSecond := CompactToBig(blockHeader.BitsSecond)
+					if currentTargetTargetSecond.Cmp(requiredTargetSecond) > 0 {
+						str := fmt.Sprintf("block target difficulty second of %064x "+
+							"is too low when compared to the previous "+
+							"checkpoint", currentTargetTargetSecond)
+						return false, false, ruleerror.NewRuleError(ruleerror.ErrDifficultyTooLow, str)
+					}
+				}
+
+			} else if blockHeader.Height >= b.chainParams.BlockHeightDSA {
+				if checkpointNode.height >= b.chainParams.BlockHeightDSA {
+					duration := blockHeader.Timestamp.Sub(checkpointTime)
+					requiredTarget := CompactToBig(
+						b.calcEasiestDifficultyDSA(checkpointNode.bits, duration),
+					)
+					currentTarget := CompactToBig(blockHeader.Bits)
+					if currentTarget.Cmp(requiredTarget) > 0 {
+						str := fmt.Sprintf("block target difficulty of %064x "+
+							"is too low when compared to the previous "+
+							"checkpoint", currentTarget)
+						return false, false, ruleerror.NewRuleError(ruleerror.ErrDifficultyTooLow, str)
+					}
+				} else {
+					// checkpointNode.height < b.chainParams.BlockHeightDSA
+					// from checkpoint block to dsa block should be checked before
+					blockDSA, err := b.BlockByHeight(b.chainParams.BlockHeightDSA)
+					if err != nil {
+						return false, false, err
+					}
+					// from checkpoint block to dsa block should be checked before
+					blockHeaderDSA := &blockDSA.MsgBlock().Header
+					duration := blockHeader.Timestamp.Sub(blockHeaderDSA.Timestamp)
+					requiredTarget := CompactToBig(
+						b.calcEasiestDifficultyDSA(blockHeaderDSA.Bits, duration),
+					)
+					currentTarget := CompactToBig(blockHeader.Bits)
+					if currentTarget.Cmp(requiredTarget) > 0 {
+						str := fmt.Sprintf("block target difficulty of %064x "+
+							"is too low when compared to the previous "+
+							"checkpoint", currentTarget)
+						return false, false, ruleerror.NewRuleError(ruleerror.ErrDifficultyTooLow, str)
+					}
+				}
+			} else {
+				duration := blockHeader.Timestamp.Sub(checkpointTime)
+				requiredTarget := CompactToBig(b.calcEasiestDifficulty(
+					checkpointNode.bits, duration))
+				currentTarget := CompactToBig(blockHeader.Bits)
+				if currentTarget.Cmp(requiredTarget) > 0 {
+					str := fmt.Sprintf("block target difficulty of %064x "+
+						"is too low when compared to the previous "+
+						"checkpoint", currentTarget)
+					return false, false, ruleerror.NewRuleError(ruleerror.ErrDifficultyTooLow, str)
+				}
 			}
 		}
 	}
