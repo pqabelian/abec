@@ -590,7 +590,7 @@ func (spentAutInstance *SpentAutInstance) SanityCheck() error {
 		// checked outside above
 
 		// UpdatedHeight
-		// checked outside above
+		// from the view of After, no need check
 
 		// MintedAmount
 		if spentAutInstance.After.MintedAmount != 0 {
@@ -830,44 +830,45 @@ func (spentAutInstance *SpentAutInstance) ScriptMatchCheck(extAutScript *ctautap
 			spentAutInstance.spentAutIdentifier.String(), scriptAutIdentifier.String())
 	}
 
-	// spentAutInstance.After.ActiveRootTokenSet should be consistent with extAutScript.GeneratedTokens()
-	if len(extAutScript.GeneratedTokens()) == 0 {
-		return fmt.Errorf("extAutScript.GeneratedTokens is nil/empty")
-	}
-	if len(spentAutInstance.After.ActiveRootTokenSet) != len(extAutScript.GeneratedTokens()) {
-		return fmt.Errorf("len(spentAutInstance.After.ActiveRootTokenSet) %d != len(extAutScript.GeneratedTokens()) %d",
-			len(spentAutInstance.After.ActiveRootTokenSet), len(extAutScript.GeneratedTokens()))
-	}
-	tempAfter := spentAutInstance.After.Clone() // make sure spentAutInstance.After is not modified
-	for i, scriptOutputToken := range extAutScript.GeneratedTokens() {
-		if scriptOutputToken == nil {
-			return fmt.Errorf("extAutScript.GeneratedTokens[%d] is nil", i)
-		}
-		outputTokenOP := scriptOutputToken.HostOutPoint
-		outputTokenOPStr := outputTokenOP.String()
-		rootTokenOP, ok := tempAfter.ActiveRootTokenSet[outputTokenOPStr]
-		if !ok {
-			return fmt.Errorf("extAutScript.GeneratedTokens[%d] (%s) does not map to any item in spentAutInstance.After.ActiveRootTokenSet",
-				i, outputTokenOPStr)
-		}
-		if rootTokenOP == nil {
-			return fmt.Errorf("extAutScript.GeneratedTokens[%d] (%s) maps to nil in spentAutInstance.After.ActiveRootTokenSet",
-				i, outputTokenOPStr)
-		}
-		if !outputTokenOP.IsEqual(rootTokenOP) {
-			return fmt.Errorf("extAutScript.GeneratedTokens[%d] (%s) maps to different item (%s) spentAutInstance.After.ActiveRootTokenSet",
-				i, outputTokenOPStr, rootTokenOP.String())
-		}
-		delete(tempAfter.ActiveRootTokenSet, outputTokenOPStr)
-	}
-
 	// spendingScriptType api.AutScriptType
+	// After             *api.AutMetadata
 	// Before             *api.AutMetadata
 	switch autScriptInst := extAutScript.AutScript.(type) {
 	case *ctautapi.RegistrationScript:
 		if spentAutInstance.spendingScriptType != ctautapi.AutScriptTypeRegistration {
 			return fmt.Errorf("the AutScript is RegistrationScript, but the spentAutInstance.spendingScriptType is %s",
 				spentAutInstance.spendingScriptType.String())
+		}
+
+		// spentAutInstance.After.ActiveRootTokenSet should be consistent with extAutScript.GeneratedTokens()
+		if len(extAutScript.GeneratedTokens()) == 0 {
+			return fmt.Errorf("extAutScript.GeneratedTokens is nil/empty")
+		}
+		if len(spentAutInstance.After.ActiveRootTokenSet) != len(extAutScript.GeneratedTokens()) {
+			return fmt.Errorf("len(spentAutInstance.After.ActiveRootTokenSet) %d != len(extAutScript.GeneratedTokens()) %d",
+				len(spentAutInstance.After.ActiveRootTokenSet), len(extAutScript.GeneratedTokens()))
+		}
+		tempAfter := spentAutInstance.After.Clone() // make sure spentAutInstance.After is not modified
+		for i, scriptOutputToken := range extAutScript.GeneratedTokens() {
+			if scriptOutputToken == nil {
+				return fmt.Errorf("extAutScript.GeneratedTokens[%d] is nil", i)
+			}
+			outputTokenOP := scriptOutputToken.HostOutPoint
+			outputTokenOPStr := outputTokenOP.String()
+			rootTokenOP, ok := tempAfter.ActiveRootTokenSet[outputTokenOPStr]
+			if !ok {
+				return fmt.Errorf("extAutScript.GeneratedTokens[%d] (%s) does not map to any item in spentAutInstance.After.ActiveRootTokenSet",
+					i, outputTokenOPStr)
+			}
+			if rootTokenOP == nil {
+				return fmt.Errorf("extAutScript.GeneratedTokens[%d] (%s) maps to nil in spentAutInstance.After.ActiveRootTokenSet",
+					i, outputTokenOPStr)
+			}
+			if !outputTokenOP.IsEqual(rootTokenOP) {
+				return fmt.Errorf("extAutScript.GeneratedTokens[%d] (%s) maps to different item (%s) spentAutInstance.After.ActiveRootTokenSet",
+					i, outputTokenOPStr, rootTokenOP.String())
+			}
+			delete(tempAfter.ActiveRootTokenSet, outputTokenOPStr)
 		}
 
 		// spentAutInstance.Before
@@ -879,10 +880,42 @@ func (spentAutInstance *SpentAutInstance) ScriptMatchCheck(extAutScript *ctautap
 				spentAutInstance.spendingScriptType.String())
 		}
 
+		// spentAutInstance.After
+		// spentAutInstance.After.ActiveRootTokenSet should be consistent with extAutScript.GeneratedTokens()
+		if len(extAutScript.GeneratedTokens()) == 0 {
+			return fmt.Errorf("extAutScript.GeneratedTokens is nil/empty")
+		}
+		if len(spentAutInstance.After.ActiveRootTokenSet) != len(extAutScript.GeneratedTokens()) {
+			return fmt.Errorf("len(spentAutInstance.After.ActiveRootTokenSet) %d != len(extAutScript.GeneratedTokens()) %d",
+				len(spentAutInstance.After.ActiveRootTokenSet), len(extAutScript.GeneratedTokens()))
+		}
+		tempAfter := spentAutInstance.After.Clone() // make sure spentAutInstance.After is not modified
+		for i, scriptOutputToken := range extAutScript.GeneratedTokens() {
+			if scriptOutputToken == nil {
+				return fmt.Errorf("extAutScript.GeneratedTokens[%d] is nil", i)
+			}
+			outputTokenOP := scriptOutputToken.HostOutPoint
+			outputTokenOPStr := outputTokenOP.String()
+			rootTokenOP, ok := tempAfter.ActiveRootTokenSet[outputTokenOPStr]
+			if !ok {
+				return fmt.Errorf("extAutScript.GeneratedTokens[%d] (%s) does not map to any item in spentAutInstance.After.ActiveRootTokenSet",
+					i, outputTokenOPStr)
+			}
+			if rootTokenOP == nil {
+				return fmt.Errorf("extAutScript.GeneratedTokens[%d] (%s) maps to nil in spentAutInstance.After.ActiveRootTokenSet",
+					i, outputTokenOPStr)
+			}
+			if !outputTokenOP.IsEqual(rootTokenOP) {
+				return fmt.Errorf("extAutScript.GeneratedTokens[%d] (%s) maps to different item (%s) spentAutInstance.After.ActiveRootTokenSet",
+					i, outputTokenOPStr, rootTokenOP.String())
+			}
+			delete(tempAfter.ActiveRootTokenSet, outputTokenOPStr)
+		}
+
 		// spentAutInstance.Before
 		// Note that previous spentAutInstance.SanityCheck() has guaranteed that spentAutInstance.Before is not nil
 		// extAutScript.ConsumedHostOutpoints() should be in spentAutInstance.Before.ActiveRootTokenSet
-		tempBefore := spentAutInstance.Before.Clone() // make sure spentAutInstance.After is not modified
+		tempBefore := spentAutInstance.Before.Clone() // make sure spentAutInstance.Before is not modified
 		for i, scriptInputOutPoint := range extAutScript.ConsumedHostOutpoints() {
 			scriptInputOutPointStr := scriptInputOutPoint.String()
 			rootTokenOP, ok := tempBefore.ActiveRootTokenSet[scriptInputOutPointStr]
@@ -906,10 +939,14 @@ func (spentAutInstance *SpentAutInstance) ScriptMatchCheck(extAutScript *ctautap
 				spentAutInstance.spendingScriptType.String())
 		}
 
+		// previous spentAutInstance.SanityCheck() has guaranteed that
+		// spentAutInstance.After.ActiveRootTokenSet is a subset of spentAutInstance.Before.ActiveRootTokenSet.
+		// Now check that spentAutInstance.Before.ActiveRootTokenSet \ spentAutInstance.After.ActiveRootTokenSet = ConsumedHostOutpoints.
+
 		// spentAutInstance.Before
 		// Note that previous spentAutInstance.SanityCheck() has guaranteed that spentAutInstance.Before is not nil
 		// extAutScript.ConsumedHostOutpoints() should be in spentAutInstance.Before.ActiveRootTokenSet
-		tempBefore := spentAutInstance.Before.Clone() // make sure spentAutInstance.After is not modified
+		tempBefore := spentAutInstance.Before.Clone() // make sure spentAutInstance.Before is not modified
 		for i, scriptInputOutPoint := range extAutScript.ConsumedHostOutpoints() {
 			scriptInputOutPointStr := scriptInputOutPoint.String()
 			rootTokenOP, ok := tempBefore.ActiveRootTokenSet[scriptInputOutPointStr]
@@ -921,10 +958,39 @@ func (spentAutInstance *SpentAutInstance) ScriptMatchCheck(extAutScript *ctautap
 				return fmt.Errorf("extAutScript.ConsumedHostOutpoints[%d] (%s) map to nil in spentAutInstance.Before.ActiveRootTokenSet",
 					i, scriptInputOutPointStr)
 			}
-			if !scriptInputOutPoint.IsEqual(rootTokenOP) {
+			if !rootTokenOP.IsEqual(scriptInputOutPoint) {
 				return fmt.Errorf("extAutScript.ConsumedHostOutpoints[%d] (%s) map to a different item (%s) in spentAutInstance.Before.ActiveRootTokenSet",
 					i, scriptInputOutPointStr, rootTokenOP.String())
 			}
+			delete(tempBefore.ActiveRootTokenSet, scriptInputOutPointStr)
+		}
+
+		// check the remainder of Before is the same as After
+		tempAfter := spentAutInstance.After.Clone() // make sure spentAutInstance.After is not modified
+
+		if len(tempAfter.ActiveRootTokenSet) != len(tempBefore.ActiveRootTokenSet) {
+			return fmt.Errorf("Before.ActiveRootTokenSet = spentAutInstance.After.ActiveRootTokenSet + ConsumedHostOutpoints does not hold")
+		}
+		for _, rootTokenOpAfter := range tempAfter.ActiveRootTokenSet {
+			rootTokenOpAfterStr := rootTokenOpAfter.String()
+			rootTokenOpBefore, ok := tempBefore.ActiveRootTokenSet[rootTokenOpAfterStr]
+			if !ok {
+				return fmt.Errorf("After.ActiveRootTokenSet(%s) does not map to any item in Before.ActiveRootTokenSet",
+					rootTokenOpAfter.String())
+			}
+			if rootTokenOpBefore == nil {
+				return fmt.Errorf("After.ActiveRootTokenSet(%s) map to a nil in Before.ActiveRootTokenSet",
+					rootTokenOpAfter.String())
+			}
+			if !rootTokenOpBefore.IsEqual(rootTokenOpAfter) {
+				return fmt.Errorf("After.ActiveRootTokenSet(%s) map to a differnet one (%s) in Before.ActiveRootTokenSet",
+					rootTokenOpAfter.String(), rootTokenOpBefore.String())
+
+			}
+			delete(tempBefore.ActiveRootTokenSet, rootTokenOpAfterStr)
+		}
+		if len(tempBefore.ActiveRootTokenSet) != 0 {
+			return fmt.Errorf("Before.ActiveRootTokenSet = spentAutInstance.After.ActiveRootTokenSet + ConsumedHostOutpoints does not hold")
 		}
 
 		// mintAmount
