@@ -794,6 +794,106 @@ func (autMetadata *AutMetadata) Clone() *AutMetadata {
 	return cloned
 }
 
+// IsEqualExMint returns whether the parameter equals to the receiver,
+// except the MintedAmount and ActiveRootTokenSet fields.
+func (autMetadata *AutMetadata) IsEqualExMint(obj *AutMetadata) bool {
+	if autMetadata == nil || obj == nil {
+		return false
+	}
+
+	if autMetadata.Version != obj.Version {
+		return false
+	}
+
+	if !bytes.Equal(autMetadata.AutIdentifier[:], obj.AutIdentifier[:]) {
+		return false
+	}
+
+	if autMetadata.UpdatedHeight != obj.UpdatedHeight {
+		return false
+	}
+
+	if !bytes.Equal(autMetadata.AutName, obj.AutName) {
+		return false
+	}
+
+	if !bytes.Equal(autMetadata.AutSymbol, obj.AutSymbol) {
+		return false
+	}
+
+	if !bytes.Equal(autMetadata.BaseUnitName, obj.BaseUnitName) {
+		return false
+	}
+	if !bytes.Equal(autMetadata.SubUnitName, obj.SubUnitName) {
+		return false
+	}
+
+	if autMetadata.UnitScale != obj.UnitScale {
+		return false
+	}
+
+	if !bytes.Equal(autMetadata.AutMemo, obj.AutMemo) {
+		return false
+	}
+
+	if autMetadata.PlannedTotalSupply != obj.PlannedTotalSupply {
+		return false
+	}
+
+	// Issuers
+	if len(autMetadata.Issuers) != len(obj.Issuers) {
+		return false
+	}
+	for i := 0; i < len(autMetadata.Issuers); i++ {
+		if !autMetadata.Issuers[i].Equal(obj.Issuers[i]) {
+			return false
+		}
+	}
+
+	if autMetadata.ReregistrationExpireHeight != obj.ReregistrationExpireHeight {
+		return false
+	}
+	if autMetadata.ReregistrationThreshold != obj.ReregistrationThreshold {
+		return false
+	}
+	if autMetadata.MintThreshold != obj.MintThreshold {
+		return false
+	}
+	if autMetadata.PrivacyType != obj.PrivacyType {
+		return false
+	}
+
+	// MintedAmount
+	// excluded
+
+	if autMetadata.BurnedAmount != obj.BurnedAmount {
+		return false
+	}
+
+	// ActiveRootTokenSet
+	// excluded
+
+	if len(autMetadata.UpdateScriptVersions) != len(obj.UpdateScriptVersions) {
+		return false
+	}
+	for i := 0; i < len(autMetadata.UpdateScriptVersions); i++ {
+		if autMetadata.UpdateScriptVersions[i] != obj.UpdateScriptVersions[i] {
+			return false
+		}
+	}
+
+	if len(autMetadata.UpdateHistoryHeights) != len(obj.UpdateHistoryHeights) {
+		return false
+	}
+	for i := 0; i < len(autMetadata.UpdateHistoryHeights); i++ {
+		if autMetadata.UpdateHistoryHeights[i] != obj.UpdateHistoryHeights[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
 // AutScript defines the interface for Aut Scripts.
 type AutScript interface {
 

@@ -668,17 +668,21 @@ func (spentAutInstance *SpentAutInstance) SanityCheck() error {
 			return fmt.Errorf("AutScriptTypeReRegistration: AutInsatnce %s, spentAutInstance.After.PlannedTotalSupply (%d) < spentAutInstance.Before.MintedAmount (%d)",
 				spentAutInstance.spendingScriptType.String(), spentAutInstance.After.PlannedTotalSupply, spentAutInstance.Before.MintedAmount)
 		}
+
 		// ActiveRootTokenSet
 		if len(spentAutInstance.After.ActiveRootTokenSet) == 0 {
-			// should produce new
+			// should produce new, this is consistent on the requirements on the AutScript.
+			// if since the issuers want to freeze the AutInstance Reregistration/Mint, they could use out the ActiveRootTokenSet by some way.
 			return fmt.Errorf("AutScriptTypeReRegistration: AutInsatnce %s, spentAutInstance.After.ActiveRootTokenSet is empty",
 				spentAutInstance.spendingScriptType.String())
 		}
+
 		if len(spentAutInstance.Before.ActiveRootTokenSet) == 0 {
 			// should have some to be consumed to generate the after
 			return fmt.Errorf("AutScriptTypeReRegistration: AutInsatnce %s, spentAutInstance.Before.ActiveRootTokenSet is empty",
 				spentAutInstance.spendingScriptType.String())
 		}
+
 		// spentAutInstance.After.ActiveRootTokenSet and spentAutInstance.Before.ActiveRootTokenSet have no common
 		for _, rootTokenOp := range spentAutInstance.After.ActiveRootTokenSet {
 			if _, ok := spentAutInstance.Before.ActiveRootTokenSet[rootTokenOp.String()]; ok {
@@ -735,32 +739,12 @@ func (spentAutInstance *SpentAutInstance) SanityCheck() error {
 				spentAutInstance.spendingScriptType.String(), spentAutInstance.GeneratedHeight, spentAutInstance.Before.UpdatedHeight)
 		}
 
-		// spentAutInstance.After and spentAutInstance.Before
-		// Version
-		// Ming does not update the version
-		if spentAutInstance.After.Version != spentAutInstance.Before.Version {
-			return fmt.Errorf("AutScriptTypeMint: AutInsatnce %s, spentAutInstance.After.Version (%d) != spentAutInstance.Before.Version (%d)",
-				spentAutInstance.spendingScriptType.String(), spentAutInstance.After.Version, spentAutInstance.Before.Version)
+		// spentAutInstance.After and spentAutInstance.Before should be same, except the MintedAmount and ActiveRootTokenSet
+		if !spentAutInstance.After.IsEqualExMint(spentAutInstance.Before) {
+			return fmt.Errorf("AutScriptTypeMint: AutInsatnce %s, spentAutInstance.After is different from spentAutInstance.Before on some fields except MintedAmount and ActiveRootTokenSet",
+				spentAutInstance.spendingScriptType.String())
 		}
 
-		// AutIdentifier
-		// checked above: "=="
-
-		// UpdatedHeight
-		// Mint does not update the UpdatedHeight
-		if spentAutInstance.After.UpdatedHeight != spentAutInstance.Before.UpdatedHeight {
-			return fmt.Errorf("AutScriptTypeMint: AutInsatnce %s, spentAutInstance.After.UpdatedHeight (%d) <= spentAutInstance.Before.UpdatedHeight (%d)",
-				spentAutInstance.spendingScriptType.String(), spentAutInstance.After.UpdatedHeight, spentAutInstance.Before.UpdatedHeight)
-		}
-		// Note now it holds that
-		// spentAutInstance.Before.UpdatedHeight == spentAutInstance.After.UpdatedHeight = spentAutInstance.GeneratedHeight < spentAutInstance.SpentHeight
-
-		// PlannedTotalSupply
-		// Mint does not update the PlannedTotalSupply
-		if spentAutInstance.After.PlannedTotalSupply != spentAutInstance.Before.PlannedTotalSupply {
-			return fmt.Errorf("AutScriptTypeMint: AutInsatnce %s, spentAutInstance.After.PlannedTotalSupply (%d) != spentAutInstance.Before.PlannedTotalSupply (%d)",
-				spentAutInstance.spendingScriptType.String(), spentAutInstance.After.PlannedTotalSupply, spentAutInstance.Before.PlannedTotalSupply)
-		}
 		// MintedAmount
 		if spentAutInstance.After.MintedAmount <= spentAutInstance.Before.MintedAmount {
 			return fmt.Errorf("AutScriptTypeMint: AutInsatnce %s, spentAutInstance.After.MintedAmount (%d) <= spentAutInstance.Before.MintedAmount (%d)",
@@ -775,27 +759,11 @@ func (spentAutInstance *SpentAutInstance) SanityCheck() error {
 			return fmt.Errorf("AutScriptTypeMint: AutInsatnce %s, spentAutInstance.Before.ActiveRootTokenSet is empty",
 				spentAutInstance.spendingScriptType.String())
 		}
-		// spentAutInstance.After.ActiveRootTokenSet should be subset of spentAutInstance.Before.ActiveRootTokenSet
+		// spentAutInstance.After.ActiveRootTokenSet should be a subset of spentAutInstance.Before.ActiveRootTokenSet
 		for _, rootTokenOp := range spentAutInstance.After.ActiveRootTokenSet {
 			if _, ok := spentAutInstance.Before.ActiveRootTokenSet[rootTokenOp.String()]; !ok {
 				return fmt.Errorf("AutScriptTypeMint: AutInsatnce %s, rootToken %s is in spentAutInstance.After.ActiveRootTokenSet but not in spentAutInstance.Before.ActiveRootTokenSet has commond %s",
 					spentAutInstance.spendingScriptType.String(), rootTokenOp.String())
-			}
-		}
-
-		// UpdateScriptVersions
-		// UpdateHistoryHeights
-		// Note that spentAutInstance.After.Version = spentAutInstance.Before.Version + 1
-		for i := uint32(0); i < spentAutInstance.Before.Version; i++ {
-			if spentAutInstance.After.UpdateScriptVersions[i] != spentAutInstance.Before.UpdateScriptVersions[i] {
-				return fmt.Errorf("AutScriptTypeMint: AutInsatnce %s, spentAutInstance.After.UpdateScriptVersions[%d] (%d) != spentAutInstance.Before.UpdateScriptVersions[%d] (%d)",
-					spentAutInstance.spendingScriptType.String(),
-					i, spentAutInstance.After.UpdateScriptVersions[i], i, spentAutInstance.Before.UpdateScriptVersions[i])
-			}
-			if spentAutInstance.After.UpdateHistoryHeights[i] != spentAutInstance.Before.UpdateHistoryHeights[i] {
-				return fmt.Errorf("AutScriptTypeMint: AutInsatnce %s, spentAutInstance.After.UpdateHistoryHeights[%d] (%d) != spentAutInstance.Before.UpdateHistoryHeights[%d] (%d)",
-					spentAutInstance.spendingScriptType.String(),
-					i, spentAutInstance.After.UpdateHistoryHeights[i], i, spentAutInstance.Before.UpdateHistoryHeights[i])
 			}
 		}
 
@@ -960,6 +928,7 @@ func (spentAutInstance *SpentAutInstance) ScriptMatchCheck(extAutScript *ctautap
 		}
 
 		// mintAmount
+		// Note that the three value has been guaranteed in the legal scope, so that adding them will not overflow.
 		if spentAutInstance.Before.MintedAmount+autScriptInst.Vin() != spentAutInstance.After.MintedAmount {
 			return fmt.Errorf("spentAutInstance.Before.MintedAmount (%d) + autScriptInst.Vin() (%d) != spentAutInstance.After.MintedAmount (%d)",
 				spentAutInstance.Before.MintedAmount, autScriptInst.Vin(), spentAutInstance.After.MintedAmount)
