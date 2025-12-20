@@ -3,6 +3,7 @@ package blockchain
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
@@ -1640,13 +1641,18 @@ func (view *CTAUTViewpoint) fetchConsumedCTAUTTokens(db database.DB, block *abeu
 
 		consumedHostOutpoints := ctAutScript.ConsumedHostOutpoints()
 		neededSet := make(map[ctautapi.HostOutPoint]struct{}, len(consumedHostOutpoints))
+
 		// Note that AutMetadata that AutScriptTypeReregister, AutScriptTypeReReregister, and AutScriptTypeMint are also fetched,
 		// and neededSet is only for autCoins.
 		if ctAutScript.Type() == ctautapi.AutScriptTypeTransfer || ctAutScript.Type() == ctautapi.AutScriptTypeBurn {
 			for i := 0; i < len(consumedHostOutpoints); i++ {
+				if coin := view.LookupCTAUTCoin(ctAutScript.AutIdentifier(), *consumedHostOutpoints[i]); coin != nil {
+					continue
+				}
 				neededSet[*consumedHostOutpoints[i]] = struct{}{}
 			}
 		}
+
 		err := view.fetchCTAUTMain(db, neededSet, ctAutScript.AutIdentifier())
 		if err != nil {
 			return err
