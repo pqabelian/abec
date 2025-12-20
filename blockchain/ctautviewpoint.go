@@ -1370,7 +1370,7 @@ func (view *CTAUTViewpoint) disconnectAutScriptBurn(db database.DB, extAutScript
 // the returned map[string]struct{} carries the autIdentifierkeys for the AutInstance to be unregistered.
 func (view *CTAUTViewpoint) disconnectAutScripts(db database.DB, block *abeutil.BlockAbe,
 	sauts []SpentAut, hostView *UtxoRingViewpoint,
-) (map[string]struct{}, error) {
+) (map[ctautapi.AutId]struct{}, error) {
 
 	// Sanity check the correct number of sauts are provided.
 	if len(sauts) != countSpentAuts(block) {
@@ -1382,7 +1382,7 @@ func (view *CTAUTViewpoint) disconnectAutScripts(db database.DB, block *abeutil.
 	// reverse order.  This is necessary since ctAutScripts later in a block
 	// can spend from previous ones.
 	extAutScripts := block.ExtAutScripts()
-	unregisteredAutInstances := map[string]struct{}{}
+	unregisteredAutInstances := map[ctautapi.AutId]struct{}{}
 	for index := len(extAutScripts) - 1; index >= 0; index-- {
 		extAutScript := extAutScripts[index]
 
@@ -1392,12 +1392,14 @@ func (view *CTAUTViewpoint) disconnectAutScripts(db database.DB, block *abeutil.
 			if err != nil {
 				return nil, fmt.Errorf("disconnectAutScriptRegistration fail: %v", err)
 			}
-			autIdKeyToDel := autIdToDel.String()
-			if _, ok := unregisteredAutInstances[autIdKeyToDel]; ok {
-				return nil, AssertError(fmt.Sprintf("disconnectAutScriptRegistration claims to unregister an AutIntance %s which has been claimed to unregister by a previous AutScript-rollback",
-					autIdKeyToDel))
+			if autIdToDel == nil {
+				return nil, AssertError(fmt.Sprintf("disconnectAutScriptRegistration return a nil AutId to unregister"))
 			}
-			unregisteredAutInstances[autIdKeyToDel] = struct{}{}
+			if _, ok := unregisteredAutInstances[*autIdToDel]; ok {
+				return nil, AssertError(fmt.Sprintf("disconnectAutScriptRegistration claims to unregister an AutIntance %s which has been claimed to unregister by a previous AutScript-rollback",
+					autIdToDel.String()))
+			}
+			unregisteredAutInstances[*autIdToDel] = struct{}{}
 
 		case *ctautapi.ReRegistrationScript:
 			err := view.disconnectAutScriptReRegistration(db, extAutScript, blockHeight, sauts[index])

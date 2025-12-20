@@ -1125,7 +1125,7 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *abeutil.Block, view
 // aut review done 2025.12.18
 func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 	view *UtxoRingViewpoint, viewToDel *UtxoRingViewpoint,
-	ctautView *CTAUTViewpoint, autIdKeysToDel map[string]struct{}) error {
+	ctautView *CTAUTViewpoint, autIdsToDel map[ctautapi.AutId]struct{}) error {
 	// Make sure the node being disconnected is the end of the best chain.
 	if !node.hash.IsEqual(&b.bestChain.Tip().hash) {
 		return AssertError("disconnectBlock must be called with the " +
@@ -1200,7 +1200,7 @@ func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe
 			return err
 		}
 		// remove the new AUT with registration transaction
-		err = dbRemoveCTAUTInstance(dbTx, autIdKeysToDel, node.height, node.hash)
+		err = dbRemoveCTAUTInstances(dbTx, autIdsToDel, node.height, node.hash)
 		if err != nil {
 			return err
 		}
@@ -1337,7 +1337,7 @@ func countSpentAuts(block *abeutil.BlockAbe) int {
 //	  6. Detach each block and attach each block really
 //
 // todo_DONE(MLP): reviewed on 2024.01.05
-// aut review done 2025.12.17 todo
+// aut review done 2025.12.17
 func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) error {
 	// Nothing to do if no reorganize nodes were provided.
 	if detachNodes.Len() == 0 && attachNodes.Len() == 0 {
@@ -1393,7 +1393,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 
 	ctautView := NewCTAUTViewpoint()
 	ctautView.SetBestHash(&oldBest.hash)
-	autInstanceToDelAll := map[string]struct{}{}
+	autInstanceToDelAll := map[ctautapi.AutId]struct{}{}
 
 	for e := detachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
@@ -1452,17 +1452,17 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			return err
 		}
 
-		autIdKeysToDelForBlock, err := ctautView.disconnectAutScripts(b.db, block, sctauts, view)
+		autIdsToDelForBlock, err := ctautView.disconnectAutScripts(b.db, block, sctauts, view)
 		if err != nil {
 			return err
 		}
-		for autIdentifierKey := range autIdKeysToDelForBlock {
+		for autIdentifier := range autIdsToDelForBlock {
 			// assert
-			if _, ok := autInstanceToDelAll[autIdentifierKey]; ok {
-				return fmt.Errorf("duplicate CTAUT instance to delete %s", autIdentifierKey)
+			if _, ok := autInstanceToDelAll[autIdentifier]; ok {
+				return fmt.Errorf("duplicate CTAUT instance to delete %s", autIdentifier.String())
 			}
 
-			autInstanceToDelAll[autIdentifierKey] = struct{}{}
+			autInstanceToDelAll[autIdentifier] = struct{}{}
 		}
 		//	Abe to do new UtxoRings if n.height % 2 == 0
 		//	These utxoRings should will be deleted from database
@@ -1517,8 +1517,8 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		}
 	}
 
-	for ctautIdentifierKey := range autInstanceToDelAll {
-
+	for ctautIdentifier := range autInstanceToDelAll {
+		ctautIdentifierKey := ctautIdentifier.String()
 		autInstance, ok := ctautView.instances[ctautIdentifierKey]
 		if !ok || autInstance == nil || autInstance.metadata == nil {
 			return fmt.Errorf("no such CTAUT instance found, this should not happen")
@@ -1708,7 +1708,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		// adds the generated tokens and flagged them "spent" (which will be deleted from database later)
 		// unregisteredInstances carries the AutInstance to be deleted from database
 		// 2025.12.18	end
-		unregisteredAutIdKeys, err := ctautView.disconnectAutScripts(b.db, block, detachSpentAuts[i], view)
+		unregisteredAutIds, err := ctautView.disconnectAutScripts(b.db, block, detachSpentAuts[i], view)
 		if err != nil {
 			return err
 		}
@@ -1754,7 +1754,8 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			}
 		}
 
-		for autIdentifierKey := range unregisteredAutIdKeys {
+		for autIdentifier := range unregisteredAutIds {
+			autIdentifierKey := autIdentifier.String()
 			autInstance, ok := ctautView.instances[autIdentifierKey]
 			if !ok || autInstance == nil || autInstance.metadata == nil {
 				return AssertError(fmt.Sprintf("detaching CTAUT instance %s fail: the instance does not exist", autIdentifierKey))
@@ -1782,7 +1783,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		// 2025.12.18 operate the database	begin
 		// Update the database and chain state.
 		// todo_DONE(MLP): reviewed on 2024.01.05
-		err = b.disconnectBlockAbe(n, block, view, viewToDel, ctautView, unregisteredAutIdKeys)
+		err = b.disconnectBlockAbe(n, block, view, viewToDel, ctautView, unregisteredAutIds)
 		if err != nil {
 			return err
 		}

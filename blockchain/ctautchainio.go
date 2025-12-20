@@ -1528,13 +1528,13 @@ func dbFetchCTAUTCoin(dbTx database.Tx, outpoint ctautapi.HostOutPoint, identifi
 	if autTokenBucket == nil {
 		return nil, fmt.Errorf("bucket for aut coin does not exist")
 	}
-	subBuckets := autTokenBucket.Bucket(identifier[:])
-	if subBuckets == nil {
+	subBucket := autTokenBucket.Bucket(identifier[:])
+	if subBucket == nil {
 		return nil, nil
 	}
 
 	key := ctautOutpointKey(outpoint)
-	serializedCoin := subBuckets.Get(*key)
+	serializedCoin := subBucket.Get(*key)
 	recycleCTAUTOutpointKey(key)
 	if serializedCoin == nil {
 		return nil, nil
@@ -1543,7 +1543,7 @@ func dbFetchCTAUTCoin(dbTx database.Tx, outpoint ctautapi.HostOutPoint, identifi
 	// A non-nil zero-length entry means there is an entry in the database
 	// for a spent transaction output which should never be the case.
 	if len(serializedCoin) == 0 {
-		return nil, AssertError(fmt.Sprintf("database contains entry "+
+		return nil, AssertError(fmt.Sprintf("database contains empty entry "+
 			"for spent tx output %v", outpoint))
 	}
 
@@ -1603,28 +1603,22 @@ func dbFetchCTAUTMetadata(dbTx database.Tx, key ctautapi.AutId) (*ctautapi.AutMe
 	return &metadata, nil
 }
 
-// aut review done 2025.12.18 todo
-func dbRemoveCTAUTInstance(dbTx database.Tx, autIdKeysToDel map[string]struct{}, blockHeight int32, blockHash chainhash.Hash) error {
+// aut review done 2025.12.18
+//
+// Note: In design, this function should be called after the coins for the AutInstance have been all removed.
+// An assertion about the design is implemented in this function.
+func dbRemoveCTAUTInstances(dbTx database.Tx, autIdsToDel map[ctautapi.AutId]struct{}, blockHeight int32, blockHash chainhash.Hash) error {
 	autInstanceBucket := dbTx.Metadata().Bucket(ctAutInstanceBucketName)
 	autTokenBucket := dbTx.Metadata().Bucket(ctAutTokenBucketName)
 
-	for autIdentifierKey, _ := range autIdKeysToDel {
+	for autIdentifier, _ := range autIdsToDel {
 		// todo: 2025.12.18 confirm This is based on that autIdentifierKey = autIdentifier.String(), where autIdentifier is a Hash.
 		// todo: 2025.12.18 future: provide a more form "paired" functions.
-		autIdentifier, err := chainhash.NewHashFromStr(autIdentifierKey)
-		if err != nil {
-			return fmt.Errorf("invalid identifier key")
-		}
-
-		err = autInstanceBucket.Delete(autIdentifier[:])
-		if err != nil {
-			return err
-		}
 
 		// assert no coins reside
 		if subBucket := autTokenBucket.Bucket(autIdentifier[:]); subBucket != nil {
 			count := 0
-			err = subBucket.ForEach(func(k, v []byte) error {
+			err := subBucket.ForEach(func(k, v []byte) error {
 				count++
 				return nil
 			})
@@ -1632,16 +1626,23 @@ func dbRemoveCTAUTInstance(dbTx database.Tx, autIdKeysToDel map[string]struct{},
 				return err
 			}
 			if count != 0 {
-				return fmt.Errorf("fail to remove instance %s because it has %d aut tokens ", autIdentifierKey, count)
+				log.Warnf("fail to removing aut instance %v: its coins have not been all deleted ", autIdentifier.String())
+
+				return AssertError(fmt.Sprintf("fail to remove instance %s because it has %d aut tokens ", autIdentifier.String(), count))
 			}
 		}
 
-		err = autTokenBucket.DeleteBucket(autIdentifier[:])
+		err := autTokenBucket.DeleteBucket(autIdentifier[:])
 		if err != nil {
 			return err
 		}
 		log.Debugf(`AUT identified by %s is removed at height %d (block hash %s)`,
-			autIdentifierKey, blockHeight, blockHash.String())
+			autIdentifier.String(), blockHeight, blockHash.String())
+
+		err = autInstanceBucket.Delete(autIdentifier[:])
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -1663,6 +1664,7 @@ func dbPutCTAUTView(dbTx database.Tx, view *CTAUTViewpoint, blockHeight int32, b
 		}
 
 		identifier := instance.metadata.AutIdentifier
+		// todo: assert identifier? no, 2025.12.20; clarify in the future
 
 		// Serialize and store the utxo entry.
 		serializedCTAUTInfo, err := instance.metadata.Serialize()
@@ -1717,7 +1719,7 @@ func dbPutCTAUTView(dbTx database.Tx, view *CTAUTViewpoint, blockHeight int32, b
 			if coin.IsSpent() {
 				key := ctautOutpointKey(outpoint)
 				err = subBucket.Delete(*key) // if rollback, would restore by spend journal
-				recycleOutpointKey(key)
+				recycleCTAUTOutpointKey(key)
 				if err != nil {
 					return err
 				}
@@ -1735,7 +1737,7 @@ func dbPutCTAUTView(dbTx database.Tx, view *CTAUTViewpoint, blockHeight int32, b
 			// todo: check whether serializedCoin is nil? 2025.12.17 refactor in the future
 			key := ctautOutpointKey(outpoint)
 			err = subBucket.Put(*key, serializedCoin)
-			// todo: why above spent recycle the key, research in the future.
+			// todo: 2025.12.20 why above spent recycle the key, research in the future.
 			// NOTE: The key is intentionally not recycled here since the
 			// database interface contract prohibits modifications.  It will
 			// be garbage collected normally when the database is done with
