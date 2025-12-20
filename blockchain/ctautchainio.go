@@ -639,9 +639,10 @@ func (spentAutInstance *SpentAutInstance) SanityCheck() error {
 				spentAutInstance.spendingScriptType.String(), spentAutInstance.GeneratedHeight, spentAutInstance.Before.UpdatedHeight)
 		}
 		// need: spentAutInstance.SpentHeight == spentAutInstance.After.UpdatedHeight
+		// SpentHeight would be the heigt of aut instance being updated
 		if spentAutInstance.SpentHeight != spentAutInstance.After.UpdatedHeight {
 			return fmt.Errorf("AutScriptTypeReRegistration: AutInsatnce %s, spentAutInstance.SpentHeight (%d) != spentAutInstance.After.UpdatedHeight (%d)",
-				spentAutInstance.SpentHeight, spentAutInstance.After.UpdatedHeight)
+				spentAutInstance.spentAutIdentifier.String(), spentAutInstance.SpentHeight, spentAutInstance.After.UpdatedHeight)
 		}
 
 		// spentAutInstance.After and spentAutInstance.Before

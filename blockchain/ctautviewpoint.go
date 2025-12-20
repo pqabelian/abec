@@ -666,7 +666,7 @@ func (view *CTAUTViewpoint) connectMintScript(extAutScript *ctautapi.ExtAutScrip
 
 	if sctauts != nil {
 		saut := NewSpentAutInstance(extAutScript.AutIdentifier(), blockHeight, oldMetadata.UpdatedHeight,
-			ctautapi.AutScriptTypeReRegistration, newMetadata.Clone(), oldMetadata.Clone())
+			ctautapi.AutScriptTypeMint, newMetadata.Clone(), oldMetadata.Clone())
 		*sctauts = append(*sctauts, saut)
 	}
 
