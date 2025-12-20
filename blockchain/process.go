@@ -247,6 +247,8 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, powConsensus *cons
 				} else {
 					// checkpointNode.height < b.chainParams.BlockHeightAconcagua
 					// from checkpoint block to dsa block should be checked before
+					// todo: THIS IS ASSUMING that the fetched blockAconcagua is a checkpoint.
+					// Todo: 2025.12.20 to guarantee this assumption, we must add this block to checkpoint once it is ready.
 					blockAconcagua, err := b.BlockByHeight(b.chainParams.BlockHeightAconcagua)
 					if err != nil {
 						return false, false, err
@@ -298,6 +300,8 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, powConsensus *cons
 					}
 					// from checkpoint block to dsa block should be checked before
 					blockHeaderDSA := &blockDSA.MsgBlock().Header
+					// todo: THIS IS ASSUMING that the fetched blockHeaderDSA is a checkpoint.
+					// todo: explicltly hardcode the checkpoint here, prevent the checkpoint mechanism fails due to some reason.
 					duration := blockHeader.Timestamp.Sub(blockHeaderDSA.Timestamp)
 					requiredTarget := CompactToBig(
 						b.calcEasiestDifficultyDSA(blockHeaderDSA.Bits, duration),
@@ -311,6 +315,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, powConsensus *cons
 					}
 				}
 			} else {
+				// blockHeader.Height < b.chainParams.BlockHeightDSA
 				duration := blockHeader.Timestamp.Sub(checkpointTime)
 				requiredTarget := CompactToBig(b.calcEasiestDifficulty(
 					checkpointNode.bits, duration))
