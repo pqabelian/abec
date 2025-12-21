@@ -243,6 +243,7 @@ type Params struct {
 	// Added by Alice, 2024.05.11, for DSA
 	// todo(DSA): review
 	BlockHeightDSA int32
+	BlockHashDSA   string
 
 	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
 	// ToDo(MLP):
@@ -378,6 +379,7 @@ var MainNetParams = Params{
 	// Added by Alice, 2024.05.11, for DSA
 	// todo(DSA): review
 	BlockHeightDSA: 284000,
+	BlockHashDSA:   "9d9494bb20e81e1e153aef2468d6c58aab62ff6e9130832af80bcc1d0fa39a52",
 
 	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
 	// ToDo(MLP):
@@ -476,6 +478,7 @@ var RegressionNetParams = Params{
 	// Added by Alice, 2024.05.11, for DSA
 	// todo(DSA): review
 	BlockHeightDSA: 284000,
+	BlockHashDSA:   "",
 
 	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
 	// ToDo(MLP):
@@ -581,6 +584,7 @@ var TestNet3Params = Params{
 	// Added by Alice, 2024.05.11, for DSA
 	// todo(DSA): review
 	BlockHeightDSA: 284000,
+	BlockHashDSA:   "",
 
 	// BlockHeightMLP specifies the block height from which MLP and AUT are supported.
 	// ToDo(MLP):
