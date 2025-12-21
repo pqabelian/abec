@@ -2477,7 +2477,7 @@ func validateAutTransferScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoi
 }
 
 // checkAutBurnScriptInputsOutputs
-// aut review done 2025.12.12 todo: discuss
+// aut review done 2025.12.12
 func checkAutBurnScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
 	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
 

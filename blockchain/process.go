@@ -149,7 +149,7 @@ func (b *BlockChain) processOrphansAbe(hash *chainhash.Hash, flags BehaviorFlags
 //     todo (EthashPoW): 202207
 //
 // todo_DONE(MLP): reviewed on 2024.01.05
-// todo: review done 2025.12.16
+// review done 2025.12.16
 func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, powConsensus *consensus.PowConsensus, flags BehaviorFlags) (bool, bool, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()

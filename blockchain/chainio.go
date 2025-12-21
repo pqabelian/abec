@@ -525,8 +525,8 @@ func deserializeSpendJournalEntry(serialized []byte, txns []*wire.MsgTx) ([]Spen
 }
 
 // Abe to do
-// aut review done 2025.12.16 todo:
-// todo: add comments: the caller need to use correct txns, say, the txs[1:] of a block.
+// aut review done 2025.12.16
+// The caller need to use correct txns, say, the txs[1:] of a block.
 func deserializeSpendJournalEntryAbe(serialized []byte, txns []*wire.MsgTxAbe) ([]*SpentTxOutAbe, error) {
 	// Calculate the total number of stxos.
 	var numStxos int
