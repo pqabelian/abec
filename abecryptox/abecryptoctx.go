@@ -11,6 +11,7 @@ import (
 // APIs for Transactions	begin
 
 // AutCoinbaseTxGen takes as input the transaction material and outputs a *wire.AutCoinbaseTx.
+// ctx review done 2025.12.22
 func AutCoinbaseTxGen(autScriptVersion uint32, vin uint64, autTxOutputDescs []*AutTxOutputDesc) (*wire.AutCoinbaseTx, error) {
 	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autScriptVersion)
 	if err != nil {
@@ -33,6 +34,7 @@ func AutCoinbaseTxGen(autScriptVersion uint32, vin uint64, autTxOutputDescs []*A
 }
 
 // AutCoinbaseTxVerify verifies whether the input autCoinbaseTx *wire.AutCoinbaseTx is valid.
+// ctx review done 2025.12.22
 func AutCoinbaseTxVerify(autCoinbaseTx *wire.AutCoinbaseTx) error {
 	if autCoinbaseTx == nil {
 		return fmt.Errorf("AutCoinbaseTxVerify: nil tx")
@@ -54,6 +56,7 @@ func AutCoinbaseTxVerify(autCoinbaseTx *wire.AutCoinbaseTx) error {
 }
 
 // AutTransferTxGen takes as input the transaction material and outputs a *wire.AutTransferTx.
+// ctx review done 2025.12.22
 func AutTransferTxGen(autScriptVersion uint32, autTxInputDescs []*AutTxInputDesc, autTxOutputDescs []*AutTxOutputDesc) (*wire.AutTransferTx, error) {
 	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autScriptVersion)
 	if err != nil {
@@ -77,6 +80,7 @@ func AutTransferTxGen(autScriptVersion uint32, autTxInputDescs []*AutTxInputDesc
 }
 
 // AutTransferTxVerify verifies the input AutTransferTx.
+// ctx review done 2025.12.22
 func AutTransferTxVerify(autTransferTx *wire.AutTransferTx) error {
 	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autTransferTx.Version)
 	if err != nil {
@@ -101,6 +105,7 @@ func AutTransferTxVerify(autTransferTx *wire.AutTransferTx) error {
 //	APIs for Txos	begin
 
 // GetAutTxoType returns the AutTxoType of the input *wire.AutTxo.
+// ctx review done 2025.12.21
 func GetAutTxoType(autTxo *wire.AutTxo) (AutTxoType, error) {
 	// TODO: add map aut script version to crypto scheme
 	// or aut script version -> tx version -> crypto scheme?
@@ -127,6 +132,7 @@ func GetAutTxoType(autTxo *wire.AutTxo) (AutTxoType, error) {
 // Note that the transactions are generated and verified by the underlying crypto-scheme,
 // the TxoScript size for AutTxo actually depends on the underlying crypto-scheme.
 // That's why txVersion is required as the input for this function.
+// ctx review done 2025.12.22
 func GetAutTxoScriptSize(autScriptVersion uint32, autTxoType AutTxoType) (int, error) {
 	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autScriptVersion)
 	if err != nil {
@@ -141,6 +147,7 @@ func GetAutTxoScriptSize(autScriptVersion uint32, autTxoType AutTxoType) (int, e
 }
 
 // ExtractAutTxoValue extracts the value of the input AutTxo.
+// ctx review done 2025.12.22
 func ExtractAutTxoValue(autTxo *wire.AutTxo, cryptoValuePublicKey []byte, cryptoValueSecretKey []byte) (uint64, error) {
 	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autTxo.Version)
 	if err != nil {
@@ -206,6 +213,7 @@ func GetAutTransferTxWitnessSizeByDesc(autScriptVersion uint32,
 // Note that AutTxo's version is inherited from AutScriptVersion.
 //
 // When new TxVersion is added, rules need to be added here.
+// ctx review done 2025.12.22 todo
 func AutRuleCheckOnAutTxoVersionType(autScriptVersion uint32, autTxoType AutTxoType) error {
 	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autScriptVersion)
 	if err != nil {
@@ -224,6 +232,7 @@ func AutRuleCheckOnAutTxoVersionType(autScriptVersion uint32, autTxoType AutTxoT
 // AutRuleCheckOnTxInputVersion checks the match between Tx's Version and TxInput's Version.
 //
 // When new TxVersion is added, rules need to be added here.
+// ctx review done 2025.12.22
 func AutRuleCheckOnTxInputVersion(autScriptVersion uint32, txInputVersion uint32) error {
 	cryptoScheme, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autScriptVersion)
 	if err != nil {
@@ -239,3 +248,5 @@ func AutRuleCheckOnTxInputVersion(autScriptVersion uint32, txInputVersion uint32
 }
 
 //	APIs for ruleChecks	end
+
+// ctx review done 2025.12.21

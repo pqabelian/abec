@@ -157,3 +157,5 @@ func NewAbeTxInDetail(ringId wire.RingId, txoList []*wire.TxOutAbe, serialNumber
 }
 
 //	data structures for abec side	end
+
+// ctx review done 2025.12.22
