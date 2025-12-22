@@ -8,7 +8,6 @@ import (
 
 	"github.com/abesuite/abec/abecryptox"
 	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
-	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/chainhash"
 	ctautapi "github.com/abesuite/abec/ctaut/api"
 	ctautwire "github.com/abesuite/abec/ctaut/wire"
@@ -481,16 +480,17 @@ func ExtractAutTokenValue(version uint32, valueScript []byte, cryptoValuePublicK
 }
 
 func ExtractAutScriptFromHostTx(serializedTx []byte) (*ExtAutScript, error) {
-	msgTx := wire.MsgTxAbe{}
+	msgTx := &wire.MsgTxAbe{}
 	err := msgTx.Deserialize(bytes.NewReader(serializedTx))
 	if err != nil {
 		return nil, err
 	}
-	tx, err := abeutil.NewTxAbeFromBytes(serializedTx)
+
+	extAutScript, err := ctautapi.DetectAndAssembleExtAutScriptFromHostTx(msgTx)
 	if err != nil {
 		return nil, err
 	}
-	extAutScript := tx.ExtAutScript()
+
 	return extAutScript, nil
 }
 
