@@ -20,3 +20,5 @@ const (
 	MaxAllowedTxWitnessSize    uint32 = 16 * 1024 * 1024 // 2^24, 16M bytes
 	MaxAllowedAutWitnessSize   uint32 = 16 * 1024 * 1024 // 2^24, 16M bytes
 )
+
+// ctx review done 2025.12.22
