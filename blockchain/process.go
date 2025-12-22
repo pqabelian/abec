@@ -9,6 +9,7 @@ import (
 	"github.com/abesuite/abec/blockchain/ruleerror"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/database"
+	"github.com/abesuite/abec/wire"
 )
 
 // BehaviorFlags is a bitmask defining tweaks to the normal behavior when
@@ -298,6 +299,19 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, powConsensus *cons
 					if err != nil {
 						return false, false, err
 					}
+					// assert
+					if b.chainParams.Net == wire.MainNet {
+						expectedBlockDSAHash, err := chainhash.NewHashFromStr(b.chainParams.BlockHashDSA)
+						if err != nil {
+							return false, false, err
+						}
+						if !expectedBlockDSAHash.IsEqual(blockDSA.Hash()) {
+							str := fmt.Sprintf("fail to assert block hash with fork DSA, expected %s but got %s",
+								expectedBlockDSAHash, blockDSA.Hash())
+							return false, false, ruleerror.NewRuleError(ruleerror.ErrBadCheckpoint, str)
+						}
+					}
+
 					// from checkpoint block to dsa block should be checked before
 					blockHeaderDSA := &blockDSA.MsgBlock().Header
 					// todo: THIS IS ASSUMING that the fetched blockHeaderDSA is a checkpoint.
