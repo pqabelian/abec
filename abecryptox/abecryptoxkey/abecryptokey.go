@@ -15,6 +15,7 @@ import (
 type PrivacyLevel uint8
 
 // reviewed on 2023.12.07
+// ctc review done 2025.12.22
 const (
 	PrivacyLevelRINGCTPre   PrivacyLevel = 0 //	hide the payer in ring, hide the amount by commitment, the default privacy-level in the initial version
 	PrivacyLevelRINGCT      PrivacyLevel = 1 //	hide the payer in ring, hide the amount by commitment, same as the initial version, but explicitly specified
@@ -58,6 +59,7 @@ func CryptoAddressKeyGen(randSeed []byte, cryptoScheme abecryptoxparam.CryptoSch
 // CryptoAddressKeyGenByRootSeeds generates a (cryptoAddress, cryptoKeys) for the input (Root Seeds, CoinDetectorRootKey).
 // CryptoAddressKeyGenByRootSeeds is a randomized algorithm.
 // reviewed on 2023.12.30
+// ctc review done 2025.12.22
 func CryptoAddressKeyGenByRootSeeds(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
 	coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte,
 	coinDetectorRootKey []byte) (cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk []byte, cryptoVsk []byte, cryptoDetectorKey []byte, err error) {
@@ -73,6 +75,7 @@ func CryptoAddressKeyGenByRootSeeds(cryptoScheme abecryptoxparam.CryptoScheme, p
 
 // ExtractPublicRandFromCryptoAddress extracts the PublicRand from the input/given CryptoAddress.
 // reviewed on 2023.12.30
+// ctc review done 2025.12.22
 func ExtractPublicRandFromCryptoAddress(cryptoAddress []byte) (publicRand []byte, err error) {
 	cryptoScheme, err := ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
 
@@ -88,6 +91,7 @@ func ExtractPublicRandFromCryptoAddress(cryptoAddress []byte) (publicRand []byte
 // CryptoAddressKeyReGenByRootSeedsFromPublicRand is the same as CryptoAddressKeyGenByRootSeeds, except that an additional Public Rand is given as input.
 // CryptoAddressKeyReGenByRootSeedsFromPublicRand is a deterministic algorithm.
 // reviewed on 2023.12.31
+// ctx review done 2025.12.22
 func CryptoAddressKeyReGenByRootSeedsFromPublicRand(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
 	coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte,
 	coinDetectorRootKey []byte, publicRand []byte) (cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk []byte, cryptoVsk []byte, cryptoDetectorKey []byte, err error) {
@@ -101,6 +105,9 @@ func CryptoAddressKeyReGenByRootSeedsFromPublicRand(cryptoScheme abecryptoxparam
 	}
 	//return nil, nil, nil, nil, nil
 }
+
+// CryptoValueKeyReGenByRootSeedsFromPublicRand
+// ctc review done 2025.12.22
 func CryptoValueKeyReGenByRootSeedsFromPublicRand(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
 	coinValueKeyRootSeed []byte, publicRand []byte) (cryptoVpk []byte, cryptoVsk []byte, err error) {
 
@@ -119,6 +126,7 @@ func CryptoValueKeyReGenByRootSeedsFromPublicRand(cryptoScheme abecryptoxparam.C
 // rather than the final (CryptoAddress, Crypto-Keys).
 // The output (Rand Seeds, coinDetectorKey) can be used to call CryptoAddressKeyGenByRandSeeds to generate the final (CryptoAddress, Crypto-Keys).
 // reviewed on 2023.12.31
+// ctc review done 2025.12.22
 func RandSeedsGenByRootSeedsFromPublicRand(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
 	coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte,
 	coinDetectorRootKey []byte, publicRand []byte) (coinSpendKeyRandSeed []byte, coinSerialNumberKeyRandSeed []byte, coinValueKeyRandSeed []byte,
@@ -145,6 +153,7 @@ func RandSeedsGenByRootSeedsFromPublicRand(cryptoScheme abecryptoxparam.CryptoSc
 // (2) To call this function, the caller should pass AddressKeyRandSeed as input coinSpendKeyRandSeed, and here it will set that randSeed := coinSpendKeyRandSeed || coinValueKeyRandSeed,
 // and then call abecrypto.CryptoAddressKeyGen(randSeed, abecryptoparam.CryptoSchemePQRingCT).
 // reviewed on 2023.12.31
+// ctc review done 2025.12.22
 func CryptoAddressKeyGenByRandSeeds(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
 	coinSpendKeyRandSeed []byte, coinSerialNumberKeyRandSeed []byte, coinValueKeyRandSeed []byte,
 	coinDetectorKey []byte, publicRand []byte) (cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk []byte, cryptoVsk []byte, cryptoDetectorKey []byte, err error) {
@@ -175,6 +184,7 @@ func CryptoAddressKeyGenByRandSeeds(cryptoScheme abecryptoxparam.CryptoScheme, p
 
 // GetPrivacyLevelFromCoinAddressType returns the PrivacyLevel corresponding to the input coinAddressType.
 // reviewed on 2024.01.04
+// ctx review done 2025.12.22
 func GetPrivacyLevelFromCoinAddressType(coinAddressType pqringctxapi.CoinAddressType) (PrivacyLevel, error) {
 	return pqringctxGetPrivacyLevelFromCoinAddressType(coinAddressType)
 }
@@ -184,6 +194,7 @@ func GetPrivacyLevelFromCoinAddressType(coinAddressType pqringctxapi.CoinAddress
 // ExtractCryptoSchemeFromCryptoAddress extracts cryptoScheme from cryptoAddress.
 // reviewed on 2023.12.07
 // reviewed on 2023.12.12
+// ctc review done 2025.12.22
 func ExtractCryptoSchemeFromCryptoAddress(cryptoAddress []byte) (cryptoScheme abecryptoxparam.CryptoScheme, err error) {
 	if len(cryptoAddress) < 4 {
 		return 0, fmt.Errorf("ExtractCryptoSchemeFromCryptoAddress: incorrect length of cryptoAddress: %d", len(cryptoAddress))
@@ -201,6 +212,7 @@ func ExtractCryptoSchemeFromCryptoAddress(cryptoAddress []byte) (cryptoScheme ab
 // ExtractCryptoSchemeFromCryptoDetectorKey extracts cryptoScheme from cryptoDetectorKey.
 // reviewed on 2023.12.30
 // todo: review
+// ctc review done 2025.12.22
 func ExtractCryptoSchemeFromCryptoDetectorKey(cryptoDetectorKey []byte) (cryptoScheme abecryptoxparam.CryptoScheme, err error) {
 	if len(cryptoDetectorKey) < 4 {
 		return 0, fmt.Errorf("ExtractCryptoSchemeFromCryptoDetectorKey: incorrect length of cryptoDetectorKey: %d", len(cryptoDetectorKey))
@@ -218,6 +230,7 @@ func ExtractCryptoSchemeFromCryptoDetectorKey(cryptoDetectorKey []byte) (cryptoS
 // ExtractCryptoSchemeFromCryptoSpendSecretKey extracts cryptoScheme from cryptoSpendSecretKey.
 // reviewed on 2023.12.09
 // reviewed on 2023.12.12
+// ctc review done 2025.12.22
 func ExtractCryptoSchemeFromCryptoSpendSecretKey(cryptoSpendSecretKey []byte) (cryptoScheme abecryptoxparam.CryptoScheme, err error) {
 	if len(cryptoSpendSecretKey) < 4 {
 		return 0, fmt.Errorf("ExtractCryptoSchemeFromCryptoSpendSecretKey: incorrect length of cryptoSpendSecretKey: %d", len(cryptoSpendSecretKey))
@@ -235,6 +248,7 @@ func ExtractCryptoSchemeFromCryptoSpendSecretKey(cryptoSpendSecretKey []byte) (c
 // ExtractCryptoSchemeFromCryptoSerialNumberSecretKey extracts cryptoScheme from cryptoSerialNumberSecretKey.
 // reviewed on 2023.12.09.
 // reviewed on 2023.12.12
+// ctc review done 2025.12.22
 func ExtractCryptoSchemeFromCryptoSerialNumberSecretKey(cryptoSerialNumberSecretKey []byte) (cryptoScheme abecryptoxparam.CryptoScheme, err error) {
 	if len(cryptoSerialNumberSecretKey) < 4 {
 		return 0, fmt.Errorf("ExtractCryptoSchemeFromCryptoSerialNumberSecretKey: incorrect length of cryptoSpendSecretKey: %d", len(cryptoSerialNumberSecretKey))
@@ -251,6 +265,7 @@ func ExtractCryptoSchemeFromCryptoSerialNumberSecretKey(cryptoSerialNumberSecret
 
 // ExtractCryptoSchemeFromCryptoValueSecretKey extracts CryptoScheme from the input cryptoValueSecretKey.
 // reviewed on 2023.12.12
+// ctc review done 2025.12.22
 func ExtractCryptoSchemeFromCryptoValueSecretKey(cryptoValueSecretKey []byte) (cryptoScheme abecryptoxparam.CryptoScheme, err error) {
 	if len(cryptoValueSecretKey) < 4 {
 		return 0, fmt.Errorf("ExtractCryptoSchemeFromCryptoValueSecretKey: incorrect length of cryptoValueSecretKey: %d", len(cryptoValueSecretKey))
@@ -265,6 +280,8 @@ func ExtractCryptoSchemeFromCryptoValueSecretKey(cryptoValueSecretKey []byte) (c
 	return cryptoScheme, err
 }
 
+// ExtractCryptoSchemeFromCryptoValuePublicKey
+// ctc review done 2025.12.22
 func ExtractCryptoSchemeFromCryptoValuePublicKey(cryptoValuePublicKey []byte) (cryptoScheme abecryptoxparam.CryptoScheme, err error) {
 	if len(cryptoValuePublicKey) < 4 {
 		return 0, fmt.Errorf("ExtractCryptoSchemeFromCryptoValuePublicKey: incorrect length of cryptoValuePublicKey: %d", len(cryptoValuePublicKey))
@@ -351,6 +368,7 @@ func ExtractCryptoSchemeFromCryptoValuePublicKey(cryptoValuePublicKey []byte) (c
 // reviewed on 2023.12.07
 // reviewed on 2023.12.12
 // reviewed on 2024.01.01
+// ctx review done 2025.12.22
 func CryptoAddressParse(cryptoAddress []byte) (privacyLevel PrivacyLevel,
 	coinAddress []byte,
 	coinValuePublicKey []byte,
@@ -387,6 +405,7 @@ func CryptoAddressParse(cryptoAddress []byte) (privacyLevel PrivacyLevel,
 // CryptoSpendSecretKeyParse parses cryptoSpendSecretKey, which was generated by CryptoAddressKeyGen,
 // into privacyLevel and coinSpendSecretKey.
 // reviewed on 2023.12.12
+// ctc review done 2025.12.22
 func CryptoSpendSecretKeyParse(cryptoSpSk []byte) (privacyLevel PrivacyLevel,
 	coinSpendSecretKey []byte,
 	err error) {
@@ -422,6 +441,7 @@ func CryptoSpendSecretKeyParse(cryptoSpSk []byte) (privacyLevel PrivacyLevel,
 // CryptoSerialNumberSecretKeyParse parses cryptoSnSk, which was generated by CryptoAddressKeyGen (including those by PQRingCT),
 // into privacyLevel and coinSerialNumberSecretKey.
 // reviewed on 2023.12.12
+// ctc review done 2025.12.22
 func CryptoSerialNumberSecretKeyParse(cryptoSnSk []byte) (privacyLevel PrivacyLevel,
 	coinSerialNumberSecretKey []byte,
 	err error) {
@@ -456,6 +476,7 @@ func CryptoSerialNumberSecretKeyParse(cryptoSnSk []byte) (privacyLevel PrivacyLe
 // CryptoValueSecretKeyParse parses the input CryptoValueSecretKey, which was generated by CryptoAddressKeyGen (including those by PQRingCT),
 // into privacyLevel and coinValueSecretKey.
 // todo: review pqringctxCryptoValueSecretKeyParse
+// ctx review done 2025.12.22
 func CryptoValueSecretKeyParse(cryptoVsk []byte) (privacyLevel PrivacyLevel,
 	coinValueSecretKey []byte,
 	err error) {
@@ -487,6 +508,9 @@ func CryptoValueSecretKeyParse(cryptoVsk []byte) (privacyLevel PrivacyLevel,
 	return privacyLevel, coinValueSecretKey, nil
 
 }
+
+// CryptoValuePublicKeyParse
+// ctc review done 2025.12.22
 func CryptoValuePublicKeyParse(cryptoVpk []byte) (privacyLevel PrivacyLevel,
 	coinValuePublicKey []byte,
 	err error) {
@@ -497,6 +521,9 @@ func CryptoValuePublicKeyParse(cryptoVpk []byte) (privacyLevel PrivacyLevel,
 	}
 
 	switch cryptoScheme {
+	// In CryptoSchemePQRingCT, the CryptoAddress = AddressPublicKey || ValuePublicKey, and there is no standalone CryptoValuePublicKey.
+	// case abecryptoxparam.CryptoSchemePQRingCT:
+
 	case abecryptoxparam.CryptoSchemePQRingCTX:
 		privacyLevel, coinValuePublicKey, err = pqringctxCryptoValuePublicKeyParse(abecryptoxparam.PQRingCTXPP, cryptoScheme, cryptoVpk)
 		if err != nil {
@@ -514,6 +541,7 @@ func CryptoValuePublicKeyParse(cryptoVpk []byte) (privacyLevel PrivacyLevel,
 // CryptoDetectorKeyParse parses cryptoDetectorKey, which was generated by CryptoDetectorKeyGenByRootKey,
 // into privacyLevel and coinSpendSecretKey.
 // reviewed on 2023.12.12
+// ctx review done 2025.12.22
 func CryptoDetectorKeyParse(cryptoDetectorKey []byte) (privacyLevel PrivacyLevel,
 	coinDetectorKey []byte,
 	err error) {
@@ -542,6 +570,8 @@ func CryptoDetectorKeyParse(cryptoDetectorKey []byte) (privacyLevel PrivacyLevel
 
 // APIs for verification start
 
+// CryptoAddressKeysVerify
+// ctx review done 2025.12.22
 func CryptoAddressKeysVerify(cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk []byte, cryptoVsk []byte, cryptoDetectorKey []byte) (bool, error) {
 	cryptoScheme, err := ExtractCryptoSchemeFromCryptoAddress(cryptoAddress)
 	if err != nil {
@@ -692,6 +722,7 @@ func CryptoAddressKeysVerify(cryptoAddress []byte, cryptoSpsk []byte, cryptoSnsk
 }
 
 // CheckCryptoAddress checks whether the input cryptoAddress is well-formed.
+// ctx review done 2025.12.22
 func CheckCryptoAddress(cryptoAddress []byte) (valid bool, err error) {
 	privacyLevel, coinAddress, coinValuePublicKey, err := CryptoAddressParse(cryptoAddress)
 	if err != nil {
@@ -724,6 +755,7 @@ func CheckCryptoAddress(cryptoAddress []byte) (valid bool, err error) {
 
 // GetCoinAddressSize returns the CoinAddressSize corresponding to the input PrivacyLevel.
 // todo: review
+// ctx review done 2025.12.22
 func GetCoinAddressSize(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel) (int, error) {
 	switch cryptoScheme {
 	case abecryptoxparam.CryptoSchemePQRingCT:
@@ -740,6 +772,8 @@ func GetCoinAddressSize(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel 
 	}
 }
 
+// GetCoinValuePublicKeySize
+// ctx review done 2025.12.22
 func GetCoinValuePublicKeySize(cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel) (int, error) {
 	switch cryptoScheme {
 	case abecryptoxparam.CryptoSchemePQRingCT:
@@ -760,3 +794,5 @@ func GetCoinValuePublicKeySize(cryptoScheme abecryptoxparam.CryptoScheme, privac
 }
 
 // APIs for key size end
+
+// ctx review done 2025.12.22
