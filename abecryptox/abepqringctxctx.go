@@ -12,6 +12,7 @@ import (
 
 // AutTxoType is defined for the types of AutTxo, which is actually pqringctxapi.CtxTxoType,
 // since it will also be passed to underlying crypto-scheme.
+// cto review done 2025.12.21
 type AutTxoType = pqringctxapi.CtxTxoType
 
 const (
@@ -23,6 +24,7 @@ const (
 
 // pqringctxAutCoinbaseTxGen generates a new AutCoinbaseTx,
 // for the input (txVersion uint32, vin uint64, autTxOutputDescs []*AutTxOutputDesc).
+// ctx review done 2025.12.21
 func pqringctxAutCoinbaseTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
 	autScriptVersion uint32, vin uint64, autTxOutputDescs []*AutTxOutputDesc) (*autwire.AutCoinbaseTx, error) {
 	// just redundant double check
@@ -89,6 +91,7 @@ func pqringctxAutCoinbaseTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 // pqringctxAutCoinbaseTxVerify verify the input autCoinbaseTx *wire.AutCoinbaseTx.
 // The caller needs to guarantee the well-form of the input autCoinbaseTx *wire.AutCoinbaseTx, such as the TxOuts.
 // This function only checks the balance proof, by calling the crypto-scheme.
+// ctx review done 2025.12.21
 func pqringctxAutCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, autCoinbaseTx *autwire.AutCoinbaseTx) error {
 	if autCoinbaseTx == nil {
 		return fmt.Errorf("pqringctxAutCoinbaseTxVerify: the input autCoinbaseTx is nil")
@@ -111,7 +114,8 @@ func pqringctxAutCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, autCoinbaseT
 				j, autTxo.Version, autCoinbaseTx.Version)
 		}
 
-		autTxoType, err := GetAutTxoType(autTxo)
+		// todo: 2025.12.22 future refactor the architecture for Aut.
+		autTxoType, err := pqringctxGetAutTxoType(pp, autTxo)
 		if err != nil {
 			return err
 		}
@@ -149,17 +153,17 @@ func pqringctxAutCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, autCoinbaseT
 // for the input (txVersion uint32, autTxInputDescs []*AutTxInputDesc, autTxOutputDescs []*AutTxOutputDesc).
 // The parameter cryptoScheme here is obtained by the caller from TxVersion, which causes this function is called.
 // Now it is redundant at this moment and works for ony double-check.
-// todo: change hostTxoVersion to AutScriptVersion
+// ctx review done 2025.12.22
 func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
 	autScriptVersion uint32, autTxInputDescs []*AutTxInputDesc, autTxOutputDescs []*AutTxOutputDesc) (*autwire.AutTransferTx, error) {
 
 	// just redundant double check
-	cryptoSchemeFromTxVersion, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autScriptVersion)
+	cryptoSchemeFromAutScriptVersion, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autScriptVersion)
 	if err != nil {
 		return nil, err
 	}
-	if cryptoSchemeFromTxVersion != cryptoScheme {
-		return nil, fmt.Errorf("pqringctxAutTransferTxGen: the input cryptoScheme is different from that implied by transferTxMsgTemplate.Version")
+	if cryptoSchemeFromAutScriptVersion != cryptoScheme {
+		return nil, fmt.Errorf("pqringctxAutTransferTxGen: the input cryptoScheme is different from that implied by autScriptVersion")
 	}
 
 	inputNum := len(autTxInputDescs)
@@ -169,7 +173,7 @@ func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 		return nil, fmt.Errorf("pqringctxAutTransferTxGen: neither the input autTxInputDescs or autTxOutputDescs could be empty")
 	}
 
-	// xtTxInputDescs
+	// ctxTxInputDescs
 	ctxTxInputDescs := make([]*pqringctxapi.CtxTxInputDesc, inputNum)
 	for i := 0; i < inputNum; i++ {
 
@@ -244,6 +248,8 @@ func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 		if err != nil {
 			return nil, err
 		}
+
+		// RULE: AutTxo has its version inherited from the AutScript.
 		autTxos[j] = &autwire.AutTxo{
 			Version:   autScriptVersion,
 			TxoScript: serializedCtxTxo,
@@ -257,6 +263,7 @@ func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 		return nil, err
 	}
 
+	// RULE: AutTransferTx has its version inherited from the AutScript.
 	autTransferTx := &autwire.AutTransferTx{
 		Version:   autScriptVersion,
 		TxIns:     autTxIns,
@@ -270,6 +277,7 @@ func pqringctxAutTransferTxGen(pp *pqringctxapi.PublicParameter, cryptoScheme ab
 // pqringctxAutTransferTxVerify verify the input autTransferTx *wire.AutTransferTx.
 // The caller needs to guarantee the well-form of the input autTransferTx *wire.AutTransferTx, such as the TxOuts.
 // This function only checks the balance proof, by calling the crypto-scheme.
+// ctx review done 2025.12.22 todo
 func pqringctxAutTransferTxVerify(pp *pqringctxapi.PublicParameter, autTransferTx *autwire.AutTransferTx) error {
 	if autTransferTx == nil {
 		return fmt.Errorf("pqringctxAutTransferTxVerify: the input transferTx is empty")
@@ -288,13 +296,14 @@ func pqringctxAutTransferTxVerify(pp *pqringctxapi.PublicParameter, autTransferT
 	//	txInputs
 	ctxTxInputs := make([]pqringctxapi.CtxTxo, inputNum)
 	for i := 0; i < inputNum; i++ {
-		// todo: assure AutScriptVersion not TxInputVersion
 		err = pqringctxAutRuleCheckOnTxInputVersion(pp, autTransferTx.Version, autTransferTx.TxIns[i].Version)
 		if err != nil {
 			return fmt.Errorf("pqringctxAutTransferTxVerify: autTransferTx.Version is %d, "+
 				"but autTransferTx.TxIns[%d].Version is %d, which is out of the allowed ones",
 				autTransferTx.Version, i, autTransferTx.TxIns[i].Version)
 		}
+
+		// Note that (AutTxo.Version, AutTxo.Type)-match is checked when the AutTxo was generated. Here does not check that.
 
 		ctxTxInputs[i], err = pqringctxapi.DeserializeCtxTxo(pp, autTransferTx.TxIns[i].TxoScript)
 		if err != nil {
@@ -307,13 +316,15 @@ func pqringctxAutTransferTxVerify(pp *pqringctxapi.PublicParameter, autTransferT
 	for j := 0; j < outputNum; j++ {
 		autTxo := autTransferTx.TxOuts[j]
 
+		// Rule check!
 		if autTxo.Version != autTransferTx.Version {
 			return fmt.Errorf("pqringctxTransferTxVerify: transferTx.TxOuts[%d].Version (%d) != transferTx.Version (%d)",
 				j, autTxo.Version, autTransferTx.Version)
 			//	The output Txos of a transaction should have the same version as the transaction.
 		}
 
-		autTxoType, err := GetAutTxoType(autTxo)
+		// autTxoType, err := GetAutTxoType(autTxo)
+		autTxoType, err := pqringctxGetAutTxoType(pp, autTxo)
 		if err != nil {
 			return err
 		}
@@ -355,6 +366,7 @@ func pqringctxAutTransferTxVerify(pp *pqringctxapi.PublicParameter, autTransferT
 //	APIs for Txos	begin
 
 // pqringctxGetAutTxoType returns the AutTxoType of the input *wire.AutTxo.
+// ctx review done 2025.12.21
 func pqringctxGetAutTxoType(pp *pqringctxapi.PublicParameter, autTxo *autwire.AutTxo) (AutTxoType, error) {
 	ctxTxo, err := pqringctxapi.DeserializeCtxTxo(pp, autTxo.TxoScript)
 	if err != nil {
@@ -365,6 +377,7 @@ func pqringctxGetAutTxoType(pp *pqringctxapi.PublicParameter, autTxo *autwire.Au
 }
 
 // pqringctxGetAutTxoScriptSize returns the TxoScript size for the input CtxTxoType.
+// ctx review done 2025.12.22
 func pqringctxGetAutTxoScriptSize(pp *pqringctxapi.PublicParameter, autTxoType AutTxoType) (int, error) {
 	// Note that AutTxoType is defined to be CtxTxoType.
 	return pqringctxapi.GetCtxTxoSerializeSizeByCtxTxoType(pp, autTxoType)
@@ -372,14 +385,15 @@ func pqringctxGetAutTxoScriptSize(pp *pqringctxapi.PublicParameter, autTxoType A
 
 // pqringctxExtractValueFromAutTxo extracts the value of the input AutTxo,
 // using the input (coinValuePublicKey, coinValueSecretKey).
+// ctx review done 2025.12.22
 func pqringctxExtractValueFromAutTxo(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
 	autTxo *autwire.AutTxo, cryptoValuePublicKey []byte, cryptoValueSecretKey []byte) (value uint64, err error) {
-	cryptoSchemeInTxo, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autTxo.Version)
+	cryptoSchemeByAutScriptVersion, err := abecryptoxparamctx.GetCryptoSchemeByAutScriptVersion(autTxo.Version)
 	if err != nil {
 		return 0, err
 	}
 
-	if cryptoSchemeInTxo != cryptoScheme {
+	if cryptoSchemeByAutScriptVersion != cryptoScheme {
 		return 0, fmt.Errorf("pqringctxExtractValueFromAutTxo: unmatched cryptoScheme for the input AutTxo")
 	}
 
@@ -423,6 +437,7 @@ func pqringctxExtractValueFromAutTxo(pp *pqringctxapi.PublicParameter, cryptoSch
 
 // pqringctxGetAutCoinbaseTxWitnessSizeByDesc returns the AutCoinbaseTxWitnessSize,
 // which depends on the number of AutTxoHidden.
+// ctx review done 2025.12.22
 func pqringctxGetAutCoinbaseTxWitnessSizeByDesc(pp *pqringctxapi.PublicParameter, outNumForHidden uint8) (int, error) {
 	return pqringctxapi.GetCtxTxWitnessCbTxSerializeSizeByDesc(pp, outNumForHidden)
 }
@@ -430,6 +445,7 @@ func pqringctxGetAutCoinbaseTxWitnessSizeByDesc(pp *pqringctxapi.PublicParameter
 // pqringctxGetAutTransferTxWitnessSizeByDesc returns the size of AutTransferTxWitness,
 // which depends on the description information (inNumForHidden uint8, outNumForHidden uint8, vPublic int64),
 // where vPublic = (sum of public value for out) - (sum of public value for in).
+// ctx review done 2025.12.22
 func pqringctxGetAutTransferTxWitnessSizeByDesc(pp *pqringctxapi.PublicParameter, inNumForHidden uint8, outNumForHidden uint8, vPublic int64) (int, error) {
 	return pqringctxapi.GetCtxTxWitnessTrTxSerializeSizeByDesc(pp, inNumForHidden, outNumForHidden, vPublic)
 }
@@ -443,6 +459,7 @@ func pqringctxGetAutTransferTxWitnessSizeByDesc(pp *pqringctxapi.PublicParameter
 // Note that AutTxo's version is inherited from AutScriptVersion.
 //
 // When new AutScriptVersion is added, rules need to be added here.
+// cto review done 2025.12.21
 func pqringctxAutRuleCheckOnAutTxoVersionType(pp *pqringctxapi.PublicParameter, autScriptVersion uint32, autType AutTxoType) error {
 	switch autScriptVersion {
 	case autwire.AutScriptVersion_1:
@@ -465,7 +482,7 @@ func pqringctxAutRuleCheckOnAutTxoVersionType(pp *pqringctxapi.PublicParameter, 
 // pqringctxRuleCheckOnTxInputVersion checks the match between Tx's Version and TxInput's Version.
 //
 // When new TxVersion is added, rules need to be added here.
-// todo: change txVersion to AutScriptVersion
+// ctx review done 2025.12.22
 func pqringctxAutRuleCheckOnTxInputVersion(pp *pqringctxapi.PublicParameter, autScriptVersion uint32, autTxInputVersion uint32) error {
 
 	switch autScriptVersion {
@@ -486,3 +503,5 @@ func pqringctxAutRuleCheckOnTxInputVersion(pp *pqringctxapi.PublicParameter, aut
 }
 
 // APIs for ruleChecks	end
+
+// ctx review done 2025.12.21
