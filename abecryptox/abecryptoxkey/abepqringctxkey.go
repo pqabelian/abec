@@ -23,6 +23,7 @@ import (
 // (c) such an architecture provides flexible functionalities to the application layer,
 // namely, the application layer can use (Root Seeds, CoinDetectorRootKey) or (Rand Seeds, CoinDetectorKey) to call the functionalities.
 // reviewed on 2023.12.30
+// ctx review done 2025.12.22
 func pqringctxCryptoAddressKeyGenByRootSeeds(pp *pqringctxapi.PublicParameter,
 	cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
 	coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte,
@@ -108,6 +109,7 @@ func pqringctxCryptoAddressKeyGenByRootSeeds(pp *pqringctxapi.PublicParameter,
 	return cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, cryptoDetectorKey, nil
 }
 
+// ctx review done 2025.12.22
 func pqringctxCryptoValueKeyGenByRootSeeds(pp *pqringctxapi.PublicParameter,
 	cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
 	coinValueKeyRootSeed []byte) (cryptoVpk []byte, cryptoVsk []byte, err error) {
@@ -115,6 +117,7 @@ func pqringctxCryptoValueKeyGenByRootSeeds(pp *pqringctxapi.PublicParameter,
 	// choose PublicRand
 	publicRand := abecryptoutils.RandomBytes(pp.GetParamKeyGenPublicRandBytesLen())
 
+	// if and else if are same, but keep them separated for clearance
 	if privacyLevel == PrivacyLevelRINGCT {
 		if len(coinValueKeyRootSeed) != abecryptoutils.PRFKeyBytesLen {
 			return nil, nil, fmt.Errorf("pqringctxCryptoAddressKeyGenByRootSeed: invalid length of coinValueKeyRootSeed (%d)", len(coinValueKeyRootSeed))
@@ -153,6 +156,7 @@ func pqringctxCryptoValueKeyGenByRootSeeds(pp *pqringctxapi.PublicParameter,
 
 // pqringctxExtractPublicRandFromCryptoAddress extracts PublicRand from CryptoAddress.
 // reviewed on 2023.12.30
+// ctx review done 2025.12.22
 func pqringctxExtractPublicRandFromCryptoAddress(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
 	cryptoAddress []byte) (
 	publicRand []byte, err error) {
@@ -168,6 +172,7 @@ func pqringctxExtractPublicRandFromCryptoAddress(pp *pqringctxapi.PublicParamete
 // pqringctxCryptoAddressKeyReGenByRootSeedsFromPublicRand is the same as pqringctxCryptoAddressKeyGenByRootSeeds,
 // except that it has an additional input PublicRand, and as a result, it is a deterministic algorithm.
 // reviewed on 2023.12.31
+// ctx review done 2025.12.22
 func pqringctxCryptoAddressKeyReGenByRootSeedsFromPublicRand(pp *pqringctxapi.PublicParameter,
 	cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
 	coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte,
@@ -257,6 +262,7 @@ func pqringctxCryptoAddressKeyReGenByRootSeedsFromPublicRand(pp *pqringctxapi.Pu
 	return cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, cryptoDetectorKey, nil
 }
 
+// ctx review done 2025.12.22
 func pqringctxCryptoValueKeyReGenByRootSeedsFromPublicRand(pp *pqringctxapi.PublicParameter,
 	cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
 	coinValueKeyRootSeed []byte, publicRand []byte) (cryptoVpk []byte, cryptoVsk []byte, err error) {
@@ -281,6 +287,7 @@ func pqringctxCryptoValueKeyReGenByRootSeedsFromPublicRand(pp *pqringctxapi.Publ
 	//	return nil, nil, nil, nil, nil, err
 	//}
 
+	// if and else if are same, but keep them separated for clearance
 	if privacyLevel == PrivacyLevelRINGCT {
 		//if len(coinSerialNumberKeyRootSeed) != abecryptoutils.PRFKeyBytesLen {
 		//	return nil, nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressKeyReGenByRootSeedsFromPublicRand: invalid length of coinSerialNumberKeyRootSeed (%d)", len(coinSerialNumberKeyRootSeed))
@@ -329,6 +336,7 @@ func pqringctxCryptoValueKeyReGenByRootSeedsFromPublicRand(pp *pqringctxapi.Publ
 // rather than the final (CryptoAddress, Crypto-Keys).
 // The output (Rand Seeds, coinDetectorKey) can be used to call pqringctxCryptoAddressKeyGenByRandSeeds to generate the final (CryptoAddress, Crypto-Keys).
 // reviewed on 2023.12.31
+// ctx review done 2025.12.22
 func pqringctxRandSeedsGenByRootSeedsFromPublicRand(pp *pqringctxapi.PublicParameter,
 	cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
 	coinSpendKeyRootSeed []byte, coinSerialNumberKeyRootSeed []byte, coinValueKeyRootSeed []byte,
@@ -416,6 +424,7 @@ func pqringctxRandSeedsGenByRootSeedsFromPublicRand(pp *pqringctxapi.PublicParam
 // reviewed on 2023.12.30
 // reviewed on 2023.12.31
 // reviewed on 2024.01.24
+// ctx review done 2025.12.22
 func pqringctxCryptoAddressKeyGenByRandSeeds(pp *pqringctxapi.PublicParameter,
 	cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
 	coinSpendKeyRandSeed []byte, coinSerialNumberKeyRandSeed []byte, coinValueKeyRandSeed []byte,
@@ -514,6 +523,7 @@ func pqringctxCryptoAddressKeyGenByRandSeeds(pp *pqringctxapi.PublicParameter,
 		cryptoVsk = nil
 
 		return cryptoAddress, cryptoSpsk, cryptoSnsk, cryptoVsk, cryptoDetectorKey, nil
+
 	} else if privacyLevel == PrivacyLevelPSEUDONYMCT {
 
 		if len(coinValueKeyRandSeed) != expectedSeedLen {
@@ -553,6 +563,8 @@ func pqringctxCryptoAddressKeyGenByRandSeeds(pp *pqringctxapi.PublicParameter,
 		return nil, nil, nil, nil, nil, fmt.Errorf("pqringctxCryptoAddressKeyGenByRandSeeds: the input privacyLevel is not supported")
 	}
 }
+
+// ctx review done 2025.12.22
 func pqringctxCryptoValueKeyGenByRandSeeds(pp *pqringctxapi.PublicParameter,
 	cryptoScheme abecryptoxparam.CryptoScheme, privacyLevel PrivacyLevel,
 	coinValueKeyRandSeed []byte, publicRand []byte) (cryptoVpk []byte, cryptoVsk []byte, err error) {
@@ -659,6 +671,8 @@ func pqringctxCoinAddressKeyForPKRingVerify(pp *pqringctxapi.PublicParameter, co
 	coinSpendSecretKey []byte, coinSerialNumberSecretKey []byte, coinDetectorKey []byte) (bool, error) {
 	return pqringctxapi.CoinAddressKeyForPKRingVerify(pp, coinAddress, coinSpendSecretKey, coinSerialNumberSecretKey, coinDetectorKey)
 }
+
+// ctx review done 2025.12.22
 func pqringctxCoinAddressKeyForPKHSingleVerify(pp *pqringctxapi.PublicParameter, privacyLevel PrivacyLevel, coinAddress []byte,
 	coinSpendSecretKey []byte, coinDetectorKey []byte) (bool, error) {
 	if privacyLevel == PrivacyLevelPSEUDONYM {
@@ -672,6 +686,7 @@ func pqringctxCoinAddressKeyForPKHSingleVerify(pp *pqringctxapi.PublicParameter,
 	}
 
 }
+
 func pqringctxCoinValueKeyVerify(pp *pqringctxapi.PublicParameter,
 	coinValuePublicKey []byte, coinValueSecretKey []byte) (bool, error) {
 	return pqringctxapi.CoinValueKeyVerify(pp, coinValuePublicKey, coinValueSecretKey)
@@ -682,6 +697,7 @@ func pqringctxCoinValueKeyVerify(pp *pqringctxapi.PublicParameter,
 // pqringctxGetPrivacyLevelFromCoinAddressType returns the PrivacyLevel corresponding to the input CoinAddressType.
 // Note that abepqringctxkey.go is the layer which knows the mapping between PrivacyLevel and CoinAddressType.
 // reviewed on 2024.01.04
+// ctx review done 2025.12.22
 func pqringctxGetPrivacyLevelFromCoinAddressType(coinAddressType pqringctxapi.CoinAddressType) (PrivacyLevel, error) {
 	switch coinAddressType {
 	case pqringctxapi.CoinAddressTypePublicKeyForRingPre:
@@ -705,6 +721,7 @@ func pqringctxGetPrivacyLevelFromCoinAddressType(coinAddressType pqringctxapi.Co
 // to privacyLevel and coinDetectorKey.
 // reviewed on 2023.12.30
 // reviewed on 2024.01.24
+// ctx review done 2025.12.22
 func pqringctxCryptoDetectorKeyParse(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, cryptoDetectorKey []byte) (
 	privacyLevel PrivacyLevel,
 	coinDetectorKey []byte,
@@ -751,6 +768,7 @@ func pqringctxCryptoDetectorKeyParse(pp *pqringctxapi.PublicParameter, cryptoSch
 // reviewed on 2023.12.07
 // reviewed on 2023.12.12
 // reviewed on 2024.01.24
+// ctx review done 2025.12.22
 func pqringctxCryptoAddressParse(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, cryptoAddress []byte) (
 	privacyLevel PrivacyLevel,
 	coinAddress []byte,
@@ -839,6 +857,7 @@ func pqringctxCryptoAddressParse(pp *pqringctxapi.PublicParameter, cryptoScheme 
 // to privacyLevel and coinSpendSecretKey.
 // reviewed on 2023.12.12.
 // reviewed on 2024.01.24
+// ctc review done 2025.12.22
 func pqringctxCryptoSpendSecretKeyParse(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, cryptoSpendSecretKey []byte) (
 	privacyLevel PrivacyLevel,
 	coinSpendSecretKey []byte,
@@ -890,6 +909,7 @@ func pqringctxCryptoSpendSecretKeyParse(pp *pqringctxapi.PublicParameter, crypto
 // to privacyLevel and coinSerialNumberSecretKey.
 // reviewed on 2023.12.12
 // reviewed on 2024.01.24
+// ctc review done 2025.12.22
 func pqringctxCryptoSerialNumberSecretKeyParse(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, cryptoSerialNumberSecretKey []byte) (
 	privacyLevel PrivacyLevel,
 	coinSerialNumberSecretKey []byte,
@@ -934,6 +954,7 @@ func pqringctxCryptoSerialNumberSecretKeyParse(pp *pqringctxapi.PublicParameter,
 // pqringctxCryptoValueSecretKeyParse parses the input cryptoValueSecretKey, which was generated by CryptoAddressKeyGen,
 // to privacyLevel and coinValueSecretKey.
 // todo: review pqringctxapi.GetCoinValueSecretKeySize(pp)
+// ctx review done 2025.12.22
 func pqringctxCryptoValueSecretKeyParse(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, cryptoValueSecretKey []byte) (
 	privacyLevel PrivacyLevel,
 	coinValueSecretKey []byte,
@@ -973,6 +994,8 @@ func pqringctxCryptoValueSecretKeyParse(pp *pqringctxapi.PublicParameter, crypto
 
 	return privacyLevel, coinValueSecretKey, nil
 }
+
+// ctx review done 2025.12.22
 func pqringctxCryptoValuePublicKeyParse(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, cryptoValuePublicKey []byte) (
 	privacyLevel PrivacyLevel,
 	coinValuePublicKey []byte,
@@ -1018,6 +1041,7 @@ func pqringctxCryptoValuePublicKeyParse(pp *pqringctxapi.PublicParameter, crypto
 // APIs for key size start
 // pqringctxGetCoinAddressSize returns the CoinAddressSize for the input PrivacyLevel.
 // todo: review
+// ctx review done 2025.12.22
 func pqringctxGetCoinAddressSize(pp *pqringctxapi.PublicParameter, privacyLevel PrivacyLevel) (int, error) {
 	switch privacyLevel {
 	case PrivacyLevelRINGCTPre:
@@ -1033,6 +1057,7 @@ func pqringctxGetCoinAddressSize(pp *pqringctxapi.PublicParameter, privacyLevel 
 	}
 }
 
+// ctx review done 2025.12.22
 func pqringctxGetCoinValuePublicKeySize(pp *pqringctxapi.PublicParameter, privacyLevel PrivacyLevel) (int, error) {
 	switch privacyLevel {
 	case PrivacyLevelRINGCTPre:
@@ -1076,3 +1101,5 @@ func coinDetectorKeyGenByCoinDetectorRootKeyFromPublicRand(pp *pqringctxapi.Publ
 }
 
 //	helper functions	end
+
+// ctx review done 2025.12.21
