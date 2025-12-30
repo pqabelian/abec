@@ -1335,7 +1335,8 @@ func deserializeSpendJournalEntryAut(serializedSpentAuts []byte, block *abeutil.
 		return nil, nil
 	}
 
-	r := bytes.NewBuffer(serializedSpentAuts)
+	// r := bytes.NewBuffer(serializedSpentAuts)
+	r := bytes.NewReader(serializedSpentAuts)
 	count, err := wire.ReadVarInt(r, 0)
 	if err != nil {
 		return nil, err
