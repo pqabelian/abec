@@ -283,6 +283,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, powConsensus *cons
 
 			} else if blockHeader.Height == b.chainParams.BlockHeightAconcagua {
 				// skip special case
+				// todo: check
 			} else if blockHeader.Height >= b.chainParams.BlockHeightDSA {
 				if checkpointNode.height >= b.chainParams.BlockHeightDSA {
 					duration := blockHeader.Timestamp.Sub(checkpointTime)
