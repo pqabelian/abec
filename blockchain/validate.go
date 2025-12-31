@@ -1119,6 +1119,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, powConsensus *consensus.PowCon
 			return ruleerror.NewRuleError(ruleerror.ErrBadMerkleRoot, str)
 		}
 	}
+	log.Infof("transaction merkle tree for block successful")
 
 	return nil
 }

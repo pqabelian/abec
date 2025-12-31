@@ -189,6 +189,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, powConsensus *cons
 	// 6. transaction sanity (input,output,fee,serialized size, ring+sn, aut)
 	err = checkBlockSanityAbe(block, powConsensus, b.chainParams, b.timeSource, flags)
 	if err != nil {
+		log.Errorf("checkBlockSanityAbe fail %s", err)
 		return false, false, err
 	}
 
@@ -363,6 +364,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, powConsensus *cons
 	// todo_DONE(MLP): reviewed on 2024.01.05
 	isMainChain, err := b.maybeAcceptBlockAbe(block, flags)
 	if err != nil {
+		log.Errorf("maybeAcceptBlockAbe fail to pass %s", err)
 		return false, false, err
 	}
 
