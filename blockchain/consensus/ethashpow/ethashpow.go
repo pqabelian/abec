@@ -67,21 +67,6 @@ func (ethashPow *EthashPow) VerifySeal(header *wire.BlockHeader, target *big.Int
 		sealHash chainhash.Hash
 	)
 
-	fmt.Println("EthashPow VerifySeal Header:")
-	fmt.Println("EthashPow VerifySeal Target: ", target)
-	fmt.Println("EthashPow VerifySeal Target: header.Version ", header.Version)
-	fmt.Println("EthashPow VerifySeal Target: header.PrevBlock ", header.PrevBlock.String())
-	fmt.Println("EthashPow VerifySeal Target: header.PrevBlock ", header.MerkleRoot.String())
-	fmt.Println("EthashPow VerifySeal Target: header.Timestamp ", header.Timestamp.Unix())
-	fmt.Println("EthashPow VerifySeal Target: header.Height ", header.Height)
-	fmt.Println("EthashPow VerifySeal Target: header.Bits ", header.Bits)
-	fmt.Println("EthashPow VerifySeal Target: header.BitsSecond ", header.BitsSecond)
-	fmt.Println("EthashPow VerifySeal Target: header.PowScaleSecond ", header.PowScaleSecond)
-	fmt.Println("EthashPow VerifySeal Target: header.ConsensusApplied ", header.ConsensusApplied)
-	fmt.Println("EthashPow VerifySeal Target: header.Nonce ", header.Nonce)
-	fmt.Println("EthashPow VerifySeal Target: header.NonceExt ", header.NonceExt)
-	fmt.Println("EthashPow VerifySeal Target: header.MixDigest ", header.MixDigest)
-
 	headerContentHash, err := HeaderContentHash(header)
 	if err != nil {
 		return err
@@ -115,7 +100,6 @@ func (ethashPow *EthashPow) VerifySeal(header *wire.BlockHeader, target *big.Int
 		// until after the call to hashimotoLight so it's not unmapped while being used.
 		runtime.KeepAlive(cacheInst)
 	}
-	fmt.Println("NakamotoPowAconcagua VerifySeal Target: sealHash ", sealHash.String())
 
 	// Verify the calculated values against the ones provided in the header
 	if !bytes.Equal(header.MixDigest[:], digest) {

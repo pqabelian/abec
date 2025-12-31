@@ -3,12 +3,11 @@ package nakamotopowaconcagua
 import (
 	"encoding/binary"
 	"fmt"
-	"math/big"
-
 	"github.com/abesuite/abec/blockchain/consensus/common"
 	"github.com/abesuite/abec/blockchain/ruleerror"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
+	"math/big"
 )
 
 type NakamotoPowAconcagua struct {
@@ -42,27 +41,12 @@ func (nakamotoPowAconcagua *NakamotoPowAconcagua) VerifySeal(header *wire.BlockH
 	//	return ruleerror.NewRuleError(ruleerror.ErrHighHash, str)
 	//}
 
-	fmt.Println("NakamotoPowAconcagua VerifySeal Header:")
-	fmt.Println("NakamotoPowAconcagua VerifySeal Target: ", target)
-	fmt.Println("NakamotoPowAconcagua VerifySeal Target: header.Version ", header.Version)
-	fmt.Println("NakamotoPowAconcagua VerifySeal Target: header.PrevBlock ", header.PrevBlock.String())
-	fmt.Println("NakamotoPowAconcagua VerifySeal Target: header.PrevBlock ", header.MerkleRoot.String())
-	fmt.Println("NakamotoPowAconcagua VerifySeal Target: header.Timestamp ", header.Timestamp.Unix())
-	fmt.Println("NakamotoPowAconcagua VerifySeal Target: header.Height ", header.Height)
-	fmt.Println("NakamotoPowAconcagua VerifySeal Target: header.Bits ", header.Bits)
-	fmt.Println("NakamotoPowAconcagua VerifySeal Target: header.BitsSecond ", header.BitsSecond)
-	fmt.Println("NakamotoPowAconcagua VerifySeal Target: header.PowScaleSecond ", header.PowScaleSecond)
-	fmt.Println("NakamotoPowAconcagua VerifySeal Target: header.ConsensusApplied ", header.ConsensusApplied)
-	fmt.Println("NakamotoPowAconcagua VerifySeal Target: header.Nonce ", header.Nonce)
-	fmt.Println("NakamotoPowAconcagua VerifySeal Target: header.NonceExt ", header.NonceExt)
-	fmt.Println("NakamotoPowAconcagua VerifySeal Target: header.MixDigest ", header.MixDigest)
-
 	sealHashPreImg, err := sealHashPreImage(header)
 	if err != nil {
 		return err
 	}
+
 	sealHash := chainhash.DoubleHashH(sealHashPreImg)
-	fmt.Println("NakamotoPowAconcagua VerifySeal Target: sealHash ", sealHash.String())
 
 	if !sealHash.IsEqual(&header.MixDigest) {
 		str := fmt.Sprintf("NakamotoPowAconcagua VerifySeal: seal hash (%s) is not equal with mixDigest (%s)",
