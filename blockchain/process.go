@@ -223,7 +223,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, powConsensus *cons
 			// maximum adjustment allowed by the retarget rules.
 			//       DSA         Aconcagua
 			// [     ] [           ] [         ]
-			if blockHeader.Height >= b.chainParams.BlockHeightAconcagua {
+			if blockHeader.Height > b.chainParams.BlockHeightAconcagua {
 				if checkpointNode.height >= b.chainParams.BlockHeightAconcagua {
 					duration := blockHeader.Timestamp.Sub(checkpointTime)
 					requiredTarget := CompactToBig(
@@ -281,6 +281,8 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, powConsensus *cons
 					}
 				}
 
+			} else if blockHeader.Height == b.chainParams.BlockHeightAconcagua {
+				// skip special case
 			} else if blockHeader.Height >= b.chainParams.BlockHeightDSA {
 				if checkpointNode.height >= b.chainParams.BlockHeightDSA {
 					duration := blockHeader.Timestamp.Sub(checkpointTime)
@@ -295,7 +297,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, powConsensus *cons
 						return false, false, ruleerror.NewRuleError(ruleerror.ErrDifficultyTooLow, str)
 					}
 				} else {
-					// checkpointNode.height < b.chainParams.BlockHeightDSA
+					// checkpointNode.h eight < b.chainParams.BlockHeightDSA
 					// from checkpoint block to dsa block should be checked before
 					blockDSA, err := b.BlockByHeight(b.chainParams.BlockHeightDSA)
 					if err != nil {
