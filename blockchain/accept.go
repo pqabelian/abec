@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"fmt"
+
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain/ruleerror"
 	"github.com/abesuite/abec/database"
@@ -49,6 +50,7 @@ func (b *BlockChain) maybeAcceptBlockAbe(block *abeutil.BlockAbe, flags Behavior
 	if err != nil {
 		return false, err
 	}
+	log.Infof("checkBlockContextAbe successful")
 
 	// Insert the block into the database if it's not already there.  Even
 	// though it is possible the block will ultimately fail to connect, it
@@ -92,6 +94,7 @@ func (b *BlockChain) maybeAcceptBlockAbe(block *abeutil.BlockAbe, flags Behavior
 	if err != nil {
 		return false, err
 	}
+	log.Infof("connectBestChainAbe successful")
 
 	// Notify the caller that the new block was accepted into the block
 	// chain.  The caller would typically want to react by relaying the

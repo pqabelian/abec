@@ -4672,7 +4672,7 @@ func handleSubmitSimplifiedBlock(s *rpcServer, cmd interface{}, closeChan <-chan
 	// nodes. This will in turn relay it to the network like normal.
 	_, err = s.cfg.SyncMgr.SubmitBlock(block, blockchain.BFNone)
 	if err != nil {
-		rpcsLog.Infof("Rejected block %s (Height %v) via submitblock", block.Hash(), block.Height())
+		rpcsLog.Infof("Rejected block %s (Height %v) via submitblock: %s", block.Hash(), block.Height(), err)
 		return fmt.Sprintf("rejected: %s", err.Error()), nil
 	}
 

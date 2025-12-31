@@ -192,6 +192,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, powConsensus *cons
 		log.Errorf("checkBlockSanityAbe fail %s", err)
 		return false, false, err
 	}
+	log.Infof("checkBlockSanityAbe successful")
 
 	// Find the previous checkpoint and perform some additional checks based
 	// on the checkpoint.  This provides a few nice properties such as
@@ -367,6 +368,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, powConsensus *cons
 		log.Errorf("maybeAcceptBlockAbe fail to pass %s", err)
 		return false, false, err
 	}
+	log.Infof("maybeAcceptBlockAbe successful")
 
 	// Accept any orphan blocks that depend on this block (they are
 	// no longer orphans) and repeat for those accepted blocks until
