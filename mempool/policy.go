@@ -2,11 +2,12 @@ package mempool
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/pqabelian/abec/abeutil"
 	"github.com/pqabelian/abec/blockchain"
 	"github.com/pqabelian/abec/txscript"
 	"github.com/pqabelian/abec/wire"
-	"time"
 )
 
 const (
@@ -45,7 +46,7 @@ const (
 	// purposes.  It is also used to help determine if a transaction is
 	// considered dust and as a base for calculating minimum required fees
 	// for larger transactions.  This value is in Neutrino/1000 bytes.
-	DefaultMinRelayTxFee = 10
+	DefaultMinRelayTxFee = 1
 
 	// maxStandardMultiSigKeys is the maximum number of public keys allowed
 	// in a multi-signature transaction output script for it to be
@@ -77,6 +78,8 @@ func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee abeutil.Amoun
 	return minFee
 }
 
+// calcMinRequiredTxRelayFeeAbe
+// TODO minRelayTxFee -> minRelayTxFeePerKB
 func calcMinRequiredTxRelayFeeAbe(serializedSize int64, minRelayTxFee abeutil.Amount) uint64 {
 	// Calculate the minimum fee for a transaction to be allowed into the
 	// mempool and relayed by scaling the base fee (which is the minimum

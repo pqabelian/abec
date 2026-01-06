@@ -448,7 +448,7 @@ func pqringctTransferTxGen(pp *pqringct.PublicParameter, cryptoScheme abecryptop
 				return nil, err
 			}
 
-			txolid := ledgerTxoIdGen(abeTxInputDescs[i].ringHash, uint8(j))
+			txolid := ledgerTxoIdGen(abeTxInputDescs[i].ringHash, uint8(j), abeTxInputDescs[i].txoList[j].Version)
 
 			lgrTxoList[j] = pqringct.NewLgrTxo(txo, txolid)
 		}
@@ -577,7 +577,7 @@ func pqringctTransferTxVerify(pp *pqringct.PublicParameter, transferTx *wire.Msg
 			if err != nil {
 				return err
 			}
-			txolid := ledgerTxoIdGen(abeTxInDetails[i].ringHash, uint8(j))
+			txolid := ledgerTxoIdGen(abeTxInDetails[i].ringHash, uint8(j), abeTxInDetails[i].txoList[j].Version)
 			txoList[j] = pqringct.NewLgrTxo(txo, txolid)
 
 		}
@@ -672,7 +672,7 @@ func pqringctTxoCoinSerialNumberGen(pp *pqringct.PublicParameter, cryptoScheme a
 		return nil, err
 	}
 
-	txolid := ledgerTxoIdGen(ringHash, txoIndexInRing)
+	txolid := ledgerTxoIdGen(ringHash, txoIndexInRing, abeTxo.Version)
 
 	lgrTxo := pqringct.NewLgrTxo(txo, txolid)
 
@@ -700,7 +700,7 @@ func pqringctExtractCoinAddressFromTxoScript(pp *pqringct.PublicParameter, txosc
 	return pp.SerializeAddressPublicKey(txo.AddressPublicKey)
 }
 
-func ledgerTxoIdGen(ringHash chainhash.Hash, index uint8) []byte {
+func ledgerTxoIdGen(ringHash chainhash.Hash, index uint8, txoVersion uint32) []byte {
 	w := bytes.NewBuffer(make([]byte, 0, chainhash.HashSize+1))
 	var err error
 	// ringHash
@@ -713,5 +713,11 @@ func ledgerTxoIdGen(ringHash chainhash.Hash, index uint8) []byte {
 	if err != nil {
 		return nil
 	}
+
+	if txoVersion >= wire.TxVersion_Height_464000_Aconcagua {
+		lgrTxoIdHash := chainhash.ChainHash(w.Bytes())
+		return lgrTxoIdHash[:]
+	}
+
 	return chainhash.DoubleHashB(w.Bytes())
 }

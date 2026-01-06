@@ -2,15 +2,17 @@ package blockchain
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
+	"sort"
+
 	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
 	"github.com/pqabelian/abec/abeutil"
 	"github.com/pqabelian/abec/chainhash"
 	"github.com/pqabelian/abec/database"
 	"github.com/pqabelian/abec/wire"
-	"io"
-	"sort"
 )
 
 // BuildTxoRings apply a chain-rule to organize the Txos of input blocks to TxoRings.
@@ -80,6 +82,7 @@ func BuildTxoRings(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.
 		for outIndex, txOut := range coinBaseTx.MsgTx().TxOuts {
 			txoSortStr[(blockNumPerRingGroup+2)*chainhash.HashSize] = uint8(outIndex)
 
+			// todo: To be backward compatible, here still uses DoubleHashH, even after Aconcagua upgrade. will have a new BuildRing function for Aconcagua.
 			txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
 			ringMemberTxo := NewRingMemberTxo(coinBaseTx.MsgTx().Version, &txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
@@ -92,6 +95,7 @@ func BuildTxoRings(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.
 			for outIndex, txOut := range tx.MsgTx().TxOuts {
 				txoSortStr[(blockNumPerRingGroup+2)*chainhash.HashSize] = uint8(outIndex)
 
+				// todo: To be backward compatible, here still uses DoubleHashH, even after Aconcagua upgrade. will have a new BuildRing function for Aconcagua.
 				txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
 				ringMemberTxo := NewRingMemberTxo(tx.MsgTx().Version, &txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
@@ -153,6 +157,7 @@ func BuildTxoRings(blockNumPerRingGroup int, txoRingSize int, blocks []*abeutil.
 // Here txoRingSize is set as an input parameter, to avoid using the global parameter TxoRingSize.
 // txoRingSize is set by the caller which may decides the value of txoRingSize based on the wire/protocol version.
 // reviewed on 2024.01.04
+// aut review done 2025.12.16
 func buildTxoRingsFromTxos(ringMemberTxos []*RingMemberTxo, ringBlockHeight int32, blockhashs []*chainhash.Hash, txoRingSize int, isCoinBase bool) (txoRings []*wire.TxoRing, err error) {
 
 	if len(ringMemberTxos) == 0 {
@@ -347,6 +352,14 @@ func (entry *UtxoRingEntry) IsSpent(serialNumber []byte) bool {
 		}
 	}
 
+	// added on 2025.12
+	if entry.outPointRing == nil || len(entry.outPointRing.OutPoints) == 0 {
+		return true
+	}
+	if len(entry.serialNumbers) == len(entry.outPointRing.OutPoints) {
+		return true
+	}
+
 	return false
 }
 
@@ -412,6 +425,8 @@ func (entry *UtxoRingEntry) ConsumingBlockHashs() []*chainhash.Hash {
 	return entry.consumingBlockHashs
 }
 
+// SerializeSize
+// aut review done 2025.12.16
 func (entry *UtxoRingEntry) SerializeSize() int {
 
 	//	utxoRingHeaderCode
@@ -460,6 +475,9 @@ func (entry *UtxoRingEntry) SerializeSize() int {
 
 // Serialize
 // todo_DONE(MLP): reviewed on 2024.01.04
+// aut review done 2025.12.16
+// aut review done 2025.12.18
+// Note (2025.12.18): the packedFlags is not serialized, since it is a temporary fieild.
 func (entry *UtxoRingEntry) Serialize(w io.Writer) error {
 	//	utxoRingHeaderCode
 	//	blockHeight and IsCoinBase
@@ -550,6 +568,7 @@ func (entry *UtxoRingEntry) Serialize(w io.Writer) error {
 
 // Deserialize
 // reviewed on 2024.01.01
+// aut review done 2025.12.16
 func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 	//	utxoRingHeaderCode
 	//	blockHeight and IsCoinBase
@@ -674,8 +693,14 @@ func (entry *UtxoRingEntry) Deserialize(r io.Reader) error {
 // has no effect.
 // The caller should check double-spending before calling this function
 // todo_DONE(MLP): reviewed on 2024.01.04
+// review done 2025.12.13;
 func (entry *UtxoRingEntry) Spend(serialNumber []byte, blockHash *chainhash.Hash) {
 	//	Abe to do: double spending?
+	if len(serialNumber) == 0 || blockHash == nil {
+		// 2025.12.16 This is only for logic-completeness, the caller will/should guarantee this will not happen.
+		return
+	}
+
 	for i, sn := range entry.serialNumbers {
 		if bytes.Compare(sn, serialNumber) == 0 {
 			if blockHash.IsEqual(entry.consumingBlockHashs[i]) {
@@ -697,7 +722,14 @@ func (entry *UtxoRingEntry) Spend(serialNumber []byte, blockHash *chainhash.Hash
 // UnSpend
 // normally, the unspent serialNumber should be the last one, as this function should be called in reverse order
 // reviewed on 2024.01.05
+// review done 2025.12.13; todo confirm
+// aut review don 2025.12.18
+// todo: 2025.12.18, consider future: is it necessary to export? how about unSpend?
 func (entry *UtxoRingEntry) UnSpend(serialNumber []byte, blockHash *chainhash.Hash) bool {
+	if len(serialNumber) == 0 || blockHash == nil {
+		return false
+	}
+
 	for i, sn := range entry.serialNumbers {
 		if bytes.Equal(sn, serialNumber) && blockHash.IsEqual(entry.consumingBlockHashs[i]) {
 			// remove the matched serial number and the consumed block hash
@@ -714,6 +746,7 @@ func (entry *UtxoRingEntry) UnSpend(serialNumber []byte, blockHash *chainhash.Ha
 
 // Clone returns a shallow copy of the utxo entry.
 // reviewed on 2024.01/04
+// aut review done 2025.12.18
 func (entry *UtxoRingEntry) Clone() *UtxoRingEntry {
 	if entry == nil {
 		return nil
@@ -741,6 +774,8 @@ func (entry *UtxoRingEntry) Clone() *UtxoRingEntry {
 	return &utxoRingClone
 }
 
+// IsSame
+// aut review done 2025.12.18
 func (entry *UtxoRingEntry) IsSame(obj *UtxoRingEntry) bool {
 	if entry == nil {
 		if obj == nil {
@@ -773,6 +808,25 @@ func (entry *UtxoRingEntry) IsSame(obj *UtxoRingEntry) bool {
 	}
 
 	return true
+}
+
+// TxoRing returns the TxoRing of the UtxoRingEntry.
+// todo: discuss and confirm that the resulting TxoRing shares the pointers in UtxoRingEntry.
+// todo: refactor UtxoRingEntry to have a TxoRing pointer?
+func (entry *UtxoRingEntry) TxoRing() *wire.TxoRing {
+	if entry == nil {
+		return nil
+	}
+
+	txoRing := &wire.TxoRing{}
+
+	txoRing.Version = entry.Version
+	txoRing.RingBlockHeight = entry.ringBlockHeight
+	txoRing.OutPointRing = entry.outPointRing
+	txoRing.TxOuts = entry.txOuts
+	txoRing.IsCoinbase = entry.IsCoinBase()
+
+	return txoRing
 }
 
 func initNewUtxoRingEntry(version uint32, ringBlockHeight int32, blockhashs []*chainhash.Hash, ringMemberTxos []*RingMemberTxo, isCoinBase bool) (*UtxoRingEntry, error) {
@@ -820,7 +874,8 @@ func initNewUtxoRingEntry(version uint32, ringBlockHeight int32, blockhashs []*c
 // script validation and double spend prevention.
 
 type UtxoRingViewpoint struct {
-	entries  map[chainhash.Hash]*UtxoRingEntry
+	entries map[chainhash.Hash]*UtxoRingEntry
+	// todo: add autEntries, 2025.12.13
 	bestHash chainhash.Hash
 }
 
@@ -855,6 +910,7 @@ func (view *UtxoRingViewpoint) SetEntries(entries map[chainhash.Hash]*UtxoRingEn
 
 // commit prunes all entries marked modified that are now fully spent and marks
 // all entries as unmodified.
+// aut review done: process the data in memory.
 func (view *UtxoRingViewpoint) commit() {
 	for outPointHash, entry := range view.entries {
 		if entry == nil || (entry.isModified() && entry.IsAllSpent()) {
@@ -872,6 +928,7 @@ func (view *UtxoRingViewpoint) commit() {
 // the block are added to the view and entries that are already in the view are
 // not modified.
 // reviewed on 2024.01.04
+// review done 2025.12.12; fetch all the ringEntries that the transactions in a block will take as input.
 func (view *UtxoRingViewpoint) fetchInputUtxoRings(db database.DB, block *abeutil.BlockAbe) error {
 	/*	// Build a map of in-flight transactions because some of the inputs in
 		// this block could be referencing other transactions earlier in this
@@ -944,6 +1001,7 @@ func (view *UtxoRingViewpoint) fetchInputUtxoRings(db database.DB, block *abeuti
 //	Abe todo: to get the UtxoRings for main chain, should fetch from db
 //
 // reviewed on 2024.01.04
+// review done 2025.12.12
 func (view *UtxoRingViewpoint) fetchUtxoRingsMain(db database.DB, outPointRings map[chainhash.Hash]struct{}) error {
 	// Nothing to do if there are no requested outputs.
 	if len(outPointRings) == 0 {
@@ -1063,7 +1121,13 @@ func (b *BlockChain) FetchUtxoRingView(tx *abeutil.TxAbe) (*UtxoRingViewpoint, e
 // Abe to do: In ABE, the connectTransaction algorithm only 'spend' TxoRings, does not generate new TxoRing.
 // Only the blocks with height%3 ==0 will trigger the generation of new TxoRings.
 // todo_DONE(MLP): reviewed on 2024.01.04
-func (view *UtxoRingViewpoint) connectTransaction(tx *abeutil.TxAbe, blockhash *chainhash.Hash, stxos *[]*SpentTxOutAbe) error {
+// TODO change function name, such as connectTransactionInputs
+// 2025.12.13 for ctaut part, new AutTokens will be generated (but it will not cause the spending of pending AutTokens, based on the host-mechanism).
+// review done 2025.12.16
+func (view *UtxoRingViewpoint) connectTransaction(
+	tx *abeutil.TxAbe, blockhash *chainhash.Hash, stxos *[]*SpentTxOutAbe,
+	blockHeight int32, ctautView *CTAUTViewpoint, sctauts *[]SpentAut,
+) error {
 	// Coinbase transactions don't have any inputs to spend.
 	isCb, err := tx.IsCoinBase()
 	if err != nil {
@@ -1073,6 +1137,7 @@ func (view *UtxoRingViewpoint) connectTransaction(tx *abeutil.TxAbe, blockhash *
 	if isCb {
 		/*		// Add the transaction's outputs as available utxos.
 				view.AddTxOuts(tx, blockHeight)*/
+		// aut does not need handle, either.
 		return nil
 	}
 
@@ -1105,6 +1170,10 @@ func (view *UtxoRingViewpoint) connectTransaction(tx *abeutil.TxAbe, blockhash *
 			*stxos = append(*stxos, stxo)
 		}
 
+		// todo: add autScript logic here 2025.12.13
+		// todo: spentInputToken (just a double-check)
+		// todo: sauttxos
+
 		// Mark the entry as spent.  This is not done until after the
 		// relevant details have been accessed since spending it might
 		// clear the fields from memory in the future.
@@ -1116,6 +1185,13 @@ func (view *UtxoRingViewpoint) connectTransaction(tx *abeutil.TxAbe, blockhash *
 
 	// Add the transaction's outputs as available utxos.
 	//	view.AddTxOuts(tx, blockHeight)
+	// todo: add output AutToken here? 2025.12.15
+
+	err = ctautView.connectTransactionAutScript(tx, blockHeight, sctauts)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -1125,9 +1201,14 @@ func (view *UtxoRingViewpoint) connectTransaction(tx *abeutil.TxAbe, blockhash *
 // In addition, when the 'stxos' argument is not nil, it will be updated to
 // append an entry for each spent txout.
 // todo_DONE(MLP): reviewed on 2024.01.04
-func (view *UtxoRingViewpoint) connectTransactions(block *abeutil.BlockAbe, stxos *[]*SpentTxOutAbe) error {
+// aut review done, 2025.12.16
+// todo: refactor in the codebase 2025.12.16
+func (view *UtxoRingViewpoint) connectTransactions(
+	block *abeutil.BlockAbe, stxos *[]*SpentTxOutAbe,
+	ctautView *CTAUTViewpoint, sctauts *[]SpentAut,
+) error {
 	for _, tx := range block.Transactions() {
-		err := view.connectTransaction(tx, block.Hash(), stxos)
+		err := view.connectTransaction(tx, block.Hash(), stxos, block.Height(), ctautView, sctauts)
 		if err != nil {
 			return err
 		}
@@ -1136,6 +1217,8 @@ func (view *UtxoRingViewpoint) connectTransactions(block *abeutil.BlockAbe, stxo
 	// Update the best hash for view to include this block since all of its
 	// transactions have been connected.
 	view.SetBestHash(block.Hash())
+	ctautView.SetBestHash(block.Hash())
+
 	return nil
 }
 
@@ -1147,6 +1230,7 @@ func (view *UtxoRingViewpoint) connectTransactions(block *abeutil.BlockAbe, stxo
 //	Abe to do: use the spendJournal to collect and update utxoRing
 //
 // todo_DONE(MLP): reviewed on 2024.01.05
+// aut review done 2025.12.18
 func (view *UtxoRingViewpoint) disconnectTransactions(db database.DB, block *abeutil.BlockAbe, stxos []*SpentTxOutAbe) error {
 	// Sanity check the correct number of stxos are provided.
 	if len(stxos) != countSpentOutputsAbe(block) {
@@ -1169,18 +1253,31 @@ func (view *UtxoRingViewpoint) disconnectTransactions(db database.DB, block *abe
 					"spent transaction out information: fail to unspend")
 			}
 			if !utxoRingEntry.IsSame(stxo.UtxoRing) {
+				// 2025.12.18 Note that this is checking whether the unSpend results in a correct/expected previous status.
 				return AssertError("disconnectTransactions called with bad " +
 					"spent transaction out information: the resulting Utxo of unspending is different from the one in STXO")
 			}
-			log.Debugf("try resume UTXORing %s with serial number %s", stxo.UtxoRing.outPointRing.Hash(), stxo.SerialNumber)
+			log.Debugf("try resume UTXORing %s with serial number %s",
+				stxo.UtxoRing.outPointRing.Hash(),
+				hex.EncodeToString(stxo.SerialNumber))
 		} else {
 			//	actually, can directly use the following codes to unspend
 			//	the above codes in if{} has the same effect, but with the strictest check.
 			//	At initial development, the strictest check may help find potential situations
+
+			// 2025.12.18 As the view is obtained by "fetch from spentJournal", rather than "fetch from database",
+			// here is assuming that the spendJournal was CORRECTLY generated.
+			// todo: 2025.12.18 future research "read from database and compare"
+
 			loadUtxoRing := stxo.UtxoRing.Clone()
 			loadUtxoRing.packedFlags |= tfModified
 			view.entries[loadUtxoRing.outPointRing.Hash()] = loadUtxoRing
-			log.Debugf("try resume UTXORing %s from stxos", stxo.UtxoRing.outPointRing.Hash())
+			log.Debugf("try resume UTXORing %s with %d serial numbers from stxos",
+				stxo.UtxoRing.outPointRing.Hash(),
+				len(loadUtxoRing.serialNumbers))
+			for kk := 0; kk < len(loadUtxoRing.serialNumbers); kk++ {
+				log.Debugf("\t [%d]%s", kk, hex.EncodeToString(loadUtxoRing.serialNumbers[kk]))
+			}
 		}
 	}
 
@@ -1310,6 +1407,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 		for outIndex, txOut := range coinBaseTx.MsgTx().TxOuts {
 			txoSortStr[(blockNum+2)*chainhash.HashSize] = uint8(outIndex)
 
+			// todo: doubleHash, it does matter, since it is not used and will be removed
 			txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
 			ringMemberTxo := NewRingMemberTxo(coinBaseTx.MsgTx().Version, &txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
@@ -1322,6 +1420,7 @@ func (view *UtxoRingViewpoint) newUtxoRingEntries(db database.DB, node *blockNod
 			for outIndex, txOut := range tx.MsgTx().TxOuts {
 				txoSortStr[(blockNum+2)*chainhash.HashSize] = uint8(outIndex)
 
+				// todo: doubleHash, it does matter, since it is not used and will be removed
 				txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
 				ringMemberTxo := NewRingMemberTxo(tx.MsgTx().Version, &txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
@@ -1573,6 +1672,7 @@ func (view *UtxoRingViewpoint) NewUtxoRingEntriesFromTxos(ringMemberTxos []*Ring
 
 // NewTxoRing constructs a new wire.TxoRing from the inputs.
 // reviewed on 2024.01.04
+// aut review done 2025.12.16
 func NewTxoRing(version uint32, ringBlockHeight int32, blockhashs []*chainhash.Hash, ringMemberTxos []*RingMemberTxo, isCoinBase bool) (*wire.TxoRing, error) {
 
 	ringSize := len(ringMemberTxos)

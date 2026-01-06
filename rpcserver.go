@@ -9,23 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gorilla/websocket"
-	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
-	"github.com/pqabelian/abec/abejson"
-	"github.com/pqabelian/abec/abeutil"
-	"github.com/pqabelian/abec/blockchain"
-	"github.com/pqabelian/abec/blockchain/indexers"
-	"github.com/pqabelian/abec/chaincfg"
-	"github.com/pqabelian/abec/chainhash"
-	"github.com/pqabelian/abec/consensus/ethash"
-	"github.com/pqabelian/abec/database"
-	"github.com/pqabelian/abec/mempool"
-	"github.com/pqabelian/abec/mining"
-	"github.com/pqabelian/abec/mining/cpuminer"
-	"github.com/pqabelian/abec/mining/externalminer"
-	"github.com/pqabelian/abec/peer"
-	"github.com/pqabelian/abec/txscript"
-	"github.com/pqabelian/abec/wire"
 	"io"
 	"io/ioutil"
 	"math/big"
@@ -38,6 +21,25 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
+	"github.com/pqabelian/abec/abejson"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/blockchain"
+	"github.com/pqabelian/abec/blockchain/consensus"
+	"github.com/pqabelian/abec/blockchain/indexers"
+	"github.com/pqabelian/abec/blockchain/ruleerror"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/database"
+	"github.com/pqabelian/abec/mempool"
+	"github.com/pqabelian/abec/mining"
+	"github.com/pqabelian/abec/mining/cpuminer"
+	"github.com/pqabelian/abec/mining/externalminer"
+	"github.com/pqabelian/abec/peer"
+	"github.com/pqabelian/abec/txscript"
+	"github.com/pqabelian/abec/wire"
 )
 
 // API version constants
@@ -149,20 +151,21 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	// TODO(ABE): ABE does not support filter.
 	//"getcfilter":            handleGetCFilter,
 	//"getcfilterheader":      handleGetCFilterHeader,
-	"getconnectioncount": handleGetConnectionCount,
-	"getcurrentnet":      handleGetCurrentNet,
-	"getdifficulty":      handleGetDifficulty,
-	"getgenerate":        handleGetGenerate,
-	"gethashespersec":    handleGetHashesPerSec,
-	"getheaders":         handleGetHeaders,
-	"getinfo":            handleGetInfo,
-	"getmempoolinfo":     handleGetMempoolInfo,
-	"getmininginfo":      handleGetMiningInfo,
-	"getnettotals":       handleGetNetTotals,
-	"getnetworkhashps":   handleGetNetworkHashPS,
-	"getpeerinfo":        handleGetPeerInfo,
-	"getrawmempool":      handleGetRawMempool,
-	"getrawtransaction":  handleGetRawTransaction,
+	"getconnectioncount":       handleGetConnectionCount,
+	"getcurrentnet":            handleGetCurrentNet,
+	"getdifficulty":            handleGetDifficulty,
+	"getdifficultyratiovector": handleGetDifficultyRatioVector,
+	"getgenerate":              handleGetGenerate,
+	"gethashespersec":          handleGetHashesPerSec,
+	"getheaders":               handleGetHeaders,
+	"getinfo":                  handleGetInfo,
+	"getmempoolinfo":           handleGetMempoolInfo,
+	"getmininginfo":            handleGetMiningInfo,
+	"getnettotals":             handleGetNetTotals,
+	"getnetworkhashps":         handleGetNetworkHashPS,
+	"getpeerinfo":              handleGetPeerInfo,
+	"getrawmempool":            handleGetRawMempool,
+	"getrawtransaction":        handleGetRawTransaction,
 	//	todo(ABE): ABE does not support 'GetTxOutCmd', as it seems that this command is to get Txo from transactions in mempool and utxo of main chain.
 	//"gettxout":              handleGetTxOut,
 	"getutxoring": handleGetUtxoRing,
@@ -186,6 +189,8 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	//	todo(ABE.MUST): At this moment, ABE does not support this cmd. As this is related to cyrpto function.
 	//	"verifymessage":         handleVerifyMessage,
 	"version": handleVersion,
+
+	"getautmetadata": handleGetAutMetadata,
 }
 
 // list of commands that we recognize, but for which abec has no support because
@@ -292,6 +297,7 @@ var rpcLimited = map[string]struct{}{
 	"validateaddress":       {},
 	"verifymessage":         {},
 	"version":               {},
+	"getautmetadata":        {},
 }
 
 // builderScript is a convenience function which is used for hard-coded scripts
@@ -367,7 +373,7 @@ type reqTemplate struct {
 	prevHash      *chainhash.Hash // chain status
 	lastTxUpdate  time.Time
 	minTimestamp  time.Time
-	template      *mining.BlockTemplate
+	template      *mining.BlockTemplate // todo: refactor the name
 }
 
 // gbtWorkState houses state that is used in between multiple RPC invocations to
@@ -777,7 +783,13 @@ func handleCreateRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-ch
 	mtx.TxFee = fee
 
 	//	TxWitness
-	mtx.TxWitness = c.Witness
+	// mtx.TxWitness = c.Witness
+	txWitness, autWitness, err := abeutil.DecodeTxWitnesses(mtx.Version, c.Witness)
+	if err != nil {
+		return nil, err
+	}
+	mtx.TxWitness = txWitness
+	mtx.AutWitness = autWitness
 
 	// Return the serialized and hex-encoded transaction.  Note that this
 	// is intentionally not directly returning because the first return
@@ -891,21 +903,23 @@ func createVinListAbe(mtx *wire.MsgTxAbe) []abejson.TxIn {
 
 		blockHashNum := len(txIn.PreviousOutPointRing.BlockHashs)
 		blockHashs := make([]string, blockHashNum)
-		for i := 0; i < blockHashNum; i++ {
-			blockHashs[i] = txIn.PreviousOutPointRing.BlockHashs[i].String()
+		for j := 0; j < blockHashNum; j++ {
+			blockHashs[j] = txIn.PreviousOutPointRing.BlockHashs[j].String()
 		}
 
 		ringSize := len(txIn.PreviousOutPointRing.OutPoints)
 		outPoints := make([]abejson.OutPointAbe, ringSize)
-		for i := 0; i < ringSize; i++ {
-			outPoint := &outPoints[i]
-			outPoint.Txid = txIn.PreviousOutPointRing.OutPoints[i].TxHash.String()
-			outPoint.Index = txIn.PreviousOutPointRing.OutPoints[i].Index
+		for j := 0; j < ringSize; j++ {
+			outPoint := &outPoints[j]
+			outPoint.Txid = txIn.PreviousOutPointRing.OutPoints[j].TxHash.String()
+			outPoint.Index = txIn.PreviousOutPointRing.OutPoints[j].Index
 		}
 
 		vinEntry.PreviousOutPointRing = &abejson.OutPointRing{
+			Version:    txIn.PreviousOutPointRing.Version,
 			BlockHashs: blockHashs,
-			OutPoints:  outPoints}
+			OutPoints:  outPoints,
+		}
 	}
 
 	return vinList
@@ -1017,6 +1031,8 @@ func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 }
 
 // todo(ABE.MUST)
+// todo (CTAUT):  investigate whether the caller of this function uses txReply.Witness to recover the TxWitness and AutWitness,
+// it should call abeutil.DecodeTxWitnesses().
 func createTxRawResultAbe(chainParams *chaincfg.Params, mtx *wire.MsgTxAbe,
 	txHash string, blkHeader *wire.BlockHeader, blkHash string,
 	blkHeight int32, chainHeight int32) (*abejson.TxRawResultAbe, error) {
@@ -1038,8 +1054,10 @@ func createTxRawResultAbe(chainParams *chaincfg.Params, mtx *wire.MsgTxAbe,
 		Version:  mtx.Version,
 	}
 
-	if mtx.HasWitness() {
-		txReply.Witness = hex.EncodeToString(mtx.TxWitness)
+	if mtx.HasTxWitness() {
+		// txReply.Witness = hex.EncodeToString(mtx.TxWitness)
+		encodedWitness := abeutil.EncodeTxWitnesses(mtx.Version, mtx.TxWitness, mtx.AutWitness)
+		txReply.Witness = hex.EncodeToString(encodedWitness)
 	}
 
 	if blkHeader != nil {
@@ -1088,6 +1106,8 @@ func handleDecodeRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 	return txReply, nil
 }
 
+// todo (CTAUT):  investigate whether the caller of this function uses txReply.Witness to recover the TxWitness and AutWitness,
+// it should call abeutil.DecodeTxWitnesses().
 func handleDecodeRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.DecodeRawTransactionCmdAbe)
 
@@ -1118,8 +1138,10 @@ func handleDecodeRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-ch
 		Fee:     abeutil.Amount(mtx.TxFee).ToABE(),
 	}
 
-	if mtx.HasWitness() {
-		txReply.Witness = hex.EncodeToString(mtx.TxWitness)
+	if mtx.HasTxWitness() {
+		//txReply.Witness = hex.EncodeToString(mtx.TxWitness)
+		encodedWitness := abeutil.EncodeTxWitnesses(mtx.Version, mtx.TxWitness, mtx.AutWitness)
+		txReply.Witness = hex.EncodeToString(encodedWitness)
 	}
 
 	return txReply, nil
@@ -1514,6 +1536,7 @@ func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	}
 	// If verbosity is 0, return the serialized block as a hex encoded string.
 	if c.Verbosity != nil && *c.Verbosity == 0 {
+		// todo: seem to have a bug, should contain witness.
 		return hex.EncodeToString(blkBytes), nil
 	}
 
@@ -1527,10 +1550,21 @@ func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	}
 
 	// Witness
-	if witnesses != nil {
+	if len(witnesses) != 0 && len(witnesses) == len(blk.Transactions()) {
 		txs := blk.Transactions()
 		for i := 0; i < len(txs); i++ {
-			txs[i].MsgTx().TxWitness = witnesses[i][chainhash.HashSize:]
+			//txs[i].MsgTx().TxWitness = witnesses[i][chainhash.HashSize:]
+			if len(witnesses[i]) < chainhash.HashSize {
+				return nil, fmt.Errorf("witnesses[%d] has length %d (<%d)", i, len(witnesses[i]), chainhash.HashSize)
+			}
+
+			txWitness, autWitness, err := abeutil.DecodeTxWitnesses(txs[i].MsgTx().Version, witnesses[i][chainhash.HashSize:])
+			if err != nil {
+				context := "Failed to deserialize block"
+				return nil, internalRPCError(err.Error(), context)
+			}
+			txs[i].MsgTx().TxWitness = txWitness
+			txs[i].MsgTx().AutWitness = autWitness
 		}
 	}
 
@@ -1556,6 +1590,11 @@ func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 
 	params := s.cfg.ChainParams
 	blockHeader := &blk.MsgBlock().Header
+	headerContentHash, err := consensus.HeaderContentHash(blockHeader)
+	if err != nil {
+		context := fmt.Sprintf("error happened when calling HeaderContentHash() on blockTemplate.MsgBlock.Header: %v", err)
+		return nil, internalRPCError(err.Error(), context)
+	}
 	blockReply := abejson.GetBlockAbeVerboseResult{
 		Hash:          c.Hash,
 		Version:       blockHeader.Version,
@@ -1574,12 +1613,18 @@ func handleGetBlockAbe(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 		Bits:        strconv.FormatInt(int64(blockHeader.Bits), 16),
 		Difficulty:  getDifficultyRatio(blockHeader.Bits, params),
 		NextHash:    nextHashString,
-		ContentHash: blockHeader.ContentHash().String(),
+		ContentHash: headerContentHash.String(),
 		MixDigest:   blockHeader.MixDigest.String(),
-		SealHash:    ethash.SealHash(blockHeader).String(),
+		SealHash:    consensus.SealHashFast(blockHeader).String(),
 	}
 	if blockHeader.Height >= s.cfg.ChainParams.BlockHeightEthashPoW {
 		blockReply.Nonce = blockHeader.NonceExt
+	}
+	if blockHeader.Height >= s.cfg.ChainParams.BlockHeightAconcagua {
+		blockReply.BitsSecond = strconv.FormatInt(int64(blockHeader.BitsSecond), 16)
+		blockReply.DifficultySecond = getDifficultyRatio(blockHeader.BitsSecond, params)
+		blockReply.PowScaleSecond = blockHeader.PowScaleSecond
+		blockReply.ConsensusApplied = uint8(blockHeader.ConsensusApplied)
 	}
 
 	if *c.Verbosity == 1 {
@@ -1646,7 +1691,10 @@ func handleGetBlockChainInfo(s *rpcServer, cmd interface{}, closeChan <-chan str
 		//	todo(ABE):
 		SoftForks: &abejson.SoftForks{},
 	}
-
+	if chainSnapshot.Height >= s.cfg.ChainParams.BlockHeightAconcagua {
+		chainInfo.DifficultySecond = getDifficultyRatio(chainSnapshot.BitsSecond, params)
+		chainInfo.PowScaleSecond = chainSnapshot.PowScaleSecond
+	}
 	return chainInfo, nil
 }
 
@@ -1690,13 +1738,14 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 	// When the verbose flag isn't set, simply return the serialized block
 	// header as a hex-encoded string.
 	if c.Verbose != nil && !*c.Verbose {
-		var headerBuf bytes.Buffer
-		err := blockHeader.Serialize(&headerBuf)
+		//var headerBuf bytes.Buffer
+		//err := blockHeader.Serialize(&headerBuf)
+		serializedBlockHeader, err := blockHeader.Serialize()
 		if err != nil {
 			context := "Failed to serialize block header"
 			return nil, internalRPCError(err.Error(), context)
 		}
-		return hex.EncodeToString(headerBuf.Bytes()), nil
+		return hex.EncodeToString(serializedBlockHeader), nil
 	}
 
 	// The verbose flag is set, so generate the JSON object and return it.
@@ -1735,7 +1784,76 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 		Bits:          strconv.FormatInt(int64(blockHeader.Bits), 16),
 		Difficulty:    getDifficultyRatio(blockHeader.Bits, params),
 	}
+
+	if blockHeader.Height >= s.cfg.ChainParams.BlockHeightAconcagua {
+		blockHeaderReply.BitsSecond = strconv.FormatInt(int64(blockHeader.BitsSecond), 16)
+		blockHeaderReply.DifficultySecond = getDifficultyRatio(blockHeader.BitsSecond, params)
+		blockHeaderReply.PowScaleSecond = blockHeader.PowScaleSecond
+		blockHeaderReply.ConsensusApplied = uint8(blockHeader.ConsensusApplied)
+	}
+
 	return blockHeaderReply, nil
+}
+func handleGetAutMetadata(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	// Obtain a snapshot of the current best known blockchain state. We'll
+	// populate the response to this call primarily from this snapshot.
+	chain := s.cfg.Chain
+
+	c := cmd.(*abejson.GetAutMetadataCmd)
+
+	// Load the raw block bytes from the database.
+	identifier, err := chainhash.NewHashFromStr(c.Identifier)
+	if err != nil {
+		return nil, rpcDecodeHexError(c.Identifier)
+	}
+
+	metadata, err := chain.FetchCTAUTMetadata(*identifier)
+	if err != nil {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCBlockNotFound,
+			Message: "Block not found",
+		}
+	}
+	if metadata == nil {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCBlockNotFound,
+			Message: "Metadata not found",
+		}
+	}
+
+	issuers := make([]string, 0, len(metadata.Issuers))
+	for i := 0; i < len(metadata.Issuers); i++ {
+		issuers = append(issuers, metadata.Issuers[i].String())
+	}
+	activeRootTokenSet := make([]*abejson.OutPointAbe, 0, len(metadata.ActiveRootTokenSet))
+	for _, point := range metadata.ActiveRootTokenSet {
+		activeRootTokenSet = append(activeRootTokenSet, &abejson.OutPointAbe{
+			Txid:  point.TxHash.String(),
+			Index: point.Index,
+		})
+	}
+	metadaReply := abejson.GetAutMetadataResult{
+		Version:                    metadata.Version,
+		AutIdentifier:              metadata.AutIdentifier.String(),
+		AutName:                    hex.EncodeToString(metadata.AutName),
+		AutSymbol:                  hex.EncodeToString(metadata.AutSymbol),
+		BaseUnitName:               hex.EncodeToString(metadata.BaseUnitName),
+		SubUnitName:                hex.EncodeToString(metadata.SubUnitName),
+		UnitScale:                  metadata.UnitScale,
+		AutMemo:                    hex.EncodeToString(metadata.AutMemo),
+		PlannedTotalSupply:         metadata.PlannedTotalSupply,
+		Issuers:                    issuers,
+		ReregistrationExpireHeight: metadata.ReregistrationExpireHeight,
+		ReRegistrationThreshold:    metadata.ReregistrationThreshold,
+		MintThreshold:              metadata.MintThreshold,
+		PrivacyType:                uint8(metadata.PrivacyType),
+		MintedAmount:               metadata.MintedAmount,
+		BurnedAmount:               metadata.BurnedAmount,
+		UpdateScriptVersions:       metadata.UpdateScriptVersions,
+		ActiveRootTokenSet:         activeRootTokenSet,
+	}
+
+	return metadaReply, nil
 }
 
 // encodeTemplateID encodes the passed details into an ID that can be used to
@@ -1969,18 +2087,12 @@ func GetExtraNonceOffset(tx *wire.MsgTxAbe) (int64, error) {
 }
 
 // updateBlockTemplate creates or updates a block template for the work state.
-// A new block template will be generated when the current best block has
-// changed or the transactions in the memory pool have been updated and it has
-// been long enough since the last template was generated.  Otherwise, the
-// timestamp for the existing block template is updated (and possibly the
-// difficulty on testnet per the consesus rules).  Finally, if the
-// useCoinbaseValue flag is false and the existing block template does not
-// already contain a valid payment address, the block template will be updated
-// with a randomly selected payment address from the list of configured
-// addresses.
-//
-// This function MUST be called with the state locked.
-func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bool, useOwnAddr bool, miningAddr []byte) error {
+// A new block template will be generated when the current best block has changed or
+// the transactions in the memory pool have been updated and it has been long enough since the last template was generated.
+// Otherwise, the timestamp for the existing block template is updated (and possibly the difficulty on testnet per the consensus rules).
+// todo: refactor
+// todo: consider the cache for the consensusApplied
+func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, consensusApplied wire.ConsensusProtocol, useOwnAddr bool, ownMiningAddr abeutil.AbelAddress) error {
 	generator := s.cfg.Generator
 	lastTxUpdate := generator.TxSource().LastUpdated()
 	if lastTxUpdate.IsZero() {
@@ -1994,26 +2106,28 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		return internalRPCError("Failed to create new block "+
 			"template: cannot find mining address in abec configuration", "")
 	}
-	var payToAddr []byte
-	if !useOwnAddr && !useCoinbaseValue {
+
+	var payToCryptoAddress []byte
+	if !useOwnAddr {
 		rand.Seed(time.Now().UnixNano())
-		payToAddr = cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))].CryptoAddress()
+		payToCryptoAddress = cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))].CryptoAddress()
+	} else {
+		if ownMiningAddr == nil {
+			return internalRPCError("Failed to create new block "+
+				"template: useOwnAddr == true but the input miningAddr is nil", "")
+		}
+		payToCryptoAddress = ownMiningAddr.CryptoAddress()
 	}
 
-	if useOwnAddr {
-		payToAddr = miningAddr
-	}
-
-	// Generate a new block template when the current best block has
-	// changed or the transactions in the memory pool have been updated and
-	// it has been at least gbtRegenerateSecond since the last template was
-	// generated.
+	// Generate a new block template when the current best block has changed or
+	// the transactions in the memory pool have been updated and
+	// it has been at least gbtRegenerateSecond since the last template was generated.
 	var msgBlock *wire.MsgBlockAbe
 	var targetDifficulty string
 	latestHash := &s.cfg.Chain.BestSnapshot().Hash
 	template := state.template
 	if useOwnAddr {
-		template = state.templates[hex.EncodeToString(miningAddr)]
+		template = state.templates[hex.EncodeToString(payToCryptoAddress)]
 	}
 	if template == nil ||
 		template.prevHash == nil || !template.prevHash.IsEqual(latestHash) ||
@@ -2030,17 +2144,15 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 			}
 		}
 
-		// Reset the previous best hash the block template was generated
-		// against so any errors below cause the next invocation to try
-		// again.
+		// Reset the previous best hash the block template was generated against
+		// so any errors below cause the next invocation to try again.
 		template.prevHash = nil
 
-		// Create a new block template that has a coinbase which anyone
-		// can redeem.  This is only acceptable because the returned
-		// block template doesn't include the coinbase, so the caller
-		// will ultimately create their own coinbase which pays to the
+		// Create a new block template that has a coinbase which anyone can redeem.
+		// This is only acceptable because the returned block template doesn't include the coinbase,
+		// so the caller will ultimately create their own coinbase which pays to the
 		// appropriate address(es).
-		blkTemplate, err := generator.NewBlockTemplate(payToAddr)
+		blkTemplate, err := generator.NewBlockTemplate(consensusApplied, payToCryptoAddress)
 		if err != nil {
 			return internalRPCError("Failed to create new block "+
 				"template: "+err.Error(), "")
@@ -2051,8 +2163,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 			blockchain.CompactToBig(msgBlock.Header.Bits))
 
 		// Get the minimum allowed timestamp for the block based on the
-		// median timestamp of the last several blocks per the chain
-		// consensus rules.
+		// median timestamp of the last several blocks per the chain consensus rules.
 		best := s.cfg.Chain.BestSnapshot()
 		minTimestamp := mining.MinimumMedianTime(best)
 
@@ -2061,100 +2172,53 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		template.lastTxUpdate = lastTxUpdate
 		template.prevHash = latestHash
 		template.minTimestamp = minTimestamp
-		// Update work state to ensure another block template isn't
-		// generated until needed.
+		// Update work state to ensure another block template isn't generated until needed.
 		if useOwnAddr {
-			state.templates[hex.EncodeToString(miningAddr)] = template
+			state.templates[hex.EncodeToString(payToCryptoAddress)] = template
 		} else {
 			state.template = template
 		}
 
-		rpcsLog.Debugf("Generated block template (timestamp %v, "+
+		rpcsLog.Infof("Generated block template (timestamp %v, "+
 			"target %s, merkle root %s)",
 			msgBlock.Header.Timestamp, targetDifficulty,
 			msgBlock.Header.MerkleRoot)
 
-		// Notify any clients that are long polling about the new
-		// template.
+		// Notify any clients that are long polling about the new template.
 		state.notifyLongPollers(latestHash, lastTxUpdate)
 	} else {
 		// At this point, there is a saved block template and another
 		// request for a template was made, but either the available
-		// transactions haven't change or it hasn't been long enough to
-		// trigger a new block template to be generated.  So, update the
-		// existing block template.
-
-		// When the caller requires a full coinbase as opposed to only
-		// the pertinent details needed to create their own coinbase,
-		// add a payment address to the output of the coinbase of the
-		// template if it doesn't already have one.  Since this requires
-		// mining addresses to be specified via the config, an error is
-		// returned if none have been specified.
-		// todo (ABE): maybe deleted or modified in the future
-		if !useCoinbaseValue && !template.template.ValidPayAddress {
-			// Choose a payment address at random.
-			rand.Seed(time.Now().UnixNano())
-			payToAddr := cfg.miningAddrs[rand.Intn(len(cfg.MiningAddrs))].CryptoAddress()
-
-			// Update the block coinbase output of the template to
-			// pay to the randomly selected payment address.
-			//	todo(ABE): remove
-			/*			pkScript, err := txscript.PayToAddrScript(payToAddr)
-						if err != nil {
-							context := "Failed to create pay-to-addr script"
-							return internalRPCError(err.Error(), context)
-						}
-						template.Block.Transactions[0].TxOut[0].PkScript = pkScript
-						template.ValidPayAddress = true*/
-
-			//addressScript, err := txscript.PayToAddressScriptAbe(payToAddr)
-			//if err != nil {
-			//	context := "Failed to create addressScript"
-			//	return internalRPCError(err.Error(), context)
-			//}
-			// TODO: 20210609 there is wrongly code
-			template.template.BlockAbe.Transactions[0].TxOuts[0].TxoScript = payToAddr
-			template.template.ValidPayAddress = true
-
-			// Update the merkle root.
-			block := abeutil.NewBlock(template.template.Block)
-			merkles := blockchain.BuildMerkleTreeStore(block.Transactions(), false)
-			template.template.Block.Header.MerkleRoot = *merkles[len(merkles)-1]
-		}
+		// transactions haven't changed or it hasn't been long enough to
+		// trigger a new block template to be generated.
+		// So, update the existing block template.
 
 		// Set locals for convenience.
-		msgBlock = template.template.BlockAbe
-		targetDifficulty = fmt.Sprintf("%064x",
-			blockchain.CompactToBig(msgBlock.Header.Bits))
-
 		// Update the time of the block template to the current time
 		// while accounting for the median time of the past several
 		// blocks per the chain consensus rules.
-		generator.UpdateBlockTimeAbe(msgBlock)
-		msgBlock.Header.Nonce = 0
-		msgBlock.Header.NonceExt = 0
+		generator.UpdateBlockTimeAconcagua(template.template)
+		template.template.BlockAbe.Header.Nonce = 0
+		template.template.BlockAbe.Header.NonceExt = 0
 
-		rpcsLog.Debugf("Updated block template (timestamp %v, "+
-			"target %s)", msgBlock.Header.Timestamp,
-			targetDifficulty)
+		rpcsLog.Infof("Updated block template (timestamp %v, "+
+			"target %064x)", template.template.BlockAbe.Header.Timestamp,
+			blockchain.CompactToBig(template.template.BlockAbe.Header.Bits))
 	}
 
 	return nil
 }
 
-// blockTemplateResult returns the current block template associated with the
-// state as a abejson.GetBlockTemplateResult that is ready to be encoded to JSON
-// and returned to the caller.
-//
+// blockTemplateResult returns the current block template associated with the state
+// as an abejson.GetBlockTemplateResult that is ready to be encoded to JSON and returned to the caller.
 // This function MUST be called with the state locked.
-func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, miningAddress []byte, submitOld *bool) (*abejson.GetBlockTemplateResult, error) {
+func (state *gbtWorkState) blockTemplateResult(miningAddr abeutil.AbelAddress, submitOld *bool) (*abejson.GetBlockTemplateResult, error) {
 	// Ensure the timestamps are still in valid range for the template.
 	// This should really only ever happen if the local clock is changed
-	// after the template is generated, but it's important to avoid serving
-	// invalid block templates.
+	// after the template is generated, but it's important to avoid serving invalid block templates.
 	template := state.template
-	if len(miningAddress) != 0 {
-		template = state.templates[hex.EncodeToString(miningAddress)]
+	if miningAddr != nil {
+		template = state.templates[hex.EncodeToString(miningAddr.CryptoAddress())]
 	}
 	if template == nil {
 		return nil, &abejson.RPCError{
@@ -2178,20 +2242,19 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, miningAddr
 		}
 	}
 
-	// Convert each transaction in the block template to a template result
-	// transaction.  The result does not include the coinbase, so notice
-	// the adjustments to the various lengths and indices.
+	// Convert each transaction in the block template to a template result transaction.
+	// The result does not include the coinbase, so notice the adjustments to the various lengths and indices.
 	numTx := len(msgBlock.Transactions)
 	transactions := make([]abejson.GetBlockTemplateResultTxAbe, 0, numTx-1)
 	txIndex := make(map[chainhash.Hash]int64, numTx)
 	for i, tx := range msgBlock.Transactions {
-		txHash := tx.TxHash()
-		txIndex[txHash] = int64(i)
-
 		// Skip the coinbase transaction.
 		if i == 0 {
 			continue
 		}
+
+		txHash := tx.TxHash()
+		txIndex[txHash] = int64(i)
 
 		// Serialize the transaction for later conversion to hex.
 		//txBuf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
@@ -2200,7 +2263,14 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, miningAddr
 		//	return nil, internalRPCError(err.Error(), context)
 		//}
 
-		bTx := abeutil.NewTxAbe(tx)
+		bTx, err := abeutil.NewTxAbe(tx, msgBlock.WitnessHashs[i])
+		if err != nil {
+			return nil, &abejson.RPCError{
+				Code: abejson.ErrRPCIntegerEncodeError,
+				Message: fmt.Sprintf("error happens when calling abeutil.NewTxAbe on MsgTx (%v): %v",
+					tx.TxHash(), err),
+			}
+		}
 		resultTx := abejson.GetBlockTemplateResultTxAbe{
 			// Data: hex.EncodeToString(txBuf.Bytes()),
 			TxHash:      txHash.String(),
@@ -2212,78 +2282,66 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, miningAddr
 		transactions = append(transactions, resultTx)
 	}
 
-	// Generate the block template reply.  Note that following mutations are
-	// implied by the included or omission of fields:
+	// Generate the block template reply.
+	// Note that following mutations are implied by the included or omission of fields:
 	//  Including MinTime -> time/decrement
 	//  Omitting CoinbaseTxn -> coinbase, generation
 	targetDifficulty := fmt.Sprintf("%064x", blockchain.CompactToBig(header.Bits))
+	// TODO(aconcagua): with height as conditions, need add params to gbtWorkState
+	// 1. targetDifficultySecond
+	// 2. BitsSecond / PowScaleSecond / ConsensusApplied / TargetSecond
+	targetDifficultySecond := fmt.Sprintf("%064x", blockchain.CompactToBig(header.BitsSecond))
 	templateID := encodeTemplateID(template.prevHash, template.lastGenerated)
 	reply := abejson.GetBlockTemplateResult{
-		Bits:         strconv.FormatInt(int64(header.Bits), 16),
-		CurTime:      header.Timestamp.Unix(),
-		Height:       int64(template.template.Height),
-		PreviousHash: header.PrevBlock.String(),
-		//		WeightLimit:  blockchain.MaxBlockWeight,
-		//		SigOpLimit:   blockchain.MaxBlockSigOpsCost,
-		SizeLimit:    wire.MaxBlockPayload,
-		Transactions: transactions,
-		Version:      header.Version,
-		LongPollID:   templateID,
-		SubmitOld:    submitOld,
-		Target:       targetDifficulty,
-		MinTime:      template.minTimestamp.Unix(),
-		MaxTime:      maxTime.Unix(),
-		Mutable:      gbtMutableFields,
-		NonceRange:   gbtNonceRange,
-		Capabilities: gbtCapabilities,
+		Bits:             strconv.FormatInt(int64(header.Bits), 16),
+		BitsSecond:       strconv.FormatInt(int64(header.BitsSecond), 16),
+		PowScaleSecond:   header.PowScaleSecond,
+		ConsensusApplied: uint8(header.ConsensusApplied),
+		CurTime:          header.Timestamp.Unix(),
+		Height:           int64(template.template.Height),
+		PreviousHash:     header.PrevBlock.String(),
+		SizeLimit:        wire.MaxBlockPayload,
+		Transactions:     transactions,
+		Version:          header.Version,
+		LongPollID:       templateID,
+		SubmitOld:        submitOld,
+		Target:           targetDifficulty,
+		TargetSecond:     targetDifficultySecond,
+		MinTime:          template.minTimestamp.Unix(),
+		MaxTime:          maxTime.Unix(),
+		Mutable:          gbtMutableFields,
+		NonceRange:       gbtNonceRange,
+		Capabilities:     gbtCapabilities,
 	}
 
-	if useCoinbaseValue {
-		// todo (ABE): currently coinbaseValue not supported
-		return nil, &abejson.RPCError{
-			Code:    abejson.ErrRPCInternal.Code,
-			Message: "Coinbase value is not supported",
-		}
-	} else {
-		// Ensure the template has a valid payment address associated
-		// with it when a full coinbase is requested.
-		if !template.template.ValidPayAddress {
-			return nil, &abejson.RPCError{
-				Code: abejson.ErrRPCInternal.Code,
-				Message: "A coinbase transaction has been " +
-					"requested, but the server has not " +
-					"been configured with any payment " +
-					"addresses via --miningaddr",
-			}
-		}
-
-		// Serialize the transaction for conversion to hex.
-		tx := msgBlock.Transactions[0]
-		txBuf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSizeFull()))
-		if err := tx.SerializeFull(txBuf); err != nil {
-			context := "Failed to serialize transaction"
-			return nil, internalRPCError(err.Error(), context)
-		}
-
-		offset, err := GetExtraNonceOffset(tx)
-		if err != nil {
-			return nil, err
-		}
-
-		witnessOffset := tx.SerializeSize()
-
-		resultTx := abejson.GetBlockTemplateResultCoinbase{
-			Data:             hex.EncodeToString(txBuf.Bytes()),
-			TxHash:           tx.TxHash().String(),
-			WitnessHash:      msgBlock.WitnessHashs[0].String(),
-			Fee:              template.template.BlockAbe.Transactions[0].TxFee,
-			ExtraNonceOffset: offset,
-			ExtraNonceLen:    8,
-			WitnessOffset:    int64(witnessOffset),
-		}
-
-		reply.CoinbaseTxn = &resultTx
+	// the coinbase tx	begin
+	// Serialize the transaction for conversion to hex.
+	tx := msgBlock.Transactions[0]
+	txBuf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSizeFull()))
+	if err := tx.SerializeFull(txBuf); err != nil {
+		context := "Failed to serialize transaction"
+		return nil, internalRPCError(err.Error(), context)
 	}
+
+	offset, err := GetExtraNonceOffset(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	witnessOffset := tx.SerializeSize()
+
+	resultTx := abejson.GetBlockTemplateResultCoinbase{
+		Data:             hex.EncodeToString(txBuf.Bytes()),
+		TxHash:           tx.TxHash().String(),
+		WitnessHash:      msgBlock.WitnessHashs[0].String(),
+		Fee:              template.template.BlockAbe.Transactions[0].TxFee,
+		ExtraNonceOffset: offset,
+		ExtraNonceLen:    8,
+		WitnessOffset:    int64(witnessOffset),
+	}
+
+	reply.CoinbaseTxn = &resultTx
+	// the coinbase tx	end
 
 	return &reply, nil
 }
@@ -2305,7 +2363,8 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 	// be manually unlocked before waiting for a notification about block
 	// template changes.
 
-	if err := state.updateBlockTemplate(s, useCoinbaseValue, false, nil); err != nil {
+	// todo: not used and will be removed, set wire.ConsensusNone
+	if err := state.updateBlockTemplate(s, wire.ConsensusNone, false, nil); err != nil {
 		state.Unlock()
 		return nil, err
 	}
@@ -2314,7 +2373,8 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 	// the caller is invalid.
 	prevHash, lastGenerated, err := decodeTemplateID(longPollID)
 	if err != nil {
-		result, err := state.blockTemplateResult(useCoinbaseValue, nil, nil)
+		// todo: not used and will be removed, set nil
+		result, err := state.blockTemplateResult(nil, nil)
 		if err != nil {
 			state.Unlock()
 			return nil, err
@@ -2335,7 +2395,8 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 		// old block template depending on whether or not a solution has
 		// already been found and added to the block chain.
 		submitOld := prevHash.IsEqual(prevTemplateHash)
-		result, err := state.blockTemplateResult(useCoinbaseValue, nil,
+		// todo: not used and will be removed, set nil
+		result, err := state.blockTemplateResult(nil,
 			&submitOld)
 		if err != nil {
 			state.Unlock()
@@ -2368,7 +2429,8 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 	state.Lock()
 	defer state.Unlock()
 
-	if err := state.updateBlockTemplate(s, useCoinbaseValue, false, nil); err != nil {
+	// todo: not used and will be removed, set wire.ConsensusNone
+	if err := state.updateBlockTemplate(s, wire.ConsensusNone, false, nil); err != nil {
 		return nil, err
 	}
 
@@ -2376,7 +2438,8 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 	// block template depending on whether or not a solution has already
 	// been found and added to the block chain.
 	submitOld := prevHash.IsEqual(&state.template.template.Block.Header.PrevBlock)
-	result, err := state.blockTemplateResult(useCoinbaseValue, nil, &submitOld)
+	// todo: not used and will be removed, set nil
+	result, err := state.blockTemplateResult(nil, &submitOld)
 	if err != nil {
 		return nil, err
 	}
@@ -2401,6 +2464,7 @@ func checkMiningAddrValidity(addr []byte) bool {
 	verifyBytes := addr[:len(addr)-32]
 	dstHash0 := addr[len(addr)-32:]
 	dstHash, _ := chainhash.NewHash(dstHash0)
+	// todo: it is fine to use DoubleHashH for checksum, even after Aconcagua upgrade.
 	realHash := chainhash.DoubleHashH(verifyBytes)
 	if !dstHash.IsEqual(&realHash) {
 		return false
@@ -2410,39 +2474,25 @@ func checkMiningAddrValidity(addr []byte) bool {
 }
 
 // handleGetBlockTemplateRequest is a helper for handleGetBlockTemplate which
-// deals with generating and returning block templates to the caller.  It
-// handles both long poll requests as well as regular requests.  In addition,
-// it detects the capabilities reported by the caller in regards to whether or
-// not it supports creating its own coinbase (the coinbasetxn and coinbasevalue
-// capabilities) and modifies the returned block template accordingly.
+// deals with generating and returning block templates to the caller.
+// todo: consider request is nil when use request.ConsensusApplied .
 func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateRequest, closeChan <-chan struct{}) (interface{}, error) {
 	// Extract the relevant passed capabilities and restrict the result to
-	// either a coinbase value or a coinbase transaction object depending on
-	// the request. Default to providing a coinbase transaction.
-	// todo (ABE): currently we do not support useCoinbaseValue, hence the useCoinbaseValue is always false
-	useCoinbaseValue := false
+	// either a coinbase value or a coinbase transaction object depending on the request.
+	// As so far, only "useOwnAddr" is supported.
 	useOwnAddr := false
 	if request != nil {
-		var hasCoinbaseValue, hasCoinbaseTxn bool
 		for _, capability := range request.Capabilities {
 			switch capability {
-			case "coinbasetxn":
-				hasCoinbaseTxn = true
-			case "coinbasevalue":
-				hasCoinbaseValue = true
 			case "useownaddr":
 				useOwnAddr = true
 			}
-		}
-
-		if !hasCoinbaseTxn && hasCoinbaseValue {
-			useCoinbaseValue = true
 		}
 	}
 
 	// When a coinbase transaction has been requested, respond with an error
 	// if there are no addresses to pay the created block template to.
-	if !useCoinbaseValue && !useOwnAddr && len(cfg.miningAddrs) == 0 {
+	if !useOwnAddr && len(cfg.miningAddrs) == 0 {
 		return nil, &abejson.RPCError{
 			Code: abejson.ErrRPCInternal.Code,
 			Message: "Using mining address provided by abec, " +
@@ -2451,9 +2501,8 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 		}
 	}
 
-	// If useownaddr is true, check if there is mining address in request
-	// also check the validity of the address
-	var miningAddrBytes []byte = nil
+	// If useOwnAddr is true, parse the request.MiningAddr to AbelAddress
+	var ownMiningAddr abeutil.AbelAddress = nil
 	if useOwnAddr {
 		if request.MiningAddr == "" {
 			return nil, &abejson.RPCError{
@@ -2462,21 +2511,21 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 					"but there is mining address in request",
 			}
 		}
-		miningAddrBytesAll, err := hex.DecodeString(request.MiningAddr)
+		var err error
+
+		ownMiningAddr, err = abeutil.DecodeAbelAddress(request.MiningAddr)
 		if err != nil {
 			return nil, &abejson.RPCError{
 				Code:    abejson.ErrRPCInternal.Code,
-				Message: "Invalid mining address",
+				Message: "useOwnAddr == true but provided mining address is invalid",
 			}
 		}
-		isValidAddr := checkMiningAddrValidity(miningAddrBytesAll)
-		if !isValidAddr {
+		if !ownMiningAddr.IsForNet(activeNetParams.Params) {
 			return nil, &abejson.RPCError{
 				Code:    abejson.ErrRPCInternal.Code,
-				Message: "Invalid mining address",
+				Message: "provided mining address does not match the network",
 			}
 		}
-		miningAddrBytes = miningAddrBytesAll[1 : len(miningAddrBytesAll)-32]
 	}
 
 	// Return an error if there are no peers connected since there is no
@@ -2505,7 +2554,6 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 	// When a long poll ID was provided, this is a long poll request by the
 	// client to be notified when block template referenced by the ID should
 	// be replaced with a new one.
-	// todo (ABE): long poll is not implemented yet
 	if request != nil && request.LongPollID != "" {
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCInternal.Code,
@@ -2526,11 +2574,12 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 	// seconds since the last template was generated.  Otherwise, the
 	// timestamp for the existing block template is updated (and possibly
 	// the difficulty on testnet per the consesus rules).
-	if err := state.updateBlockTemplate(s, useCoinbaseValue, useOwnAddr, miningAddrBytes); err != nil {
+	if err := state.updateBlockTemplate(s, wire.ConsensusProtocol(request.ConsensusApplied), useOwnAddr, ownMiningAddr); err != nil {
 		return nil, err
 	}
 
-	return state.blockTemplateResult(useCoinbaseValue, miningAddrBytes, nil)
+	// rpcsLog.Infof("template prev block hash: %s", hex.EncodeToString((*state.template.prevHash)[:]))
+	return state.blockTemplateResult(ownMiningAddr, nil)
 }
 
 // chainErrToGBTErrString converts an error returned from btcchain to a string
@@ -2539,103 +2588,103 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *abejson.TemplateReques
 func chainErrToGBTErrString(err error) string {
 	// When the passed error is not a RuleError, just return a generic
 	// rejected string with the error text.
-	ruleErr, ok := err.(blockchain.RuleError)
+	ruleErr, ok := err.(ruleerror.RuleError)
 	if !ok {
 		return "rejected: " + err.Error()
 	}
 
 	switch ruleErr.ErrorCode {
-	case blockchain.ErrDuplicateBlock:
+	case ruleerror.ErrDuplicateBlock:
 		return "duplicate"
-	case blockchain.ErrBlockTooBig:
+	case ruleerror.ErrBlockTooBig:
 		return "bad-blk-length"
 		//	todo(ABE): ABE does not use weight
-	case blockchain.ErrBlockWeightTooHigh:
+	case ruleerror.ErrBlockWeightTooHigh:
 		return "bad-blk-weight"
-	case blockchain.ErrBlockVersionTooOld:
+	case ruleerror.ErrBlockVersionTooOld:
 		return "bad-version"
-	case blockchain.ErrInvalidTime:
+	case ruleerror.ErrInvalidTime:
 		return "bad-time"
-	case blockchain.ErrTimeTooOld:
+	case ruleerror.ErrTimeTooOld:
 		return "time-too-old"
-	case blockchain.ErrTimeTooNew:
+	case ruleerror.ErrTimeTooNew:
 		return "time-too-new"
-	case blockchain.ErrDifficultyTooLow:
+	case ruleerror.ErrDifficultyTooLow:
 		return "bad-diffbits"
-	case blockchain.ErrUnexpectedDifficulty:
+	case ruleerror.ErrUnexpectedDifficulty:
 		return "bad-diffbits"
-	case blockchain.ErrMismatchedBlockHeightWithPrevNode:
+	case ruleerror.ErrMismatchedBlockHeightWithPrevNode:
 		return "bad-height"
-	case blockchain.ErrMismatchedBlockHeightAndVersion:
+	case ruleerror.ErrMismatchedBlockHeightAndVersion:
 		return "bad-height-version"
-	case blockchain.ErrHighHash:
+	case ruleerror.ErrHighHash:
 		return "high-hash"
-	case blockchain.ErrBadMerkleRoot:
+	case ruleerror.ErrBadMerkleRoot:
 		return "bad-txnmrklroot"
-	case blockchain.ErrBadCheckpoint:
+	case ruleerror.ErrBadCheckpoint:
 		return "bad-checkpoint"
-	case blockchain.ErrForkTooOld:
+	case ruleerror.ErrForkTooOld:
 		return "fork-too-old"
-	case blockchain.ErrCheckpointTimeTooOld:
+	case ruleerror.ErrCheckpointTimeTooOld:
 		return "checkpoint-time-too-old"
-	case blockchain.ErrNoTransactions:
+	case ruleerror.ErrNoTransactions:
 		return "bad-txns-none"
-	case blockchain.ErrNoTxInputs:
+	case ruleerror.ErrNoTxInputs:
 		return "bad-txns-noinputs"
-	case blockchain.ErrNoTxOutputs:
+	case ruleerror.ErrNoTxOutputs:
 		return "bad-txns-nooutputs"
-	case blockchain.ErrTxTooBig:
+	case ruleerror.ErrTxTooBig:
 		return "bad-txns-size"
-	case blockchain.ErrBadTxOutValue:
+	case ruleerror.ErrBadTxOutValue:
 		return "bad-txns-outputvalue"
-	case blockchain.ErrDuplicateTxInputs:
+	case ruleerror.ErrDuplicateTxInputs:
 		return "bad-txns-dupinputs"
-	case blockchain.ErrBadTxInput:
+	case ruleerror.ErrBadTxInput:
 		return "bad-txns-badinput"
-	case blockchain.ErrMissingTxOut:
+	case ruleerror.ErrMissingTxOut:
 		return "bad-txns-missinginput"
-	case blockchain.ErrUnfinalizedTx:
-		return "bad-txns-unfinalizedtx"
-	case blockchain.ErrDuplicateTx:
+	case ruleerror.ErrNilTx:
+		return "bad-txns-nil-tx"
+	case ruleerror.ErrDuplicateTx:
 		return "bad-txns-duplicate"
-	case blockchain.ErrOverwriteTx:
-		return "bad-txns-overwrite"
-	case blockchain.ErrImmatureSpend:
+	case ruleerror.ErrMismatchedTxoVersionAndPrivacyLevel:
+		return "bad-txns-mistmatch-version-privacylevel"
+	case ruleerror.ErrImmatureSpend:
 		return "bad-txns-maturity"
-	case blockchain.ErrSpendTooHigh:
+	case ruleerror.ErrSpendTooHigh:
 		return "bad-txns-highspend"
-	case blockchain.ErrBadFees:
+	case ruleerror.ErrBadFees:
 		return "bad-txns-fees"
 		//	todo(ABE):
-	case blockchain.ErrTooManySigOps:
-		return "high-sigops"
-	case blockchain.ErrFirstTxNotCoinbase:
+	case ruleerror.ErrTooManySerialNumbers:
+		return "too-many-serialnumbers"
+	case ruleerror.ErrFirstTxNotCoinbase:
 		return "bad-txns-nocoinbase"
-	case blockchain.ErrMultipleCoinbases:
+	case ruleerror.ErrMultipleCoinbases:
 		return "bad-txns-multicoinbase"
-	case blockchain.ErrBadCoinbaseScriptLen:
+	case ruleerror.ErrBadCoinbaseBasicRule:
 		return "bad-cb-length"
-	case blockchain.ErrBadCoinbaseValue:
+	case ruleerror.ErrBadCoinbaseValue:
 		return "bad-cb-value"
-	case blockchain.ErrMissingCoinbaseHeight:
+	case ruleerror.ErrMissingCoinbaseHeight:
 		return "bad-cb-height"
-	case blockchain.ErrBadCoinbaseHeight:
+	case ruleerror.ErrBadCoinbaseHeight:
 		return "bad-cb-height"
-	case blockchain.ErrScriptMalformed:
-		return "bad-script-malformed"
-	case blockchain.ErrScriptValidation:
+	case ruleerror.ErrTxVersionNotSupported:
+		return "bad-txns-unsupported-version"
+	case ruleerror.ErrScriptValidation:
 		return "bad-script-validate"
-	case blockchain.ErrUnexpectedWitness:
+	case ruleerror.ErrUnexpectedWitness:
 		return "unexpected-witness"
-	case blockchain.ErrInvalidWitnessCommitment:
+	case ruleerror.ErrInvalidWitnessCommitment:
 		return "bad-witness-nonce-size"
-	case blockchain.ErrWitnessCommitmentMismatch:
+	case ruleerror.ErrWitnessCommitmentMismatch:
 		return "bad-witness-merkle-match"
-	case blockchain.ErrPreviousBlockUnknown:
+	case ruleerror.ErrPreviousBlockUnknown:
 		return "prev-blk-not-found"
-	case blockchain.ErrInvalidAncestorBlock:
+	case ruleerror.ErrInvalidAncestorBlock:
 		return "bad-prevblk"
-	case blockchain.ErrPrevBlockNotBest:
+	case ruleerror.ErrPrevBlockNotBest:
 		return "inconclusive-not-best-prvblk"
 	}
 
@@ -2646,6 +2695,7 @@ func chainErrToGBTErrString(err error) string {
 // deals with block proposals.
 //
 // See https://en.bitcoin.it/wiki/BIP_0023 for more details.
+// todo: this function has potential issue due to msgBlock.Deserialize(). Fortunately, it is not used at present.
 func handleGetBlockTemplateProposal(s *rpcServer, request *abejson.TemplateRequest) (interface{}, error) {
 	hexData := request.Data
 	if hexData == "" {
@@ -2676,7 +2726,13 @@ func handleGetBlockTemplateProposal(s *rpcServer, request *abejson.TemplateReque
 			Message: "Block decode failed: " + err.Error(),
 		}
 	}
-	block := abeutil.NewBlockAbe(&msgBlock)
+	block, err := abeutil.NewBlockAbe(&msgBlock)
+	if err != nil {
+		return nil, &abejson.RPCError{
+			Code:    abejson.ErrRPCIntegerEncodeError,
+			Message: fmt.Sprintf("Block decode failed: error happens when calling NewBlockAbe on a msgBlock (hash=%s): %v ", consensus.SealHashFast(&msgBlock.Header), err.Error()),
+		}
+	}
 
 	// Ensure the block is building from the expected previous block.
 	expectedPrevHash := s.cfg.Chain.BestSnapshot().Hash
@@ -2686,7 +2742,7 @@ func handleGetBlockTemplateProposal(s *rpcServer, request *abejson.TemplateReque
 	}
 
 	if err := s.cfg.Chain.CheckConnectBlockTemplateAbe(block); err != nil {
-		if _, ok := err.(blockchain.RuleError); !ok {
+		if _, ok := err.(ruleerror.RuleError); !ok {
 			errStr := fmt.Sprintf("Failed to process block proposal: %v", err)
 			rpcsLog.Error(errStr)
 			return nil, &abejson.RPCError{
@@ -2988,6 +3044,18 @@ func handleGetDifficulty(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 	return getDifficultyRatio(best.Bits, s.cfg.ChainParams), nil
 }
 
+func handleGetDifficultyRatioVector(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	best := s.cfg.Chain.BestSnapshot()
+
+	// TODO(aconcagua) with height as condition?
+	var ret abejson.GetDifficultyRatioVectorResult
+	ret.DifficultyRatio = getDifficultyRatio(best.Bits, s.cfg.ChainParams)
+	ret.DifficultyRatioSecond = getDifficultyRatio(best.BitsSecond, s.cfg.ChainParams)
+	ret.PowScaleSecond = best.PowScaleSecond
+
+	return ret, nil
+}
+
 // handleGetGenerate implements the getgenerate command.
 func handleGetGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	return s.cfg.CPUMiner.IsMining(), nil
@@ -3026,15 +3094,16 @@ func handleGetHeaders(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 
 	// Return the serialized block headers as hex-encoded strings.
 	hexBlockHeaders := make([]string, len(headers))
-	var buf bytes.Buffer
+	//var buf bytes.Buffer
 	for i, h := range headers {
-		err := h.Serialize(&buf)
+		// err := h.Serialize(&buf)
+		serializedBlockHeader, err := h.Serialize()
 		if err != nil {
 			return nil, internalRPCError(err.Error(),
 				"Failed to serialize block header")
 		}
-		hexBlockHeaders[i] = hex.EncodeToString(buf.Bytes())
-		buf.Reset()
+		hexBlockHeaders[i] = hex.EncodeToString(serializedBlockHeader)
+		//buf.Reset()
 	}
 	return hexBlockHeaders, nil
 }
@@ -3079,6 +3148,11 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		NodeType:             nodeType.String(),
 		WitnessServiceHeight: int32(witnessServiceHeight),
 		NetID:                s.cfg.ChainParams.AbelAddressNetId,
+	}
+	if best.Height >= s.cfg.ChainParams.BlockHeightAconcagua {
+		ret.WorkSumSecondScaled = s.cfg.Chain.BestChainWorkSumSecondScaled().String()
+		ret.DifficultySecond = getDifficultyRatio(best.BitsSecond, s.cfg.ChainParams)
+		ret.PowScaleSecond = best.PowScaleSecond
 	}
 
 	return ret, nil
@@ -3135,6 +3209,11 @@ func handleGetMiningInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		NetworkHashPS:      networkHashesPerSec,
 		PooledTx:           uint64(s.cfg.TxMemPool.Count()),
 		TestNet:            cfg.TestNet3,
+	}
+	if best.Height >= s.cfg.ChainParams.BlockHeightAconcagua {
+		result.DifficultySecond = getDifficultyRatio(best.BitsSecond, s.cfg.ChainParams)
+		result.PowScaleSecond = best.PowScaleSecond
+		result.ConsensusApplied = uint8(best.ConsensusApplied)
 	}
 	return &result, nil
 }
@@ -3315,6 +3394,10 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 }
 
 // handleGetRawTransaction implements the getrawtransaction command.
+// if the caller of this function use verbose = true call this function and uses the returned bytes,
+// then it also need to call abeutil.DecodeTxWitnesses() to obtain TxWitness and AutWitness.
+// todo (CTAUT): investigate the callers of this function, check whether they use !verbose and decode witness.
+// If necessary, call abeutil.DecodeTxWitnesses().
 func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*abejson.GetRawTransactionCmd)
 
@@ -3386,6 +3469,7 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 		// avoid deserializing it only to reserialize it again later.
 		if !verbose {
 			return hex.EncodeToString(res), nil
+			// todo: if the caller of this function use res, then it also need to call abeutil.DecodeTxWitnesses()
 		}
 
 		// Grab the block height.
@@ -3404,7 +3488,18 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 			return nil, internalRPCError(err.Error(), context)
 		}
 		if len(witness) != 0 {
-			msgTx.TxWitness = witness[chainhash.HashSize:]
+			// msgTx.TxWitness = witness[chainhash.HashSize:]
+			if len(witness) < chainhash.HashSize {
+				return nil, fmt.Errorf("witness has length %d (<%d)", len(witness), chainhash.HashSize)
+			}
+
+			txWitness, autWitness, err := abeutil.DecodeTxWitnesses(msgTx.Version, witness[chainhash.HashSize:])
+			if err != nil {
+				context := "Failed to deserialize transaction"
+				return nil, internalRPCError(err.Error(), context)
+			}
+			msgTx.TxWitness = txWitness
+			msgTx.AutWitness = autWitness
 		}
 		mtx = &msgTx
 	} else {
@@ -4218,7 +4313,15 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 	}
 
 	// Use 0 for the tag to represent local node.
-	tx := abeutil.NewTxAbe(&msgTx)
+	tx, err := abeutil.NewTxAbe(&msgTx, nil)
+	if err != nil {
+		return nil, &abejson.RPCError{
+			Code: abejson.ErrRPCIntegerEncodeError,
+			Message: fmt.Sprintf("error happens when calling abeutil.NewTxAbe on MsgTx (%v): %v",
+				msgTx.TxHash(), err),
+		}
+	}
+
 	acceptedTx, err := s.cfg.TxMemPool.ProcessTransactionAbe(tx, false, false, 0, false)
 	if err != nil {
 		// When the error is a rule error, it means the transaction was
@@ -4330,7 +4433,14 @@ func handleSendRawTransactionAbe(s *rpcServer, cmd interface{}, closeChan <-chan
 	}
 
 	// Use 0 for the tag to represent local node.
-	tx := abeutil.NewTxAbe(&msgTx)
+	tx, err := abeutil.NewTxAbe(&msgTx, nil)
+	if err != nil {
+		return nil, &abejson.RPCError{
+			Code: abejson.ErrRPCIntegerEncodeError,
+			Message: fmt.Sprintf("error happens when calling abeutil.NewTxAbe on MsgTx (%v): %v",
+				msgTx.TxHash(), err),
+		}
+	}
 	acceptedTx, err := s.cfg.TxMemPool.ProcessTransactionAbe(tx, false, false, 0, false)
 	if err != nil {
 		// When the error is a rule error, it means the transaction was
@@ -4562,7 +4672,7 @@ func handleSubmitSimplifiedBlock(s *rpcServer, cmd interface{}, closeChan <-chan
 	// nodes. This will in turn relay it to the network like normal.
 	_, err = s.cfg.SyncMgr.SubmitBlock(block, blockchain.BFNone)
 	if err != nil {
-		rpcsLog.Infof("Rejected block %s (Height %v) via submitblock", block.Hash(), block.Height())
+		rpcsLog.Infof("Rejected block %s (Height %v) via submitblock: %s", block.Hash(), block.Height(), err)
 		return fmt.Sprintf("rejected: %s", err.Error()), nil
 	}
 
@@ -4596,7 +4706,10 @@ func AddWitnessForSimplifiedBlock(simplifiedBlock *wire.MsgSimplifiedBlock, txPo
 		}
 	}
 
-	block := abeutil.NewBlockAbe(msgBlock)
+	block, err := abeutil.NewBlockAbe(msgBlock)
+	if err != nil {
+		return nil, err
+	}
 
 	return block, nil
 }
@@ -4645,7 +4758,7 @@ func verifyChain(s *rpcServer, level, depth int32) error {
 		// Level 1 does basic chain sanity checks.
 		if level > 0 {
 			// todo: (EthashPoW) 202207
-			err := blockchain.CheckBlockSanity(block, s.cfg.Ethash,
+			err := blockchain.CheckBlockSanity(block, s.cfg.PowConsensus,
 				s.cfg.ChainParams, s.cfg.TimeSource)
 			if err != nil {
 				rpcsLog.Errorf("Verify is unable to validate "+
@@ -5493,8 +5606,8 @@ type rpcserverConfig struct {
 	// TxMemPool defines the transaction memory pool to interact with.
 	TxMemPool *mempool.TxPool
 
-	// todo: (EthashPow) 202207
-	Ethash *ethash.Ethash
+	// PowConsensus defines the PoW consensus to interact with.
+	PowConsensus *consensus.PowConsensus
 
 	// These fields allow the RPC server to interface with mining.
 	//

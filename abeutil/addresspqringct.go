@@ -160,6 +160,8 @@ func (instAddr *InstanceAddress) Deserialize(serializedInstAddr []byte) error {
 	case abecryptoxkey.PrivacyLevelRINGCT:
 		fallthrough
 	case abecryptoxkey.PrivacyLevelPSEUDONYM:
+		fallthrough
+	case abecryptoxkey.PrivacyLevelPSEUDONYMCT:
 		instAddr.netID = netId
 		instAddr.cryptoScheme = abecryptoxparam.CryptoSchemePQRingCTX
 
@@ -175,6 +177,7 @@ func (instAddr *InstanceAddress) Deserialize(serializedInstAddr []byte) error {
 
 func (instAddr *InstanceAddress) Encode() string {
 	serialized := instAddr.Serialize()
+	// todo: it is fine to use DoubleHashH for checksum, even after Aconcagua upgrade.
 	checkSum := chainhash.DoubleHashH(serialized)
 
 	encodeAddrStr := hex.EncodeToString(serialized)
@@ -194,6 +197,7 @@ func (instAddr *InstanceAddress) Decode(addrStr string) error {
 
 	serializedInstantAddr := addrBytes[:len(addrBytes)-chainhash.HashSize]
 	checkSum := addrBytes[len(addrBytes)-chainhash.HashSize:]
+	// todo: it is fine to use DoubleHashH for checksum, even after Aconcagua upgrade.
 	checkSumComputed := chainhash.DoubleHashH(serializedInstantAddr)
 	if bytes.Compare(checkSum, checkSumComputed[:]) != 0 {
 		errStr := fmt.Sprintf("abel-address %v has a wrong check sum", addrStr)

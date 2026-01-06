@@ -28,6 +28,22 @@ var (
 //	return int((blockHeight - wire.BlockHeightEthashPoW) / epochLength)
 //}
 
+// HeaderContentHash returns the hash of the passed BlockHeader's HeaderContent, computed by SHA3-256.
+//
+// EthashPow uses (HeaderContentHash, NonceExt) to mine/find the valid (MixDigest,SealHash), and
+// can use (HeaderContentHash, NonceExt, MixDigest) to compute SealHash fast (without expensive computation) to have a quick verification.
+//
+// See (bh *BlockHeader) HeaderContent() and VerifySealFast().
+func HeaderContentHash(header *wire.BlockHeader) (*chainhash.Hash, error) {
+	headerContent, err := header.HeaderContent()
+	if err != nil {
+		return nil, err
+	}
+
+	headerContentHash := chainhash.ChainHash(headerContent)
+	return &headerContentHash, nil
+}
+
 // VerifySeal checks whether a block(header) satisfies the PoW difficulty requirements,
 // either using the usual ethash cache for it, or alternatively using a full DAG to make it faster.
 //
@@ -58,11 +74,16 @@ func (ethash *Ethash) VerifySeal(header *wire.BlockHeader, target *big.Int) erro
 		sealHash chainhash.Hash
 	)
 
+	headerContentHash, err := HeaderContentHash(header)
+	if err != nil {
+		return err
+	}
+
 	// If fast-but-heavy PoW verification was requested, use an ethash dataset
 	if fulldag {
 		dataset := ethash.dataset(epoch, true)
 		if dataset.generated() {
-			digest, sealHash = hashimotoFull(dataset.dataset, header.ContentHash(), header.NonceExt)
+			digest, sealHash = hashimotoFull(dataset.dataset, *headerContentHash, header.NonceExt)
 
 			// Datasets are unmapped in a finalizer. Ensure that the dataset stays alive
 			// until after the call to hashimotoFull so it's not unmapped while being used.
@@ -80,7 +101,7 @@ func (ethash *Ethash) VerifySeal(header *wire.BlockHeader, target *big.Int) erro
 		if ethash.config.PowMode == ModeTest {
 			size = 32 * 1024
 		}
-		digest, sealHash = hashimotoLight(size, cache.cache, header.ContentHash(), header.NonceExt)
+		digest, sealHash = hashimotoLight(size, cache.cache, *headerContentHash, header.NonceExt)
 
 		// Caches are unmapped in a finalizer. Ensure that the cache stays alive
 		// until after the call to hashimotoLight so it's not unmapped while being used.
@@ -177,10 +198,13 @@ func SealHash(header *wire.BlockHeader) chainhash.Hash {
 	}
 
 	// Combine contentHash + nonce into a 64 byte seed
-	contentHash := header.ContentHash()
+	headerContentHash, err := HeaderContentHash(header)
+	if err != nil {
+		return chainhash.InvalidHash
+	}
 
 	seedTmp := make([]byte, chainhash.HashSize+8)
-	copy(seedTmp, contentHash[:])
+	copy(seedTmp, headerContentHash[:])
 	binary.LittleEndian.PutUint64(seedTmp[chainhash.HashSize:], header.NonceExt)
 
 	// we use the standard SHA3-512, rather than LegacyKeccak512

@@ -600,42 +600,6 @@ func NewListSpentAndMinedAbeCmd(min *float64, max *float64) *ListSpentAndMinedAb
 	}
 }
 
-type ListAUTCoinsCmd struct {
-	AUTIdentifier *string
-	RootCoinOnly  *bool
-}
-
-func NewListAUTCoinsCmd(autIdentifier *string, rootCoinOnly *bool) *ListAUTCoinsCmd {
-	return &ListAUTCoinsCmd{
-		AUTIdentifier: autIdentifier,
-		RootCoinOnly:  rootCoinOnly,
-	}
-}
-
-type GetAUTBalanceCmd struct {
-	AUTIdentifier string
-	Address       string
-}
-
-func NewGetAUTBalanceCmd(autIdentifier string, address string) *GetAUTBalanceCmd {
-	return &GetAUTBalanceCmd{
-		AUTIdentifier: autIdentifier,
-		Address:       address,
-	}
-}
-
-type BurnAUTBalanceCmd struct {
-	AUTIdentifier string
-	Address       string
-}
-
-func NewBurnAUTBalanceCmd(autIdentifier string, address string) *BurnAUTBalanceCmd {
-	return &BurnAUTBalanceCmd{
-		AUTIdentifier: autIdentifier,
-		Address:       address,
-	}
-}
-
 type ListConfirmedTxsCmd struct {
 	Verbose *int `jsonrpcdefault:"0"`
 }
@@ -829,128 +793,72 @@ type AUTPair struct {
 	Value   uint64 `json:"value"`
 }
 
-// registeraut register testname - 3 5000 1 1 1000000 dollar cent 1
-type RegisterAUTTransactionCmd struct {
+type RegisterCTAUTCmd struct {
+	//AUTIdentifier string
+	CTAUTName    string
+	CTAUTSymbol  string
+	BaseUnitName string
+	SubUnitName  string
+	UnitScale    uint64
+	CTAUTMemo    string
+
+	PlannedTotalAmount         uint64
+	IssuerTokens               []string
+	ReRegistrationExpireHeight int32
+
+	ReRegisterThreshold uint8
+	MintThreshold       uint8
+	PrivacyType         uint8
+
+	IssuerTimes int
+	Memo        string
+}
+type ReRegisterCTAUTCmd struct {
 	AUTIdentifier string
-	AUTSymbol     string
-	IssuerTokens  []string // specify issuer tokens
-	IssuerTimes   int
 
-	ExpireHeight          int32
-	IssuerTokenThreshold  uint8
-	IssuerUpdateThreshold uint8
-	PlannedTotalAmount    uint64
-	UnitName              string
-	MinUnitName           string
-	UnitScale             uint64
+	CTAUTMemo string
+
+	PlannedTotalAmount         uint64
+	IssuerTokens               []string
+	ReRegistrationExpireHeight int32
+
+	ReRegisterThreshold uint8
+	MintThreshold       uint8
+	PrivacyType         uint8
+
+	IssuerTimes int
+	Memo        string
 }
 
-func NewRegisterAUTTransactionCmd(autIdentifier string, autSymbol string,
-	issuerTokens []string, issuerTimes int, expireHeight int32,
-	issuerTokenThreshold uint8, IssuerUpdateThreshold uint8, plannedTotalAmount uint64,
-	unitName string, minUnitName string, unitScale uint64) *RegisterAUTTransactionCmd {
-	return &RegisterAUTTransactionCmd{
-		AUTIdentifier:         autIdentifier,
-		AUTSymbol:             autSymbol,
-		IssuerTokens:          issuerTokens,
-		IssuerTimes:           issuerTimes,
-		ExpireHeight:          expireHeight,
-		IssuerTokenThreshold:  issuerTokenThreshold,
-		IssuerUpdateThreshold: IssuerUpdateThreshold,
-		PlannedTotalAmount:    plannedTotalAmount,
-		UnitName:              unitName,
-		MinUnitName:           minUnitName,
-		UnitScale:             unitScale,
-	}
+type CTAUTPair struct {
+	Address string `json:"address"`
+	Value   uint64 `json:"value"`
+	Hidden  bool   `json:"hidden"`
 }
-
-type MintAUTTransactionCmd struct {
+type MintCTAUTCmd struct {
 	AUTIdentifier string
-	Outputs       []AUTPair
 
-	AUTIssueThreshold uint8
+	Vin        uint64
+	Recipients []*CTAUTPair
+	Memo       string
 }
-
-func NewIssueAUTTransactionCmd(autIdentifier string,
-	outputs []AUTPair, autIssuerTokenThreshold uint8) *MintAUTTransactionCmd {
-	return &MintAUTTransactionCmd{
-		AUTIdentifier:     autIdentifier,
-		Outputs:           outputs,
-		AUTIssueThreshold: autIssuerTokenThreshold,
-		//ChangeAddress:    changeAddress,
-	}
-}
-
-type TransferAUTTransactionCmd struct {
+type TransferCTAUTCmd struct {
 	AUTIdentifier string
-	Outputs       []AUTPair
 
-	AUTChangeAddress string
+	Recipients []*CTAUTPair
 
-	// For blockchain layer
-	//ChangeAddress string
+	Memo              string
+	ChangeAddress     string
+	ChangePrivacyType *uint8
 }
-
-func NewTransferAUTTransactionCmd(autIdentifier string,
-	outputs []AUTPair, autChangeAddress string, changeAddress string) *TransferAUTTransactionCmd {
-	return &TransferAUTTransactionCmd{
-		AUTIdentifier:    autIdentifier,
-		Outputs:          outputs,
-		AUTChangeAddress: autChangeAddress,
-		//ChangeAddress:    changeAddress,
-	}
-}
-
-// registeraut register testname - 3 5000 1 1 1000000 dollar cent 1
-type ReRegisterAUTTransactionCmd struct {
+type BurnCTAUTCmd struct {
 	AUTIdentifier string
-	AUTSymbol     string
-	IssuerTokens  []string // specify issuer tokens
-	IssuerTimes   int
 
-	ExpireHeight          int32
-	IssuerTokenThreshold  uint8
-	IssuerUpdateThreshold uint8
-	PlannedTotalAmount    uint64
-	//UnitName              string
-	//MinUnitName           string
-	UnitScale uint64
+	Recipients []*CTAUTPair // the first recipient would be marked burned
 
-	AUTIssuerUpdateThreshold uint8
-}
-
-func NewReRegisterAUTTransactionCmd(autIdentifier string, autSymbol string,
-	issuerTokens []string, issuerTimes int, expireHeight int32,
-	issuerTokenThreshold uint8, IssuerUpdateThreshold uint8, plannedTotalAmount uint64,
-	/*unitName string, minUnitName string,*/ unitScale uint64, autIssuerUpdateThreshold uint8) *ReRegisterAUTTransactionCmd {
-	return &ReRegisterAUTTransactionCmd{
-		AUTIdentifier:         autIdentifier,
-		AUTSymbol:             autSymbol,
-		IssuerTokens:          issuerTokens,
-		IssuerTimes:           issuerTimes,
-		ExpireHeight:          expireHeight,
-		IssuerTokenThreshold:  issuerTokenThreshold,
-		IssuerUpdateThreshold: IssuerUpdateThreshold,
-		PlannedTotalAmount:    plannedTotalAmount,
-		//UnitName:                 unitName,
-		//MinUnitName:              minUnitName,
-		UnitScale:                unitScale,
-		AUTIssuerUpdateThreshold: autIssuerUpdateThreshold,
-	}
-}
-
-// burnaut register testname - 3 5000 1 1 1000000 dollar cent 1
-type BurnAUTTransactionCmd struct {
-	AUTIdentifier  string
-	UTXOSpescified string
-}
-
-func NewBurnAUTTransactionCmd(autIdentifier string,
-	utxoSpescified string) *BurnAUTTransactionCmd {
-	return &BurnAUTTransactionCmd{
-		AUTIdentifier:  autIdentifier,
-		UTXOSpescified: utxoSpescified,
-	}
+	Memo              string
+	ChangeAddress     string
+	ChangePrivacyType *uint8
 }
 
 type SendToPayeesCmd struct {
@@ -1161,7 +1069,7 @@ func init() {
 	MustRegisterCmd("listunconfirmedtxoabe", (*ListSpentButUnminedAbeCmd)(nil), flags)
 	MustRegisterCmd("listconfirmedtxoabe", (*ListSpentAndMinedAbeCmd)(nil), flags)
 
-	MustRegisterCmd("listautcoins", (*ListAUTCoinsCmd)(nil), flags)
+	//MustRegisterCmd("listautcoins", (*ListAUTCoinsCmd)(nil), flags)
 
 	MustRegisterCmd("rangespendableutxo", (*RangeSpendableUTXOAbeCmd)(nil), flags)
 
@@ -1177,13 +1085,19 @@ func init() {
 	//MustRegisterCmd("sendfrom", (*SendFromCmd)(nil), flags)
 	//MustRegisterCmd("sendmany", (*SendManyCmd)(nil), flags)
 	MustRegisterCmd("sendtoaddressesabe", (*SendToAddressAbeCmd)(nil), flags)
-	MustRegisterCmd("registeraut", (*RegisterAUTTransactionCmd)(nil), flags)
-	MustRegisterCmd("mintaut", (*MintAUTTransactionCmd)(nil), flags)
-	MustRegisterCmd("transferaut", (*TransferAUTTransactionCmd)(nil), flags)
-	MustRegisterCmd("reregisteraut", (*ReRegisterAUTTransactionCmd)(nil), flags)
-	MustRegisterCmd("burnaut", (*BurnAUTTransactionCmd)(nil), flags)
-	MustRegisterCmd("getautbalance", (*GetAUTBalanceCmd)(nil), flags)
-	MustRegisterCmd("burnautbalance", (*BurnAUTBalanceCmd)(nil), flags)
+	//MustRegisterCmd("registeraut", (*RegisterAUTTransactionCmd)(nil), flags)
+	//MustRegisterCmd("mintaut", (*MintAUTTransactionCmd)(nil), flags)
+	//MustRegisterCmd("transferaut", (*TransferAUTTransactionCmd)(nil), flags)
+	//MustRegisterCmd("reregisteraut", (*ReRegisterAUTTransactionCmd)(nil), flags)
+	//MustRegisterCmd("burnaut", (*BurnAUTTransactionCmd)(nil), flags)
+	//MustRegisterCmd("getautbalance", (*GetAUTBalanceCmd)(nil), flags)
+	//MustRegisterCmd("burnautbalance", (*BurnAUTBalanceCmd)(nil), flags)
+
+	MustRegisterCmd("registerctaut", (*RegisterCTAUTCmd)(nil), flags)
+	MustRegisterCmd("reregisterctaut", (*ReRegisterCTAUTCmd)(nil), flags)
+	MustRegisterCmd("mintctaut", (*MintCTAUTCmd)(nil), flags)
+	MustRegisterCmd("transferctaut", (*TransferCTAUTCmd)(nil), flags)
+	MustRegisterCmd("burnctaut", (*BurnCTAUTCmd)(nil), flags)
 
 	MustRegisterCmd("generateaddressabe", (*GenerateAddressCmd)(nil), flags)
 	MustRegisterCmd("listfreeaddresses", (*ListFreeAddressesCmd)(nil), flags)

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/blockchain/ruleerror"
 	"github.com/pqabelian/abec/chainhash"
 	"github.com/pqabelian/abec/txscript"
 	"math"
@@ -59,6 +60,7 @@ func HashMerkleBranches(left *chainhash.Hash, right *chainhash.Hash) *chainhash.
 	copy(hash[:chainhash.HashSize], left[:])
 	copy(hash[chainhash.HashSize:], right[:])
 
+	// todo: To be backward compatible, here still uses DoubleHash, even after Aconcagua upgrade.
 	newHash := chainhash.DoubleHashH(hash[:])
 	return &newHash
 }
@@ -209,7 +211,8 @@ func BuildMerkleTreeStoreAbe(transactions []*abeutil.TxAbe, witness bool) []*cha
 		// chainhash.DoubleHashH(tx Hash || witness Hash)
 		// todo (ethminming): there is a bug, since for extraNonce update, the tx.txHash has been cached, it is inconsist with the update coinbaseTx.
 		copy(tmp[:chainhash.HashSize], tx.Hash()[:])
-		copy(tmp[chainhash.HashSize:], tx.WitnessHash()[:])
+		copy(tmp[chainhash.HashSize:], tx.TxWitnessHash()[:])
+		// todo: To be backward compatible, here still uses DoubleHash, even after Aconcagua upgrade.
 		tHash := chainhash.DoubleHashH(tmp)
 		merkles[i] = &tHash
 	}
@@ -271,7 +274,7 @@ func BuildMerkleTreeStoreAbeEthash(transactions []*abeutil.TxAbe) (merkleRoot *c
 		// chainhash.DoubleHashH(tx Hash || txWitness Hash)
 		//	todo: (EthashPoW) For transaction layer, for compatibility, we keep tx.Hash() and tx.WitnessHash() by chainhash.DoubleHashH.
 		copy(tmp[:chainhash.HashSize], tx.Hash()[:])
-		copy(tmp[chainhash.HashSize:], tx.WitnessHash()[:])
+		copy(tmp[chainhash.HashSize:], tx.TxWitnessHash()[:])
 
 		//	todo: (EthashPoW) for building merkle tree, using ChainHash
 		tHash := chainhash.ChainHash(tmp)
@@ -412,12 +415,12 @@ func ValidateWitnessCommitment(blk *abeutil.Block) error {
 	if len(blk.Transactions()) == 0 {
 		str := "cannot validate witness commitment of block without " +
 			"transactions"
-		return ruleError(ErrNoTransactions, str)
+		return ruleerror.NewRuleError(ruleerror.ErrNoTransactions, str)
 	}
 
 	coinbaseTx := blk.Transactions()[0]
 	if len(coinbaseTx.MsgTx().TxIn) == 0 {
-		return ruleError(ErrNoTxInputs, "transaction has no inputs")
+		return ruleerror.NewRuleError(ruleerror.ErrNoTxInputs, "transaction has no inputs")
 	}
 
 	witnessCommitment, witnessFound := ExtractWitnessCommitment(coinbaseTx)
@@ -431,7 +434,7 @@ func ValidateWitnessCommitment(blk *abeutil.Block) error {
 			if msgTx.HasWitness() {
 				str := fmt.Sprintf("block contains transaction with witness" +
 					" data, yet no witness commitment present")
-				return ruleError(ErrUnexpectedWitness, str)
+				return ruleerror.NewRuleError(ruleerror.ErrUnexpectedWitness, str)
 			}
 		}
 		return nil
@@ -446,14 +449,14 @@ func ValidateWitnessCommitment(blk *abeutil.Block) error {
 		str := fmt.Sprintf("the coinbase transaction has %d items in "+
 			"its witness stack when only one is allowed",
 			len(coinbaseWitness))
-		return ruleError(ErrInvalidWitnessCommitment, str)
+		return ruleerror.NewRuleError(ruleerror.ErrInvalidWitnessCommitment, str)
 	}
 	witnessNonce := coinbaseWitness[0]
 	if len(witnessNonce) != CoinbaseWitnessDataLen {
 		str := fmt.Sprintf("the coinbase transaction witness nonce "+
 			"has %d bytes when it must be %d bytes",
 			len(witnessNonce), CoinbaseWitnessDataLen)
-		return ruleError(ErrInvalidWitnessCommitment, str)
+		return ruleerror.NewRuleError(ruleerror.ErrInvalidWitnessCommitment, str)
 	}
 
 	// Finally, with the preliminary checks out of the way, we can check if
@@ -467,12 +470,13 @@ func ValidateWitnessCommitment(blk *abeutil.Block) error {
 	copy(witnessPreimage[:], witnessMerkleRoot[:])
 	copy(witnessPreimage[chainhash.HashSize:], witnessNonce)
 
+	// todo: it is fine to use DoubleHashH here, since it is not used and will be removed
 	computedCommitment := chainhash.DoubleHashB(witnessPreimage[:])
 	if !bytes.Equal(computedCommitment, witnessCommitment) {
 		str := fmt.Sprintf("witness commitment does not match: "+
 			"computed %v, coinbase includes %v", computedCommitment,
 			witnessCommitment)
-		return ruleError(ErrWitnessCommitmentMismatch, str)
+		return ruleerror.NewRuleError(ruleerror.ErrWitnessCommitmentMismatch, str)
 	}
 
 	return nil

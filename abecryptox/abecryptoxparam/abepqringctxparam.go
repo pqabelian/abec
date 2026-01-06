@@ -29,9 +29,12 @@ func pqringctxGetNullSerialNumber(pp *pqringctxapi.PublicParameter) []byte {
 	return pqringctxapi.GetNullSerialNumber(pp)
 }
 
-// pqringctxGetTxoSerializeSize
-// todo: review
-func pqringctxGetTxoSerializeSize(pp *pqringctxapi.PublicParameter, coinAddressPayTo []byte) (int, error) {
+// pqringctxGetTxoScriptSize returns the TxoSerializeSize for the input coinAddressPayTo.
+// reviewed on 2023.12.07
+// We have a design that pqringctx-Layer takes as input cryptoAddress and parses it to coinAddress,
+// however, this function may cause cyclic imports. As a result, we have to use coinAddress here as input.
+// ctx review done 2025.12.22
+func pqringctxGetTxoScriptSize(pp *pqringctxapi.PublicParameter, coinAddressPayTo []byte) (int, error) {
 	return pqringctxapi.GetTxoSerializeSize(pp, coinAddressPayTo)
 }
 
@@ -64,3 +67,5 @@ func pqringctxGetTxOutputMaxNumForSingle(pp *pqringctxapi.PublicParameter) int {
 }
 
 //	Transaction-related Params	end
+
+// ctx review done 2025.12.22

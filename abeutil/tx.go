@@ -2,8 +2,10 @@ package abeutil
 
 import (
 	"bytes"
-	"github.com/pqabelian/abec/aut"
+	"fmt"
 	"io"
+
+	ctautapi "github.com/pqabelian/abec/ctaut/api"
 
 	"github.com/pqabelian/abec/chainhash"
 	"github.com/pqabelian/abec/wire"
@@ -27,18 +29,18 @@ type Tx struct {
 	txIndex       int             // Position within a block or TxIndexUnknown
 }
 
+// todo: make a uniqe creator of TxAbe
 type TxAbe struct {
 	msgTx         *wire.MsgTxAbe  // Underlying MsgTx
 	txHash        *chainhash.Hash // Cached transaction content hash
 	txWitnessHash *chainhash.Hash // Cached transaction witness hash
 	//	txPersistentHash	*chainhash.Hash // Cached transaction witness hash
 	//	txHasTxoDetails *bool // if the transaction has txo details
-	txHasWitness *bool // If the transaction has witness data
-	txIndex      int   // Position within a block or TxIndexUnknown
+	txHasTxWitness  *bool // If the transaction has witness data
+	txHasAutWitness *bool
+	txIndex         int // Position within a block or TxIndexUnknown
 
-	autTxDone bool
-	autTx     aut.Transaction
-	errAUTTx  error
+	extAutScript *ctautapi.ExtAutScript // todo: confirm that ExtAutScript also carries msgTx
 }
 
 // MsgTx returns the underlying wire.MsgTx for the transaction.
@@ -52,25 +54,15 @@ func (tx *TxAbe) MsgTx() *wire.MsgTxAbe {
 	return tx.msgTx
 }
 
-// AUTTransaction try to deserialize the memo in transaction to AUT transaction,
-// when success, set the fields autTx to the AUT transaction, and isAUTTx to true
-// when failed:
-// - if the origin transaction can not be an AUT transaction, set the fields autTx to nil, and isAUTTx to false
-// - if the origin transaction can be an AUT transaction but conflict with sanity, set the fields autTx to nil, and isAUTTx to true
-// refactored by Alice, on 2024.02.29, to return err if there is
-func (tx *TxAbe) AUTTransaction() (aut.Transaction, error) {
-	if tx.autTxDone {
-		return tx.autTx, tx.errAUTTx
-	}
-	tx.autTxDone = true
-
-	tx.autTx, tx.errAUTTx = aut.ExtractAutTransaction(tx.MsgTx())
-
-	return tx.autTx, tx.errAUTTx
+// ExtAutScript returns the ExtAutScript of the abeutil.Tx, which returns nil is it does not exist.
+//
+// NOTE: MUST keep NewTxAbe() as the unique way to make abeutil.Tx, where tx.extAutScript is initialized.
+func (tx *TxAbe) ExtAutScript() *ctautapi.ExtAutScript {
+	return tx.extAutScript
 }
 
 func (tx *TxAbe) InvType() wire.InvType {
-	if tx.msgTx != nil && tx.msgTx.HasWitness() {
+	if tx.msgTx != nil && tx.msgTx.HasTxWitness() {
 		return wire.InvTypeWitnessTx
 	}
 	return wire.InvTypeTx
@@ -122,10 +114,10 @@ func (tx *TxAbe) TxId() wire.TxId {
 	return txId
 }
 
-// WitnessHash returns the hash the transaction witness.
+// TxWitnessHash returns the hash the TxWitness.
 // This is equivalent to calling TxWitnessHash on the underlying wire.MsgTx, however it
 // caches the result so subsequent calls are more efficient.
-func (tx *TxAbe) WitnessHash() *chainhash.Hash {
+func (tx *TxAbe) TxWitnessHash() *chainhash.Hash {
 	// Return the cached hash if it has already been generated.
 	if tx.txWitnessHash != nil {
 		return tx.txWitnessHash
@@ -165,10 +157,16 @@ func (t *Tx) HasWitness() bool {
 	return hasWitness
 }
 
-func (tx *TxAbe) HasWitness() bool {
-	hasWitness := tx.msgTx.HasWitness()
-	tx.txHasWitness = &hasWitness
+func (tx *TxAbe) HasTxWitness() bool {
+	hasWitness := tx.msgTx.HasTxWitness()
+	tx.txHasTxWitness = &hasWitness
 	return hasWitness
+}
+
+func (tx *TxAbe) HasTxAutWitness() bool {
+	hasAutWitness := tx.msgTx.HasAutWitness()
+	tx.txHasAutWitness = &hasAutWitness
+	return hasAutWitness
 }
 
 // Index returns the saved index of the transaction within a block.  This value
@@ -199,11 +197,65 @@ func NewTx(msgTx *wire.MsgTx) *Tx {
 	}
 }
 
-func NewTxAbe(msgTx *wire.MsgTxAbe) *TxAbe {
-	return &TxAbe{
+func NewTxAbe(msgTx *wire.MsgTxAbe, txWitnessHashInBlock *chainhash.Hash) (*TxAbe, error) {
+	if msgTx == nil {
+		return nil, fmt.Errorf("NewTxAbe: the input msgTx is nil")
+	}
+
+	tx := &TxAbe{
 		msgTx:   msgTx,
 		txIndex: TxAbeIndexUnknown,
 	}
+
+	// tx.txHash
+	txHash := msgTx.TxHash()
+	tx.txHash = &txHash // why use pointer?
+
+	// tx.txWitnessHash
+	hasWitness := msgTx.HasTxWitness()
+	if !hasWitness && txWitnessHashInBlock == nil {
+		return nil, fmt.Errorf("NewTxAbe: the input MsgTxAbe does not have witness and the input txWitnessHashInBlock is empty/nil")
+	}
+
+	if txWitnessHashInBlock == nil {
+		// implying hasWitness == true
+		// case 1: txWitnessHashInBlock == nil AND hasWitness == true
+		tx.txWitnessHash = msgTx.TxWitnessHash()
+	} else {
+		if !hasWitness {
+			// case 2: txWitnessHashInBlock != nil AND hasWitness == false
+			// use the input txWitnessHash
+			tmpHash := &chainhash.Hash{}
+			copy(tmpHash[:], txWitnessHashInBlock[:])
+			tx.txWitnessHash = tmpHash
+		} else {
+			// case 3: txWitnessHashInBlock != nil AND hasWitness == true
+			// need to check consistence
+			tmpHash := msgTx.TxWitnessHash()
+			if !txWitnessHashInBlock.IsEqual(tmpHash) {
+				return nil, fmt.Errorf("NewTxAbe: the txWitnessHash of input MsgTxAbe is not equal to the input txWitnessHashInBlock")
+			}
+			tx.txWitnessHash = tmpHash
+		}
+	}
+
+	var err error
+
+	// tx.extAutScript
+	tx.extAutScript, err = ctautapi.DetectAndAssembleExtAutScriptFromHostTx(msgTx)
+	if err != nil {
+		return nil, err
+	}
+
+	// isCoinbase
+	// todo: Note that here just to make sure when tx.IsCoinBase() is called, no error is returned.
+	// todo: Note that at present, we still allow other places call the old tx.IsCoinBase(), where msgTx.IsCoinBase() is called.
+	_, err = msgTx.IsCoinBase()
+	if err != nil {
+		return nil, err
+	}
+
+	return tx, nil
 }
 
 // NewTxFromBytes returns a new instance of a bitcoin transaction given the
@@ -235,6 +287,7 @@ func NewTxFromReader(r io.Reader) (*Tx, error) {
 	return &t, nil
 }
 
+// todo: make a uniqe entrance for TxAbe
 func NewTxAbeFromReader(r io.Reader) (*TxAbe, error) {
 	// Deserialize the bytes into a MsgTx.
 	var msgTx wire.MsgTxAbe
@@ -243,9 +296,13 @@ func NewTxAbeFromReader(r io.Reader) (*TxAbe, error) {
 		return nil, err
 	}
 
-	tx := TxAbe{
-		msgTx:   &msgTx,
-		txIndex: TxAbeIndexUnknown,
-	}
-	return &tx, nil
+	//tx := TxAbe{
+	//	msgTx:   &msgTx,
+	//	txIndex: TxAbeIndexUnknown,
+	//}
+	//return &tx, nil
+
+	return NewTxAbe(&msgTx, nil)
 }
+
+// aut review done  1210

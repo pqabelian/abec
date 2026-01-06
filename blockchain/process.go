@@ -2,11 +2,14 @@ package blockchain
 
 import (
 	"fmt"
-	"github.com/pqabelian/abec/abeutil"
-	"github.com/pqabelian/abec/chainhash"
-	"github.com/pqabelian/abec/consensus/ethash"
-	"github.com/pqabelian/abec/database"
 	"time"
+
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/blockchain/consensus"
+	"github.com/pqabelian/abec/blockchain/ruleerror"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/database"
+	"github.com/pqabelian/abec/wire"
 )
 
 // BehaviorFlags is a bitmask defining tweaks to the normal behavior when
@@ -147,7 +150,8 @@ func (b *BlockChain) processOrphansAbe(hash *chainhash.Hash, flags BehaviorFlags
 //     todo (EthashPoW): 202207
 //
 // todo_DONE(MLP): reviewed on 2024.01.05
-func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.Ethash, flags BehaviorFlags) (bool, bool, error) {
+// review done 2025.12.16
+func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, powConsensus *consensus.PowConsensus, flags BehaviorFlags) (bool, bool, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
 
@@ -163,13 +167,13 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.
 	}
 	if exists {
 		str := fmt.Sprintf("already have block %v", blockHash)
-		return false, false, ruleError(ErrDuplicateBlock, str)
+		return false, false, ruleerror.NewRuleError(ruleerror.ErrDuplicateBlock, str)
 	}
 
 	// The block must not already exist as an orphan.
 	if _, exists := b.orphansAbe[*blockHash]; exists {
 		str := fmt.Sprintf("already have block (orphan) %v", blockHash)
-		return false, false, ruleError(ErrDuplicateBlock, str)
+		return false, false, ruleerror.NewRuleError(ruleerror.ErrDuplicateBlock, str)
 	}
 
 	// Perform preliminary sanity checks on the block and its transactions.
@@ -177,16 +181,18 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.
 	// todo_DONE(MLP): reviewed on 2024.01.03, by Alice
 	// from higher level to low:
 	// block header firstly -> block size -> transaction hash -> merkle root -> every transaction
-	// 1. block header santity:
+	// 1. block header sanity, including pow on blockheader
 	// 2. size of serialized block
 	// 3. only on coinbase transaction
 	// 4. no duplicated transaction
 	// 5. merkle tree root
 	// 6. transaction sanity (input,output,fee,serialized size, ring+sn, aut)
-	err = checkBlockSanityAbe(block, ethashObj, b.chainParams, b.timeSource, flags)
+	err = checkBlockSanityAbe(block, powConsensus, b.chainParams, b.timeSource, flags)
 	if err != nil {
+		log.Errorf("checkBlockSanityAbe fail %s", err)
 		return false, false, err
 	}
+	log.Infof("checkBlockSanityAbe successful")
 
 	// Find the previous checkpoint and perform some additional checks based
 	// on the checkpoint.  This provides a few nice properties such as
@@ -206,7 +212,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.
 			str := fmt.Sprintf("block %v has timestamp %v before "+
 				"last checkpoint timestamp %v", blockHash,
 				blockHeader.Timestamp, checkpointTime)
-			return false, false, ruleError(ErrCheckpointTimeTooOld, str)
+			return false, false, ruleerror.NewRuleError(ruleerror.ErrCheckpointTimeTooOld, str)
 		}
 		if !fastAdd {
 			// Even though the checks prior to now have already ensured the
@@ -215,15 +221,130 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.
 			// check ensures the proof of work is at least the minimum
 			// expected based on elapsed time since the last checkpoint and
 			// maximum adjustment allowed by the retarget rules.
-			duration := blockHeader.Timestamp.Sub(checkpointTime)
-			requiredTarget := CompactToBig(b.calcEasiestDifficulty(
-				checkpointNode.bits, duration))
-			currentTarget := CompactToBig(blockHeader.Bits)
-			if currentTarget.Cmp(requiredTarget) > 0 {
-				str := fmt.Sprintf("block target difficulty of %064x "+
-					"is too low when compared to the previous "+
-					"checkpoint", currentTarget)
-				return false, false, ruleError(ErrDifficultyTooLow, str)
+			//       DSA         Aconcagua
+			// [     ] [           ] [         ]
+			if blockHeader.Height > b.chainParams.BlockHeightAconcagua {
+				if checkpointNode.height >= b.chainParams.BlockHeightAconcagua {
+					duration := blockHeader.Timestamp.Sub(checkpointTime)
+					requiredTarget := CompactToBig(
+						b.calcEasiestDifficultyDSA(checkpointNode.bits, duration),
+					)
+					currentTarget := CompactToBig(blockHeader.Bits)
+					if currentTarget.Cmp(requiredTarget) > 0 {
+						str := fmt.Sprintf("block target difficulty of %064x "+
+							"is too low when compared to the previous "+
+							"checkpoint", currentTarget)
+						return false, false, ruleerror.NewRuleError(ruleerror.ErrDifficultyTooLow, str)
+					}
+
+					requiredTargetSecond := CompactToBig(
+						b.calcEasiestDifficultyDSA(checkpointNode.bitsSecond, duration),
+					)
+					currentTargetTargetSecond := CompactToBig(blockHeader.BitsSecond)
+					if currentTargetTargetSecond.Cmp(requiredTargetSecond) > 0 {
+						str := fmt.Sprintf("block target difficulty second of %064x "+
+							"is too low when compared to the previous "+
+							"checkpoint", currentTargetTargetSecond)
+						return false, false, ruleerror.NewRuleError(ruleerror.ErrDifficultyTooLow, str)
+					}
+				} else {
+					// checkpointNode.height < b.chainParams.BlockHeightAconcagua
+					// from checkpoint block to dsa block should be checked before
+					// todo: THIS IS ASSUMING that the fetched blockAconcagua is a checkpoint.
+					// Todo: 2025.12.20 to guarantee this assumption, we must add this block to checkpoint once it is ready.
+					blockAconcagua, err := b.BlockByHeight(b.chainParams.BlockHeightAconcagua)
+					if err != nil {
+						return false, false, err
+					}
+					blockHeaderAconcagua := &blockAconcagua.MsgBlock().Header
+					duration := blockHeader.Timestamp.Sub(blockHeaderAconcagua.Timestamp)
+					requiredTarget := CompactToBig(
+						b.calcEasiestDifficultyDSA(blockHeaderAconcagua.Bits, duration),
+					)
+					currentTarget := CompactToBig(blockHeader.Bits)
+					if currentTarget.Cmp(requiredTarget) > 0 {
+						str := fmt.Sprintf("block target difficulty of %064x "+
+							"is too low when compared to the previous "+
+							"checkpoint", currentTarget)
+						return false, false, ruleerror.NewRuleError(ruleerror.ErrDifficultyTooLow, str)
+					}
+
+					requiredTargetSecond := CompactToBig(
+						b.calcEasiestDifficultyDSA(blockHeaderAconcagua.BitsSecond, duration),
+					)
+					currentTargetTargetSecond := CompactToBig(blockHeader.BitsSecond)
+					if currentTargetTargetSecond.Cmp(requiredTargetSecond) > 0 {
+						str := fmt.Sprintf("block target difficulty second of %064x "+
+							"is too low when compared to the previous "+
+							"checkpoint", currentTargetTargetSecond)
+						return false, false, ruleerror.NewRuleError(ruleerror.ErrDifficultyTooLow, str)
+					}
+				}
+
+			} else if blockHeader.Height == b.chainParams.BlockHeightAconcagua {
+				// skip special case
+				// todo: check
+			} else if blockHeader.Height >= b.chainParams.BlockHeightDSA {
+				if checkpointNode.height >= b.chainParams.BlockHeightDSA {
+					duration := blockHeader.Timestamp.Sub(checkpointTime)
+					requiredTarget := CompactToBig(
+						b.calcEasiestDifficultyDSA(checkpointNode.bits, duration),
+					)
+					currentTarget := CompactToBig(blockHeader.Bits)
+					if currentTarget.Cmp(requiredTarget) > 0 {
+						str := fmt.Sprintf("block target difficulty of %064x "+
+							"is too low when compared to the previous "+
+							"checkpoint", currentTarget)
+						return false, false, ruleerror.NewRuleError(ruleerror.ErrDifficultyTooLow, str)
+					}
+				} else {
+					// checkpointNode.h eight < b.chainParams.BlockHeightDSA
+					// from checkpoint block to dsa block should be checked before
+					blockDSA, err := b.BlockByHeight(b.chainParams.BlockHeightDSA)
+					if err != nil {
+						return false, false, err
+					}
+					// assert
+					if b.chainParams.Net == wire.MainNet {
+						expectedBlockDSAHash, err := chainhash.NewHashFromStr(b.chainParams.BlockHashDSA)
+						if err != nil {
+							return false, false, err
+						}
+						if !expectedBlockDSAHash.IsEqual(blockDSA.Hash()) {
+							str := fmt.Sprintf("fail to assert block hash with fork DSA, expected %s but got %s",
+								expectedBlockDSAHash, blockDSA.Hash())
+							return false, false, ruleerror.NewRuleError(ruleerror.ErrBadCheckpoint, str)
+						}
+					}
+
+					// from checkpoint block to dsa block should be checked before
+					blockHeaderDSA := &blockDSA.MsgBlock().Header
+					// todo: THIS IS ASSUMING that the fetched blockHeaderDSA is a checkpoint.
+					// todo: explicltly hardcode the checkpoint here, prevent the checkpoint mechanism fails due to some reason.
+					duration := blockHeader.Timestamp.Sub(blockHeaderDSA.Timestamp)
+					requiredTarget := CompactToBig(
+						b.calcEasiestDifficultyDSA(blockHeaderDSA.Bits, duration),
+					)
+					currentTarget := CompactToBig(blockHeader.Bits)
+					if currentTarget.Cmp(requiredTarget) > 0 {
+						str := fmt.Sprintf("block target difficulty of %064x "+
+							"is too low when compared to the previous "+
+							"checkpoint", currentTarget)
+						return false, false, ruleerror.NewRuleError(ruleerror.ErrDifficultyTooLow, str)
+					}
+				}
+			} else {
+				// blockHeader.Height < b.chainParams.BlockHeightDSA
+				duration := blockHeader.Timestamp.Sub(checkpointTime)
+				requiredTarget := CompactToBig(b.calcEasiestDifficulty(
+					checkpointNode.bits, duration))
+				currentTarget := CompactToBig(blockHeader.Bits)
+				if currentTarget.Cmp(requiredTarget) > 0 {
+					str := fmt.Sprintf("block target difficulty of %064x "+
+						"is too low when compared to the previous "+
+						"checkpoint", currentTarget)
+					return false, false, ruleerror.NewRuleError(ruleerror.ErrDifficultyTooLow, str)
+				}
 			}
 		}
 	}
@@ -235,7 +356,8 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.
 		return false, false, err
 	}
 	if !prevHashExists {
-		log.Infof("Adding orphan block %v (seal hash %v) with parent %v", blockHash, ethash.SealHash(&block.MsgBlock().Header), prevHash)
+		log.Infof("Adding orphan block %v (height %d, seal hash %v) with parent %v", blockHash, blockHeader.Height, consensus.SealHashFast(blockHeader), prevHash)
+
 		b.addOrphanBlock(block)
 
 		return false, true, nil
@@ -246,8 +368,10 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.
 	// todo_DONE(MLP): reviewed on 2024.01.05
 	isMainChain, err := b.maybeAcceptBlockAbe(block, flags)
 	if err != nil {
+		log.Errorf("maybeAcceptBlockAbe fail to pass %s", err)
 		return false, false, err
 	}
+	log.Infof("maybeAcceptBlockAbe successful")
 
 	// Accept any orphan blocks that depend on this block (they are
 	// no longer orphans) and repeat for those accepted blocks until
@@ -259,7 +383,7 @@ func (b *BlockChain) ProcessBlockAbe(block *abeutil.BlockAbe, ethashObj *ethash.
 		return false, false, err
 	}
 
-	log.Debugf("Accepted block %v (seal hash %v), height %v, tx %v", blockHash, ethash.SealHash(&block.MsgBlock().Header), block.Height(), len(block.Transactions()))
+	log.Debugf("Accepted block %v (seal hash %v), height %v, tx %v", blockHash, consensus.SealHashFast(&block.MsgBlock().Header), block.Height(), len(block.Transactions()))
 
 	return isMainChain, false, nil
 }

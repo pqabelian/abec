@@ -1,0 +1,185 @@
+package rules
+
+import (
+	"encoding/hex"
+	"fmt"
+
+	"github.com/abesuite/abec/ctaut/script"
+
+	"github.com/abesuite/abec/abecryptox"
+	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
+	"github.com/abesuite/abec/ctaut/dao"
+	ctautwire "github.com/abesuite/abec/ctaut/wire"
+	"github.com/abesuite/abec/wire"
+)
+
+type HostOutPoint = dao.HostOutPoint
+type AutIssuer = dao.AutIssuer
+type AutToken = dao.AutToken
+type AutPrivacyType = script.AutPrivacyType
+
+// RuleCheckOnHostTxo would check the following rule on HostTxo:
+// 1. the privacy level MUST be abecryptoxkey.PrivacyLevelPSEUDONYMCT, note that this means the value in Abelian-Txo is public
+// 2. the value must be 1 Neutrino
+//
+// If the checks are passed, the coinAddress will be returned.
+func RuleCheckOnHostTxo(txOut *wire.TxOutAbe) ([]byte, error) {
+	if txOut == nil {
+		return nil, fmt.Errorf("the input txOut is nil")
+	}
+	privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
+	if err != nil {
+		return nil, fmt.Errorf("fail to extract the privacy level from TxOutAbe: %v", err)
+	}
+	if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+		return nil, fmt.Errorf("invalid privacy level (%d) for Aut-Host-Txo", privacyLevel)
+	}
+
+	// todo: the above codes are necessary, since if it is not Pseudonym, the PseudonymTxoCoinParse will return error.
+	coinAddress, coinValue, err := abecryptox.PseudonymTxoCoinParse(txOut)
+	if err != nil {
+		return nil, fmt.Errorf("fail to parse Pseudonym coin %v", err)
+	}
+	if coinValue != 1 {
+		return nil, fmt.Errorf("invalid value (%d) for Aut-Host-Txo", coinValue)
+	}
+
+	// remove the start codes, and check coinAddress here; need to add an api abecryptox.GetPrivacyLevelFromCoinAddress(),
+	// which does not parse all, to improve efficiency
+	return coinAddress, nil
+}
+
+// RuleCheckOnIssuerHostClaim checks that
+// (1) each claimed issuer has at least one corresponding AutToken, and
+// (2) each output AutToken has a corresponding issuer.
+func RuleCheckOnIssuerHostClaim(issuers []*AutIssuer, outputTokens []*AutToken) error {
+	claimedIssuersByCoinAddress := make(map[string]*AutIssuer, len(issuers))
+	for i := 0; i < len(issuers); i++ {
+		if issuers[i] == nil {
+			return fmt.Errorf("issuers[%d] is nil]", i)
+		}
+		coinAddressStr := hex.EncodeToString(issuers[i].CoinAddress())
+		// ensure no duplicates one
+		if _, ok := claimedIssuersByCoinAddress[coinAddressStr]; ok {
+			return fmt.Errorf("claimed repeated issuers: %s", coinAddressStr)
+		}
+		claimedIssuersByCoinAddress[coinAddressStr] = issuers[i]
+	}
+
+	outputTokenCoinAddressesMap := make(map[string]*AutToken, len(outputTokens))
+	for i := 0; i < len(outputTokens); i++ {
+		if outputTokens[i] == nil {
+			return fmt.Errorf("outputTokens[%d] is nil", i)
+		}
+		coinAddressStr := hex.EncodeToString(outputTokens[i].CoinAddress)
+		if _, ok := outputTokenCoinAddressesMap[coinAddressStr]; !ok {
+			outputTokenCoinAddressesMap[coinAddressStr] = outputTokens[i]
+		} else {
+			// do nothing
+			// allow repeated, does not matter
+		}
+	}
+
+	// compare with claimed issueTokens
+	if len(outputTokenCoinAddressesMap) != len(claimedIssuersByCoinAddress) {
+		return fmt.Errorf("claimed mismatched issue token")
+	}
+	for coinAddressStr, issuer := range claimedIssuersByCoinAddress {
+		if _, ok := outputTokenCoinAddressesMap[coinAddressStr]; !ok {
+			return fmt.Errorf("claimed issuer (%s) does not appear in output tokens", issuer.String())
+		}
+		delete(outputTokenCoinAddressesMap, coinAddressStr)
+	}
+	if len(outputTokenCoinAddressesMap) != 0 {
+		return fmt.Errorf(" %d output tokens do not have corresponding issuer", len(outputTokenCoinAddressesMap))
+	}
+	return nil
+}
+
+// RuleGetTxVersionFromAutScriptVersion defines a map from AutScriptVersion to host-Txo-Version.
+//
+// See the design on version in ctaut/wire.
+func RuleGetTxVersionFromAutScriptVersion(autScriptVersion uint32) (uint32, error) {
+	switch autScriptVersion {
+	case ctautwire.AutScriptVersion_1:
+		return wire.TxVersion_Height_464000_Aconcagua, nil
+	default:
+		return 0, fmt.Errorf("RuleGetTxVersionFromAutScriptVersion: unknown autScriptVersion %d", autScriptVersion)
+	}
+}
+
+// RuleCheckOnAutTxoVersionType checks whether the AutTxo's version and type match.
+func RuleCheckOnAutTxoVersionType(autScriptVersion uint32, autTxo *ctautwire.AutTxo) error {
+	autTxoType, err := abecryptox.GetAutTxoType(autTxo)
+	if err != nil {
+		return fmt.Errorf("fail to get last aut txo type: %v", err)
+	}
+
+	err = abecryptox.AutRuleCheckOnAutTxoVersionType(autScriptVersion, autTxoType)
+	if err != nil {
+		return fmt.Errorf("fail to pass the AutRuleCheckOnTxoVersionType: %v", err)
+	}
+
+	return nil
+}
+
+// RuleCheckOnAutTxOutputPrivacyTypeAndValue checks whether the outputAutTxo's type match the autPrivacyType's requirements.
+func RuleCheckOnAutTxOutputPrivacyTypeAndValue(autPrivacyType AutPrivacyType, outputAutTxo *ctautwire.AutTxo) error {
+	if outputAutTxo == nil {
+		return fmt.Errorf("RuleCheckOnAutTxOutputPrivacyType: nil outputAutTxo")
+	}
+
+	outAutTxoType, err := abecryptox.GetAutTxoType(outputAutTxo)
+	if err != nil {
+		return err
+	}
+
+	if autPrivacyType == script.AutPrivacyTypeUnlimited {
+		// nothing
+	} else if autPrivacyType == script.AutPrivacyTypeLimitedPublic {
+		if outAutTxoType != abecryptox.AutTxoTypePublic {
+			return fmt.Errorf("expected public aut txo, but got %d", outAutTxoType)
+		}
+	} else if autPrivacyType == script.AutPrivacyTypeLimitedHidden {
+		if outAutTxoType != abecryptox.AutTxoTypeHidden {
+			return fmt.Errorf("expected hidden aut txo, but got %d", outAutTxoType)
+		}
+	} else {
+		return fmt.Errorf("unknown aut privacy type %d", autPrivacyType)
+	}
+
+	if outAutTxoType != abecryptox.AutTxoTypePublic {
+		return nil
+	}
+	// disallow 0-value
+	value, err := abecryptox.ExtractAutTxoValue(outputAutTxo, nil, nil)
+	if err != nil {
+		return fmt.Errorf("fail to extract aut txo value with public: %v", err)
+	}
+	if value == 0 {
+		return fmt.Errorf("aut txo value should not be 0")
+	}
+
+	return nil
+}
+
+// RuleCheckOnAutTxInputVersion checks whether the inputAutTxo's version matches the autScriptVersion.
+func RuleCheckOnAutTxInputVersion(autScriptVersion uint32, inputAutTxo *ctautwire.AutTxo) error {
+	if inputAutTxo == nil {
+		return fmt.Errorf("RuleCheckOnAutTxInputVersion: nil inputAutTxo")
+	}
+
+	// TODO check the type of the input autTxo?
+	//autTxoType, err := abecryptox.GetAutTxoType(autTxo)
+	//if err != nil {
+	//	return fmt.Errorf("fail to get last aut txo type: %v", err)
+	//}
+
+	err := abecryptox.AutRuleCheckOnTxInputVersion(autScriptVersion, inputAutTxo.Version)
+	if err != nil {
+		return fmt.Errorf("fail to pass the AutRuleCheckOnTxInputVersion: %v", err)
+	}
+	return nil
+}
+
+// end of codes

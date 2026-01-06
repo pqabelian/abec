@@ -1,7 +1,7 @@
 package mempool
 
 import (
-	"github.com/pqabelian/abec/blockchain"
+	"github.com/pqabelian/abec/blockchain/ruleerror"
 	"github.com/pqabelian/abec/wire"
 )
 
@@ -48,7 +48,7 @@ func txRuleError(c wire.RejectCode, desc string) RuleError {
 
 // chainRuleError returns a RuleError that encapsulates the given
 // blockchain.RuleError.
-func chainRuleError(chainErr blockchain.RuleError) RuleError {
+func chainRuleError(chainErr ruleerror.RuleError) RuleError {
 	return RuleError{
 		Err: chainErr,
 	}
@@ -64,26 +64,26 @@ func extractRejectCode(err error) (wire.RejectCode, bool) {
 	}
 
 	switch err := err.(type) {
-	case blockchain.RuleError:
+	case ruleerror.RuleError:
 		// Convert the chain error to a reject code.
 		var code wire.RejectCode
 		switch err.ErrorCode {
 		// Rejected due to duplicate.
-		case blockchain.ErrDuplicateBlock:
+		case ruleerror.ErrDuplicateBlock:
 			code = wire.RejectDuplicate
 
 		// Rejected due to obsolete version.
-		case blockchain.ErrBlockVersionTooOld:
+		case ruleerror.ErrBlockVersionTooOld:
 			code = wire.RejectObsolete
 
 		// Rejected due to checkpoint.
-		case blockchain.ErrCheckpointTimeTooOld:
+		case ruleerror.ErrCheckpointTimeTooOld:
 			fallthrough
-		case blockchain.ErrDifficultyTooLow:
+		case ruleerror.ErrDifficultyTooLow:
 			fallthrough
-		case blockchain.ErrBadCheckpoint:
+		case ruleerror.ErrBadCheckpoint:
 			fallthrough
-		case blockchain.ErrForkTooOld:
+		case ruleerror.ErrForkTooOld:
 			code = wire.RejectCheckpoint
 
 		// Everything else is due to the block or transaction being invalid.

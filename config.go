@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/pqabelian/abec/blockchain/consensus/ethashpow"
 	"github.com/pqabelian/abec/consensus/ethash"
 	"github.com/pqabelian/abec/wire"
 	"io"
@@ -213,6 +214,7 @@ type config struct {
 	// todo: (ethmining) miningAddr vs. the above MiningAddr, need to clarify
 	miningAddrs []abeutil.AbelAddress
 	//miningAddrBytes []byte
+	ethashConfig         ethashpow.EthashConfig
 	minRelayTxFee        abeutil.Amount
 	nodeType             wire.NodeType
 	witnessServiceHeight int32
@@ -538,7 +540,7 @@ func loadConfig() (*config, []string, error) {
 		Generate:               defaultGenerate,
 		ExternalGenerate:       defaultExternalGenerate,
 		HashRateWatermark:      defaultHashRateWatermark,
-		EthashConfig:           ethash.DefaultCfg,
+		ethashConfig:           ethashpow.GetDefaultEthashConfigCopy(),
 		TxIndex:                defaultTxIndex,
 		NodeType:               defaultNodeType,
 		maxReservedWitness:     defaultMaxReservedWitness,

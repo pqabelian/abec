@@ -2,11 +2,13 @@ package blockchain
 
 import (
 	"fmt"
-	"github.com/pqabelian/abec/abecryptox"
-	"github.com/pqabelian/abec/abeutil"
-	"github.com/pqabelian/abec/txscript"
 	"runtime"
 	"time"
+
+	"github.com/pqabelian/abec/abecryptox"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/blockchain/ruleerror"
+	"github.com/pqabelian/abec/txscript"
 )
 
 // txValidateItem holds a transaction to validate.
@@ -23,6 +25,7 @@ type txValidator struct {
 	quitChan     chan struct{}
 	resultChan   chan error
 	utxoRingView *UtxoRingViewpoint
+	autView      *CTAUTViewpoint
 	witnessCache *txscript.WitnessCache
 }
 
@@ -46,7 +49,7 @@ out:
 	for {
 		select {
 		case txVI := <-v.validateChan:
-			err := ValidateTransactionScriptsAbe(txVI.tx, v.utxoRingView, v.witnessCache)
+			err := ValidateTransactionScriptsAbe(txVI.tx, v.utxoRingView, v.autView, v.witnessCache)
 
 			v.sendResult(err)
 
@@ -117,12 +120,13 @@ func (v *txValidator) Validate(items []*txValidateItem) error {
 
 // newTxValidator returns a new instance of txValidator to be used for
 // validating transaction scripts asynchronously.
-func newTxValidator(utxoRingView *UtxoRingViewpoint, witnessCache *txscript.WitnessCache) *txValidator {
+func newTxValidator(utxoRingView *UtxoRingViewpoint, autView *CTAUTViewpoint, witnessCache *txscript.WitnessCache) *txValidator {
 	return &txValidator{
 		validateChan: make(chan *txValidateItem),
 		quitChan:     make(chan struct{}),
 		resultChan:   make(chan error),
 		utxoRingView: utxoRingView,
+		autView:      autView,
 		witnessCache: witnessCache,
 	}
 }
@@ -132,7 +136,9 @@ func newTxValidator(utxoRingView *UtxoRingViewpoint, witnessCache *txscript.Witn
 // to be discussed
 // ValidateTransactionScriptsAbe validates the input abeutil.TxAbe.
 // todo_DONE(MLP): reviewed on 2024.01.04
-func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingViewpoint, witnessCache *txscript.WitnessCache) error {
+// todo: 2025.12.12 aut should have such a standalone ValidTxAutScriptWitness(),
+// which is dedicated to valid AutWitness, bu calling crypto-layer.
+func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingViewpoint, autView *CTAUTViewpoint, witnessCache *txscript.WitnessCache) error {
 	// If transaction witness has already been validated and stored in cache, just return.
 	if witnessCache.Exists(*tx.Hash()) {
 		return nil
@@ -148,7 +154,7 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 		err = abecryptox.CoinbaseTxVerify(tx.MsgTx())
 		if err != nil {
 			str := fmt.Sprintf("coinbase transaction %s verify failed: %v", tx.Hash(), err)
-			return ruleError(ErrScriptValidation, str)
+			return ruleerror.NewRuleError(ruleerror.ErrScriptValidation, str)
 		}
 
 		//if !isValid {
@@ -162,6 +168,11 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 	txInLen := len(tx.MsgTx().TxIns)
 	abeTxInDetail := make([]*abecryptox.AbeTxInDetail, txInLen)
 	for i := 0; i < txInLen; i++ {
+		if tx.MsgTx().TxIns[i] == nil {
+			str := fmt.Sprintf("the %d -th TxIn of tx %v is nil/empty", i, tx.Hash())
+			return ruleerror.NewRuleError(ruleerror.ErrMissingTxOut, str)
+		}
+
 		utxoRing := utxoRingView.LookupEntry(tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash())
 		if utxoRing == nil {
 			str := fmt.Sprintf("unable to find unspent "+
@@ -169,7 +180,7 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 				"transaction %s:%d",
 				tx.MsgTx().TxIns[i].PreviousOutPointRing, tx.Hash(),
 				i)
-			return ruleError(ErrMissingTxOut, str)
+			return ruleerror.NewRuleError(ruleerror.ErrMissingTxOut, str)
 		}
 
 		serializedTxoList := utxoRing.TxOuts()
@@ -181,12 +192,17 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 	err = abecryptox.TransferTxVerify(tx.MsgTx(), abeTxInDetail)
 	if err != nil {
 		str := fmt.Sprintf("transaction %s verify failed: %v", tx.Hash(), err)
-		return ruleError(ErrScriptValidation, str)
+		return ruleerror.NewRuleError(ruleerror.ErrScriptValidation, str)
 	}
 	//if !isValid {
 	//	str := fmt.Sprintf("transaction %s verify failed", tx.Hash())
 	//	return ruleError(ErrScriptValidation, str)
 	//}
+
+	err = validateTxAutScriptWitness(tx, autView, utxoRingView)
+	if err != nil {
+		return err
+	}
 
 	// Add transaction into witness cache.
 	witnessCache.Add(*tx.Hash())
@@ -195,7 +211,7 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 
 // checkBlockScriptsAbe validates the witness of each transaction in blocks
 // todo_DONE(MLP): reviewed on 2024.01.04
-func checkBlockScriptsAbe(block *abeutil.BlockAbe, utxoRingView *UtxoRingViewpoint, witnessCache *txscript.WitnessCache) error {
+func checkBlockScriptsAbe(block *abeutil.BlockAbe, utxoRingView *UtxoRingViewpoint, autView *CTAUTViewpoint, witnessCache *txscript.WitnessCache) error {
 
 	//	Collect all transactions and required information for validation.
 	allTxs := block.Transactions()
@@ -204,9 +220,9 @@ func checkBlockScriptsAbe(block *abeutil.BlockAbe, utxoRingView *UtxoRingViewpoi
 
 	for i := 0; i < numTx; i++ {
 
-		if !allTxs[i].HasWitness() {
+		if !allTxs[i].HasTxWitness() {
 			str := fmt.Sprintf("transaction %s verify failed due to no witness", allTxs[i].Hash())
-			return ruleError(ErrWitnessMissing, str)
+			return ruleerror.NewRuleError(ruleerror.ErrWitnessMissing, str)
 		}
 
 		txVI := &txValidateItem{
@@ -218,7 +234,7 @@ func checkBlockScriptsAbe(block *abeutil.BlockAbe, utxoRingView *UtxoRingViewpoi
 
 	start := time.Now()
 
-	validator := newTxValidator(utxoRingView, witnessCache)
+	validator := newTxValidator(utxoRingView, autView, witnessCache)
 	if err := validator.Validate(txValItems); err != nil {
 		return err
 	}

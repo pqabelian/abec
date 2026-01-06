@@ -1,14 +1,17 @@
 package externalminer
 
 import (
-	"bytes"
 	"errors"
+	"fmt"
 	"github.com/pqabelian/abec/abeutil"
 	"github.com/pqabelian/abec/blockchain"
+	"github.com/pqabelian/abec/blockchain/consensus"
+	"github.com/pqabelian/abec/blockchain/ruleerror"
 	"github.com/pqabelian/abec/chaincfg"
 	"github.com/pqabelian/abec/chainhash"
 	"github.com/pqabelian/abec/consensus/ethash"
 	"github.com/pqabelian/abec/mining"
+	"github.com/pqabelian/abec/wire"
 	"math/rand"
 	"strings"
 	"sync"
@@ -28,8 +31,8 @@ type Config struct {
 	// associated with.
 	ChainParams *chaincfg.Params
 
-	//	Ethash manages the cache and dataset for EthashPoW mining.
-	Ethash *ethash.Ethash
+	//	PowConsensus manages the cache and dataset for PoW consensus.
+	PowConsensus *consensus.PowConsensus
 
 	// BlockTemplateGenerator identifies the instance to use in order to
 	// generate block templates that the miner will attempt to solve.
@@ -73,9 +76,7 @@ type Config struct {
 // system which is typically sufficient.
 type ExternalMiner struct {
 	sync.Mutex
-	g                *mining.BlkTmplGenerator
 	cfg              Config
-	ethash           *ethash.Ethash
 	started          bool
 	submitBlockLock  sync.Mutex
 	wg               sync.WaitGroup
@@ -113,8 +114,7 @@ func (m *ExternalMiner) speedMonitor() {
 out:
 	for {
 		select {
-		// Periodic updates from the workers with how many hashes they
-		// have performed.
+		// Periodic updates from the workers with how many hashes they have performed.
 		case submitHashRateReq := <-m.submitHashRateCh:
 			workerHashRate, ok := m.workerHashRates[submitHashRateReq.Params.Id]
 			if !ok {
@@ -129,7 +129,7 @@ out:
 				workerHashRate.UpdateTime = time.Now()
 			}
 
-		// Time to update the hash rate of the external miner, which is actually contributed by the workers
+		// Time to update the total hash rate of the external miners, which is actually contributed by the workers
 		case <-ticker.C:
 			toDelWorkerId := make([]string, 0, len(m.workerHashRates))
 			hashRate = float64(0)
@@ -222,7 +222,7 @@ out:
 			} else {
 				m.submitBlockLock.Lock()
 
-				curHeight := m.g.BestSnapshot().Height
+				curHeight := m.cfg.BlockTemplateGenerator.BestSnapshot().Height
 				if curHeight != 0 && !m.cfg.IsCurrent() {
 					err := errors.New("the tip of local chain is not current, please try again later")
 					getWorkReq.Err <- err
@@ -230,12 +230,12 @@ out:
 
 					m.submitBlockLock.Unlock()
 				} else {
-					generateNewTemplate := false
+					needGenerateNewTemplate := false
 
 					if m.latestBlockTemplate == nil {
-						generateNewTemplate = true
+						needGenerateNewTemplate = true
 					} else {
-						best := m.g.BestSnapshot()
+						best := m.cfg.BlockTemplateGenerator.BestSnapshot()
 						if !m.latestBlockTemplate.BlockTemplate.BlockAbe.Header.PrevBlock.IsEqual(&best.Hash) {
 							//	all activate blockTemplates and jobs are outdated, shall be cleaned
 							m.activeBlockTemplates = make(map[string]*SharedBlockTemplate)
@@ -243,19 +243,19 @@ out:
 							m.activeBlockTemplateJobs = make(map[string]map[string]struct{})
 
 							m.latestBlockTemplate = nil
-							generateNewTemplate = true
-						} else if m.g.TxSource().LastUpdated().After(m.latestBlockTemplate.BlockTemplate.BlockAbe.Header.Timestamp) {
+							needGenerateNewTemplate = true
+						} else if m.cfg.BlockTemplateGenerator.TxSource().LastUpdated().After(m.latestBlockTemplate.BlockTemplate.BlockAbe.Header.Timestamp) {
 							// The mempool is updated after the last update of timestamp of latestBlockTemplate.
 							// Generating a new block template as the latestBlockTemplate to guarantee it is consistent with the mempool:
 							// (1) if new transactions are added into the mempool, the new latestBlockTemplate may collect the new transactions;
 							// (2) if some previous transactions are removed from mempool due to some reasons, such as fade, such a generation will guarantee that the latestBlockTemplate is consistent with the mempool.
 							//	But at such a moment, externalMiner does not clean the existing blockTempaltes or jobs, while leaving this to timeSticker, although they may have been outdated.
 							//	Since actually, accurate judgement on whether a blockTemplate's transactions are outdated to the mempool is expensive.
-							generateNewTemplate = true
+							needGenerateNewTemplate = true
 						} else {
 							//	just update the timestamp of the latestBlockTemplate
-							generateNewTemplate = false
-							m.g.UpdateBlockTimeAbeEthash(m.latestBlockTemplate.BlockTemplate)
+							needGenerateNewTemplate = false
+							m.cfg.BlockTemplateGenerator.UpdateBlockTimeAconcagua(m.latestBlockTemplate.BlockTemplate)
 							// note that for mainnet, this just updates timestamp,
 							// while in testnet or simnet, this may update the Bits field, depends on m.cfg.ChainParams.ReduceMinDifficulty
 							if m.cfg.ChainParams.ReduceMinDifficulty {
@@ -265,7 +265,7 @@ out:
 					}
 
 					blockTemplateReady := true
-					if generateNewTemplate {
+					if needGenerateNewTemplate {
 						// Choose a payment address at random.
 						rand.Seed(time.Now().UnixNano())
 						payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))].CryptoAddress()
@@ -273,7 +273,8 @@ out:
 						// Create a new block template using the available transactions
 						// in the memory pool as a source of transactions to potentially
 						// include in the block.
-						newTemplate, err := m.g.NewBlockTemplate(payToAddr)
+						exampleConsensus := wire.ConsensusEthashPow // Note that this is just an example value.
+						newTemplate, err := m.cfg.BlockTemplateGenerator.NewBlockTemplate(exampleConsensus, payToAddr)
 						if err != nil {
 							log.Debugf("Fail to re-generate external miner's latest blocktemplate")
 
@@ -281,7 +282,7 @@ out:
 							getWorkReq.Result <- nil
 							blockTemplateReady = false
 						} else {
-							log.Debugf("external miner's latest blocktemplate is re-generated successfully")
+							log.Debugf("external miner's latest blockTemplate is re-generated successfully")
 
 							m.latestBlockTemplate = NewSharedBlockTemplate(newTemplate)
 							m.latestEpoch = int((m.latestBlockTemplate.BlockTemplate.BlockAbe.Header.Height - m.cfg.ChainParams.BlockHeightEthashPoW) / m.cfg.ChainParams.EthashEpochLength)
@@ -296,32 +297,40 @@ out:
 
 					if blockTemplateReady == true {
 						//	new job based on the latestBlockTemplate
-						contentHash := m.latestBlockTemplate.BlockTemplate.BlockAbe.Header.ContentHash()
-						if bytes.Compare(contentHash[:], m.latestContentHash[:]) != 0 {
-							m.latestContentHash = contentHash
-							m.latestExtraNonce = 0
+						//contentHash := m.latestBlockTemplate.BlockTemplate.MsgBlock.Header.ContentHash()
+						// todo: Aconcagua, set the consensusApplied
+						headerContentHash, err := consensus.HeaderContentHash(&m.latestBlockTemplate.BlockTemplate.BlockAbe.Header)
+						if err != nil {
+							rstErr := fmt.Errorf("error happened when calling HeaderContentHash() on blockTemplate.MsgBlock.Header: %v", err)
+							getWorkReq.Err <- rstErr
+							getWorkReq.Result <- nil
 						} else {
-							m.latestExtraNonce = m.latestExtraNonce + 1
-							//	Note that for each GetWorkReq request, the latestBlockTemplate either is a newly generated one, or update its timestamp in header,
-							//	so that two GetWorkReq request share the same latestContentHash only if the two corresponding latestBlockTemplate share the same timestamp due to the precision of timestamp.
-							//	Further, it is almost impossible that 2^16 GetWorkReq requests shares the same latestContentHash, which means 2^16 GetWorkReq requests arrived and are handled at the same time (precision).
-							//	Thus, here we just take it as never happened.
-							//	If it happened, the Result is that some computation 'may' be wasted. (If the miner start from a random nonce, the probability will be further reduced)
-							//	Note that m.latestExtraNonce is defined as uint16, so that 65535+1 will Result 0.
+							if !headerContentHash.IsEqual(&m.latestContentHash) {
+								m.latestContentHash = *headerContentHash
+								m.latestExtraNonce = 0
+							} else {
+								m.latestExtraNonce = m.latestExtraNonce + 1
+								//	Note that for each GetWorkReq request, the latestBlockTemplate either is a newly generated one, or update its timestamp in header,
+								//	so that two GetWorkReq request share the same latestContentHash only if the two corresponding latestBlockTemplate share the same timestamp due to the precision of timestamp.
+								//	Further, it is almost impossible that 2^16 GetWorkReq requests shares the same latestContentHash, which means 2^16 GetWorkReq requests arrived and are handled at the same time (precision).
+								//	Thus, here we just take it as never happened.
+								//	If it happened, the Result is that some computation 'may' be wasted. (If the miner start from a random nonce, the probability will be further reduced)
+								//	Note that m.latestExtraNonce is defined as uint16, so that 65535+1 will Result 0.
+							}
+							targetBoundary := blockchain.CompactToBig(m.latestBlockTemplate.BlockTemplate.BlockAbe.Header.Bits)
+
+							newJob := NewJob(m.latestBlockTemplate, m.latestEpoch, m.latestEpochSeed, m.latestBlockTemplate.BlockTemplate.BlockAbe.Header.Timestamp, m.latestContentHash, m.latestExtraNonce, targetBoundary, time.Now())
+							m.activeJobs[newJob.Id()] = newJob
+
+							_, ok := m.activeBlockTemplateJobs[newJob.SharedBlockTemplate.Id()]
+							if !ok {
+								m.activeBlockTemplateJobs[newJob.SharedBlockTemplate.Id()] = make(map[string]struct{})
+							}
+							m.activeBlockTemplateJobs[newJob.SharedBlockTemplate.Id()][newJob.Id()] = struct{}{}
+
+							getWorkReq.Err <- nil
+							getWorkReq.Result <- newJob
 						}
-						targetBoundary := blockchain.CompactToBig(m.latestBlockTemplate.BlockTemplate.BlockAbe.Header.Bits)
-
-						newJob := NewJob(m.latestBlockTemplate, m.latestEpoch, m.latestEpochSeed, m.latestBlockTemplate.BlockTemplate.BlockAbe.Header.Timestamp, m.latestContentHash, m.latestExtraNonce, targetBoundary, time.Now())
-						m.activeJobs[newJob.Id()] = newJob
-
-						_, ok := m.activeBlockTemplateJobs[newJob.SharedBlockTemplate.Id()]
-						if !ok {
-							m.activeBlockTemplateJobs[newJob.SharedBlockTemplate.Id()] = make(map[string]struct{})
-						}
-						m.activeBlockTemplateJobs[newJob.SharedBlockTemplate.Id()][newJob.Id()] = struct{}{}
-
-						getWorkReq.Err <- nil
-						getWorkReq.Result <- newJob
 					}
 				}
 			}
@@ -331,13 +340,17 @@ out:
 			if !ok {
 				err := errors.New("the target job is not in the active job set")
 				submitWorkReq.Err <- err
-			} else if ethash.VerifySealFast(job.ContentHash, submitWorkReq.Params.Nonce, submitWorkReq.Params.MixDigest, job.TargetBoundary) == true {
+			} else if consensus.EthashPowVerifySealFast(job.ContentHash, submitWorkReq.Params.Nonce, submitWorkReq.Params.MixDigest, job.TargetBoundary) == true {
 				//	check the validity of (nonce, mixDigest) to prevent DOS attack
 				job.SharedBlockTemplate.BlockTemplate.BlockAbe.Header.NonceExt = submitWorkReq.Params.Nonce
 				job.SharedBlockTemplate.BlockTemplate.BlockAbe.Header.MixDigest = submitWorkReq.Params.MixDigest
-				block := abeutil.NewBlockAbe(job.SharedBlockTemplate.BlockTemplate.BlockAbe)
-				//	externalminer is implemented after the EthashPoW is implemented. For simplicity, we only call submitBlockEthash().
-				if m.submitBlockEthash(block) == false {
+				block, err := abeutil.NewBlockAbe(job.SharedBlockTemplate.BlockTemplate.BlockAbe)
+				if err != nil {
+					log.Errorf("error happens when calling NewBlockAbe on a found msgBlock (hash=%s): %v",
+						consensus.SealHashFast(&job.SharedBlockTemplate.BlockTemplate.BlockAbe.Header), err)
+					continue
+				}
+				if m.submitBlock(block) == false {
 					log.Infof("The (nonce, mixDigest) submitted to external miner is valid to the corresponding active job, but it is not accepted by the blockchain due to some reason.")
 				}
 				//	even if m.submitBlockEthash(block) return false, for external miner, the SubmitWorkReq submits a valid solution.
@@ -386,7 +399,6 @@ out:
 	}
 
 	//	free all blockTemplates, jobs, ...
-	//	todo: Is this necessary?
 	m.latestBlockTemplate = nil
 	m.activeBlockTemplates = nil
 	m.activeJobs = nil
@@ -398,17 +410,16 @@ out:
 	m.wg.Done()
 }
 
-func (m *ExternalMiner) submitBlockEthash(block *abeutil.BlockAbe) bool {
+// submitBlock submits the input block to network after ensuring it passes all the consensus validation rules.
+func (m *ExternalMiner) submitBlock(block *abeutil.BlockAbe) bool {
 	m.submitBlockLock.Lock()
 	defer m.submitBlockLock.Unlock()
 
-	// Ensure the block is not stale since a new block could have shown up
-	// while the solution was being found. Typically that condition is
-	// detected and all work on the stale block is halted to start work on
-	// a new block, but the check only happens periodically, so it is
-	// possible a block was found and submitted in between.
+	// Ensure the block is not stale since a new block could have shown up while the solution was being found.
+	// Usually the case is detected and all work on the stale block is halted to start work on a new block,
+	// but the check only happens periodically, so it is possible a block was found and submitted in between.
 	msgBlock := block.MsgBlock()
-	if !msgBlock.Header.PrevBlock.IsEqual(&m.g.BestSnapshot().Hash) {
+	if !msgBlock.Header.PrevBlock.IsEqual(&m.cfg.BlockTemplateGenerator.BestSnapshot().Hash) {
 		//	As block-submission related information is important, we set it to be Info rather than debug-info.
 		log.Infof("Block submitted via external miner with previous "+
 			"block %s is stale", msgBlock.Header.PrevBlock)
@@ -421,7 +432,7 @@ func (m *ExternalMiner) submitBlockEthash(block *abeutil.BlockAbe) bool {
 	if err != nil {
 		// Anything other than a rule violation is an unexpected error,
 		// so log that error as an internal error.
-		if _, ok := err.(blockchain.RuleError); !ok {
+		if _, ok := err.(ruleerror.RuleError); !ok {
 			log.Infof("Unexpected error while processing "+
 				"block submitted via external miner: %v", err)
 			return false
@@ -437,10 +448,12 @@ func (m *ExternalMiner) submitBlockEthash(block *abeutil.BlockAbe) bool {
 
 	// The block was accepted.
 
-	//	in pqringct-Abelian, the TxFee field of CoinbaseTx is used to store the invalue
-	inValue := block.MsgBlock().Transactions[0].TxFee
-	log.Infof("Block submitted via external miner accepted (hash %v, "+"seal Hash %v, "+"height %d, "+
-		"amount %v)", block.Hash(), ethash.SealHash(&block.MsgBlock().Header), block.Height(), abeutil.Amount(inValue))
+	// In abelian, the TxFee field of CoinbaseTx is used to store the invalue
+	inValue := msgBlock.Transactions[0].TxFee
+	log.Infof("Block submitted via external miner accepted (version %08x, hash %v, seal hash %v, "+"height %d, "+
+		"amount %v, base size %d bytes, full size %d bytes)",
+		msgBlock.Header.Version, block.Hash(), consensus.SealHashFast(&msgBlock.Header), block.Height(), abeutil.Amount(inValue),
+		msgBlock.SerializeSizeStripped(), msgBlock.SerializeSize())
 	return true
 }
 
@@ -545,10 +558,8 @@ func (m *ExternalMiner) HandleSubmitHashRateReq(req *SubmitHashRateReq) {
 // New returns a new instance of a CPU miner for the provided configuration.
 // Use Start to begin the mining process.  See the documentation for CPUMiner
 // type for more details.
-func New(cfg *Config) *ExternalMiner {
+func NewExternalMiner(cfg *Config) *ExternalMiner {
 	return &ExternalMiner{
-		g:      cfg.BlockTemplateGenerator,
-		ethash: cfg.Ethash,
-		cfg:    *cfg,
+		cfg: *cfg,
 	}
 }

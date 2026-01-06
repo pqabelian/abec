@@ -282,6 +282,7 @@ func DecodeMasterAddressAbe(addrstr string) (MasterAddress, error) {
 
 	checkSum := addrBytes[totalSize-chainhash.HashSize:]
 	serialzedMasterAddress := addrBytes[:totalSize-chainhash.HashSize]
+	// todo: it is fine to use DoubleHashH for checksum, even after Aconcagua upgrade.
 	computedCheckSum := chainhash.DoubleHashB(serialzedMasterAddress)
 	if !bytes.Equal(checkSum, computedCheckSum) {
 		return nil, errors.New("decoded address is of unknown format: the check sum does not match")

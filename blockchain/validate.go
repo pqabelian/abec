@@ -4,20 +4,22 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
 	"fmt"
-	"github.com/pqabelian/abec/abecryptox/abecryptoxkey"
-	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
-	"github.com/pqabelian/abec/abeutil"
-	"github.com/pqabelian/abec/aut"
-	"github.com/pqabelian/abec/chaincfg"
-	"github.com/pqabelian/abec/chainhash"
-	"github.com/pqabelian/abec/consensus/ethash"
-	"github.com/pqabelian/abec/txscript"
-	"github.com/pqabelian/abec/wire"
 	"math"
 	"math/big"
 	"time"
+
+	"github.com/pqabelian/abec/abecryptox"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/blockchain/consensus"
+	"github.com/pqabelian/abec/blockchain/ruleerror"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/chainhash"
+	ctautapi "github.com/pqabelian/abec/ctaut/api"
+	ctautwire "github.com/pqabelian/abec/ctaut/wire"
+	"github.com/pqabelian/abec/txscript"
+	"github.com/pqabelian/abec/wire"
 )
 
 const (
@@ -303,12 +305,12 @@ func CheckTransactionSanity(tx *abeutil.Tx) error {
 	// A transaction must have at least one input.
 	msgTx := tx.MsgTx()
 	if len(msgTx.TxIn) == 0 {
-		return ruleError(ErrNoTxInputs, "transaction has no inputs")
+		return ruleerror.NewRuleError(ruleerror.ErrNoTxInputs, "transaction has no inputs")
 	}
 
 	// A transaction must have at least one output.
 	if len(msgTx.TxOut) == 0 {
-		return ruleError(ErrNoTxOutputs, "transaction has no outputs")
+		return ruleerror.NewRuleError(ruleerror.ErrNoTxOutputs, "transaction has no outputs")
 	}
 
 	// A transaction must not exceed the maximum allowed block payload when
@@ -317,7 +319,7 @@ func CheckTransactionSanity(tx *abeutil.Tx) error {
 	if serializedTxSize > MaxBlockBaseSize {
 		str := fmt.Sprintf("serialized transaction is too big - got "+
 			"%d, max %d", serializedTxSize, MaxBlockBaseSize)
-		return ruleError(ErrTxTooBig, str)
+		return ruleerror.NewRuleError(ruleerror.ErrTxTooBig, str)
 	}
 
 	// Ensure the transaction amounts are in range.  Each transaction
@@ -332,13 +334,13 @@ func CheckTransactionSanity(tx *abeutil.Tx) error {
 		if satoshi < 0 {
 			str := fmt.Sprintf("transaction output has negative "+
 				"value of %v", satoshi)
-			return ruleError(ErrBadTxOutValue, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBadTxOutValue, str)
 		}
 		if satoshi > abeutil.MaxSatoshi {
 			str := fmt.Sprintf("transaction output value of %v is "+
 				"higher than max allowed value of %v", satoshi,
 				abeutil.MaxSatoshi)
-			return ruleError(ErrBadTxOutValue, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBadTxOutValue, str)
 		}
 
 		// Two's complement int64 overflow guarantees that any overflow
@@ -349,14 +351,14 @@ func CheckTransactionSanity(tx *abeutil.Tx) error {
 			str := fmt.Sprintf("total value of all transaction "+
 				"outputs exceeds max allowed value of %v",
 				abeutil.MaxSatoshi)
-			return ruleError(ErrBadTxOutValue, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBadTxOutValue, str)
 		}
 		if totalSatoshi > abeutil.MaxSatoshi {
 			str := fmt.Sprintf("total value of all transaction "+
 				"outputs is %v which is higher than max "+
 				"allowed value of %v", totalSatoshi,
 				abeutil.MaxSatoshi)
-			return ruleError(ErrBadTxOutValue, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBadTxOutValue, str)
 		}
 	}
 
@@ -364,7 +366,7 @@ func CheckTransactionSanity(tx *abeutil.Tx) error {
 	existingTxOut := make(map[wire.OutPoint]struct{})
 	for _, txIn := range msgTx.TxIn {
 		if _, exists := existingTxOut[txIn.PreviousOutPoint]; exists {
-			return ruleError(ErrDuplicateTxInputs, "transaction "+
+			return ruleerror.NewRuleError(ruleerror.ErrDuplicateTxInputs, "transaction "+
 				"contains duplicate inputs")
 		}
 		existingTxOut[txIn.PreviousOutPoint] = struct{}{}
@@ -377,14 +379,14 @@ func CheckTransactionSanity(tx *abeutil.Tx) error {
 			str := fmt.Sprintf("coinbase transaction script length "+
 				"of %d is out of range (min: %d, max: %d)",
 				slen, MinCoinbaseScriptLen, MaxCoinbaseScriptLen)
-			return ruleError(ErrBadCoinbaseScriptLen, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBadCoinbaseBasicRule, str)
 		}
 	} else {
 		// Previous transaction outputs referenced by the inputs to this
 		// transaction must not be null.
 		for _, txIn := range msgTx.TxIn {
 			if isNullOutpoint(&txIn.PreviousOutPoint) {
-				return ruleError(ErrBadTxInput, "transaction "+
+				return ruleerror.NewRuleError(ruleerror.ErrBadTxInput, "transaction "+
 					"input refers to previous output that "+
 					"is null")
 			}
@@ -399,27 +401,30 @@ func CheckTransactionSanity(tx *abeutil.Tx) error {
 //  1. There is at least one input and one output
 //  2. The number of input and output should not exceed the maximum
 //  3. Fee should not smaller than zero and bigger than MaxNeutrino
-//  4. The size (without witness) should not exceed MaxBlockBaseSize
-//  5. If is coinbase tx
-//  1. Input's block number and ring size should obey the ring version
-//     If is transfer tx
-//  1. Each input's serial number should not be zero
-//  2. Each input's ring version should be the same
-//  3. Each input's block number and ring size should obey the ring version
-//  4. No duplicate inputs (same ring and same serial number)
+//  4. The size (without / with witness) should not exceed MaxBlockBaseSizeMLPAUT / MaxBlockFullSizeMLPAUT
+//  5. The version and privacy level of all outputs would be well-matched
+//  6. If it is coinbase tx
+//     6.1. the input's block number and ring size should obey the ring version
+//  7. If it is transfer tx,
+//     7.1. Each input's serial number should not be zero
+//     7.2. Each input's version in a ring should be the same, and should obey the transaction version
+//     7.3. Each input's block number and ring size should obey the ring version
+//     7.4. No duplicate inputs (same ring and same serial number)
+//  8. If the transaction contain AUT script, it should be conducted well-formed before
 //
 // todo_DONE(MLP): reviewed on 2024.01.03 by Alice.
+// aut review done 2025.12.16
 func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 	// A transaction must have at least one input.
 	msgTx := tx.MsgTx()
 	if len(msgTx.TxIns) == 0 {
-		return ruleError(ErrNoTxInputs, "transaction has no inputs")
+		return ruleerror.NewRuleError(ruleerror.ErrNoTxInputs, "transaction has no inputs")
 	}
 
 	// A transaction must have at least one output.
 	//	here only does not check the situation of TxoDetails
 	if len(msgTx.TxOuts) == 0 {
-		return ruleError(ErrNoTxOutputs, "transaction has no outputs")
+		return ruleerror.NewRuleError(ruleerror.ErrNoTxOutputs, "transaction has no outputs")
 	}
 
 	// At this moment, ABE limits the numbers of inputs and outputs, so does not consider the payload size
@@ -429,7 +434,7 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 	}
 	if len(msgTx.TxIns) > txInputMaxNum {
 		str := fmt.Sprintf("the number of inputs exceeds the allowd max number %d", txInputMaxNum)
-		return ruleError(ErrTooManyTxInputs, str)
+		return ruleerror.NewRuleError(ruleerror.ErrTooManyTxInputs, str)
 	}
 	txOutputMaxNum, err := abecryptoxparam.GetTxOutputMaxNum(msgTx.Version)
 	if err != nil {
@@ -437,16 +442,16 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 	}
 	if len(msgTx.TxOuts) > txOutputMaxNum {
 		str := fmt.Sprintf("the number of txo exceeds the allowd max number %d", txOutputMaxNum)
-		return ruleError(ErrTooManyTxOutputs, str)
+		return ruleerror.NewRuleError(ruleerror.ErrTooManyTxOutputs, str)
 	}
 
 	if msgTx.TxFee < 0 {
 		str := fmt.Sprintf("transaction output has negative value of %v", msgTx.TxFee)
-		return ruleError(ErrBadTxFeeValue, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBadTxFeeValue, str)
 	}
 	if msgTx.TxFee > abeutil.MaxNeutrino {
 		str := fmt.Sprintf("transaction fee of %v is higher than max allowed value of %v", msgTx.TxFee, abeutil.MaxSatoshi)
-		return ruleError(ErrBadTxFeeValue, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBadTxFeeValue, str)
 	}
 
 	// A transaction must not exceed the maximum allowed block payload when serialized.
@@ -454,14 +459,39 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 	if serializedTxSize > MaxBlockBaseSizeMLPAUT {
 		str := fmt.Sprintf("serialized transaction is too big - got "+
 			"%d, max %d", serializedTxSize, MaxBlockBaseSizeMLPAUT)
-		return ruleError(ErrTxTooBig, str)
+		return ruleerror.NewRuleError(ruleerror.ErrTxTooBig, str)
 	}
 
 	serializedTxFullSize := tx.MsgTx().SerializeSizeFull()
 	if serializedTxFullSize > MaxBlockFullSizeMLPAUT {
 		str := fmt.Sprintf("serialized full transaction is too big - got "+
 			"%d, max %d", serializedTxSize, MaxBlockFullSizeMLPAUT)
-		return ruleError(ErrTxTooBig, str)
+		return ruleerror.NewRuleError(ruleerror.ErrTxTooBig, str)
+	}
+
+	// The rules of (txoVersion, PrivacyLevel) need to be checked, since the ring-rules need this.
+	for j := 0; j < len(msgTx.TxOuts); j++ {
+		txOut := msgTx.TxOuts[j]
+
+		if txOut.Version != msgTx.Version {
+			str := fmt.Sprintf("msgTx.TxOuts[%d]'s version (%d) "+
+				"does not equal msgTx.Version (%d)",
+				j, txOut.Version, msgTx.Version)
+			return ruleerror.NewRuleError(ruleerror.ErrMismatchedTxoVersionAndTxVersion, str)
+		}
+
+		privacyLevel, err := abecryptox.GetTxoPrivacyLevel(txOut)
+		if err != nil {
+			return err
+		}
+
+		err = abecryptox.RuleCheckOnTxoVersionPrivacyLevel(txOut.Version, privacyLevel)
+		if err != nil {
+			str := fmt.Sprintf("msgTx.TxOuts[%d]'s (version, privacyLevel) (%d, %d,) "+
+				"fail to pass the RuleCheckOnTxoVersionPrivacyLevel: %v",
+				j, txOut.Version, privacyLevel, err)
+			return ruleerror.NewRuleError(ruleerror.ErrMismatchedTxoVersionAndPrivacyLevel, str)
+		}
 	}
 
 	isCb, err := IsCoinBaseAbe(tx)
@@ -521,21 +551,18 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		}
 
 		if len(txIn.SerialNumber) == 0 {
-			return ruleError(ErrBadTxInput, "transaction input refers to a serial number that is null")
+			return ruleerror.NewRuleError(ruleerror.ErrBadTxInput, "transaction input refers to a serial number that is null")
 		}
 		if bytes.Compare(txIn.SerialNumber, nullSn) == 0 {
-			return ruleError(ErrBadTxInput, "transaction input refers to a serial number that is null")
+			return ruleerror.NewRuleError(ruleerror.ErrBadTxInput, "transaction input refers to a serial number that is null")
 		}
 
-		if txIn.PreviousOutPointRing.Version != msgTx.Version {
-			// todo: when there are more cases of TxVersion, we may need hardcode more cases here.
-			if txIn.PreviousOutPointRing.Version == wire.TxVersion_Height_0 && msgTx.Version == wire.TxVersion_Height_MLPAUT_300000 {
-				//	allowed case, nothing to do
-			} else {
-				str := fmt.Sprintf("transaction's %d -th input refers to an OutPointRing with ring version "+
-					"%d, which is different from msgTx.Version %d, and this is not in the expected cases", i, txIn.PreviousOutPointRing.Version, msgTx.Version)
-				return ruleError(ErrBadTxInput, str)
-			}
+		err = abecryptox.RuleCheckOnTxInputVersion(txIn.PreviousOutPointRing.Version, msgTx.Version)
+		if err != nil {
+			str := fmt.Sprintf("msgTx.TxIns[%d] refers to an OutPointRing with ring version %d, "+
+				"while msgTx.Version %d, failing to pass the RuleCheckOnTxInputVersion: %v",
+				i, txIn.PreviousOutPointRing.Version, msgTx.Version, err)
+			return ruleerror.NewRuleError(ruleerror.ErrBadTxInput, str)
 		}
 
 		//	todo: When the fork with different blockNumPerRingGroup happens, hard code here.
@@ -552,107 +579,123 @@ func CheckTransactionSanityAbe(tx *abeutil.TxAbe) error {
 		if blkHashNum != int(blockNumPerRingGroup) {
 			str := fmt.Sprintf("transaction's %d -th input refers to an OutPointRing with block-hash-number "+
 				"%d, should be %d", i, blkHashNum, blockNumPerRingGroup)
-			return ruleError(ErrBadTxInput, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBadTxInput, str)
 		}
 
 		ringSize := len(txIn.PreviousOutPointRing.OutPoints)
 		if ringSize > int(txoRingSize) {
 			str := fmt.Sprintf("transaction's %d -th input refers to an OutPointRing with ring-size too big: "+
 				"%d, max %d", i, ringSize, txoRingSize)
-			return ruleError(ErrBadTxInput, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBadTxInput, str)
 		}
 
 		ringHash := txIn.PreviousOutPointRing.Hash()
 		if _, ringExists := consumedOutPoints[ringHash]; !ringExists {
 			consumedOutPoints[ringHash] = make(map[string]struct{})
 		}
-		if _, snExists := consumedOutPoints[ringHash][string(txIn.SerialNumber)]; snExists {
-			return ruleError(ErrDuplicateTxInputs, "transaction "+
+
+		snStr := hex.EncodeToString(txIn.SerialNumber)
+		if _, snExists := consumedOutPoints[ringHash][snStr]; snExists {
+			return ruleerror.NewRuleError(ruleerror.ErrDuplicateTxInputs, "transaction "+
 				"contains duplicate inputs")
 		}
 
-		consumedOutPoints[ringHash][string(txIn.SerialNumber)] = struct{}{}
+		consumedOutPoints[ringHash][snStr] = struct{}{}
 	}
 
-	// todo(MLPAUT): to review
-	autTransaction, err := tx.AUTTransaction()
-	if err != nil {
-		str := fmt.Sprintf("error hapeens when extracting AutTransaction from Tx %s: %v", tx.Hash(), err)
-		return ruleError(ErrAUTBadForm, str)
-	}
-	if autTransaction != nil {
-		if tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_300000 {
-			return ruleError(ErrTxVersionForAUT, "transaction "+
-				"contains AUT but it has invalid version")
-		}
+	extAutScript := tx.ExtAutScript()
+	if extAutScript != nil {
+		// 2025.12.13 As all the LOCAL extAutScript has only one entrance (in abeutil.NewTx()),
+		// where these checks on GeneratedTokens have been performed.
 
-		consumedAUTCoins := make(map[aut.OutPoint]struct{})
-		for _, autpoint := range autTransaction.TxInputs() {
-			if _, pointExists := consumedAUTCoins[autpoint]; pointExists {
-				return ruleError(ErrDuplicateTxInputs, "transaction "+
-					"contains duplicate inputs")
-			}
-			consumedAUTCoins[autpoint] = struct{}{}
-		}
+		// The following checks have been performed when generating ExtAutScript
+		// (1) the match between extAutScript.AutScriptVersion and the host-Tx-Version
+		// (2) outAutToken has the same version as the AutScript (all local extAutScripts are generated by a unique entrance, and some rules are complied )
+		// (3) RuleCheckOnAutTxoVersionType
+		// NOTE: the caller should call checkAutScriptInputsOutputs() later.
 
-		txOuts := tx.MsgTx().TxOuts
-		// TODO_DONE extract output to check chain rule for AUT in package aut
-		for i := range autTransaction.TxOutputs() {
-			if txOuts[i].Version < wire.TxVersion_Height_MLPAUT_300000 {
-				return ruleError(ErrTxVersionForAUT, "transaction "+
-					"contains AUT but it has invalid version")
-			}
-		}
+		//if tx.MsgTx().Version < wire.TxVersion_Height_464000_Aconcagua {
+		//	return ruleerror.NewRuleError(ruleerror.ErrTxVersionForCTAUT, "transaction "+
+		//		"contains CTAUT but the transaction version is invalid")
+		//}
+		//
+		//// for input part, with no utxoRingView, it can't know which inputs are used for CTAUT
+		//
+		//// for output part, all tokens must be parasitized in the output with valid version
+		//txOuts := tx.MsgTx().TxOuts
+		//for _, token := range extAutScript.GeneratedTokens() {
+		//}
 	}
 
 	return nil
 }
 
 // checkProofOfWork ensures the block header bits which indicate the target
-// difficulty is in min/max range and that the block hash is less than the
+// difficulty is in min/max range and that the pow hash is less than the
 // target difficulty as claimed.
 //
 // The flags modify the behavior of this function as follows:
-//   - BFNoPoWCheck: The check to ensure the block hash is less than the target
-//     difficulty is not performed.
-//     //	todo: (EthashPoW)
-func checkProofOfWork(header *wire.BlockHeader, ethash *ethash.Ethash, powLimit *big.Int, flags BehaviorFlags) error {
+//   - BFNoPoWCheck: The check to ensure the pow hash is less than the target difficulty is not performed.
+//
+// todo: Aconcagua review
+// review done 2025.12.12
+func checkProofOfWork(header *wire.BlockHeader, powConsensus *consensus.PowConsensus, powLimit *big.Int, flags BehaviorFlags) error {
 	// The target difficulty must be larger than zero.
 	target := CompactToBig(header.Bits)
 	if target.Sign() <= 0 {
 		str := fmt.Sprintf("block target difficulty of %064x is too low",
 			target)
-		return ruleError(ErrUnexpectedDifficulty, str)
+		return ruleerror.NewRuleError(ruleerror.ErrUnexpectedDifficulty, str)
 	}
 
 	// The target difficulty must be less than the maximum allowed.
 	if target.Cmp(powLimit) > 0 {
 		str := fmt.Sprintf("block target difficulty of %064x is "+
 			"higher than max of %064x", target, powLimit)
-		return ruleError(ErrUnexpectedDifficulty, str)
+		return ruleerror.NewRuleError(ruleerror.ErrUnexpectedDifficulty, str)
 	}
 
-	// The block hash must be less than the claimed target unless the flag
+	// todo: Aconcagua review
+	targetSecond := CompactToBig(header.BitsSecond)
+	if header.Version >= wire.BlockVersionAconcagua {
+		// hybridPow enabled
+		// The target difficulty must be larger than zero.
+		if targetSecond.Sign() <= 0 {
+			str := fmt.Sprintf("block target difficulty second of %064x is too low",
+				targetSecond)
+			return ruleerror.NewRuleError(ruleerror.ErrUnexpectedDifficulty, str)
+		}
+
+		// The target difficulty must be less than the maximum allowed.
+		if targetSecond.Cmp(powLimit) > 0 {
+			str := fmt.Sprintf("block target difficulty second of %064x is "+
+				"higher than max of %064x", targetSecond, powLimit)
+			return ruleerror.NewRuleError(ruleerror.ErrUnexpectedDifficulty, str)
+		}
+	} else { // header.Version < wire.BlockVersionAconcagua
+		// targetSecond should not be used, so that it does not need to be checked.
+	}
+
+	// The pow hash must be less than the claimed target unless the flag
 	// to avoid proof of work checks is set.
 	if flags&BFNoPoWCheck != BFNoPoWCheck {
-		// The block hash must be less than the claimed target.
-		// todo: (EthashPoW)
-		// It is necessary to use header.Version, rather than the Height as the branch condition.
-		// todo(MLP):
-		if header.Version >= int32(wire.BlockVersionEthashPow) {
-			err := ethash.VerifySeal(header, target)
-			if err != nil {
-				return err
-			}
-		} else {
-			hash := header.BlockHash()
-			hashNum := HashToBig(&hash)
-			if hashNum.Cmp(target) > 0 {
-				str := fmt.Sprintf("block hash of %064x is higher than "+
-					"expected max of %064x", hashNum, target)
-				return ruleError(ErrHighHash, str)
-			}
-		}
+		//// The pow hash must be less than the claimed target.
+		//// It is necessary to use header.Version, rather than the Height as the branch condition.
+		//if header.Version >= int32(wire.BlockVersionEthashPow) {
+		//	err := ethash.VerifySeal(header, target)
+		//	if err != nil {
+		//		return err
+		//	}
+		//} else {
+		//	hash := header.BlockHash()
+		//	hashNum := consensus.HashToBig(hash)
+		//	if hashNum.Cmp(target) > 0 {
+		//		str := fmt.Sprintf("block hash of %064x is higher than "+
+		//			"expected max of %064x", hashNum, target)
+		//		return ruleerror.NewRuleError(ruleerror.ErrHighHash, str)
+		//	}
+		//}
+		return powConsensus.VerifySeal(header, target, targetSecond)
 	}
 
 	return nil
@@ -712,7 +755,7 @@ func CountP2SHSigOps(tx *abeutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint)
 				"transaction %s:%d either does not exist or "+
 				"has already been spent", txIn.PreviousOutPoint,
 				tx.Hash(), txInIndex)
-			return 0, ruleError(ErrMissingTxOut, str)
+			return 0, ruleerror.NewRuleError(ruleerror.ErrMissingTxOut, str)
 		}
 
 		// We're only interested in pay-to-script-hash types, so skip
@@ -736,7 +779,7 @@ func CountP2SHSigOps(tx *abeutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint)
 			str := fmt.Sprintf("the public key script from output "+
 				"%v contains too many signature operations - "+
 				"overflow", txIn.PreviousOutPoint)
-			return 0, ruleError(ErrTooManySigOps, str)
+			return 0, ruleerror.NewRuleError(ruleerror.ErrTooManySerialNumbers, str) // todo: not accurate, will remove
 		}
 	}
 
@@ -754,13 +797,14 @@ func CountP2SHSigOps(tx *abeutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint)
 // are needed to pass along to checkProofOfWork.
 // todo: (EthashPoW)
 // reviewed on 2024.01.03, by Alice
-func checkBlockHeaderSanity(header *wire.BlockHeader, ethash *ethash.Ethash, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
+// review done 2025.12.12
+func checkBlockHeaderSanity(header *wire.BlockHeader, powConsensus *consensus.PowConsensus, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
 	// Ensure the proof of work bits in the block header is in min/max range
 	// and the block hash is less than the target value described by the
 	// bits.
 	//	todo: (EthashPoW)
 	// todo(MLP): done, reviewed on 2024.01.03, by Alice
-	err := checkProofOfWork(header, ethash, powLimit, flags)
+	err := checkProofOfWork(header, powConsensus, powLimit, flags)
 	if err != nil {
 		return err
 	}
@@ -773,7 +817,7 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, ethash *ethash.Ethash, pow
 	if !header.Timestamp.Equal(time.Unix(header.Timestamp.Unix(), 0)) {
 		str := fmt.Sprintf("block timestamp of %v has a higher "+
 			"precision than one second", header.Timestamp)
-		return ruleError(ErrInvalidTime, str)
+		return ruleerror.NewRuleError(ruleerror.ErrInvalidTime, str)
 	}
 
 	// Ensure the block time is not too far in the future.
@@ -782,7 +826,7 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, ethash *ethash.Ethash, pow
 	if header.Timestamp.After(maxTimestamp) {
 		str := fmt.Sprintf("block timestamp of %v is too far in the "+
 			"future", header.Timestamp)
-		return ruleError(ErrTimeTooNew, str)
+		return ruleerror.NewRuleError(ruleerror.ErrTimeTooNew, str)
 	}
 
 	return nil
@@ -806,7 +850,7 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 	// A block must have at least one transaction.
 	numTx := len(msgBlock.Transactions)
 	if numTx == 0 {
-		return ruleError(ErrNoTransactions, "block does not contain "+
+		return ruleerror.NewRuleError(ruleerror.ErrNoTransactions, "block does not contain "+
 			"any transactions")
 	}
 
@@ -816,7 +860,7 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 	if numTx > MaxBlockBaseSize {
 		str := fmt.Sprintf("block contains too many transactions - "+
 			"got %d, max %d", numTx, MaxBlockBaseSize)
-		return ruleError(ErrBlockTooBig, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBlockTooBig, str)
 	}
 
 	// A block must not exceed the maximum allowed block payload when
@@ -825,13 +869,13 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 	if serializedSize > MaxBlockBaseSize {
 		str := fmt.Sprintf("serialized block is too big - got %d, "+
 			"max %d", serializedSize, MaxBlockBaseSize)
-		return ruleError(ErrBlockTooBig, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBlockTooBig, str)
 	}
 
 	// The first transaction in a block must be a coinbase.
 	transactions := block.Transactions()
 	if !IsCoinBase(transactions[0]) {
-		return ruleError(ErrFirstTxNotCoinbase, "first transaction in "+
+		return ruleerror.NewRuleError(ruleerror.ErrFirstTxNotCoinbase, "first transaction in "+
 			"block is not a coinbase")
 	}
 
@@ -840,7 +884,7 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 		if IsCoinBase(tx) {
 			str := fmt.Sprintf("block contains second coinbase at "+
 				"index %d", i+1)
-			return ruleError(ErrMultipleCoinbases, str)
+			return ruleerror.NewRuleError(ruleerror.ErrMultipleCoinbases, str)
 		}
 	}
 
@@ -865,7 +909,7 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 		str := fmt.Sprintf("block merkle root is invalid - block "+
 			"header indicates %v, but calculated value is %v",
 			header.MerkleRoot, calculatedMerkleRoot)
-		return ruleError(ErrBadMerkleRoot, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBadMerkleRoot, str)
 	}
 
 	// Check for duplicate transactions.  This check will be fairly quick
@@ -877,7 +921,7 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 		if _, exists := existingTxHashes[*hash]; exists {
 			str := fmt.Sprintf("block contains duplicate "+
 				"transaction %v", hash)
-			return ruleError(ErrDuplicateTx, str)
+			return ruleerror.NewRuleError(ruleerror.ErrDuplicateTx, str)
 		}
 		existingTxHashes[*hash] = struct{}{}
 	}
@@ -894,7 +938,7 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 			str := fmt.Sprintf("block contains too many signature "+
 				"operations - got %v, max %v", totalSigOps,
 				MaxBlockSigOpsCost)
-			return ruleError(ErrTooManySigOps, str)
+			return ruleerror.NewRuleError(ruleerror.ErrTooManySerialNumbers, str) // todo: not accurate, will remove
 		}
 	}
 
@@ -902,28 +946,30 @@ func checkBlockSanityBTCD(block *abeutil.Block, powLimit *big.Int, timeSource Me
 }
 
 // checkBlockSanityAbe performs some preliminary checks on a block to ensure it is
-// sane before continuing with block processing.  These checks are context free.
-//  1. Check sanity of block header (checkBlockHeaderSanity)
-//  2. There is at least one transaction in the block
-//  3. The block size (without witness) is smaller than MaxBlockBaseSize
-//  4. The block full size (with witness) is smaller than MaxBlockFullSize
-//  5. The first transaction is coinbase and there is only one coinbase in the block
-//  6. No duplicate transactions (same tx hash)
-//  7. The merkle root is correctly computed with the given transactions
-//  8. Preliminary check on each transaction (CheckTransactionSanityAbe)
+// sane before continuing with block processing. These checks are context free.
+//  1. Check sanity of block header (checkBlockHeaderSanity), including the PoW.
+//  2. There is at least one transaction in the block.
+//  3. The block size (without witness) is smaller than RuleMaxBlockBaseSize.
+//  4. The block full size (with witness) is smaller than RuleMaxBlockFullSize.
+//  5. The first transaction is coinbase and there is only one coinbase in the block.
+//  6. No duplicate transactions (same tx hash).
+//  7. Preliminary check on each transaction (CheckTransactionSanityAbe).
+//  8. The merkle root is correctly computed with the given transactions.
+//  9. In each block, for an AutInstance, there is at most ONE AutScriptTypeReRegistration or AutScriptTypeMint.
 //
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkBlockHeaderSanity.
 //
 // todo: (EthashPoW)
 // reviewed on 2024.01.03 by Alice
-func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainParams *chaincfg.Params, timeSource MedianTimeSource, flags BehaviorFlags) error {
+// review 2025.12.13
+func checkBlockSanityAbe(block *abeutil.BlockAbe, powConsensus *consensus.PowConsensus, chainParams *chaincfg.Params, timeSource MedianTimeSource, flags BehaviorFlags) error {
 	powLimit := chainParams.PowLimit
 	msgBlock := block.MsgBlock()
 	header := &msgBlock.Header
 	//	todo: (EthashPoW)
 	// todo_DONE(MLP): reviewed on 2024.01.03, by Alice
-	err := checkBlockHeaderSanity(header, ethash, powLimit, timeSource, flags)
+	err := checkBlockHeaderSanity(header, powConsensus, powLimit, timeSource, flags)
 	if err != nil {
 		return err
 	}
@@ -931,7 +977,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainPa
 	// A block must have at least one transaction.
 	numTx := len(msgBlock.Transactions)
 	if numTx == 0 {
-		return ruleError(ErrNoTransactions, "block does not contain "+
+		return ruleerror.NewRuleError(ruleerror.ErrNoTransactions, "block does not contain "+
 			"any transactions")
 	}
 
@@ -953,7 +999,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainPa
 		if serializedSize > MaxBlockBaseSizeMLPAUT {
 			str := fmt.Sprintf("serialized block content is too big - got %d, "+
 				"max %d", serializedSize, MaxBlockBaseSizeMLPAUT)
-			return ruleError(ErrBlockTooBig, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBlockTooBig, str)
 		}
 
 		// TODO(MLPAUT) add block full size check here
@@ -961,7 +1007,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainPa
 		if serializedFullSize > MaxBlockFullSizeMLPAUT {
 			str := fmt.Sprintf("serialized block is too big - got %d, "+
 				"max %d", serializedSize, MaxBlockFullSizeMLPAUT)
-			return ruleError(ErrBlockTooBig, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBlockTooBig, str)
 		}
 
 	} else {
@@ -969,7 +1015,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainPa
 		if serializedSize > MaxBlockBaseSize {
 			str := fmt.Sprintf("serialized block is too big - got %d, "+
 				"max %d", serializedSize, MaxBlockBaseSize)
-			return ruleError(ErrBlockTooBig, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBlockTooBig, str)
 		}
 	}
 
@@ -980,7 +1026,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainPa
 		return err
 	}
 	if !isCb {
-		return ruleError(ErrFirstTxNotCoinbase, "first transaction in "+
+		return ruleerror.NewRuleError(ruleerror.ErrFirstTxNotCoinbase, "first transaction in "+
 			"block is not a coinbase")
 	}
 
@@ -994,7 +1040,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainPa
 		if isCb {
 			str := fmt.Sprintf("block contains second coinbase at "+
 				"index %d", i+1)
-			return ruleError(ErrMultipleCoinbases, str)
+			return ruleerror.NewRuleError(ruleerror.ErrMultipleCoinbases, str)
 		}
 	}
 
@@ -1007,7 +1053,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainPa
 		if _, exists := existingTxHashes[*hash]; exists {
 			str := fmt.Sprintf("block contains duplicate "+
 				"transaction %v", hash)
-			return ruleError(ErrDuplicateTx, str)
+			return ruleerror.NewRuleError(ruleerror.ErrDuplicateTx, str)
 		}
 		existingTxHashes[*hash] = struct{}{}
 	}
@@ -1015,12 +1061,35 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainPa
 	// Do some preliminary checks on each transaction to ensure they are
 	// sane before continuing.
 	//
-	for _, tx := range transactions {
+	autScriptTypeMapReregMint := make(map[string]*abeutil.TxAbe, len(transactions))
+
+	for i, tx := range transactions {
 		// todo_DONE(MLP): reviewed on 2024.01.03 by Alice.
 		err := CheckTransactionSanityAbe(tx)
 		if err != nil {
 			return err
 		}
+
+		extAutScript := tx.ExtAutScript()
+		if extAutScript != nil {
+			// RULE: In each block, for an AutInstance, there is at most ONE AutScriptTypeReRegistration or AutScriptTypeMint.
+			// This is because AutScriptTypeReRegistration and AutScriptTypeMint updates the corresponding AutInstance,
+			// and each block should allow at most ONE such operation.
+			autIdentifierKey := extAutScript.AutIdentifier().String()
+			autScriptType := extAutScript.Type()
+			// AutScriptTypeRegistration does not need to check, since it is guaranteed by the identifier mechanism.
+			if autScriptType == ctautapi.AutScriptTypeReRegistration || autScriptType == ctautapi.AutScriptTypeMint {
+				if prevTx, ok := autScriptTypeMapReregMint[autIdentifierKey]; ok {
+					return fmt.Errorf("the %d -th tx (hash=%v) carries an AutScript(type=%s) of AutInsatnce (%s), "+
+						"while a previous tx (hash=%v) already carries an AutScript(type=%s)",
+						i, tx.Hash(), autScriptType.String(), autIdentifierKey, prevTx.Hash(), prevTx.ExtAutScript().Type().String())
+				}
+
+				autScriptTypeMapReregMint[autIdentifierKey] = tx
+
+			}
+		}
+
 	}
 
 	// Build merkle tree and ensure the calculated merkle root matches the
@@ -1038,7 +1107,7 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainPa
 			str := fmt.Sprintf("block merkle root is invalid - block "+
 				"header indicates %v, but calculated value is %v",
 				header.MerkleRoot, calculatedMerkleRoot)
-			return ruleError(ErrBadMerkleRoot, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBadMerkleRoot, str)
 		}
 	} else {
 		merkles := BuildMerkleTreeStoreAbe(block.Transactions(), false)
@@ -1047,16 +1116,17 @@ func checkBlockSanityAbe(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainPa
 			str := fmt.Sprintf("block merkle root is invalid - block "+
 				"header indicates %v, but calculated value is %v",
 				header.MerkleRoot, calculatedMerkleRoot)
-			return ruleError(ErrBadMerkleRoot, str)
+			return ruleerror.NewRuleError(ruleerror.ErrBadMerkleRoot, str)
 		}
 	}
+	log.Infof("transaction merkle tree for block successful")
 
 	return nil
 }
 
 // todo: (EthashPoW) 202207
-func CheckBlockSanity(block *abeutil.BlockAbe, ethash *ethash.Ethash, chainParams *chaincfg.Params, timeSource MedianTimeSource) error {
-	return checkBlockSanityAbe(block, ethash, chainParams, timeSource, BFNone)
+func CheckBlockSanity(block *abeutil.BlockAbe, powConsensus *consensus.PowConsensus, chainParams *chaincfg.Params, timeSource MedianTimeSource) error {
+	return checkBlockSanityAbe(block, powConsensus, chainParams, timeSource, BFNone)
 }
 
 // ExtractCoinbaseHeight attempts to extract the height of the block from the
@@ -1069,7 +1139,7 @@ func ExtractCoinbaseHeight(coinbaseTx *abeutil.Tx) (int32, error) {
 			"version %d or greater must start with the " +
 			"length of the serialized block height"
 		str = fmt.Sprintf(str, serializedHeightVersion)
-		return 0, ruleError(ErrMissingCoinbaseHeight, str)
+		return 0, ruleerror.NewRuleError(ruleerror.ErrMissingCoinbaseHeight, str)
 	}
 
 	// Detect the case when the block height is a small integer encoded with
@@ -1090,7 +1160,7 @@ func ExtractCoinbaseHeight(coinbaseTx *abeutil.Tx) (int32, error) {
 			"version %d or greater must start with the " +
 			"serialized block height"
 		str = fmt.Sprintf(str, serializedLen)
-		return 0, ruleError(ErrMissingCoinbaseHeight, str)
+		return 0, ruleerror.NewRuleError(ruleerror.ErrMissingCoinbaseHeight, str)
 	}
 
 	serializedHeightBytes := make([]byte, 8)
@@ -1105,7 +1175,7 @@ func ExtractCoinbaseHeight(coinbaseTx *abeutil.Tx) (int32, error) {
 func ExtractCoinbaseHeightAbe(coinbaseTx *abeutil.TxAbe) (int32, error) {
 	if coinbaseTx == nil {
 		str := "Cannot extract blockHeight from a coinbase transaction that is null"
-		return 0, ruleError(ErrMissingCoinbaseHeight, str)
+		return 0, ruleerror.NewRuleError(ruleerror.ErrMissingCoinbaseHeight, str)
 	}
 
 	//isCb, err := coinbaseTx.IsCoinBase()
@@ -1137,7 +1207,7 @@ func checkSerializedHeight(coinbaseTx *abeutil.Tx, wantHeight int32) error {
 		str := fmt.Sprintf("the coinbase signature script serialized "+
 			"block height is %d when %d was expected",
 			serializedHeight, wantHeight)
-		return ruleError(ErrBadCoinbaseHeight, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBadCoinbaseHeight, str)
 	}
 	return nil
 }
@@ -1155,41 +1225,65 @@ func checkSerializedHeightAbe(coinbaseTx *abeutil.TxAbe, wantHeight int32) error
 		str := fmt.Sprintf("the coinbase signature script serialized "+
 			"block height is %d when %d was expected",
 			serializedHeight, wantHeight)
-		return ruleError(ErrBadCoinbaseHeight, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBadCoinbaseHeight, str)
 	}
 	return nil
 }
 
 // checkBlockHeaderContextAbe performs several validation checks on the block header
-// which depend on its position within the block chain.
+// which depend on its position within the blockchain.
+// In particular,
+// 1. Check the difficulty is correctly computed (if not fast add)
+// 2. Check the timestamp is after the median time of last several blocks (if not fast add)
+// 3. If this height is checkpoint, check if the block hash matches the checkpoint
+// 4. Ensure the height of block is after the latest checkpoint
 //
 // The flags modify the behavior of this function as follows:
-//   - BFFastAdd: All checks except those involving comparing the header against
-//     the checkpoints are not performed.
+//   - BFFastAdd: All checks except those involving comparing the header against the checkpoints are not performed.
 //
 // This function MUST be called with the chain state lock held (for writes).
-//  1. Check the difficulty is correctly computed (if not fast add)
-//  2. Check the timestamp is after the median time of last several blocks (if not fast add)
-//  3. If this height is checkpoint, check if the block hash matches the checkpoint
-//  4. Ensure the height of block is after the latest checkpoint
-//
-// reviewed on 2024.01.03, by Alice for MLP
+// todo: Aconcagua review
+// review done 2025.12.12
 func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNode *blockNode, flags BehaviorFlags) error {
+
+	if header == nil {
+		return fmt.Errorf("checkBlockHeaderContextAbe: the input block header is nil")
+	}
+
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	if !fastAdd {
 		// Ensure the difficulty specified in the block header matches
-		// the calculated difficulty based on the previous block and
-		// difficulty retarget rules.
-		expectedDifficulty, err := b.calcNextRequiredDifficulty(prevNode,
-			header.Timestamp)
+		// the calculated difficulty based on the previous block and difficulty retarget rules.
+		expectedDifficultyVector, err := b.calcNextRequiredDifficultyVector(prevNode, header.Timestamp)
 		if err != nil {
 			return err
 		}
-		blockDifficulty := header.Bits
-		if blockDifficulty != expectedDifficulty {
-			str := "block difficulty of %d is not the expected value of %d"
-			str = fmt.Sprintf(str, blockDifficulty, expectedDifficulty)
-			return ruleError(ErrUnexpectedDifficulty, str)
+		if header.Version >= int32(wire.BlockVersionAconcagua) {
+			log.Infof("check header diff vector, header target: %x, target: %x", header.Bits, expectedDifficultyVector.Bits)
+
+			if header.Bits != expectedDifficultyVector.Bits {
+				str := "block difficulty of %d is not the expected value of %d"
+				str = fmt.Sprintf(str, header.Bits, expectedDifficultyVector.Bits)
+				return ruleerror.NewRuleError(ruleerror.ErrUnexpectedDifficulty, str)
+			}
+
+			if header.BitsSecond != expectedDifficultyVector.BitsSecond {
+				str := "block difficulty second of %d is not the expected value of %d"
+				str = fmt.Sprintf(str, header.BitsSecond, expectedDifficultyVector.BitsSecond)
+				return ruleerror.NewRuleError(ruleerror.ErrUnexpectedDifficulty, str)
+			}
+
+			if header.PowScaleSecond != expectedDifficultyVector.PowScaleSecond {
+				str := "block PowScaleSecond of %d is not the expected value of %d"
+				str = fmt.Sprintf(str, header.PowScaleSecond, expectedDifficultyVector.PowScaleSecond)
+				return ruleerror.NewRuleError(ruleerror.ErrUnexpectedDifficulty, str)
+			}
+		} else { // header.Version < int32(wire.BlockVersionAconcagua)
+			if header.Bits != expectedDifficultyVector.Bits {
+				str := "block difficulty of %d is not the expected value of %d"
+				str = fmt.Sprintf(str, header.Bits, expectedDifficultyVector.Bits)
+				return ruleerror.NewRuleError(ruleerror.ErrUnexpectedDifficulty, str)
+			}
 		}
 
 		// Ensure the timestamp for the block header is after the
@@ -1198,54 +1292,54 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 		if !header.Timestamp.After(medianTime) {
 			str := "block timestamp of %v is not after expected %v"
 			str = fmt.Sprintf(str, header.Timestamp, medianTime)
-			return ruleError(ErrTimeTooOld, str)
+			return ruleerror.NewRuleError(ruleerror.ErrTimeTooOld, str)
 		}
 	}
 
-	// The height of this block is one more than the referenced previous
-	// block.
+	// The height of this block is one more than the referenced previous block.
 	blockHeight := prevNode.height + 1
-	// todo:(EthashPoW)
 	//	This is VERY necessary.
-	//	Now, the blockHeight of block/node is set, we can check the whether the header.Height and header.Version are set correctly.
-	//	This will prevent an updated Abelian node from accepting an old-version block.
+	//	Now, the blockHeight of block/node is set, we can check whether the header.Height and header.Version are set correctly.
+	//	This will prevent an updated abelian node from accepting an old-version block.
 	if blockHeight >= b.chainParams.BlockHeightEthashPoW {
-		if header.Height != blockHeight {
+		if blockHeight != header.Height {
 			str := fmt.Sprintf("block has height %d while its prevNode has height %d", header.Height, prevNode.height)
-			return ruleError(ErrMismatchedBlockHeightWithPrevNode, str)
+			return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightWithPrevNode, str)
 		}
+	}
+	// now blockHeight is correct
 
-		// ToDo(MLP):
-		////	todo: when more versions appear, we need to refactor here.
-		//if header.Version != int32(wire.BlockVersionEthashPow) {
-		//	str := fmt.Sprintf("block has height %d, it should have version %d for EthashPoW, rather than the old version %d", header.Height, int32(wire.BlockVersionEthashPow), header.Version)
-		//	return ruleError(ErrMismatchedBlockHeightAndVersion, str)
-		//
-		//}
-		//	todo: when more versions appear, we need to refactor here.
-		// Added by Alice, 2024.05.11, for DSA
-		// todo(DSA): review
-		if header.Height >= b.chainParams.BlockHeightMLPAUT {
-			if header.Version != int32(wire.BlockVersionMLPAUT) {
-				str := fmt.Sprintf("block has height %d, it should have version %08x for MLPAUT, rather than the version %08x", header.Height, int32(wire.BlockVersionMLPAUT), header.Version)
-				return ruleError(ErrMismatchedBlockHeightAndVersion, str)
-			}
-		} else if header.Height >= b.chainParams.BlockHeightDSA {
-			if header.Version != int32(wire.BlockVersionDSA) {
-				str := fmt.Sprintf("block has height %d, it should have version %08x for DSA, rather than the version %08x", header.Height, int32(wire.BlockVersionDSA), header.Version)
-				return ruleError(ErrMismatchedBlockHeightAndVersion, str)
-			}
-		} else {
-			if header.Version != int32(wire.BlockVersionEthashPow) {
-				str := fmt.Sprintf("block has height %d, it should have version %08x for EthashPoW, rather than the version %08x", header.Height, int32(wire.BlockVersionEthashPow), header.Version)
-				return ruleError(ErrMismatchedBlockHeightAndVersion, str)
-			}
+	//	todo: when more versions appear, we need to refactor here.
+	if blockHeight >= b.chainParams.BlockHeightAconcagua {
+		if header.Version != int32(wire.BlockVersionAconcagua) {
+			str := fmt.Sprintf("block has height %d, it should have version %08x for Aconcagua, "+
+				"rather than the version %08x",
+				header.Height, int32(wire.BlockVersionAconcagua), header.Version)
+			return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
 		}
-
+	} else if blockHeight >= b.chainParams.BlockHeightMLPAUT {
+		if header.Version != int32(wire.BlockVersionMLPAUT) {
+			str := fmt.Sprintf("block has height %d, it should have version %08x for MLPAUT, "+
+				"rather than the version %08x", header.Height, int32(wire.BlockVersionMLPAUT), header.Version)
+			return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
+		}
+	} else if blockHeight >= b.chainParams.BlockHeightDSA {
+		if header.Version != int32(wire.BlockVersionDSA) {
+			str := fmt.Sprintf("block has height %d, it should have version %08x for DSA, rather than the version %08x",
+				header.Height, int32(wire.BlockVersionDSA), header.Version)
+			return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
+		}
+	} else if blockHeight >= b.chainParams.BlockHeightEthashPoW {
+		if header.Version != int32(wire.BlockVersionEthashPow) {
+			str := fmt.Sprintf("block has height %d, it should have version %08x for EthashPoW, rather than the version %08x",
+				header.Height, int32(wire.BlockVersionEthashPow), header.Version)
+			return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
+		}
 	} else { // blockHeight < b.chainParams.BlockHeightEthashPoW
-		if header.Version != int32(BlockVersionInitial) {
-			str := fmt.Sprintf("block has height %d, it should have version %08x, rather than the version %08x", header.Height, int32(BlockVersionInitial), header.Version)
-			return ruleError(ErrMismatchedBlockHeightAndVersion, str)
+		if header.Version != int32(wire.BlockVersionInitial) {
+			str := fmt.Sprintf("block has height %d, it should have version %08x, rather than the version %08x",
+				header.Height, int32(wire.BlockVersionInitial), header.Version)
+			return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightAndVersion, str)
 		}
 	}
 
@@ -1254,11 +1348,11 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 	if !b.verifyCheckpoint(blockHeight, &blockHash) {
 		str := fmt.Sprintf("block at height %d does not match "+
 			"checkpoint hash", blockHeight)
-		return ruleError(ErrBadCheckpoint, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBadCheckpoint, str)
 	}
 
-	// Find the previous checkpoint and prevent blocks which fork the main
-	// chain before it.  This prevents storage of new, otherwise valid,
+	// Find the previous checkpoint and prevent blocks which fork the main chain before it.
+	// This prevents storage of new, otherwise valid,
 	// blocks which build off of old blocks that are likely at a much easier
 	// difficulty and therefore could be used to waste cache and disk space.
 	checkpointNode, err := b.findPreviousCheckpoint()
@@ -1269,20 +1363,23 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 		str := fmt.Sprintf("block at height %d forks the main chain "+
 			"before the previous checkpoint at height %d",
 			blockHeight, checkpointNode.height)
-		return ruleError(ErrForkTooOld, str)
+		return ruleerror.NewRuleError(ruleerror.ErrForkTooOld, str)
 	}
 
 	return nil
 }
 
 // checkBlockContextAbe performs several validation checks on the block which depend
-// on its position within the block chain.
+// on its position within the blockchain.
+// In particular,
+// 1. Check the block header context (checkBlockHeaderContextAbe)
+// 2. Check if the block height is written into the coinbase transaction (if not fastAdd)
 //
 // The flags modify the behavior of this function as follows:
 //   - BFFastAdd: The transaction are not checked to see if they are finalized
 //
-// The flags are also passed to checkBlockHeaderContext.  See its documentation
-// for how the flags modify its behavior.
+// The flags are also passed to checkBlockHeaderContext.
+// See its documentation for how the flags modify its behavior.
 //
 // This function MUST be called with the chain state lock held (for writes).
 //  1. Check the block header context (checkBlockHeaderContextAbe)
@@ -1290,6 +1387,7 @@ func (b *BlockChain) checkBlockHeaderContextAbe(header *wire.BlockHeader, prevNo
 //
 // refactored on 2024.01.03 by Alice
 // reviewed on 2024.01.03 by Alice
+// review done 2025.12.12
 func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blockNode, flags BehaviorFlags) error {
 	// Perform all block header related validation checks.
 	header := &block.MsgBlock().Header
@@ -1321,9 +1419,32 @@ func (b *BlockChain) checkBlockContextAbe(block *abeutil.BlockAbe, prevNode *blo
 	}
 
 	// todo: if there are more forks, we need hard code the version check here.
+	// todo: change to switch-case
 	// 1. after commit height, disallow transaction less than older version
 	// 2. during fork to commit, coinbase transaction must be new version
 	// 3. before fork, coinbase/transfer transaction must be older version
+	if blockHeight >= b.chainParams.BlockHeightAconcaguaCommit {
+		//	the block should not contain transactions with earlier version
+		for i, tx := range block.Transactions() {
+			if tx.MsgTx().Version < wire.TxVersion_Height_464000_Aconcagua {
+				return fmt.Errorf("checkBlockContextAbe: the block has height %d, "+
+					"but its %d -th transaction has version %d", block.Height(), i, tx.MsgTx().Version)
+			}
+		}
+	} else if blockHeight >= b.chainParams.BlockHeightAconcagua {
+		if coinbaseTx.MsgTx().Version < wire.TxVersion_Height_464000_Aconcagua {
+			return fmt.Errorf("checkBlockContextAbe: the block has height %d, but its first transaction (coinbase Tx) has version %d", block.Height(), coinbaseTx.MsgTx().Version)
+		}
+	} else {
+		// blockHeight < b.chainParams.BlockHeightAconcagua
+		for i, tx := range block.Transactions() {
+			if tx.MsgTx().Version >= wire.TxVersion_Height_464000_Aconcagua {
+				return fmt.Errorf("checkBlockContextAbe: the block has height %d, "+
+					"but its %d -th transaction has version %d", block.Height(), i, tx.MsgTx().Version)
+			}
+		}
+	}
+
 	if blockHeight >= b.chainParams.BlockHeightMLPAUTCOMMIT {
 		//	the block should not contain transactions with earlier version
 		for i, tx := range block.Transactions() {
@@ -1405,18 +1526,18 @@ func checkStandardCoinbaseTxIn(coinbaseTx *wire.MsgTxAbe, blockHash *chainhash.H
 	isCb, err := coinbaseTx.IsCoinBase()
 	if err != nil {
 		str := fmt.Sprintf("checkStandardCoinbaseTxIn: error happens when calling coinbaseTx.IsCoinBase() on the coinbaseTx of block %s : %v", blockHash, err)
-		return ruleError(ErrBadTxInput, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBadTxInput, str)
 	}
 
 	if !isCb {
 		str := fmt.Sprintf("checkStandardCoinbaseTxIn: the coinbaseTx of block %s is not a coinbaseTx", blockHash)
-		return ruleError(ErrBadTxInput, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBadTxInput, str)
 	}
 
 	err = wire.CheckStandardCoinbaseTxIn(coinbaseTx)
 	if err != nil {
 		str := fmt.Sprintf("checkStandardCoinbaseTxIn: error happens when calling wire.CheckStandardCoinbaseTxIn() on the coinbaseTx of block %s : %v", blockHash, err)
-		return ruleError(ErrBadTxInput, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBadTxInput, str)
 	}
 
 	return nil
@@ -1504,7 +1625,8 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *abeutil.Block, view *U
 			str := fmt.Sprintf("tried to overwrite transaction %v "+
 				"at block height %d that is not fully spent",
 				outpoint.Hash, utxo.BlockHeight())
-			return ruleError(ErrOverwriteTx, str)
+			//return ruleerror.NewRuleError(ruleerror.ErrOverwriteTx, str)
+			return ruleerror.NewRuleError(ruleerror.ErrForkTooOld, str) // will be removed, just put a random error
 		}
 	}
 
@@ -1570,7 +1692,7 @@ func CheckTransactionInputs(tx *abeutil.Tx, txHeight int32, utxoView *UtxoViewpo
 				"transaction %s:%d either does not exist or "+
 				"has already been spent", txIn.PreviousOutPoint,
 				tx.Hash(), txInIndex)
-			return 0, ruleError(ErrMissingTxOut, str)
+			return 0, ruleerror.NewRuleError(ruleerror.ErrMissingTxOut, str)
 		}
 
 		// Ensure the transaction is not spending coins which have not
@@ -1586,7 +1708,7 @@ func CheckTransactionInputs(tx *abeutil.Tx, txHeight int32, utxoView *UtxoViewpo
 					"of %v blocks", txIn.PreviousOutPoint,
 					originHeight, txHeight,
 					coinbaseMaturity)
-				return 0, ruleError(ErrImmatureSpend, str)
+				return 0, ruleerror.NewRuleError(ruleerror.ErrImmatureSpend, str)
 			}
 		}
 
@@ -1600,14 +1722,14 @@ func CheckTransactionInputs(tx *abeutil.Tx, txHeight int32, utxoView *UtxoViewpo
 		if originTxSatoshi < 0 {
 			str := fmt.Sprintf("transaction output has negative "+
 				"value of %v", abeutil.Amount(originTxSatoshi))
-			return 0, ruleError(ErrBadTxOutValue, str)
+			return 0, ruleerror.NewRuleError(ruleerror.ErrBadTxOutValue, str)
 		}
 		if originTxSatoshi > abeutil.MaxSatoshi {
 			str := fmt.Sprintf("transaction output value of %v is "+
 				"higher than max allowed value of %v",
 				abeutil.Amount(originTxSatoshi),
 				abeutil.MaxSatoshi)
-			return 0, ruleError(ErrBadTxOutValue, str)
+			return 0, ruleerror.NewRuleError(ruleerror.ErrBadTxOutValue, str)
 		}
 
 		// The total of all outputs must not be more than the max
@@ -1621,7 +1743,7 @@ func CheckTransactionInputs(tx *abeutil.Tx, txHeight int32, utxoView *UtxoViewpo
 				"inputs is %v which is higher than max "+
 				"allowed value of %v", totalSatoshiIn,
 				abeutil.MaxSatoshi)
-			return 0, ruleError(ErrBadTxOutValue, str)
+			return 0, ruleerror.NewRuleError(ruleerror.ErrBadTxOutValue, str)
 		}
 	}
 
@@ -1638,7 +1760,7 @@ func CheckTransactionInputs(tx *abeutil.Tx, txHeight int32, utxoView *UtxoViewpo
 		str := fmt.Sprintf("total value of all transaction inputs for "+
 			"transaction %v is %v which is less than the amount "+
 			"spent of %v", txHash, totalSatoshiIn, totalSatoshiOut)
-		return 0, ruleError(ErrSpendTooHigh, str)
+		return 0, ruleerror.NewRuleError(ruleerror.ErrSpendTooHigh, str)
 	}
 
 	// NOTE: bitcoind checks if the transaction fees are < 0 here, but that
@@ -1656,7 +1778,8 @@ func CheckTransactionInputs(tx *abeutil.Tx, txHeight int32, utxoView *UtxoViewpo
 //     Abe todo
 //
 // todo_DONE(MLP): review on 2024.01.04
-func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
+// todo_done: reviewed on 2025.12.12
+func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *UtxoRingViewpoint, ctautView *CTAUTViewpoint, chainParams *chaincfg.Params) error {
 	// Coinbase transactions have no inputs.
 	isCb, err := IsCoinBaseAbe(tx)
 	if err != nil {
@@ -1672,7 +1795,7 @@ func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *
 			str := fmt.Sprintf("TXO Ring %s (txIn %s) referenced from "+
 				"transaction %s:%d has a empty serialNumber", txIn.PreviousOutPointRing.RingId(), txIn.String(),
 				tx.Hash(), txInIndex)
-			return ruleError(ErrMissingTxOut, str)
+			return ruleerror.NewRuleError(ruleerror.ErrMissingTxOut, str)
 		}
 
 		utxoRing := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())
@@ -1680,13 +1803,13 @@ func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *
 			str := fmt.Sprintf("TXO Ring %s (txIn %s) referenced from "+
 				"transaction %s:%d does not exist", txIn.PreviousOutPointRing.RingId(), txIn.String(),
 				tx.Hash(), txInIndex)
-			return ruleError(ErrMissingTxOut, str)
+			return ruleerror.NewRuleError(ruleerror.ErrMissingTxOut, str)
 		}
 		if utxoRing.IsSpent(txIn.SerialNumber) {
 			str := fmt.Sprintf("TXO Ring %s (txIn %s) referenced from "+
 				"transaction %s:%d has already been spent", txIn.PreviousOutPointRing.RingId(), txIn.String(),
 				tx.Hash(), txInIndex)
-			return ruleError(ErrMissingTxOut, str)
+			return ruleerror.NewRuleError(ruleerror.ErrMissingTxOut, str)
 			// Abe to do: update the ErrMissingTxOut to ErrMissingTxOutRing
 		}
 
@@ -1703,294 +1826,1010 @@ func CheckTransactionInputsAbe(tx *abeutil.TxAbe, txHeight int32, utxoRingView *
 					"of %v blocks", txIn.String(),
 					originHeight, txHeight,
 					coinbaseMaturity)
-				return ruleError(ErrImmatureSpend, str)
+				return ruleerror.NewRuleError(ruleerror.ErrImmatureSpend, str)
 			}
+		}
+	}
+
+	err = checkTxAutScriptInputsOutputs(tx, ctautView, utxoRingView, txHeight, chainParams)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateAutRegistrationScript
+// aut review done 2025.12.12
+func checkAutRegistrationScriptInputsOutputs(tx *abeutil.TxAbe, currentHeight int32,
+	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
+
+	if tx == nil {
+		return fmt.Errorf("tx is nil")
+	}
+
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		// the caller should check whether tx.ExtAutScript() is nil before calling this function
+		return fmt.Errorf("wrong call on validateAutRegistrationScript: tx.ExtAutScript is nil")
+	}
+
+	if extAutScript.Type() != ctautapi.AutScriptTypeRegistration {
+		return fmt.Errorf("expected registration script, but got %d", extAutScript.Type())
+	}
+
+	_, ok := extAutScript.AutScript.(*ctautapi.RegistrationScript)
+	if !ok {
+		return fmt.Errorf("expected registration script, but got %d", extAutScript.Type())
+	}
+
+	// ensure no the same identifier is registered
+	autMetadata := ctautView.LookupCTAUTMetaInfo(extAutScript.AutIdentifier())
+	if autMetadata != nil {
+		return fmt.Errorf("an registration transaction try to register AUT instance with an existing AUT identifier")
+	}
+
+	// allow use a ReregistrationExpireHeight that results no one can update/reregister.
+	//// if the claimed height will expire soon, reject it
+	//if registrationScript.ReregistrationExpireHeight() != ctautapi.InfiniteExpireHeight &&
+	//	registrationScript.ReregistrationExpireHeight() <= currentHeight {
+	//	return fmt.Errorf("transaction %s try to register an AUT "+
+	//		"instance with expire height %d , but current block height %d, it will expire soon", tx.Hash(),
+	//		registrationScript.ReregistrationExpireHeight(), currentHeight)
+	//}
+
+	return nil
+}
+
+// validateAutReRegistrationScript
+// aut review done 2025.12.11
+// todo: check hostView[ringhash].unspent
+func checkAutReRegistrationScriptInputsOutputs(tx *abeutil.TxAbe, currentHeight int32,
+	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
+	if tx == nil {
+		return fmt.Errorf("tx is nil")
+	}
+
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		// the caller should check whether tx.ExtAutScript() is nil before calling this function
+		return fmt.Errorf("wrong call on validateAutReRegistrationScript: tx.ExtAutScript is nil")
+	}
+
+	if extAutScript.Type() != ctautapi.AutScriptTypeReRegistration {
+		return fmt.Errorf("expected re-registration script, but got %d", extAutScript.Type())
+	}
+	reRegisterScript, ok := extAutScript.AutScript.(*ctautapi.ReRegistrationScript)
+	if !ok {
+		return fmt.Errorf("expected re-registration script, but got %d", extAutScript.Type())
+	}
+
+	autMetadata := ctautView.LookupCTAUTMetaInfo(extAutScript.AutIdentifier())
+
+	if autMetadata == nil {
+		return fmt.Errorf("a Reregistration Aut script attempts to operate on non-existing AutInstance")
+	}
+
+	// sanity check: expiry
+	if autMetadata.ReregistrationExpireHeight != ctautapi.InfiniteExpireHeight &&
+		autMetadata.ReregistrationExpireHeight < currentHeight {
+		return fmt.Errorf("transaction %s carries a re-register at height %d but "+
+			"the AutInstance claims its expire height %d", tx.Hash(), currentHeight,
+			autMetadata.ReregistrationExpireHeight)
+	}
+
+	if currentHeight <= autMetadata.UpdatedHeight {
+		return fmt.Errorf("transaction %s carries a re-register at height %d, "+
+			"which is not greater than the AutInstance last UpdateHeight %d",
+			tx.Hash(), currentHeight, autMetadata.UpdatedHeight)
+	}
+
+	claimedIssuersByCoinAddress := map[string]struct{}{}
+	for i := 0; i < len(autMetadata.Issuers); i++ {
+		if autMetadata.Issuers[i] == nil {
+			return fmt.Errorf("instance.metadata.Issuers[%d] is nil", i)
+		}
+		if len(autMetadata.Issuers[i].CoinAddress()) == 0 {
+			return fmt.Errorf("instance.metadata.Issuers[%d].CoinAddress() is nil/empty", i)
+		}
+
+		issuerCoinAddressStr := hex.EncodeToString(autMetadata.Issuers[i].CoinAddress())
+		claimedIssuersByCoinAddress[issuerCoinAddressStr] = struct{}{}
+	}
+
+	// duplicated input or double spending?
+	consumedTokenIssuersByCoinAddress := map[string]struct{}{}
+	willConsumedRootTokenHostOutpoints := map[string]*ctautapi.HostOutPoint{}
+
+	inStartIndex := int(reRegisterScript.InStartIndex())
+	inAutRootTokenNum := int(reRegisterScript.InAutRootTokenNum())
+
+	hostTxIns := tx.MsgTx().TxIns
+
+	if inStartIndex+inAutRootTokenNum > len(hostTxIns) {
+		return fmt.Errorf("inStartIndex (%d) + inAutRootTokenNum (%d) exceeds the number of TxIns (%d)",
+			inStartIndex, inAutRootTokenNum, len(hostTxIns))
+	}
+
+	for i := 0; i < inAutRootTokenNum; i++ {
+
+		hostTxIn := hostTxIns[inStartIndex+i]
+
+		if hostTxIn == nil {
+			return fmt.Errorf("TxIns[%d] is nil]", i)
+		}
+
+		ringHash := hostTxIn.PreviousOutPointRing.Hash()
+		ringEntry := hostView.LookupEntry(ringHash)
+		if ringEntry == nil {
+			return fmt.Errorf("transaction %s try to re-register at height %d but "+
+				"the consumed UTXO at Ring %s not exist", tx.Hash(), currentHeight, hostTxIn.PreviousOutPointRing.Hash())
+		}
+
+		// todo: enhance this function: take ringEntry as input, and return additionally isSpent.
+		hostTxo, hostOutPoint, err := getAutHostFromTxoRing(ringEntry.TxoRing(), ringHash)
+		if err != nil {
+			return fmt.Errorf("error happens when calling getAutHostFromTxoRing on ringId %v: %v", ringHash, err)
+		}
+
+		coinAddress, err := ctautapi.RuleCheckOnHostTxo(hostTxo)
+		if err != nil {
+			return err
+		}
+
+		if hostOutPoint == nil {
+			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has nil at position 0 ", ringHash.String())
+		}
+		hostOpStr := hostOutPoint.String()
+
+		if _, existOutpoint := autMetadata.ActiveRootTokenSet[hostOpStr]; !existOutpoint {
+			return fmt.Errorf("transaction %s try to re-register with unknown root coin <%s:%d>",
+				tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
+		}
+
+		// check whether duplicate though it won't appear with the checking with hosted Abelian transaction
+		if _, ok := willConsumedRootTokenHostOutpoints[hostOpStr]; ok {
+			return fmt.Errorf("transaction %s try to mint with repeated root coin <%s:%d>",
+				tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
+		}
+		willConsumedRootTokenHostOutpoints[hostOpStr] = hostOutPoint
+
+		consumedTokenCoinAddressStr := hex.EncodeToString(coinAddress)
+
+		if _, ok := claimedIssuersByCoinAddress[consumedTokenCoinAddressStr]; !ok {
+			return fmt.Errorf("transaction %s try to mint at height %d with "+
+				"issue token but it do not exist in its registration", tx.Hash(), currentHeight)
+		}
+		if _, ok := consumedTokenIssuersByCoinAddress[consumedTokenCoinAddressStr]; !ok {
+			consumedTokenIssuersByCoinAddress[consumedTokenCoinAddressStr] = struct{}{}
+		} else {
+			// already in, does nothing
+			// repeat consumeTokenIssuers are allowed, just waste some AutRootTokens.
+		}
+	}
+
+	// check the threshold
+	if len(consumedTokenIssuersByCoinAddress) < int(autMetadata.ReregistrationThreshold) {
+		return fmt.Errorf("transaction %s try to re-register instance but fail to meet the claimed re-registration threshold (%d/%d)",
+			tx.Hash(), len(consumedTokenIssuersByCoinAddress), autMetadata.ReregistrationThreshold)
+	}
+
+	// check updated AUT info
+	// planned amount
+	if autMetadata.MintedAmount > reRegisterScript.PlannedTotalSupply() {
+		return fmt.Errorf("transaction %s try to update the planned total amount to %d but "+
+			"the AutInstance has mint %d", tx.Hash(), reRegisterScript.PlannedTotalSupply(),
+			autMetadata.MintedAmount)
+	}
+
+	// allow use a ReregistrationExpireHeight that results no one can update/reregister.
+	//// expiry
+	//if reRegisterScript.ReregistrationExpireHeight() != ctautapi.InfiniteExpireHeight &&
+	//	reRegisterScript.ReregistrationExpireHeight() <= currentHeight {
+	//	return fmt.Errorf("transaction %s try to re-register the "+
+	//		"instance with expire height %d (current height %d)", tx.Hash(),
+	//		reRegisterScript.ReregistrationExpireHeight(), currentHeight)
+	//}
+
+	return nil
+}
+
+// checkAutMintScriptInputsOutputs
+// aut review done 2025.12.12
+func checkAutMintScriptInputsOutputs(tx *abeutil.TxAbe, currentHeight int32,
+	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
+
+	if tx == nil {
+		return fmt.Errorf("tx is nil")
+	}
+
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		// the caller should check whether tx.ExtAutScript() is nil before calling this function
+		return fmt.Errorf("wrong call on validateAutMintScript: tx.ExtAutScript is nil")
+	}
+
+	if extAutScript.Type() != ctautapi.AutScriptTypeMint {
+		return fmt.Errorf("expected mint script, but got %d", extAutScript.Type())
+	}
+	mintScript, ok := extAutScript.AutScript.(*ctautapi.MintScript)
+	if !ok {
+		return fmt.Errorf("expected mint script, but got %d", extAutScript.Type())
+	}
+
+	autMetadata := ctautView.LookupCTAUTMetaInfo(extAutScript.AutIdentifier())
+	if autMetadata == nil {
+		return fmt.Errorf("tx %v carries an AutMinScript which attempts to operate on non-existing AutInstance %s",
+			tx.Hash(), extAutScript.AutIdentifier().String())
+	}
+
+	claimedIssuersByCoinAddress := map[string]struct{}{}
+	for i := 0; i < len(autMetadata.Issuers); i++ {
+		if autMetadata.Issuers[i] == nil {
+			return fmt.Errorf("instance.metadata.Issuers[%d] is nil", i)
+		}
+
+		coinAddress := autMetadata.Issuers[i].CoinAddress()
+		if len(coinAddress) == 0 {
+			return fmt.Errorf("instance.metadata.Issuers[%d]CoinAddress() is nil/empty", i)
+		}
+
+		issuerCoinAddressStr := hex.EncodeToString(coinAddress)
+		claimedIssuersByCoinAddress[issuerCoinAddressStr] = struct{}{}
+	}
+
+	// duplicated input or double spending?
+	consumedTokenIssuersByCoinAddress := map[string]struct{}{}
+	willConsumedRootTokenHostOutpoints := map[string]*ctautapi.HostOutPoint{}
+
+	inStartIndex := int(mintScript.InStartIndex())
+	inAutRootTokenNum := int(mintScript.InAutRootTokenNum())
+
+	hostTxIns := tx.MsgTx().TxIns
+	if inStartIndex+inAutRootTokenNum > len(hostTxIns) {
+		return fmt.Errorf("inStartIndex %d + inAutRootTokenNum(%d) exceeds the number of TxIns (%d)",
+			inStartIndex, inAutRootTokenNum, len(hostTxIns))
+	}
+
+	for i := 0; i < inAutRootTokenNum; i++ {
+		hostTxIn := hostTxIns[inStartIndex+i]
+
+		if hostTxIn == nil {
+			return fmt.Errorf("TxIns[%d] is nil]", i)
+		}
+
+		ringHash := hostTxIn.PreviousOutPointRing.Hash()
+		ringEntry := hostView.LookupEntry(ringHash)
+		if ringEntry == nil {
+			return fmt.Errorf("transaction %s try to re-register at height %d but "+
+				"the consumed UTXO at Ring %s not exist", tx.Hash(), currentHeight, hostTxIn.PreviousOutPointRing.Hash())
+		}
+
+		hostTxo, hostOutPoint, err := getAutHostFromTxoRing(ringEntry.TxoRing(), ringHash)
+		if err != nil {
+			return fmt.Errorf("error happens when calling getAutHostFromTxoRing on ringId %v: %v", ringHash, err)
+		}
+
+		// fill out with the first item in ring
+		coinAddress, err := ctautapi.RuleCheckOnHostTxo(hostTxo)
+		if err != nil {
+			return err
+		}
+
+		if hostOutPoint == nil {
+			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has nil at position 0 ", ringHash.String())
+		}
+
+		hostOPStr := hostOutPoint.String()
+		if _, existOutpoint := autMetadata.ActiveRootTokenSet[hostOPStr]; !existOutpoint {
+			return fmt.Errorf("transaction %s try to re-register with unknown root coin <%s:%d>",
+				tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
+		}
+
+		// check whether duplicate though it won't appear with the checking with hosted Abelian transaction
+		if _, ok := willConsumedRootTokenHostOutpoints[hostOPStr]; ok {
+			return fmt.Errorf("transaction %s try to mint with repeated root coin <%s:%d>",
+				tx.Hash(), hostOutPoint.TxHash, hostOutPoint.Index)
+		}
+		willConsumedRootTokenHostOutpoints[hostOPStr] = hostOutPoint
+
+		consumedTokenCoinAddressStr := hex.EncodeToString(coinAddress)
+
+		if _, ok := claimedIssuersByCoinAddress[consumedTokenCoinAddressStr]; !ok {
+			return fmt.Errorf("transaction %s try to mint at height %d with "+
+				"issue token but it do not exist in its registration", tx.Hash(), currentHeight)
+		}
+		if _, ok := consumedTokenIssuersByCoinAddress[consumedTokenCoinAddressStr]; !ok {
+			consumedTokenIssuersByCoinAddress[consumedTokenCoinAddressStr] = struct{}{}
+		} else {
+			// already in, does nothing
+			// repeat consumeTokenIssuers are allowed, just waste some AutRootTokens.
+		}
+	}
+
+	// check the threshold
+	if len(consumedTokenIssuersByCoinAddress) < int(autMetadata.MintThreshold) {
+		return fmt.Errorf("transaction %s try to mint tokens but fail to meet the claimed mint threshold (%d/%d)",
+			tx.Hash(), len(consumedTokenIssuersByCoinAddress), autMetadata.MintThreshold)
+	}
+
+	// check the supply
+	if autMetadata.MintedAmount > autMetadata.PlannedTotalSupply {
+		// just assert
+		return fmt.Errorf("the target AutInstance has mintedAmout (%d) which exceeds the plannedTotalSupply (%d) ",
+			autMetadata.MintedAmount, autMetadata.PlannedTotalSupply)
+	}
+	maxAllowed := autMetadata.PlannedTotalSupply - autMetadata.MintedAmount // uint64, and >= 0
+
+	if mintScript.Vin() > maxAllowed {
+		return fmt.Errorf("transaction %s try to mint coin value %d, which exceeds the allowed value %d (= PlannedTotalSupply %d - MintedAmount %d)",
+			tx.Hash(), mintScript.Vin(), maxAllowed, autMetadata.PlannedTotalSupply, autMetadata.MintedAmount)
+	}
+
+	// check privacy type of output tokens
+	for i, outputToken := range extAutScript.GeneratedTokens() {
+		if outputToken == nil {
+			return fmt.Errorf("extAutScript.GeneratedTokens[%d] is nil", i)
+		}
+
+		autTxo := &ctautwire.AutTxo{}
+		err := autTxo.Deserialize(outputToken.ValueScript)
+		if err != nil {
+			return err
+		}
+
+		err = ctautapi.RuleCheckOnAutTxOutputPrivacyTypeAndValue(autMetadata.PrivacyType, autTxo)
+		if err != nil {
+			return err
 		}
 	}
 
 	return nil
 }
 
-// CheckTransactionInputsAUT
-// refactored by Alice on 2024.03.01
-func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRingViewpoint, autView *AUTViewpoint, chainParams *chaincfg.Params) error {
+// review done 2025.12.15
+func validateAutMintScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint) error {
+
 	if tx == nil {
-		return fmt.Errorf("CheckTransactionInputsAUT: a nil transaction")
+		return fmt.Errorf("tx is nil")
 	}
-	autTx, err := tx.AUTTransaction()
+
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		// the caller should check whether tx.ExtAutScript() is nil before calling this function
+		return fmt.Errorf("wrong call on validateAutMintScriptWitness: tx.ExtAutScript is nil")
+	}
+
+	if extAutScript.Type() != ctautapi.AutScriptTypeMint {
+		return fmt.Errorf("expected mint script, but got %d", extAutScript.Type())
+	}
+	mintScript, ok := extAutScript.AutScript.(*ctautapi.MintScript)
+	if !ok {
+		return fmt.Errorf("expected mint script, but got %d", extAutScript.Type())
+	}
+
+	if !tx.MsgTx().HasAutWitness() {
+		return fmt.Errorf("transaction %s has no aut witness", tx.Hash())
+	}
+	witnessHash := ctautwire.AutWitnessHash(tx.MsgTx().AutWitness)
+
+	claimedWitnessHash := mintScript.WitnessHash()
+	if !witnessHash.IsEqual(&claimedWitnessHash) {
+		return fmt.Errorf("mismatch witness for script")
+	}
+
+	generatedTokens := extAutScript.GeneratedTokens()
+	autTxOuts := make([]*ctautwire.AutTxo, len(generatedTokens))
+	for i, outputToken := range generatedTokens {
+		if outputToken == nil {
+			return fmt.Errorf("validateAutMintScriptWitness: %d-th generatedToken is nil", i)
+		}
+
+		autTxo := &ctautwire.AutTxo{}
+		err := autTxo.Deserialize(outputToken.ValueScript)
+		if err != nil {
+			return err
+		}
+
+		autTxOuts[i] = autTxo
+	}
+
+	cbTx := &ctautwire.AutCoinbaseTx{
+		Version:   extAutScript.Version(),
+		Vin:       mintScript.Vin(),
+		TxOuts:    autTxOuts,
+		TxWitness: tx.MsgTx().AutWitness,
+	}
+
+	err := abecryptox.AutCoinbaseTxVerify(cbTx)
 	if err != nil {
-		return fmt.Errorf("CheckTransactionInputsAUT: error happens when extract AutTRansaction from the input abeutil.TxAbe: %v", err)
-	}
-	if autTx == nil {
-		// As this function is for AUT, so it should be called on a Tx without hosting AutTransaction.
-		return fmt.Errorf("CheckTransactionInputsAUT: the input abeutil.TxAbe does not contain a valid AutTransaction")
-	}
-
-	autIdentifierKey := hex.EncodeToString(autTx.AUTIdentifier())
-	if autTx.Type() == aut.Registration {
-		autEntry, exist := autView.entries[autIdentifierKey]
-		if exist && autEntry != nil && autEntry.metadata != nil {
-			return errors.New("an registration AUT transaction try to register AUT entry with an existing AUT identifier ")
-		}
-	} else {
-		autEntry, exist := autView.entries[autIdentifierKey]
-		if !exist || autEntry == nil || autEntry.metadata == nil {
-			return errors.New("an non-registration AUT transaction try to operate on non-existing AUT entry")
-		}
-	}
-
-	// The output for AUT has been check in deserialized
-	// So just skip it here
-	//txOuts := tx.MsgTx().TxOuts
-	//for i := range autTx.Outs() {
-	//	err := aut.CheckTxoSanity(*tx.Hash(), i, txOuts[i])
-	//	if err != nil {
-	//		return err
-	//	}
-	//}
-
-	switch autTransaction := autTx.(type) {
-	case *aut.RegistrationTx:
-		// TODO if the height in %3!=2 it means that the aut should be expired!
-		// but we can just ignore now
-		if autTransaction.ExpireHeight < txHeight {
-			return fmt.Errorf("transaction %s try to register an AUT "+
-				"entry with expire height %d (current block height %d)", tx.Hash(),
-				autTransaction.ExpireHeight, txHeight)
-		}
-		// TODO Check issuer?
-
-	case *aut.MintTx:
-		// expired?
-		//if autEntry.info.ExpireHeight < txHeight {
-		//	return fmt.Errorf("transaction %s try to mint at height %d but "+
-		//		"the AUT entry claim its expire height %d", tx.Hash(), txHeight, autEntry.info.ExpireHeight)
-		//}
-
-		// duplicated input or double spending?
-		consumedIssueTokens := map[string]struct{}{}
-		willConsumedRootCoins := map[aut.OutPoint]struct{}{}
-		for i := 0; i < len(autTransaction.TxIns); i++ {
-			// spend non-exist or double spending
-			if _, existOutpoint := autView.entries[autIdentifierKey].metadata.RootCoinSet[autTransaction.TxIns[i]]; !existOutpoint {
-				return fmt.Errorf("transaction %s try to mint with unknown root coin <%s:%d>",
-					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index)
-			}
-
-			// check whether duplicate
-			if _, ok := willConsumedRootCoins[autTransaction.TxIns[i]]; ok {
-				return fmt.Errorf("transaction %s try to mint with repeated root coin <%s:%d>",
-					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index)
-			}
-			willConsumedRootCoins[autTransaction.TxIns[i]] = struct{}{}
-
-			utxoRing := view.LookupEntry(tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash())
-			if utxoRing == nil {
-				return fmt.Errorf("transaction %s try to mint at height %d but "+
-					"the consumed UTXO at Ring %s not exist", tx.Hash(), txHeight, tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash())
-			}
-			if len(utxoRing.txOuts) != 1 {
-				return fmt.Errorf("transaction %s try to mint at height %d but "+
-					"the consumed UTXO at Ring %s has ring size %d, expected %d",
-					tx.Hash(), txHeight, tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash(),
-					len(utxoRing.txOuts), 1,
-				)
-			}
-			coinAddress, err := aut.CheckTxoSanity(autTransaction.TxIns[i].TxHash, i, utxoRing.txOuts[0])
-			if err != nil {
-				return fmt.Errorf("transaction %s try to mint at height %d but "+
-					"the consumed UTXO at Ring %s is not a valid output", tx.Hash(), txHeight, tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash())
-			}
-			if _, ok := consumedIssueTokens[hex.EncodeToString(coinAddress)]; !ok {
-				consumedIssueTokens[hex.EncodeToString(coinAddress)] = struct{}{}
-			}
-		}
-		allIssuerTokens := map[string]struct{}{}
-		for i := 0; i < len(autView.entries[autIdentifierKey].metadata.IssuerTokens); i++ {
-			privacyLevel, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(autView.entries[autIdentifierKey].metadata.IssuerTokens[i])
-			if err != nil {
-				return fmt.Errorf("fail to parse %d-th issuer token in aut %s(identifer %s)", i, string(autView.entries[autIdentifierKey].metadata.AutSymbol), string(autView.entries[autIdentifierKey].metadata.AutIdentifier))
-			}
-			if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
-				return fmt.Errorf("specified %d-th issuer token is invalid in aut %s(identifer %s)", i, string(autView.entries[autIdentifierKey].metadata.AutSymbol), string(autView.entries[autIdentifierKey].metadata.AutIdentifier))
-			}
-			allIssuerTokens[hex.EncodeToString(coinAddress)] = struct{}{}
-		}
-		for issuerToken := range consumedIssueTokens {
-			if _, ok := allIssuerTokens[issuerToken]; !ok {
-				return fmt.Errorf("transaction %s try to mint at height %d with "+
-					"issue token but it do not exist in its registration", tx.Hash(), txHeight)
-			}
-		}
-		// check the input issuer token and issue token in info
-		if len(consumedIssueTokens) < int(autView.entries[autIdentifierKey].metadata.IssueTokensThreshold) {
-			return fmt.Errorf("transaction %s try to mint with %d issue token but "+
-				"the AUT entry claim its issue threshold %d", tx.Hash(), len(consumedIssueTokens), autView.entries[autIdentifierKey].metadata.IssueTokensThreshold)
-		}
-
-		// value
-		wouldMintedAmount := uint64(0)
-		for i := 0; i < len(autTransaction.TxoAUTValues); i++ {
-			// overflow
-			if wouldMintedAmount+autTransaction.TxoAUTValues[i] < wouldMintedAmount ||
-				wouldMintedAmount+autTransaction.TxoAUTValues[i] < autTransaction.TxoAUTValues[i] {
-				return fmt.Errorf("transaction %s try to mint coin to overflow", tx.Hash())
-			}
-			if wouldMintedAmount+autTransaction.TxoAUTValues[i] > autView.entries[autIdentifierKey].metadata.PlannedTotalAmount {
-				return fmt.Errorf("transaction %s try to mint coin exceed it claimed planned %d",
-					tx.Hash(), autView.entries[autIdentifierKey].metadata.PlannedTotalAmount)
-			}
-			wouldMintedAmount += autTransaction.TxoAUTValues[i]
-		}
-		if autView.entries[autIdentifierKey].metadata.MintedAmount+wouldMintedAmount < autView.entries[autIdentifierKey].metadata.MintedAmount {
-			return fmt.Errorf("transaction %s try to mint coin exceed it claimed planned %d",
-				tx.Hash(), autView.entries[autIdentifierKey].metadata.PlannedTotalAmount)
-		}
-
-	case *aut.ReRegistrationTx:
-		// check the sanity of re-registration transaction
-		// expire height
-		if autView.entries[autIdentifierKey].metadata.ExpireHeight < txHeight {
-			return fmt.Errorf("transaction %s try to re-register at height %d but "+
-				"the AUT entry claim its expire height %d when last registered", tx.Hash(), txHeight, autView.entries[autIdentifierKey].metadata.ExpireHeight)
-		}
-		if autTransaction.ExpireHeight < txHeight {
-			return fmt.Errorf("transaction %s try to re-register an AUT "+
-				"entry with expire height %d (current height %d)", tx.Hash(),
-				autTransaction.ExpireHeight, txHeight)
-		}
-
-		// duplicated input or double spending?
-		consumedIssueTokens := map[string]struct{}{}
-		willConsumedRootCoins := map[aut.OutPoint]struct{}{}
-		for i := 0; i < len(autTransaction.TxIns); i++ {
-			// spend non-exist or double spending
-			if _, isAUTTx := autView.entries[autIdentifierKey].metadata.RootCoinSet[autTransaction.TxIns[i]]; !isAUTTx {
-				return fmt.Errorf("transaction %s try to re-register with unknown root coin <%s:%d>",
-					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index)
-			}
-
-			// duplicate
-			if _, ok := willConsumedRootCoins[autTransaction.TxIns[i]]; ok {
-				return fmt.Errorf("transaction %s try to re-register with repeated root coin <%s:%d>",
-					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index)
-			}
-			willConsumedRootCoins[autTransaction.TxIns[i]] = struct{}{}
-
-			utxoRing := view.LookupEntry(tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash())
-			if utxoRing == nil {
-				return fmt.Errorf("transaction %s try to re-register at height %d but "+
-					"the consumed UTXO at Ring %s not exist", tx.Hash(), txHeight, tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash())
-			}
-			if len(utxoRing.txOuts) != 1 {
-				return fmt.Errorf("transaction %s try to mint at height %d but "+
-					"the consumed UTXO at Ring %s has ring size %d, expected %d",
-					tx.Hash(), txHeight, tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash(),
-					len(utxoRing.txOuts), 1,
-				)
-			}
-			coinAddress, err := aut.CheckTxoSanity(autTransaction.TxIns[i].TxHash, i, utxoRing.txOuts[0])
-			if err != nil {
-				return fmt.Errorf("transaction %s try to re-register at height %d but "+
-					"the consumed UTXO at Ring %s is not a valid output", tx.Hash(), txHeight, tx.MsgTx().TxIns[i].PreviousOutPointRing.Hash())
-			}
-			if _, ok := consumedIssueTokens[hex.EncodeToString(coinAddress)]; !ok {
-				consumedIssueTokens[hex.EncodeToString(coinAddress)] = struct{}{}
-			}
-		}
-		allIssuerTokens := map[string]struct{}{}
-		for i := 0; i < len(autView.entries[autIdentifierKey].metadata.IssuerTokens); i++ {
-			privacyLevel, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(autView.entries[autIdentifierKey].metadata.IssuerTokens[i])
-			if err != nil {
-				return fmt.Errorf("fail to parse %d-th issuer token in aut %s(identifer %s)", i, string(autView.entries[autIdentifierKey].metadata.AutSymbol), string(autView.entries[autIdentifierKey].metadata.AutIdentifier))
-			}
-			if privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
-				return fmt.Errorf("specified %d-th issuer token is invalid in aut %s(identifer %s)", i, string(autView.entries[autIdentifierKey].metadata.AutSymbol), string(autView.entries[autIdentifierKey].metadata.AutIdentifier))
-			}
-			allIssuerTokens[hex.EncodeToString(coinAddress)] = struct{}{}
-		}
-		for issuerToken := range consumedIssueTokens {
-			if _, ok := allIssuerTokens[issuerToken]; !ok {
-				return fmt.Errorf("transaction %s try to re-register at height %d with "+
-					"issue token but it do not exist in its registration", tx.Hash(), txHeight)
-			}
-		}
-		// check the input issuer token and issue token in info
-		if len(consumedIssueTokens) < int(autView.entries[autIdentifierKey].metadata.IssueTokensThreshold) {
-			return fmt.Errorf("transaction %s try to re-register with %d issue token but "+
-				"the AUT entry claim its issue threshold %d", tx.Hash(), len(consumedIssueTokens), autView.entries[autIdentifierKey].metadata.IssueTokensThreshold)
-		}
-
-		// check updated AUT info
-		// planned amount
-		if autTransaction.PlannedTotalAmount < autView.entries[autIdentifierKey].metadata.MintedAmount {
-			return fmt.Errorf("transaction %s try to re-register with planned total amount %d but "+
-				"the AUT entry has mint %d", tx.Hash(), autTransaction.PlannedTotalAmount, autView.entries[autIdentifierKey].metadata.MintedAmount)
-		}
-
-	case *aut.TransferTx:
-		// check the sanity of transfer transaction
-		// balance between inputs and outputs
-		totalInputValue := uint64(0)
-		willConsumedTokens := map[aut.OutPoint]struct{}{}
-		for i := 0; i < len(autTransaction.TxIns); i++ {
-			token, ok := autView.entries[autIdentifierKey].coins[autTransaction.TxIns[i]]
-			if !ok {
-				return fmt.Errorf("transaction %s try to spend non-existing/spent/burn token"+
-					"<%s:%d>", tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index)
-			}
-			// duplicate
-			if _, ok := willConsumedTokens[autTransaction.TxIns[i]]; ok {
-				return fmt.Errorf("transaction %s try to spend with repeat token <%s:%d>",
-					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index)
-			}
-			if token == nil {
-				return AssertError(fmt.Sprintf("transaction %s try to spend non-existing token", tx.Hash()))
-			}
-
-			willConsumedTokens[autTransaction.TxIns[i]] = struct{}{}
-			totalInputValue += token.amount
-		}
-		totalOutValue := uint64(0)
-		for i := 0; i < len(autTransaction.TxoAUTValues); i++ {
-			// overflow
-			if totalOutValue+autTransaction.TxoAUTValues[i] < totalOutValue ||
-				totalOutValue+autTransaction.TxoAUTValues[i] < autTransaction.TxoAUTValues[i] {
-				return fmt.Errorf("transaction %s try to spend coin with overflow value", tx.Hash())
-
-			}
-			if totalOutValue+autTransaction.TxoAUTValues[i] > autView.entries[autIdentifierKey].metadata.MintedAmount ||
-				totalOutValue+autTransaction.TxoAUTValues[i] > autView.entries[autIdentifierKey].metadata.PlannedTotalAmount {
-				return fmt.Errorf("transaction %s try to spend coin exceed it claimed minted %d/planned %d",
-					tx.Hash(), autView.entries[autIdentifierKey].metadata.MintedAmount, autView.entries[autIdentifierKey].metadata.PlannedTotalAmount)
-			}
-			totalOutValue += autTransaction.TxoAUTValues[i]
-		}
-		if totalInputValue != totalOutValue {
-			return errors.New("an AUT transfer transaction try to break-balance amount")
-		}
-
-	case *aut.BurnTx:
-		willBurnedCoins := map[aut.OutPoint]struct{}{}
-		for i := 0; i < len(autTransaction.TxIns); i++ {
-			// spend non-exist or double spending
-			if _, isAUTTx := autView.entries[autIdentifierKey].coins[autTransaction.TxIns[i]]; !isAUTTx {
-				return fmt.Errorf("transaction %s try to burn with unknown coin <%s:%d>",
-					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index)
-			}
-
-			// duplicate
-			if _, ok := willBurnedCoins[autTransaction.TxIns[i]]; ok {
-				return fmt.Errorf("transaction %s try to burn repeated coin <%s:%d>",
-					tx.Hash(), autTransaction.TxIns[i].TxHash, autTransaction.TxIns[i].Index)
-			}
-			willBurnedCoins[autTransaction.TxIns[i]] = struct{}{}
-		}
-	default:
-		return errors.New("unsupported AUT transaction type")
+		return fmt.Errorf("transaction %s try to mint but the witness verfied fail with %v",
+			tx.Hash(), err)
 	}
 
 	return nil
+}
+
+// validateAutTransferScript
+// aut review done 2025.12.12
+func checkAutTransferScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
+	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
+
+	if tx == nil {
+		return fmt.Errorf("tx is nil")
+	}
+
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		// the caller should check whether tx.ExtAutScript() is nil before calling this function
+		return fmt.Errorf("wrong call on validateAutTransferScript: tx.ExtAutScript is nil")
+	}
+
+	if extAutScript.Type() != ctautapi.AutScriptTypeTransfer {
+		return fmt.Errorf("expected transfer script, but got %d", extAutScript.Type())
+	}
+	transferScript, ok := extAutScript.AutScript.(*ctautapi.TransferScript)
+	if !ok {
+		return fmt.Errorf("expected transfer script, but got %d", extAutScript.Type())
+	}
+
+	autScriptVersion := extAutScript.Version()
+	autIdentifier := extAutScript.AutIdentifier()
+	autMetadata := ctautView.LookupCTAUTMetaInfo(autIdentifier)
+	if autMetadata == nil {
+		return fmt.Errorf("tx %v carries an AutTransferScript attempts to operate on non-existing AutInstance %s",
+			tx.Hash(), autIdentifier.String())
+	}
+
+	inStartIndex := int(transferScript.InStartIndex())
+	inHiddenAutTokenNum := int(transferScript.InHiddenAutTokenNum())
+	inPublicAutTokenNum := int(transferScript.InPublicAutTokenNum())
+
+	hostTxIns := tx.MsgTx().TxIns
+
+	if inStartIndex+inHiddenAutTokenNum+inPublicAutTokenNum > len(hostTxIns) {
+		return fmt.Errorf("inStartIndex (%d) + inHiddenAutTokenNum (%d) + inPublicAutTokenNum (%d) exceeds the number of TxIns (%d)",
+			inStartIndex, inHiddenAutTokenNum, inPublicAutTokenNum, len(hostTxIns))
+	}
+
+	willConsumedTokens := map[string]*ctautapi.HostOutPoint{}
+	for i := 0; i < inHiddenAutTokenNum+inPublicAutTokenNum; i++ {
+		hostTxIn := hostTxIns[inStartIndex+i]
+
+		ringHash := hostTxIn.PreviousOutPointRing.Hash()
+		ringEntry := hostView.LookupEntry(ringHash)
+		if ringEntry == nil {
+			return fmt.Errorf("transaction %s try to re-register at height %d but "+
+				"the consumed UTXO at Ring %s not exist", tx.Hash(), txHeight, hostTxIn.PreviousOutPointRing.Hash())
+		}
+
+		hostTxo, hostOutPoint, err := getAutHostFromTxoRing(ringEntry.TxoRing(), ringHash)
+		if err != nil {
+			return fmt.Errorf("error happens when calling getAutHostFromTxoRing on ringId %v: %v", ringHash, err)
+		}
+
+		// fill out with the first item in ring
+		_, err = ctautapi.RuleCheckOnHostTxo(hostTxo) // perform host checks
+		if err != nil {
+			return err
+		}
+
+		if hostOutPoint == nil {
+			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has nil at position 0 ", ringHash.String())
+		}
+
+		hostOPStr := hostOutPoint.String()
+		if _, ok = willConsumedTokens[hostOPStr]; ok {
+			return fmt.Errorf("AutTransferScript in transaction %v attempts to double spend the token <%s:%s>",
+				tx.Hash(), autIdentifier.String(), hostOutPoint.String())
+		}
+		willConsumedTokens[hostOPStr] = hostOutPoint
+
+		coin := ctautView.LookupCTAUTCoin(autIdentifier, *hostOutPoint)
+		if coin == nil {
+			// This is checking the case of spend-unexist.
+			// Double-spending check is performed through the host on TxIn.
+			return fmt.Errorf("AutTransferScript in transaction %v attepmts to spend an Aut Coin that does not exist (%s:%s)",
+				tx.Hash(), autIdentifier.String(), hostOutPoint.String())
+		}
+		if coin.IsSpent() {
+			// 2025.12.13 This is actually an assert, which should not happen.
+			// Double-spending check is performed through the host on TxIn.
+			return fmt.Errorf("AutTransferScript in transaction %v attempts to double spend the token <%s:%s>",
+				tx.Hash(), autIdentifier.String(), hostOutPoint.String())
+		}
+		// does not need to consider the double spending on coin, since that is checked by hostOutPoint.
+
+		autTxo := &ctautwire.AutTxo{}
+		err = autTxo.Deserialize(coin.valueScript)
+		if err != nil {
+			return err
+		}
+
+		// check input AutTxo's Type
+		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
+		if err != nil {
+			return fmt.Errorf("fail to get last aut txo type: %v", err)
+		}
+		if i < inHiddenAutTokenNum {
+			if autTxoType != abecryptox.AutTxoTypeHidden {
+				return fmt.Errorf("expect aut txo type %d but got %d",
+					abecryptox.AutTxoTypeHidden, autTxoType)
+			}
+		} else {
+			// >= inHiddenAutTokenNum
+			if autTxoType != abecryptox.AutTxoTypePublic {
+				return fmt.Errorf("expect aut txo type %d but got %d",
+					abecryptox.AutTxoTypePublic, autTxoType)
+			}
+		}
+
+		err = ctautapi.RuleCheckOnAutTxInputVersion(autScriptVersion, autTxo)
+		if err != nil {
+			return err
+		}
+	}
+
+	// check the output AutTxo's privacy type
+	// As local extAutScript is generated by a unique entrance,
+	// sanity-checks (without needing AutMetadata) on outputTokens have been performed.
+	for i, outputToken := range extAutScript.GeneratedTokens() {
+		if outputToken == nil {
+			return fmt.Errorf("extAutScript.GeneratedTokens()[%d] is nil", i)
+		}
+
+		autTxo := &ctautwire.AutTxo{}
+		err := autTxo.Deserialize(outputToken.ValueScript)
+		if err != nil {
+			return err
+		}
+
+		err = ctautapi.RuleCheckOnAutTxOutputPrivacyTypeAndValue(autMetadata.PrivacyType, autTxo)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validateAutTransferScriptWitness
+//
+// This function should be called after checkAutTransferScriptInputOutputs() is performed.
+// review done 2025.12.15
+func validateAutTransferScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint) error {
+
+	if tx == nil {
+		return fmt.Errorf("tx is nil")
+	}
+
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		// the caller should check whether tx.ExtAutScript() is nil before calling this function
+		return fmt.Errorf("wrong call on validateAutTransferScriptWitness: tx.ExtAutScript is nil")
+	}
+
+	if extAutScript.Type() != ctautapi.AutScriptTypeTransfer {
+		return fmt.Errorf("expected transfer script, but got %d", extAutScript.Type())
+	}
+	transferScript, ok := extAutScript.AutScript.(*ctautapi.TransferScript)
+	if !ok {
+		return fmt.Errorf("expected transfer script, but got %d", extAutScript.Type())
+	}
+
+	if !tx.MsgTx().HasAutWitness() {
+		return fmt.Errorf("transaction %s has no aut witness", tx.Hash())
+	}
+	witnessHash := ctautwire.AutWitnessHash(tx.MsgTx().AutWitness)
+
+	claimedWitnessHash := transferScript.WitnessHash()
+	if !witnessHash.IsEqual(&claimedWitnessHash) {
+		return fmt.Errorf("mismatch witness for script")
+	}
+
+	autIdentifier := extAutScript.AutIdentifier()
+	hostOutPoints := extAutScript.ConsumedHostOutpoints()
+	autTxIns := make([]*ctautwire.AutTxo, len(hostOutPoints))
+	for i, hostOutPoint := range hostOutPoints {
+		if hostOutPoint == nil {
+			return fmt.Errorf("%d -th ConsumedHostOutpoint is nil", i)
+		}
+		coin := ctautView.LookupCTAUTCoin(autIdentifier, *hostOutPoint)
+		if coin == nil {
+			return fmt.Errorf("no such aut coin for (%s:%s) found", autIdentifier.String(), hostOutPoint.String())
+		}
+		autTxo := &ctautwire.AutTxo{}
+		err := autTxo.Deserialize(coin.valueScript)
+		if err != nil {
+			return err
+		}
+		autTxIns[i] = autTxo
+	}
+
+	generatedTokens := extAutScript.GeneratedTokens()
+	autTxOuts := make([]*ctautwire.AutTxo, len(generatedTokens))
+	for i, outputToken := range generatedTokens {
+		if outputToken == nil {
+			return fmt.Errorf("%d -th generatedToken is nil", i)
+		}
+		autTxo := &ctautwire.AutTxo{}
+		err := autTxo.Deserialize(outputToken.ValueScript)
+		if err != nil {
+			return err
+		}
+
+		autTxOuts[i] = autTxo
+	}
+
+	trTx := &ctautwire.AutTransferTx{
+		Version:   extAutScript.Version(),
+		TxIns:     autTxIns,
+		TxOuts:    autTxOuts,
+		TxWitness: tx.MsgTx().AutWitness,
+	}
+
+	err := abecryptox.AutTransferTxVerify(trTx)
+	if err != nil {
+		return fmt.Errorf("transaction %s try to transfer tokens but the witness verfied fail with %v",
+			tx.Hash(), err)
+	}
+
+	return nil
+}
+
+// checkAutBurnScriptInputsOutputs
+// aut review done 2025.12.12
+func checkAutBurnScriptInputsOutputs(tx *abeutil.TxAbe, txHeight int32,
+	ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint, chainParams *chaincfg.Params) error {
+
+	if tx == nil {
+		return fmt.Errorf("tx is nil")
+	}
+
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		// the caller should check whether tx.ExtAutScript() is nil before calling this function
+		return fmt.Errorf("wrong call on validateAutBurnScript: tx.ExtAutScript is nil")
+	}
+
+	if extAutScript.Type() != ctautapi.AutScriptTypeBurn {
+		return fmt.Errorf("expected burn script, but got %d", extAutScript.Type())
+	}
+	burnScript, ok := extAutScript.AutScript.(*ctautapi.BurnScript)
+	if !ok {
+		return fmt.Errorf("expected burn script, but got %d", extAutScript.Type())
+	}
+
+	autScriptVersion := extAutScript.Version()
+	autIdentifier := extAutScript.AutIdentifier()
+	autMetadata := ctautView.LookupCTAUTMetaInfo(autIdentifier)
+	if autMetadata == nil {
+		return fmt.Errorf("tx %v carries an AutBurnScript which attempts to operate on non-existing AutInstance %s",
+			tx.Hash(), autIdentifier.String())
+	}
+
+	inStartIndex := int(burnScript.InStartIndex())
+	inHiddenAutTokenNum := int(burnScript.InHiddenAutTokenNum())
+	inPublicAutTokenNum := int(burnScript.InPublicAutTokenNum())
+
+	hostTxIns := tx.MsgTx().TxIns
+
+	if inStartIndex+inHiddenAutTokenNum+inPublicAutTokenNum > len(hostTxIns) {
+		return fmt.Errorf("inStartIndex (%d) + inHiddenAutTokenNum (%d) + inPublicAutTokenNum (%d) exceeds the number of TxIns (%d)",
+			inStartIndex, inHiddenAutTokenNum, inPublicAutTokenNum, len(hostTxIns))
+	}
+
+	willConsumedTokens := map[string]*ctautapi.HostOutPoint{}
+	for i := 0; i < inHiddenAutTokenNum+inPublicAutTokenNum; i++ {
+		hostTxIn := hostTxIns[inStartIndex+i]
+
+		ringHash := hostTxIn.PreviousOutPointRing.Hash()
+		ringEntry := hostView.LookupEntry(ringHash)
+		if ringEntry == nil {
+			return fmt.Errorf("transaction %s try to re-register at height %d but "+
+				"the consumed UTXO at Ring %s not exist", tx.Hash(), txHeight, hostTxIn.PreviousOutPointRing.Hash())
+		}
+
+		hostTxo, hostOutPoint, err := getAutHostFromTxoRing(ringEntry.TxoRing(), ringHash)
+		if err != nil {
+			return fmt.Errorf("error happens when calling getAutHostFromTxoRing on ringId %v: %v", ringHash, err)
+		}
+
+		// fill out with the first item in ring
+		_, err = ctautapi.RuleCheckOnHostTxo(hostTxo) // preform host checks
+		if err != nil {
+			return err
+		}
+
+		if hostOutPoint == nil {
+			return fmt.Errorf("the TxoRing.OutPointRing obtained by ringHash (%s) has nil at position 0 ", ringHash.String())
+		}
+
+		hostOPStr := hostOutPoint.String()
+		if _, ok = willConsumedTokens[hostOPStr]; ok {
+			return fmt.Errorf("AutBurnScript in transaction %v attempts to double spend the token <%s:%s>",
+				tx.Hash(), autIdentifier.String(), hostOutPoint.String())
+		}
+		willConsumedTokens[hostOPStr] = hostOutPoint
+
+		coin := ctautView.LookupCTAUTCoin(autIdentifier, *hostOutPoint)
+		if coin == nil {
+			return fmt.Errorf("AutBurnScript in transaction %v attempts to spend a non-existing Aut coin <%s:%s>",
+				tx.Hash(), autIdentifier.String(), hostOutPoint.String())
+		}
+		if coin.IsSpent() {
+			return fmt.Errorf("AutBurnScript in transaction %v attempts to double spend the token <%s:%s>",
+				tx.Hash(), autIdentifier.String(), hostOutPoint.String())
+		}
+
+		autTxo := &ctautwire.AutTxo{}
+		err = autTxo.Deserialize(coin.valueScript)
+		if err != nil {
+			return err
+		}
+
+		// check input AutTxo's type
+		autTxoType, err := abecryptox.GetAutTxoType(autTxo)
+		if err != nil {
+			return fmt.Errorf("fail to get last aut txo type: %v", err)
+		}
+		if i < inHiddenAutTokenNum {
+			if autTxoType != abecryptox.AutTxoTypeHidden {
+				return fmt.Errorf("expect aut txo type %d but got %d",
+					abecryptox.AutTxoTypeHidden, autTxoType)
+			}
+		} else {
+			// >= inHiddenAutTokenNum
+			if autTxoType != abecryptox.AutTxoTypePublic {
+				return fmt.Errorf("expect aut txo type %d but got %d",
+					abecryptox.AutTxoTypePublic, autTxoType)
+			}
+		}
+
+		err = ctautapi.RuleCheckOnAutTxInputVersion(autScriptVersion, autTxo)
+		if err != nil {
+			return err
+		}
+	}
+
+	// check privacy type
+	// special case: ignore the last one token when checking the privacy type rule, and it must be public
+	var burnedValue uint64
+	outputTokens := extAutScript.GeneratedTokens()
+	for i, outputToken := range outputTokens {
+		if outputToken == nil {
+			return fmt.Errorf("extAutScript.GeneratedTokens()[%d] is nil", i)
+		}
+
+		autTxo := &ctautwire.AutTxo{}
+		err := autTxo.Deserialize(outputToken.ValueScript)
+		if err != nil {
+			return err
+		}
+
+		if i == len(outputTokens)-1 {
+			// for the burned token, it must be public, whatever the AutInstance's privacy type.
+			autTxoType, err := abecryptox.GetAutTxoType(autTxo)
+			if err != nil {
+				return fmt.Errorf("fail to get last aut txo type: %v", err)
+			}
+			if autTxoType != abecryptox.AutTxoTypePublic {
+				return fmt.Errorf("the burned token must have typr = AutTxoTypePublic (%d), rather than %d",
+					abecryptox.AutTxoTypePublic, autTxoType)
+			}
+			burnedValue, err = abecryptox.ExtractAutTxoValue(autTxo, nil, nil)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = ctautapi.RuleCheckOnAutTxOutputPrivacyTypeAndValue(autMetadata.PrivacyType, autTxo)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// check the supply
+	if autMetadata.BurnedAmount > autMetadata.MintedAmount {
+		// just assert
+		return fmt.Errorf("the target AutInstance has burnedAmout (%d) which exceeds the mintedAmount (%d) ",
+			autMetadata.BurnedAmount, autMetadata.MintedAmount)
+	}
+	maxAllowed := autMetadata.MintedAmount - autMetadata.BurnedAmount // uint64, and >= 0
+
+	if burnedValue > maxAllowed {
+		return fmt.Errorf("transaction %s try to burn coin value %d, which exceeds the allowed value %d (= MintedAmount %d - BunredAmount %d)",
+			tx.Hash(), burnedValue, maxAllowed, autMetadata.MintedAmount, autMetadata.BurnedAmount)
+	}
+
+	return nil
+}
+
+// validateAutBurnScriptWitness
+//
+// This function should be called after checkAutBrunScriptInputOutputs() is performed.
+// review done 2025.12.15
+func validateAutBurnScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint) error {
+
+	if tx == nil {
+		return fmt.Errorf("tx is nil")
+	}
+
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		// the caller should check whether tx.ExtAutScript() is nil before calling this function
+		return fmt.Errorf("wrong call on validateAutBurnScriptWitness: tx.ExtAutScript is nil")
+	}
+
+	if extAutScript.Type() != ctautapi.AutScriptTypeBurn {
+		return fmt.Errorf("expected burn script, but got %d", extAutScript.Type())
+	}
+	burnScript, ok := extAutScript.AutScript.(*ctautapi.BurnScript)
+	if !ok {
+		return fmt.Errorf("expected burn script, but got %d", extAutScript.Type())
+	}
+
+	if !tx.MsgTx().HasAutWitness() {
+		return fmt.Errorf("transaction %s has no aut witness", tx.Hash())
+	}
+	witnessHash := ctautwire.AutWitnessHash(tx.MsgTx().AutWitness)
+	claimedWitnessHash := burnScript.WitnessHash()
+	if !witnessHash.IsEqual(&claimedWitnessHash) {
+		return fmt.Errorf("mismatch witness for script")
+	}
+
+	autIdentifier := extAutScript.AutIdentifier()
+	hostOutPoints := extAutScript.ConsumedHostOutpoints()
+	autTxIns := make([]*ctautwire.AutTxo, len(hostOutPoints))
+	for i, hostOutPoint := range hostOutPoints {
+		if hostOutPoint == nil {
+			return fmt.Errorf("the %d -th input ConsumedHostOutpoint is nil ", i)
+		}
+
+		coin := ctautView.LookupCTAUTCoin(autIdentifier, *hostOutPoint)
+		if coin == nil {
+			return fmt.Errorf("no Aut coin for (%s:%s) found", autIdentifier.String(), hostOutPoint.String())
+		}
+
+		autTxo := &ctautwire.AutTxo{}
+		err := autTxo.Deserialize(coin.valueScript)
+		if err != nil {
+			return err
+		}
+
+		autTxIns[i] = autTxo
+	}
+
+	generatedTokens := extAutScript.GeneratedTokens()
+	autTxOuts := make([]*ctautwire.AutTxo, len(generatedTokens))
+	for i, outputToken := range generatedTokens {
+
+		if outputToken == nil {
+			return fmt.Errorf("the %d -th generatedToken is nil", i)
+		}
+
+		autTxo := &ctautwire.AutTxo{}
+		err := autTxo.Deserialize(outputToken.ValueScript)
+		if err != nil {
+			return err
+		}
+
+		autTxOuts[i] = autTxo
+	}
+
+	trTx := &ctautwire.AutTransferTx{
+		Version:   extAutScript.Version(),
+		TxIns:     autTxIns,
+		TxOuts:    autTxOuts,
+		TxWitness: tx.MsgTx().AutWitness,
+	}
+
+	err := abecryptox.AutTransferTxVerify(trTx)
+	if err != nil {
+		return fmt.Errorf("transaction %s try to burn tokens but the witness verfied fail with %v",
+			tx.Hash(), err)
+	}
+
+	return nil
+}
+
+// getAutHostFromTxoRing returns the host-Txo and host-OutPoint from the given txoRing,
+// which should have size  = 1.
+func getAutHostFromTxoRing(txoRing *wire.TxoRing, ringHash wire.RingId) (*wire.TxOutAbe, *ctautapi.HostOutPoint, error) {
+	if txoRing == nil {
+		return nil, nil, fmt.Errorf("the TxoRing is nil")
+	}
+	if txoRing.OutPointRing == nil {
+		return nil, nil, fmt.Errorf("the TxoRing.OutPointRing is nil")
+	}
+
+	ringId := txoRing.OutPointRing.RingId()
+	if !ringId.IsEqual(&ringHash) {
+		return nil, nil, fmt.Errorf("the TxoRing.OutPointRing has has ringId (%s), which does not match the expected %s",
+			ringId.String(), ringHash.String())
+	}
+
+	if len(txoRing.OutPointRing.OutPoints) != 1 {
+		return nil, nil, fmt.Errorf("the TxoRing has len(txoRing.OutPointRing.OutPoints) (%d) != 1 ",
+			len(txoRing.OutPointRing.OutPoints))
+	}
+
+	if len(txoRing.TxOuts) != len(txoRing.OutPointRing.OutPoints) {
+		return nil, nil, fmt.Errorf("the TxoRing has len(txoRing.TxOuts) = %d while len(txoRing.OutPointRing.OutPoints) = %d",
+			len(txoRing.TxOuts), len(txoRing.OutPointRing.OutPoints))
+	}
+
+	txo := txoRing.TxOuts[0]
+	hostPoint := txoRing.OutPointRing.OutPoints[0]
+
+	return txo, hostPoint, nil
+}
+
+// checkTxAutScriptInputsOutputs
+// aut review done, 2025.12.13 done
+func checkTxAutScriptInputsOutputs(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint,
+	currentHeight int32, chainParams *chaincfg.Params) error {
+	if tx == nil {
+		return fmt.Errorf("checkTxAutScriptInputsOutputs: a nil transaction")
+	}
+
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		return nil
+	}
+
+	switch extAutScript.AutScript.(type) {
+	case *ctautapi.RegistrationScript:
+		return checkAutRegistrationScriptInputsOutputs(tx, currentHeight, ctautView, hostView, chainParams)
+
+	case *ctautapi.ReRegistrationScript:
+		return checkAutReRegistrationScriptInputsOutputs(tx, currentHeight, ctautView, hostView, chainParams)
+
+	case *ctautapi.MintScript:
+		return checkAutMintScriptInputsOutputs(tx, currentHeight, ctautView, hostView, chainParams)
+
+	case *ctautapi.TransferScript:
+		return checkAutTransferScriptInputsOutputs(tx, currentHeight, ctautView, hostView, chainParams)
+
+	case *ctautapi.BurnScript:
+		// This branch is exactly the same checking as the previous one, except for all the differences in handling outputs
+		return checkAutBurnScriptInputsOutputs(tx, currentHeight, ctautView, hostView, chainParams)
+
+	default:
+		return fmt.Errorf("unsupported AUT Script type")
+	}
+}
+
+// validateTxAutScriptWitness
+// aut review done, 2025.12.15 done
+func validateTxAutScriptWitness(tx *abeutil.TxAbe, ctautView *CTAUTViewpoint, hostView *UtxoRingViewpoint) error {
+	if tx == nil {
+		return fmt.Errorf("validateTxAutScriptWitness: a nil transaction")
+	}
+
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		return nil
+	}
+
+	switch extAutScript.AutScript.(type) {
+	case *ctautapi.RegistrationScript, *ctautapi.ReRegistrationScript:
+		// no witness to verify
+		return nil
+
+	case *ctautapi.MintScript:
+		return validateAutMintScriptWitness(tx, ctautView, hostView)
+
+	case *ctautapi.TransferScript:
+		return validateAutTransferScriptWitness(tx, ctautView, hostView)
+
+	case *ctautapi.BurnScript:
+		// This branch is exactly the same checking as the previous one, except for all the differences in handling outputs
+		return validateAutBurnScriptWitness(tx, ctautView, hostView)
+
+	default:
+		return fmt.Errorf("validateTxAutScriptWitness: unsupported Aut Script type")
+	}
 }
 
 // checkConnectBlockAbe performs several checks to confirm connecting the passed
@@ -2025,9 +2864,12 @@ func CheckTransactionInputsAUT(tx *abeutil.TxAbe, txHeight int32, view *UtxoRing
 //	  7. Set new best height for utxo ring view
 //
 // todo_DONE(MLP): reviewed on 2024.01.04
-func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
+// aut review done 2025.12.16
+func (b *BlockChain) checkConnectBlockAbe(
+	node *blockNode, block *abeutil.BlockAbe,
 	view *UtxoRingViewpoint, stxos *[]*SpentTxOutAbe,
-	autView *AUTViewpoint, sauts *[]SpentAUT) error {
+	ctautView *CTAUTViewpoint, sctauts *[]SpentAut,
+) error {
 	// If the side chain blocks end up in the database, a call to
 	// CheckBlockSanity should be done here in case a previous version
 	// allowed a block that is no longer valid.  However, since the
@@ -2087,7 +2929,8 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 		return err
 	}
 
-	err = autView.fetchInputAUTUtxos(b.db, block)
+	// 1. fetch ctaut input from blockchain
+	err = ctautView.fetchConsumedCTAUTTokens(b.db, block, view)
 	if err != nil {
 		return err
 	}
@@ -2153,22 +2996,9 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	for _, tx := range transactions[1:] {
 		// todo_DONE(MLP): reviewed on 2024.01.04
 		// Did not check/prevent the case that two transactions in a block spend the same coin. It will be handled later.
-		err = CheckTransactionInputsAbe(tx, node.height, view,
-			b.chainParams)
+		err = CheckTransactionInputsAbe(tx, node.height, view, ctautView, b.chainParams)
 		if err != nil {
 			return err
-		}
-
-		autTx, err := tx.AUTTransaction()
-		if err != nil {
-			return err
-		}
-		if autTx != nil {
-			err = CheckTransactionInputsAUT(tx, node.height, view, autView,
-				b.chainParams)
-			if err != nil {
-				return err
-			}
 		}
 
 		// Sum the total fees and ensure we don't overflow the
@@ -2176,7 +3006,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 		lastTotalFees := totalFees
 		totalFees += tx.MsgTx().TxFee
 		if totalFees < lastTotalFees {
-			return ruleError(ErrBadFees, "total fees for block "+
+			return ruleerror.NewRuleError(ruleerror.ErrBadFees, "total fees for block "+
 				"overflows accumulator")
 		}
 
@@ -2186,15 +3016,16 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 		// spent txout in the order each transaction spends them.
 		// todo_DONE(MLP): reviewed on 2024.01.04
 		// view.connectTransaction() checks the double-spending among one block
-		err = view.connectTransaction(tx, &node.hash, stxos)
+		// todo: 2025.12.13 add (ctautView, sctauts) as paramter to view.connectTransaction(); consider refactor in the future.
+		err = view.connectTransaction(tx, &node.hash, stxos, node.height, ctautView, sctauts)
 		if err != nil {
 			return err
 		}
 
-		err = autView.connectTransaction(tx, node.height, sauts)
-		if err != nil {
-			return err
-		}
+		//err = ctautView.connectTransaction(tx, node.height, sctauts)
+		//if err != nil {
+		//	return err
+		//}
 	}
 
 	// The total output values of the coinbase transaction must not exceed
@@ -2208,12 +3039,19 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 		}*/
 	totalNeutrinoOut := transactions[0].MsgTx().TxFee // for coinbase transaction, TxFee is used to represent the Value_in
 
-	expectedNeutrinoOut := CalcBlockSubsidy(node.height, b.chainParams) + totalFees
+	subsidy := CalcBlockSubsidy(node.height, b.chainParams)
+	expectedNeutrinoOut := subsidy + totalFees
+	if expectedNeutrinoOut < subsidy || expectedNeutrinoOut < totalFees {
+		str := fmt.Sprintf("subsidy (%d) + totalFees (%d) results overflow",
+			subsidy, totalFees)
+		return ruleerror.NewRuleError(ruleerror.ErrBadCoinbaseValue, str)
+	}
+
 	if totalNeutrinoOut > expectedNeutrinoOut {
 		str := fmt.Sprintf("coinbase transaction for block pays %v "+
 			"which is more than expected value of %v",
 			totalNeutrinoOut, expectedNeutrinoOut)
-		return ruleError(ErrBadCoinbaseValue, str)
+		return ruleerror.NewRuleError(ruleerror.ErrBadCoinbaseValue, str)
 	}
 
 	// Don't run scripts if this node is before the latest known good
@@ -2303,7 +3141,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	if witnessCheck {
 		log.Debugf("Check the witness for block %s in height %d", block.Hash(), block.Height())
 		// todo_DONE(MLP): reviewed on 2024.01.04
-		err := checkBlockScriptsAbe(block, view, b.witnessCache)
+		err := checkBlockScriptsAbe(block, view, ctautView, b.witnessCache)
 		if err != nil {
 			return err
 		}
@@ -2312,7 +3150,7 @@ func (b *BlockChain) checkConnectBlockAbe(node *blockNode, block *abeutil.BlockA
 	// Update the best hash for view to include this block since all of its
 	// transactions have been connected.
 	view.SetBestHash(&node.hash)
-	autView.SetBestHash(&node.hash)
+	ctautView.SetBestHash(&node.hash)
 
 	return nil
 }
@@ -2338,14 +3176,14 @@ func (b *BlockChain) CheckConnectBlockTemplateAbe(block *abeutil.BlockAbe) error
 	if tip.hash != header.PrevBlock {
 		str := fmt.Sprintf("previous block must be the current chain tip %v, "+
 			"instead got %v", tip.hash, header.PrevBlock)
-		return ruleError(ErrPrevBlockNotBest, str)
+		return ruleerror.NewRuleError(ruleerror.ErrPrevBlockNotBest, str)
 	}
 
 	//	todo: (EthashPoW)
 	if header.Height != tip.height+1 {
 		str := fmt.Sprintf("the height of block (template) must be 1 greater than that of the current chain tip %v (%d), "+
 			"instead got %d", tip.hash, tip.height, header.Height)
-		return ruleError(ErrMismatchedBlockHeightWithPrevNode, str)
+		return ruleerror.NewRuleError(ruleerror.ErrMismatchedBlockHeightWithPrevNode, str)
 	}
 
 	//	todo: (EthashPoW)
@@ -2365,13 +3203,13 @@ func (b *BlockChain) CheckConnectBlockTemplateAbe(block *abeutil.BlockAbe) error
 	view := NewUtxoRingViewpoint()
 	view.SetBestHash(&tip.hash)
 
-	autView := NewAUTViewpoint()
-	autView.SetBestHash(&tip.hash)
+	ctautView := NewCTAUTViewpoint()
+	ctautView.SetBestHash(&tip.hash)
 	//	todo: (EthashPoW)
 	newNode, err := b.newBlockNode(&header, tip)
 	if err != nil {
 		return err
 	}
 
-	return b.checkConnectBlockAbe(newNode, block, view, nil, autView, nil)
+	return b.checkConnectBlockAbe(newNode, block, view, nil, ctautView, nil)
 }

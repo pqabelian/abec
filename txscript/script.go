@@ -388,6 +388,7 @@ func calcHashPrevOuts(tx *wire.MsgTx) chainhash.Hash {
 		b.Write(buf[:])
 	}
 
+	// todo: doubleHash, it does matter, since it is not used and will be removed
 	return chainhash.DoubleHashH(b.Bytes())
 }
 
@@ -405,6 +406,7 @@ func calcHashSequence(tx *wire.MsgTx) chainhash.Hash {
 		b.Write(buf[:])
 	}
 
+	// todo: doubleHash, it does matter, since it is not used and will be removed
 	return chainhash.DoubleHashH(b.Bytes())
 }
 
@@ -419,6 +421,7 @@ func calcHashOutputs(tx *wire.MsgTx) chainhash.Hash {
 		wire.WriteTxOut(&b, 0, 0, out)
 	}
 
+	// todo: doubleHash, it does matter, since it is not used and will be removed
 	return chainhash.DoubleHashH(b.Bytes())
 }
 
@@ -521,6 +524,7 @@ func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 	} else if hashType&sigHashMask == SigHashSingle && idx < len(tx.TxOut) {
 		var b bytes.Buffer
 		wire.WriteTxOut(&b, 0, 0, tx.TxOut[idx])
+		// todo: doubleHash, it does matter, since it is not used and will be removed
 		sigHash.Write(chainhash.DoubleHashB(b.Bytes()))
 	} else {
 		sigHash.Write(zeroHash[:])
@@ -534,7 +538,7 @@ func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 	var bHashType [4]byte
 	binary.LittleEndian.PutUint32(bHashType[:], uint32(hashType))
 	sigHash.Write(bHashType[:])
-
+	// todo: doubleHash, it does matter, since it is not used and will be removed
 	return chainhash.DoubleHashB(sigHash.Bytes()), nil
 }
 
@@ -683,6 +687,7 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType, tx *wire.Msg
 	wbuf := bytes.NewBuffer(make([]byte, 0, txCopy.SerializeSizeStripped()+4))
 	txCopy.SerializeNoWitness(wbuf)
 	binary.Write(wbuf, binary.LittleEndian, hashType)
+	// todo: doubleHash, it does matter, since it is not used and will be removed
 	return chainhash.DoubleHashB(wbuf.Bytes())
 }
 

@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"github.com/pqabelian/abec/abeutil"
 	"github.com/pqabelian/abec/blockchain"
+	"github.com/pqabelian/abec/blockchain/consensus"
+	"github.com/pqabelian/abec/blockchain/consensus/ethashpow"
 	"github.com/pqabelian/abec/blockchain/indexers"
 	"github.com/pqabelian/abec/chainhash"
-	"github.com/pqabelian/abec/consensus/ethash"
 	"github.com/pqabelian/abec/database"
 	"github.com/pqabelian/abec/wire"
 	"io"
@@ -42,7 +43,7 @@ type blockImporter struct {
 	lastHeight        int64
 	lastBlockTime     time.Time
 	lastLogTime       time.Time
-	ethash            *ethash.Ethash // todo: (EthashPoW)
+	powConsensus      *consensus.PowConsensus
 }
 
 // readBlock reads the next block from the input file.
@@ -127,7 +128,7 @@ func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 
 	// Ensure the blocks follows all of the chain rules and match up to the
 	// known checkpoints.
-	isMainChain, isOrphan, err := bi.chain.ProcessBlockAbe(block, bi.ethash,
+	isMainChain, isOrphan, err := bi.chain.ProcessBlockAbe(block, bi.powConsensus,
 		blockchain.BFFastAdd)
 	if err != nil {
 		return false, err
@@ -338,7 +339,7 @@ func newBlockImporter(db database.DB, r io.ReadSeeker) (*blockImporter, error) {
 		return nil, err
 	}
 
-	ethash := ethash.New(ethash.DefaultCfg) //	todo: (EthashPoW)
+	powConsensus := consensus.NewPowConsensus(ethashpow.GetDefaultEthashConfigCopy())
 	return &blockImporter{
 		db:           db,
 		r:            r,
@@ -348,6 +349,6 @@ func newBlockImporter(db database.DB, r io.ReadSeeker) (*blockImporter, error) {
 		quit:         make(chan struct{}),
 		chain:        chain,
 		lastLogTime:  time.Now(),
-		ethash:       ethash, //	todo: (EthashPoW)
+		powConsensus: powConsensus,
 	}, nil
 }

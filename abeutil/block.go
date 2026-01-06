@@ -2,11 +2,12 @@ package abeutil
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
-	"github.com/pqabelian/abec/aut"
 	"io"
 
 	"github.com/pqabelian/abec/chainhash"
+	ctautapi "github.com/pqabelian/abec/ctaut/api"
 	"github.com/pqabelian/abec/wire"
 )
 
@@ -46,10 +47,8 @@ type BlockAbe struct {
 	blockHash                *chainhash.Hash   // Cached block hash
 	blockHeight              int32             // Height in the main block chain
 	transactions             []*TxAbe          // Transactions
-	txnsGenerated            bool              // ALL wrapped transactions generated
 
-	autTransactions  []aut.Transaction
-	autTxnsGenerated bool
+	extAutScripts []*ctautapi.ExtAutScript
 }
 
 // Abe to do
@@ -121,6 +120,8 @@ func (b *Block) Bytes() ([]byte, error) {
 	return serializedBlock, nil
 }
 
+// Bytes
+// todo: this function has some potential issue. Fortunately, it is not used at present.
 func (b *BlockAbe) Bytes() ([]byte, error) {
 	// Return the cached serialized bytes if it has already been generated.
 	if len(b.serializedBlock) != 0 {
@@ -303,79 +304,76 @@ func (b *Block) Transactions() []*Tx {
 
 // Abe to do
 func (b *BlockAbe) Transactions() []*TxAbe {
-	// Return transactions if they have ALL already been generated.  This
-	// flag is necessary because the wrapped transactions are lazily
-	// generated in a sparse fashion.
-	if b.txnsGenerated {
-		return b.transactions
-	}
-
-	// Generate slice to hold all of the wrapped transactions if needed.
-	if len(b.transactions) == 0 {
-		b.transactions = make([]*TxAbe, len(b.msgBlock.Transactions))
-	}
-
-	// Generate and cache the wrapped transactions for all that haven't
-	// already been done.
-	for i, tx := range b.transactions {
-		if tx == nil {
-			newTx := NewTxAbe(b.msgBlock.Transactions[i])
-			newTx.SetIndex(i)
-			if !newTx.HasWitness() {
-				newTx.txWitnessHash = b.msgBlock.WitnessHashs[i]
-			}
-			b.transactions[i] = newTx
-		}
-	}
-
-	b.txnsGenerated = true
+	//// Return transactions if they have ALL already been generated.  This
+	//// flag is necessary because the wrapped transactions are lazily
+	//// generated in a sparse fashion.
+	//if b.txnsGenerated {
+	//	return b.transactions
+	//}
+	//
+	//// Generate slice to hold all of the wrapped transactions if needed.
+	//if len(b.transactions) == 0 {
+	//	b.transactions = make([]*TxAbe, len(b.msgBlock.Transactions))
+	//}
+	//
+	//// Generate and cache the wrapped transactions for all that haven't
+	//// already been done.
+	//for i, tx := range b.transactions {
+	//	if tx == nil {
+	//		newTx := NewTxAbe(b.msgBlock.Transactions[i])
+	//		newTx.SetIndex(i)
+	//		if !newTx.HasTxWitness() {
+	//			newTx.txWitnessHash = b.msgBlock.WitnessHashs[i]
+	//		}
+	//		b.transactions[i] = newTx
+	//	}
+	//}
+	//
+	//b.txnsGenerated = true
 	return b.transactions
 }
 
-// AUTTransactions returns the AutTransaction hosted by the transaction in the block.
-// If they have been parsed, just return, otherwise, parse and return.
-// refactored by Alice on 2024.03.01
-func (b *BlockAbe) AUTTransactions() []aut.Transaction {
-	// Return transactions if they have ALL already been generated.  This
-	// flag is necessary because the wrapped transactions are lazily
-	// generated in a sparse fashion.
-	if b.autTxnsGenerated {
-		return b.autTransactions
-	}
-
-	// Generate slice to hold all of the wrapped transactions if needed.
-	if len(b.autTransactions) == 0 {
-		b.autTransactions = make([]aut.Transaction, 0, len(b.msgBlock.Transactions))
-	}
-
-	// Generate and cache the wrapped autTransactions for all that haven't
-	// already been done.
-	for i, txAbe := range b.Transactions() {
-		isCb, err := txAbe.IsCoinBase()
-		if err != nil {
-			//	this should not happen
-			log.Warnf("AUTTransactions: error happens when calling IsCoinBase() on the %d-th transaction of the block: %v", i, err)
-			continue
-		}
-		if isCb {
-			continue
-		}
-
-		autTx, err := txAbe.AUTTransaction()
-		if err != nil {
-			//	this should not happen
-			log.Warnf("AUTTransactions: error happens when getting AutTransaction from the %d-th transaction (%s) of the block: %v", i, txAbe.Hash(), err)
-			continue
-		}
-		if autTx == nil {
-			log.Debugf("AUTTransactions: skip non-AUT transaction %s", txAbe.Hash())
-			continue
-		}
-		b.autTransactions = append(b.autTransactions, autTx)
-	}
-
-	b.autTxnsGenerated = true
-	return b.autTransactions
+func (b *BlockAbe) ExtAutScripts() []*ctautapi.ExtAutScript {
+	//// Return transactions if they have ALL already been generated.  This
+	//// flag is necessary because the wrapped transactions are lazily
+	//// generated in a sparse fashion.
+	//if b.extAutScriptsGenerated {
+	//	return b.extAutScripts
+	//}
+	//
+	//// Generate slice to hold all of the wrapped transactions if needed.
+	//if len(b.extAutScripts) == 0 {
+	//	b.extAutScripts = make([]*ctautapi.ExtAutScript, 0, len(b.msgBlock.Transactions))
+	//}
+	//
+	//// Generate and cache the wrapped autTransactions for all that haven't
+	//// already been done.
+	//for i, txAbe := range b.Transactions() {
+	//	isCb, err := txAbe.IsCoinBase()
+	//	if err != nil {
+	//		//	this should not happen
+	//		log.Warnf("AUTTransactions: error happens when calling IsCoinBase() on the %d-th transaction of the block: %v", i, err)
+	//		continue
+	//	}
+	//	if isCb {
+	//		continue
+	//	}
+	//
+	//	script, err := txAbe.ExtAutScript()
+	//	if err != nil {
+	//		//	this should not happen
+	//		log.Warnf("AUTTransactions: error happens when getting AutTransaction from the %d-th transaction (%s) of the block: %v", i, txAbe.Hash(), err)
+	//		continue
+	//	}
+	//	if script == nil {
+	//		log.Debugf("AUTTransactions: skip non-AUT transaction %s", txAbe.Hash())
+	//		continue
+	//	}
+	//	b.extAutScripts = append(b.extAutScripts, script)
+	//}
+	//
+	//b.extAutScriptsGenerated = true
+	return b.extAutScripts
 }
 
 // TxHash returns the hash for the requested transaction number in the Block.
@@ -415,24 +413,39 @@ func (b *Block) TxLoc() ([]wire.TxLoc, error) {
 	return txLocs, err
 }
 
+// TxLoc
+// todo: modify according to the store of block in database
+// TxLoc is built from BlockAbe --> serialized to TxAbeIndexEntry --> put into Bucket-txIndexKey (key = txHash, value=(blockId, TxLoc))
+// --> Fetched into BlockRegion --> used by FetchBlockRegion and FetchWitnessRegion --> put into TxWitness
 func (b *BlockAbe) TxLoc() ([]wire.TxAbeLoc, error) {
-	var offset, witOffset int
-	// todo(MLP):
-	if b.msgBlock.Header.Version >= int32(wire.BlockVersionEthashPow) {
-		offset, witOffset = 120+wire.VarIntSerializeSize(uint64(len(b.msgBlock.Transactions))), 8
-	} else {
-		offset, witOffset = 80+wire.VarIntSerializeSize(uint64(len(b.msgBlock.Transactions))), 8
-	}
+	//var offset, witOffset int
+	//
+	//if b.msgBlock.Header.Version >= int32(wire.BlockVersionEthashPow) {
+	//	offset = 120
+	//} else {
+	//	offset = 80
+	//}
+	//offset = offset + wire.VarIntSerializeSize(uint64(len(b.msgBlock.Transactions)))
+
+	// blockHeader
+	offset := b.MsgBlock().Header.SerializeSize()
+	// Tx number
+	offset = offset + wire.VarIntSerializeSize(uint64(len(b.Transactions())))
+
+	witOffset := 4 // witness number
+
 	txs := b.Transactions()
 	res := make([]wire.TxAbeLoc, len(txs))
+
 	for i := 0; i < len(txs); i++ {
 		res[i].TxStart = offset
-		txLen := txs[i].MsgTx().SerializeSize()
-		res[i].TxLen, offset = txLen, offset+txLen
+		res[i].TxLen = txs[i].MsgTx().SerializeSize()
+		offset = offset + res[i].TxLen
 
-		res[i].WitnessStart = witOffset
-		witLen := chainhash.HashSize + len(txs[i].MsgTx().TxWitness)
-		res[i].WitnessLen, witOffset = witLen, witOffset+witLen+4
+		encodedWitness := EncodeTxWitnesses(txs[i].MsgTx().Version, txs[i].MsgTx().TxWitness, txs[i].MsgTx().AutWitness)
+		res[i].WitnessStart = witOffset + 4 // 4 bytes for size of rawWitness = (TxHash + encodeWitness)
+		res[i].WitnessLen = chainhash.HashSize + len(encodedWitness)
+		witOffset = witOffset + 4 + res[i].WitnessLen
 	}
 	return res, nil
 }
@@ -473,11 +486,90 @@ func NewBlock(msgBlock *wire.MsgBlock) *Block {
 	}
 }
 
-func NewBlockAbe(msgBlock *wire.MsgBlockAbe) *BlockAbe {
-	return &BlockAbe{
-		msgBlock:    msgBlock,
-		blockHeight: BlockHeightUnknown,
+func NewBlockAbe(msgBlock *wire.MsgBlockAbe) (*BlockAbe, error) {
+	if msgBlock == nil {
+		return nil, fmt.Errorf("NewBlockAbe: msgBlock is nil")
 	}
+	if len(msgBlock.Transactions) == 0 {
+		return nil, fmt.Errorf("NewBlockAbe: the input msgBlock does not carry any transaction")
+	}
+
+	if len(msgBlock.WitnessHashs) != len(msgBlock.Transactions) {
+		return nil, fmt.Errorf("NewBlockAbe: the input msgBlock has len(msgBlock.WitnessHashs) = %d while len(msgBlock.Transactions) = %d",
+			len(msgBlock.WitnessHashs), len(msgBlock.Transactions))
+	}
+
+	block := &BlockAbe{
+		msgBlock: msgBlock,
+	}
+
+	// At present, with high probability, all the fields will be used soon after the BlockAbe is created,
+	// below we directly set them, rather than use the lazy-set mechanism.
+	// As the MsgBlockAbe may be data violating the blockchain rules (e.g., the AUT transactions),
+	// immediate setting also help detect these wrong data as early as possible.
+
+	// blockHash
+	blockHash := msgBlock.BlockHash()
+	block.blockHash = &blockHash
+
+	// blockHeight
+	// It is a blockchain rule that the coinbaseTx contains the block height.
+	heightInCoinbase, err := wire.ExtractCoinbaseHeight(msgBlock.Transactions[0])
+	if err != nil {
+		return nil, err
+	}
+
+	if msgBlock.Header.Version >= wire.BlockVersionEthashPow {
+		// Header carries the height, it is necessary to guarantee that the height is consistent with that in coinbaseTx.
+		if msgBlock.Header.Height != heightInCoinbase {
+			return nil, fmt.Errorf("NewBlockAbe: for the block (hash=%v), the height in blockHeader (%d) is different that in coinbaseTx (%d)",
+				block.blockHash, msgBlock.Header.Height, heightInCoinbase)
+		}
+	}
+	// In the initial blocks before wire.BlockVersionEthashPow, header does not carry the height,
+	// and the block height directly uses that in coinbaseTx.
+	block.blockHeight = heightInCoinbase
+
+	// transactions
+	// extAutScripts
+	block.transactions = make([]*TxAbe, len(msgBlock.Transactions))
+	block.extAutScripts = make([]*ctautapi.ExtAutScript, 0, len(msgBlock.Transactions)) // todo: confirm: this is just a redundant quick available set
+	for i, msgTx := range msgBlock.Transactions {
+		// Note that it has been checked assumed that msgBlock.TxWitnessHashes has the same length as msgBlock.Transactions.
+		if msgTx == nil {
+			return nil, fmt.Errorf("NewBlockAbe: the %d-th transaction is nil", i)
+		}
+		if msgBlock.WitnessHashs[i] == nil {
+			return nil, fmt.Errorf("NewBlockAbe: the %d-th WitnessHashs is nil", i)
+		}
+
+		newTx, err := NewTxAbe(msgTx, msgBlock.WitnessHashs[i])
+		if err != nil {
+			return nil, err
+		}
+		isCoinbase, err := msgTx.IsCoinBase()
+		if err != nil {
+			return nil, err
+		}
+		if i == 0 {
+			if !isCoinbase {
+				return nil, fmt.Errorf("NewBlockAbe: the first transaction is not coinbaseTx")
+			}
+		} else {
+			if isCoinbase {
+				return nil, fmt.Errorf("NewBlockAbe: the %d -th transaction is coinbaseTx", i)
+			}
+		}
+		newTx.SetIndex(i)
+		block.transactions[i] = newTx
+
+		extAutScript := newTx.ExtAutScript()
+		if extAutScript != nil {
+			block.extAutScripts = append(block.extAutScripts, extAutScript)
+		}
+	}
+
+	return block, nil
 }
 
 // NewBlockFromBytes returns a new instance of a bitcoin block given the
@@ -493,6 +585,7 @@ func NewBlockFromBytes(serializedBlock []byte) (*Block, error) {
 }
 
 // NewBlockFromBytesAbe uses serialized block without witness
+// aut review done e025.12.16
 func NewBlockFromBytesAbe(serializedBlock []byte) (*BlockAbe, error) {
 	br := bytes.NewReader(serializedBlock)
 	b, err := NewBlockFromReaderAbe(br)
@@ -532,6 +625,7 @@ func NewBlockFromReader(r io.Reader) (*Block, error) {
 
 // NewBlockFromReaderAbe returns a new instance of an abec block given a
 // Reader to deserialize the block.  See BlockAbe.
+// aut review done, 2025.12.16
 func NewBlockFromReaderAbe(r io.Reader) (*BlockAbe, error) {
 	// Deserialize the bytes into a MsgBlock.
 	var msgBlock wire.MsgBlockAbe
@@ -540,11 +634,13 @@ func NewBlockFromReaderAbe(r io.Reader) (*BlockAbe, error) {
 		return nil, err
 	}
 
-	b := BlockAbe{
-		msgBlock:    &msgBlock,
-		blockHeight: BlockHeightUnknown,
-	}
-	return &b, nil
+	//b := BlockAbe{
+	//	msgBlock:    &msgBlock,
+	//	blockHeight: BlockHeightUnknown,
+	//}
+	//return &b, nil
+
+	return NewBlockAbe(&msgBlock)
 }
 
 // NewBlockFromBlockAndBytes returns a new instance of a bitcoin block given
@@ -557,12 +653,20 @@ func NewBlockFromBlockAndBytes(msgBlock *wire.MsgBlock, serializedBlock []byte) 
 	}
 }
 
-func NewBlockFromBlockAndBytesAbe(msgBlock *wire.MsgBlockAbe, serializedBlock []byte) *BlockAbe {
-	return &BlockAbe{
-		msgBlock:        msgBlock,
-		serializedBlock: serializedBlock,
-		blockHeight:     BlockHeightUnknown,
+func NewBlockFromBlockAndBytesAbe(msgBlock *wire.MsgBlockAbe, serializedBlock []byte) (*BlockAbe, error) {
+	//return &BlockAbe{
+	//	msgBlock:        msgBlock,
+	//	serializedBlock: serializedBlock,
+	//	blockHeight:     BlockHeightUnknown,
+	//}
+
+	newBlock, err := NewBlockAbe(msgBlock)
+	if err != nil {
+		return nil, err
 	}
+	newBlock.serializedBlock = serializedBlock
+
+	return newBlock, nil
 }
 
 func NewPrunedBlockFromPrunedBlockAndBytesAbe(msgBlock *wire.MsgPrunedBlock, serializedBlock []byte) *PrunedBlock {
@@ -587,3 +691,72 @@ func NewNeedSetResult(needsetResult *wire.MsgNeedSetResult, serialized []byte) *
 		serializedNeedSetResult: serialized,
 	}
 }
+
+// add for ctaut
+
+// EncodeTxWitnesses encodes the input txWitness []byte, autWitness []byte into a single []byte,
+// in the format <4 bytes txWitnessLen> <4 bytes autWitnessLen> <txWitness> <autWitness>
+func EncodeTxWitnesses(txVersion uint32, txWitness []byte, autWitness []byte) []byte {
+
+	if txVersion >= wire.TxVersion_Height_464000_Aconcagua {
+		txWitnessLen := len(txWitness)
+		autWitnessLen := len(autWitness)
+
+		witness := make([]byte, 4+4+txWitnessLen+autWitnessLen)
+
+		binary.LittleEndian.PutUint32(witness[:4], uint32(txWitnessLen)) // todo: need to consider overflow of int to uint32?
+		binary.LittleEndian.PutUint32(witness[4:8], uint32(autWitnessLen))
+		copy(witness[8:8+txWitnessLen], txWitness)
+		copy(witness[8+txWitnessLen:], autWitness)
+
+		return witness
+	}
+
+	// txVersion < wire.TxVersion_Height_450000_Aconcagua
+
+	witness := make([]byte, len(txWitness))
+	copy(witness, txWitness)
+	return witness
+
+}
+
+// DecodeTxWitnesses decodes the input witness []byte, which is assumed to be generated by EncodeTxWitnesses,
+// into txWitness []byte, autWitness []byte.
+// If the format does not match that in EncodeTxWitnesses, an error is return.
+// aut review done, 2025.12.16
+func DecodeTxWitnesses(txVersion uint32, witness []byte) (txWitness []byte, autWitness []byte, err error) {
+
+	if txVersion >= wire.TxVersion_Height_464000_Aconcagua {
+		if len(witness) == 0 {
+			return nil, nil, nil
+		}
+
+		if len(witness) < 8 {
+			return nil, nil, fmt.Errorf("length of the input witness is smaller than 8")
+		}
+
+		txWitnessLen := binary.LittleEndian.Uint32(witness[:4])
+		autWitnessLen := binary.LittleEndian.Uint32(witness[4:8])
+
+		if uint32(len(witness)) != 8+txWitnessLen+autWitnessLen { // todo: need to consider overflow of int to uint32?
+			return nil, nil, fmt.Errorf("the input witness does not match the encode rule: "+
+				"len(witness), extracted txWitnessLen, extracted autWitnessLen are %d, %d, %d, respectively",
+				len(witness), txWitnessLen, autWitnessLen)
+		}
+
+		txWitness = make([]byte, txWitnessLen)
+		autWitness = make([]byte, autWitnessLen)
+		copy(txWitness, witness[8:8+txWitnessLen])
+		copy(autWitness, witness[8+txWitnessLen:])
+
+		return txWitness, autWitness, nil
+	}
+
+	// txVersion < wire.TxVersion_Height_450000_Aconcagua
+	txWitness = make([]byte, len(witness))
+	autWitness = make([]byte, 0)
+	copy(txWitness, witness)
+	return txWitness, autWitness, nil
+}
+
+// aut review done 1210

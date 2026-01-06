@@ -7,18 +7,21 @@ package blockchain
 import (
 	"container/list"
 	"fmt"
-	"github.com/pqabelian/abec/abeutil"
-	"github.com/pqabelian/abec/aut"
-	"github.com/pqabelian/abec/chaincfg"
-	"github.com/pqabelian/abec/chainhash"
-	"github.com/pqabelian/abec/consensus/ethash"
-	"github.com/pqabelian/abec/database"
-	"github.com/pqabelian/abec/txscript"
-	"github.com/pqabelian/abec/wire"
+	ctautapi "github.com/pqabelian/abec/ctaut/api"
 	"math/big"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pqabelian/abec/blockchain/consensus"
+	"github.com/pqabelian/abec/blockchain/ruleerror"
+
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/database"
+	"github.com/pqabelian/abec/txscript"
+	"github.com/pqabelian/abec/wire"
 )
 
 var (
@@ -69,9 +72,12 @@ type orphanBlockAbe struct {
 type BestState struct {
 	Hash chainhash.Hash // The hash of the block.
 	// todo: (ethmining), the BlockHeader's prevBlock is set using this hash. Thus, need to set the hash based on the update situation
-	Height    int32  // The height of the block.
-	Bits      uint32 // The difficulty bits of the block.
-	BlockSize uint64 // The size of the block.
+	Height           int32  // The height of the block.
+	Bits             uint32 // The difficulty bits of the block.
+	BitsSecond       uint32 // The difficulty bits of the block.
+	PowScaleSecond   uint32
+	ConsensusApplied wire.ConsensusProtocol
+	BlockSize        uint64 // The size of the block.
 	//	todo(ABE): ABE does not ues weight.
 	BlockWeight uint64    // The weight of the block.
 	NumTxns     uint64    // The number of txns in the block.
@@ -84,14 +90,17 @@ func newBestState(node *blockNode, blockSize, blockWeight, numTxns,
 	totalTxns uint64, medianTime time.Time) *BestState {
 
 	return &BestState{
-		Hash:        node.hash,
-		Height:      node.height,
-		Bits:        node.bits,
-		BlockSize:   blockSize,
-		BlockWeight: blockWeight,
-		NumTxns:     numTxns,
-		TotalTxns:   totalTxns,
-		MedianTime:  medianTime,
+		Hash:             node.hash,
+		Height:           node.height,
+		Bits:             node.bits,
+		BitsSecond:       node.bitsSecond,
+		PowScaleSecond:   node.powScaleSecond,
+		ConsensusApplied: node.consensusApplied,
+		BlockSize:        blockSize,
+		BlockWeight:      blockWeight,
+		NumTxns:          numTxns,
+		TotalTxns:        totalTxns,
+		MedianTime:       medianTime,
 	}
 }
 
@@ -487,7 +496,7 @@ func (b *BlockChain) calcSequenceLock(node *blockNode, tx *abeutil.Tx, utxoView 
 				"transaction %s:%d either does not exist or "+
 				"has already been spent", txIn.PreviousOutPoint,
 				tx.Hash(), txInIndex)
-			return sequenceLock, ruleError(ErrMissingTxOut, str)
+			return sequenceLock, ruleerror.NewRuleError(ruleerror.ErrMissingTxOut, str)
 		}
 
 		// If the input height is set to the mempool height, then we
@@ -750,7 +759,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *abeutil.Block,
 	// Atomically insert info into the database.
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
-		err := dbPutBestState(dbTx, state, node.workSum)
+		err := dbPutBestState(dbTx, state, node.workSum, node.workSumSecondScaled)
 		if err != nil {
 			return err
 		}
@@ -839,9 +848,10 @@ func (b *BlockChain) connectBlock(node *blockNode, block *abeutil.Block,
 //  4. Send NTBlockConnected notification
 //
 // todo_DONE(MLP): reviewed on 2024.01.04
+// aut review done 2025.12.16
 func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 	view *UtxoRingViewpoint, stxos []*SpentTxOutAbe,
-	autView *AUTViewpoint, sauts []SpentAUT,
+	ctautView *CTAUTViewpoint, sctauts []SpentAut,
 ) error {
 
 	// Make sure it's extending the end of the best chain.
@@ -856,7 +866,7 @@ func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 		return AssertError("connectBlock called with inconsistent " +
 			"spent transaction out information")
 	}
-	if len(sauts) != countSpentOutputsAUT(block) {
+	if len(sctauts) != countSpentAuts(block) {
 		return AssertError("connectBlock called with inconsistent " +
 			"spent aut transaction information")
 	}
@@ -890,7 +900,7 @@ func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 	curTotalTxns := b.stateSnapshot.TotalTxns
 	b.stateLock.RUnlock()
 	numTxns := uint64(len(block.MsgBlock().Transactions))
-	blockSize := uint64(block.MsgBlock().SerializeSize())
+	blockSize := uint64(block.MsgBlock().SerializeSize()) // todo: 2025.12.16 txFullSize is used, know and will refactor later
 	//	todo(ABE): ABE does not use weight, while use size only.
 	//	blockWeight := uint64(GetBlockWeightAbe(block))
 	blockWeight := blockSize
@@ -900,7 +910,7 @@ func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 	// Atomically insert info into the database.
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
-		err := dbPutBestState(dbTx, state, node.workSum)
+		err := dbPutBestState(dbTx, state, node.workSum, node.workSumSecondScaled)
 		if err != nil {
 			return err
 		}
@@ -921,7 +931,7 @@ func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 			return err
 		}
 
-		err = dbPutAUTView(dbTx, autView, node.height, node.hash)
+		err = dbPutCTAUTView(dbTx, ctautView, node.height, node.hash)
 		if err != nil {
 			return err
 		}
@@ -934,7 +944,9 @@ func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 			return err
 		}
 
-		err = dbPutSpendJournalEntryAUT(dbTx, block.Hash(), sauts)
+		// TODO check spendjournal logic
+		// err = dbPutSpendJournalEntryCTAUT(dbTx, block.Hash(), sctauts)
+		err = dbPutSpendJournalEntryAut(dbTx, block, sctauts)
 		if err != nil {
 			return err
 		}
@@ -959,7 +971,7 @@ func (b *BlockChain) connectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 	// Prune fully spent entries and mark all entries in the view unmodified
 	// now that the modifications have been committed to the database.
 	view.commit()
-	autView.commit()
+	ctautView.commit()
 
 	// This node is now the end of the best chain.
 	b.bestChain.SetTip(node)
@@ -1029,7 +1041,7 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *abeutil.Block, view
 
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
-		err := dbPutBestState(dbTx, state, node.workSum)
+		err := dbPutBestState(dbTx, state, node.workSum, node.workSumSecondScaled)
 		if err != nil {
 			return err
 		}
@@ -1110,9 +1122,10 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *abeutil.Block, view
 // disconnectBlockAbe
 // Abe to do
 // todo_DONE(MLP): reviewed on 2024.01.05
+// aut review done 2025.12.18
 func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe,
 	view *UtxoRingViewpoint, viewToDel *UtxoRingViewpoint,
-	autView *AUTViewpoint, infoToDel map[string]struct{}) error {
+	ctautView *CTAUTViewpoint, autIdsToDel map[ctautapi.AutId]struct{}) error {
 	// Make sure the node being disconnected is the end of the best chain.
 	if !node.hash.IsEqual(&b.bestChain.Tip().hash) {
 		return AssertError("disconnectBlock must be called with the " +
@@ -1153,7 +1166,7 @@ func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe
 
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
-		err := dbPutBestState(dbTx, state, node.workSum)
+		err := dbPutBestState(dbTx, state, node.workSum, node.workSumSecondScaled)
 		if err != nil {
 			return err
 		}
@@ -1182,13 +1195,12 @@ func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe
 			return err
 		}
 
-		err = dbPutAUTView(dbTx, autView, node.height, node.hash)
+		err = dbPutCTAUTView(dbTx, ctautView, node.height, node.hash)
 		if err != nil {
 			return err
 		}
-
 		// remove the new AUT with registration transaction
-		err = dbRemoveAUTInfo(dbTx, infoToDel, node.height, node.hash)
+		err = dbRemoveCTAUTInstances(dbTx, autIdsToDel, node.height, node.hash)
 		if err != nil {
 			return err
 		}
@@ -1201,7 +1213,7 @@ func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe
 		}
 
 		// TODO(MLPAUT) transfer spent aut information to indexer manager
-		_, err = dbFetchSpendJournalEntryAUT(dbTx, block)
+		_, err = dbFetchSpendJournalEntryAut(dbTx, block)
 		if err != nil {
 			return err
 		}
@@ -1213,7 +1225,7 @@ func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe
 			return err
 		}
 
-		err = dbRemoveSpendJournalEntryAUT(dbTx, block.Hash())
+		err = dbRemoveSpendJournalEntryAut(dbTx, block.Hash())
 		if err != nil {
 			return err
 		}
@@ -1240,7 +1252,7 @@ func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe
 	//	Abe to do: Note that some rings committed to tha database may be deleted in next(previous) block's disconnection.
 	//	The checks can detect abnormal cases. The deleted rings will be removed from view after all blocks are disconnected.
 	view.commit()
-	autView.commit()
+	ctautView.commit()
 
 	// This node's parent is now the end of the best chain.
 	b.bestChain.SetTip(node.parent)
@@ -1257,6 +1269,7 @@ func (b *BlockChain) disconnectBlockAbe(node *blockNode, block *abeutil.BlockAbe
 	// Notify the caller that the block was disconnected from the main
 	// chain.  The caller would typically want to react with actions such as
 	// updating wallets.
+	// todo: 2025.12.18 notify the deletion of the AutInstances or AutCoins. future: improvement
 	invalidRingHashs := make([]chainhash.Hash, 0, len(viewToDel.entries))
 	for hash, _ := range viewToDel.entries {
 		invalidRingHashs = append(invalidRingHashs, hash)
@@ -1293,31 +1306,9 @@ func countSpentOutputsAbe(block *abeutil.BlockAbe) int {
 	return numSpent
 }
 
-func countSpentOutputsAUT(block *abeutil.BlockAbe) int {
-	// Exclude the transfer transaction which is not an AUT transaction
-	var num = 0
-	for _, tx := range block.Transactions()[1:] {
-		//if autTx, isAUTTx := tx.AUTTransaction(); isAUTTx {
-		//	if autTx.Type() < aut.ReRegistration {
-		//		// it seems that we do not need saut for those type
-		//	}
-		//	num++
-		//}
-
-		autTx, err := tx.AUTTransaction()
-		if err != nil {
-			//	This should not happen
-			log.Warnf("countSpentOutputsAUT: error happens when extracting AutTransaction from Tx %s: %v", tx.Hash(), err)
-		}
-		if autTx != nil {
-			if autTx.Type() < aut.ReRegistration {
-				// just record them, but it seems that do not need saut for those type
-			}
-			num++
-		}
-
-	}
-	return num
+// aut review done 2025.12.16
+func countSpentAuts(block *abeutil.BlockAbe) int {
+	return len(block.ExtAutScripts())
 }
 
 // reorganizeChainAbe reorganizes the block chain by disconnecting the nodes in the
@@ -1346,6 +1337,7 @@ func countSpentOutputsAUT(block *abeutil.BlockAbe) int {
 //	  6. Detach each block and attach each block really
 //
 // todo_DONE(MLP): reviewed on 2024.01.05
+// aut review done 2025.12.17
 func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) error {
 	// Nothing to do if no reorganize nodes were provided.
 	if detachNodes.Len() == 0 && attachNodes.Len() == 0 {
@@ -1386,7 +1378,8 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 	// Rather than doing two loads, cache the loaded data into these slices.
 	detachBlocks := make([]*abeutil.BlockAbe, 0, detachNodes.Len())
 	detachSpentTxOuts := make([][]*SpentTxOutAbe, 0, detachNodes.Len())
-	detachSpentAUTs := make([][]SpentAUT, 0, detachNodes.Len())
+	detachSpentAuts := make([][]SpentAut, 0, detachNodes.Len())
+
 	attachBlocks := make([]*abeutil.BlockAbe, 0, attachNodes.Len())
 
 	// Disconnect all the blocks back to the point of the fork.  This
@@ -1398,14 +1391,14 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 	viewToDelAll := NewUtxoRingViewpoint()
 	viewToDelAll.SetBestHash(&oldBest.hash)
 
-	autView := NewAUTViewpoint()
-	autView.SetBestHash(&oldBest.hash)
-	var autInfoToDel map[string]struct{}
+	ctautView := NewCTAUTViewpoint()
+	ctautView.SetBestHash(&oldBest.hash)
+	autInstanceToDelAll := map[ctautapi.AutId]struct{}{}
 
 	for e := detachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
 		blockHeader := n.Header()
-		log.Debugf("DETACH: Block %s (seal hash %s, height %d) is trying to detach", n.hash, ethash.SealHash(&blockHeader), n.height)
+		log.Debugf("DETACH: Block %s (seal hash %s, height %d) is trying to detach", n.hash, consensus.SealHashFast(&blockHeader), n.height)
 
 		var block *abeutil.BlockAbe
 		err := b.db.View(func(dbTx database.Tx) error {
@@ -1433,13 +1426,13 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		// Load all of the spent txos for the block from the spend
 		// journal.
 		var stxos []*SpentTxOutAbe
-		var sauts []SpentAUT
+		var sctauts []SpentAut
 		err = b.db.View(func(dbTx database.Tx) error {
 			stxos, err = dbFetchSpendJournalEntryAbe(dbTx, block)
 			if err != nil {
 				return err
 			}
-			sauts, err = dbFetchSpendJournalEntryAUT(dbTx, block)
+			sctauts, err = dbFetchSpendJournalEntryAut(dbTx, block)
 			return err
 		})
 		if err != nil {
@@ -1449,20 +1442,28 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		// Store the loaded block and spend journal entry for later.
 		detachBlocks = append(detachBlocks, block)
 		detachSpentTxOuts = append(detachSpentTxOuts, stxos)
-		detachSpentAUTs = append(detachSpentAUTs, sauts)
+		detachSpentAuts = append(detachSpentAuts, sctauts)
 
 		// todo_DONE(MLP): reviewed on 2024.01.05
 		// view loads all the related UtxoRingEntries of the TxIns of the transactions in block, using stxos.
+		// Note that view is initialized to be empty, and filled by using stxos. 2025.12.18
 		err = view.disconnectTransactions(b.db, block, stxos)
 		if err != nil {
 			return err
 		}
 
-		autInfoToDel, err = autView.disconnectTransactions(b.db, block, sauts)
+		autIdsToDelForBlock, err := ctautView.disconnectAutScripts(b.db, block, sctauts, view)
 		if err != nil {
 			return err
 		}
+		for autIdentifier := range autIdsToDelForBlock {
+			// assert
+			if _, ok := autInstanceToDelAll[autIdentifier]; ok {
+				return fmt.Errorf("duplicate CTAUT instance to delete %s", autIdentifier.String())
+			}
 
+			autInstanceToDelAll[autIdentifier] = struct{}{}
+		}
 		//	Abe to do new UtxoRings if n.height % 2 == 0
 		//	These utxoRings should will be deleted from database
 		//	TODO: when BlockNumPerRingGroup or TxoRingSize change, it may cause fork.
@@ -1474,7 +1475,8 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			viewToDelAll.SetBestHash(&n.hash)
 			//	todo_DONE(MLP): reviewed on 2024.01.05
 			// err = viewToDelAll.newUtxoRingEntries(b.db, n, block)
-			err = viewToDelAll.newUtxoRingEntriesMLP(b.db, n, block)
+			// err = viewToDelAll.newUtxoRingEntriesMLP(b.db, n, block)
+			err = viewToDelAll.newUTxoRingEntriesAconcagua(b.db, n, block)
 			if err != nil {
 				return err
 			}
@@ -1498,6 +1500,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			}
 		}
 	}*/
+
 	for ringHash, _ := range viewToDelAll.entries {
 		ringFromStxo := view.entries[ringHash]
 		if ringFromStxo != nil {
@@ -1514,13 +1517,29 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		}
 	}
 
-	for autIdentifierKey := range autInfoToDel {
-		entry := autView.entries[autIdentifierKey]
-		if entry != nil {
-			delete(autView.entries, autIdentifierKey)
-		} else {
-			// ?
+	for ctautIdentifier := range autInstanceToDelAll {
+		ctautIdentifierKey := ctautIdentifier.String()
+		autInstance, ok := ctautView.instances[ctautIdentifierKey]
+		if !ok || autInstance == nil || autInstance.metadata == nil {
+			return fmt.Errorf("no such CTAUT instance found, this should not happen")
 		}
+
+		// 2025.12.18 check to make sure no coins exist in view for this instance
+		if autInstance.metadata.Version != ctautapi.AutMetadataVersionInitValue {
+			return fmt.Errorf("metadata.Version (%d) for AutInstance (%s) is not the initial value (%d), while attepmingt to unregister",
+				autInstance.metadata.Version, ctautIdentifierKey, ctautapi.AutMetadataVersionInitValue)
+		}
+		for hostOutPoint, coin := range autInstance.coins {
+			if coin == nil {
+				return fmt.Errorf("coin (%s) for AutInstance (%s) is nil ", hostOutPoint.String(), ctautIdentifierKey)
+			}
+			if !coin.IsSpent() {
+				return fmt.Errorf("coin (%s) for AutInstance (%s) is not spent, while attepmingt to unregister",
+					hostOutPoint.String(), ctautIdentifierKey)
+			}
+		}
+
+		delete(ctautView.instances, ctautIdentifierKey)
 	}
 
 	// Set the fork point only if there are nodes to attach since otherwise
@@ -1545,7 +1564,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 	for e := attachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
 		blockHeader := n.Header()
-		log.Debugf("ATTACH: Block %s (seal hash %s, height %d) is trying to attach", n.hash, ethash.SealHash(&blockHeader), n.height)
+		log.Debugf("ATTACH: Block %s (seal hash %s, height %d) is trying to attach", n.hash, consensus.SealHashFast(&blockHeader), n.height)
 
 		var block *abeutil.BlockAbe
 		err := b.db.View(func(dbTx database.Tx) error {
@@ -1564,25 +1583,26 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		// checkConnectBlock gets skipped, we still need to update the UTXO
 		// view.
 		if b.index.NodeStatus(n).KnownValid() {
+			// 2025.12.18 fetchInputUtxoRings will not read the data for which has been in view.
 			err = view.fetchInputUtxoRings(b.db, block)
 			if err != nil {
 				return err
 			}
 
-			err = view.connectTransactions(block, nil)
+			err = ctautView.fetchConsumedCTAUTTokens(b.db, block, view)
 			if err != nil {
 				return err
 			}
 
-			err = autView.fetchInputAUTUtxos(b.db, block)
+			err = view.connectTransactions(block, nil, ctautView, nil)
 			if err != nil {
 				return err
 			}
 
-			err = autView.connectTransactions(block, nil)
-			if err != nil {
-				return err
-			}
+			//err = ctautView.connectTransactions(block, nil)
+			//if err != nil {
+			//	return err
+			//}
 			/*			newBest = n
 						continue*/
 		} else {
@@ -1594,10 +1614,11 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			// In the case the block is determined to be invalid due to a
 			// rule violation, mark it as invalid and mark all of its
 			// descendants as having an invalid ancestor.
-			err = b.checkConnectBlockAbe(n, block, view, nil, autView, nil)
+			// 2025.12.18 Note that view and ctautView are filled again, but due to the "exist-data-not-refresh" policy, it does not matter.
+			err = b.checkConnectBlockAbe(n, block, view, nil, ctautView, nil)
 			if err != nil {
-				if ruleErr, ok := err.(RuleError); ok {
-					if ruleErr.ErrorCode == ErrWitnessMissing {
+				if ruleErr, ok := err.(ruleerror.RuleError); ok {
+					if ruleErr.ErrorCode == ruleerror.ErrWitnessMissing {
 						b.index.SetStatusFlags(n, statusWitnessMissing)
 					} else {
 						b.index.SetStatusFlags(n, statusValidateFailed)
@@ -1625,7 +1646,8 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		if n.height%blockNumPerRingGroup == blockNumPerRingGroup-1 {
 			//	todo(MLPAUT):
 			//err = view.newUtxoRingEntries(b.db, n, block)
-			err = view.newUtxoRingEntriesMLP(b.db, n, block)
+			// err = view.newUtxoRingEntriesMLP(b.db, n, block)
+			err = view.newUTxoRingEntriesAconcagua(b.db, n, block)
 			if err != nil {
 				return err
 			}
@@ -1638,20 +1660,30 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 	// the reorg would be successful and the connection code requires the
 	// view to be valid from the viewpoint of each block being connected or
 	// disconnected.
+
+	// 2025.12.18	begin
+	// In the above check, global views (span the detach and attach) are used to simulate the checks in the memory.
+	// It seems that the following formal connect also use the global views to keep the status of database in memory,
+	// say, the views generated in detach phase are used for attach phase.
+	// Such a mechanism seem to have better efficiency, say, reducing the read of database.
+	// todo: In the future, consider to separate to make the codes simple and easy, reducing the chances of generating bugs.
+	// 2025.12.18	end
+
+	// 2025.12.18 when detaching, the view is obtained by "fetching from spentUtxoRing in the spentJournal",
+	// and "removing the rings that were generated by a detached block".
 	view = NewUtxoRingViewpoint()
 	view.SetBestHash(&b.bestChain.Tip().hash)
-	autView = NewAUTViewpoint()
-	autView.SetBestHash(&b.bestChain.Tip().hash)
+	ctautView = NewCTAUTViewpoint()
+	ctautView.SetBestHash(&b.bestChain.Tip().hash)
 
 	// Disconnect blocks from the main chain.
 	for i, e := 0, detachNodes.Front(); e != nil; i, e = i+1, e.Next() {
 		n := e.Value.(*blockNode)
 		block := detachBlocks[i]
-		log.Debugf("DETACH: Block %s (seal hash %s, height %d) is detaching", n.hash, ethash.SealHash(&block.MsgBlock().Header), n.height)
+		log.Debugf("DETACH: Block %s (seal hash %s, height %d) is detaching", n.hash, consensus.SealHashFast(&block.MsgBlock().Header), n.height)
 
 		viewToDel := NewUtxoRingViewpoint()
 		viewToDel.SetBestHash(block.Hash())
-		var infoToDel map[string]struct{}
 
 		//	Abe to do: why to read from databse, we can directly use the SpendJournal to obtain the related UtxoRings
 		// Load all of the utxos referenced by the block that aren't
@@ -1669,7 +1701,14 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			return err
 		}
 
-		infoToDel, err = autView.disconnectTransactions(b.db, block, detachSpentAUTs[i])
+		// 2025.12.18	begin
+		// ctautView is initially empty before looping the blocks,
+		// carries the latest state of related metadata,
+		// adds the consumed AutToken back (which will be put into database later (if they are not flagged "spent"))
+		// adds the generated tokens and flagged them "spent" (which will be deleted from database later)
+		// unregisteredInstances carries the AutInstance to be deleted from database
+		// 2025.12.18	end
+		unregisteredAutIds, err := ctautView.disconnectAutScripts(b.db, block, detachSpentAuts[i], view)
 		if err != nil {
 			return err
 		}
@@ -1687,11 +1726,15 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		if n.height%blockNumPerRingGroup == blockNumPerRingGroup-1 {
 			//	todo(MLPAUT):
 			// err = viewToDel.newUtxoRingEntries(b.db, n, block)
-			err = viewToDel.newUtxoRingEntriesMLP(b.db, n, block)
+			// err = viewToDel.newUtxoRingEntriesMLP(b.db, n, block)
+			err = viewToDel.newUTxoRingEntriesAconcagua(b.db, n, block)
 			if err != nil {
 				return err
 			}
 		}
+
+		// 2025.12.18 Maintain the view in memory	begin
+		// This will make the view to be consistent with the database, while the database is operated in the following disconnectBlockAbe().
 
 		for ringHash, _ := range viewToDel.entries {
 			ringFromStxo := view.entries[ringHash]
@@ -1700,28 +1743,51 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 					return AssertError(fmt.Sprintf("detaching utxoRing (ringHeight = %d, outPointHash = %v) fail: the serialNumbers List should be empty, but not",
 						ringFromStxo.ringBlockHeight, ringFromStxo.outPointRing.Hash()))
 				}
+				// 2025.12.18 confirm If an UtxoRingEntry (added into view due to recover of spent for previous detached block) was generated
+				// due to the appending of this (being detached block), delete it from view. This is to keep the view freshest.
 				delete(view.entries, ringHash)
 			} else {
 				// added by Alice on 2024.01.05
 				// This may happen, since view loaded only UtxoRingEntries appeared in TxIns of blocks.
+
+				// 2025.12.18 later should delete all UtxoRingEntries in viewToDel from database.
 			}
 		}
 
-		for autIdentifierKey := range infoToDel {
-			entry := autView.entries[autIdentifierKey]
-			if entry != nil {
-				delete(autView.entries, autIdentifierKey)
-			} else {
-				// ?
+		for autIdentifier := range unregisteredAutIds {
+			autIdentifierKey := autIdentifier.String()
+			autInstance, ok := ctautView.instances[autIdentifierKey]
+			if !ok || autInstance == nil || autInstance.metadata == nil {
+				return AssertError(fmt.Sprintf("detaching CTAUT instance %s fail: the instance does not exist", autIdentifierKey))
 			}
-		}
 
+			// 2025.12.18 check to make sure no coins exist in view for this instance
+			if autInstance.metadata.Version != ctautapi.AutMetadataVersionInitValue {
+				return fmt.Errorf("metadata.Version (%d) for AutInstance (%s) is not the initial value (%d), while attepmingt to unregister",
+					autInstance.metadata.Version, autIdentifierKey, ctautapi.AutMetadataVersionInitValue)
+			}
+			for hostOutPoint, coin := range autInstance.coins {
+				if coin == nil {
+					return fmt.Errorf("coin (%s) for AutInstance (%s) is nil ", hostOutPoint.String(), autIdentifierKey)
+				}
+				if !coin.IsSpent() {
+					return fmt.Errorf("coin (%s) for AutInstance (%s) is not spent, while attepmingt to unregister",
+						hostOutPoint.String(), autIdentifierKey)
+				}
+			}
+
+			delete(ctautView.instances, autIdentifierKey)
+		}
+		// 2025.12.18 Maintain the view in memory	end
+
+		// 2025.12.18 operate the database	begin
 		// Update the database and chain state.
 		// todo_DONE(MLP): reviewed on 2024.01.05
-		err = b.disconnectBlockAbe(n, block, view, viewToDel, autView, infoToDel)
+		err = b.disconnectBlockAbe(n, block, view, viewToDel, ctautView, unregisteredAutIds)
 		if err != nil {
 			return err
 		}
+		// 2025.12.18 operate the database	end
 
 	}
 
@@ -1743,12 +1809,13 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			delete(view.entries, ringHash)
 		}
 	}
+	// todo: 2025.12.18 why use the old views? rather than use new ones. refactor future
 
 	// Connect the new best chain blocks.
 	for i, e := 0, attachNodes.Front(); e != nil; i, e = i+1, e.Next() {
 		n := e.Value.(*blockNode)
 		block := attachBlocks[i]
-		log.Debugf("ATTACH: Block %s (seal hash %s, height %d) is attaching", n.hash, ethash.SealHash(&block.MsgBlock().Header), n.height)
+		log.Debugf("ATTACH: Block %s (seal hash %s, height %d) is attaching", n.hash, consensus.SealHashFast(&block.MsgBlock().Header), n.height)
 
 		// Load all of the utxos referenced by the block that aren't
 		// already in the view.
@@ -1757,7 +1824,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 			return err
 		}
 
-		err = autView.fetchInputAUTUtxos(b.db, block)
+		err = ctautView.fetchConsumedCTAUTTokens(b.db, block, view)
 		if err != nil {
 			return err
 		}
@@ -1767,16 +1834,16 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		// to it.  Also, provide an stxo slice so the spent txout
 		// details are generated.
 		stxos := make([]*SpentTxOutAbe, 0, countSpentOutputsAbe(block))
-		err = view.connectTransactions(block, &stxos)
+		sctauts := make([]SpentAut, 0, countSpentAuts(block))
+		err = view.connectTransactions(block, &stxos, ctautView, &sctauts)
 		if err != nil {
 			return err
 		}
 
-		sauts := make([]SpentAUT, 0, countSpentOutputsAUT(block))
-		err = autView.connectTransactions(block, &sauts)
-		if err != nil {
-			return err
-		}
+		//err = ctautView.connectTransactions(block, &sctauts)
+		//if err != nil {
+		//	return err
+		//}
 
 		//	Abe to do: new UtxoRings if n.height % 3 == 2
 		//	TODO: when BlockNumPerRingGroup or TxoRingSize change, it may cause fork.
@@ -1789,14 +1856,15 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 		if n.height%blockNumPerRingGroup == blockNumPerRingGroup-1 {
 			//	todo_DONE(MLP): reviewed on 2024.01.05
 			// err = view.newUtxoRingEntries(b.db, n, block)
-			err = view.newUtxoRingEntriesMLP(b.db, n, block)
+			// err = view.newUtxoRingEntriesMLP(b.db, n, block)
+			err = view.newUTxoRingEntriesAconcagua(b.db, n, block)
 			if err != nil {
 				return err
 			}
 		}
 
 		// Update the database and chain state.
-		err = b.connectBlockAbe(n, block, view, stxos, autView, sauts)
+		err = b.connectBlockAbe(n, block, view, stxos, ctautView, sctauts)
 		if err != nil {
 			return err
 		}
@@ -1843,6 +1911,7 @@ func (b *BlockChain) reorganizeChainAbe(detachNodes, attachNodes *list.List) err
 //	    3. Reorganize the chain (reorganizeChainAbe)
 //
 // todo_DONE(MLP): reviewed on 2024.01.05
+// aut review 2025.12.16
 func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAbe, flags BehaviorFlags) (bool, error) {
 	fastAdd := flags&BFFastAdd == BFFastAdd
 
@@ -1871,24 +1940,26 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 		view.SetBestHash(parentHash)
 		stxos := make([]*SpentTxOutAbe, 0, countSpentOutputsAbe(block))
 
-		autView := NewAUTViewpoint()
-		autView.SetBestHash(parentHash)
-		sauts := make([]SpentAUT, 0, countSpentOutputsAUT(block))
+		ctautView := NewCTAUTViewpoint()
+		ctautView.SetBestHash(parentHash)
+		sctauts := make([]SpentAut, 0, countSpentAuts(block))
 
 		if !fastAdd || b.nodeType == wire.FullNode {
 			// todo_DONE(MLP): reviewed on 2024.01.04
-			err := b.checkConnectBlockAbe(node, block, view, &stxos, autView, &sauts)
+			err := b.checkConnectBlockAbe(node, block, view, &stxos, ctautView, &sctauts)
 			if err == nil {
 				b.index.SetStatusFlags(node, statusValid)
-			} else if _, ok := err.(RuleError); ok {
+			} else if _, ok := err.(ruleerror.RuleError); ok {
 				b.index.SetStatusFlags(node, statusValidateFailed)
 			} else {
 				return false, err
 			}
 
+			// err == nil || (err == RuleError)
 			flushIndexState()
 
 			if err != nil {
+				// err == RuleError
 				return false, err
 			}
 		} else {
@@ -1900,20 +1971,23 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 			if err != nil {
 				return false, err
 			}
+
+			err = ctautView.fetchConsumedCTAUTTokens(b.db, block, view)
+			if err != nil {
+				return false, err
+			}
 			// todo_DONE(MLP): reviewed on 2024.01.04
-			err = view.connectTransactions(block, &stxos)
+
+			// update the view and ctautView, as well as fill stxos and sctauts
+			err = view.connectTransactions(block, &stxos, ctautView, &sctauts)
 			if err != nil {
 				return false, err
 			}
 
-			err = autView.fetchInputAUTUtxos(b.db, block)
-			if err != nil {
-				return false, err
-			}
-			err = autView.connectTransactions(block, &sauts)
-			if err != nil {
-				return false, err
-			}
+			//err = ctautView.connectTransactions(block, &sctauts)
+			//if err != nil {
+			//	return false, err
+			//}
 		}
 
 		//	TODO: generating new UtxoRingEntry if currentblock.height%2 = 0
@@ -1927,7 +2001,8 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 		if node.height%blockNumPerRingGroup == blockNumPerRingGroup-1 {
 			//	todo_DONE(MLP): reviewed on 2024.01.04
 			// err := view.newUtxoRingEntries(b.db, node, block)
-			err := view.newUtxoRingEntriesMLP(b.db, node, block)
+			// err := view.newUtxoRingEntriesMLP(b.db, node, block)
+			err := view.newUTxoRingEntriesAconcagua(b.db, node, block)
 			if err != nil {
 				return false, err
 			}
@@ -1936,12 +2011,13 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 		// Connect the block to the main chain.
 		//	ToDo(ABE): Here stxos is used as input, all precious are setting stxos
 		//	todo_DONE(MLP): reviewed on 2024.01.04
-		err := b.connectBlockAbe(node, block, view, stxos, autView, sauts)
+		// WRITE to database: the view and ctautView, as well as fill stxos and sctauts
+		err := b.connectBlockAbe(node, block, view, stxos, ctautView, sctauts)
 		if err != nil {
 			// If we got hit with a rule error, then we'll mark
 			// that status of the block as invalid and flush the
 			// index state to disk before returning with the error.
-			if _, ok := err.(RuleError); ok {
+			if _, ok := err.(ruleerror.RuleError); ok {
 				b.index.SetStatusFlags(
 					node, statusValidateFailed,
 				)
@@ -1969,17 +2045,33 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 
 	// We're extending (or creating) a side chain, but the cumulative
 	// work for this new side chain is not enough to make it the new chain.
-	if node.workSum.Cmp(b.bestChain.Tip().workSum) <= 0 {
+	// todo: Aconcagua review
+	nodeTotalWorkSum := big.NewInt(0)
+	tipTotalWorkSum := big.NewInt(0)
+	if node.height >= b.chainParams.BlockHeightAconcagua {
+		nodeTotalWorkSum = nodeTotalWorkSum.Add(node.workSum, node.workSumSecondScaled)
+	} else {
+		nodeTotalWorkSum = node.workSum
+	}
+
+	if b.bestChain.Tip().height >= b.chainParams.BlockHeightAconcagua {
+		tipTotalWorkSum = tipTotalWorkSum.Add(b.bestChain.Tip().workSum, b.bestChain.Tip().workSumSecondScaled)
+	} else {
+		tipTotalWorkSum = b.bestChain.Tip().workSum
+	}
+
+	// if node.workSum.Cmp(b.bestChain.Tip().workSum) <= 0 {
+	if nodeTotalWorkSum.Cmp(tipTotalWorkSum) <= 0 {
 		// Log information about how the block is forking the chain.
 		fork := b.bestChain.FindFork(node)
 		if fork.hash.IsEqual(parentHash) {
 			log.Infof("FORK: Block %v (seal hash %v) forks the chain at height %d"+
 				"/block %v, but does not cause a reorganize",
-				node.hash, ethash.SealHash(&block.MsgBlock().Header), fork.height, fork.hash)
+				node.hash, consensus.SealHashFast(&block.MsgBlock().Header), fork.height, fork.hash)
 		} else {
 			log.Infof("EXTEND FORK: Block %v (seal hash %v) extends a side chain "+
 				"which forks the chain at height %d/block %v",
-				node.hash, ethash.SealHash(&block.MsgBlock().Header), fork.height, fork.hash)
+				node.hash, consensus.SealHashFast(&block.MsgBlock().Header), fork.height, fork.hash)
 		}
 
 		return false, nil
@@ -1995,7 +2087,7 @@ func (b *BlockChain) connectBestChainAbe(node *blockNode, block *abeutil.BlockAb
 	detachNodes, attachNodes := b.getReorganizeNodesAbe(node)
 
 	// Reorganize the chain.
-	log.Infof("REORGANIZE: Block %v (seal hash %v) at height %d is causing a reorganize.", node.hash, ethash.SealHash(&block.MsgBlock().Header), node.height)
+	log.Infof("REORGANIZE: Block %v (seal hash %v) at height %d is causing a reorganize.", node.hash, consensus.SealHashFast(&block.MsgBlock().Header), node.height)
 	// todo_DONE(MLP): reviewed on 2024.01.05
 	err := b.reorganizeChainAbe(detachNodes, attachNodes)
 
@@ -2064,6 +2156,14 @@ func (b *BlockChain) BestSnapshot() *BestState {
 func (b *BlockChain) BestChainWorkSum() *big.Int {
 	bestNode := b.bestChain.Tip()
 	return bestNode.workSum
+}
+
+// BestChainWorkSumSecondScaled
+// added for Aconcagua
+// todo: review
+func (b *BlockChain) BestChainWorkSumSecondScaled() *big.Int {
+	bestNode := b.bestChain.Tip()
+	return bestNode.workSumSecondScaled
 }
 
 // HeaderByHash returns the block header identified by the given hash or an
@@ -2643,9 +2743,9 @@ func New(config *Config) (*BlockChain, error) {
 	}
 
 	bestNode := b.bestChain.Tip()
-	log.Infof("Chain state (height %d, hash %v, totaltx %d, work %v)",
+	log.Infof("Chain state (height %d, hash %v, totaltx %d, work sum %v, work sum (by second PoW) %v)",
 		bestNode.height, bestNode.hash, b.stateSnapshot.TotalTxns,
-		bestNode.workSum)
+		bestNode.workSum, bestNode.workSumSecondScaled)
 
 	return &b, nil
 }

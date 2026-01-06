@@ -2,6 +2,7 @@ package abecryptox
 
 import (
 	"fmt"
+
 	"github.com/pqabelian/abec/abecrypto"
 	"github.com/pqabelian/abec/abecrypto/abecryptoparam"
 	"github.com/pqabelian/abec/abecryptox/abecryptoxkey"
@@ -71,11 +72,11 @@ func CoinbaseTxVerify(coinbaseTx *wire.MsgTxAbe) error {
 
 // CreateTransferTxMsgTemplateByRootSeeds creates a *wire.MsgTxAbe template, which will be used when calling TransferTxGen().
 // reviewed on 2023.12.31
-func CreateTransferTxMsgTemplateByRootSeeds(abeTxInputDescs []*AbeTxInputDescByRootSeeds, abeTxOutputDescs []*AbeTxOutputDesc, txFee uint64, txMemo []byte) (*wire.MsgTxAbe, error) {
+func CreateTransferTxMsgTemplateByRootSeeds(txVersion uint32, abeTxInputDescs []*AbeTxInputDescByRootSeeds, abeTxOutputDescs []*AbeTxOutputDesc, txFee uint64, txMemo []byte) (*wire.MsgTxAbe, error) {
 
 	//	Version
 	//	Note that new Tx must use the latest/current TxVersion.
-	txMsgTemplate := wire.NewMsgTxAbe(wire.TxVersion)
+	txMsgTemplate := wire.NewMsgTxAbe(txVersion)
 
 	//	TxIns     []*TxInAbe
 	for _, abeTxInputDesc := range abeTxInputDescs {
@@ -98,11 +99,11 @@ func CreateTransferTxMsgTemplateByRootSeeds(abeTxInputDescs []*AbeTxInputDescByR
 
 // CreateTransferTxMsgTemplateByRandSeeds creates a *wire.MsgTxAbe template, which will be used when calling TransferTxGen().
 // reviewed on 2023.12.31
-func CreateTransferTxMsgTemplateByRandSeeds(abeTxInputDescs []*AbeTxInputDescByRandSeeds, abeTxOutputDescs []*AbeTxOutputDesc, txFee uint64, txMemo []byte) (*wire.MsgTxAbe, error) {
+func CreateTransferTxMsgTemplateByRandSeeds(txVersion uint32, abeTxInputDescs []*AbeTxInputDescByRandSeeds, abeTxOutputDescs []*AbeTxOutputDesc, txFee uint64, txMemo []byte) (*wire.MsgTxAbe, error) {
 
 	//	Version
 	//	Note that new Tx must use the latest/current TxVersion.
-	txMsgTemplate := wire.NewMsgTxAbe(wire.TxVersion)
+	txMsgTemplate := wire.NewMsgTxAbe(txVersion)
 
 	//	TxIns     []*TxInAbe
 	for _, abeTxInputDesc := range abeTxInputDescs {
@@ -139,11 +140,11 @@ func CreateTransferTxMsgTemplateByRandSeeds(abeTxInputDescs []*AbeTxInputDescByR
 // a caller may use other methods to create a TransferTxMsgTemplate.
 // reviewed on 2023.12.21
 // reviewed on 2023.12.31
-func CreateTransferTxMsgTemplateByKeys(abeTxInputDescs []*AbeTxInputDescByKeys, abeTxOutputDescs []*AbeTxOutputDesc, txFee uint64, txMemo []byte) (*wire.MsgTxAbe, error) {
+func CreateTransferTxMsgTemplateByKeys(txVersion uint32, abeTxInputDescs []*AbeTxInputDescByKeys, abeTxOutputDescs []*AbeTxOutputDesc, txFee uint64, txMemo []byte) (*wire.MsgTxAbe, error) {
 
 	//	Version
 	//	Note that new Tx must use the latest/current TxVersion.
-	txMsgTemplate := wire.NewMsgTxAbe(wire.TxVersion)
+	txMsgTemplate := wire.NewMsgTxAbe(txVersion)
 
 	//	TxIns     []*TxInAbe
 	for _, abeTxInputDesc := range abeTxInputDescs {
@@ -289,7 +290,12 @@ func TransferTxVerify(transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail
 
 // GetTxoPrivacyLevel returns the PrivacyLevel of the input wire.TxOutAbe,
 // which is determined by its version and its coinAddress.
+// At present, there are only 3 Privacy Levels for Txo, say PrivacyLevelRINGCTPre, PrivacyLevelRINGCT, PrivacyLevelPSEUDONYM/PrivacyLevelPSEUDONYMCT,
+// depending on the Txo's CoinAddressType.
+// In the future, if PrivacyLevelPSEUDONYMCT Txo is supported, Txo's data besides CoinAddressType will be further used to
+// determine its PrivacyLevel.
 // reviewed on 2024.01.04
+// ctx review done 2025.12.21
 func GetTxoPrivacyLevel(abeTxo *wire.TxOutAbe) (abecryptoxkey.PrivacyLevel, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
 	if err != nil {
@@ -308,31 +314,10 @@ func GetTxoPrivacyLevel(abeTxo *wire.TxOutAbe) (abecryptoxkey.PrivacyLevel, erro
 	return 0, nil
 }
 
-// GetTxoSerializeSizeApprox returns the approximate serialize size for a Txo,
-// which is in a transaction with the version being the input TxVersion and for the cryptoAddressPayTo.
-// Note that the transactions are generated and verified by the underlying crypto-scheme,
-// the approximate serialize size for Txo actually depends on the underlying crypto-scheme.
-// That's why txVersion is required as the input for this function.
-// reviewed on 2023.12.07
-// reviewed on 2024.01.01
-func GetTxoSerializeSizeApprox(txVersion uint32, cryptoAddressPayTo []byte) (int, error) {
-	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
-	if err != nil {
-		return 0, err
-	}
-	switch cryptoScheme {
-	case abecryptoxparam.CryptoSchemePQRingCT:
-		return abecryptoparam.GetTxoSerializeSizeApprox(txVersion)
-	case abecryptoxparam.CryptoSchemePQRingCTX:
-		return pqringctxGetTxoSerializeSize(abecryptoxparam.PQRingCTXPP, cryptoAddressPayTo)
-	default:
-		return 0, fmt.Errorf("GetTxoSerializeSizeApprox: Unsupported txVersion")
-	}
-}
-
 // ExtractPublicRandFromTxo returns the PublicRand in the CoinAddress of the input wire.TxOutAbe.
 // reviewed on 2023.12.31
 // reviewed on 2024.01.24
+// ctx review done 2025.12.22
 func ExtractPublicRandFromTxo(abeTxo *wire.TxOutAbe) (publicRand []byte, err error) {
 	if abeTxo == nil {
 		return nil, fmt.Errorf("ExtractPublicRandFromTxo: the input abeTxo is nil")
@@ -356,6 +341,7 @@ func ExtractPublicRandFromTxo(abeTxo *wire.TxOutAbe) (publicRand []byte, err err
 // ExtractCoinAddressFromTxo returns the coinAddress of the input TxOutAbe.
 // refactored on 2024.01.24 by Alice.
 // todo: review
+// ctx review done 2025.12.22
 func ExtractCoinAddressFromTxo(abeTxo *wire.TxOutAbe) (coinAddress []byte, err error) {
 	if abeTxo == nil {
 		return nil, fmt.Errorf("ExtractCoinAddressFromTxo: the input abeTxo is nil")
@@ -380,6 +366,7 @@ func ExtractCoinAddressFromTxo(abeTxo *wire.TxOutAbe) (coinAddress []byte, err e
 
 // TxoCoinDetectByCoinDetectorRootKey checks whether an abeTxo belongs to the owner of coinDetectorRootKey.
 // todo: review
+// ctx review done 2025.12.22
 func TxoCoinDetectByCoinDetectorRootKey(abeTxo *wire.TxOutAbe, coinDetectorRootKey []byte) (bool, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
 	if err != nil {
@@ -401,6 +388,7 @@ func TxoCoinDetectByCoinDetectorRootKey(abeTxo *wire.TxOutAbe, coinDetectorRootK
 // NOTE: From the view of users, detectorKey only has two layers, namely CoinDetectorRootKey and CryptoDetectorKey.
 // This is different from the SpendKey.
 // todo: review
+// ctx review done 2025.12.22
 func TxoCoinDetectByCryptoDetectorKey(abeTxo *wire.TxOutAbe, cryptoDetectorKey []byte) (bool, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
 	if err != nil {
@@ -420,6 +408,7 @@ func TxoCoinDetectByCryptoDetectorKey(abeTxo *wire.TxOutAbe, cryptoDetectorKey [
 
 // TxoCoinReceiveByRootSeeds
 // todo: review
+// ctx review done 2025.12.22
 func TxoCoinReceiveByRootSeeds(abeTxo *wire.TxOutAbe, coinValueKeyRootSeed []byte, coinDetectorRootKey []byte) (valid bool, value uint64, err error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
 	if err != nil {
@@ -439,6 +428,7 @@ func TxoCoinReceiveByRootSeeds(abeTxo *wire.TxOutAbe, coinValueKeyRootSeed []byt
 
 // TxoCoinReceiveByRandSeeds
 // todo: review
+// ctx review done 2025.12.22
 func TxoCoinReceiveByRandSeeds(abeTxo *wire.TxOutAbe, coinValueKeyRandSeed []byte, coinDetectorKey []byte) (valid bool, value uint64, err error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
 	if err != nil {
@@ -458,18 +448,25 @@ func TxoCoinReceiveByRandSeeds(abeTxo *wire.TxOutAbe, coinValueKeyRandSeed []byt
 
 // TxoCoinReceiveByKeys
 // todo: review
+// ctx review done 2025.12.22
 func TxoCoinReceiveByKeys(abeTxo *wire.TxOutAbe, cryptoAddress []byte, cryptoValueSecretKey []byte) (bool, uint64, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
 	if err != nil {
 		return false, 0, err
 	}
+	// todo: 2025.12.22 future add crypto-scheme branches
+
 	return pqringctxTxoCoinReceiveByKeys(abecryptoxparam.PQRingCTXPP, cryptoScheme, abeTxo, cryptoAddress, cryptoValueSecretKey)
 }
 
 // PseudonymTxoCoinParse parses the input (Pseudonym-Privacy) TxoMLP to its (coinAddress, coinValue) pair, and
 // return an err if it is not a Pseudonym-Privacy Txo.
 // todo: review
+// ctx review done 2025.12.22
 func PseudonymTxoCoinParse(abeTxo *wire.TxOutAbe) (coinAddress []byte, coinValue uint64, err error) {
+	if abeTxo == nil {
+		return nil, 0, fmt.Errorf("PseudonymTxoCoinParse: TxOut is nil")
+	}
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
 	if err != nil {
 		return nil, 0, err
@@ -490,6 +487,7 @@ func PseudonymTxoCoinParse(abeTxo *wire.TxOutAbe) (coinAddress []byte, coinValue
 // TxoCoinSerialNumberGenByRootSeed generates serialNumber for the input TxOutAbe, using the input cryptoSerialNumberSecretKey.
 // NOTE: the input coinSerialNumberKeyRootSeed could be nil, for example, when the input TxOutAbe is on a Pseudonym-Privacy address.
 // todo: review
+// ctx review done 2025.12.22
 func TxoCoinSerialNumberGenByRootSeed(abeTxo *wire.TxOutAbe, ringId wire.RingId, txoIndexInRing uint8, coinSerialNumberKeyRootSeed []byte) ([]byte, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
 	if err != nil {
@@ -509,6 +507,7 @@ func TxoCoinSerialNumberGenByRootSeed(abeTxo *wire.TxOutAbe, ringId wire.RingId,
 // TxoCoinSerialNumberGenByRandSeed generates serialNumber for the input TxOutAbe, using the input coinSerialNumberKeyRandSeed.
 // NOTE: the input coinSerialNumberKeyRandSeed could be nil, for example, when the input TxOutAbe is on a Pseudonym-Privacy address.
 // todo: review
+// ctx review done 2025.12.22
 func TxoCoinSerialNumberGenByRandSeed(abeTxo *wire.TxOutAbe, ringId wire.RingId, txoIndexInRing uint8, coinSerialNumberKeyRandSeed []byte) ([]byte, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
 	if err != nil {
@@ -528,6 +527,7 @@ func TxoCoinSerialNumberGenByRandSeed(abeTxo *wire.TxOutAbe, ringId wire.RingId,
 // TxoCoinSerialNumberGenByKey generates serialNumber for the input TxOutAbe, using the input cryptoSerialNumberSecretKey.
 // NOTE: the input cryptoSerialNumberSecretKey could be nil, for example, when the input TxOutAbe is on a Pseudonym-Privacy address.
 // todo: review
+// ctx review done 2025.12.22
 func TxoCoinSerialNumberGenByKey(abeTxo *wire.TxOutAbe, ringId wire.RingId, txoIndexInRing uint8, cryptoSerialNumberSecretKey []byte) ([]byte, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
 	if err != nil {
@@ -578,6 +578,7 @@ func TxoCoinSerialNumberGenByKey(abeTxo *wire.TxOutAbe, ringId wire.RingId, txoI
 // reviewed on 2023.12.07
 // reviewed on 2024.01.01, by Alice
 // refactored on 2024.01.24, by Alice, pqringctx-Layer takes cryptoAddress as input.
+// todo: move to abecryptoparam.go
 func GetCbTxWitnessSerializeSizeApprox(txVersion uint32, cryptoAddressListPayTo [][]byte) (int, error) {
 	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
 	if err != nil {
@@ -600,7 +601,7 @@ func GetCbTxWitnessSerializeSizeApprox(txVersion uint32, cryptoAddressListPayTo 
 // Note that the transactions are generated and versified by the underlying crypto-scheme,
 // the approximate serialize size for TransferTxWitness actually depends on the underlying crypto-scheme.
 // That's why txVersion is required as the input for this function.
-// todo: review
+// todo: move to abecryptoparam.go
 func GetTrTxWitnessSerializeSizeApprox(txVersion uint32,
 	inForRing uint8, inForSingleDistinct uint8, inRingSizes []uint8,
 	outForRing uint8, vPublic int64) (int, error) {
@@ -627,3 +628,68 @@ func GetTrTxWitnessSerializeSizeApprox(txVersion uint32,
 }
 
 //	APIs for TxWitness	end
+
+// APIs for ruleChecks	begin
+
+// RuleCheckOnTxoVersionPrivacyLevel checks the match between Txo's Version and PrivacyLevel.
+//
+// When new TxVersion is added, rules need to be added here.
+// ctx review done 2025.12.22
+func RuleCheckOnTxoVersionPrivacyLevel(txoVersion uint32, privacyLevel abecryptoxkey.PrivacyLevel) error {
+	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txoVersion)
+	if err != nil {
+		return err
+	}
+
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCT:
+		if txoVersion == wire.TxVersion_Height_0 && privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre {
+			// allowed case
+			// for CryptoSchemePQRingCT,
+			// PrivacyLevel is not introduced yet,
+			// and this backward compatible case is the only allowed case.
+			return nil
+		}
+		return fmt.Errorf("RuleCheckOnTxoVersionPrivacyLevel: (txoVersion, privacyLevel) (%d, %d) "+
+			"implies CryptoSchemePQRingCT, but is not (TxVersion_Height_0, PrivacyLevelRINGCTPre)", txoVersion, privacyLevel)
+
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+		return pqringctxRuleCheckOnTxoVersionPrivacyLevel(abecryptoxparam.PQRingCTXPP, txoVersion, privacyLevel)
+
+	default:
+		return fmt.Errorf("RuleCheckOnTxoVersionPrivacyLevel: Unsupported txoVersion (%d)", txoVersion)
+	}
+}
+
+// RuleCheckOnTxInputVersion checks the match between TxInput's Version and Tx's Version.
+//
+// When new TxVersion is added, rules need to be added here.
+// ctx review done 2025.12.22
+func RuleCheckOnTxInputVersion(txInputVersion uint32, txVersion uint32) error {
+	cryptoScheme, err := abecryptoxparam.GetCryptoSchemeByTxVersion(txVersion)
+	if err != nil {
+		return err
+	}
+	switch cryptoScheme {
+	case abecryptoxparam.CryptoSchemePQRingCT:
+		if txInputVersion == wire.TxVersion_Height_0 && txVersion == wire.TxVersion_Height_0 {
+			// allowed case
+			// for CryptoSchemePQRingCT,
+			// only TxVersion_Height_0 appears,
+			// and this backward compatible case is the only allowed case.
+			return nil
+		}
+		return fmt.Errorf("RuleCheckOnTxInputVersion: (txInputVersion, txVersion) (%d, %d) "+
+			"implies CryptoSchemePQRingCT, but is not (TxVersion_Height_0, TxVersion_Height_0)", txInputVersion, txVersion)
+
+	case abecryptoxparam.CryptoSchemePQRingCTX:
+		return pqringctxRuleCheckOnTxInputVersion(abecryptoxparam.PQRingCTXPP, txInputVersion, txVersion)
+
+	default:
+		return fmt.Errorf("RuleCheckOnTxInputVersion: Unsupported txVersion (%d)", txVersion)
+	}
+}
+
+//	APIs for ruleChecks	end
+
+// ctx review done 2025.12.22

@@ -2,7 +2,9 @@ package blockchain
 
 import (
 	"fmt"
+
 	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/blockchain/ruleerror"
 	"github.com/pqabelian/abec/database"
 )
 
@@ -32,10 +34,10 @@ func (b *BlockChain) maybeAcceptBlockAbe(block *abeutil.BlockAbe, flags Behavior
 	prevNode := b.index.LookupNode(prevHash)
 	if prevNode == nil {
 		str := fmt.Sprintf("previous block %s is unknown", prevHash)
-		return false, ruleError(ErrPreviousBlockUnknown, str)
+		return false, ruleerror.NewRuleError(ruleerror.ErrPreviousBlockUnknown, str)
 	} else if b.index.NodeStatus(prevNode).KnownInvalid() {
 		str := fmt.Sprintf("previous block %s is known to be invalid", prevHash)
-		return false, ruleError(ErrInvalidAncestorBlock, str)
+		return false, ruleerror.NewRuleError(ruleerror.ErrInvalidAncestorBlock, str)
 	}
 
 	blockHeight := prevNode.height + 1
@@ -48,6 +50,7 @@ func (b *BlockChain) maybeAcceptBlockAbe(block *abeutil.BlockAbe, flags Behavior
 	if err != nil {
 		return false, err
 	}
+	log.Infof("checkBlockContextAbe successful")
 
 	// Insert the block into the database if it's not already there.  Even
 	// though it is possible the block will ultimately fail to connect, it
@@ -91,6 +94,7 @@ func (b *BlockChain) maybeAcceptBlockAbe(block *abeutil.BlockAbe, flags Behavior
 	if err != nil {
 		return false, err
 	}
+	log.Infof("connectBestChainAbe successful")
 
 	// Notify the caller that the new block was accepted into the block
 	// chain.  The caller would typically want to react by relaying the
