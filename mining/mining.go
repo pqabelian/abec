@@ -4,14 +4,22 @@ import (
 	"container/heap"
 	"encoding/binary"
 	"fmt"
+	ctautwire "github.com/pqabelian/abec/ctaut/wire"
+
+	"github.com/pqabelian/abec/blockchain/consensus"
+	ctautapi "github.com/pqabelian/abec/ctaut/api"
+
+	"time"
+
 	"github.com/pqabelian/abec/abecryptox"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxkey"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
 	"github.com/pqabelian/abec/abeutil"
 	"github.com/pqabelian/abec/blockchain"
 	"github.com/pqabelian/abec/chaincfg"
 	"github.com/pqabelian/abec/chainhash"
 	"github.com/pqabelian/abec/txscript"
 	"github.com/pqabelian/abec/wire"
-	"time"
 )
 
 const (
@@ -258,29 +266,43 @@ func mergeUtxoRingView(viewA *blockchain.UtxoRingViewpoint, viewB *blockchain.Ut
 	viewA.SetEntries(viewAEntries)
 }
 
-func mergeAUTView(viewA *blockchain.AUTViewpoint, viewB *blockchain.AUTViewpoint) {
+// aut review done, 2025.12.12
+func mergeCTAUTView(viewA *blockchain.CTAUTViewpoint, viewB *blockchain.CTAUTViewpoint) {
 	if viewB == nil {
 		return
 	}
 
-	viewAEntries := viewA.Entries()
-	if viewAEntries == nil {
-		viewAEntries = make(map[string]*blockchain.AUTEntry)
+	viewAInstances := viewA.Instances()
+	if viewAInstances == nil {
+		viewAInstances = make(map[string]*blockchain.CTAUTInstance)
 	}
-	for autNameKeys, entry := range viewB.Entries() {
-		existAUTInfo := viewAEntries[autNameKeys]
-		if existAUTInfo == nil {
-			viewAEntries[autNameKeys] = entry
+	for identifierKey, instanceInViewB := range viewB.Instances() {
+		instanceInViewA := viewAInstances[identifierKey]
+		if instanceInViewA == nil {
+			viewAInstances[identifierKey] = instanceInViewB
 			continue
 		}
-		// do not change AUT info
-		// but add all coin to viewA
-		for outpiont, coin := range entry.AUTCoins() {
-			existAUTInfo.Add(outpiont, coin)
+
+		// Note that this function is only a helper function in newBlockTemplate:
+		// viewB is FRESHLY fetched from database for each Tx and IS NOT modified before it is merged into viewA, and
+		// viewA is obtained by merging these viewBs and IS NOT modified.
+		// As a result, for an identifierKey, if instanceInViewA exits in viewA, the autMetaData in viewB should be the same as that in ViewA.
+		// But the coin in viewB should be different ones from those in viewA.
+
+		// Here we do not need to update ViewA's autMetaData if it is not nil.
+		if instanceInViewA.Metadata() == nil {
+			if instanceInViewB.Metadata() != nil {
+				instanceInViewA.SetAutMetadata(instanceInViewB.Metadata().Clone())
+			}
 		}
-		viewAEntries[autNameKeys] = existAUTInfo
+
+		// add all coin to viewA
+		for outpoint, coin := range instanceInViewB.AUTCoins() {
+			instanceInViewA.PutCoin(outpoint, coin)
+		}
+		viewAInstances[identifierKey] = instanceInViewA
 	}
-	viewA.SetEntries(viewAEntries)
+	viewA.SetInstances(viewAInstances)
 }
 
 // standardCoinbaseScript returns a standard script suitable for use as the
@@ -422,7 +444,11 @@ func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, txVersion uint32, cry
 	msgTx.AddTxIn(coinbaseTxIn)
 
 	// oneTxOut
-	txoScriptSizeApprox, err := abecryptox.GetTxoSerializeSizeApprox(msgTx.Version, cryptoAddressPayTo)
+	_, coinAddressPayTo, _, err := abecryptoxkey.CryptoAddressParse(cryptoAddressPayTo)
+	if err != nil {
+		return nil, err
+	}
+	txoScriptSizeApprox, err := abecryptoxparam.GetTxoScriptSizeApprox(msgTx.Version, coinAddressPayTo)
 	if err != nil {
 		return nil, err
 	}
@@ -447,7 +473,8 @@ func createCoinbaseTxAbeMsgTemplate(nextBlockHeight int32, txVersion uint32, cry
 	if err != nil {
 		return nil, err
 	}
-	msgTx.TxWitness = make([]byte, txWitnessSizeApprox)
+	msgTx.TxWitness = make([]byte, txWitnessSizeApprox) // todo: make sure len(msgTx.TxWitness) != 0 so that msgTx.HasWitness == true
+	msgTx.AutWitness = nil                              // coinbaseTx should not carry AutTx.
 
 	return msgTx, nil
 }
@@ -467,25 +494,145 @@ func spendTransaction(utxoView *blockchain.UtxoViewpoint, tx *abeutil.Tx, height
 	return nil
 }
 
+// spendTransactionAbe is a local helper function in mining (like inline function), should not be called by other place.
+// Note the checks before calling this function will guarantee that
+// the operations in spendTransactionAbe will always succeed, say never return err.
+// Even in case error happens, it only may cause that some later tx can't be added into the constructing block template,
+// will not cause other worse results.
 // todo(ABE): the block is unknown yet, use hainhash.ZeroHash as the block hash consuming the serialNumber
 // Move this function to blockchain package
-func spendTransactionAbe(utxoRingView *blockchain.UtxoRingViewpoint, autView *blockchain.AUTViewpoint, tx *abeutil.TxAbe) error {
+// aut review done 2025.12.16
+func spendTransactionAbe(tx *abeutil.TxAbe, utxoRingView *blockchain.UtxoRingViewpoint, ctautView *blockchain.CTAUTViewpoint, blockHeight int32) error {
 	for _, txIn := range tx.MsgTx().TxIns {
 		entry := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())
 		if entry != nil {
-			entry.Spend(txIn.SerialNumber, &chainhash.ZeroHash)
+			entry.Spend(txIn.SerialNumber, &chainhash.ZeroHash) // TODO(review)
+			// todo: spend Aut here?
 		}
 	}
-	// AUT
-	autTx, err := tx.AUTTransaction()
+
+	// todo: spendAutScript
+	// set AutRootToken spent for Rereg;
+	// ste AutRootToken spent and update mintedAmount and Mint;
+	// set AutCoin spent for Transfer;
+	// set AutCoin spent and updated burnedAMount.
+	err := spendTransactionAUTScript(tx, ctautView, blockHeight)
 	if err != nil {
 		return err
 	}
-	if autTx != nil {
-		err = autView.SpendTransaction(autTx)
+
+	// todo: 2025.12.12 how about add spendTransactionAutScript here
+	// todo: what is the function of this spend function? to prepare data for double-spending check?
+	// todo: note that the double-spending check for aut is simple, since its double-spending-proof is guaranteed by the host-tx.
+	// todo: fot aut, it only needs to prevent spend-unexist.
+
+	return nil
+}
+
+// spendTransactionAUTScript is a subroutine of spendTransactionAbe.
+//
+// Note the checks before calling spendTransactionAbe will guarantee that
+// the operations in spendTransactionAUTScript will always succeed, say never return err.
+// Even in case error happens, it only may cause that some later tx can't be added into the constructing block template,
+// will not cause other bad results.
+// aut review done 2025.12.16
+func spendTransactionAUTScript(tx *abeutil.TxAbe, ctAutView *blockchain.CTAUTViewpoint, blockHeight int32) error {
+	if tx == nil {
+		return fmt.Errorf("spendTransactionAUTScript: tx is nil")
+	}
+
+	extAutScript := tx.ExtAutScript()
+	if extAutScript == nil {
+		return nil
+	}
+
+	var err error
+	switch scriptInst := extAutScript.AutScript.(type) {
+	case *ctautapi.RegistrationScript:
+		// nothing to do here for registration
+
+	case *ctautapi.ReRegistrationScript:
+		// remove root token
+		for i, consumedHostOutPoint := range extAutScript.ConsumedHostOutpoints() {
+			if consumedHostOutPoint == nil {
+				return fmt.Errorf("spendTransactionAUTScript: ReRegistrationScript.consumedHostOutpoints[%d] is nil", i)
+			}
+			err = ctAutView.SpendRootToken(scriptInst.AutIdentifier(), *consumedHostOutPoint)
+			if err != nil {
+				return err
+			}
+		}
+
+	case *ctautapi.MintScript:
+		// remove root token
+		for i, consumedHostOutPoint := range extAutScript.ConsumedHostOutpoints() {
+			if consumedHostOutPoint == nil {
+				return fmt.Errorf("spendTransactionAUTScript: MintScript.consumedHostOutpoints[%d] is nil", i)
+			}
+			err = ctAutView.SpendRootToken(scriptInst.AutIdentifier(), *consumedHostOutPoint)
+			if err != nil {
+				return err
+			}
+		}
+
+		// update MintedAmount
+		err = ctAutView.AddMintAmount(scriptInst.AutIdentifier(), scriptInst.Vin())
 		if err != nil {
 			return err
 		}
+
+	case *ctautapi.TransferScript:
+		// remove aut coin
+		for i, consumedHostOutPoint := range extAutScript.ConsumedHostOutpoints() {
+			if consumedHostOutPoint == nil {
+				return fmt.Errorf("spendTransactionAUTScript: TransferScript.consumedHostOutpoints[%d] is nil", i)
+			}
+
+			err = ctAutView.SpendCTAUTCoin(scriptInst.AutIdentifier(), *consumedHostOutPoint)
+			if err != nil {
+				return err
+			}
+		}
+
+	case *ctautapi.BurnScript:
+		// remove aut coin
+		for i, consumedHostOutPoint := range extAutScript.ConsumedHostOutpoints() {
+			if consumedHostOutPoint == nil {
+				return fmt.Errorf("spendTransactionAUTScript: BurnScript.consumedHostOutpoints[%d] is nil", i)
+			}
+
+			err = ctAutView.SpendCTAUTCoin(scriptInst.AutIdentifier(), *consumedHostOutPoint)
+			if err != nil {
+				return err
+			}
+		}
+
+		// update burnedAmount
+		generatedTokens := extAutScript.GeneratedTokens()
+		if len(generatedTokens) == 0 {
+			return fmt.Errorf("spendTransactionAUTScript: BurnScript.GeneratedTokens is empty")
+		}
+		burnedToken := generatedTokens[len(generatedTokens)-1]
+		if burnedToken == nil {
+			return fmt.Errorf("spendTransactionAUTScript: the last of BurnScript.GeneratedTokens is nil")
+		}
+		autTxo := &ctautwire.AutTxo{}
+		if err = autTxo.Deserialize(burnedToken.ValueScript); err != nil {
+			return err
+		}
+
+		burnAmount, err := abecryptox.ExtractAutTxoValue(autTxo, nil, nil)
+		if err != nil {
+			return err
+		}
+
+		err = ctAutView.AddBurnAmount(scriptInst.AutIdentifier(), burnAmount)
+		if err != nil {
+			return err
+		}
+
+	default:
+		return fmt.Errorf("script with unknown type %d", extAutScript.Type())
 	}
 
 	return nil
@@ -632,7 +779,7 @@ func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
 //	 -----------------------------------  --
 //
 // reviewed on 2024.01.01, by Alice
-func (g *BlkTmplGenerator) NewBlockTemplate(cryptoAddressPayTo []byte) (*BlockTemplate, error) {
+func (g *BlkTmplGenerator) NewBlockTemplate(consensusApplied wire.ConsensusProtocol, cryptoAddressPayTo []byte) (*BlockTemplate, error) {
 	// Extend the most recently known best block.
 	best := g.chain.BestSnapshot()
 	nextBlockHeight := best.Height + 1
@@ -647,21 +794,27 @@ func (g *BlkTmplGenerator) NewBlockTemplate(cryptoAddressPayTo []byte) (*BlockTe
 	// identical transaction for block version 1).
 	//extraNonce := uint64(0)
 	// ToDo(MLP): If there are more versions, we need to added here.
-	txVersion := wire.TxVersion
-	if nextBlockHeight < g.chainParams.BlockHeightMLPAUT {
-		txVersion = wire.TxVersion_Height_0
+	cbTxVersion := wire.TxVersion
+	if nextBlockHeight >= g.chainParams.BlockHeightAconcagua {
+		cbTxVersion = wire.TxVersion_Height_464000_Aconcagua
+
+		if consensusApplied != wire.ConsensusNakamotoPow && consensusApplied != wire.ConsensusEthashPow {
+			return nil, fmt.Errorf("for height %d, the input consensusApplied is not ConsensusNakamotoPow or ConsensusEthashPow", nextBlockHeight)
+		}
+	} else if nextBlockHeight >= g.chainParams.BlockHeightMLPAUT {
+		cbTxVersion = wire.TxVersion_Height_MLPAUT_300000
 	} else {
-		txVersion = wire.TxVersion_Height_MLPAUT_300000
+		cbTxVersion = wire.TxVersion_Height_0
 	}
+
 	// At this moment, we do not need to support output for coinbaseTx,
 	// since it will require the mechanism on separating the total output value to the multiple output Txos.
-	coinbaseTxMsg, err := createCoinbaseTxAbeMsgTemplate(nextBlockHeight, txVersion, cryptoAddressPayTo)
+	coinbaseTxMsg, err := createCoinbaseTxAbeMsgTemplate(nextBlockHeight, cbTxVersion, cryptoAddressPayTo)
 	if err != nil {
 		return nil, err
 	}
 	subsidy := blockchain.CalcBlockSubsidy(nextBlockHeight, g.chainParams)
 
-	// TODO review from here 20240125
 	// Get the current source transactions and create a priority queue to
 	// hold the transactions which are ready for inclusion into a block
 	// along with some priority related and fee metadata.  Reserve the same
@@ -677,10 +830,14 @@ func (g *BlkTmplGenerator) NewBlockTemplate(cryptoAddressPayTo []byte) (*BlockTe
 	// house all of the input transactions so multiple lookups can be
 	// avoided.
 	blockTxns := make([]*abeutil.TxAbe, 0, len(sourceTxns)+1)
-	coinbaseTx := abeutil.NewTxAbe(coinbaseTxMsg)
+	coinbaseTx, err := abeutil.NewTxAbe(coinbaseTxMsg, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error happens when calling abeutil.NewTxAbe on MsgTx (%v): %v", coinbaseTxMsg.TxHash(), err)
+	}
+
 	blockTxns = append(blockTxns, coinbaseTx)
 	blockUtxoRings := blockchain.NewUtxoRingViewpoint()
-	blockAUTView := blockchain.NewAUTViewpoint()
+	blockCTAUTView := blockchain.NewCTAUTViewpoint()
 
 	// Create slices to hold the fees and number of signature operations
 	// for each of the selected transactions and add an entry for the
@@ -694,15 +851,24 @@ func (g *BlkTmplGenerator) NewBlockTemplate(cryptoAddressPayTo []byte) (*BlockTe
 	log.Debugf("Considering %d transactions for inclusion to new block",
 		len(sourceTxns))
 
+	// Calculate the next expected block version based on the state of the rule change deployments.
+	nextBlockVersion, err := g.chain.CalcNextBlockVersion()
+	if err != nil {
+		return nil, err
+	}
+
 	//	todo: (EthashPow)
 	//	blockHeaderOverhead is the max number of bytes it takes to serialize a block header and max possible transaction count.
 	//	It is a maximum possible value, rather than an accurate value.
 	// blockHeaderOverhead := wire.MaxBlockHeaderPayload + wire.MaxVarIntPayload
-	blockHeaderOverhead := wire.MaxBlockHeaderPayload
-	if nextBlockHeight >= g.chainParams.BlockHeightEthashPoW {
-		blockHeaderOverhead = wire.MaxBlockHeaderPayloadEthash
-	}
+	//blockHeaderOverhead := wire.MaxBlockHeaderPayload
+	//if nextBlockHeight >= g.chainParams.BlockHeightEthashPoW {
+	//	blockHeaderOverhead = wire.MaxBlockHeaderPayloadEthash
+	//}
+	blockHeaderOverhead := wire.GetBlockHeaderSize(nextBlockVersion)
 	blockHeaderOverhead += wire.MaxVarIntPayload
+
+	autScriptTypeMapReregMint := make(map[string]*abeutil.TxAbe, len(sourceTxns))
 
 mempoolLoop:
 	for _, txDesc := range sourceTxns {
@@ -720,6 +886,23 @@ mempoolLoop:
 		// simnet  [0    -    299  ] [300       -    999   ] [1000     -    1999  ]
 		//             1                    1/2                  2
 		// ToDo(MLP):
+		if nextBlockHeight >= g.chainParams.BlockHeightAconcaguaCommit {
+			if tx.MsgTx().Version < wire.TxVersion_Height_464000_Aconcagua {
+				log.Tracef("Skipping tx %s, since from block with height %d, "+
+					"transactions with version %d will not be mined any more",
+					tx.Hash(), g.chainParams.BlockHeightAconcaguaCommit, tx.MsgTx().Version)
+				continue
+			}
+		} else if nextBlockHeight >= g.chainParams.BlockHeightAconcagua {
+			// nothing to do
+		} else { //nextBlockHeight < g.chainParams.BlockHeightAconcagua
+			if tx.MsgTx().Version >= wire.TxVersion_Height_464000_Aconcagua {
+				log.Tracef("Skipping tx %s, transactions with version %d would not be mined until height %d",
+					tx.Hash(), tx.MsgTx().Version, g.chainParams.BlockHeightAconcagua)
+				continue
+			}
+		}
+
 		if nextBlockHeight >= g.chainParams.BlockHeightMLPAUTCOMMIT {
 			if tx.MsgTx().Version < wire.TxVersion_Height_MLPAUT_300000 {
 				log.Tracef("Skipping tx %s, since from block with height %d, transactions with version %d will not be mined any more", tx.Hash(), g.chainParams.BlockHeightMLPAUTCOMMIT, tx.MsgTx().Version)
@@ -735,27 +918,36 @@ mempoolLoop:
 		}
 
 		// Fetch all of the utxoRings referenced by this transaction.
-		utxoRings, err := g.chain.FetchUtxoRingView(tx)
+		utxoRingView, err := g.chain.FetchUtxoRingView(tx)
 		if err != nil {
 			log.Warnf("Unable to fetch utxoRing view for tx %s: %v",
 				tx.Hash(), err)
 			continue
 		}
 
-		// TODO replace with this one?
-		err = blockchain.CheckTransactionInputsAbe(tx, nextBlockHeight, utxoRings, g.chainParams)
+		// aut review done, 2025.12.12
+		ctAutView, err := g.chain.FetchCTAUTView(tx.ExtAutScript())
 		if err != nil {
-			log.Tracef("Skipping tx %s because it "+
-				"references unspent output %s "+
-				"which is not available",
+			log.Debugf("Skipping tx %s because it "+
+				"contains an invalid CTAUT transaction: %v",
+				tx.Hash(), err)
+			continue
+		}
+
+		// TODO replace with this one?
+		// Note that here use a utxoRings read from mainchain to call CheckTransactionInputsAbe
+		err = blockchain.CheckTransactionInputsAbe(tx, nextBlockHeight, utxoRingView, ctAutView, g.chainParams)
+		if err != nil {
+			log.Tracef("Skipping tx %s because the inptts check failed: %v ",
 				tx.Hash(), err)
 			continue mempoolLoop
 		}
 		// ToDo(MLP):todo
 		// If utxoRing of one of the transaction inputs does not exist,
 		// skip this transaction.
+		// 2025.12.12 Note that this check has actually performed in the above CheckTransactionInputsAbe
 		for _, txIn := range tx.MsgTx().TxIns {
-			entry := utxoRings.LookupEntry(txIn.PreviousOutPointRing.Hash())
+			entry := utxoRingView.LookupEntry(txIn.PreviousOutPointRing.Hash())
 			if entry == nil || entry.IsSpent(txIn.SerialNumber) {
 				log.Tracef("Skipping tx %s because it "+
 					"references unspent output %s "+
@@ -765,20 +957,27 @@ mempoolLoop:
 			}
 		}
 
-		autView, err := g.chain.FetchAUTView(tx)
-		if err != nil {
-			log.Warnf("Unable to fetch aut view for tx %s: %v",
-				tx.Hash(), err)
-			continue
-		}
+		extAutScript := tx.ExtAutScript()
+		if extAutScript != nil {
+			// RULE: In each block, for an AutInstance, there is at most ONE AutScriptTypeReRegistration or AutScriptTypeMint.
+			// This is because AutScriptTypeReRegistration and AutScriptTypeMint updates the corresponding AutInstance,
+			// and each block should allow at most ONE such operation.
+			autIdentifierKey := extAutScript.AutIdentifier().String()
+			autScriptType := extAutScript.Type()
+			// AutScriptTypeRegistration does not need this check, since it is guaranteed by the identifier mechanism.
+			// AutScriptTypeBurn does not need this limitation, since it is only a special transferScript,
+			// although it modifies the BurnedAmount of the AutInstance.
+			// Note that this modification is still inside the AutInstance.
+			if autScriptType == ctautapi.AutScriptTypeReRegistration || autScriptType == ctautapi.AutScriptTypeMint {
+				if prevTx, ok := autScriptTypeMapReregMint[autIdentifierKey]; ok {
+					log.Debugf("sking tx (hash=%v) because it carries an AutScript(type=%s) of AutInsatnce (%s), "+
+						"while a previous tx (hash=%v) already carries an AutScript(type=%s)",
+						tx.Hash(), autScriptType.String(), autIdentifierKey, prevTx.Hash(), prevTx.ExtAutScript().Type().String())
+					continue
+				}
 
-		if autView != nil {
-			err = blockchain.CheckTransactionInputsAUT(tx, nextBlockHeight, utxoRings, autView, g.chainParams)
-			if err != nil {
-				log.Debugf("Skipping tx %s because it "+
-					"contains an invalid AUT transaction: %v",
-					tx.Hash(), err)
-				continue
+				autScriptTypeMapReregMint[autIdentifierKey] = tx
+
 			}
 		}
 
@@ -786,7 +985,7 @@ mempoolLoop:
 		// Calculate the final transaction priority using the input
 		// value age sum as well as the adjusted transaction size.
 		// Current formula is: sum(inputAge) / adjustedTxSize
-		prioItem.priority = CalcPriorityAbe(tx.MsgTx(), utxoRings, nextBlockHeight)
+		prioItem.priority = CalcPriorityAbe(tx.MsgTx(), utxoRingView, nextBlockHeight)
 
 		// Calculate the fee in Neutrino/kB.
 		prioItem.feePerKB = txDesc.FeePerKB
@@ -803,8 +1002,8 @@ mempoolLoop:
 		//mergeUtxoView(blockUtxos, utxos)
 		// if blockUtxoRings.Entries() has the same utxoRing,
 		// just replace, as the utxoRing in utxoRings is queried from the latest database
-		mergeUtxoRingView(blockUtxoRings, utxoRings)
-		mergeAUTView(blockAUTView, autView)
+		mergeUtxoRingView(blockUtxoRings, utxoRingView)
+		mergeCTAUTView(blockCTAUTView, ctAutView)
 	}
 
 	log.Tracef("Priority queue len %d", priorityQueue.Len())
@@ -815,7 +1014,7 @@ mempoolLoop:
 	//	todo(ABE): ABE does not use weight, while use size only.
 	// blockWeight := (blockHeaderOverhead * blockchain.WitnessScaleFactor) + uint32(blockchain.GetTransactionWeightAbe(coinbaseTx))
 	blockSize := uint32((blockHeaderOverhead) + coinbaseTx.MsgTx().SerializeSize())
-	blockFullSize := uint32((blockHeaderOverhead) + coinbaseTx.MsgTx().SerializeSize())
+	blockFullSize := uint32((blockHeaderOverhead) + coinbaseTx.MsgTx().SerializeSizeFull())
 	totalFee := uint64(0)
 
 	// Choose which transactions make it into the block.
@@ -909,7 +1108,10 @@ mempoolLoop:
 		// Ensure the transaction inputs pass all of the necessary
 		// preconditions before allowing it to be added to the block.
 		//	todo(ABE): check double spending
-		err := blockchain.CheckTransactionInputsAbe(tx, nextBlockHeight, blockUtxoRings, g.chainParams)
+		// 2025.12.12 here use blockUtxoRings to check the double-spending and spend-unexist,
+		// to prevent double-spend among different transactions,
+		// which is achieved together with later spendTransactionAbe().
+		err := blockchain.CheckTransactionInputsAbe(tx, nextBlockHeight, blockUtxoRings, blockCTAUTView, g.chainParams)
 		if err != nil {
 			log.Debugf("Skipping tx %s due to error in "+
 				"CheckTransactionInputs: %v", tx.Hash(), err)
@@ -920,33 +1122,24 @@ mempoolLoop:
 			In particular, for each tx in mp.pool, there is an additional filed, to identify whether the tx's witness has been verified.
 			Other information, e.g., the inputs's double-spending may change, but as long as the txhash does not change, the witness does not need to verify again
 		*/
-		err = blockchain.ValidateTransactionScriptsAbe(tx, blockUtxoRings, g.witnessCache)
+		err = blockchain.ValidateTransactionScriptsAbe(tx, blockUtxoRings, blockCTAUTView, g.witnessCache)
 		if err != nil {
 			log.Debugf("Skipping tx %s due to error in "+
 				"ValidateTransactionScripts: %v", tx.Hash(), err)
 			continue
 		}
 
-		autTx, err := tx.AUTTransaction()
-		if err != nil {
-			log.Debugf("Skipping tx %s due to error in "+
-				"AUTTransaction: %v", tx.Hash(), err)
-			continue
-		}
-		if autTx != nil {
-			err = blockchain.CheckTransactionInputsAUT(tx, nextBlockHeight, blockUtxoRings, blockAUTView, g.chainParams)
-			if err != nil {
-				log.Debugf("Skipping tx %s due to error in "+
-					"CheckTransactionInputsAUT: %v", tx.Hash(), err)
-				continue
-			}
-		}
-
+		// TODO why not consistent with
 		// Spend the transaction inputs in the block utxoRing view and add
 		// an entry for it to ensure any transactions which reference
 		// this one have it available as an input and can ensure they
 		// aren't double spending.
-		err = spendTransactionAbe(blockUtxoRings, blockAUTView, tx)
+		// 2025.12.15 Note that the previous CheckTransactionInputsAbe and ValidateTransactionScriptsAbe
+		// have guaranteed
+		// (a) the operations on Host_Txs in spendTransactionAbe will be always successfully executed,
+		// (b) the operations on AutMetadata nd AutToken in spendTransactionAbe will be always successfully executed.
+		// Even error happens, it may cause some later transaction not to be added, without worse results.
+		err = spendTransactionAbe(tx, blockUtxoRings, blockCTAUTView, nextBlockHeight)
 		if err != nil {
 			log.Debugf("Skipping tx %s due to error in "+
 				"spendTransactionAbe: %v", tx.Hash(), err)
@@ -985,7 +1178,11 @@ mempoolLoop:
 	if err != nil {
 		return nil, err
 	}
-	coinbaseTx = abeutil.NewTxAbe(coinbaseTxMsg)
+	coinbaseTx, err = abeutil.NewTxAbe(coinbaseTxMsg, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error happens when calling abeutil.NewTxAbe on MsgTx (%v): %v", coinbaseTxMsg.TxHash(), err)
+	}
+
 	blockTxns[0] = coinbaseTx
 
 	//	todo(ABE): Does ABE need to store a commitment of the hash for the witnesses of transactions?
@@ -994,14 +1191,9 @@ mempoolLoop:
 	// is potentially adjusted to ensure it comes after the median time of
 	// the last several blocks per the chain consensus rules.
 	ts := medianAdjustedTime(best, g.timeSource)
-	reqDifficulty, err := g.chain.CalcNextRequiredDifficulty(ts)
-	if err != nil {
-		return nil, err
-	}
-
-	// Calculate the next expected block version based on the state of the
-	// rule change deployments.
-	nextBlockVersion, err := g.chain.CalcNextBlockVersion()
+	// todo: Aconcagua review
+	// reqDifficulty, err := g.chain.CalcNextRequiredDifficulty(ts)
+	reqDifficultyVector, err := g.chain.CalcNextRequiredDifficultyVector(ts)
 	if err != nil {
 		return nil, err
 	}
@@ -1020,12 +1212,15 @@ mempoolLoop:
 
 	var msgBlock wire.MsgBlockAbe
 	msgBlock.Header = wire.BlockHeader{
-		Version:    nextBlockVersion,
-		PrevBlock:  best.Hash,
-		MerkleRoot: *merkleRoot,
-		Timestamp:  ts,
-		Bits:       reqDifficulty,
-		Height:     nextBlockHeight, // todo: (EthashPow)
+		Version:          nextBlockVersion,
+		PrevBlock:        best.Hash,
+		MerkleRoot:       *merkleRoot,
+		Timestamp:        ts,
+		Height:           nextBlockHeight,
+		Bits:             reqDifficultyVector.Bits,
+		BitsSecond:       reqDifficultyVector.BitsSecond,
+		PowScaleSecond:   reqDifficultyVector.PowScaleSecond,
+		ConsensusApplied: consensusApplied,
 	}
 	for _, tx := range blockTxns {
 		if err := msgBlock.AddTransaction(tx.MsgTx()); err != nil {
@@ -1036,7 +1231,12 @@ mempoolLoop:
 	// Finally, perform a full check on the created block against the chain
 	// consensus rules to ensure it properly connects to the current best
 	// chain with no issues.
-	block := abeutil.NewBlockAbe(&msgBlock)
+	block, err := abeutil.NewBlockAbe(&msgBlock)
+	if err != nil {
+		return nil, fmt.Errorf("error happens when calling NewBlockAbe on a msgBlock (hash=%s): %v",
+			consensus.SealHashFast(&msgBlock.Header), err)
+	}
+
 	block.SetHeight(nextBlockHeight)
 	if err := g.chain.CheckConnectBlockTemplateAbe(block); err != nil {
 		return nil, err
@@ -1119,6 +1319,26 @@ func (g *BlkTmplGenerator) UpdateBlockTimeAbeEthash(blockTemplate *BlockTemplate
 	return nil
 }
 
+func (g *BlkTmplGenerator) UpdateBlockTimeAconcagua(blockTemplate *BlockTemplate) error {
+	// The new timestamp is potentially adjusted to ensure it comes after
+	// the median time of the last several blocks per the chain consensus rules.
+	newTime := medianAdjustedTime(g.chain.BestSnapshot(), g.timeSource)
+	blockTemplate.BlockAbe.Header.Timestamp = newTime
+
+	// Recalculate the difficulty if running on a network that requires it.
+	if g.chainParams.ReduceMinDifficulty {
+		difficultyVector, err := g.chain.CalcNextRequiredDifficultyVector(newTime)
+		if err != nil {
+			return err
+		}
+		blockTemplate.BlockAbe.Header.Bits = difficultyVector.Bits
+		blockTemplate.BlockAbe.Header.BitsSecond = difficultyVector.BitsSecond
+		blockTemplate.BlockAbe.Header.PowScaleSecond = difficultyVector.PowScaleSecond
+	}
+
+	return nil
+}
+
 // UpdateExtraNonce updates the extra nonce in the coinbase script of the passed
 // block by regenerating the coinbase script with the passed value and block
 // height.  It also recalculates and updates the new merkle root that results
@@ -1159,7 +1379,11 @@ func (g *BlkTmplGenerator) UpdateExtraNonceAbe(msgBlock *wire.MsgBlockAbe, extra
 	binary.BigEndian.PutUint64(msgBlock.Transactions[0].TxIns[0].PreviousOutPointRing.BlockHashs[1][0:8], extraNonce)
 
 	// Recalculate the merkle root with the updated extra nonce.
-	block := abeutil.NewBlockAbe(msgBlock) //	This is important. By this new block, block.Transactions() will be re-generated.
+	block, err := abeutil.NewBlockAbe(msgBlock) //	This is important. By this new block, block.Transactions() will be re-generated.
+	if err != nil {
+		return fmt.Errorf("error happens when calling NewBlockAbe on a msgBlock (hash=%s): %v",
+			consensus.SealHashFast(&msgBlock.Header), err)
+	}
 	merkles := blockchain.BuildMerkleTreeStoreAbe(block.Transactions(), false)
 	msgBlock.Header.MerkleRoot = *merkles[len(merkles)-1]
 	return nil
@@ -1179,14 +1403,17 @@ func (g *BlkTmplGenerator) UpdateExtraNonceAbeEthash(blockTemplate *BlockTemplat
 	binary.BigEndian.PutUint64(blockTemplate.BlockAbe.Transactions[0].TxIns[0].PreviousOutPointRing.BlockHashs[1][0:8], extraNonce)
 
 	//	This new coinbaseTx will make the later coinbaseTx.Hash()[:] return the hash of the updated coinbaseTx.
-	coinbaseTx := abeutil.NewTxAbe(blockTemplate.BlockAbe.Transactions[0])
+	coinbaseTx, err := abeutil.NewTxAbe(blockTemplate.BlockAbe.Transactions[0], nil)
+	if err != nil {
+		return fmt.Errorf("error happens when calling abeutil.NewTxAbe on MsgTx (%v): %v", blockTemplate.BlockAbe.Transactions[0].TxHash(), err)
+	}
 
 	// Recalculate the merkle root with the updated extra nonce.
 	//	Consistent with the codes in BuildMerkleTreeStoreAbeEthash
 	tmp := make([]byte, chainhash.HashSize*2)
 	// chainhash.DoubleHashH(tx Hash || witness Hash)
 	copy(tmp[:chainhash.HashSize], coinbaseTx.Hash()[:])
-	copy(tmp[chainhash.HashSize:], coinbaseTx.WitnessHash()[:])
+	copy(tmp[chainhash.HashSize:], coinbaseTx.TxWitnessHash()[:])
 
 	newCbTxHash := chainhash.ChainHash(tmp)
 

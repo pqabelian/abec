@@ -77,6 +77,7 @@ func (cmd *blockRegionCmd) Execute(args []string) error {
 			return err
 		}
 		log.Infof("Loaded block region in %v", time.Since(startTime))
+		// todo: It is fine to uses DoubleHashH for log here, even after Aconcagua upgrade.
 		log.Infof("Double Hash: %s", chainhash.DoubleHashH(regionBytes))
 		log.Infof("Region Hex: %s", hex.EncodeToString(regionBytes))
 		return nil

@@ -87,8 +87,9 @@ func (msg *MsgBlock) AddTransaction(tx *MsgTx) error {
 
 func (msg *MsgBlockAbe) AddTransaction(tx *MsgTxAbe) error {
 	msg.Transactions = append(msg.Transactions, tx)
-	witHash := chainhash.DoubleHashH(tx.TxWitness)
-	msg.WitnessHashs = append(msg.WitnessHashs, &witHash)
+	// witHash := chainhash.DoubleHashH(tx.TxWitness)
+	witHash := tx.TxWitnessHash()
+	msg.WitnessHashs = append(msg.WitnessHashs, witHash)
 	return nil
 }
 
@@ -107,7 +108,7 @@ func (msg *MsgBlockAbe) ClearTransactions() {
 // See Deserialize for decoding blocks stored to disk, such as in a database, as
 // opposed to decoding blocks from the wire.
 func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
-	err := readBlockHeader(r, pver, &msg.Header)
+	err := msg.Header.ReadBlockHeader(r, pver)
 	if err != nil {
 		return err
 	}
@@ -140,7 +141,7 @@ func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 }
 
 func (msg *MsgBlockAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
-	err := readBlockHeader(r, pver, &msg.Header)
+	err := msg.Header.ReadBlockHeader(r, pver)
 	if err != nil {
 		return err
 	}
@@ -186,18 +187,27 @@ func (msg *MsgBlockAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding)
 	if enc == WitnessEncoding && existWitness[0] == 1 {
 		var tmp []byte
 		for _, tx := range msg.Transactions {
-			tmp, err = ReadVarBytes(r, pver, abecryptoxparam.MaxAllowedTxWitnessSize, "tx.Witness")
+			tmp, err = ReadVarBytes(r, pver, abecryptoxparam.MaxAllowedTxWitnessSize, "tx.TxWitness")
 			if err != nil {
 				return err
 			}
 			tx.TxWitness = tmp
+
+			if tx.Version >= TxVersion_Height_464000_Aconcagua {
+				tmp, err = ReadVarBytes(r, pver, abecryptoxparam.MaxAllowedAutWitnessSize, "tx.AutWitness")
+				if err != nil {
+					return err
+				}
+				tx.AutWitness = tmp
+			}
+
 		}
 	}
 	return nil
 }
 
 func (msg *MsgSimplifiedBlock) AbeDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
-	err := readBlockHeader(r, pver, &msg.Header)
+	err := msg.Header.ReadBlockHeader(r, pver)
 	if err != nil {
 		return err
 	}
@@ -315,7 +325,7 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 	// At the current time, there is no difference between the wire encoding
 	// at protocol version 0 and the stable long-term storage format.  As
 	// a result, make use of existing wire protocol functions.
-	err := readBlockHeader(r, 0, &msg.Header)
+	err := msg.Header.ReadBlockHeader(r, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -352,14 +362,14 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 	return txLocs, nil
 }
 
-// DeserializeTxLoc Would be delete
+// DeserializeTxLoc Would be deleted
 func (msg *MsgBlockAbe) DeserializeTxLoc(r *bytes.Buffer) ([]TxAbeLoc, error) {
 	fullLen := r.Len()
 
 	// At the current time, there is no difference between the wire encoding
 	// at protocol version 0 and the stable long-term storage format.  As
 	// a result, make use of existing wire protocol functions.
-	err := readBlockHeader(r, 0, &msg.Header)
+	err := msg.Header.ReadBlockHeader(r, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -401,7 +411,7 @@ func (msg *MsgBlockAbe) DeserializeTxLoc(r *bytes.Buffer) ([]TxAbeLoc, error) {
 // See Serialize for encoding blocks to be stored to disk, such as in a
 // database, as opposed to encoding blocks for the wire.
 func (msg *MsgBlock) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
-	err := writeBlockHeader(w, pver, &msg.Header)
+	err := msg.Header.WriteBlockHeader(w, pver)
 	if err != nil {
 		return err
 	}
@@ -443,7 +453,7 @@ func (msg *MsgBlock) Serialize(w io.Writer) error {
 
 // todo(ABE): for ABEBlocks, the encode of tx should not encode the txo details and witness details
 func (msg *MsgBlockAbe) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
-	err := writeBlockHeader(w, pver, &msg.Header)
+	err := msg.Header.WriteBlockHeader(w, pver)
 	if err != nil {
 		return err
 	}
@@ -477,6 +487,14 @@ func (msg *MsgBlockAbe) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding)
 			if err != nil {
 				return err
 			}
+
+			if tx.Version >= TxVersion_Height_464000_Aconcagua {
+				err = WriteVarBytes(w, pver, tx.AutWitness)
+				if err != nil {
+					return err
+				}
+			}
+
 		}
 	} else {
 		_, err = w.Write([]byte{0})
@@ -492,7 +510,7 @@ func (msg *MsgSimplifiedBlock) Serialize(w io.Writer) error {
 }
 
 func (msg *MsgSimplifiedBlock) AbeEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
-	err := writeBlockHeader(w, pver, &msg.Header)
+	err := msg.Header.WriteBlockHeader(w, pver)
 	if err != nil {
 		return err
 	}
@@ -547,11 +565,14 @@ func (msg *MsgBlock) SerializeSize() int {
 	// transactions.
 	// todo: (EthashPow)
 	// n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
-	n := blockHeaderLen
-	// todo(MLP):
-	if msg.Header.Version >= int32(BlockVersionEthashPow) {
-		n = blockHeaderLenEthash
-	}
+	//n := blockHeaderLen
+	//// todo(MLP):
+	//if msg.Header.Version >= int32(BlockVersionEthashPow) {
+	//	n = blockHeaderLenEthash
+	//}
+
+	n := msg.Header.SerializeSize()
+
 	n += VarIntSerializeSize(uint64(len(msg.Transactions)))
 
 	for _, tx := range msg.Transactions {
@@ -568,11 +589,14 @@ func (msg *MsgBlock) SerializeSizeStripped() int {
 	// transactions.
 	//	todo: (EthashPoW)
 	//n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
-	n := blockHeaderLen
-	// todo(MLP):
-	if msg.Header.Version >= int32(BlockVersionEthashPow) {
-		n = blockHeaderLenEthash
-	}
+	//n := blockHeaderLen
+	//// todo(MLP):
+	//if msg.Header.Version >= int32(BlockVersionEthashPow) {
+	//	n = blockHeaderLenEthash
+	//}
+
+	n := msg.Header.SerializeSize()
+
 	n += VarIntSerializeSize(uint64(len(msg.Transactions)))
 
 	for _, tx := range msg.Transactions {
@@ -586,11 +610,14 @@ func (msg *MsgBlockAbe) SerializeSizeStripped() int {
 	// transactions.
 	// todo: (EthashPoW)
 	//n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
-	n := blockHeaderLen
-	// todo(MLP):
-	if msg.Header.Version >= int32(BlockVersionEthashPow) {
-		n = blockHeaderLenEthash
-	}
+	//n := blockHeaderLen
+	//// todo(MLP):
+	//if msg.Header.Version >= int32(BlockVersionEthashPow) {
+	//	n = blockHeaderLenEthash
+	//}
+
+	n := msg.Header.SerializeSize()
+
 	n += VarIntSerializeSize(uint64(len(msg.Transactions)))
 
 	for _, tx := range msg.Transactions {
@@ -635,11 +662,14 @@ func (msg *MsgBlockAbe) SerializeSize() int {
 	// transactions.
 	// todo: (EthashPoW)
 	// n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
-	n := blockHeaderLen
-	// todo(MLP):
-	if msg.Header.Version >= int32(BlockVersionEthashPow) {
-		n = blockHeaderLenEthash
-	}
+	//n := blockHeaderLen
+	//// todo(MLP):
+	//if msg.Header.Version >= int32(BlockVersionEthashPow) {
+	//	n = blockHeaderLenEthash
+	//}
+
+	n := msg.Header.SerializeSize()
+
 	n += VarIntSerializeSize(uint64(len(msg.Transactions)))
 
 	for _, tx := range msg.Transactions {

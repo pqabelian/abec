@@ -3,6 +3,7 @@ package abecryptoxparam
 import (
 	"encoding/binary"
 	"fmt"
+
 	"github.com/pqabelian/abec/abecrypto/abecryptoparam"
 	"github.com/pqabelian/pqringctx/pqringctxapi"
 )
@@ -65,12 +66,15 @@ func DeserializeCryptoScheme(serializedCryptoScheme []byte) (CryptoScheme, error
 // For each TxVersion, there is a corresponding CryptoScheme, while multiple TxVersions may use the same CryptoScheme.
 // The package abec.abecryptox will access the function.
 // reviewed on 2023.12.07
+// ctx review done 2025.12.22
 func GetCryptoSchemeByTxVersion(txVersion uint32) (CryptoScheme, error) {
 	//	todo: for each version, there is a corresponding CryptoScheme
 	switch txVersion {
 	case 1: // wire.TxVersion_Height_0
 		return CryptoSchemePQRingCT, nil
 	case 2: // wire.TxVersion_Height_MLPAUT_300000
+		return CryptoSchemePQRingCTX, nil
+	case 3: // wire.TxVersion_Height_464000_ACONCAGUA
 		return CryptoSchemePQRingCTX, nil
 	default:
 		return 0, fmt.Errorf("GetCryptoSchemeByTxVersion: Unsupported TxVersion")
@@ -94,6 +98,7 @@ func GetCurrentCryptoScheme() CryptoScheme {
 // the allowed maximum number of inputs actually depends on the underlying crypto-scheme.
 // That's why txVersion is required as the input for this function.
 // reviewed on 2024.01.03
+// ctx review done 2025.12.22
 func GetTxInputMaxNum(txVersion uint32) (int, error) {
 	switch txVersion {
 	// todo: for each version, there is a corresponding CryptoScheme.
@@ -104,11 +109,16 @@ func GetTxInputMaxNum(txVersion uint32) (int, error) {
 	case 2: // wire.TxVersion_Height_MLPAUT_300000:
 		return pqringctxGetTxInputMaxNum(PQRingCTXPP), nil
 
+	case 3: // wire.TxVersion_Height_464000_Aconcagua:
+		return pqringctxGetTxInputMaxNum(PQRingCTXPP), nil
+
 	default:
 		return 0, fmt.Errorf("GetTxInputMaxNum: the input txVersion (%d) is not supported", txVersion)
 	}
 }
 
+// GetTxInputMaxNumForRing
+// ctx review done 2025.12.22
 func GetTxInputMaxNumForRing(txVersion uint32) (int, error) {
 	switch txVersion {
 	// todo: for each version, there is a corresponding CryptoScheme.
@@ -119,15 +129,24 @@ func GetTxInputMaxNumForRing(txVersion uint32) (int, error) {
 	case 2: // wire.TxVersion_Height_MLPAUT_300000:
 		return pqringctxGetTxInputMaxNumForRing(PQRingCTXPP), nil
 
+	case 3: // wire.TxVersion_Height_464000_Aconcagua:
+		return pqringctxGetTxInputMaxNumForRing(PQRingCTXPP), nil
+
 	default:
 		return 0, fmt.Errorf("GetTxInputMaxNumForRing: the input txVersion (%d) is not supported", txVersion)
 	}
 }
+
+// GetTxInputMaxNumForSingle
+// ctx review done 2025.12.22
 func GetTxInputMaxNumForSingle(txVersion uint32) (int, error) {
 	switch txVersion {
 	// todo: for each version, there is a corresponding CryptoScheme.
 	// Here we call the function of corresponding crypto-scheme
 	case 2: // wire.TxVersion_Height_MLPAUT_300000:
+		return pqringctxGetTxInputMaxNumForSingle(PQRingCTXPP), nil
+
+	case 3: // wire.TxVersion_Height_450000_Aconcagua:
 		return pqringctxGetTxInputMaxNumForSingle(PQRingCTXPP), nil
 
 	default:
@@ -140,6 +159,7 @@ func GetTxInputMaxNumForSingle(txVersion uint32) (int, error) {
 // the allowed maximum number of outputs actually depends on the underlying crypto-scheme.
 // That's why txVersion is required as the input for this function.
 // reviewed on 2024.01.03
+// ctx review done 2025.12.22
 func GetTxOutputMaxNum(txVersion uint32) (int, error) {
 	switch txVersion {
 	case 1: //wire.TxVersion_Height_0:
@@ -148,10 +168,16 @@ func GetTxOutputMaxNum(txVersion uint32) (int, error) {
 	case 2: //wire.TxVersion_Height_MLPAUT_300000:
 		return pqringctxGetTxOutputMaxNum(PQRingCTXPP), nil
 
+	case 3: //wire.TxVersion_Height_464000_Aconcagua:
+		return pqringctxGetTxOutputMaxNum(PQRingCTXPP), nil
+
 	default:
 		return 0, fmt.Errorf("GetTxOutputMaxNum: the input txVersion (%d) is not supported", txVersion)
 	}
 }
+
+// GetTxOutputMaxNumForRing
+// ctx review done 2025.12.22
 func GetTxOutputMaxNumForRing(txVersion uint32) (int, error) {
 	switch txVersion {
 	// todo: for each version, there is a corresponding CryptoScheme.
@@ -162,15 +188,24 @@ func GetTxOutputMaxNumForRing(txVersion uint32) (int, error) {
 	case 2: // wire.TxVersion_Height_MLPAUT_300000:
 		return pqringctxGetTxOutputMaxNumForRing(PQRingCTXPP), nil
 
+	case 3: // wire.TxVersion_Height_464000_Aconcagua:
+		return pqringctxGetTxOutputMaxNumForRing(PQRingCTXPP), nil
+
 	default:
 		return 0, fmt.Errorf("GetTxOutputMaxNumForRing: the input txVersion (%d) is not supported", txVersion)
 	}
 }
+
+// GetTxOutputMaxNumForSingle
+// ctx review done 2025.12.22
 func GetTxOutputMaxNumForSingle(txVersion uint32) (int, error) {
 	switch txVersion {
 	// todo: for each version, there is a corresponding CryptoScheme.
 	// Here we call the function of corresponding crypto-scheme
 	case 2: // wire.TxVersion_Height_MLPAUT_300000:
+		return pqringctxGetTxOutputMaxNumForSingle(PQRingCTXPP), nil
+
+	case 3: // wire.TxVersion_Height_464000_Aconcagua:
 		return pqringctxGetTxOutputMaxNumForSingle(PQRingCTXPP), nil
 
 	default:
@@ -219,9 +254,12 @@ func GetNullSerialNumber(txVersion uint32) ([]byte, error) {
 	}
 }
 
-// GetTxoSerializeSizeApprox
-// todo: review
-func GetTxoSerializeSizeApprox(txVersion uint32, coinAddressPayTo []byte) (int, error) {
+// GetTxoScriptSizeApprox returns the approximate serialize size for a Txo,
+// which is in a transaction with the version being the input TxVersion and for the cryptoAddressPayTo.
+// Note that the transactions are generated and verified by the underlying crypto-scheme,
+// the approximate serialize size for Txo actually depends on the underlying crypto-scheme.
+// That's why txVersion is required as the input for this function.
+func GetTxoScriptSizeApprox(txVersion uint32, coinAddressPayTo []byte) (int, error) {
 	cryptoScheme, err := GetCryptoSchemeByTxVersion(txVersion)
 	if err != nil {
 		return 0, err
@@ -229,10 +267,10 @@ func GetTxoSerializeSizeApprox(txVersion uint32, coinAddressPayTo []byte) (int, 
 
 	switch cryptoScheme {
 	case CryptoSchemePQRingCT:
-		return abecryptoparam.GetTxoSerializeSizeApprox(txVersion)
+		return abecryptoparam.GetTxoScriptSizeApprox(txVersion)
 
 	case CryptoSchemePQRingCTX:
-		return pqringctxGetTxoSerializeSize(PQRingCTXPP, coinAddressPayTo)
+		return pqringctxGetTxoScriptSize(PQRingCTXPP, coinAddressPayTo)
 
 	default:
 		return 0, fmt.Errorf("GetTxoSerializeSizeApprox: the cryptoScheme (%d) corresponding to the input txVersion (%d) is not supported", cryptoScheme, txVersion)
@@ -280,3 +318,5 @@ func GetParamKeyGenPublicRandBytesLen(cryptoScheme CryptoScheme) (int, error) {
 }
 
 // API for Sizes	end
+
+// ctx review done 2025.12.22

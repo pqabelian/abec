@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/pqabelian/abec/abejson"
 	"github.com/pqabelian/abec/abeutil"
-	"time"
+	ctautapi "github.com/pqabelian/abec/ctaut/api"
 
 	"github.com/pqabelian/abec/chainhash"
 	"github.com/pqabelian/abec/wire"
@@ -585,7 +587,8 @@ func parseFilteredBlockConnectedParams(params []json.RawMessage) (int32,
 
 	// Deserialize block header from slice of bytes.
 	var blockHeader wire.BlockHeader
-	err = blockHeader.Deserialize(bytes.NewReader(blockHeaderBytes))
+	//err = blockHeader.Deserialize(bytes.NewReader(blockHeaderBytes))
+	err = blockHeader.Deserialize(blockHeaderBytes)
 	if err != nil {
 		return 0, nil, nil, err
 	}
@@ -640,7 +643,8 @@ func parseFilteredBlockDisconnectedParams(params []json.RawMessage) (int32,
 
 	// Deserialize block header from slice of bytes.
 	var blockHeader wire.BlockHeader
-	err = blockHeader.Deserialize(bytes.NewReader(blockHeaderBytes))
+	// err = blockHeader.Deserialize(bytes.NewReader(blockHeaderBytes))
+	err = blockHeader.Deserialize(blockHeaderBytes)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -1280,6 +1284,9 @@ func (c *Client) Rescan(startBlock *chainhash.Hash,
 func (c *Client) RescanAbe(startBlock *chainhash.Hash) error {
 
 	return c.RescanAbeAsync(startBlock).Receive()
+}
+func (c *Client) GetAutMetadata(identifier ctautapi.AutId) (*ctautapi.AutMetadata, error) {
+	return c.GetAutMetadataAsync(identifier).Receive()
 }
 
 // RescanEndBlockAsync returns an instance of a type that can be used to get

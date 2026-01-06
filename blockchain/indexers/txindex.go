@@ -268,6 +268,7 @@ func dbAddTxIndexEntries(dbTx database.Tx, block *abeutil.Block, blockID uint32)
 }
 
 // Abe to do
+// aut review done 2025.12.17 todo
 func dbAddTxIndexEntriesAbe(dbTx database.Tx, block *abeutil.BlockAbe, blockID uint32) error {
 	// The offset and length of the transactions within the serialized
 	// block.
@@ -464,7 +465,9 @@ func (idx *TxIndex) ConnectBlock(dbTx database.Tx, block *abeutil.Block,
 	return nil
 }
 
-// todo(ABE.MUST)
+//	todo(ABE.MUST)
+//
+// aut review done 2025.12.17 todo
 func (idx *TxIndex) ConnectBlockAbe(dbTx database.Tx, block *abeutil.BlockAbe,
 	stxos []*blockchain.SpentTxOutAbe) error {
 

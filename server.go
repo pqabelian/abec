@@ -7,6 +7,21 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
+	"net"
+	"os"
+	"path/filepath"
+	"runtime"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"github.com/pqabelian/abec/blockchain/consensus"
+
+	"github.com/pqabelian/abec/abecryptox/abecryptoxkey"
 	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
 	"github.com/pqabelian/abec/abeutil"
 	"github.com/pqabelian/abec/blockchain"
@@ -14,7 +29,6 @@ import (
 	"github.com/pqabelian/abec/chaincfg"
 	"github.com/pqabelian/abec/chainhash"
 	"github.com/pqabelian/abec/connmgr"
-	"github.com/pqabelian/abec/consensus/ethash"
 	"github.com/pqabelian/abec/database"
 	"github.com/pqabelian/abec/mempool"
 	"github.com/pqabelian/abec/mempool/rotator"
@@ -28,17 +42,6 @@ import (
 	"github.com/pqabelian/abec/wire"
 	"github.com/pqabelian/abec/witnessmgr"
 	"github.com/shirou/gopsutil/v3/process"
-	"math"
-	"net"
-	"os"
-	"path/filepath"
-	"runtime"
-	"sort"
-	"strconv"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 const (
@@ -209,7 +212,7 @@ type server struct {
 	witnessManager       *witnessmgr.WitnessManager
 	chain                *blockchain.BlockChain
 	txMemPool            *mempool.TxPool
-	ethash               *ethash.Ethash // todo: (ethmining)
+	powConsensus         *consensus.PowConsensus
 	cpuMiner             *cpuminer.CPUMiner
 	externalMiner        *externalminer.ExternalMiner
 	modifyRebroadcastInv chan interface{}
@@ -471,7 +474,14 @@ func (sp *serverPeer) OnTx(_ *peer.Peer, msg *wire.MsgTxAbe) {
 	// Add the transaction to the known inventory for the peer.
 	// Convert the raw MsgTx to a abeutil.Tx which provides some convenience
 	// methods and things such as hash caching.
-	tx := abeutil.NewTxAbe(msg)
+	tx, err := abeutil.NewTxAbe(msg, nil)
+	if err != nil {
+		peerLog.Tracef("Ignoring msgBlock %v from %v: errors happen when calling abeutil.NewTxAbe: %v",
+			msg.TxHash(), sp, err)
+
+		return
+	}
+
 	iv := wire.NewInvVect(wire.InvTypeTx, tx.Hash())
 	sp.AddKnownInventory(iv)
 
@@ -490,7 +500,13 @@ func (sp *serverPeer) OnBlock(p *peer.Peer, msg *wire.MsgBlockAbe, buf []byte) {
 	// peerLog.Debugf("Receive block %s containing %v transactions from peer %s", msg.BlockHash().String(), len(msg.Transactions), p)
 	// Convert the raw MsgBlock to a abeutil.Block which provides some
 	// convenience methods and things such as hash caching.
-	block := abeutil.NewBlockFromBlockAndBytesAbe(msg, buf) // TODO(abe): the height of block is unknown
+	block, err := abeutil.NewBlockFromBlockAndBytesAbe(msg, buf) // TODO(abe): the height of block is unknown
+	if err != nil {
+		peerLog.Tracef("Ignoring msgBlock %v from %v: errors happen when calling abeutil.NewBlock: %v",
+			msg.BlockHash(), sp, err)
+
+		return
+	}
 
 	// Add the block to the known inventory for the peer.
 	inv := wire.InvTypeBlock
@@ -572,7 +588,7 @@ func (sp *serverPeer) OnNeedSetResult(p *peer.Peer, msg *wire.MsgNeedSetResult, 
 
 	// check witness in response
 	for i := 0; i < len(msg.Txs); i++ {
-		if !msg.Txs[i].HasWitness() {
+		if !msg.Txs[i].HasTxWitness() {
 			peerLog.Warnf("Got needset %v from %s, but some transaction in response does not has witness -- "+
 				"disconnecting", msg.BlockHash, p.Addr())
 			p.Disconnect()
@@ -1060,7 +1076,7 @@ func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<-
 			}
 			return err
 		}
-		if encoding == wire.WitnessEncoding && !tx.HasWitness() {
+		if encoding == wire.WitnessEncoding && !tx.HasTxWitness() {
 			peerLog.Warnf("Transaction %v fetch successful but it do not has witness: %v", hash, err)
 
 			if doneChan != nil {
@@ -1230,10 +1246,20 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 			return err
 		}
 
-		if len(witnesses) != 0 {
+		if len(witnesses) != 0 && len(witnesses) == len(msgBlock.Transactions) {
 			txs := msgBlock.Transactions
 			for i := 0; i < len(txs); i++ {
-				txs[i].TxWitness = witnesses[i][chainhash.HashSize:]
+				// txs[i].TxWitness = witnesses[i][chainhash.HashSize:]
+				if len(witnesses[i]) < chainhash.HashSize {
+					return fmt.Errorf("witnesses[%d] has length %d (<%d)", i, len(witnesses[i]), chainhash.HashSize)
+				}
+
+				txWitness, autWitness, err := abeutil.DecodeTxWitnesses(txs[i].Version, witnesses[i][chainhash.HashSize:])
+				if err != nil {
+					return err
+				}
+				txs[i].TxWitness = txWitness
+				txs[i].AutWitness = autWitness
 			}
 		}
 
@@ -1322,10 +1348,20 @@ func (s *server) pushPrunedBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneCh
 		return err
 	}
 
-	if witnessBytes != nil {
+	if len(witnessBytes) != 0 && len(witnessBytes) == len(msgBlock.Transactions) {
 		txs := msgBlock.Transactions
 		for i := 0; i < len(txs); i++ {
-			txs[i].TxWitness = witnessBytes[i][chainhash.HashSize:]
+			//txs[i].TxWitness = witnessBytes[i][chainhash.HashSize:]
+			if len(witnessBytes[i]) < chainhash.HashSize {
+				return fmt.Errorf("witnessBytes[%d] has length %d (<%d)", i, len(witnessBytes[i]), chainhash.HashSize)
+			}
+
+			txWitness, autWitness, err := abeutil.DecodeTxWitnesses(txs[i].Version, witnessBytes[i][chainhash.HashSize:])
+			if err != nil {
+				return err
+			}
+			txs[i].TxWitness = txWitness
+			txs[i].AutWitness = autWitness
 		}
 	}
 
@@ -2633,9 +2669,10 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		//	todo(ABE):
 		FetchUtxoView:     s.chain.FetchUtxoView,
 		FetchUtxoRingView: s.chain.FetchUtxoRingView,
-		FetchAUTView:      s.chain.FetchAUTView,
-		BestHeight:        func() int32 { return s.chain.BestSnapshot().Height },
-		MedianTimePast:    func() time.Time { return s.chain.BestSnapshot().MedianTime },
+		//FetchAUTView:      s.chain.FetchAUTView,
+		FetchCTAUTView: s.chain.FetchCTAUTView,
+		BestHeight:     func() int32 { return s.chain.BestSnapshot().Height },
+		MedianTimePast: func() time.Time { return s.chain.BestSnapshot().MedianTime },
 		CalcSequenceLock: func(tx *abeutil.Tx, view *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error) {
 			return s.chain.CalcSequenceLock(tx, view, true)
 		},
@@ -2650,16 +2687,16 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	}
 	s.txMemPool = mempool.New(&txC)
 	//	todo: (EthashPoW)
-	cfg.EthashConfig.BlockHeightStart = s.chainParams.BlockHeightEthashPoW
-	cfg.EthashConfig.EpochLength = s.chainParams.EthashEpochLength
-	s.ethash = ethash.New(cfg.EthashConfig)
+	cfg.ethashConfig.BlockHeightStart = s.chainParams.BlockHeightEthashPoW
+	cfg.ethashConfig.EpochLength = s.chainParams.EthashEpochLength
+	s.powConsensus = consensus.NewPowConsensus(cfg.ethashConfig)
 
-	s.syncManager, err = syncmgr.New(&syncmgr.Config{
+	s.syncManager, err = syncmgr.NewSyncManager(&syncmgr.Config{
 		NodeType:           cfg.nodeType,
 		PeerNotifier:       &s, // serve
 		Chain:              s.chain,
 		TxMemPool:          s.txMemPool,
-		Ethash:             s.ethash, // todo: (EthashPoW)
+		PowConsensus:       s.powConsensus,
 		ChainParams:        s.chainParams,
 		DisableCheckpoints: cfg.DisableCheckpoints,
 		MaxPeers:           cfg.MaxPeers,
@@ -2711,15 +2748,52 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	if s.chain.BestSnapshot().Height+1 < s.chainParams.BlockHeightMLPAUT {
 		// Check address, disallow higher address with crypto scheme
 		for i := 0; i < len(cfg.miningAddrs); i++ {
+			// allowed crypto scheme:
+			// - abecryptoxparam.CryptoSchemePQRingCT
+			// allowed privacy level:
+			// - abecryptoxkey.PrivacyLevelRINGCTPre
 			if cfg.miningAddrs[i].CryptoScheme() != abecryptoxparam.CryptoSchemePQRingCT {
 				return nil, fmt.Errorf("address with crypto scheme other than %d address is disallow until height %d", abecryptoxparam.CryptoSchemePQRingCT, s.chainParams.BlockHeightMLPAUT)
 			}
 		}
+	} else if s.chain.BestSnapshot().Height+1 < s.chainParams.BlockHeightAconcagua {
+		// Check address, disallow higher address with crypto scheme
+		for i := 0; i < len(cfg.miningAddrs); i++ {
+			// allowed crypto scheme:
+			// - abecryptoxparam.CryptoSchemePQRingCT
+			// - abecryptoxparam.CryptoSchemePQRingCTX
+			// allowed privacy level:
+			// - abecryptoxkey.PrivacyLevelRINGCTPre
+			// - abecryptoxkey.PrivacyLevelRINGCT
+			// - abecryptoxkey.PrivacyLevelPSEUDONYM
+			if cfg.miningAddrs[i].CryptoScheme() != abecryptoxparam.CryptoSchemePQRingCT &&
+				cfg.miningAddrs[i].CryptoScheme() != abecryptoxparam.CryptoSchemePQRingCTX {
+				return nil, fmt.Errorf("address with crypto scheme other than [%d,%d] is disallow until height %d",
+					abecryptoxparam.CryptoSchemePQRingCT,
+					abecryptoxparam.CryptoSchemePQRingCTX,
+					s.chainParams.BlockHeightAconcagua)
+			}
+			privacyLevel, _, _, err := abecryptoxkey.CryptoAddressParse(cfg.miningAddrs[i].CryptoAddress())
+			if err != nil {
+				return nil, fmt.Errorf("fail to get privacy level from address")
+			}
+			if privacyLevel != abecryptoxkey.PrivacyLevelRINGCTPre &&
+				privacyLevel != abecryptoxkey.PrivacyLevelRINGCT &&
+				privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
+				return nil, fmt.Errorf("address with privacy level other than [%d,%d,%d] is disallow until height %d",
+					abecryptoxkey.PrivacyLevelRINGCTPre,
+					abecryptoxkey.PrivacyLevelRINGCT,
+					abecryptoxkey.PrivacyLevelPSEUDONYM,
+					s.chainParams.BlockHeightAconcagua)
+			}
+		}
 	}
 
-	s.cpuMiner = cpuminer.New(&cpuminer.Config{
+	// s.powConsensus --> cpuminer.Config.powConsensus
+	// Note that cpuminer holds cpuminer.Config and can use cfg to access PowConsensus
+	s.cpuMiner = cpuminer.NewCPUMiner(&cpuminer.Config{
 		ChainParams:            chainParams,
-		Ethash:                 s.ethash, // todo: (EthashPoW)
+		PowConsensus:           s.powConsensus,
 		FakePowHeightScope:     s.chain.FakePoWHeightScopes(),
 		BlockTemplateGenerator: blockTemplateGenerator,
 		MiningAddrs:            cfg.miningAddrs,
@@ -2729,9 +2803,11 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		IsCurrent:              s.syncManager.IsCurrent,
 	})
 
-	s.externalMiner = externalminer.New(&externalminer.Config{
+	// s.powConsensus --> externalminer.Config.powConsensus
+	// Note that externalminer holds externalminer.Config and can use cfg to access PowConsensus
+	s.externalMiner = externalminer.NewExternalMiner(&externalminer.Config{
 		ChainParams:            chainParams,
-		Ethash:                 s.ethash,
+		PowConsensus:           s.powConsensus,
 		BlockTemplateGenerator: blockTemplateGenerator,
 		MiningAddrs:            cfg.miningAddrs,
 		ProcessBlock:           s.syncManager.ProcessBlock,
@@ -2838,20 +2914,19 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		}
 
 		s.rpcServer, err = newRPCServer(&rpcserverConfig{
-			Listeners:   rpcListeners,
-			StartupTime: s.startupTime,
-			ConnMgr:     &rpcConnManager{&s},
-			SyncMgr:     &rpcSyncMgr{&s, s.syncManager},
-			TimeSource:  s.timeSource,
-			Chain:       s.chain,
-			ChainParams: chainParams,
-			DB:          db,
-			TxMemPool:   s.txMemPool,
-			// todo: (EthashPoW) 202207
-			Ethash:    s.ethash,
-			Generator: blockTemplateGenerator,
-			CPUMiner:  s.cpuMiner,
-			// todo: 2023.05.11 At this moment, the ExternalMiner here is not used,
+			Listeners:    rpcListeners,
+			StartupTime:  s.startupTime,
+			ConnMgr:      &rpcConnManager{&s},
+			SyncMgr:      &rpcSyncMgr{&s, s.syncManager},
+			TimeSource:   s.timeSource,
+			Chain:        s.chain,
+			ChainParams:  chainParams,
+			DB:           db,
+			TxMemPool:    s.txMemPool,
+			PowConsensus: s.powConsensus,
+			Generator:    blockTemplateGenerator,
+			CPUMiner:     s.cpuMiner,
+			// The ExternalMiner here is not used,
 			// since we use rpcServerGetWork to respond the requests of getwork.
 			ExternalMiner: s.externalMiner,
 			TxIndex:       s.txIndex,
@@ -2878,18 +2953,19 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 			return nil, errors.New("RPCS: No valid listen address for getwork")
 		}
 
+		// s.powConsensus --> rpcserverConfig.powConsensus
+		// Note that rpcServerGetWork holds rpcserverConfig and can use cfg to access PowConsensus
 		s.rpcServerGetWork, err = newRPCServer(&rpcserverConfig{
-			Listeners:   rpcListeners,
-			StartupTime: s.startupTime,
-			ConnMgr:     &rpcConnManager{&s},
-			SyncMgr:     &rpcSyncMgr{&s, s.syncManager},
-			TimeSource:  s.timeSource,
-			Chain:       s.chain,
-			ChainParams: chainParams,
-			DB:          db,
-			TxMemPool:   s.txMemPool,
-			// todo: (EthashPoW) 202207
-			Ethash:        s.ethash,
+			Listeners:     rpcListeners,
+			StartupTime:   s.startupTime,
+			ConnMgr:       &rpcConnManager{&s},
+			SyncMgr:       &rpcSyncMgr{&s, s.syncManager},
+			TimeSource:    s.timeSource,
+			Chain:         s.chain,
+			ChainParams:   chainParams,
+			DB:            db,
+			TxMemPool:     s.txMemPool,
+			PowConsensus:  s.powConsensus,
 			Generator:     blockTemplateGenerator,
 			CPUMiner:      s.cpuMiner,
 			ExternalMiner: s.externalMiner,

@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+
 	"github.com/pqabelian/abec/abejson"
 	"github.com/pqabelian/abec/chainhash"
+	ctautapi "github.com/pqabelian/abec/ctaut/api"
 	"github.com/pqabelian/abec/wire"
 )
 
@@ -732,7 +734,8 @@ func (r FutureGetBlockHeaderResult) Receive() (*wire.BlockHeader, error) {
 
 	// Deserialize the blockheader and return it.
 	var bh wire.BlockHeader
-	err = bh.Deserialize(bytes.NewReader(serializedBH))
+	//err = bh.Deserialize(bytes.NewReader(serializedBH))
+	err = bh.Deserialize(serializedBH)
 	if err != nil {
 		return &bh, err
 	}
@@ -806,6 +809,101 @@ func (c *Client) GetBlockHeaderVerboseAsync(blockHash *chainhash.Hash) FutureGet
 // See GetBlockHeader to retrieve a blockheader instead.
 func (c *Client) GetBlockHeaderVerbose(blockHash *chainhash.Hash) (*abejson.GetBlockHeaderVerboseResult, error) {
 	return c.GetBlockHeaderVerboseAsync(blockHash).Receive()
+}
+
+type FutureGetAutMetadataResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// data structure of the blockheader requested from the server given its hash.
+func (r FutureGetAutMetadataResult) Receive() (*ctautapi.AutMetadata, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a string.
+	var result abejson.GetAutMetadataResult
+	err = json.Unmarshal(res, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	autIdentifier, err := chainhash.NewHashFromStr(result.AutIdentifier)
+	if err != nil {
+		return nil, err
+	}
+	autName, err := hex.DecodeString(result.AutName)
+	if err != nil {
+		return nil, err
+	}
+	autSymbol, err := hex.DecodeString(result.AutSymbol)
+	if err != nil {
+		return nil, err
+	}
+	aaseUnitName, err := hex.DecodeString(result.BaseUnitName)
+	if err != nil {
+		return nil, err
+	}
+	aubUnitName, err := hex.DecodeString(result.SubUnitName)
+	if err != nil {
+		return nil, err
+	}
+	autMemo, err := hex.DecodeString(result.AutMemo)
+	if err != nil {
+		return nil, err
+	}
+	issuers := make([]*ctautapi.AutIssuer, len(result.Issuers))
+	for i := 0; i < len(result.Issuers); i++ {
+		coinAddress, err := hex.DecodeString(result.Issuers[i])
+		issuers[i] = ctautapi.NewAutIssuerFromCoinAddress(coinAddress)
+		if err != nil {
+			return nil, err
+		}
+	}
+	activeRootTokenSet := make(map[string]*ctautapi.HostOutPoint, len(result.ActiveRootTokenSet))
+	for i := 0; i < len(result.ActiveRootTokenSet); i++ {
+		outpoint := result.ActiveRootTokenSet[i]
+		txHash, err := chainhash.NewHashFromStr(outpoint.Txid)
+		if err != nil {
+			return nil, err
+		}
+		hostOutPoint := &ctautapi.HostOutPoint{
+			TxHash: *txHash,
+			Index:  outpoint.Index,
+		}
+		if err != nil {
+			return nil, err
+		}
+		activeRootTokenSet[hostOutPoint.String()] = hostOutPoint
+	}
+
+	autMetadata := &ctautapi.AutMetadata{
+		Version:                    result.Version,
+		AutIdentifier:              *autIdentifier,
+		AutName:                    autName,
+		AutSymbol:                  autSymbol,
+		BaseUnitName:               aaseUnitName,
+		SubUnitName:                aubUnitName,
+		UnitScale:                  result.UnitScale,
+		AutMemo:                    autMemo,
+		PlannedTotalSupply:         result.PlannedTotalSupply,
+		Issuers:                    issuers,
+		ReregistrationExpireHeight: result.ReregistrationExpireHeight,
+		ReregistrationThreshold:    result.ReRegistrationThreshold,
+		MintThreshold:              result.MintThreshold,
+		PrivacyType:                ctautapi.AutPrivacyType(result.PrivacyType),
+		MintedAmount:               result.MintedAmount,
+		BurnedAmount:               result.BurnedAmount,
+		ActiveRootTokenSet:         activeRootTokenSet,
+		UpdateScriptVersions:       result.UpdateScriptVersions,
+	}
+
+	return autMetadata, nil
+}
+
+func (c *Client) GetAutMetadataAsync(identifier ctautapi.AutId) FutureGetAutMetadataResult {
+	cmd := abejson.NewGetAutMetadataCmd(identifier.String())
+	return c.sendCmd(cmd)
 }
 
 // FutureGetMempoolEntryResult is a future promise to deliver the result of a

@@ -105,6 +105,7 @@ func DecodeWIF(wif string) (*WIF, error) {
 	} else {
 		tosum = decoded[:1+btcec.PrivKeyBytesLen]
 	}
+	// todo: it is fine to use DoubleHash for checksum, even after Aconcagua upgrade.
 	cksum := chainhash.DoubleHashB(tosum)[:4]
 	if !bytes.Equal(cksum, decoded[decodedLen-4:]) {
 		return nil, ErrChecksumMismatch
@@ -137,6 +138,7 @@ func (w *WIF) String() string {
 	if w.CompressPubKey {
 		a = append(a, compressMagic)
 	}
+	// todo: it is fine to use DoubleHash for checksum, even after Aconcagua upgrade.
 	cksum := chainhash.DoubleHashB(a)[:4]
 	a = append(a, cksum...)
 	return base58.Encode(a)

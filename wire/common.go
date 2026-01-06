@@ -274,6 +274,14 @@ func readElement(r io.Reader, element interface{}) error {
 		}
 		return nil
 
+	case *ConsensusProtocol:
+		rv, err := binarySerializer.Uint8(r)
+		if err != nil {
+			return err
+		}
+		*e = ConsensusProtocol(rv)
+		return nil
+
 	case *chainhash.Hash:
 		_, err := io.ReadFull(r, e[:])
 		if err != nil {
@@ -404,6 +412,13 @@ func writeElement(w io.Writer, element interface{}) error {
 	// IP address.
 	case [16]byte:
 		_, err := w.Write(e[:])
+		if err != nil {
+			return err
+		}
+		return nil
+
+	case ConsensusProtocol:
+		err := binarySerializer.PutUint8(w, uint8(e))
 		if err != nil {
 			return err
 		}

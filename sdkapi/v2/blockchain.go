@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
+
 	"github.com/pqabelian/abec/abeutil"
 	"github.com/pqabelian/abec/blockchain"
 	"github.com/pqabelian/abec/chainhash"
 	"github.com/pqabelian/abec/wire"
-	"io"
 )
 
 func GetTxoRingSizeByBlockHeight(height int32) uint8 {
@@ -114,7 +115,7 @@ func (outpointRing *OutPointRing) RingId() (string, error) {
 
 func NewOutPointRing(version uint32, blockIDs []string, outpoints []*OutPoint) (*OutPointRing, error) {
 	return &OutPointRing{
-		Version:   TxVersion,
+		Version:   version,
 		BlockIDs:  blockIDs,
 		OutPoints: outpoints,
 	}, nil
@@ -217,7 +218,8 @@ func BuildTxoRingsFromRingBlocks(serializedBlocksForRingGroup [][]byte) ([]*TxoR
 		return nil, err
 	}
 
-	wireTxoRings, err := blockchain.BuildTxoRingsMLP(len(blocks), ringSize, blocks)
+	// wireTxoRings, err := blockchain.BuildTxoRingsMLP(len(blocks), ringSize, blocks)
+	wireTxoRings, err := blockchain.BuildTxoRingsAconcagua(len(blocks), ringSize, blocks)
 	if err != nil {
 		return nil, err
 	}

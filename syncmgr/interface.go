@@ -3,9 +3,9 @@ package syncmgr
 import (
 	"github.com/pqabelian/abec/abeutil"
 	"github.com/pqabelian/abec/blockchain"
+	"github.com/pqabelian/abec/blockchain/consensus"
 	"github.com/pqabelian/abec/chaincfg"
 	"github.com/pqabelian/abec/chainhash"
-	"github.com/pqabelian/abec/consensus/ethash"
 	"github.com/pqabelian/abec/mempool"
 	"github.com/pqabelian/abec/peer"
 	"github.com/pqabelian/abec/wire"
@@ -30,7 +30,7 @@ type Config struct {
 	PeerNotifier PeerNotifier
 	Chain        *blockchain.BlockChain
 	TxMemPool    *mempool.TxPool
-	Ethash       *ethash.Ethash // todo: (ethmining)
+	PowConsensus *consensus.PowConsensus
 	ChainParams  *chaincfg.Params
 
 	DisableCheckpoints bool

@@ -1,14 +1,16 @@
 package txscript
 
 import (
-	"github.com/pqabelian/abec/chainhash"
 	"sync"
+
+	"github.com/pqabelian/abec/chainhash"
 )
 
 // WitnessCache implements a transaction witness verification cache with a randomized
 // entry eviction policy. Only valid transactions will be added to the cache.
 // It can speed up the validation of transactions within a block,
 // if they've already been seen and verified within the mempool.
+// TODO use (tx_hash,witness_hash)?
 type WitnessCache struct {
 	sync.RWMutex
 	validTransactions map[chainhash.Hash]struct{}

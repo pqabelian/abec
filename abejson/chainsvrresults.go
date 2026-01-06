@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+
 	"github.com/pqabelian/abec/abeutil"
 	"github.com/pqabelian/abec/wire"
 )
@@ -12,18 +13,44 @@ import (
 // the verbose flag is set.  When the verbose flag is not set, getblockheader
 // returns a hex-encoded string.
 type GetBlockHeaderVerboseResult struct {
-	Hash          string  `json:"hash"`
-	Confirmations int64   `json:"confirmations"`
-	Height        int32   `json:"height"`
-	Version       int32   `json:"version"`
-	VersionHex    string  `json:"versionHex"`
-	MerkleRoot    string  `json:"merkleroot"`
-	Time          int64   `json:"time"`
-	Nonce         uint64  `json:"nonce"`
-	Bits          string  `json:"bits"`
-	Difficulty    float64 `json:"difficulty"`
-	PreviousHash  string  `json:"previousblockhash,omitempty"`
-	NextHash      string  `json:"nextblockhash,omitempty"`
+	Hash             string  `json:"hash"`
+	Confirmations    int64   `json:"confirmations"`
+	Height           int32   `json:"height"`
+	Version          int32   `json:"version"`
+	VersionHex       string  `json:"versionHex"`
+	MerkleRoot       string  `json:"merkleroot"`
+	Time             int64   `json:"time"`
+	Nonce            uint64  `json:"nonce"`
+	Bits             string  `json:"bits"`
+	Difficulty       float64 `json:"difficulty"`
+	BitsSecond       string  `json:"bitsSecond"`
+	DifficultySecond float64 `json:"difficultySecond"`
+	PowScaleSecond   uint32  `json:"powScaleSecond"`
+	ConsensusApplied uint8   `json:"consensusApplied"`
+	PreviousHash     string  `json:"previousblockhash,omitempty"`
+	NextHash         string  `json:"nextblockhash,omitempty"`
+}
+
+type GetAutMetadataResult struct {
+	Version                    uint32   `json:"version"`
+	AutIdentifier              string   `json:"identifier"`
+	AutName                    string   `json:"name"`
+	AutSymbol                  string   `json:"symbol"`
+	BaseUnitName               string   `json:"baseUnitName"`
+	SubUnitName                string   `json:"subUnitName"`
+	UnitScale                  uint64   `json:"unitScale"`
+	AutMemo                    string   `json:"autMemo"`
+	PlannedTotalSupply         uint64   `json:"plannedTotalSupply"`
+	Issuers                    []string `json:"issuers"`
+	ReregistrationExpireHeight int32    `json:"reRegistrationHeight"`
+	ReRegistrationThreshold    uint8    `json:"reRegistrationThreshold"`
+	MintThreshold              uint8    `json:"mintThreshold"`
+	PrivacyType                uint8    `json:"privacyType"`
+
+	MintedAmount         uint64         `json:"mintedAmount"`
+	BurnedAmount         uint64         `json:"burnedAmount"`
+	UpdateScriptVersions []uint32       `json:"updateScriptVersions"`
+	ActiveRootTokenSet   []*OutPointAbe `json:"activeRootTokenSet"`
 }
 
 // GetBlockStatsResult models the data from the getblockstats command.
@@ -119,21 +146,25 @@ type GetBlockAbeVerboseResult struct {
 	Size     int32 `json:"size"`
 	Fullsize int32 `json:"fullsize"`
 	//	Weight        int32         `json:"weight"`
-	Height       int64            `json:"height"`
-	Version      int32            `json:"version"`
-	VersionHex   string           `json:"versionHex"`
-	MerkleRoot   string           `json:"merkleroot"`
-	Tx           []string         `json:"tx,omitempty"`
-	RawTx        []TxRawResultAbe `json:"rawtx,omitempty"` // Note: this field is always empty when verbose != 2.
-	Time         int64            `json:"time"`
-	Nonce        uint64           `json:"nonce"`
-	Bits         string           `json:"bits"`
-	Difficulty   float64          `json:"difficulty"`
-	PreviousHash string           `json:"previousblockhash"`
-	NextHash     string           `json:"nextblockhash,omitempty"`
-	ContentHash  string           `json:"contenthash,omitempty"`
-	MixDigest    string           `json:"mixdigest,omitempty"`
-	SealHash     string           `json:"sealhash,omitempty"`
+	Height           int64            `json:"height"`
+	Version          int32            `json:"version"`
+	VersionHex       string           `json:"versionHex"`
+	MerkleRoot       string           `json:"merkleroot"`
+	Tx               []string         `json:"tx,omitempty"`
+	RawTx            []TxRawResultAbe `json:"rawtx,omitempty"` // Note: this field is always empty when verbose != 2.
+	Time             int64            `json:"time"`
+	Nonce            uint64           `json:"nonce"`
+	Bits             string           `json:"bits"`
+	Difficulty       float64          `json:"difficulty"`
+	BitsSecond       string           `json:"bitsSecond"`
+	DifficultySecond float64          `json:"difficultySecond"`
+	PowScaleSecond   uint32           `json:"powScaleSecond"`
+	ConsensusApplied uint8            `json:"consensusApplied"`
+	PreviousHash     string           `json:"previousblockhash"`
+	NextHash         string           `json:"nextblockhash,omitempty"`
+	ContentHash      string           `json:"contenthash,omitempty"`
+	MixDigest        string           `json:"mixdigest,omitempty"`
+	SealHash         string           `json:"sealhash,omitempty"`
 }
 
 // GetBlockVerboseTxResult models the data from the getblock command when the
@@ -163,22 +194,26 @@ type GetBlockVerboseTxResult struct {
 
 // TODO(abe)
 type GetBlockAbeVerboseTxResult struct {
-	Hash          string        `json:"hash"`
-	Confirmations int64         `json:"confirmations"`
-	StrippedSize  int32         `json:"strippedsize"`
-	Size          int32         `json:"size"`
-	Weight        int32         `json:"weight"`
-	Height        int64         `json:"height"`
-	Version       int32         `json:"version"`
-	VersionHex    string        `json:"versionHex"`
-	MerkleRoot    string        `json:"merkleroot"`
-	Tx            []TxRawResult `json:"tx,omitempty"`
-	Time          int64         `json:"time"`
-	Nonce         uint32        `json:"nonce"`
-	Bits          string        `json:"bits"`
-	Difficulty    float64       `json:"difficulty"`
-	PreviousHash  string        `json:"previousblockhash"`
-	NextHash      string        `json:"nextblockhash,omitempty"`
+	Hash             string        `json:"hash"`
+	Confirmations    int64         `json:"confirmations"`
+	StrippedSize     int32         `json:"strippedsize"`
+	Size             int32         `json:"size"`
+	Weight           int32         `json:"weight"`
+	Height           int64         `json:"height"`
+	Version          int32         `json:"version"`
+	VersionHex       string        `json:"versionHex"`
+	MerkleRoot       string        `json:"merkleroot"`
+	Tx               []TxRawResult `json:"tx,omitempty"`
+	Time             int64         `json:"time"`
+	Nonce            uint32        `json:"nonce"`
+	Bits             string        `json:"bits"`
+	Difficulty       float64       `json:"difficulty"`
+	BitsSecond       string        `json:"bitsSecond"`
+	DifficultySecond float64       `json:"difficultySecond"`
+	PowScaleSecond   uint32        `json:"powScaleSecond"`
+	ConsensusApplied uint8         `json:"consensusApplied"`
+	PreviousHash     string        `json:"previousblockhash"`
+	NextHash         string        `json:"nextblockhash,omitempty"`
 }
 
 // GetChainTxStatsResult models the data from the getchaintxstats command.
@@ -284,6 +319,8 @@ type GetBlockChainInfoResult struct {
 	Headers              int32   `json:"headers"`
 	BestBlockHash        string  `json:"bestblockhash"`
 	Difficulty           float64 `json:"difficulty"`
+	DifficultySecond     float64 `json:"difficultySecond"`
+	PowScaleSecond       uint32  `json:"powScaleSecond"`
 	MedianTime           int64   `json:"mediantime"`
 	VerificationProgress float64 `json:"verificationprogress,omitempty"`
 	Pruned               bool    `json:"pruned"`
@@ -341,11 +378,14 @@ type GetBlockTemplateResultAux struct {
 type GetBlockTemplateResult struct {
 	// CoinbaseAux is optional.  One of
 	// CoinbaseTxn or CoinbaseValue must be specified, but not both.
-	Bits         string `json:"bits"`
-	CurTime      int64  `json:"curtime"`
-	Height       int64  `json:"height"`
-	PreviousHash string `json:"previousblockhash"`
-	SizeLimit    int64  `json:"sizelimit,omitempty"`
+	Bits             string `json:"bits"`
+	BitsSecond       string `json:"bitsSecond,omitempty"`
+	PowScaleSecond   uint32 `json:"powScaleSecond,omitempty"`
+	ConsensusApplied uint8  `json:"consensusApplied,omitempty"`
+	CurTime          int64  `json:"curtime"`
+	Height           int64  `json:"height"`
+	PreviousHash     string `json:"previousblockhash"`
+	SizeLimit        int64  `json:"sizelimit,omitempty"`
 	//	WeightLimit   int64                      `json:"weightlimit,omitempty"`
 	Transactions []GetBlockTemplateResultTxAbe `json:"transactions"`
 	Version      int32                         `json:"version"`
@@ -363,8 +403,9 @@ type GetBlockTemplateResult struct {
 	SubmitOld   *bool  `json:"submitold,omitempty"`
 
 	// Basic pool extension from BIP 0023.
-	Target  string `json:"target,omitempty"`
-	Expires int64  `json:"expires,omitempty"`
+	Target       string `json:"target,omitempty"`
+	TargetSecond string `json:"targetSecond,omitempty"`
+	Expires      int64  `json:"expires,omitempty"`
 
 	// Mutations from BIP 0023.
 	MaxTime    int64    `json:"maxtime,omitempty"`
@@ -725,6 +766,14 @@ type TxOutAbe struct {
 	TxoScript string `json:"script"`
 }
 
+// GetDifficultyRatioVectorResult
+// todo: unify the json label
+type GetDifficultyRatioVectorResult struct {
+	DifficultyRatio       float64 `json:"difficulty_ratio"`
+	DifficultyRatioSecond float64 `json:"difficulty_ratio_second"`
+	PowScaleSecond        uint32  `json:"pow_scale_second"`
+}
+
 // GetMiningInfoResult models the data from the getmininginfo command.
 type GetMiningInfoResult struct {
 	Blocks             int64   `json:"blocks"`
@@ -732,6 +781,9 @@ type GetMiningInfoResult struct {
 	CurrentBlockWeight uint64  `json:"currentblockweight"`
 	CurrentBlockTx     uint64  `json:"currentblocktx"`
 	Difficulty         float64 `json:"difficulty"`
+	DifficultySecond   float64 `json:"difficultySecond"`
+	PowScaleSecond     uint32  `json:"powScaleSecond"`
+	ConsensusApplied   uint8   `json:"consensusApplied"`
 	Errors             string  `json:"errors"`
 	Generate           bool    `json:"generate"`
 	GenProcLimit       int32   `json:"genproclimit"`
@@ -756,10 +808,13 @@ type InfoChainResult struct {
 	Blocks               int32   `json:"blocks"`
 	BestBlockHash        string  `json:"bestblockhash"`
 	WorkSum              string  `json:"worksum"`
+	WorkSumSecondScaled  string  `json:"worksumsecondscaled"` // added for Aconcagua upgrade
 	TimeOffset           int64   `json:"timeoffset"`
 	Connections          int32   `json:"connections"`
 	Proxy                string  `json:"proxy"`
 	Difficulty           float64 `json:"difficulty"`
+	DifficultySecond     float64 `json:"difficultySecond"`
+	PowScaleSecond       uint32  `json:"powScaleSecond"`
 	TestNet              bool    `json:"testnet"`
 	RelayFee             float64 `json:"relayfee"`
 	Errors               string  `json:"errors"`

@@ -388,6 +388,7 @@ func GetFilterHash(filter *gcs.Filter) (chainhash.Hash, error) {
 		return chainhash.Hash{}, err
 	}
 
+	// todo: doubleHash, it does matter, since it is not used and will be removed
 	return chainhash.DoubleHashH(filterData), nil
 }
 
@@ -407,5 +408,6 @@ func MakeHeaderForFilter(filter *gcs.Filter, prevHeader chainhash.Hash) (chainha
 
 	// The final filter hash is the double-sha256 of the hash computed
 	// above.
+	// todo: doubleHash, it does matter, since it is not used and will be removed
 	return chainhash.DoubleHashH(filterTip), nil
 }

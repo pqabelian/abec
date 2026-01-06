@@ -307,6 +307,7 @@ func (msg *MsgTx) TxHash() chainhash.Hash {
 	// cause a run-time panic.
 	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSizeStripped()))
 	_ = msg.SerializeNoWitness(buf)
+	// todo: This will be removed. It does not matter in Aconcagua upgrade.
 	return chainhash.DoubleHashH(buf.Bytes())
 }
 
@@ -319,6 +320,7 @@ func (msg *MsgTx) WitnessHash() chainhash.Hash {
 	if msg.HasWitness() {
 		buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSize()))
 		_ = msg.Serialize(buf)
+		// todo: This will be removed. It does not matter in Aconcagua upgrade.
 		return chainhash.DoubleHashH(buf.Bytes())
 	}
 

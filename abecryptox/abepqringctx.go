@@ -3,6 +3,7 @@ package abecryptox
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/pqabelian/abec/abecryptox/abecryptoutils"
 	"github.com/pqabelian/abec/abecryptox/abecryptoxkey"
 	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
@@ -17,14 +18,23 @@ import (
 // this function will fill the TxOuts and TxWitness fields.
 // reviewed on 2023.12.07
 // reviewed on 2023.12.21
+// ctx review done 2025.12.22
 func pqringctxCoinbaseTxGen(pp *pqringctxapi.PublicParameter, abeTxOutputDescs []*AbeTxOutputDesc, coinbaseTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 
 	//	parse AbeTxOutputDesc to pqringctx.TxOutputDesc
 	txOutputDescs := make([]*pqringctxapi.TxOutputDescMLP, len(abeTxOutputDescs))
 	for j := 0; j < len(abeTxOutputDescs); j++ {
-		_, coinAddress, coinValuePK, err := abecryptoxkey.CryptoAddressParse(abeTxOutputDescs[j].cryptoAddress)
+		privacyLevel, coinAddress, coinValuePK, err := abecryptoxkey.CryptoAddressParse(abeTxOutputDescs[j].cryptoAddress)
 		if err != nil {
 			return nil, err
+		}
+
+		// The rules of (txoVersion, PrivacyLevel) need to be checked, since the ring-rules need this.
+		err = pqringctxRuleCheckOnTxoVersionPrivacyLevel(pp, coinbaseTxMsgTemplate.Version, privacyLevel)
+		if err != nil {
+			return nil, fmt.Errorf("pqringctxCoinbaseTxGen: (coinbaseTxMsgTemplate.Version, abeTxOutputDescs[%d].cryptoAddress's privacyLevel) (%d, %d) "+
+				"fail to pass the RuleCheckOnTxoVersionPrivacyLevel: %v",
+				coinbaseTxMsgTemplate.Version, j, privacyLevel, err)
 		}
 
 		txOutputDescs[j] = pqringctxapi.NewTxOutputDescMLP(coinAddress, coinValuePK, abeTxOutputDescs[j].value)
@@ -69,6 +79,7 @@ func pqringctxCoinbaseTxGen(pp *pqringctxapi.PublicParameter, abeTxOutputDescs [
 // reviewed on 2023.12.21
 // refactored on 2024.01.08, using err == nil or not to denote valid or invalid
 // todo: review
+// ctx review done 2025.12.22
 func pqringctxCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, coinbaseTx *wire.MsgTxAbe) error {
 	if coinbaseTx == nil {
 		return fmt.Errorf("pqringctxCoinbaseTxVerify: the input coinbaseTx is nil")
@@ -83,12 +94,28 @@ func pqringctxCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, coinbaseTx *wir
 
 	txoMLPs := make([]pqringctxapi.TxoMLP, len(coinbaseTx.TxOuts))
 	for i := 0; i < len(coinbaseTx.TxOuts); i++ {
-		if coinbaseTx.TxOuts[i].Version != coinbaseTx.Version {
+		txOut := coinbaseTx.TxOuts[i]
+		if txOut.Version != coinbaseTx.Version {
 			return fmt.Errorf("pqringctxCoinbaseTxVerify: coinbaseTx.TxOuts[%d].Version (%d) != coinbaseTx.Version (%d)",
-				i, coinbaseTx.TxOuts[i].Version, coinbaseTx.Version)
+				i, txOut.Version, coinbaseTx.Version)
 		}
 
-		txoMLPs[i], err = pqringctxapi.DeserializeTxo(pp, coinbaseTx.TxOuts[i].TxoScript)
+		// The rules of (txoVersion, PrivacyLevel) need to be checked, since the ring-rules need this.
+		// todo: 2025.12.22 future refactor the architecture
+		// todo: 2025.12.22 future move the txoMLPs[i], err = pqringctxapi.DeserializeTxo(pp, txOut.TxoScript) here
+
+		privacyLevel, err := GetTxoPrivacyLevel(txOut)
+		if err != nil {
+			return err
+		}
+		err = pqringctxRuleCheckOnTxoVersionPrivacyLevel(pp, txOut.Version, privacyLevel)
+		if err != nil {
+			return fmt.Errorf("pqringctxCoinbaseTxVerify: coinbaseTx.TxOuts[%d]'s (Version, privacyLevel) (%d, %d) "+
+				"fail to pass the RuleCheckOnTxoVersionPrivacyLevel: %v",
+				i, txOut.Version, privacyLevel, err)
+		}
+
+		txoMLPs[i], err = pqringctxapi.DeserializeTxo(pp, txOut.TxoScript)
 		if err != nil {
 			return err
 		}
@@ -116,6 +143,7 @@ func pqringctxCoinbaseTxVerify(pp *pqringctxapi.PublicParameter, coinbaseTx *wir
 
 // pqringctxTransferTxGenByRootSeeds translates []*AbeTxInputDescByRootSeeds into []*AbeTxInputDescByKeys, then call pqringctxTransferTxGenByKeys.
 // reviewed on 2023.12.31
+// ctx review done 2025.12.22
 func pqringctxTransferTxGenByRootSeeds(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
 	abeTxInputDescsByRootSeeds []*AbeTxInputDescByRootSeeds, abeTxOutputDescs []*AbeTxOutputDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 	// just redundant double check
@@ -132,8 +160,10 @@ func pqringctxTransferTxGenByRootSeeds(pp *pqringctxapi.PublicParameter, cryptoS
 	for i := 0; i < inputNum; i++ {
 		abeTxInputDescByRootSeedsItem := abeTxInputDescsByRootSeeds[i]
 
-		if abeTxInputDescByRootSeedsItem.privacyLevel != abecryptoxkey.PrivacyLevelRINGCT && abeTxInputDescByRootSeedsItem.privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
-			return nil, fmt.Errorf("pqringctxTransferTxGenByRootSeeds: the privacyLeve of the %d -th coin-to-spend is not PrivacyLevelRINGCT or PrivacyLevelPSEUDONYM", i)
+		if abeTxInputDescByRootSeedsItem.privacyLevel != abecryptoxkey.PrivacyLevelRINGCT &&
+			abeTxInputDescByRootSeedsItem.privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM &&
+			abeTxInputDescByRootSeedsItem.privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+			return nil, fmt.Errorf("pqringctxTransferTxGenByRootSeeds: the privacyLeve of the %d -th coin-to-spend is not PrivacyLevelRINGCT, PrivacyLevelPSEUDONYM, or PrivacyLevelPSEUDONYMCT", i)
 		}
 
 		if abeTxInputDescByRootSeedsItem.txoRing == nil || int(abeTxInputDescByRootSeedsItem.sidx) >= len(abeTxInputDescByRootSeedsItem.txoRing.TxOuts) {
@@ -164,6 +194,7 @@ func pqringctxTransferTxGenByRootSeeds(pp *pqringctxapi.PublicParameter, cryptoS
 
 // pqringctxTransferTxGenByRandSeeds translates []*AbeTxInputDescByRandSeeds into []*AbeTxInputDescByKeys, then call pqringctxTransferTxGenByKeys.
 // reviewed on 2023.12.31
+// ctx review done 2025.12.22
 func pqringctxTransferTxGenByRandSeeds(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxInputDescsByRandSeeds []*AbeTxInputDescByRandSeeds, abeTxOutputDescs []*AbeTxOutputDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 	// just redundant double check
 	cryptoSchemeFromTxVersion, err := abecryptoxparam.GetCryptoSchemeByTxVersion(transferTxMsgTemplate.Version)
@@ -179,7 +210,9 @@ func pqringctxTransferTxGenByRandSeeds(pp *pqringctxapi.PublicParameter, cryptoS
 	for i := 0; i < inputNum; i++ {
 		abeTxInputDescByRandSeedsItem := abeTxInputDescsByRandSeeds[i]
 
-		if abeTxInputDescByRandSeedsItem.privacyLevel != abecryptoxkey.PrivacyLevelRINGCT && abeTxInputDescByRandSeedsItem.privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM {
+		if abeTxInputDescByRandSeedsItem.privacyLevel != abecryptoxkey.PrivacyLevelRINGCT &&
+			abeTxInputDescByRandSeedsItem.privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYM &&
+			abeTxInputDescByRandSeedsItem.privacyLevel != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
 			return nil, fmt.Errorf("pqringctxTransferTxGenByRandSeeds: the privacyLeve of the %d -th coin-to-spend is not PrivacyLevelRINGCT or PrivacyLevelPSEUDONYM", i)
 		}
 
@@ -221,6 +254,7 @@ func pqringctxTransferTxGenByRandSeeds(pp *pqringctxapi.PublicParameter, cryptoS
 // reviewed on 2023.12.21
 // todo: to review
 // todo: review CryptoValueSecretKeyParse
+// ctx review done 2025.12.22
 func pqringctxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxInputDescs []*AbeTxInputDescByKeys, abeTxOutputDescs []*AbeTxOutputDesc, transferTxMsgTemplate *wire.MsgTxAbe) (*wire.MsgTxAbe, error) {
 	// just redundant double check
 	cryptoSchemeFromTxVersion, err := abecryptoxparam.GetCryptoSchemeByTxVersion(transferTxMsgTemplate.Version)
@@ -246,17 +280,11 @@ func pqringctxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme
 	cryptoTxInputDescs := make([]*pqringctxapi.TxInputDescMLP, inputNum)
 	for i := 0; i < inputNum; i++ {
 		txInRingVersion := transferTxMsgTemplate.TxIns[i].PreviousOutPointRing.Version
-		if txInRingVersion != transferTxMsgTemplate.Version {
-			//	the transferTxMsgTemplate is attempting to spend the coins generated by Txs with different versions.
-			//	Here we need to hard code to accept only the expected cases.
-			if txInRingVersion == wire.TxVersion_Height_0 &&
-				transferTxMsgTemplate.Version == wire.TxVersion_Height_MLPAUT_300000 {
-				// allowed case:
-				// we allow to use a transaction with Version == wire.TxVersion_Height_MLPAUT_300000
-				// to spend coins with Version == wire.TxVersion_Height_0.
-			} else {
-				return nil, fmt.Errorf("pqringctxTransferTxGen: the transferTxMsgTemplate is attempting to spend coins created by transactions with differnet versions, but the case is out of the allowed ones")
-			}
+		err = pqringctxRuleCheckOnTxInputVersion(pp, txInRingVersion, transferTxMsgTemplate.Version)
+		if err != nil {
+			return nil, fmt.Errorf("pqringctxTransferTxGen: the transferTxMsgTemplate has version = %d, "+
+				"but the %d -th txInput has version = %d, which is out of the allowed ones",
+				transferTxMsgTemplate.Version, i, txInRingVersion)
 		}
 
 		// lgrTxoList
@@ -272,7 +300,7 @@ func pqringctxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme
 				return nil, err
 			}
 
-			lgrTxoId := pqringctxLedgerTxoIdGen(ringId, uint8(j))
+			lgrTxoId := pqringctxLedgerTxoIdGen(ringId, uint8(j), abeTxInputDescs[i].txoRing.TxOuts[j].Version)
 
 			lgrTxoList[j] = pqringctxapi.NewLgrTxo(txoMLP, lgrTxoId)
 		}
@@ -326,7 +354,7 @@ func pqringctxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme
 
 		//	coinSerialNumberSecretKey []byte
 		var coinSerialNumberSecretKey []byte = nil
-		if abeTxInputDescs[i].cryptoSnsk != nil {
+		if len(abeTxInputDescs[i].cryptoSnsk) != 0 {
 			privacyLevelInKey, coinSerialNumberSecretKey, err = abecryptoxkey.CryptoSerialNumberSecretKeyParse(abeTxInputDescs[i].cryptoSnsk)
 			if err != nil {
 				return nil, err
@@ -343,15 +371,15 @@ func pqringctxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme
 				return nil, fmt.Errorf("pqringctxTransferTxGen: the coinAddressType in abeTxInputDescs[%d].cryptoSnsk does not match that of the coin to spend", i)
 			}
 		} else {
-			if privacyLevelInAddress != abecryptoxkey.PrivacyLevelPSEUDONYM {
-				// only when the privacyLevelInAddress is PrivacyLevelPSEUDONYM, the provided cryptoSnsk could be nil.
-				return nil, fmt.Errorf("pqringctxTransferTxGen: the abeTxInputDescs[%d].[%d]-th Txo's privacy-level is not PrivacyLevelPSEUDONYM, but the cryptoSnsk is nil", i, sidx)
+			if privacyLevelInAddress != abecryptoxkey.PrivacyLevelPSEUDONYM && privacyLevelInAddress != abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+				// only when the privacyLevelInAddress is PrivacyLevelPSEUDONYM or PrivacyLevelPSEUDONYMCT, the provided cryptoSnsk could be nil.
+				return nil, fmt.Errorf("pqringctxTransferTxGen: the abeTxInputDescs[%d].[%d]-th Txo's privacy-level is not PrivacyLevelPSEUDONYM or PrivacyLevelPSEUDONYMCT, but the cryptoSnsk is nil", i, sidx)
 			}
 		}
 
 		//	coinValuePublicKey             []byte
 		//	parsed from cryptoAddress as above
-		if coinValuePublicKey == nil {
+		if len(coinValuePublicKey) == 0 {
 			if privacyLevelInAddress != abecryptoxkey.PrivacyLevelPSEUDONYM {
 				// only when the privacyLevelInAddress is PrivacyLevelPSEUDONYM, the extracted coinValuePublicKey from the cryptoAddress could be nil.
 				return nil, fmt.Errorf("pqringctxTransferTxGen: the abeTxInputDescs[%d].[%d]-th Txo's privacy-level is not PrivacyLevelPSEUDONYM, but the coinValuePublicKey is nil", i, sidx)
@@ -360,7 +388,7 @@ func pqringctxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme
 
 		//	coinValueSecretKey             []byte
 		var coinValueSecretKey []byte = nil
-		if abeTxInputDescs[i].cryptoVsk != nil {
+		if len(abeTxInputDescs[i].cryptoVsk) != 0 {
 			privacyLevelInKey, coinValueSecretKey, err = abecryptoxkey.CryptoValueSecretKeyParse(abeTxInputDescs[i].cryptoVsk)
 			if err != nil {
 				return nil, err
@@ -397,9 +425,17 @@ func pqringctxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme
 	//	cryptoTxOutputDescs
 	cryptoTxOutputDescs := make([]*pqringctxapi.TxOutputDescMLP, outputNum)
 	for j := 0; j < outputNum; j++ {
-		_, coinAddress, coinValuePublicKey, err := abecryptoxkey.CryptoAddressParse(abeTxOutputDescs[j].cryptoAddress)
+		privacyLevel, coinAddress, coinValuePublicKey, err := abecryptoxkey.CryptoAddressParse(abeTxOutputDescs[j].cryptoAddress)
 		if err != nil {
 			return nil, err
+		}
+
+		// The rules of (txoVersion, PrivacyLevel) need to be checked, since the ring-rules need this.
+		err = pqringctxRuleCheckOnTxoVersionPrivacyLevel(pp, transferTxMsgTemplate.Version, privacyLevel)
+		if err != nil {
+			return nil, fmt.Errorf("pqringctxCoinbaseTxGen: (transferTxMsgTemplate.Version, abeTxOutputDescs[%d].cryptoAddress's privacyLevel) (%d, %d) "+
+				"fail to pass the RuleCheckOnTxoVersionPrivacyLevel: %v",
+				transferTxMsgTemplate.Version, j, privacyLevel, err)
 		}
 
 		cryptoTxOutputDescs[j] = pqringctxapi.NewTxOutputDescMLP(coinAddress, coinValuePublicKey, abeTxOutputDescs[j].value)
@@ -426,6 +462,7 @@ func pqringctxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme
 			return nil, err
 		}
 		transferTxMsgTemplate.TxOuts[i] = &wire.TxOutAbe{
+			// RULE: Txo has its version inherited from Tx.
 			Version:   transferTxMsgTemplate.Version,
 			TxoScript: serializedTxo,
 		}
@@ -443,6 +480,7 @@ func pqringctxTransferTxGenByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme
 
 // pqringctxTransferTxVerify verifies wire.MsgTxAbe.
 // todo: review
+// ctx review done 2025.12.22
 func pqringctxTransferTxVerify(pp *pqringctxapi.PublicParameter, transferTx *wire.MsgTxAbe, abeTxInDetails []*AbeTxInDetail) error {
 	if transferTx == nil {
 		return fmt.Errorf("pqringctxTransferTxVerify: the input transferTx is empty")
@@ -465,17 +503,17 @@ func pqringctxTransferTxVerify(pp *pqringctxapi.PublicParameter, transferTx *wir
 	//	txInputs
 	cryptoTxInputMLPs := make([]*pqringctxapi.TxInputMLP, inputNum)
 	for i := 0; i < inputNum; i++ {
-		if transferTx.TxIns[i].PreviousOutPointRing.Version != transferTx.Version {
-			if transferTx.TxIns[i].PreviousOutPointRing.Version == wire.TxVersion_Height_0 &&
-				transferTx.Version == wire.TxVersion_Height_MLPAUT_300000 {
-				//	allowed
-			} else {
-				//	not in the allowed cases
-				return fmt.Errorf("pqringctxTransferTxVerify: transferTx.TxIns[%d].PreviousOutPointRing.Version (%d) is out of design", i, transferTx.TxIns[i].PreviousOutPointRing.Version)
-			}
+		err = pqringctxRuleCheckOnTxInputVersion(pp, transferTx.TxIns[i].PreviousOutPointRing.Version, transferTx.Version)
+		if err != nil {
+			return fmt.Errorf("pqringctxTransferTxVerify: transferTx.TxIns[%d].PreviousOutPointRing.Version (%d) and , "+
+				"transferTx.Version (%d) fail to pass the RuleCheckOnTxInputVersion: %v",
+				i, transferTx.TxIns[i].PreviousOutPointRing.Version, transferTx.Version, err)
 		}
 
 		//	to be self-contained, the serial number should be checked
+		if len(transferTx.TxIns[i].SerialNumber) == 0 {
+			return fmt.Errorf("pqringctxTransferTxVerify: transferTx.TxIns[%d].SerialNumber is nil/empty", i)
+		}
 		if bytes.Compare(transferTx.TxIns[i].SerialNumber, abeTxInDetails[i].serialNumber) != 0 {
 			return fmt.Errorf("pqringctxTransferTxVerify: transferTx.TxIns[%d].SerialNumber (%v) and abeTxInDetails[%d].serialNumber (%v) are differnet",
 				i, transferTx.TxIns[i].SerialNumber, i, abeTxInDetails[i].serialNumber)
@@ -483,9 +521,10 @@ func pqringctxTransferTxVerify(pp *pqringctxapi.PublicParameter, transferTx *wir
 
 		//	to be self-contained, the ringId should be checked
 		ringId := transferTx.TxIns[i].PreviousOutPointRing.RingId()
-		if bytes.Compare(ringId[:], abeTxInDetails[i].ringId[:]) != 0 {
+		if !ringId.IsEqual(&abeTxInDetails[i].ringId) {
+			// if bytes.Compare(ringId[:], abeTxInDetails[i].ringId[:]) != 0 {
 			return fmt.Errorf("pqringctxTransferTxVerify: transferTx.TxIns[%d].PreviousOutPointRing.RingId() (%v) and abeTxInDetails[%d].ringId (%v) are different",
-				i, transferTx.TxIns[i].PreviousOutPointRing.RingId(), i, abeTxInDetails[i].ringId)
+				i, ringId, i, abeTxInDetails[i].ringId)
 		}
 
 		lgrTxoList := make([]*pqringctxapi.LgrTxoMLP, len(abeTxInDetails[i].txoList))
@@ -493,14 +532,14 @@ func pqringctxTransferTxVerify(pp *pqringctxapi.PublicParameter, transferTx *wir
 			if abeTxInDetails[i].txoList[j].Version != transferTx.TxIns[i].PreviousOutPointRing.Version {
 				return fmt.Errorf("pqringctxTransferTxVerify: abeTxInDetails[%d].txoList[%d].Version (%d) is different from transferTx.TxIns[%d].PreviousOutPointRing.Version (%d)",
 					i, j, abeTxInDetails[i].txoList[j].Version, i, transferTx.TxIns[i].PreviousOutPointRing.Version)
-				//	The Txos in the same ring should have the same version
+				//	RULE: The Txos in the same ring should have the same version
 			}
 
 			txoMLP, err := pqringctxapi.DeserializeTxo(pp, abeTxInDetails[i].txoList[j].TxoScript) //	Note that pqringctx can deserialize the TxoScript generated by pqringct.
 			if err != nil {
 				return err
 			}
-			lgrTxoId := pqringctxLedgerTxoIdGen(ringId, uint8(j))
+			lgrTxoId := pqringctxLedgerTxoIdGen(ringId, uint8(j), abeTxInDetails[i].txoList[j].Version)
 			lgrTxoList[j] = pqringctxapi.NewLgrTxo(txoMLP, lgrTxoId)
 		}
 
@@ -510,13 +549,32 @@ func pqringctxTransferTxVerify(pp *pqringctxapi.PublicParameter, transferTx *wir
 	//	txos
 	cryptoTxoMLPs := make([]pqringctxapi.TxoMLP, outputNum)
 	for j := 0; j < outputNum; j++ {
-		if transferTx.TxOuts[j].Version != transferTx.Version {
+		txOut := transferTx.TxOuts[j]
+
+		if txOut.Version != transferTx.Version {
 			return fmt.Errorf("pqringctxTransferTxVerify: transferTx.TxOuts[%d].Version (%d) != transferTx.Version (%d)",
-				j, transferTx.TxOuts[j].Version, transferTx.Version)
-			//	The output Txos of a transaction should have the same version as the transaction.
+				j, txOut.Version, transferTx.Version)
+			//	RULE: The output Txos of a transaction should have the same version as the transaction.
 		}
 
-		cryptoTxoMLPs[j], err = pqringctxapi.DeserializeTxo(pp, transferTx.TxOuts[j].TxoScript)
+		// The rules of (txoVersion, PrivacyLevel) need to be checked, since the ring-rules need this.
+
+		// todo: 2025.12.22 refactor the architecture to avoid call GetTxoPrivacyLevel
+		// todo: 2025.12.22 refactor call pqringctxGetTxoPrivacyLevel rather than GetTxoPrivacyLeve,
+		// based on the design that only pqringctx case will come here.
+
+		privacyLevel, err := GetTxoPrivacyLevel(txOut)
+		if err != nil {
+			return err
+		}
+		err = pqringctxRuleCheckOnTxoVersionPrivacyLevel(pp, txOut.Version, privacyLevel)
+		if err != nil {
+			return fmt.Errorf("pqringctxTransferTxVerify: transferTx.TxOuts[%d]'s (Version, privacyLevel) (%d, %d) "+
+				"fail to pass the RuleCheckOnTxoVersionPrivacyLevel: %v",
+				j, txOut.Version, privacyLevel, err)
+		}
+
+		cryptoTxoMLPs[j], err = pqringctxapi.DeserializeTxo(pp, txOut.TxoScript)
 		if err != nil {
 			return err
 		}
@@ -551,7 +609,8 @@ func pqringctxTransferTxVerify(pp *pqringctxapi.PublicParameter, transferTx *wir
 // This must keep the same as that in pqringct.ledgerTxoIdGen.
 // reviewed on 2023.12.08
 // reviewed on 2023.12.21
-func pqringctxLedgerTxoIdGen(ringId wire.RingId, index uint8) []byte {
+// ctx revuew done 2025.12.22
+func pqringctxLedgerTxoIdGen(ringId wire.RingId, index uint8, txoVersion uint32) []byte {
 	w := bytes.NewBuffer(make([]byte, 0, chainhash.HashSize+1))
 	var err error
 	// ringId
@@ -564,6 +623,12 @@ func pqringctxLedgerTxoIdGen(ringId wire.RingId, index uint8) []byte {
 	if err != nil {
 		return nil
 	}
+	// todo: in Aconcagua fork, here need use SHA3-256 while using DoubleHash to have backward compatibility
+	if txoVersion >= wire.TxVersion_Height_464000_Aconcagua {
+		lgrTxoIdHash := chainhash.ChainHash(w.Bytes())
+		return lgrTxoIdHash[:]
+	}
+
 	return chainhash.DoubleHashB(w.Bytes())
 }
 
@@ -573,6 +638,7 @@ func pqringctxLedgerTxoIdGen(ringId wire.RingId, index uint8) []byte {
 
 // pqringctxGetTxoPrivacyLevel returns the PrivacyLevel of the input wire.TxOutAbe.
 // reviewed on 2024.01.04
+// ctx review done 2025.12.22
 func pqringctxGetTxoPrivacyLevel(pp *pqringctxapi.PublicParameter, abeTxo *wire.TxOutAbe) (abecryptoxkey.PrivacyLevel, error) {
 	cryptoTxoMLP, err := pqringctxapi.DeserializeTxo(pp, abeTxo.TxoScript)
 	if err != nil {
@@ -582,22 +648,9 @@ func pqringctxGetTxoPrivacyLevel(pp *pqringctxapi.PublicParameter, abeTxo *wire.
 	return abecryptoxkey.GetPrivacyLevelFromCoinAddressType(cryptoTxoMLP.CoinAddressType())
 }
 
-// pqringctxGetTxoSerializeSize returns the TxoSerializeSize for the input coinAddress.
-// reviewed on 2023.12.07
-// refactored on 2024.01.24 by Alice: pqringctx-Layer takes as input cryptoAddress and parses it to coinAddress.
-func pqringctxGetTxoSerializeSize(pp *pqringctxapi.PublicParameter, cryptoAddressPayTo []byte) (int, error) {
-	//	Note that the cryptoAddressPayTo may not be generated by pqringctx,
-	//	we call ParseCryptoAddress() to cover all cases.
-	_, coinAddress, _, err := abecryptoxkey.CryptoAddressParse(cryptoAddressPayTo)
-	if err != nil {
-		return 0, err
-	}
-
-	return pqringctxapi.GetTxoSerializeSize(pp, coinAddress)
-}
-
 // pqringctxExtractPublicRandFromTxo returns the PublicRand in the CoinAddress of the input wire.TxOutAbe.
 // reviewed on 2023.12.31
+// ctx review done 2025.12.22
 func pqringctxExtractPublicRandFromTxo(pp *pqringctxapi.PublicParameter, abeTxo *wire.TxOutAbe) ([]byte, error) {
 	coinAddress, err := pqringctxapi.ExtractCoinAddressFromSerializedTxo(pp, abeTxo.TxoScript)
 	if err != nil {
@@ -608,15 +661,21 @@ func pqringctxExtractPublicRandFromTxo(pp *pqringctxapi.PublicParameter, abeTxo 
 
 // pqringctxExtractCoinAddressFromTxo returns the CoinAddress of the input wire.TxOutAbe.
 // reviewed on 2023.12.31
+// ctx review done 2025.12.22
 func pqringctxExtractCoinAddressFromTxo(pp *pqringctxapi.PublicParameter, abeTxo *wire.TxOutAbe) ([]byte, error) {
 	return pqringctxapi.ExtractCoinAddressFromSerializedTxo(pp, abeTxo.TxoScript)
 }
 
 // pqringctxTxoCoinDetectByCoinDetectorRootKey use the input coinDetectorRootKey to check whether the input wire.TxOutAbe's coinAddress belongs to the owner of coinDetectorRootKey.
 // todo: review
+// ctx review done 2025.12.22
 func pqringctxTxoCoinDetectByCoinDetectorRootKey(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe, coinDetectorRootKey []byte) (bool, error) {
 	if abeTxo == nil {
 		return false, fmt.Errorf("pqringctxTxoCoinDetectByCoinDetectorRootKey: the input abeTxo is nil")
+	}
+
+	if len(coinDetectorRootKey) != abecryptoutils.PRFKeyBytesLen {
+		return false, fmt.Errorf("pqringctxTxoCoinDetectByCoinDetectorRootKey: invalid length of coinDetectorRootKey (%d)", len(coinDetectorRootKey))
 	}
 
 	coinAddress, err := pqringctxapi.ExtractCoinAddressFromSerializedTxo(pp, abeTxo.TxoScript)
@@ -640,6 +699,7 @@ func pqringctxTxoCoinDetectByCoinDetectorRootKey(pp *pqringctxapi.PublicParamete
 
 // pqringctxTxoCoinDetectByCryptoDetectorKey use the input cryptoDetectorKey to check whether the input wire.TxOutAbe's coinAddress belongs to the owner of cryptoDetectorKey.
 // todo: review
+// ctx review done 2025.12.22
 func pqringctxTxoCoinDetectByCryptoDetectorKey(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe, cryptoDetectorKey []byte) (bool, error) {
 	if abeTxo == nil {
 		return false, fmt.Errorf("pqringctxTxoCoinDetectByCryptoDetectorKey: the input abeTxo is nil")
@@ -662,6 +722,7 @@ func pqringctxTxoCoinDetectByCryptoDetectorKey(pp *pqringctxapi.PublicParameter,
 // it extracts the value of abeTxo using the input coinValueKeyRootSeed.
 // Note that it is the responsibility of the caller or user to make sure the coinValueKeyRootSeed is for the input abeTxo.
 // todo: review
+// ctx review done 2025.12.22
 func pqringctxTxoCoinReceiveByRootSeeds(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe,
 	coinValueKeyRootSeed []byte, coinDetectorRootKey []byte) (valid bool, value uint64, err error) {
 
@@ -693,6 +754,10 @@ func pqringctxTxoCoinReceiveByRootSeeds(pp *pqringctxapi.PublicParameter, crypto
 
 	//	generate coinDetectorKey and detect coinAddress
 	//	NOTE: the codes here must be consistent with that in abecryptoxkey/abepqringctxkey.go
+	if len(coinDetectorRootKey) != abecryptoutils.PRFKeyBytesLen {
+		return false, 0, fmt.Errorf("pqringctxTxoCoinReceiveByRootSeeds: invalid length of coinDetectorRootKey (%d)", len(coinDetectorRootKey))
+	}
+
 	coinDetectorKey, err := abecryptoutils.KDF(coinDetectorRootKey, publicRand)
 	if err != nil {
 		return false, 0, err
@@ -735,6 +800,7 @@ func pqringctxTxoCoinReceiveByRootSeeds(pp *pqringctxapi.PublicParameter, crypto
 // it extracts the value of abeTxo using the input coinValueKeyRandSeed.
 // Note that it is the responsibility of the caller or user to make sure the coinValueKeyRandSeed is for the input abeTxo.
 // todo: review
+// ctx review done 2025.12.22
 func pqringctxTxoCoinReceiveByRandSeeds(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe,
 	coinValueKeyRandSeed []byte, coinDetectorKey []byte) (valid bool, value uint64, err error) {
 	cryptoSchemeInTxo, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
@@ -785,6 +851,7 @@ func pqringctxTxoCoinReceiveByRandSeeds(pp *pqringctxapi.PublicParameter, crypto
 // pqringctxTxoCoinReceiveByKeys checks whether the input abeTxo *wire.TxOutAbe belongs to the owner of the input cryptoAddress, and if true,
 // it extracts the value of abeTxo using the input cryptoValueSecretKey (if it indeed corresponds to the cryptoAddress).
 // todo: review
+// ctx review done 2025.12.22
 func pqringctxTxoCoinReceiveByKeys(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe,
 	cryptoAddress []byte, cryptoValueSecretKey []byte) (valid bool, value uint64, err error) {
 	cryptoSchemeInTxo, err := abecryptoxparam.GetCryptoSchemeByTxVersion(abeTxo.Version)
@@ -829,6 +896,7 @@ func pqringctxTxoCoinReceiveByKeys(pp *pqringctxapi.PublicParameter, cryptoSchem
 // pqringctxPseudonymTxoCoinParse parses the input (Pseudonym-Privacy) TxoMLP to its (coinAddress, coinValue) pair, and
 // return an err if it is not a Pseudonym-Privacy Txo.
 // todo: review
+// ctx review done 2025.12.22
 func pqringctxPseudonymTxoCoinParse(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme, abeTxo *wire.TxOutAbe) (
 	coinAddress []byte, value uint64, err error) {
 
@@ -838,7 +906,7 @@ func pqringctxPseudonymTxoCoinParse(pp *pqringctxapi.PublicParameter, cryptoSche
 	}
 
 	if cryptoSchemeInTxo != cryptoScheme {
-		return nil, 0, fmt.Errorf("pqringctxTxoCoinReceiveByKeys: unmatched cryptoScheme for the input Txo")
+		return nil, 0, fmt.Errorf("pqringctxPseudonymTxoCoinParse: unmatched cryptoScheme for the input Txo")
 	}
 
 	//	NOTE: As the abepqringctx-layer obtained TxoMLP (associated in crypto-TransferTx/CoinbaseTx) and serialized it to abeTxo.TxoScript,
@@ -854,6 +922,7 @@ func pqringctxPseudonymTxoCoinParse(pp *pqringctxapi.PublicParameter, cryptoSche
 // pqringctxTxoCoinSerialNumberGenByRootSeed generates serialNumber for the input LgrTxoMLP, using the input coinSerialNumberKeyRootSeed.
 // NOTE: the input coinSerialNumberKeyRootSeed could be nil, for example, when the input TxOutAbe is on a Pseudonym-Privacy address.
 // todo: review
+// ctx review done 2025.12.22
 func pqringctxTxoCoinSerialNumberGenByRootSeed(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
 	abeTxo *wire.TxOutAbe, ringId wire.RingId, txoIndexInRing uint8, coinSerialNumberKeyRootSeed []byte) ([]byte, error) {
 	// ringId + index -> ID
@@ -873,18 +942,13 @@ func pqringctxTxoCoinSerialNumberGenByRootSeed(pp *pqringctxapi.PublicParameter,
 	}
 	coinAddressType := txoMLP.CoinAddressType()
 
-	txolid := pqringctxLedgerTxoIdGen(ringId, txoIndexInRing)
+	txolid := pqringctxLedgerTxoIdGen(ringId, txoIndexInRing, abeTxo.Version)
 
 	lgrTxo := pqringctxapi.NewLgrTxo(txoMLP, txolid)
 
 	var coinSerialNumberSecretKey []byte
 	// The cryptoSerialNumberSecretKey could be nil, for example, for Pseudonym-Privacy Txo.
-	if len(coinSerialNumberKeyRootSeed) != 0 {
-		if coinAddressType != pqringctxapi.CoinAddressTypePublicKeyForRing {
-			//	NOTE: only CoinAddressTypePublicKeyForRing address has coinSerialNumberKeyRandSeed
-			return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRootSeed: coinSerialNumberKeyRandSeed is not nil/empty, but the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyForRing", coinAddressType)
-		}
-
+	if coinAddressType == pqringctxapi.CoinAddressTypePublicKeyForRing {
 		//	extract publicRand and generate coinSerialNumberSecretKey
 		//	NOTE: the codes here must be consistent with that in abecryptoxkey/abepqringctxkey.go
 		coinAddress, err := pqringctxapi.GetCoinAddressFromTxo(pp, txoMLP)
@@ -909,12 +973,13 @@ func pqringctxTxoCoinSerialNumberGenByRootSeed(pp *pqringctxapi.PublicParameter,
 			return nil, err
 		}
 
-	} else {
-		if coinAddressType != pqringctxapi.CoinAddressTypePublicKeyHashForSingle {
-			return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRootSeed: coinSerialNumberKeyRandSeed is nil/empty, while the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyHashForSingle", coinAddressType)
-		}
+	} else if coinAddressType == pqringctxapi.CoinAddressTypePublicKeyHashForSingle ||
+		coinAddressType == pqringctxapi.CoinAddressTypePublicKeyHashForSingleCT {
 
 		coinSerialNumberSecretKey = nil
+
+	} else {
+		return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRootSeed: this function is called on the case of coinAddressType (%d)", coinAddressType)
 	}
 
 	//	lgrTxo rather than (txo,txolid) pair is used, since TransferTxGen is called on input Ledger-txos.
@@ -929,6 +994,7 @@ func pqringctxTxoCoinSerialNumberGenByRootSeed(pp *pqringctxapi.PublicParameter,
 // pqringctxTxoCoinSerialNumberGenByRandSeed generates serialNumber for the input LgrTxoMLP, using the input coinSerialNumberKeyRandSeed.
 // NOTE: the input coinSerialNumberKeyRandSeed could be nil, for example, when the input TxOutAbe is on a Pseudonym-Privacy address.
 // todo: review
+// ctx review done 2025.12.22
 func pqringctxTxoCoinSerialNumberGenByRandSeed(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
 	abeTxo *wire.TxOutAbe, ringId wire.RingId, txoIndexInRing uint8, coinSerialNumberKeyRandSeed []byte) ([]byte, error) {
 	// ringId + index -> ID
@@ -948,31 +1014,31 @@ func pqringctxTxoCoinSerialNumberGenByRandSeed(pp *pqringctxapi.PublicParameter,
 	}
 	coinAddressType := txoMLP.CoinAddressType()
 
-	txolid := pqringctxLedgerTxoIdGen(ringId, txoIndexInRing)
+	txolid := pqringctxLedgerTxoIdGen(ringId, txoIndexInRing, abeTxo.Version)
 
 	lgrTxo := pqringctxapi.NewLgrTxo(txoMLP, txolid)
 
 	var coinSerialNumberSecretKey []byte
 	// The cryptoSerialNumberSecretKey could be nil, for example, for Pseudonym-Privacy Txo.
-	if len(coinSerialNumberKeyRandSeed) != 0 {
-		if coinAddressType != pqringctxapi.CoinAddressTypePublicKeyForRing {
-			//	NOTE: only CoinAddressTypePublicKeyForRing address has coinSerialNumberKeyRandSeed
-			return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRandSeed: coinSerialNumberKeyRandSeed is not nil/empty, but the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyForRing", coinAddressType)
-		}
-
+	if coinAddressType == pqringctxapi.CoinAddressTypePublicKeyForRing {
 		//	generate coinSerialNumberSecretKey
 		//	NOTE: the codes here must be consistent with that in abecryptoxkey/abepqringctxkey.go
+		if len(coinSerialNumberKeyRandSeed) == 0 {
+			return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRandSeed: coinAddressType is CoinAddressTypePublicKeyForRing, but coinSerialNumberKeyRandSeed is nil/empty")
+		}
+
 		coinSerialNumberSecretKey, err = pqringctxapi.CoinAddressKeyForPKRingGenSerialNumberKeyPart(pp, coinSerialNumberKeyRandSeed)
 		if err != nil {
 			return nil, err
 		}
 
-	} else {
-		if coinAddressType != pqringctxapi.CoinAddressTypePublicKeyHashForSingle {
-			return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRandSeed: coinSerialNumberKeyRandSeed is nil/empty, while the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyHashForSingle", coinAddressType)
-		}
+	} else if coinAddressType == pqringctxapi.CoinAddressTypePublicKeyHashForSingle ||
+		coinAddressType == pqringctxapi.CoinAddressTypePublicKeyHashForSingleCT {
 
 		coinSerialNumberSecretKey = nil
+
+	} else {
+		return nil, fmt.Errorf("pqringctxTxoCoinSerialNumberGenByRandSeed: this function is called on the case of coinAddressType (%d)", coinAddressType)
 	}
 
 	//	lgrTxo rather than (txo,txolid) pair is used, since TransferTxGen is called on input Ledger-txos.
@@ -987,6 +1053,7 @@ func pqringctxTxoCoinSerialNumberGenByRandSeed(pp *pqringctxapi.PublicParameter,
 // pqringctxTxoCoinSerialNumberGenByKey generates serialNumber for the input LgrTxoMLP, using the input coinSerialNumberSecretKey.
 // NOTE: the input cryptoSerialNumberSecretKey could be nil, for example, when the input TxOutAbe is on a Pseudonym-Privacy address.
 // todo: review
+// ctx review done 2025.12.22
 func pqringctxTxoCoinSerialNumberGenByKey(pp *pqringctxapi.PublicParameter, cryptoScheme abecryptoxparam.CryptoScheme,
 	abeTxo *wire.TxOutAbe, ringId wire.RingId, txoIndexInRing uint8, cryptoSerialNumberSecretKey []byte) ([]byte, error) {
 	// ringId + index -> ID
@@ -1006,37 +1073,47 @@ func pqringctxTxoCoinSerialNumberGenByKey(pp *pqringctxapi.PublicParameter, cryp
 	}
 	coinAddressType := txoMLP.CoinAddressType()
 
-	txolid := pqringctxLedgerTxoIdGen(ringId, txoIndexInRing)
+	txolid := pqringctxLedgerTxoIdGen(ringId, txoIndexInRing, abeTxo.Version)
 
 	lgrTxo := pqringctxapi.NewLgrTxo(txoMLP, txolid)
 
 	var coinSerialNumberSecretKey []byte
 	// The cryptoSerialNumberSecretKey could be nil, for example, for Pseudonym-Privacy Txo.
-	if len(cryptoSerialNumberSecretKey) != 0 {
+	if coinAddressType == pqringctxapi.CoinAddressTypePublicKeyForRingPre {
+		if len(cryptoSerialNumberSecretKey) == 0 {
+			return nil, fmt.Errorf("pqringctTxoCoinSerialNumberGenByKey: coinAddressType is CoinAddressTypePublicKeyForRingPre but cryptoSerialNumberSecretKey is not nil/empty")
+		}
 		var privacyLevel abecryptoxkey.PrivacyLevel
 		privacyLevel, coinSerialNumberSecretKey, err = abecryptoxkey.CryptoSerialNumberSecretKeyParse(cryptoSerialNumberSecretKey)
 		if err != nil {
 			return nil, err
 		}
 
-		if privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre {
-			if coinAddressType != pqringctxapi.CoinAddressTypePublicKeyForRingPre {
-				return nil, fmt.Errorf("pqringctTxoCoinSerialNumberGenByKey: cryptoSerialNumberSecretKey is not nil/empty and the extracted privacyLevel is PrivacyLevelRINGCTPre, but the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyForRingPre", coinAddressType)
-			}
-		} else if privacyLevel == abecryptoxkey.PrivacyLevelRINGCT {
-			if coinAddressType != pqringctxapi.CoinAddressTypePublicKeyForRing {
-				return nil, fmt.Errorf("pqringctTxoCoinSerialNumberGenByKey: cryptoSerialNumberSecretKey is not nil/empty and the extracted privacyLevel is PrivacyLevelRINGCT, but the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyForRing", coinAddressType)
-			}
-		} else {
-			return nil, fmt.Errorf("pqringctTxoCoinSerialNumberGenByKey: cryptoSerialNumberSecretKey is not nil/empty, but the extracted privacyLevel (%d) is not PrivacyLevelRINGCTPre or PrivacyLevelRINGCT", privacyLevel)
+		if privacyLevel != abecryptoxkey.PrivacyLevelRINGCTPre {
+			return nil, fmt.Errorf("pqringctTxoCoinSerialNumberGenByKey: coinAddressType is CoinAddressTypePublicKeyForRingPre but privacyLevel (%d) is not PrivacyLevelRINGCTPre", privacyLevel)
 		}
 
-	} else {
-		if coinAddressType != pqringctxapi.CoinAddressTypePublicKeyHashForSingle {
-			return nil, fmt.Errorf("pqringctTxoCoinSerialNumberGenByKey: cryptoSerialNumberSecretKey is nil/empty, but the txo's coinAddressType (%d) is not CoinAddressTypePublicKeyHashForSingle", coinAddressType)
+	} else if coinAddressType == pqringctxapi.CoinAddressTypePublicKeyForRing {
+		if len(cryptoSerialNumberSecretKey) == 0 {
+			return nil, fmt.Errorf("pqringctTxoCoinSerialNumberGenByKey: coinAddressType is CoinAddressTypePublicKeyForRing but cryptoSerialNumberSecretKey is not nil/empty")
 		}
+		var privacyLevel abecryptoxkey.PrivacyLevel
+		privacyLevel, coinSerialNumberSecretKey, err = abecryptoxkey.CryptoSerialNumberSecretKeyParse(cryptoSerialNumberSecretKey)
+		if err != nil {
+			return nil, err
+		}
+
+		if privacyLevel != abecryptoxkey.PrivacyLevelRINGCT {
+			return nil, fmt.Errorf("pqringctTxoCoinSerialNumberGenByKey: coinAddressType is CoinAddressTypePublicKeyForRing but privacyLevel (%d) is not PrivacyLevelRINGCT", privacyLevel)
+		}
+	} else if coinAddressType == pqringctxapi.CoinAddressTypePublicKeyHashForSingle ||
+		coinAddressType == pqringctxapi.CoinAddressTypePublicKeyHashForSingleCT {
 
 		coinSerialNumberSecretKey = nil
+
+	} else {
+		return nil, fmt.Errorf("pqringctTxoCoinSerialNumberGenByKey: this function is called on the case of coinAddressType (%d)", coinAddressType)
+
 	}
 
 	//	lgrTxo rather than (txo,txolid) pair is used, since TransferTxGen is called on input Ledger-txos.
@@ -1120,3 +1197,89 @@ func pqringctxGetTxWitnessTrTxSerializeSizeByDesc(pp *pqringctxapi.PublicParamet
 }
 
 //	APIs for TxWitnesses	end
+
+// APIs for ruleChecks	begin
+
+// pqringctxRuleCheckOnTxoVersionPrivacyLevel checks the match between Txo's Version and PrivacyLevel.
+//
+// When new TxVersion is added, rules need to be added here.
+// ctx review done 2025.12.22
+func pqringctxRuleCheckOnTxoVersionPrivacyLevel(pp *pqringctxapi.PublicParameter, txoVersion uint32, privacyLevel abecryptoxkey.PrivacyLevel) error {
+	switch txoVersion {
+	case wire.TxVersion_Height_0:
+		// Based on the design that pqringctxXYZ function will be only called by the pqringctx and later packages.
+		return fmt.Errorf("pqringctxRuleCheckOnTxoVersionPrivacyLevel should not be called with txVersion (%d)", txoVersion)
+
+	case wire.TxVersion_Height_MLPAUT_300000:
+		if privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre ||
+			privacyLevel == abecryptoxkey.PrivacyLevelRINGCT ||
+			privacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYM {
+			// allowed cases
+		} else {
+			return fmt.Errorf("pqringctxRuleCheckOnTxoVersionPrivacyLevel: txoVersion is %d, "+
+				"but the PrivacyLevel (%d) is not PrivacyLevelRINGCTPre",
+				txoVersion, privacyLevel)
+		}
+
+	case wire.TxVersion_Height_464000_Aconcagua:
+		if privacyLevel == abecryptoxkey.PrivacyLevelRINGCTPre ||
+			privacyLevel == abecryptoxkey.PrivacyLevelRINGCT ||
+			privacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYM ||
+			privacyLevel == abecryptoxkey.PrivacyLevelPSEUDONYMCT {
+			// allowed cases
+		} else {
+			return fmt.Errorf("pqringctxRuleCheckOnTxoVersionPrivacyLevel: txoVersion is %d, "+
+				"but the PrivacyLevel (%d) is not PrivacyLevelRINGCTPre",
+				txoVersion, privacyLevel)
+		}
+
+	default:
+		return fmt.Errorf("pqringctxRuleCheckOnTxoVersionPrivacyLevel: txoVersion (%d) is not supported",
+			txoVersion)
+	}
+
+	return nil
+}
+
+// pqringctxRuleCheckOnTxInputVersion checks the match between TxInput's Version and Tx's Version.
+//
+// When new TxVersion is added, rules need to be added here.
+// ctx review done 2025.12.22
+func pqringctxRuleCheckOnTxInputVersion(pp *pqringctxapi.PublicParameter, txInputVersion uint32, txVersion uint32) error {
+
+	switch txVersion {
+	case wire.TxVersion_Height_0:
+		// Based on the design that pqringctxXYZ function will be only called by the pqringctx and later packages.
+		return fmt.Errorf("pqringctxRuleCheckOnTxInputVersion should not be called with txVersion (%d)", txVersion)
+
+	case wire.TxVersion_Height_MLPAUT_300000:
+		if txInputVersion == wire.TxVersion_Height_0 ||
+			txInputVersion == wire.TxVersion_Height_MLPAUT_300000 {
+			// allowed cases
+		} else {
+			return fmt.Errorf("pqringctxRuleCheckOnTxInputVersion: (txInputVersion, txVersion) (%d, %d), "+
+				"is not allowed/supported",
+				txInputVersion, txVersion)
+		}
+
+	case wire.TxVersion_Height_464000_Aconcagua:
+		if txInputVersion == wire.TxVersion_Height_0 ||
+			txInputVersion == wire.TxVersion_Height_MLPAUT_300000 ||
+			txInputVersion == wire.TxVersion_Height_464000_Aconcagua {
+			// allowed cases
+		} else {
+			return fmt.Errorf("pqringctxRuleCheckOnTxInputVersion: (txInputVersion, txVersion) (%d, %d), "+
+				"is not allowed/supported",
+				txInputVersion, txVersion)
+		}
+	default:
+		return fmt.Errorf("pqringctxRuleCheckOnTxInputVersion: txVersion (%d) is not supported",
+			txVersion)
+	}
+
+	return nil
+}
+
+// APIs for ruleChecks	end
+
+// ctx review done 2025.12.22

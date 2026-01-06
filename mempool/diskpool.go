@@ -75,7 +75,12 @@ func (mp *TxPool) txMonitor() {
 					if err != nil {
 						break
 					}
-					tx := abeutil.NewTxAbe(msgTx)
+					tx, err := abeutil.NewTxAbe(msgTx, nil)
+					if err != nil {
+						log.Errorf("error happens when calling abeutil.NewTxAbe on MsgTx (%v): %v", msgTx.TxHash(), err)
+						break
+					}
+
 					log.Infof("loading transaction %s from file %s", msgTx.TxHash(), name)
 					_, err = mp.ProcessTransactionAbe(tx, false, false, 0, true)
 					if err != nil {

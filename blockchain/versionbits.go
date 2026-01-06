@@ -24,7 +24,7 @@ const (
 	//	Note that hard-forks will be not so many.
 	//	If necessary, we may use versions such as 0x31000000, ... 0x3F000000.
 	// All historical versions should be listed here.
-	BlockVersionInitial = 0x10000000
+	// BlockVersionInitial = 0x10000000
 	//	wire.BlockVersionEthashPow = 0x20000000
 
 	// todo(DSA): review
@@ -233,6 +233,10 @@ func (b *BlockChain) calcNextBlockVersion(prevNode *blockNode) (int32, error) {
 	//}
 
 	if prevNode != nil {
+		if prevNode.height+1 >= b.chainParams.BlockHeightAconcagua {
+			return int32(wire.BlockVersionAconcagua), nil
+		}
+
 		if prevNode.height+1 >= b.chainParams.BlockHeightMLPAUT {
 			return int32(wire.BlockVersionMLPAUT), nil
 		}
@@ -248,7 +252,7 @@ func (b *BlockChain) calcNextBlockVersion(prevNode *blockNode) (int32, error) {
 		}
 	}
 
-	return int32(BlockVersionInitial), nil
+	return int32(wire.BlockVersionInitial), nil
 
 	// todo: modify according to the AIP mechanism.
 	//expectedVersion := uint32(vbTopBits)

@@ -170,6 +170,7 @@ func BuildTxoRingsMLP(blockNumPerRingGroup int, txoRingSize int, blocks []*abeut
 			//	(4) outIndex
 			txoSortStr[(blockNumPerRingGroup+2)*chainhash.HashSize] = uint8(outIndex)
 
+			// todo: To be backward compatible, here still uses DoubleHashH, even after Aconcagua upgrade. will have a new BuildRing function for Aconcagua.
 			txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
 			ringMemberTxo := NewRingMemberTxo(txOut.Version, &txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
@@ -225,6 +226,7 @@ func BuildTxoRingsMLP(blockNumPerRingGroup int, txoRingSize int, blocks []*abeut
 				//	(4) outIndex
 				txoSortStr[(blockNumPerRingGroup+2)*chainhash.HashSize] = uint8(outIndex)
 
+				// todo: To be backward compatible, here still uses DoubleHashH, even after Aconcagua upgrade. will have a new BuildRing function for Aconcagua.
 				txoOrderHash := chainhash.DoubleHashH(txoSortStr)
 
 				ringMemberTxo := NewRingMemberTxo(txOut.Version, &txoOrderHash, blockHash, blockHeight, txHash, uint8(outIndex), txOut)
@@ -395,6 +397,7 @@ func BuildTxoRingsMLP(blockNumPerRingGroup int, txoRingSize int, blocks []*abeut
 
 // InitNewUtxoRingEntryMLP initializes a new UtxoRingEntry from the input wire.TxoRing.
 // reviewed on 2024.01.04
+// aut review done 2025.12.16
 func InitNewUtxoRingEntryMLP(txoRing *wire.TxoRing) *UtxoRingEntry {
 	utxoRingEntry := &UtxoRingEntry{
 		Version:             txoRing.Version,
@@ -415,6 +418,7 @@ func InitNewUtxoRingEntryMLP(txoRing *wire.TxoRing) *UtxoRingEntry {
 // buildTxoRingsFromTxosForSingle builds rings with ringSize = 1 from the input ringMemberTxos,
 // i.e., each ringMemberTxo will form a ring.
 // reviewed on 2024.01.04
+// aut review 2025.12.16
 func buildTxoRingsFromTxosForSingle(ringMemberTxos []*RingMemberTxo, ringBlockHeight int32, blockHashes []*chainhash.Hash, isCoinBase bool) (txoRings []*wire.TxoRing, err error) {
 
 	if len(ringMemberTxos) == 0 {

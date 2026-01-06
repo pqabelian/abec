@@ -16,8 +16,9 @@ type MsgPrunedBlock struct {
 
 func (msg *MsgPrunedBlock) AddTransactionHash(tx *MsgTxAbe) error {
 	msg.TransactionHashes = append(msg.TransactionHashes, tx.TxHash())
-	witHash := chainhash.DoubleHashH(tx.TxWitness)
-	msg.WitnessHashs = append(msg.WitnessHashs, witHash)
+	//witHash := chainhash.DoubleHashH(tx.TxWitness)
+	witHash := tx.TxWitnessHash()
+	msg.WitnessHashs = append(msg.WitnessHashs, *witHash)
 	return nil
 }
 
@@ -32,10 +33,11 @@ func (msg *MsgPrunedBlock) ClearTransactions() {
 // opposed to decoding blocks from the wire.
 
 func (msg *MsgPrunedBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
-	err := readBlockHeader(r, pver, &msg.Header)
+	err := msg.Header.ReadBlockHeader(r, pver)
 	if err != nil {
 		return err
 	}
+
 	// TODO: There are something problem becasuse the transaction version would be updated in the future
 	// Use TxVersion_Unknown temporary, this would be immediately set after Deserialize
 	msg.CoinbaseTx = NewMsgTxAbe(TxVersion_Unknown)
@@ -93,7 +95,7 @@ func (msg *MsgPrunedBlock) Deserialize(r io.Reader) error {
 }
 
 func (msg *MsgPrunedBlock) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
-	err := writeBlockHeader(w, pver, &msg.Header)
+	err := msg.Header.WriteBlockHeader(w, pver)
 	if err != nil {
 		return err
 	}
@@ -133,11 +135,13 @@ func (msg *MsgPrunedBlock) SerializeSize() int {
 	// transactions.
 	// todo: (EthashPow)
 	// n := blockHeaderLen + msg.CoinbaseTx.SerializeSizeFull() + VarIntSerializeSize(uint64(len(msg.TransactionHashes))) + len(msg.TransactionHashes)*32 + len(msg.WitnessHashs)*32
-	n := blockHeaderLen
-	// todo(MLP):
-	if msg.Header.Version >= int32(BlockVersionEthashPow) {
-		n = blockHeaderLenEthash
-	}
+	//n := blockHeaderLen
+	//// todo(MLP):
+	//if msg.Header.Version >= int32(BlockVersionEthashPow) {
+	//	n = blockHeaderLenEthash
+	//}
+	n := msg.Header.SerializeSize()
+
 	n += msg.CoinbaseTx.SerializeSizeFull() + VarIntSerializeSize(uint64(len(msg.TransactionHashes))) + len(msg.TransactionHashes)*32 + len(msg.WitnessHashs)*32
 
 	return n

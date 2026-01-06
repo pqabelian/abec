@@ -7,6 +7,7 @@ package blockchain
 import (
 	"fmt"
 	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/blockchain/ruleerror"
 	"github.com/pqabelian/abec/txscript"
 	"github.com/pqabelian/abec/wire"
 )
@@ -129,7 +130,7 @@ func GetSigOpCost(tx *abeutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint, bi
 					"exist or has already been spent",
 					txIn.PreviousOutPoint, tx.Hash(),
 					txInIndex)
-				return 0, ruleError(ErrMissingTxOut, str)
+				return 0, ruleerror.NewRuleError(ruleerror.ErrMissingTxOut, str)
 			}
 
 			witness := txIn.Witness

@@ -2,10 +2,11 @@ package main
 
 import (
 	"errors"
-	"github.com/pqabelian/abec/abejson"
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/pqabelian/abec/abejson"
 )
 
 // helpDescsEnUS defines the English descriptions used for the help strings.
@@ -740,6 +741,8 @@ var rpcResultTypes = map[string][]interface{}{
 	"stopnotifyspent":           nil,
 	"rescan":                    nil,
 	"rescanblocks":              {(*[]abejson.RescannedBlock)(nil)},
+
+	"getautmetadata": {(*string)(nil), (*abejson.GetAutMetadataResult)(nil)},
 }
 
 // helpCacher provides a concurrent safe type that provides help and usage for

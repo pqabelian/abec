@@ -2,20 +2,24 @@ package syncmgr
 
 import (
 	"container/list"
-	"github.com/pqabelian/abec/abeutil"
-	"github.com/pqabelian/abec/blockchain"
-	"github.com/pqabelian/abec/chaincfg"
-	"github.com/pqabelian/abec/chainhash"
-	"github.com/pqabelian/abec/consensus/ethash"
-	"github.com/pqabelian/abec/database"
-	"github.com/pqabelian/abec/mempool"
-	peerpkg "github.com/pqabelian/abec/peer"
-	"github.com/pqabelian/abec/wire"
 	"math/rand"
 	"net"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/pqabelian/abec/blockchain/consensus"
+	"github.com/pqabelian/abec/blockchain/ruleerror"
+	ctautapi "github.com/pqabelian/abec/ctaut/api"
+
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/blockchain"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/database"
+	"github.com/pqabelian/abec/mempool"
+	peerpkg "github.com/pqabelian/abec/peer"
+	"github.com/pqabelian/abec/wire"
 )
 
 const (
@@ -206,7 +210,7 @@ type SyncManager struct {
 	started        int32
 	shutdown       int32
 	chain          *blockchain.BlockChain
-	ethash         *ethash.Ethash // todo: (ethmining)
+	powConsensus   *consensus.PowConsensus
 	txMemPool      *mempool.TxPool
 	chainParams    *chaincfg.Params
 	progressLogger *blockProgressLogger
@@ -1020,7 +1024,7 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 			}
 
 			for _, scope := range fakePoWHeightScopes {
-				if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
+				if scope.StartHeight <= blockHeight && blockHeight < scope.EndHeight {
 					behaviorFlags |= blockchain.BFNoPoWCheck
 					break
 				}
@@ -1054,13 +1058,13 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 	// handling, etc.
 	//	todo (EthashPoW): 202207
 	// todo_DONE(MLP): reviewed on 2024.01.05
-	_, isOrphan, err := sm.chain.ProcessBlockAbe(bmsg.block, sm.ethash, behaviorFlags)
+	_, isOrphan, err := sm.chain.ProcessBlockAbe(bmsg.block, sm.powConsensus, behaviorFlags)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
 		// it as such.  Otherwise, something really did go wrong, so log
 		// it as an actual error.
-		if _, ok := err.(blockchain.RuleError); ok {
+		if _, ok := err.(ruleerror.RuleError); ok {
 			log.Infof("Rejected block %v from %s: %v", blockHash,
 				peer, err)
 		} else {
@@ -1282,7 +1286,7 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 			}
 
 			for _, scope := range fakePoWHeightScopes {
-				if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
+				if scope.StartHeight <= blockHeight && blockHeight < scope.EndHeight {
 					behaviorFlags |= blockchain.BFNoPoWCheck
 					break
 				}
@@ -1302,8 +1306,12 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	msgBlockAbe.Transactions = make([]*wire.MsgTxAbe, 1, len(bmsg.block.MsgPrunedBlock().TransactionHashes)+1)
 	msgBlockAbe.WitnessHashs = make([]*chainhash.Hash, 1, len(bmsg.block.MsgPrunedBlock().WitnessHashs)+1)
 	msgBlockAbe.Transactions[0] = bmsg.block.MsgPrunedBlock().CoinbaseTx
-	witHash := chainhash.DoubleHashH(bmsg.block.MsgPrunedBlock().CoinbaseTx.TxWitness)
-	msgBlockAbe.WitnessHashs[0] = &witHash
+	// For Aconcagua upgrade, witnessHash should call the unified TxWitnessHash()
+	//witHash := chainhash.DoubleHashH(bmsg.block.MsgPrunedBlock().CoinbaseTx.TxWitness)
+	//msgBlockAbe.WitnessHashs[0] = &witHash
+	witHash := bmsg.block.MsgPrunedBlock().CoinbaseTx.TxWitnessHash()
+	msgBlockAbe.WitnessHashs[0] = witHash
+
 	needSet := make([]chainhash.Hash, 0, len(bmsg.block.MsgPrunedBlock().TransactionHashes))
 	txmap := make(map[chainhash.Hash]*wire.MsgTxAbe)
 	// try to restore the block with the help of local transaction pool
@@ -1351,20 +1359,28 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 			return
 		}
 		msgBlockAbe.Transactions = append(msgBlockAbe.Transactions, tx)
-		witnessHash := chainhash.DoubleHashH(tx.TxWitness)
-		msgBlockAbe.WitnessHashs = append(msgBlockAbe.WitnessHashs, &witnessHash)
+		// witnessHash := chainhash.DoubleHashH(tx.TxWitness)
+		// msgBlockAbe.WitnessHashs = append(msgBlockAbe.WitnessHashs, &witnessHash)
+		// For Aconcagua upgrade, witnessHash should call the unified TxWitnessHash()
+		witnessHash := tx.TxWitnessHash()
+		msgBlockAbe.WitnessHashs = append(msgBlockAbe.WitnessHashs, witnessHash)
 	}
 
-	block := abeutil.NewBlockAbe(&msgBlockAbe)
+	block, err := abeutil.NewBlockAbe(&msgBlockAbe)
+	if err != nil {
+		log.Errorf("error happens when calling NewBlockAbe on a msgBlock (hash=%s): %v",
+			consensus.SealHashFast(&msgBlockAbe.Header), err)
+	}
+
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
-	_, isOrphan, err := sm.chain.ProcessBlockAbe(block, sm.ethash, behaviorFlags)
+	_, isOrphan, err := sm.chain.ProcessBlockAbe(block, sm.powConsensus, behaviorFlags)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
 		// it as such.  Otherwise, something really did go wrong, so log
 		// it as an actual error.
-		if _, ok := err.(blockchain.RuleError); ok {
+		if _, ok := err.(ruleerror.RuleError); ok {
 			log.Infof("Rejected block %v from %s: %v", blockHash,
 				peer, err)
 		} else {
@@ -2076,7 +2092,7 @@ out:
 
 			case processBlockMsgAbe:
 				//	todo (EthashPoW): 202207
-				_, isOrphan, err := sm.chain.ProcessBlockAbe(msg.block, sm.ethash, msg.flags)
+				_, isOrphan, err := sm.chain.ProcessBlockAbe(msg.block, sm.powConsensus, msg.flags)
 				if err != nil {
 					msg.reply <- processBlockResponse{
 						isOrphan: false,
@@ -2157,17 +2173,26 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 		// transaction are NOT removed recursively because they are still
 		// valid.
 		//	todo(ABE): mempool will not contain the transactions that double-spend those in mainchain.
+		affectedAutIdentifiers := make(map[ctautapi.AutId]struct{})
 		for _, tx := range block.Transactions()[1:] {
 			sm.txMemPool.RemoveTransactionAbe(tx)    // remove this transaction from the mempool
 			sm.txMemPool.RemoveDoubleSpendsAbe(tx)   // remove the transactions that spend the same outpoint
 			sm.txMemPool.RemoveOrphanAbe(tx)         // remove this transaction from the orphan pool
 			sm.peerNotifier.TransactionConfirmed(tx) // the transaction is confirmed
 			sm.txMemPool.ProcessOrphansAbe(tx)       //	remove the orphans that double-spend the txIns of tx
+
+			extAutScript := tx.ExtAutScript()
+			if extAutScript != nil {
+				identifier := extAutScript.AutIdentifier()
+				affectedAutIdentifiers[identifier] = struct{}{}
+			}
+
 			//sm.peerNotifier.AnnounceNewTransactions(acceptedTxs)
 			//todo(ABE): for ABE, sm does not need to sm.peerNotifier.AnnounceNewTransactions(acceptedTx),
 			// as tx is propagated with blocks, and may be announced when verify the block.
 		}
-		sm.txMemPool.RemoveExpiredAUTTransaction(block.Height())
+
+		sm.txMemPool.ReValidateAutTransactions(affectedAutIdentifiers)
 
 		// Register block with the fee estimator, if it exists.
 		if sm.feeEstimator != nil {
@@ -2182,9 +2207,7 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 					mempool.DefaultEstimateFeeMinRegisteredBlocks)
 			}
 		}
-		if sm.chainParams.BlockHeightMLPAUTCOMMIT <= block.Height() && block.Height() < sm.chainParams.BlockHeightMLPAUTCOMMIT+10 {
-			sm.txMemPool.ClearOutdatedTransaction()
-		}
+		sm.txMemPool.ClearOutdatedTransaction(block.Height() + 1)
 
 	// A block has been disconnected from the main block chain.
 	case blockchain.NTBlockDisconnected:
@@ -2430,13 +2453,13 @@ func (sm *SyncManager) Pause() chan<- struct{} {
 
 // New constructs a new SyncManager. Use Start to begin processing asynchronous
 // block, tx, and inv updates.
-func New(config *Config) (*SyncManager, error) {
+func NewSyncManager(config *Config) (*SyncManager, error) {
 	sm := SyncManager{
 		nodeType:        config.NodeType,
 		peerNotifier:    config.PeerNotifier,
 		chain:           config.Chain,
 		txMemPool:       config.TxMemPool,
-		ethash:          config.Ethash, // todo: (EthashPoW)
+		powConsensus:    config.PowConsensus,
 		chainParams:     config.ChainParams,
 		rejectedTxns:    make(map[chainhash.Hash]struct{}),
 		requestedTxns:   make(map[chainhash.Hash]struct{}),

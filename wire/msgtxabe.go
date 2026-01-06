@@ -6,11 +6,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
+	"strconv"
+
 	"github.com/pqabelian/abec/abecrypto/abecryptoparam"
 	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
 	"github.com/pqabelian/abec/chainhash"
-	"io"
-	"strconv"
 )
 
 // borrow something from msgtx.go
@@ -56,6 +57,33 @@ type OutPointAbe struct {
 	// For safety, we do not cache outPointId. 2023.12.08
 }
 
+func (outPoint *OutPointAbe) Clone() *OutPointAbe {
+	if outPoint == nil {
+		return nil
+	}
+
+	newOutPoint := &OutPointAbe{}
+
+	copy(newOutPoint.TxHash[:], outPoint.TxHash[:])
+	newOutPoint.Index = outPoint.Index
+
+	return newOutPoint
+}
+
+func (outPoint *OutPointAbe) IsEqual(obj *OutPointAbe) bool {
+	if outPoint == nil {
+		return false
+	}
+	if obj == nil {
+		return false
+	}
+
+	if outPoint.TxHash.IsEqual(&obj.TxHash) && outPoint.Index == obj.Index {
+		return true
+	}
+	return false
+}
+
 func (outPoint *OutPointAbe) OutPointId() OutPointId {
 	// For safety, we do not cache outPointId. 2023.12.08
 	//if outPoint.outPointId == nil {
@@ -78,7 +106,7 @@ func (outPoint *OutPointAbe) OutPointId() OutPointId {
 }
 
 // String returns the OutPoint in the human-readable form "hash:index".
-func (op OutPointAbe) String() string {
+func (outPoint *OutPointAbe) String() string {
 	// Allocate enough for hash string, colon, and 10 digits.  Although
 	// at the time of writing, the number of digits can be no greater than
 	// the length of the decimal representation of maxTxOutPerMessage, the
@@ -86,9 +114,9 @@ func (op OutPointAbe) String() string {
 	// optimization may go unnoticed, so allocate space for 10 decimal
 	// digits, which will fit any uint32.
 	buf := make([]byte, 2*chainhash.HashSize+1, 2*chainhash.HashSize+1+10)
-	copy(buf, op.TxHash.String())
+	copy(buf, outPoint.TxHash.String())
 	buf[2*chainhash.HashSize] = ':'
-	buf = strconv.AppendUint(buf, uint64(op.Index), 10)
+	buf = strconv.AppendUint(buf, uint64(outPoint.Index), 10)
 	return string(buf)
 }
 
@@ -181,6 +209,13 @@ func (outPointRing *OutPointRing) String() string {
 func (outPointRing *OutPointRing) Hash() chainhash.Hash {
 	buf := bytes.NewBuffer(make([]byte, 0, outPointRing.SerializeSize()))
 	_ = WriteOutPointRing(buf, 0, outPointRing.Version, outPointRing)
+
+	// todo: In Aconcagua upgrade, use SHA3-256 with compatibility
+	// todo: review
+	if outPointRing.Version >= TxVersion_Height_464000_Aconcagua {
+		return chainhash.ChainHash(buf.Bytes())
+	}
+
 	return chainhash.DoubleHashH(buf.Bytes())
 }
 
@@ -242,7 +277,7 @@ func WriteOutPointRing(w io.Writer, pver uint32, version uint32, opr *OutPointRi
 	return nil
 }
 func ReadOutPointRing(r io.Reader, pver uint32, version uint32, opr *OutPointRing) error {
-	err := readElement(r, &opr.Version)
+	err := readElement(r, &opr.Version) // todo: not symmetric with the write 2025.12.16
 	if err != nil {
 		return err
 	}
@@ -295,6 +330,18 @@ func ReadOutPointRing(r io.Reader, pver uint32, version uint32, opr *OutPointRin
 	}
 
 	return nil
+}
+
+func (outPoint *OutPointAbe) SerializeSize() int {
+	return chainhash.HashSize + 1
+}
+
+func WriteOutPointAbe(w io.Writer, pver uint32, version uint32, op *OutPointAbe) error {
+	return writeOutPointAbe(w, pver, version, op)
+}
+
+func ReadOutPointAbe(r io.Reader, pver uint32, version uint32, op *OutPointAbe) error {
+	return readOutPointAbe(r, pver, version, op)
 }
 
 func writeOutPointAbe(w io.Writer, pver uint32, version uint32, op *OutPointAbe) error {
@@ -497,6 +544,12 @@ func NewTxInAbe(serialNumber []byte, previousOutPointRing *OutPointRing) *TxInAb
 func (txIn *TxInAbe) RingMemberHash() chainhash.Hash {
 	buf := bytes.NewBuffer(make([]byte, 0, txIn.PreviousOutPointRing.SerializeSize()))
 	_ = WriteOutPointRing(buf, 0, txIn.PreviousOutPointRing.Version, &txIn.PreviousOutPointRing)
+
+	// todo: is not used and will be removed
+	if txIn.PreviousOutPointRing.Version >= TxVersion_Height_464000_Aconcagua {
+		return chainhash.ChainHash(buf.Bytes())
+	}
+
 	return chainhash.DoubleHashH(buf.Bytes())
 }
 
@@ -542,8 +595,14 @@ type MsgTxAbe struct {
 	//	At most 1024 bytes
 	TxMemo []byte
 
+	// We clarify the concept of "Witness of Tx" here that it includes TxWitness and AutWitness
+	// Hash(AutWitness) are contained in TxMemo, so that TxWitness actually sealed TxBaseContent and AutWitness.
+
 	//TxWitness *TxWitnessAbe // Each Tx has one witness, consisting all necessary information, for example, signatures for inputs, range proofs for outputs, balance between inputs and outputs
 	TxWitness []byte
+
+	// AutWitness
+	AutWitness []byte
 }
 
 // AddTxIn adds a transaction input to the message.
@@ -556,10 +615,19 @@ func (msg *MsgTxAbe) AddTxOut(txOut *TxOutAbe) {
 	msg.TxOuts = append(msg.TxOuts, txOut)
 }
 
-// HasWitness returns false if none of the inputs within the transaction
+// HasTxWitness returns false if none of the inputs within the transaction
 // contain witness data, true false otherwise.
-func (msg *MsgTxAbe) HasWitness() bool {
+func (msg *MsgTxAbe) HasTxWitness() bool {
 	if msg.TxWitness == nil || len(msg.TxWitness) == 0 {
+		return false
+	}
+	return true
+}
+
+// HasAutWitness
+// review done 2025.12.15
+func (msg *MsgTxAbe) HasAutWitness() bool {
+	if len(msg.AutWitness) == 0 {
 		return false
 	}
 	return true
@@ -579,6 +647,12 @@ func (msg *MsgTxAbe) TxHash() chainhash.Hash {
 	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSize()))
 	_ = msg.Serialize(buf)
 
+	// In Aconcagua fork, use SHA3-256 with backward compatibility
+	// todo: review
+	if msg.Version >= TxVersion_Height_464000_Aconcagua {
+		return chainhash.ChainHash(buf.Bytes())
+	}
+
 	// todo: (ethhash mining) Shall we use new Hash function
 	//	need to check what is the functionality of TxHash: OutPoint, outpoint is formalized in ring
 	//  TxHash is computed based what block it is contained in?
@@ -589,6 +663,12 @@ func (msg *MsgTxAbe) TxHash() chainhash.Hash {
 func (msg *MsgTxAbe) TxHashFull() chainhash.Hash {
 	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSizeFull()))
 	_ = msg.SerializeFull(buf)
+
+	// In Aconcagua fork, use SHA3-256 with backward compatibility
+	// todo: review
+	if msg.Version >= TxVersion_Height_464000_Aconcagua {
+		return chainhash.ChainHash(buf.Bytes())
+	}
 
 	// todo: (ethhash mining) Shall we use new Hash function
 	return chainhash.DoubleHashH(buf.Bytes())
@@ -604,6 +684,13 @@ func (msg *MsgTxAbe) TxWitnessHash() *chainhash.Hash {
 	// cause a run-time panic.
 	if msg.TxWitness == nil {
 		return nil
+	}
+
+	// In Aconcagua fork, use SHA3-256 with backward compatibility
+	// todo: review
+	if msg.Version >= TxVersion_Height_464000_Aconcagua {
+		witnessHash := chainhash.ChainHash(msg.TxWitness)
+		return &witnessHash
 	}
 
 	witnessHash := chainhash.DoubleHashH(msg.TxWitness)
@@ -705,9 +792,17 @@ func (msg *MsgTxAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 		// txWitness, err := ReadVarBytes(r, pver, uint32(abepqringctparam.GetTxWitnessMaxLen(msg.Version)), "TxWitness")
 		txWitness, err := ReadVarBytes(r, pver, abecryptoxparam.MaxAllowedTxWitnessSize, "TxWitness")
 		if err != nil {
-			msg.TxWitness = nil
+			return err
 		}
 		msg.TxWitness = txWitness
+
+		if msg.Version >= TxVersion_Height_464000_Aconcagua {
+			autWitness, err := ReadVarBytes(r, pver, abecryptoxparam.MaxAllowedAutWitnessSize, "AutWitness")
+			if err != nil {
+				return err
+			}
+			msg.AutWitness = autWitness
+		}
 	}
 
 	return nil
@@ -762,10 +857,17 @@ func (msg *MsgTxAbe) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) er
 		return err
 	}
 
-	if enc == WitnessEncoding && msg.HasWitness() {
+	if enc == WitnessEncoding {
 		err = WriteVarBytes(w, 0, msg.TxWitness)
 		if err != nil {
 			return err
+		}
+
+		if msg.Version >= TxVersion_Height_464000_Aconcagua {
+			err = WriteVarBytes(w, 0, msg.AutWitness)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -820,6 +922,10 @@ func (msg *MsgTxAbe) SerializeSizeFull() int {
 
 	n = n + VarIntSerializeSize(uint64(len(msg.TxWitness))) + len(msg.TxWitness)
 
+	if msg.Version >= TxVersion_Height_464000_Aconcagua {
+		n = n + VarIntSerializeSize(uint64(len(msg.AutWitness))) + len(msg.AutWitness)
+	}
+
 	return n
 }
 
@@ -865,11 +971,11 @@ func PrecomputeTrTxConSizeMLP(txVersion uint32, inputRingVersions []uint32,
 	// 	serialized varInt size for output number
 	n = n + 1 // 1 byte for the output Txo Number
 	for i := 0; i < len(coinAddressListPayTo); i++ {
-		txoScriptLen, err := abecryptoxparam.GetTxoSerializeSizeApprox(txVersion, coinAddressListPayTo[i]) // depending on the crypto-scheme, and the TxVersion
+		txoScriptLen, err := abecryptoxparam.GetTxoScriptSizeApprox(txVersion, coinAddressListPayTo[i]) // depending on the crypto-scheme, and the TxVersion
 		if err != nil {
 			return 0, err
 		}
-		n = n + uint32(4+VarIntSerializeSize(uint64(txoScriptLen))) + uint32(txoScriptLen)
+		n = n + 4 + uint32(VarIntSerializeSize(uint64(txoScriptLen))) + uint32(txoScriptLen)
 	}
 
 	/*	for _, txOut := range msg.TxOuts {
@@ -910,12 +1016,12 @@ func PrecomputeTrTxConSize(txVersion uint32, inputRingVersions []uint32, inputRi
 	}*/
 
 	// 	serialized varint size for output number
-	n = n + 1                                                                // 1 byte for the output Txo Number
-	txoScriptLen, err := abecryptoparam.GetTxoSerializeSizeApprox(txVersion) // depending on the crypto-scheme, and the TxVersion
+	n = n + 1                                                             // 1 byte for the output Txo Number
+	txoScriptLen, err := abecryptoparam.GetTxoScriptSizeApprox(txVersion) // depending on the crypto-scheme, and the TxVersion
 	if err != nil {
 		return 0, err
 	}
-	n = n + uint32(outputTxoNum)*(uint32(4+VarIntSerializeSize(uint64(txoScriptLen)))+uint32(txoScriptLen))
+	n = n + uint32(outputTxoNum)*(4+uint32(VarIntSerializeSize(uint64(txoScriptLen)))+uint32(txoScriptLen))
 	/*	for _, txOut := range msg.TxOuts {
 		n = n + txOut.SerializeSize()
 	}*/

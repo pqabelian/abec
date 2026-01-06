@@ -741,16 +741,16 @@ func (s *blockStore) writeWitness(rawWitness [][]byte) (witnessLocation, error) 
 	}
 	_, _ = hasher.Write(scratch[:])
 
-	// witness length.
+	// witness data total length.
 	byteOrder.PutUint32(scratch[:], witnessLen)
-	if err := s.writeDataWitness(scratch[:], "block length"); err != nil {
+	if err := s.writeDataWitness(scratch[:], "witness data total length"); err != nil {
 		return witnessLocation{}, err
 	}
 	_, _ = hasher.Write(scratch[:])
 
 	// witness num
 	byteOrder.PutUint32(scratch[:], uint32(len(rawWitness)))
-	if err := s.writeDataWitness(scratch[:], "block length"); err != nil {
+	if err := s.writeDataWitness(scratch[:], "witness number"); err != nil {
 		return witnessLocation{}, err
 	}
 	_, _ = hasher.Write(scratch[:])
@@ -759,7 +759,7 @@ func (s *blockStore) writeWitness(rawWitness [][]byte) (witnessLocation, error) 
 	for i := 0; i < len(rawWitness); i++ {
 		// length
 		byteOrder.PutUint32(scratch[:], uint32(len(rawWitness[i])))
-		if err := s.writeDataWitness(scratch[:], "block length"); err != nil {
+		if err := s.writeDataWitness(scratch[:], "witness length"); err != nil {
 			return witnessLocation{}, err
 		}
 		_, _ = hasher.Write(scratch[:])
@@ -948,6 +948,8 @@ func (s *blockStore) readBlockRegion(loc blockLocation, offset, numBytes uint32)
 	return serializedData, nil
 }
 
+// todo: this function needs codes for ctaut.
+// todo: all caller of this function needs codes for ctaut.
 func (s *blockStore) readWitnessRegion(loc witnessLocation, offset, numBytes uint32) ([]byte, error) {
 	// Get the referenced block file handle opening the file as needed.  The
 	// function also handles closing files as needed to avoid going over the
@@ -959,7 +961,7 @@ func (s *blockStore) readWitnessRegion(loc witnessLocation, offset, numBytes uin
 
 	// Regions are offsets into the actual block, however the serialized
 	// data for a block includes an initial 4 bytes for network + 4 bytes
-	// for block length.  Thus, add 8 bytes to adjust.
+	// for witness total length.  Thus, add 8 bytes to adjust.
 	readOffset := loc.fileOffset + 8 + offset
 	serializedData := make([]byte, numBytes)
 	_, err = witnessFile.file.ReadAt(serializedData, int64(readOffset))
@@ -1122,6 +1124,7 @@ func (s *blockStore) handleRollback(oldBlockFileNum, oldBlockOffset uint32) {
 	}
 }
 
+// todo: review this function for ctaut
 func (s *blockStore) handleRollbackForWitness(oldWitnessFileNum, oldWitnessOffset uint32) {
 	// Grab the write cursor mutex since it is modified throughout this
 	// function.

@@ -3,15 +3,17 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
+	"log"
+	"os"
+	"time"
+
 	"github.com/pqabelian/abec/abecrypto"
 	"github.com/pqabelian/abec/abecrypto/abecryptoparam"
 	"github.com/pqabelian/abec/abeutil"
 	"github.com/pqabelian/abec/blockchain"
+	"github.com/pqabelian/abec/blockchain/consensus/nakamotopowinit"
 	"github.com/pqabelian/abec/chainhash"
 	"github.com/pqabelian/abec/wire"
-	"log"
-	"os"
-	"time"
 )
 
 func main() {
@@ -66,7 +68,7 @@ func gensis() {
 	for i := 0; i < len(txOutDescs); i++ {
 		txOutDescs[i] = abecrypto.NewAbeTxOutDesc(retSerializedCryptoAddress, 205_799_813_685_247)
 	}
-	txVersion := wire.TxVersion
+	txVersion := wire.TxVersion_Height_0
 	nullSerialNumer, _ := abecryptoparam.GetNullSerialNumber(txVersion)
 	cbTxTemplate := &wire.MsgTxAbe{
 		Version: txVersion,
@@ -123,7 +125,11 @@ func gensis() {
 	}
 	fmt.Fprintln(f)
 	blockTxns := make([]*abeutil.TxAbe, 1)
-	coinbaseTx := abeutil.NewTxAbe(genesisCoinbaseTx)
+	coinbaseTx, err := abeutil.NewTxAbe(genesisCoinbaseTx, nil)
+	if err != nil {
+		panic(fmt.Errorf("error happens when calling abeutil.NewTxAbe on MsgTx (%v): %v", genesisCoinbaseTx.TxHash(), err))
+	}
+
 	blockTxns[0] = coinbaseTx
 	genesisMerkleRoot := blockchain.BuildMerkleTreeStoreAbe(blockTxns, false)
 
@@ -136,7 +142,8 @@ func gensis() {
 	fmt.Fprintln(f, "Time:")
 	fmt.Fprintf(f, "%#x\n", currentTime.Unix())
 	fmt.Fprintln(f)
-	genesisWitnessHash := chainhash.DoubleHashH(genesisCoinbaseTx.TxWitness)
+	// genesisWitnessHash := chainhash.DoubleHashH(genesisCoinbaseTx.TxWitness)
+	genesisWitnessHash := genesisCoinbaseTx.TxWitnessHash()
 	fmt.Fprintln(f, "coinbase witness hash")
 	for i := 0; i < len(genesisWitnessHash); i++ {
 		fmt.Fprintf(f, "%#2x, ", genesisWitnessHash[i])
@@ -152,17 +159,20 @@ func gensis() {
 			Nonce:      0,
 		},
 		Transactions: []*wire.MsgTxAbe{genesisCoinbaseTx},
-		WitnessHashs: []*chainhash.Hash{&genesisWitnessHash},
+		WitnessHashs: []*chainhash.Hash{genesisWitnessHash},
 	}
+	nakamotoPowInit := nakamotopowinit.NewNakamotoPowInit()
 	now := time.Now()
 	for i := uint32(0); i <= ^uint32(0); i++ {
 		genesisBlock.Header.Nonce = i
 		if i%10000000 == 0 {
 			fmt.Fprintf(f, "current i = %d\n", i)
 		}
-		hash := genesisBlock.Header.BlockHash()
+		// hash := genesisBlock.Header.BlockHash()
 		targetDifficulty := blockchain.CompactToBig(genesisBlock.Header.Bits)
-		if blockchain.HashToBig(&hash).Cmp(targetDifficulty) <= 0 {
+		//if blockchain.HashToBig(&hash).Cmp(targetDifficulty) <= 0 {
+		if nakamotoPowInit.VerifySeal(&genesisBlock.Header, targetDifficulty) == nil {
+			hash := genesisBlock.Header.BlockHash()
 			fmt.Fprintln(f, "Successful!")
 			fmt.Fprintln(f, "genesis block hash:")
 			for i := 0; i < len(hash); i++ {
