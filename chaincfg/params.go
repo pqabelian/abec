@@ -260,6 +260,7 @@ type Params struct {
 
 	// BlockHeightAconcagua specifies the block height from which Aconcagua fork starts.
 	BlockHeightAconcagua int32
+	BlockHashAconcagua   string
 	// BlockHeightAconcaguaCommit specifies the block height
 	// from which new transactions with version before TxVersion_Height_500000_Aconcagua will not be accepted anymore.
 	BlockHeightAconcaguaCommit int32
@@ -328,6 +329,7 @@ var MainNetParams = Params{
 		{340000, newHashFromStr("562da4e0adac79c98344ce28bf236a383f58712d4b4a68cffb78126e47caeb3c")},
 		{360000, newHashFromStr("00d39b5d84f43b088728b7b947ffe7d138ddbcb4a67fbc3f746cfeb3172d7a3b")},
 		{400000, newHashFromStr("73a434b741b357e37587b1b0a39c0ef65832d403bfd4d91eb11d9d805c568022")},
+		{464000, newHashFromStr("fa03de96d2c39d9f73dd9b427d61ce62dcfe05a9d04dbe5b37f9fcbd1321a166")},
 	},
 	// Consensus rule change deployments.
 	//
@@ -394,6 +396,8 @@ var MainNetParams = Params{
 
 	// BlockHeightAconcagua specifies the block height from which Aconcagua fork starts.
 	BlockHeightAconcagua: 464_000,
+	BlockHashAconcagua:   "fa03de96d2c39d9f73dd9b427d61ce62dcfe05a9d04dbe5b37f9fcbd1321a166",
+
 	// BlockHeightAconcaguaCommit specifies the block height
 	// from which new transactions with version before TxVersion_Height_450000_Aconcagua will not be accepted anymore.
 	BlockHeightAconcaguaCommit: 480_000,
@@ -493,6 +497,7 @@ var RegressionNetParams = Params{
 
 	// BlockHeightAconcagua specifies the block height from which Aconcagua fork starts.
 	BlockHeightAconcagua: 464_000,
+	BlockHashAconcagua:   "",
 	// BlockHeightAconcaguaCommit specifies the block height
 	// from which new transactions with version before TxVersion_Height_450000_Aconcagua will not be accepted anymore.
 	BlockHeightAconcaguaCommit: 480_000,
@@ -599,6 +604,7 @@ var TestNet3Params = Params{
 
 	// BlockHeightAconcagua specifies the block height from which Aconcagua fork starts.
 	BlockHeightAconcagua: 464_000,
+	BlockHashAconcagua:   "",
 	// BlockHeightAconcaguaCommit specifies the block height
 	// from which new transactions with version before TxVersion_Height_450000_Aconcagua will not be accepted anymore.
 	BlockHeightAconcaguaCommit: 480_000,
@@ -700,6 +706,7 @@ var SimNetParams = Params{
 
 	// BlockHeightAconcagua specifies the block height from which Aconcagua fork starts.
 	BlockHeightAconcagua: 464_000,
+	BlockHashAconcagua:   "",
 	// BlockHeightAconcaguaCommit specifies the block height
 	// from which new transactions with version before TxVersion_Height_450000_Aconcagua will not be accepted anymore.
 	BlockHeightAconcaguaCommit: 480_000,
