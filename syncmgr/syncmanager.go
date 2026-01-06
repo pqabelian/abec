@@ -1024,7 +1024,7 @@ func (sm *SyncManager) handleBlockMsgAbe(bmsg *blockMsgAbe) {
 			}
 
 			for _, scope := range fakePoWHeightScopes {
-				if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
+				if scope.StartHeight <= blockHeight && blockHeight < scope.EndHeight {
 					behaviorFlags |= blockchain.BFNoPoWCheck
 					break
 				}
@@ -1286,7 +1286,7 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 			}
 
 			for _, scope := range fakePoWHeightScopes {
-				if scope.StartHeight <= blockHeight && blockHeight <= scope.EndHeight {
+				if scope.StartHeight <= blockHeight && blockHeight < scope.EndHeight {
 					behaviorFlags |= blockchain.BFNoPoWCheck
 					break
 				}
