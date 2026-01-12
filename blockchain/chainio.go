@@ -1580,7 +1580,7 @@ func (b *BlockChain) createChainState() error {
 		for _, scope := range b.fakePoWHeightScopes {
 			if scope.StartHeight <= currentHeight && currentHeight < scope.EndHeight {
 				activeHeightScope = append(activeHeightScope, BlockHeightScope{
-					StartHeight: currentHeight + 1,
+					StartHeight: currentHeight,
 					EndHeight:   scope.EndHeight,
 				})
 			} else if currentHeight < scope.StartHeight {
@@ -1997,10 +1997,10 @@ func (b *BlockChain) initChainState() error {
 				EndHeight:   currentHeight + 1,
 			})
 			activeHeightScope = append(activeHeightScope, BlockHeightScope{
-				StartHeight: currentHeight + 1,
+				StartHeight: currentHeight,
 				EndHeight:   scope.EndHeight,
 			})
-		} else if scope.EndHeight <= currentHeight {
+		} else if scope.EndHeight < currentHeight {
 			workedHeightScope = append(workedHeightScope, BlockHeightScope{
 				StartHeight: scope.StartHeight,
 				EndHeight:   scope.EndHeight,
@@ -2019,7 +2019,7 @@ func (b *BlockChain) initChainState() error {
 		for _, scope := range b.fakePoWHeightScopes {
 			if scope.StartHeight <= currentHeight && currentHeight < scope.EndHeight {
 				activeHeightScope = append(activeHeightScope, BlockHeightScope{
-					StartHeight: currentHeight + 1,
+					StartHeight: currentHeight,
 					EndHeight:   scope.EndHeight,
 				})
 			} else if currentHeight < scope.StartHeight {
