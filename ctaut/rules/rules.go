@@ -4,13 +4,13 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/abesuite/abec/ctaut/script"
+	"github.com/pqabelian/abec/ctaut/script"
 
-	"github.com/abesuite/abec/abecryptox"
-	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
-	"github.com/abesuite/abec/ctaut/dao"
-	ctautwire "github.com/abesuite/abec/ctaut/wire"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abecryptox"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxkey"
+	"github.com/pqabelian/abec/ctaut/dao"
+	ctautwire "github.com/pqabelian/abec/ctaut/wire"
+	"github.com/pqabelian/abec/wire"
 )
 
 type HostOutPoint = dao.HostOutPoint

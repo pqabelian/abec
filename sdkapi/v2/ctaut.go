@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/abesuite/abec/abecryptox"
-	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
-	"github.com/abesuite/abec/chainhash"
-	ctautapi "github.com/abesuite/abec/ctaut/api"
-	ctautwire "github.com/abesuite/abec/ctaut/wire"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abecryptox"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxkey"
+	"github.com/pqabelian/abec/chainhash"
+	ctautapi "github.com/pqabelian/abec/ctaut/api"
+	ctautwire "github.com/pqabelian/abec/ctaut/wire"
+	"github.com/pqabelian/abec/wire"
 )
 
 const TxVersionForCTAUT = wire.TxVersion_Height_464000_Aconcagua

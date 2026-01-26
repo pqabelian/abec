@@ -12,10 +12,11 @@
 package consensus
 
 import (
-	"github.com/abesuite/abec/blockchain/consensus/ethashpow"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
 	"math/big"
+
+	"github.com/pqabelian/abec/blockchain/consensus/ethashpow"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 // EthashPowVerifySealFast is a demo function to support the demo of ethashPow mining.

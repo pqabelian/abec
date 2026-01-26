@@ -3,9 +3,10 @@ package wire
 import (
 	"bytes"
 	"fmt"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
 	"math"
+
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 const MaxAutTxoLength = 16 * 1024 // 16K

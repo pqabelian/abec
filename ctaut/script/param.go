@@ -2,8 +2,9 @@ package script
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/chainhash"
-	ctautwire "github.com/abesuite/abec/ctaut/wire"
+
+	"github.com/pqabelian/abec/chainhash"
+	ctautwire "github.com/pqabelian/abec/ctaut/wire"
 )
 
 type AutScriptType uint8

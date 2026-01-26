@@ -7,15 +7,15 @@ import (
 	"io"
 	"math"
 
-	ctautapi "github.com/abesuite/abec/ctaut/api"
+	ctautapi "github.com/pqabelian/abec/ctaut/api"
 
 	//"reflect"
 	"sync"
 
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/database"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/database"
+	"github.com/pqabelian/abec/wire"
 )
 
 var (

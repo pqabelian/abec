@@ -16,13 +16,14 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/blockchain/consensus/common"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
-	"golang.org/x/crypto/sha3"
 	"math/big"
 	"runtime"
 	"time"
+
+	"github.com/pqabelian/abec/blockchain/consensus/common"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
+	"golang.org/x/crypto/sha3"
 )
 
 // Various error messages to mark blocks invalid. These should be private to

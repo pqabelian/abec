@@ -1,8 +1,8 @@
 package api
 
 import (
-	"github.com/abesuite/abec/ctaut/script"
-	ctautwire "github.com/abesuite/abec/ctaut/wire"
+	"github.com/pqabelian/abec/ctaut/script"
+	ctautwire "github.com/pqabelian/abec/ctaut/wire"
 )
 
 // All CT-AUT Script must start with the following specified prefix.

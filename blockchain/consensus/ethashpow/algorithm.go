@@ -31,9 +31,6 @@ package ethashpow
 
 import (
 	"encoding/binary"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/common/bitutil"
-	"golang.org/x/crypto/sha3"
 	"hash"
 	"math/big"
 	"reflect"
@@ -42,6 +39,10 @@ import (
 	"sync/atomic"
 	"time"
 	"unsafe"
+
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/common/bitutil"
+	"golang.org/x/crypto/sha3"
 )
 
 const EthashSeedStr = "the seed string for cache and dataset"

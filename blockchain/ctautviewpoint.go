@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/abesuite/abec/abecryptox"
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/chainhash"
-	ctautapi "github.com/abesuite/abec/ctaut/api"
-	ctautwire "github.com/abesuite/abec/ctaut/wire"
-	"github.com/abesuite/abec/database"
+	"github.com/pqabelian/abec/abecryptox"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/chainhash"
+	ctautapi "github.com/pqabelian/abec/ctaut/api"
+	ctautwire "github.com/pqabelian/abec/ctaut/wire"
+	"github.com/pqabelian/abec/database"
 )
 
 // autFlags is a bitmask defining additional information and state for a

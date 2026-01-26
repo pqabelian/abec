@@ -1,7 +1,7 @@
 package abecryptox
 
 import (
-	"github.com/abesuite/abec/ctaut/wire"
+	"github.com/pqabelian/abec/ctaut/wire"
 )
 
 // AutTxOutputDesc defines the description for AuxTxo generation.

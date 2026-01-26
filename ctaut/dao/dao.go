@@ -5,8 +5,8 @@ import (
 	"encoding/hex"
 	"io"
 
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 const MaxIssuerAddressLength = 256 // not exact, to have some redundancy

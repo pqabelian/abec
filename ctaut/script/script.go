@@ -7,12 +7,12 @@ import (
 	"math"
 	"strings"
 
-	"github.com/abesuite/abec/ctaut/dao"
+	"github.com/pqabelian/abec/ctaut/dao"
 
-	"github.com/abesuite/abec/abecryptox"
-	"github.com/abesuite/abec/chainhash"
-	ctautwire "github.com/abesuite/abec/ctaut/wire"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abecryptox"
+	"github.com/pqabelian/abec/chainhash"
+	ctautwire "github.com/pqabelian/abec/ctaut/wire"
+	"github.com/pqabelian/abec/wire"
 )
 
 type HostOutPoint = dao.HostOutPoint

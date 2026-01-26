@@ -4,9 +4,9 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/abesuite/abec/abecryptox/abecryptoutils"
-	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
-	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
+	"github.com/pqabelian/abec/abecryptox/abecryptoutils"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxkey"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
 )
 
 func TestAutCoinbaseTxGen(t *testing.T) {

@@ -1,9 +1,9 @@
 package api
 
 import (
-	"github.com/abesuite/abec/ctaut/rules"
-	ctautwire "github.com/abesuite/abec/ctaut/wire"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/ctaut/rules"
+	ctautwire "github.com/pqabelian/abec/ctaut/wire"
+	"github.com/pqabelian/abec/wire"
 )
 
 // RuleCheckOnHostTxo would check the following rule on HostTxo:

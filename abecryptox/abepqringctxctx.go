@@ -3,11 +3,11 @@ package abecryptox
 import (
 	"fmt"
 
-	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
-	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
-	"github.com/abesuite/abec/abecryptox/abecryptoxparamctx"
-	autwire "github.com/abesuite/abec/ctaut/wire"
-	"github.com/cryptosuite/pqringctx/pqringctxapi"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxkey"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxparamctx"
+	autwire "github.com/pqabelian/abec/ctaut/wire"
+	"github.com/pqabelian/pqringctx/pqringctxapi"
 )
 
 // AutTxoType is defined for the types of AutTxo, which is actually pqringctxapi.CtxTxoType,
