@@ -19,6 +19,8 @@ github.com/cryptosuite/pqringctx v0.13.1-0.20251221113137-efeef447a5a2 h1:2NDPhB
 github.com/cryptosuite/pqringctx v0.13.1-0.20251221113137-efeef447a5a2/go.mod h1:w0l9e1ckzV5V5FefK+eZziU3Mgf5Jbml/cRBKDKeUNk=
 github.com/cryptosuite/pqringctx v0.14.0 h1:b6BH1kYQaYj+YBbgGB2yUYOnUe72quw0toqahTp335Q=
 github.com/cryptosuite/pqringctx v0.14.0/go.mod h1:w0l9e1ckzV5V5FefK+eZziU3Mgf5Jbml/cRBKDKeUNk=
+github.com/cryptosuite/pqringctx v0.14.1-0.20260213134758-cb13ce080504 h1:avKUrzllw4KbMcG8wvOxL2ymZnnq45LUXMT6jF4gBTk=
+github.com/cryptosuite/pqringctx v0.14.1-0.20260213134758-cb13ce080504/go.mod h1:w0l9e1ckzV5V5FefK+eZziU3Mgf5Jbml/cRBKDKeUNk=
 github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1 h1:vN3Cibtye7f3YuPvrJWG4Kp/jrb/XfxS5oIwl8XZBQY=
 github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1/go.mod h1:mJeCa86eOqj3kCJO+O4245Wnq5U07P9K9RfJplI8bQ4=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
