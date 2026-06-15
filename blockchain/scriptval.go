@@ -140,7 +140,7 @@ func newTxValidator(utxoRingView *UtxoRingViewpoint, autView *CTAUTViewpoint, wi
 // which is dedicated to valid AutWitness, bu calling crypto-layer.
 func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingViewpoint, autView *CTAUTViewpoint, witnessCache *txscript.WitnessCache) error {
 	// If transaction witness has already been validated and stored in cache, just return.
-	if witnessCache.Exists(*tx.Hash()) {
+	if witnessCache.Exists(*tx.Hash(), *tx.TxWitnessHash()) {
 		return nil
 	}
 
@@ -205,7 +205,7 @@ func ValidateTransactionScriptsAbe(tx *abeutil.TxAbe, utxoRingView *UtxoRingView
 	}
 
 	// Add transaction into witness cache.
-	witnessCache.Add(*tx.Hash())
+	witnessCache.Add(*tx.Hash(), *tx.TxWitnessHash())
 	return nil
 }
 

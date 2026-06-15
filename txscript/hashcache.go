@@ -33,7 +33,8 @@ func NewTxSigHashes(tx *wire.MsgTx) *TxSigHashes {
 // multiple goroutines can safely re-use the pre-computed partial sighashes
 // speeding up validation time amongst all inputs found within a block.
 type HashCache struct {
-	sigHashes map[chainhash.Hash]*TxSigHashes
+	sigHashes  map[chainhash.Hash]*TxSigHashes
+	maxEntries uint
 
 	sync.RWMutex
 }
@@ -42,7 +43,8 @@ type HashCache struct {
 // of entries which may exist within it at anytime.
 func NewHashCache(maxSize uint) *HashCache {
 	return &HashCache{
-		sigHashes: make(map[chainhash.Hash]*TxSigHashes, maxSize),
+		sigHashes:  make(map[chainhash.Hash]*TxSigHashes, maxSize),
+		maxEntries: maxSize,
 	}
 }
 
@@ -50,8 +52,15 @@ func NewHashCache(maxSize uint) *HashCache {
 // transaction.
 func (h *HashCache) AddSigHashes(tx *wire.MsgTx) {
 	h.Lock()
+	defer h.Unlock()
+
+	if h.maxEntries > 0 && uint(len(h.sigHashes)) >= h.maxEntries {
+		for sigHash := range h.sigHashes {
+			delete(h.sigHashes, sigHash)
+			break
+		}
+	}
 	h.sigHashes[tx.TxHash()] = NewTxSigHashes(tx)
-	h.Unlock()
 }
 
 // ContainsHashes returns true if the partial sighashes for the passed

@@ -15,6 +15,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -5403,6 +5404,17 @@ func (s *rpcServer) Start() {
 		if err != nil {
 			jsonAuthFail(w)
 			return
+		}
+
+		// Reject cross-origin WebSocket requests to prevent CSWSH attacks.
+		origin := r.Header.Get("Origin")
+		if origin != "" {
+			originURL, err := url.Parse(origin)
+			if err != nil || originURL.Host != r.Host {
+				rpcsLog.Warnf("Rejected WebSocket connection from origin %s (host %s)", origin, r.Host)
+				http.Error(w, "403 Forbidden", http.StatusForbidden)
+				return
+			}
 		}
 
 		// Attempt to upgrade the connection to a websocket connection

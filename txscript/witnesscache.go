@@ -6,14 +6,18 @@ import (
 	"github.com/pqabelian/abec/chainhash"
 )
 
+type witnessCacheKey struct {
+	txHash      chainhash.Hash
+	witnessHash chainhash.Hash
+}
+
 // WitnessCache implements a transaction witness verification cache with a randomized
 // entry eviction policy. Only valid transactions will be added to the cache.
 // It can speed up the validation of transactions within a block,
 // if they've already been seen and verified within the mempool.
-// TODO use (tx_hash,witness_hash)?
 type WitnessCache struct {
 	sync.RWMutex
-	validTransactions map[chainhash.Hash]struct{}
+	validTransactions map[witnessCacheKey]struct{}
 	maxEntries        uint
 }
 
@@ -24,7 +28,7 @@ type WitnessCache struct {
 // cache to exceed the max.
 func NewWitnessCache(maxEntries uint) *WitnessCache {
 	return &WitnessCache{
-		validTransactions: make(map[chainhash.Hash]struct{}, maxEntries),
+		validTransactions: make(map[witnessCacheKey]struct{}, maxEntries),
 		maxEntries:        maxEntries,
 	}
 }
@@ -34,9 +38,9 @@ func NewWitnessCache(maxEntries uint) *WitnessCache {
 //
 // NOTE: This function is safe for concurrent access. Readers won't be blocked
 // unless there exists a writer, adding an entry to the WitnessCache.
-func (s *WitnessCache) Exists(txHash chainhash.Hash) bool {
+func (s *WitnessCache) Exists(txHash chainhash.Hash, witnessHash chainhash.Hash) bool {
 	s.RLock()
-	_, ok := s.validTransactions[txHash]
+	_, ok := s.validTransactions[witnessCacheKey{txHash: txHash, witnessHash: witnessHash}]
 	s.RUnlock()
 
 	return ok
@@ -48,7 +52,7 @@ func (s *WitnessCache) Exists(txHash chainhash.Hash) bool {
 //
 // NOTE: This function is safe for concurrent access. Writers will block
 // simultaneous readers until function execution has concluded.
-func (s *WitnessCache) Add(txHash chainhash.Hash) {
+func (s *WitnessCache) Add(txHash chainhash.Hash, witnessHash chainhash.Hash) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -65,5 +69,5 @@ func (s *WitnessCache) Add(txHash chainhash.Hash) {
 			break
 		}
 	}
-	s.validTransactions[txHash] = struct{}{}
+	s.validTransactions[witnessCacheKey{txHash: txHash, witnessHash: witnessHash}] = struct{}{}
 }
