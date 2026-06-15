@@ -434,7 +434,7 @@ func (mp *TxPool) limitNumOrphansAbe() error {
 
 	// Nothing to do if adding another orphan will not cause the pool to
 	// exceed the limit.
-	if len(mp.orphans)+1 <= mp.cfg.Policy.MaxOrphanTxs {
+	if len(mp.orphansAbe)+1 <= mp.cfg.Policy.MaxOrphanTxs {
 		return nil
 	}
 

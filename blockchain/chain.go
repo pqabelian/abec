@@ -377,10 +377,12 @@ func (b *BlockChain) removeOrphanBlockAbe(orphan *orphanBlockAbe) {
 // blocks and will remove the oldest received orphan block if the limit is
 // exceeded.
 func (b *BlockChain) addOrphanBlock(block *abeutil.BlockAbe) {
-	// Remove expired orphan blocks.
+	// Collect expired orphan blocks under the lock.
+	b.orphanLock.Lock()
+	var expired []*orphanBlockAbe
 	for _, oBlock := range b.orphansAbe {
 		if time.Now().After(oBlock.expiration) {
-			b.removeOrphanBlockAbe(oBlock)
+			expired = append(expired, oBlock)
 			continue
 		}
 
@@ -390,19 +392,21 @@ func (b *BlockChain) addOrphanBlock(block *abeutil.BlockAbe) {
 			b.oldestOrphanAbe = oBlock
 		}
 	}
+	b.orphanLock.Unlock()
 
-	// Limit orphan blocks to prevent memory exhaustion.
-	if len(b.orphansAbe)+1 > MaxOrphanBlocks {
-		// Remove the oldest orphan to make room for the new one.
-		b.removeOrphanBlockAbe(b.oldestOrphanAbe)
-		b.oldestOrphanAbe = nil
+	// Remove expired orphans outside the lock (removeOrphanBlockAbe locks internally).
+	for _, oBlock := range expired {
+		b.removeOrphanBlockAbe(oBlock)
 	}
 
-	// Protect concurrent access.  This is intentionally done here instead
-	// of near the top since removeOrphanBlock does its own locking and
-	// the range iterator is not invalidated by removing map entries.
+	// Limit orphan blocks to prevent memory exhaustion.
 	b.orphanLock.Lock()
-	defer b.orphanLock.Unlock()
+	if len(b.orphansAbe)+1 > MaxOrphanBlocks {
+		if b.oldestOrphanAbe != nil {
+			b.removeOrphanBlockAbe(b.oldestOrphanAbe)
+		}
+		b.oldestOrphanAbe = nil
+	}
 
 	// Insert the block into the orphan map with an expiration time
 	// 1 hour from now.
@@ -416,6 +420,7 @@ func (b *BlockChain) addOrphanBlock(block *abeutil.BlockAbe) {
 	// Add to previous hash lookup index for faster dependency lookups.
 	prevHash := &block.MsgBlock().Header.PrevBlock
 	b.prevOrphansAbe[*prevHash] = append(b.prevOrphansAbe[*prevHash], oBlock)
+	b.orphanLock.Unlock()
 }
 
 // SequenceLock represents the converted relative lock-time in seconds, and

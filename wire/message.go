@@ -24,6 +24,10 @@ const CommandSize = 12
 // and corresponding, the max message size is adjusted to 320MB for redundancy
 const MaxMessagePayload = 320 * 1024 * 1024 // 256MB
 
+// maxReadAlloc is the maximum bytes allocated for reading a single message
+// payload, to prevent memory exhaustion from oversized message headers.
+const maxReadAlloc = 32 * 1024 * 1024 // 32MB
+
 // Commands used in bitcoin message headers which describe the type of message.
 const (
 	CmdVersion       = "version"
@@ -417,6 +421,14 @@ func ReadMessageWithEncodingN(r io.Reader, pver uint32, btcnet AbelianNet,
 		str := fmt.Sprintf("payload exceeds max length - header "+
 			"indicates %v bytes, but max payload size for "+
 			"messages of type [%v] is %v.", hdr.length, command, mpl)
+		return totalBytes, nil, nil, messageError("ReadMessage", str)
+	}
+
+	// Cap pre-allocation to prevent memory exhaustion.
+	if hdr.length > maxReadAlloc {
+		discardInput(r, hdr.length)
+		str := fmt.Sprintf("payload length %v exceeds max read alloc %v",
+			hdr.length, maxReadAlloc)
 		return totalBytes, nil, nil, messageError("ReadMessage", str)
 	}
 
