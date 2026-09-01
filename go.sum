@@ -13,6 +13,8 @@ github.com/cryptosuite/pqringct v0.13.1-0.20250912012454-e6f985e4800a h1:u1b8/AG
 github.com/cryptosuite/pqringct v0.13.1-0.20250912012454-e6f985e4800a/go.mod h1:LVtvih9kNVHzAX60qzOqO6TAIjurfNKYWICRDUegjkg=
 github.com/cryptosuite/pqringct v0.14.0 h1:xDFs3YX1x6OtV3cMlYcl4N1BCnCpqfbtomANwn86Eb8=
 github.com/cryptosuite/pqringct v0.14.0/go.mod h1:LVtvih9kNVHzAX60qzOqO6TAIjurfNKYWICRDUegjkg=
+github.com/cryptosuite/pqringct v0.14.1-0.20260901144407-80394bd09693 h1:BSJnyWAJO+z+nEz1c/RY5HC90N9t7Hc6zvMMHWIh7H8=
+github.com/cryptosuite/pqringct v0.14.1-0.20260901144407-80394bd09693/go.mod h1:LVtvih9kNVHzAX60qzOqO6TAIjurfNKYWICRDUegjkg=
 github.com/cryptosuite/pqringctx v0.13.1-0.20251020034854-8e3438f25c0a h1:chQyRulbjyEVoWL+4CzqLa2ezQYNpptTjdJ7UfR7wf4=
 github.com/cryptosuite/pqringctx v0.13.1-0.20251020034854-8e3438f25c0a/go.mod h1:w0l9e1ckzV5V5FefK+eZziU3Mgf5Jbml/cRBKDKeUNk=
 github.com/cryptosuite/pqringctx v0.13.1-0.20251221113137-efeef447a5a2 h1:2NDPhBGTZlf3PcaxE+m6RmlpZ00SSY4qb0Y3msYaAMA=
@@ -23,6 +25,8 @@ github.com/cryptosuite/pqringctx v0.14.1-0.20260213134758-cb13ce080504 h1:avKUrz
 github.com/cryptosuite/pqringctx v0.14.1-0.20260213134758-cb13ce080504/go.mod h1:w0l9e1ckzV5V5FefK+eZziU3Mgf5Jbml/cRBKDKeUNk=
 github.com/cryptosuite/pqringctx v0.14.1-0.20260901124135-097a1ec5fe45 h1:lNmKjF16oIdqFE2TvTo74hvX0ATZdy/EKr7l+Ma4Jjk=
 github.com/cryptosuite/pqringctx v0.14.1-0.20260901124135-097a1ec5fe45/go.mod h1:w0l9e1ckzV5V5FefK+eZziU3Mgf5Jbml/cRBKDKeUNk=
+github.com/cryptosuite/pqringctx v0.14.1-0.20260901140419-dfbabaa1bd04 h1:X306CalUCylIibmCb6Ec0ymyqP4/rw/tmcwr4nFukL4=
+github.com/cryptosuite/pqringctx v0.14.1-0.20260901140419-dfbabaa1bd04/go.mod h1:w0l9e1ckzV5V5FefK+eZziU3Mgf5Jbml/cRBKDKeUNk=
 github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1 h1:vN3Cibtye7f3YuPvrJWG4Kp/jrb/XfxS5oIwl8XZBQY=
 github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1/go.mod h1:mJeCa86eOqj3kCJO+O4245Wnq5U07P9K9RfJplI8bQ4=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
