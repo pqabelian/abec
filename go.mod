@@ -7,7 +7,7 @@ require (
 	github.com/abesuite/go-spew v1.1.1
 	github.com/aead/siphash v1.0.1
 	github.com/cryptosuite/pqringct v0.14.0
-	github.com/cryptosuite/pqringctx v0.14.1-0.20260213134758-cb13ce080504
+	github.com/cryptosuite/pqringctx v0.14.1-0.20260901124135-097a1ec5fe45
 	github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1
 	github.com/decred/dcrd/lru v1.0.0
 	github.com/gorilla/websocket v1.4.2
