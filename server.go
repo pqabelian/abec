@@ -2479,6 +2479,31 @@ func setupRPCListeners() ([]net.Listener, error) {
 // addresses.
 func setupRPCListenersGetWork() ([]net.Listener, error) {
 	listenFunc := net.Listen
+	if !cfg.DisableTLSGetWork {
+		// Generate the TLS cert and key file if both don't already
+		// exist.
+		if !fileExists(cfg.RPCKeyGetWork) && !fileExists(cfg.RPCCertGetWork) {
+			err := genCertPair(cfg.RPCCertGetWork, cfg.RPCKeyGetWork)
+			if err != nil {
+				return nil, err
+			}
+		}
+		keypair, err := tls.LoadX509KeyPair(cfg.RPCCertGetWork, cfg.RPCKeyGetWork)
+		if err != nil {
+			return nil, err
+		}
+
+		tlsConfig := tls.Config{
+			Certificates: []tls.Certificate{keypair},
+			MinVersion:   tls.VersionTLS12,
+		}
+
+		// Change the standard net.Listen function to the tls one.
+		listenFunc = func(net string, laddr string) (net.Listener, error) {
+			return tls.Listen(net, laddr, &tlsConfig)
+		}
+	}
+
 	netAddrs, err := parseListeners(cfg.RPCListenersGetWork)
 	if err != nil {
 		return nil, err
