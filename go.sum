@@ -17,6 +17,8 @@ github.com/cryptosuite/pqringct v0.14.1-0.20260901144407-80394bd09693 h1:BSJnyWA
 github.com/cryptosuite/pqringct v0.14.1-0.20260901144407-80394bd09693/go.mod h1:LVtvih9kNVHzAX60qzOqO6TAIjurfNKYWICRDUegjkg=
 github.com/cryptosuite/pqringct v0.14.1-0.20260902054400-013974a937fe h1:OyMhR6t8/AqmIarFsOtzPKSM0kAiwplgoYYplfJw7M8=
 github.com/cryptosuite/pqringct v0.14.1-0.20260902054400-013974a937fe/go.mod h1:LVtvih9kNVHzAX60qzOqO6TAIjurfNKYWICRDUegjkg=
+github.com/cryptosuite/pqringct v0.14.1-0.20260902072840-d90e2c097b27 h1:yGwKnG63lt/C/Fq2VuHXJZP4h9undV98YdtZ9w1yGjs=
+github.com/cryptosuite/pqringct v0.14.1-0.20260902072840-d90e2c097b27/go.mod h1:LVtvih9kNVHzAX60qzOqO6TAIjurfNKYWICRDUegjkg=
 github.com/cryptosuite/pqringctx v0.13.1-0.20251020034854-8e3438f25c0a h1:chQyRulbjyEVoWL+4CzqLa2ezQYNpptTjdJ7UfR7wf4=
 github.com/cryptosuite/pqringctx v0.13.1-0.20251020034854-8e3438f25c0a/go.mod h1:w0l9e1ckzV5V5FefK+eZziU3Mgf5Jbml/cRBKDKeUNk=
 github.com/cryptosuite/pqringctx v0.13.1-0.20251221113137-efeef447a5a2 h1:2NDPhBGTZlf3PcaxE+m6RmlpZ00SSY4qb0Y3msYaAMA=
@@ -31,6 +33,8 @@ github.com/cryptosuite/pqringctx v0.14.1-0.20260901140419-dfbabaa1bd04 h1:X306Ca
 github.com/cryptosuite/pqringctx v0.14.1-0.20260901140419-dfbabaa1bd04/go.mod h1:w0l9e1ckzV5V5FefK+eZziU3Mgf5Jbml/cRBKDKeUNk=
 github.com/cryptosuite/pqringctx v0.14.1-0.20260902054614-f199808435b8 h1:SYuI/4JTvLXONS+BBnoQvu1uBEcX772SOJwJ//yk07w=
 github.com/cryptosuite/pqringctx v0.14.1-0.20260902054614-f199808435b8/go.mod h1:w0l9e1ckzV5V5FefK+eZziU3Mgf5Jbml/cRBKDKeUNk=
+github.com/cryptosuite/pqringctx v0.14.1-0.20260902073022-edfe220aecca h1:1HfOk6ZNkRUK5z9huavU6idqmp+LJwE+OuJTWpK3T/g=
+github.com/cryptosuite/pqringctx v0.14.1-0.20260902073022-edfe220aecca/go.mod h1:w0l9e1ckzV5V5FefK+eZziU3Mgf5Jbml/cRBKDKeUNk=
 github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1 h1:vN3Cibtye7f3YuPvrJWG4Kp/jrb/XfxS5oIwl8XZBQY=
 github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1/go.mod h1:mJeCa86eOqj3kCJO+O4245Wnq5U07P9K9RfJplI8bQ4=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
