@@ -3,9 +3,10 @@ package wire
 import (
 	"bytes"
 	"fmt"
-	"github.com/abesuite/abec/chainhash"
 	"io"
 	"unicode/utf8"
+
+	"github.com/abesuite/abec/chainhash"
 )
 
 // MessageHeaderSize is the number of bytes in a bitcoin message header.
@@ -43,7 +44,7 @@ const (
 	CmdHeaders       = "headers"
 	CmdPing          = "ping"
 	CmdPong          = "pong"
-	CmdAlert         = "alert"
+	//CmdAlert         = "alert"
 	// TODO(ABE): ABE does not support filter.
 	//CmdMemPool    = "mempool"
 	// TODO(ABE): ABE does not support filter.
@@ -147,10 +148,10 @@ func makeEmptyMessage(command string) (Message, error) {
 	case CmdHeaders:
 		msg = &MsgHeaders{}
 
-	case CmdAlert:
-		msg = &MsgAlert{}
+	//case CmdAlert:
+	//	msg = &MsgAlert{}
 
-		// TODO(ABE): ABE does not support filter.
+	// TODO(ABE): ABE does not support filter.
 	//case CmdMemPool:
 	//	msg = &MsgMemPool{}
 
