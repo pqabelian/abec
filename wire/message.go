@@ -174,10 +174,10 @@ func makeEmptyMessage(command string) (Message, error) {
 	case CmdSendHeaders:
 		msg = &MsgSendHeaders{}
 
-	case CmdFeeFilter:
-		msg = &MsgFeeFilter{}
+	//case CmdFeeFilter:
+	//	msg = &MsgFeeFilter{}
 
-		// TODO(ABE): ABE does not support filter.
+	// TODO(ABE): ABE does not support filter.
 	//case CmdGetCFilters:
 	//	msg = &MsgGetCFilters{}
 	//

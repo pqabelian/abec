@@ -2,12 +2,13 @@ package peer
 
 import (
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/abesuite/abec/abelog"
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/txscript"
 	"github.com/abesuite/abec/wire"
-	"strings"
-	"time"
 )
 
 const (
@@ -176,10 +177,10 @@ func messageSummary(msg wire.Message) string {
 	case *wire.MsgPong:
 		// No summary - perhaps add nonce.
 
-	case *wire.MsgAlert:
-		// No summary.
+	//case *wire.MsgAlert:
+	// No summary.
 
-		// TODO(ABE): ABE does not support filter.
+	// TODO(ABE): ABE does not support filter.
 	//case *wire.MsgMemPool:
 	//	// No summary.
 

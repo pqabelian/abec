@@ -5,13 +5,6 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
-	"github.com/abesuite/abec/blockchain"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
-	"github.com/abesuite/go-socks/socks"
-	"github.com/abesuite/go-spew/spew"
-	"github.com/decred/dcrd/lru"
 	"io"
 	"math/rand"
 	"net"
@@ -20,6 +13,14 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/abesuite/abec/blockchain"
+	"github.com/abesuite/abec/chaincfg"
+	"github.com/abesuite/abec/chainhash"
+	"github.com/abesuite/abec/wire"
+	"github.com/abesuite/go-socks/socks"
+	"github.com/abesuite/go-spew/spew"
+	"github.com/decred/dcrd/lru"
 )
 
 const (
@@ -116,7 +117,7 @@ type MessageListeners struct {
 	OnPong func(p *Peer, msg *wire.MsgPong)
 
 	// OnAlert is invoked when a peer receives an alert abelian message.
-	OnAlert func(p *Peer, msg *wire.MsgAlert)
+	//OnAlert func(p *Peer, msg *wire.MsgAlert)
 
 	// TODO(ABE): ABE does not support filter.
 	// OnMemPool is invoked when a peer receives a mempool abelian message.
@@ -180,7 +181,7 @@ type MessageListeners struct {
 	//OnGetCFCheckpt func(p *Peer, msg *wire.MsgGetCFCheckpt)
 
 	// OnFeeFilter is invoked when a peer receives a feefilter abelian message.
-	OnFeeFilter func(p *Peer, msg *wire.MsgFeeFilter)
+	//OnFeeFilter func(p *Peer, msg *wire.MsgFeeFilter)
 
 	// TODO(ABE): ABE does not support filter.
 	//// OnFilterAdd is invoked when a peer receives a filteradd abelian message.
@@ -1561,12 +1562,12 @@ out:
 				p.cfg.Listeners.OnPong(p, msg)
 			}
 
-		case *wire.MsgAlert:
-			if p.cfg.Listeners.OnAlert != nil {
-				p.cfg.Listeners.OnAlert(p, msg)
-			}
+		//case *wire.MsgAlert:
+		//	if p.cfg.Listeners.OnAlert != nil {
+		//		p.cfg.Listeners.OnAlert(p, msg)
+		//	}
 
-			// TODO(ABE): ABE does not support filter.
+		// TODO(ABE): ABE does not support filter.
 		//case *wire.MsgMemPool:
 		//	if p.cfg.Listeners.OnMemPool != nil {
 		//		p.cfg.Listeners.OnMemPool(p, msg)
@@ -1665,12 +1666,12 @@ out:
 		//		p.cfg.Listeners.OnCFHeaders(p, msg)
 		//	}
 
-		case *wire.MsgFeeFilter:
-			if p.cfg.Listeners.OnFeeFilter != nil {
-				p.cfg.Listeners.OnFeeFilter(p, msg)
-			}
+		//case *wire.MsgFeeFilter:
+		//	if p.cfg.Listeners.OnFeeFilter != nil {
+		//		p.cfg.Listeners.OnFeeFilter(p, msg)
+		//	}
 
-			// TODO(ABE): ABE does not support filter.
+		// TODO(ABE): ABE does not support filter.
 		//case *wire.MsgFilterAdd:
 		//	if p.cfg.Listeners.OnFilterAdd != nil {
 		//		p.cfg.Listeners.OnFilterAdd(p, msg)

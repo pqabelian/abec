@@ -817,17 +817,17 @@ func (sp *serverPeer) OnGetHeaders(_ *peer.Peer, msg *wire.MsgGetHeaders) {
 // is used by remote peers to request that no transactions which have a fee rate
 // lower than provided value are inventoried to them.  The peer will be
 // disconnected if an invalid fee filter value is provided.
-func (sp *serverPeer) OnFeeFilter(_ *peer.Peer, msg *wire.MsgFeeFilter) {
-	// Check that the passed minimum fee is a valid amount.
-	if msg.MinFee < 0 || msg.MinFee > int64(abeutil.MaxNeutrino) {
-		peerLog.Debugf("Peer %v sent an invalid feefilter '%v' -- "+
-			"disconnecting", sp, abeutil.Amount(msg.MinFee))
-		sp.Disconnect()
-		return
-	}
-
-	atomic.StoreInt64(&sp.feeFilter, msg.MinFee)
-}
+//func (sp *serverPeer) OnFeeFilter(_ *peer.Peer, msg *wire.MsgFeeFilter) {
+//	// Check that the passed minimum fee is a valid amount.
+//	if msg.MinFee < 0 || msg.MinFee > int64(abeutil.MaxNeutrino) {
+//		peerLog.Debugf("Peer %v sent an invalid feefilter '%v' -- "+
+//			"disconnecting", sp, abeutil.Amount(msg.MinFee))
+//		sp.Disconnect()
+//		return
+//	}
+//
+//	atomic.StoreInt64(&sp.feeFilter, msg.MinFee)
+//}
 
 // OnGetAddr is invoked when a peer receives a getaddr Abelian message
 // and is used to provide the peer with known addresses from the address
@@ -1851,18 +1851,18 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			OnGetData:       sp.OnGetData,
 			OnGetBlocks:     sp.OnGetBlocks,
 			OnGetHeaders:    sp.OnGetHeaders,
-			OnFeeFilter:     sp.OnFeeFilter,
-			OnGetAddr:       sp.OnGetAddr,
-			OnAddr:          sp.OnAddr,
-			OnRead:          sp.OnRead,
-			OnWrite:         sp.OnWrite,
-			OnNotFound:      sp.OnNotFound,
+			//OnFeeFilter:     sp.OnFeeFilter,
+			OnGetAddr:  sp.OnGetAddr,
+			OnAddr:     sp.OnAddr,
+			OnRead:     sp.OnRead,
+			OnWrite:    sp.OnWrite,
+			OnNotFound: sp.OnNotFound,
 
 			// Note: The reference client currently bans peers that send alerts
 			// not signed with its key.  We could verify against their key, but
 			// since the reference client is currently unwilling to support
 			// other implementations' alert messages, we will not relay theirs.
-			OnAlert: nil,
+			//OnAlert: nil,
 		},
 		NewestBlock:        sp.newestBlock,
 		HostToNetAddress:   sp.server.addrManager.HostToNetAddress,
