@@ -35,15 +35,19 @@ const (
 	CmdInv           = "inv"
 	CmdNeedSet       = "needset"
 	CmdNeedSetResult = "nsresult"
-	CmdGetData       = "getdata"
-	CmdNotFound      = "notfound"
-	CmdBlock         = "block"
-	CmdPrunedBlock   = "prunedblock"
-	CmdTx            = "tx"
-	CmdGetHeaders    = "getheaders"
-	CmdHeaders       = "headers"
-	CmdPing          = "ping"
-	CmdPong          = "pong"
+
+	CmdGetBlockTx = "getblocktx"
+	CmdBlockTx    = "blocktx"
+
+	CmdGetData     = "getdata"
+	CmdNotFound    = "notfound"
+	CmdBlock       = "block"
+	CmdPrunedBlock = "prunedblock"
+	CmdTx          = "tx"
+	CmdGetHeaders  = "getheaders"
+	CmdHeaders     = "headers"
+	CmdPing        = "ping"
+	CmdPong        = "pong"
 	//CmdAlert         = "alert"
 	// TODO(ABE): ABE does not support filter.
 	//CmdMemPool    = "mempool"
@@ -123,6 +127,10 @@ func makeEmptyMessage(command string) (Message, error) {
 
 	case CmdNeedSetResult:
 		msg = &MsgNeedSetResult{}
+	case CmdGetBlockTx:
+		msg = &MsgGetBlockTx{}
+	case CmdBlockTx:
+		msg = &MsgBlockTx{}
 
 	case CmdInv:
 		msg = &MsgInv{}

@@ -8,14 +8,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/abesuite/abec/blockchain/consensus"
-	"github.com/abesuite/abec/blockchain/ruleerror"
-	ctautapi "github.com/abesuite/abec/ctaut/api"
-
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
+	"github.com/abesuite/abec/blockchain/consensus"
+	"github.com/abesuite/abec/blockchain/ruleerror"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 	"github.com/abesuite/abec/database"
 	"github.com/abesuite/abec/mempool"
 	peerpkg "github.com/abesuite/abec/peer"
@@ -170,6 +169,7 @@ type peerSyncState struct {
 	requestedTxns    map[chainhash.Hash]struct{}
 	requestedBlocks  map[chainhash.Hash]struct{}
 	requestedNeedSet map[chainhash.Hash]struct{}
+	requestedBlockTx map[chainhash.Hash]map[chainhash.Hash]struct{}
 }
 
 func (p peerSyncState) ExistRequestedNeedSet(blockHash chainhash.Hash) bool {
@@ -248,6 +248,22 @@ func (sm *SyncManager) ExistRequestedNeedSetInPeerStates(p *peerpkg.Peer, blockH
 func (sm *SyncManager) RemoveRequestedNeedSetInPeerStates(p *peerpkg.Peer, blockHash chainhash.Hash) {
 	if _, exist := sm.peerStates[p]; exist {
 		delete(sm.peerStates[p].requestedNeedSet, blockHash)
+	}
+	return
+}
+
+func (sm *SyncManager) ExistRequestedBlockTxInPeerStates(p *peerpkg.Peer, blockHash chainhash.Hash) (bool, bool) {
+	state, exist := sm.peerStates[p]
+	if !exist {
+		return false, false
+	}
+	_, ok := state.requestedBlockTx[blockHash]
+	return true, ok
+}
+
+func (sm *SyncManager) RemoveRequestedBlockTxInPeerStates(p *peerpkg.Peer, blockHash chainhash.Hash, txHash chainhash.Hash) {
+	if _, exist := sm.peerStates[p]; exist {
+		delete(sm.peerStates[p].requestedBlockTx, blockHash)
 	}
 	return
 }
@@ -519,6 +535,7 @@ func (sm *SyncManager) handleNewPeerMsg(peer *peerpkg.Peer) {
 		requestedTxns:    make(map[chainhash.Hash]struct{}),
 		requestedBlocks:  make(map[chainhash.Hash]struct{}),
 		requestedNeedSet: make(map[chainhash.Hash]struct{}),
+		requestedBlockTx: make(map[chainhash.Hash]map[chainhash.Hash]struct{}),
 	}
 
 	// Start syncing by choosing the best candidate if needed.
@@ -1312,13 +1329,13 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	witHash := bmsg.block.MsgPrunedBlock().CoinbaseTx.TxWitnessHash()
 	msgBlockAbe.WitnessHashs[0] = witHash
 
-	needSet := make([]chainhash.Hash, 0, len(bmsg.block.MsgPrunedBlock().TransactionHashes))
+	missingTxHashs := make([]chainhash.Hash, 0, len(bmsg.block.MsgPrunedBlock().TransactionHashes))
 	txmap := make(map[chainhash.Hash]*wire.MsgTxAbe)
 	// try to restore the block with the help of local transaction pool
 	for i := 0; i < len(bmsg.block.MsgPrunedBlock().TransactionHashes); i++ {
 		txHash := bmsg.block.MsgPrunedBlock().TransactionHashes[i]
 		if tx, err := sm.txMemPool.FetchTransaction(&txHash); err != nil {
-			needSet = append(needSet, txHash)
+			missingTxHashs = append(missingTxHashs, txHash)
 		} else {
 			txhash := tx.MsgTx().TxHash()
 			txmap[txhash] = tx.MsgTx()
@@ -1326,22 +1343,28 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 	}
 
 	// wait the needsetResult
-	if len(needSet) != 0 {
-		log.Debugf("Missing %v transactions in pruned block %s from peer %s, sending needset message...", len(needSet), bmsg.block.Hash().String(), peer)
+	if len(missingTxHashs) != 0 {
+		log.Debugf("Missing %v transactions in pruned block %s from peer %s, sending needset/getblocktx message...", len(missingTxHashs), bmsg.block.Hash().String(), peer)
 		syncPeerState, exists := sm.peerStates[peer]
 		if !exists {
 			log.Warnf("Received pruned block message from unknown peer %s", peer)
 			return
 		}
 		syncPeerState.requestedNeedSet[*blockHash] = struct{}{}
-		txs, err := peer.PushNeedSetMsg(*blockHash, needSet)
+
+		syncPeerState.requestedBlockTx[*blockHash] = map[chainhash.Hash]struct{}{}
+		for _, txHash := range missingTxHashs {
+			syncPeerState.requestedBlockTx[*blockHash][txHash] = struct{}{}
+		}
+
+		txs, err := peer.PushNeedSetMsg(*blockHash, missingTxHashs)
 		if txs == nil || err != nil {
 			log.Infof("Rejected block %v from %s: %v", blockHash,
 				peer, err)
 			return
 		}
 
-		log.Debugf("Receive need set result containing %v transactions from peer %s, restoring...", len(txs), peer)
+		log.Debugf("Receive response containing %v transactions from peer %s, restoring...", len(txs), peer)
 
 		for _, tx := range txs {
 			txhash := tx.TxHash()

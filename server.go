@@ -599,6 +599,46 @@ func (sp *serverPeer) OnNeedSetResult(p *peer.Peer, msg *wire.MsgNeedSetResult, 
 
 }
 
+func (sp *serverPeer) OnGetBlockTx(_ *peer.Peer, msg *wire.MsgGetBlockTx, buf []byte) {
+	// Convert the raw MsgBlock to a abeutil.Block which provides some
+	// convenience methods and things such as hash caching.
+	err := sp.server.pushBlockTxMsg(sp, msg.BlockHash, msg.TxHashes, wire.WitnessEncoding)
+	if err != nil {
+		// do nothing
+	}
+}
+
+func (sp *serverPeer) OnBlockTx(p *peer.Peer, msg *wire.MsgBlockTx, buf []byte) {
+	peerExist, reqExist := sp.server.syncManager.ExistRequestedBlockTxInPeerStates(p, msg.BlockHash)
+	if !peerExist {
+		peerLog.Warnf("Received pruned block message from unknown peer %s", p)
+		return
+	}
+
+	// If we didn't ask for this needset then the peer is misbehaving.
+	if !reqExist {
+		// Disconnect with the misbehaving peer
+		peerLog.Warnf("Got unrequested getblocktx %v from %s -- "+
+			"disconnecting", msg.BlockHash, p.Addr())
+		p.Disconnect()
+		return
+	}
+
+	// check witness in response
+	for i := 0; i < len(msg.Txs); i++ {
+		if !msg.Txs[i].HasTxWitness() {
+			peerLog.Warnf("Got blocktx %v from %s, but some transaction in response does not has witness -- "+
+				"disconnecting", msg.BlockHash, p.Addr())
+			p.Disconnect()
+			return
+		}
+	}
+	p.StoreBlockTxResult(msg)
+	for _, tx := range msg.Txs {
+		sp.server.syncManager.RemoveRequestedBlockTxInPeerStates(p, msg.BlockHash, tx.TxHash())
+	}
+}
+
 // OnInv is invoked when a peer receives an inv message and is
 // used to examine the inventory being advertised by the remote peer and react
 // accordingly.  We pass the message down to blockmanager which will call
@@ -1120,6 +1160,33 @@ func (s *server) pushNeedSetResultMsg(sp *serverPeer, blockHash chainhash.Hash,
 		rtxs[i] = txhashMap[txhash].MsgTx()
 	}
 	resMsg := wire.NewMsgNeedSetResult(blockHash, rtxs)
+
+	sp.QueueMessageWithEncoding(resMsg, nil, encoding)
+	//sp.QueueMessageWithEncoding(block.MsgBlock(), doneChan, encoding)
+	//sp.PushRejectMsg(wire.CmdNeedSet, wire.RejectInvalid, "invalid block hash", &blockHash, false)
+
+	return nil
+}
+
+func (s *server) pushBlockTxMsg(sp *serverPeer, blockHash chainhash.Hash,
+	txHashes []chainhash.Hash, encoding wire.MessageEncoding) error {
+
+	block, err := sp.server.chain.BlockByHashAbe(&blockHash)
+	if err != nil {
+		sp.PushRejectMsg(wire.CmdBlockTx, wire.RejectInvalid, "invalid block hash", &blockHash, false)
+		return err
+	}
+	originTxs := block.Transactions()
+	txhashMap := make(map[chainhash.Hash]*abeutil.TxAbe)
+	for i := 0; i < len(originTxs); i++ {
+		txhash := originTxs[i].Hash()
+		txhashMap[*txhash] = originTxs[i]
+	}
+	rtxs := make([]*wire.MsgTxAbe, len(txHashes))
+	for i, txhash := range txHashes {
+		rtxs[i] = txhashMap[txhash].MsgTx()
+	}
+	resMsg := wire.NewMsgBlockTx(blockHash, rtxs)
 
 	sp.QueueMessageWithEncoding(resMsg, nil, encoding)
 	//sp.QueueMessageWithEncoding(block.MsgBlock(), doneChan, encoding)
@@ -1846,6 +1913,8 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			OnPrunedBlock:   sp.OnPrunedBlock,
 			OnNeedSet:       sp.OnNeedSet,
 			OnNeedSetResult: sp.OnNeedSetResult,
+			OnGetBlockTx:    sp.OnGetBlockTx,
+			OnBlockTx:       sp.OnBlockTx,
 			OnInv:           sp.OnInv,
 			OnHeaders:       sp.OnHeaders,
 			OnGetData:       sp.OnGetData,
