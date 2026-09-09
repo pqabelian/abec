@@ -1366,7 +1366,7 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 			syncPeerState.requestedBlockTx[*blockHash][txHash] = struct{}{}
 		}
 
-		txs, err := peer.PushNeedSetMsg(*blockHash, missingTxHashs)
+		txs, err := peer.FetchMissingBlockTxs(*blockHash, missingTxHashs)
 		if txs == nil || err != nil {
 			log.Infof("Rejected block %v from %s: %v", blockHash,
 				peer, err)
