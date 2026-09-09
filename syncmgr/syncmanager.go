@@ -263,7 +263,13 @@ func (sm *SyncManager) ExistRequestedBlockTxInPeerStates(p *peerpkg.Peer, blockH
 
 func (sm *SyncManager) RemoveRequestedBlockTxInPeerStates(p *peerpkg.Peer, blockHash chainhash.Hash, txHash chainhash.Hash) {
 	if _, exist := sm.peerStates[p]; exist {
-		delete(sm.peerStates[p].requestedBlockTx, blockHash)
+		if _, ok := sm.peerStates[p].requestedBlockTx[blockHash]; ok {
+			delete(sm.peerStates[p].requestedBlockTx[blockHash], txHash)
+
+			if len(sm.peerStates[p].requestedBlockTx) == 0 {
+				delete(sm.peerStates[p].requestedBlockTx, blockHash)
+			}
+		}
 	}
 	return
 }
