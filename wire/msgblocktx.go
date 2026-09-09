@@ -1,7 +1,6 @@
 package wire
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/abesuite/abec/chainhash"
@@ -9,7 +8,7 @@ import (
 
 type MsgBlockTx struct {
 	BlockHash chainhash.Hash
-	Txs       []*MsgTxAbe
+	Tx        *MsgTxAbe
 }
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
@@ -20,27 +19,11 @@ func (msg *MsgBlockTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) 
 		return err
 	}
 
-	count, err := ReadVarInt(r, pver)
+	// Use TxVersion_Unknown temporary, this would be immediately set after Deserialize
+	msg.Tx = NewMsgTxAbe(TxVersion_Unknown)
+	err = msg.Tx.Deserialize(r)
 	if err != nil {
 		return err
-	}
-
-	// Limit to max inventory vectors per message.
-	if count > maxTxPerBlock {
-		str := fmt.Sprintf("too many invvect in message [%v]", count)
-		return messageError("MsgInv.BtcDecode", str)
-	}
-
-	// Create a contiguous slice of inventory vectors to deserialize into in
-	// order to reduce the number of allocations.
-	msg.Txs = make([]*MsgTxAbe, count)
-	for i := uint64(0); i < count; i++ {
-		// Use TxVersion_Unknown temporary, this would be immediately set after Deserialize
-		msg.Txs[i] = NewMsgTxAbe(TxVersion_Unknown)
-		err = msg.Txs[i].Deserialize(r)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -53,23 +36,10 @@ func (msg *MsgBlockTx) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) 
 	if err != nil {
 		return err
 	}
-	// Limit to max inventory vectors per message.
-	count := len(msg.Txs)
-	if count > blockTxNumLimit {
-		str := fmt.Sprintf("too many invvect in message [%v]", count)
-		return messageError("MsgInv.BtcEncode", str)
-	}
 
-	err = WriteVarInt(w, pver, uint64(count))
+	err = msg.Tx.BtcEncode(w, pver, enc)
 	if err != nil {
 		return err
-	}
-
-	for _, tx := range msg.Txs {
-		err = tx.BtcEncode(w, pver, enc)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -84,12 +54,12 @@ func (msg *MsgBlockTx) Command() string {
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgBlockTx) MaxPayloadLength(pver uint32) uint32 {
-	return MaxVarIntPayload + 32*1024*1024
+	return chainhash.HashSize + 32*1024*1024
 }
 
-func NewMsgBlockTx(blockHash chainhash.Hash, Txs []*MsgTxAbe) *MsgBlockTx {
+func NewMsgBlockTx(blockHash chainhash.Hash, tx *MsgTxAbe) *MsgBlockTx {
 	return &MsgBlockTx{
 		BlockHash: blockHash,
-		Txs:       Txs,
+		Tx:        tx,
 	}
 }

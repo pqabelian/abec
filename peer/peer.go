@@ -908,10 +908,8 @@ func (p *Peer) StoreNeedSetResult(msg *wire.MsgNeedSetResult) {
 	p.needsetResult.Store(msg.BlockHash, msg)
 }
 func (p *Peer) StoreBlockTxResult(msg *wire.MsgBlockTx) {
-	for _, tx := range msg.Txs {
-		txHash := tx.TxHash()
-		p.blockTxResult.Store(txHash, tx)
-	}
+	txHash := msg.Tx.TxHash()
+	p.blockTxResult.Store(txHash, msg.Tx)
 }
 
 // PushAddrMsg sends an addr message to the connected peer using the provided
@@ -1048,7 +1046,7 @@ func (p *Peer) PushNeedSetMsg(blockHash chainhash.Hash, txHashes []chainhash.Has
 	uas := strings.Split(p.UserAgent(), "/")
 	for _, ua := range uas {
 		version, found := strings.CutPrefix(ua, "abec:")
-		if found && semver.Compare("v"+version, "v3.0.1") > 0 {
+		if found && semver.Compare("v"+version, "v3.1.0") > 0 {
 			useGetBlockTx = true
 		}
 	}
@@ -1058,7 +1056,7 @@ func (p *Peer) PushNeedSetMsg(blockHash chainhash.Hash, txHashes []chainhash.Has
 		p.QueueMessage(msg, nil)
 	} else {
 		for _, txHash := range txHashes {
-			msg := wire.NewMsgGetBlockTx(blockHash, []chainhash.Hash{txHash})
+			msg := wire.NewMsgGetBlockTx(blockHash, txHash)
 			p.QueueMessage(msg, nil)
 		}
 	}
@@ -1070,6 +1068,7 @@ func (p *Peer) PushNeedSetMsg(blockHash chainhash.Hash, txHashes []chainhash.Has
 	txTicker := time.NewTicker(time.Second)
 	defer txTicker.Stop()
 
+	res := make([]*wire.MsgTxAbe, 0, len(txHashes))
 	for {
 		select {
 		case <-timeoutTimer.C:
@@ -1079,24 +1078,24 @@ func (p *Peer) PushNeedSetMsg(blockHash chainhash.Hash, txHashes []chainhash.Has
 			return nil, errors.New("peer disconnected")
 		case <-txTicker.C:
 			if !useGetBlockTx {
-				if response, ok := p.needsetResult.LoadAndDelete(blockHash); ok {
-					if response != nil {
-						res := response.(*wire.MsgNeedSetResult)
-						return res.Txs, nil
+				if needSetRe, ok := p.needsetResult.LoadAndDelete(blockHash); ok {
+					if needSetRe != nil {
+						if nsr, ok := needSetRe.(*wire.MsgNeedSetResult); ok {
+							return nsr.Txs, nil
+						}
 					}
 					return nil, errors.New("invalid transaction in response")
 				}
 			} else {
-				response := make([]*wire.MsgTxAbe, 0, len(txHashes))
 				for _, txHash := range txHashes {
-					if tx, exist := p.blockTxResult.LoadAndDelete(txHash); exist {
-						if res, ok := tx.(*wire.MsgTxAbe); ok {
-							response = append(response, res)
+					if txRes, exist := p.blockTxResult.LoadAndDelete(txHash); exist {
+						if msgTx, ok := txRes.(*wire.MsgTxAbe); ok {
+							res = append(res, msgTx)
 						}
 					}
 				}
-				if len(response) == len(txHashes) {
-					return response, nil
+				if len(res) == len(txHashes) {
+					return res, nil
 				}
 			}
 		}
