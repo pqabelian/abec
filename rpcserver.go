@@ -5342,14 +5342,14 @@ func (s *rpcServer) Start() {
 			// Keep track of the number of connected clients.
 			s.incrementClients()
 			defer s.decrementClients()
-			_, _, err := s.checkAuth(r, true)
+			_, isAdmin, err := s.checkAuth(r, true)
 			if err != nil {
 				jsonAuthFail(w)
 				return
 			}
 
 			// Read and respond to the request.
-			s.jsonRPCRead(w, r, true)
+			s.jsonRPCRead(w, r, isAdmin)
 		})
 
 		for _, listener := range s.cfg.Listeners {
