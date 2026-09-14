@@ -259,7 +259,7 @@ func (sm *SyncManager) ExistRequestedBlockTxInPeerStates(p *peerpkg.Peer, blockH
 	}
 	txMaps, ok := state.requestedBlockTx[blockHash]
 	if !ok || txMaps == nil {
-		return false, false
+		return true, false
 	}
 
 	_, existReq := txMaps[txHash]
