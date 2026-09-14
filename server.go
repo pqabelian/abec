@@ -609,7 +609,8 @@ func (sp *serverPeer) OnGetBlockTx(_ *peer.Peer, msg *wire.MsgGetBlockTx, buf []
 }
 
 func (sp *serverPeer) OnBlockTx(p *peer.Peer, msg *wire.MsgBlockTx, buf []byte) {
-	peerExist, reqExist := sp.server.syncManager.ExistRequestedBlockTxInPeerStates(p, msg.BlockHash)
+	txHash := msg.Tx.TxHash()
+	peerExist, reqExist := sp.server.syncManager.ExistRequestedBlockTxInPeerStates(p, msg.BlockHash, txHash)
 	if !peerExist {
 		peerLog.Warnf("Received pruned block message from unknown peer %s", p)
 		return
@@ -632,7 +633,7 @@ func (sp *serverPeer) OnBlockTx(p *peer.Peer, msg *wire.MsgBlockTx, buf []byte) 
 		return
 	}
 	p.StoreBlockTxResult(msg)
-	sp.server.syncManager.RemoveRequestedBlockTxInPeerStates(p, msg.BlockHash, msg.Tx.TxHash())
+	sp.server.syncManager.RemoveRequestedBlockTxInPeerStates(p, msg.BlockHash, txHash)
 }
 
 // OnInv is invoked when a peer receives an inv message and is
@@ -1179,7 +1180,12 @@ func (s *server) pushBlockTxMsg(sp *serverPeer, blockHash chainhash.Hash,
 		txhashMap[*txhash] = originTxs[i]
 	}
 
-	resMsg := wire.NewMsgBlockTx(blockHash, txhashMap[txHash].MsgTx())
+	txAbe, exist := txhashMap[txHash]
+	if !exist {
+		sp.PushRejectMsg(wire.CmdBlockTx, wire.RejectInvalid, "invalid tx hash", &txHash, false)
+		return err
+	}
+	resMsg := wire.NewMsgBlockTx(blockHash, txAbe.MsgTx())
 	sp.QueueMessageWithEncoding(resMsg, nil, encoding)
 	//sp.QueueMessageWithEncoding(block.MsgBlock(), doneChan, encoding)
 	//sp.PushRejectMsg(wire.CmdNeedSet, wire.RejectInvalid, "invalid block hash", &blockHash, false)

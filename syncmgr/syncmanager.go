@@ -252,27 +252,38 @@ func (sm *SyncManager) RemoveRequestedNeedSetInPeerStates(p *peerpkg.Peer, block
 	return
 }
 
-func (sm *SyncManager) ExistRequestedBlockTxInPeerStates(p *peerpkg.Peer, blockHash chainhash.Hash) (bool, bool) {
+func (sm *SyncManager) ExistRequestedBlockTxInPeerStates(p *peerpkg.Peer, blockHash chainhash.Hash, txHash chainhash.Hash) (bool, bool) {
 	state, exist := sm.peerStates[p]
 	if !exist {
 		return false, false
 	}
-	_, ok := state.requestedBlockTx[blockHash]
-	return true, ok
+	txMaps, ok := state.requestedBlockTx[blockHash]
+	if !ok || txMaps == nil {
+		return false, false
+	}
+
+	_, existReq := txMaps[txHash]
+	return true, existReq
 }
 
 func (sm *SyncManager) RemoveRequestedBlockTxInPeerStates(p *peerpkg.Peer, blockHash chainhash.Hash, txHash chainhash.Hash) {
-	if _, exist := sm.peerStates[p]; exist {
-		if txMaps, ok := sm.peerStates[p].requestedBlockTx[blockHash]; ok {
-			if _, existReq := txMaps[txHash]; existReq {
-				delete(txMaps, txHash)
-			}
-			if len(txMaps) == 0 {
-				delete(sm.peerStates[p].requestedBlockTx, blockHash)
-			} else {
-				sm.peerStates[p].requestedBlockTx[blockHash] = txMaps
-			}
-		}
+	state, exist := sm.peerStates[p]
+	if !exist {
+		return
+	}
+	txMaps, ok := state.requestedBlockTx[blockHash]
+	if !ok || txMaps == nil {
+		return
+	}
+
+	if _, existReq := txMaps[txHash]; existReq {
+		delete(txMaps, txHash)
+	}
+
+	if len(txMaps) == 0 {
+		delete(sm.peerStates[p].requestedBlockTx, blockHash)
+	} else {
+		sm.peerStates[p].requestedBlockTx[blockHash] = txMaps
 	}
 	return
 }
@@ -1359,11 +1370,15 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(bmsg *prunedBlockMsg) {
 			log.Warnf("Received pruned block message from unknown peer %s", peer)
 			return
 		}
-		syncPeerState.requestedNeedSet[*blockHash] = struct{}{}
 
-		syncPeerState.requestedBlockTx[*blockHash] = map[chainhash.Hash]struct{}{}
-		for _, txHash := range missingTxHashs {
-			syncPeerState.requestedBlockTx[*blockHash][txHash] = struct{}{}
+		if peer.UseGetBlockTx() {
+			syncPeerState.requestedBlockTx[*blockHash] = map[chainhash.Hash]struct{}{}
+
+			for _, txHash := range missingTxHashs {
+				syncPeerState.requestedBlockTx[*blockHash][txHash] = struct{}{}
+			}
+		} else {
+			syncPeerState.requestedNeedSet[*blockHash] = struct{}{}
 		}
 
 		txs, err := peer.FetchMissingBlockTxs(*blockHash, missingTxHashs)

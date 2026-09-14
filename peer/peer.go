@@ -1041,7 +1041,8 @@ func (p *Peer) PushGetHeadersMsg(locator blockchain.BlockLocator, stopHash *chai
 	p.prevGetHdrsMtx.Unlock()
 	return nil
 }
-func (p *Peer) FetchMissingBlockTxs(blockHash chainhash.Hash, txHashes []chainhash.Hash) ([]*wire.MsgTxAbe, error) {
+
+func (p *Peer) UseGetBlockTx() bool {
 	useGetBlockTx := false
 	uas := strings.Split(p.UserAgent(), "/")
 	for _, ua := range uas {
@@ -1050,6 +1051,11 @@ func (p *Peer) FetchMissingBlockTxs(blockHash chainhash.Hash, txHashes []chainha
 			useGetBlockTx = true
 		}
 	}
+
+	return useGetBlockTx
+}
+func (p *Peer) FetchMissingBlockTxs(blockHash chainhash.Hash, txHashes []chainhash.Hash) ([]*wire.MsgTxAbe, error) {
+	useGetBlockTx := p.UseGetBlockTx()
 	if !useGetBlockTx {
 		// Construct the needset request and queue it to be sent.
 		msg := wire.NewMsgNeedSet(blockHash, txHashes)
