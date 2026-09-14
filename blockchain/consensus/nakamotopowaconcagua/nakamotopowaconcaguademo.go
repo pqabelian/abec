@@ -1,6 +1,6 @@
 package nakamotopowaconcagua
 
-import "github.com/abesuite/abec/wire"
+import "github.com/pqabelian/abec/wire"
 
 // SealHashPreImage returns the content of header that is used to compute SealHash in NakamotoPowAconcagua.
 //

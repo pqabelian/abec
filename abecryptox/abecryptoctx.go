@@ -3,9 +3,9 @@ package abecryptox
 import (
 	"fmt"
 
-	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
-	"github.com/abesuite/abec/abecryptox/abecryptoxparamctx"
-	"github.com/abesuite/abec/ctaut/wire"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxparamctx"
+	"github.com/pqabelian/abec/ctaut/wire"
 )
 
 // APIs for Transactions	begin

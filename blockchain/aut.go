@@ -1,7 +1,7 @@
 package blockchain
 
 import (
-	ctautwire "github.com/abesuite/abec/ctaut/wire"
+	ctautwire "github.com/pqabelian/abec/ctaut/wire"
 )
 
 // RPC should provide the corresponding APIs.

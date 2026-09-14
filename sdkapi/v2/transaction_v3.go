@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/abesuite/abec/abecryptox"
-	"github.com/abesuite/abec/abecryptox/abecryptoxkey"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abecryptox"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxkey"
+	"github.com/pqabelian/abec/wire"
 )
 
 var TxVersionV3 = wire.TxVersion_Height_464000_Aconcagua

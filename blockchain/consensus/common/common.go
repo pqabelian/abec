@@ -12,8 +12,9 @@
 package common
 
 import (
-	"github.com/abesuite/abec/chainhash"
 	"math/big"
+
+	"github.com/pqabelian/abec/chainhash"
 )
 
 // HashToBig converts a chainhash.Hash into a big.Int that can be used to perform math comparisons.

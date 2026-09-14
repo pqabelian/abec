@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/wire"
 )
 
 type DifficultyVector struct {

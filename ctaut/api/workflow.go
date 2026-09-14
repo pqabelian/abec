@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/ctaut/extscript"
-	"github.com/abesuite/abec/ctaut/rules"
-	"github.com/abesuite/abec/ctaut/script"
-	ctautwire "github.com/abesuite/abec/ctaut/wire"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/ctaut/extscript"
+	"github.com/pqabelian/abec/ctaut/rules"
+	"github.com/pqabelian/abec/ctaut/script"
+	ctautwire "github.com/pqabelian/abec/ctaut/wire"
+	"github.com/pqabelian/abec/wire"
 )
 
 // Create:

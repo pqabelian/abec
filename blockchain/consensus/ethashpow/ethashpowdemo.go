@@ -1,11 +1,12 @@
 package ethashpow
 
 import (
-	"github.com/abesuite/abec/blockchain/consensus/common"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
 	"math/big"
 	"runtime"
+
+	"github.com/pqabelian/abec/blockchain/consensus/common"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 // The functions below are used to support the demo of ethashPow mining.

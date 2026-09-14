@@ -2,11 +2,12 @@ package nakamotopowinit
 
 import (
 	"fmt"
-	"github.com/abesuite/abec/blockchain/consensus/common"
-	"github.com/abesuite/abec/blockchain/ruleerror"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
 	"math/big"
+
+	"github.com/pqabelian/abec/blockchain/consensus/common"
+	"github.com/pqabelian/abec/blockchain/ruleerror"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 type NakamotoPowInit struct {

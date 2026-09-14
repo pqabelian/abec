@@ -6,12 +6,13 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/abesuite/abec/chainhash"
-	"golang.org/x/crypto/sha3"
 	"math/big"
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/pqabelian/abec/chainhash"
+	"golang.org/x/crypto/sha3"
 )
 
 // the original parameter of EthashPoW

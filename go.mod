@@ -6,8 +6,6 @@ require (
 	github.com/abesuite/go-socks v0.0.0-20170105172521-4720035b7bfd
 	github.com/abesuite/go-spew v1.1.1
 	github.com/aead/siphash v1.0.1
-	github.com/pqabelian/pqringct v0.14.0
-	github.com/pqabelian/pqringctx v0.14.0
 	github.com/decred/dcrd/lru v1.0.0
 	github.com/edsrzf/mmap-go v1.2.0
 	github.com/gorilla/websocket v1.4.2
@@ -15,10 +13,13 @@ require (
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/jrick/logrotate v1.0.0
 	github.com/kkdai/bstream v1.0.0
+	github.com/pqabelian/pqringct v0.0.0-20260914061053-72ded1bc38de
+	github.com/pqabelian/pqringctx v0.0.0-20260914052803-b5517c868411
 	github.com/shirou/gopsutil/v3 v3.23.7
 	github.com/syndtr/goleveldb v1.0.0
-	golang.org/x/crypto v0.14.0
-	golang.org/x/sys v0.13.0
+	golang.org/x/crypto v0.29.0
+	golang.org/x/mod v0.41.0
+	golang.org/x/sys v0.27.0
 )
 
 require (
@@ -38,5 +39,4 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.3 // indirect
 	golang.org/x/net v0.31.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	golang.org/x/mod v0.41.0 // indirect
 )

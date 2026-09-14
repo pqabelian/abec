@@ -3,7 +3,7 @@ package wire
 import (
 	"io"
 
-	"github.com/abesuite/abec/chainhash"
+	"github.com/pqabelian/abec/chainhash"
 )
 
 type MsgGetBlockTx struct {

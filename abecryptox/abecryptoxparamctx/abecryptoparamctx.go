@@ -3,7 +3,7 @@ package abecryptoxparamctx
 import (
 	"fmt"
 
-	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
+	"github.com/pqabelian/abec/abecryptox/abecryptoxparam"
 )
 
 // GetCryptoSchemeByAutScriptVersion
