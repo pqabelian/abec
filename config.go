@@ -187,8 +187,8 @@ type config struct {
 	RelayNonStd            bool          `long:"relaynonstd" description:"Relay non-standard transactions regardless of the default settings for the active network."`
 	RPCCert                string        `long:"rpccert" description:"File containing the certificate file"`
 	RPCKey                 string        `long:"rpckey" description:"File containing the certificate key"`
-	RPCCertGetWork         string        `long:"rpccertgetwork" description:"File containing the certificate file"`
-	RPCKeyGetWork          string        `long:"rpckeygetwork" description:"File containing the certificate key"`
+	RPCCertGetWork         string        `long:"rpccertgetwork" description:"File containing the certificate file for getwork protocol"`
+	RPCKeyGetWork          string        `long:"rpckeygetwork" description:"File containing the certificate key for getwork protocol"`
 	RPCLimitPass           string        `long:"rpclimitpass" default-mask:"-" description:"Password for limited RPC connections"`
 	RPCLimitUser           string        `long:"rpclimituser" description:"Username for limited RPC connections"`
 	RPCListeners           []string      `long:"rpclisten" description:"Add an interface/port to listen for RPC connections (default port: 8667, testnet: 18667, simnet: 18889)"`

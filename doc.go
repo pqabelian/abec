@@ -116,6 +116,8 @@ Application Options:
                               default settings for the active network.
       --rpccert=              File containing the certificate file
       --rpckey=               File containing the certificate key
+      --rpccertgetwork=       File containing the certificate file for getwork protocol
+      --rpckeygetwork=        File containing the certificate key for getwork protocol
       --rpclimitpass=         Password for limited RPC connections
       --rpclimituser=         Username for limited RPC connections
       --rpclisten=            Add an interface/port to listen for RPC
