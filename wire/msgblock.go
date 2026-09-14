@@ -3,8 +3,9 @@ package wire
 import (
 	"bytes"
 	"fmt"
-	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 	"io"
+
+	"github.com/abesuite/abec/abecryptox/abecryptoxparam"
 
 	"github.com/abesuite/abec/chainhash"
 )
@@ -180,7 +181,7 @@ func (msg *MsgBlockAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding)
 		msg.WitnessHashs[i] = &tmp
 	}
 	existWitness := make([]byte, 1)
-	_, err = r.Read(existWitness)
+	_, err = io.ReadFull(r, existWitness)
 	if err != nil {
 		return err
 	}
