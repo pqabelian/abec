@@ -1155,9 +1155,9 @@ func (s *server) pushNeedSetResultMsg(sp *serverPeer, blockHash chainhash.Hash,
 	rtxs := make([]*wire.MsgTxAbe, len(txHashes))
 	for i, txhash := range txHashes {
 		txAbe, exist := txhashMap[txhash]
-		if exist {
+		if !exist {
 			sp.PushRejectMsg(wire.CmdNeedSet, wire.RejectInvalid, "invalid transaction hash", &blockHash, false)
-			return err
+			return fmt.Errorf("non-existent transaction %d in block %s is requested", txhash, blockHash)
 		}
 		rtxs[i] = txAbe.MsgTx()
 	}
