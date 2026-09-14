@@ -358,6 +358,7 @@ func (b *BlockChain) calcNextRequiredDifficultyVectorAconcagua(lastNode *blockNo
 	// THIS IS VERY IMPORTANT!
 	// THIS IS VERY IMPORTANT!
 	// THIS IS VERY IMPORTANT!
+	// todo: this rule should be applied before the (1/4, 4)-rule. 2026.01.03 in future refactor, need to check the existing data.
 	if lastNode.height+1 == b.chainParams.BlockHeightAconcagua {
 		// For the 0-th slot of Aconcagua fork, set BitsSecond to the same as Bits.
 		// This is because there is no PoWConsensus-2 before lastNode.height+1.

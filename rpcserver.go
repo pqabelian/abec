@@ -5342,15 +5342,25 @@ func (s *rpcServer) Start() {
 			// Keep track of the number of connected clients.
 			s.incrementClients()
 			defer s.decrementClients()
+			_, isAdmin, err := s.checkAuth(r, true)
+			if err != nil {
+				jsonAuthFail(w)
+				return
+			}
 
 			// Read and respond to the request.
-			s.jsonRPCRead(w, r, true)
+			s.jsonRPCRead(w, r, isAdmin)
 		})
 
 		for _, listener := range s.cfg.Listeners {
 			s.wg.Add(1)
 			go func(listener net.Listener) {
-				rpcsLog.Infof("RPC server getwork listening on %s (TLS %s)", listener.Addr(), "off")
+				tlsState := "on"
+				if cfg.DisableTLSGetWork {
+					tlsState = "off"
+				}
+
+				rpcsLog.Infof("RPC server getwork listening on %s (TLS %s)", listener.Addr(), tlsState)
 				httpServer.Serve(listener)
 				rpcsLog.Tracef("RPC listener getwork done for %s", listener.Addr())
 				s.wg.Done()

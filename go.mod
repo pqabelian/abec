@@ -1,6 +1,6 @@
 module github.com/pqabelian/abec
 
-go 1.18
+go 1.26.0
 
 require (
 	github.com/abesuite/go-socks v0.0.0-20170105172521-4720035b7bfd
@@ -17,8 +17,8 @@ require (
 	github.com/kkdai/bstream v1.0.0
 	github.com/shirou/gopsutil/v3 v3.23.7
 	github.com/syndtr/goleveldb v1.0.0
-	golang.org/x/crypto v0.31.0
-	golang.org/x/sys v0.28.0
+	golang.org/x/crypto v0.14.0
+	golang.org/x/sys v0.13.0
 )
 
 require (
@@ -38,4 +38,5 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.3 // indirect
 	golang.org/x/net v0.31.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
+	golang.org/x/mod v0.41.0 // indirect
 )

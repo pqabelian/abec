@@ -5,13 +5,6 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
-	"github.com/abesuite/go-socks/socks"
-	"github.com/abesuite/go-spew/spew"
-	"github.com/decred/dcrd/lru"
-	"github.com/pqabelian/abec/blockchain"
-	"github.com/pqabelian/abec/chaincfg"
-	"github.com/pqabelian/abec/chainhash"
-	"github.com/pqabelian/abec/wire"
 	"io"
 	"math/rand"
 	"net"
@@ -20,6 +13,15 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/pqabelian/abec/blockchain"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
+	"github.com/abesuite/go-socks/socks"
+	"github.com/abesuite/go-spew/spew"
+	"github.com/decred/dcrd/lru"
+	"golang.org/x/mod/semver"
 )
 
 const (
@@ -116,7 +118,7 @@ type MessageListeners struct {
 	OnPong func(p *Peer, msg *wire.MsgPong)
 
 	// OnAlert is invoked when a peer receives an alert abelian message.
-	OnAlert func(p *Peer, msg *wire.MsgAlert)
+	//OnAlert func(p *Peer, msg *wire.MsgAlert)
 
 	// TODO(ABE): ABE does not support filter.
 	// OnMemPool is invoked when a peer receives a mempool abelian message.
@@ -132,6 +134,9 @@ type MessageListeners struct {
 	OnPrunedBlock   func(p *Peer, msg *wire.MsgPrunedBlock, buf []byte)
 	OnNeedSet       func(p *Peer, msg *wire.MsgNeedSet, buf []byte)
 	OnNeedSetResult func(p *Peer, msg *wire.MsgNeedSetResult, buf []byte)
+
+	OnGetBlockTx func(p *Peer, msg *wire.MsgGetBlockTx, buf []byte)
+	OnBlockTx    func(p *Peer, msg *wire.MsgBlockTx, buf []byte)
 
 	// TODO(ABE): ABE does not support filter.
 	//// OnCFilter is invoked when a peer receives a cfilter abelian message.
@@ -180,7 +185,7 @@ type MessageListeners struct {
 	//OnGetCFCheckpt func(p *Peer, msg *wire.MsgGetCFCheckpt)
 
 	// OnFeeFilter is invoked when a peer receives a feefilter abelian message.
-	OnFeeFilter func(p *Peer, msg *wire.MsgFeeFilter)
+	//OnFeeFilter func(p *Peer, msg *wire.MsgFeeFilter)
 
 	// TODO(ABE): ABE does not support filter.
 	//// OnFilterAdd is invoked when a peer receives a filteradd abelian message.
@@ -497,7 +502,9 @@ type Peer struct {
 	sendDoneQueue chan struct{}
 	outputInvChan chan *wire.InvVect
 
-	needsetResult      sync.Map
+	needsetResult sync.Map
+	blockTxResult sync.Map
+
 	communicationCache *sync.Map
 
 	inQuit    chan struct{}
@@ -900,6 +907,10 @@ func (p *Peer) IsWitnessEnabled() bool {
 func (p *Peer) StoreNeedSetResult(msg *wire.MsgNeedSetResult) {
 	p.needsetResult.Store(msg.BlockHash, msg)
 }
+func (p *Peer) StoreBlockTxResult(msg *wire.MsgBlockTx) {
+	txHash := msg.Tx.TxHash()
+	p.blockTxResult.Store(txHash, msg.Tx)
+}
 
 // PushAddrMsg sends an addr message to the connected peer using the provided
 // addresses.  This function is useful over manually sending the message via
@@ -1030,10 +1041,32 @@ func (p *Peer) PushGetHeadersMsg(locator blockchain.BlockLocator, stopHash *chai
 	p.prevGetHdrsMtx.Unlock()
 	return nil
 }
-func (p *Peer) PushNeedSetMsg(blockHash chainhash.Hash, hashes []chainhash.Hash) ([]*wire.MsgTxAbe, error) {
-	// Construct the needset request and queue it to be sent.
-	msg := wire.NewMsgNeedSet(blockHash, hashes)
-	p.QueueMessage(msg, nil)
+
+func (p *Peer) UseGetBlockTx() bool {
+	useGetBlockTx := false
+	uas := strings.Split(p.UserAgent(), "/")
+	for _, ua := range uas {
+		version, found := strings.CutPrefix(ua, "abec:")
+		if found && semver.Compare("v"+version, "v3.1.0") > 0 {
+			useGetBlockTx = true
+		}
+	}
+
+	return useGetBlockTx
+}
+func (p *Peer) FetchMissingBlockTxs(blockHash chainhash.Hash, txHashes []chainhash.Hash) ([]*wire.MsgTxAbe, error) {
+	useGetBlockTx := p.UseGetBlockTx()
+	if !useGetBlockTx {
+		// Construct the needset request and queue it to be sent.
+		msg := wire.NewMsgNeedSet(blockHash, txHashes)
+		p.QueueMessage(msg, nil)
+	} else {
+		for _, txHash := range txHashes {
+			msg := wire.NewMsgGetBlockTx(blockHash, txHash)
+			p.QueueMessage(msg, nil)
+		}
+	}
+
 	//	todo (ABE): No need to get the reply? if the correspoding peer does not give any reply, what will happen?
 	//	todo (ABE): how to guarantee the corresponding peer think itself to be cureent?
 	timeoutTimer := time.NewTimer(time.Second * 30)
@@ -1041,6 +1074,7 @@ func (p *Peer) PushNeedSetMsg(blockHash chainhash.Hash, hashes []chainhash.Hash)
 	txTicker := time.NewTicker(time.Second)
 	defer txTicker.Stop()
 
+	res := make([]*wire.MsgTxAbe, 0, len(txHashes))
 	for {
 		select {
 		case <-timeoutTimer.C:
@@ -1049,12 +1083,26 @@ func (p *Peer) PushNeedSetMsg(blockHash chainhash.Hash, hashes []chainhash.Hash)
 		case <-p.quit:
 			return nil, errors.New("peer disconnected")
 		case <-txTicker.C:
-			if response, ok := p.needsetResult.LoadAndDelete(blockHash); ok {
-				if response != nil {
-					res := response.(*wire.MsgNeedSetResult)
-					return res.Txs, nil
+			if !useGetBlockTx {
+				if needSetRe, ok := p.needsetResult.LoadAndDelete(blockHash); ok {
+					if needSetRe != nil {
+						if nsr, ok := needSetRe.(*wire.MsgNeedSetResult); ok {
+							return nsr.Txs, nil
+						}
+					}
+					return nil, errors.New("invalid transaction in response")
 				}
-				return nil, errors.New("invalid transaction in response")
+			} else {
+				for _, txHash := range txHashes {
+					if txRes, exist := p.blockTxResult.LoadAndDelete(txHash); exist {
+						if msgTx, ok := txRes.(*wire.MsgTxAbe); ok {
+							res = append(res, msgTx)
+						}
+					}
+				}
+				if len(res) == len(txHashes) {
+					return res, nil
+				}
 			}
 		}
 	}
@@ -1561,12 +1609,12 @@ out:
 				p.cfg.Listeners.OnPong(p, msg)
 			}
 
-		case *wire.MsgAlert:
-			if p.cfg.Listeners.OnAlert != nil {
-				p.cfg.Listeners.OnAlert(p, msg)
-			}
+		//case *wire.MsgAlert:
+		//	if p.cfg.Listeners.OnAlert != nil {
+		//		p.cfg.Listeners.OnAlert(p, msg)
+		//	}
 
-			// TODO(ABE): ABE does not support filter.
+		// TODO(ABE): ABE does not support filter.
 		//case *wire.MsgMemPool:
 		//	if p.cfg.Listeners.OnMemPool != nil {
 		//		p.cfg.Listeners.OnMemPool(p, msg)
@@ -1606,6 +1654,15 @@ out:
 		case *wire.MsgNeedSetResult:
 			if p.cfg.Listeners.OnNeedSetResult != nil {
 				p.cfg.Listeners.OnNeedSetResult(p, msg, buf)
+			}
+		case *wire.MsgGetBlockTx:
+			if p.cfg.Listeners.OnGetBlockTx != nil {
+				p.cfg.Listeners.OnGetBlockTx(p, msg, buf)
+			}
+
+		case *wire.MsgBlockTx:
+			if p.cfg.Listeners.OnBlockTx != nil {
+				p.cfg.Listeners.OnBlockTx(p, msg, buf)
 			}
 
 		case *wire.MsgInv:
@@ -1665,12 +1722,12 @@ out:
 		//		p.cfg.Listeners.OnCFHeaders(p, msg)
 		//	}
 
-		case *wire.MsgFeeFilter:
-			if p.cfg.Listeners.OnFeeFilter != nil {
-				p.cfg.Listeners.OnFeeFilter(p, msg)
-			}
+		//case *wire.MsgFeeFilter:
+		//	if p.cfg.Listeners.OnFeeFilter != nil {
+		//		p.cfg.Listeners.OnFeeFilter(p, msg)
+		//	}
 
-			// TODO(ABE): ABE does not support filter.
+		// TODO(ABE): ABE does not support filter.
 		//case *wire.MsgFilterAdd:
 		//	if p.cfg.Listeners.OnFilterAdd != nil {
 		//		p.cfg.Listeners.OnFilterAdd(p, msg)

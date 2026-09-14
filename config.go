@@ -10,9 +10,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/pqabelian/abec/blockchain/consensus/ethashpow"
-	"github.com/pqabelian/abec/consensus/ethash"
-	"github.com/pqabelian/abec/wire"
 	"io"
 	"net"
 	"os"
@@ -23,8 +20,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abesuite/go-socks/socks"
-	flags "github.com/jessevdk/go-flags"
+	"github.com/pqabelian/abec/blockchain/consensus/ethashpow"
+	"github.com/pqabelian/abec/consensus/ethash"
+	"github.com/pqabelian/abec/wire"
 	"github.com/pqabelian/abec/abeutil"
 	"github.com/pqabelian/abec/blockchain"
 	"github.com/pqabelian/abec/chaincfg"
@@ -34,6 +32,8 @@ import (
 	_ "github.com/pqabelian/abec/database/ffldb"
 	"github.com/pqabelian/abec/mempool"
 	"github.com/pqabelian/abec/peer"
+	"github.com/abesuite/go-socks/socks"
+	flags "github.com/jessevdk/go-flags"
 )
 
 const (
@@ -95,14 +95,16 @@ const (
 )
 
 var (
-	defaultHomeDir     = abeutil.AppDataDir("abec", false)
-	defaultConfigFile  = filepath.Join(defaultHomeDir, defaultConfigFilename)
-	defaultDataDir     = filepath.Join(defaultHomeDir, defaultDataDirname)
-	defaultCacheTxDir  = filepath.Join(defaultHomeDir, defaultCacheTxDirname)
-	knownDbTypes       = database.SupportedDrivers()
-	defaultRPCKeyFile  = filepath.Join(defaultHomeDir, "rpc.key")
-	defaultRPCCertFile = filepath.Join(defaultHomeDir, "rpc.cert")
-	defaultLogDir      = filepath.Join(defaultHomeDir, defaultLogDirname)
+	defaultHomeDir            = abeutil.AppDataDir("abec", false)
+	defaultConfigFile         = filepath.Join(defaultHomeDir, defaultConfigFilename)
+	defaultDataDir            = filepath.Join(defaultHomeDir, defaultDataDirname)
+	defaultCacheTxDir         = filepath.Join(defaultHomeDir, defaultCacheTxDirname)
+	knownDbTypes              = database.SupportedDrivers()
+	defaultRPCKeyFile         = filepath.Join(defaultHomeDir, "rpc.key")
+	defaultRPCCertFile        = filepath.Join(defaultHomeDir, "rpc.cert")
+	defaultRPCKeyGetWorkFile  = filepath.Join(defaultHomeDir, "getwork-rpc.key")
+	defaultRPCCertGetWorkFile = filepath.Join(defaultHomeDir, "getwork-rpc.cert")
+	defaultLogDir             = filepath.Join(defaultHomeDir, defaultLogDirname)
 )
 
 // runServiceCommand is only set to a real function on Windows.  It is used
@@ -170,6 +172,7 @@ type config struct {
 	NoRelayPriority        bool          `long:"norelaypriority" description:"Do not require free or low-fee transactions to have high priority for relaying"`
 	DisableRPC             bool          `long:"norpc" description:"Disable built-in RPC server -- NOTE: The RPC server is disabled by default if no rpcuser/rpcpass or rpclimituser/rpclimitpass is specified"`
 	DisableTLS             bool          `long:"notls" description:"Disable TLS for the RPC server -- NOTE: This is only allowed if the RPC server is bound to localhost"`
+	DisableTLSGetWork      bool          `long:"notlsgetwork" description:"Disable TLS for the getwork RPC server -- NOTE: This is only allowed if the RPC server is bound to localhost"`
 	EnableGetWorkRPC       bool          `long:"enablegetwork" description:"Enable get work RPC server, this server is TLS disabled"`
 	OnionProxy             string        `long:"onion" description:"Connect to tor hidden services via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
 	OnionProxyPass         string        `long:"onionpass" default-mask:"-" description:"Password for onion proxy server"`
@@ -184,6 +187,8 @@ type config struct {
 	RelayNonStd            bool          `long:"relaynonstd" description:"Relay non-standard transactions regardless of the default settings for the active network."`
 	RPCCert                string        `long:"rpccert" description:"File containing the certificate file"`
 	RPCKey                 string        `long:"rpckey" description:"File containing the certificate key"`
+	RPCCertGetWork         string        `long:"rpccertgetwork" description:"File containing the certificate file"`
+	RPCKeyGetWork          string        `long:"rpckeygetwork" description:"File containing the certificate key"`
 	RPCLimitPass           string        `long:"rpclimitpass" default-mask:"-" description:"Password for limited RPC connections"`
 	RPCLimitUser           string        `long:"rpclimituser" description:"Username for limited RPC connections"`
 	RPCListeners           []string      `long:"rpclisten" description:"Add an interface/port to listen for RPC connections (default port: 8667, testnet: 18667, simnet: 18889)"`
@@ -522,6 +527,8 @@ func loadConfig() (*config, []string, error) {
 		DbType:                 defaultDbType,
 		RPCKey:                 defaultRPCKeyFile,
 		RPCCert:                defaultRPCCertFile,
+		RPCCertGetWork:         defaultRPCCertGetWorkFile,
+		RPCKeyGetWork:          defaultRPCKeyGetWorkFile,
 		MinRelayTxFee:          mempool.DefaultMinRelayTxFee,
 		FreeTxRelayLimit:       defaultFreeTxRelayLimit,
 		TrickleInterval:        defaultTrickleInterval,
@@ -1128,13 +1135,13 @@ func loadConfig() (*config, []string, error) {
 		activeNetParams.rpcPortGetWork)
 
 	// Only allow TLS to be disabled if the RPC is bound to localhost
-	// addresses or is not mainnet.
-	if activeNetParams.Net == wire.MainNet && !cfg.DisableRPC && cfg.DisableTLS {
-		allowedTLSListeners := map[string]struct{}{
-			"localhost": {},
-			"127.0.0.1": {},
-			"::1":       {},
-		}
+	// addresses.
+	allowedTLSListeners := map[string]struct{}{
+		"localhost": {},
+		"127.0.0.1": {},
+		"::1":       {},
+	}
+	if !cfg.DisableRPC && cfg.DisableTLS {
 		for _, addr := range cfg.RPCListeners {
 			host, _, err := net.SplitHostPort(addr)
 			if err != nil {
@@ -1154,6 +1161,31 @@ func loadConfig() (*config, []string, error) {
 				fmt.Fprintln(os.Stderr, usageMessage)
 				return nil, nil, err
 			}
+
+		}
+	}
+
+	if cfg.EnableGetWorkRPC && cfg.DisableTLSGetWork {
+		for _, addr := range cfg.RPCListenersGetWork {
+			host, _, err := net.SplitHostPort(addr)
+			if err != nil {
+				str := "%s: RPC listen interface '%s' is " +
+					"invalid: %v"
+				err := fmt.Errorf(str, funcName, addr, err)
+				fmt.Fprintln(os.Stderr, err)
+				fmt.Fprintln(os.Stderr, usageMessage)
+				return nil, nil, err
+			}
+			if _, ok := allowedTLSListeners[host]; !ok {
+				str := "%s: the --notlsgetwork option may not be used " +
+					"when binding RPC to non localhost " +
+					"addresses: %s"
+				err := fmt.Errorf(str, funcName, addr)
+				fmt.Fprintln(os.Stderr, err)
+				fmt.Fprintln(os.Stderr, usageMessage)
+				return nil, nil, err
+			}
+
 		}
 	}
 

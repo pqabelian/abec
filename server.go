@@ -599,6 +599,43 @@ func (sp *serverPeer) OnNeedSetResult(p *peer.Peer, msg *wire.MsgNeedSetResult, 
 
 }
 
+func (sp *serverPeer) OnGetBlockTx(_ *peer.Peer, msg *wire.MsgGetBlockTx, buf []byte) {
+	// Convert the raw MsgBlock to a abeutil.Block which provides some
+	// convenience methods and things such as hash caching.
+	err := sp.server.pushBlockTxMsg(sp, msg.BlockHash, msg.TxHash, wire.WitnessEncoding)
+	if err != nil {
+		// do nothing
+	}
+}
+
+func (sp *serverPeer) OnBlockTx(p *peer.Peer, msg *wire.MsgBlockTx, buf []byte) {
+	txHash := msg.Tx.TxHash()
+	peerExist, reqExist := sp.server.syncManager.ExistRequestedBlockTxInPeerStates(p, msg.BlockHash, txHash)
+	if !peerExist {
+		peerLog.Warnf("Received pruned block message from unknown peer %s", p)
+		return
+	}
+
+	// If we didn't ask for this needset then the peer is misbehaving.
+	if !reqExist {
+		// Disconnect with the misbehaving peer
+		peerLog.Warnf("Got unrequested getblocktx %v from %s -- "+
+			"disconnecting", msg.BlockHash, p.Addr())
+		p.Disconnect()
+		return
+	}
+
+	// check witness in response
+	if !msg.Tx.HasTxWitness() {
+		peerLog.Warnf("Got blocktx %v from %s, but some transaction in response does not has witness -- "+
+			"disconnecting", msg.BlockHash, p.Addr())
+		p.Disconnect()
+		return
+	}
+	p.StoreBlockTxResult(msg)
+	sp.server.syncManager.RemoveRequestedBlockTxInPeerStates(p, msg.BlockHash, txHash)
+}
+
 // OnInv is invoked when a peer receives an inv message and is
 // used to examine the inventory being advertised by the remote peer and react
 // accordingly.  We pass the message down to blockmanager which will call
@@ -817,17 +854,17 @@ func (sp *serverPeer) OnGetHeaders(_ *peer.Peer, msg *wire.MsgGetHeaders) {
 // is used by remote peers to request that no transactions which have a fee rate
 // lower than provided value are inventoried to them.  The peer will be
 // disconnected if an invalid fee filter value is provided.
-func (sp *serverPeer) OnFeeFilter(_ *peer.Peer, msg *wire.MsgFeeFilter) {
-	// Check that the passed minimum fee is a valid amount.
-	if msg.MinFee < 0 || msg.MinFee > int64(abeutil.MaxNeutrino) {
-		peerLog.Debugf("Peer %v sent an invalid feefilter '%v' -- "+
-			"disconnecting", sp, abeutil.Amount(msg.MinFee))
-		sp.Disconnect()
-		return
-	}
-
-	atomic.StoreInt64(&sp.feeFilter, msg.MinFee)
-}
+//func (sp *serverPeer) OnFeeFilter(_ *peer.Peer, msg *wire.MsgFeeFilter) {
+//	// Check that the passed minimum fee is a valid amount.
+//	if msg.MinFee < 0 || msg.MinFee > int64(abeutil.MaxNeutrino) {
+//		peerLog.Debugf("Peer %v sent an invalid feefilter '%v' -- "+
+//			"disconnecting", sp, abeutil.Amount(msg.MinFee))
+//		sp.Disconnect()
+//		return
+//	}
+//
+//	atomic.StoreInt64(&sp.feeFilter, msg.MinFee)
+//}
 
 // OnGetAddr is invoked when a peer receives a getaddr Abelian message
 // and is used to provide the peer with known addresses from the address
@@ -1121,6 +1158,34 @@ func (s *server) pushNeedSetResultMsg(sp *serverPeer, blockHash chainhash.Hash,
 	}
 	resMsg := wire.NewMsgNeedSetResult(blockHash, rtxs)
 
+	sp.QueueMessageWithEncoding(resMsg, nil, encoding)
+	//sp.QueueMessageWithEncoding(block.MsgBlock(), doneChan, encoding)
+	//sp.PushRejectMsg(wire.CmdNeedSet, wire.RejectInvalid, "invalid block hash", &blockHash, false)
+
+	return nil
+}
+
+func (s *server) pushBlockTxMsg(sp *serverPeer, blockHash chainhash.Hash,
+	txHash chainhash.Hash, encoding wire.MessageEncoding) error {
+
+	block, err := sp.server.chain.BlockByHashAbe(&blockHash)
+	if err != nil {
+		sp.PushRejectMsg(wire.CmdBlockTx, wire.RejectInvalid, "invalid block hash", &blockHash, false)
+		return err
+	}
+	originTxs := block.Transactions()
+	txhashMap := make(map[chainhash.Hash]*abeutil.TxAbe)
+	for i := 0; i < len(originTxs); i++ {
+		txhash := originTxs[i].Hash()
+		txhashMap[*txhash] = originTxs[i]
+	}
+
+	txAbe, exist := txhashMap[txHash]
+	if !exist {
+		sp.PushRejectMsg(wire.CmdBlockTx, wire.RejectInvalid, "invalid tx hash", &txHash, false)
+		return err
+	}
+	resMsg := wire.NewMsgBlockTx(blockHash, txAbe.MsgTx())
 	sp.QueueMessageWithEncoding(resMsg, nil, encoding)
 	//sp.QueueMessageWithEncoding(block.MsgBlock(), doneChan, encoding)
 	//sp.PushRejectMsg(wire.CmdNeedSet, wire.RejectInvalid, "invalid block hash", &blockHash, false)
@@ -1846,23 +1911,25 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			OnPrunedBlock:   sp.OnPrunedBlock,
 			OnNeedSet:       sp.OnNeedSet,
 			OnNeedSetResult: sp.OnNeedSetResult,
+			OnGetBlockTx:    sp.OnGetBlockTx,
+			OnBlockTx:       sp.OnBlockTx,
 			OnInv:           sp.OnInv,
 			OnHeaders:       sp.OnHeaders,
 			OnGetData:       sp.OnGetData,
 			OnGetBlocks:     sp.OnGetBlocks,
 			OnGetHeaders:    sp.OnGetHeaders,
-			OnFeeFilter:     sp.OnFeeFilter,
-			OnGetAddr:       sp.OnGetAddr,
-			OnAddr:          sp.OnAddr,
-			OnRead:          sp.OnRead,
-			OnWrite:         sp.OnWrite,
-			OnNotFound:      sp.OnNotFound,
+			//OnFeeFilter:     sp.OnFeeFilter,
+			OnGetAddr:  sp.OnGetAddr,
+			OnAddr:     sp.OnAddr,
+			OnRead:     sp.OnRead,
+			OnWrite:    sp.OnWrite,
+			OnNotFound: sp.OnNotFound,
 
 			// Note: The reference client currently bans peers that send alerts
 			// not signed with its key.  We could verify against their key, but
 			// since the reference client is currently unwilling to support
 			// other implementations' alert messages, we will not relay theirs.
-			OnAlert: nil,
+			//OnAlert: nil,
 		},
 		NewestBlock:        sp.newestBlock,
 		HostToNetAddress:   sp.server.addrManager.HostToNetAddress,
@@ -2479,6 +2546,31 @@ func setupRPCListeners() ([]net.Listener, error) {
 // addresses.
 func setupRPCListenersGetWork() ([]net.Listener, error) {
 	listenFunc := net.Listen
+	if !cfg.DisableTLSGetWork {
+		// Generate the TLS cert and key file if both don't already
+		// exist.
+		if !fileExists(cfg.RPCKeyGetWork) && !fileExists(cfg.RPCCertGetWork) {
+			err := genCertPair(cfg.RPCCertGetWork, cfg.RPCKeyGetWork)
+			if err != nil {
+				return nil, err
+			}
+		}
+		keypair, err := tls.LoadX509KeyPair(cfg.RPCCertGetWork, cfg.RPCKeyGetWork)
+		if err != nil {
+			return nil, err
+		}
+
+		tlsConfig := tls.Config{
+			Certificates: []tls.Certificate{keypair},
+			MinVersion:   tls.VersionTLS12,
+		}
+
+		// Change the standard net.Listen function to the tls one.
+		listenFunc = func(net string, laddr string) (net.Listener, error) {
+			return tls.Listen(net, laddr, &tlsConfig)
+		}
+	}
+
 	netAddrs, err := parseListeners(cfg.RPCListenersGetWork)
 	if err != nil {
 		return nil, err

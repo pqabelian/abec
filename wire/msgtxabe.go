@@ -883,7 +883,8 @@ func (msg *MsgTxAbe) Command() string {
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgTxAbe) MaxPayloadLength(pver uint32) uint32 {
-	return MaxBlockPayloadAbe
+	//return MaxBlockPayloadAbe
+	return 32 * 1024 * 1024
 }
 
 // todo: Is it safe to use int as the size type?

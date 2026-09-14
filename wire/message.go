@@ -3,9 +3,10 @@ package wire
 import (
 	"bytes"
 	"fmt"
-	"github.com/pqabelian/abec/chainhash"
 	"io"
 	"unicode/utf8"
+
+	"github.com/pqabelian/abec/chainhash"
 )
 
 // MessageHeaderSize is the number of bytes in a bitcoin message header.
@@ -34,16 +35,20 @@ const (
 	CmdInv           = "inv"
 	CmdNeedSet       = "needset"
 	CmdNeedSetResult = "nsresult"
-	CmdGetData       = "getdata"
-	CmdNotFound      = "notfound"
-	CmdBlock         = "block"
-	CmdPrunedBlock   = "prunedblock"
-	CmdTx            = "tx"
-	CmdGetHeaders    = "getheaders"
-	CmdHeaders       = "headers"
-	CmdPing          = "ping"
-	CmdPong          = "pong"
-	CmdAlert         = "alert"
+
+	CmdGetBlockTx = "getblocktx"
+	CmdBlockTx    = "blocktx"
+
+	CmdGetData     = "getdata"
+	CmdNotFound    = "notfound"
+	CmdBlock       = "block"
+	CmdPrunedBlock = "prunedblock"
+	CmdTx          = "tx"
+	CmdGetHeaders  = "getheaders"
+	CmdHeaders     = "headers"
+	CmdPing        = "ping"
+	CmdPong        = "pong"
+	//CmdAlert         = "alert"
 	// TODO(ABE): ABE does not support filter.
 	//CmdMemPool    = "mempool"
 	// TODO(ABE): ABE does not support filter.
@@ -122,6 +127,10 @@ func makeEmptyMessage(command string) (Message, error) {
 
 	case CmdNeedSetResult:
 		msg = &MsgNeedSetResult{}
+	case CmdGetBlockTx:
+		msg = &MsgGetBlockTx{}
+	case CmdBlockTx:
+		msg = &MsgBlockTx{}
 
 	case CmdInv:
 		msg = &MsgInv{}
@@ -147,10 +156,10 @@ func makeEmptyMessage(command string) (Message, error) {
 	case CmdHeaders:
 		msg = &MsgHeaders{}
 
-	case CmdAlert:
-		msg = &MsgAlert{}
+	//case CmdAlert:
+	//	msg = &MsgAlert{}
 
-		// TODO(ABE): ABE does not support filter.
+	// TODO(ABE): ABE does not support filter.
 	//case CmdMemPool:
 	//	msg = &MsgMemPool{}
 
@@ -173,10 +182,10 @@ func makeEmptyMessage(command string) (Message, error) {
 	case CmdSendHeaders:
 		msg = &MsgSendHeaders{}
 
-	case CmdFeeFilter:
-		msg = &MsgFeeFilter{}
+	//case CmdFeeFilter:
+	//	msg = &MsgFeeFilter{}
 
-		// TODO(ABE): ABE does not support filter.
+	// TODO(ABE): ABE does not support filter.
 	//case CmdGetCFilters:
 	//	msg = &MsgGetCFilters{}
 	//
