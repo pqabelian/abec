@@ -96,14 +96,16 @@ const (
 )
 
 var (
-	defaultHomeDir     = abeutil.AppDataDir("abec", false)
-	defaultConfigFile  = filepath.Join(defaultHomeDir, defaultConfigFilename)
-	defaultDataDir     = filepath.Join(defaultHomeDir, defaultDataDirname)
-	defaultCacheTxDir  = filepath.Join(defaultHomeDir, defaultCacheTxDirname)
-	knownDbTypes       = database.SupportedDrivers()
-	defaultRPCKeyFile  = filepath.Join(defaultHomeDir, "rpc.key")
-	defaultRPCCertFile = filepath.Join(defaultHomeDir, "rpc.cert")
-	defaultLogDir      = filepath.Join(defaultHomeDir, defaultLogDirname)
+	defaultHomeDir            = abeutil.AppDataDir("abec", false)
+	defaultConfigFile         = filepath.Join(defaultHomeDir, defaultConfigFilename)
+	defaultDataDir            = filepath.Join(defaultHomeDir, defaultDataDirname)
+	defaultCacheTxDir         = filepath.Join(defaultHomeDir, defaultCacheTxDirname)
+	knownDbTypes              = database.SupportedDrivers()
+	defaultRPCKeyFile         = filepath.Join(defaultHomeDir, "rpc.key")
+	defaultRPCCertFile        = filepath.Join(defaultHomeDir, "rpc.cert")
+	defaultRPCKeyGetWorkFile  = filepath.Join(defaultHomeDir, "getwork-rpc.key")
+	defaultRPCCertGetWorkFile = filepath.Join(defaultHomeDir, "getwork-rpc.cert")
+	defaultLogDir             = filepath.Join(defaultHomeDir, defaultLogDirname)
 )
 
 // runServiceCommand is only set to a real function on Windows.  It is used
@@ -526,6 +528,8 @@ func loadConfig() (*config, []string, error) {
 		DbType:                 defaultDbType,
 		RPCKey:                 defaultRPCKeyFile,
 		RPCCert:                defaultRPCCertFile,
+		RPCCertGetWork:         defaultRPCCertGetWorkFile,
+		RPCKeyGetWork:          defaultRPCKeyGetWorkFile,
 		MinRelayTxFee:          mempool.DefaultMinRelayTxFee,
 		FreeTxRelayLimit:       defaultFreeTxRelayLimit,
 		TrickleInterval:        defaultTrickleInterval,
@@ -1132,59 +1136,57 @@ func loadConfig() (*config, []string, error) {
 		activeNetParams.rpcPortGetWork)
 
 	// Only allow TLS to be disabled if the RPC is bound to localhost
-	// addresses or is not mainnet.
-	if activeNetParams.Net == wire.MainNet {
-		allowedTLSListeners := map[string]struct{}{
-			"localhost": {},
-			"127.0.0.1": {},
-			"::1":       {},
-		}
-		if !cfg.DisableRPC && cfg.DisableTLS {
-			for _, addr := range cfg.RPCListeners {
-				host, _, err := net.SplitHostPort(addr)
-				if err != nil {
-					str := "%s: RPC listen interface '%s' is " +
-						"invalid: %v"
-					err := fmt.Errorf(str, funcName, addr, err)
-					fmt.Fprintln(os.Stderr, err)
-					fmt.Fprintln(os.Stderr, usageMessage)
-					return nil, nil, err
-				}
-				if _, ok := allowedTLSListeners[host]; !ok {
-					str := "%s: the --notls option may not be used " +
-						"when binding RPC to non localhost " +
-						"addresses: %s"
-					err := fmt.Errorf(str, funcName, addr)
-					fmt.Fprintln(os.Stderr, err)
-					fmt.Fprintln(os.Stderr, usageMessage)
-					return nil, nil, err
-				}
-
+	// addresses.
+	allowedTLSListeners := map[string]struct{}{
+		"localhost": {},
+		"127.0.0.1": {},
+		"::1":       {},
+	}
+	if !cfg.DisableRPC && cfg.DisableTLS {
+		for _, addr := range cfg.RPCListeners {
+			host, _, err := net.SplitHostPort(addr)
+			if err != nil {
+				str := "%s: RPC listen interface '%s' is " +
+					"invalid: %v"
+				err := fmt.Errorf(str, funcName, addr, err)
+				fmt.Fprintln(os.Stderr, err)
+				fmt.Fprintln(os.Stderr, usageMessage)
+				return nil, nil, err
 			}
-		}
-
-		if cfg.EnableGetWorkRPC && cfg.DisableTLSGetWork {
-			for _, addr := range cfg.RPCListenersGetWork {
-				host, _, err := net.SplitHostPort(addr)
-				if err != nil {
-					str := "%s: RPC listen interface '%s' is " +
-						"invalid: %v"
-					err := fmt.Errorf(str, funcName, addr, err)
-					fmt.Fprintln(os.Stderr, err)
-					fmt.Fprintln(os.Stderr, usageMessage)
-					return nil, nil, err
-				}
-				if _, ok := allowedTLSListeners[host]; !ok {
-					str := "%s: the --notlsgetwork option may not be used " +
-						"when binding RPC to non localhost " +
-						"addresses: %s"
-					err := fmt.Errorf(str, funcName, addr)
-					fmt.Fprintln(os.Stderr, err)
-					fmt.Fprintln(os.Stderr, usageMessage)
-					return nil, nil, err
-				}
-
+			if _, ok := allowedTLSListeners[host]; !ok {
+				str := "%s: the --notls option may not be used " +
+					"when binding RPC to non localhost " +
+					"addresses: %s"
+				err := fmt.Errorf(str, funcName, addr)
+				fmt.Fprintln(os.Stderr, err)
+				fmt.Fprintln(os.Stderr, usageMessage)
+				return nil, nil, err
 			}
+
+		}
+	}
+
+	if cfg.EnableGetWorkRPC && cfg.DisableTLSGetWork {
+		for _, addr := range cfg.RPCListenersGetWork {
+			host, _, err := net.SplitHostPort(addr)
+			if err != nil {
+				str := "%s: RPC listen interface '%s' is " +
+					"invalid: %v"
+				err := fmt.Errorf(str, funcName, addr, err)
+				fmt.Fprintln(os.Stderr, err)
+				fmt.Fprintln(os.Stderr, usageMessage)
+				return nil, nil, err
+			}
+			if _, ok := allowedTLSListeners[host]; !ok {
+				str := "%s: the --notlsgetwork option may not be used " +
+					"when binding RPC to non localhost " +
+					"addresses: %s"
+				err := fmt.Errorf(str, funcName, addr)
+				fmt.Fprintln(os.Stderr, err)
+				fmt.Fprintln(os.Stderr, usageMessage)
+				return nil, nil, err
+			}
+
 		}
 	}
 
