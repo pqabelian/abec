@@ -100,6 +100,9 @@ Application Options:
       --notls                 Disable TLS for the RPC server -- NOTE: This is
                               only allowed if the RPC server is bound to
                               localhost
+      --notlsgetwork          Disable TLS for the getwork RPC server -- NOTE: This is
+                              only allowed if the RPC server is bound to
+                              localhost
       --onion=                Connect to tor hidden services via SOCKS5 proxy
                               (eg. 127.0.0.1:9050)
       --onionpass=            Password for onion proxy server
