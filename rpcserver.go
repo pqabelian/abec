@@ -2913,7 +2913,7 @@ func handleSubmitWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 
 	err = <-submitWorkReq.Err
 	if err != nil {
-		rpcsLog.Infof("handleSubmitWork receives an error returned by external miner manager: ", err.Error())
+		rpcsLog.Infof("handleSubmitWork receives an error returned by external miner manager: %s", err.Error())
 		return nil, &abejson.RPCError{
 			Code:    abejson.ErrRPCSubmitWorkError,
 			Message: err.Error(),
@@ -5187,7 +5187,7 @@ func (s *rpcServer) jsonRPCRead(w http.ResponseWriter, r *http.Request, isAdmin 
 	hj, ok := w.(http.Hijacker)
 	if !ok {
 		errMsg := "webserver doesn't support hijacking"
-		rpcsLog.Warnf(errMsg)
+		rpcsLog.Warnf("%s", errMsg)
 		errCode := http.StatusInternalServerError
 		http.Error(w, strconv.Itoa(errCode)+" "+errMsg, errCode)
 		return

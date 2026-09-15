@@ -561,7 +561,8 @@ func (sp *serverPeer) OnNeedSet(_ *peer.Peer, msg *wire.MsgNeedSet, buf []byte) 
 	// convenience methods and things such as hash caching.
 	err := sp.server.pushNeedSetResultMsg(sp, msg.BlockHash, msg.Hashes, wire.WitnessEncoding)
 	if err != nil {
-		// do nothing
+		peerLog.Errorf("Get error during processing needset message: %s", err)
+		return
 	}
 }
 
@@ -592,7 +593,6 @@ func (sp *serverPeer) OnNeedSetResult(p *peer.Peer, msg *wire.MsgNeedSetResult, 
 			peerLog.Warnf("Got needset %v from %s, but some transaction in response does not has witness -- "+
 				"disconnecting", msg.BlockHash, p.Addr())
 			p.Disconnect()
-			p.StoreNeedSetResult(nil)
 			return
 		}
 	}
@@ -604,7 +604,8 @@ func (sp *serverPeer) OnGetBlockTx(_ *peer.Peer, msg *wire.MsgGetBlockTx, buf []
 	// convenience methods and things such as hash caching.
 	err := sp.server.pushBlockTxMsg(sp, msg.BlockHash, msg.TxHash, wire.WitnessEncoding)
 	if err != nil {
-		// do nothing
+		peerLog.Errorf("Get error during processing getblocktx message: %s", err)
+		return
 	}
 }
 
@@ -1146,18 +1147,19 @@ func (s *server) pushNeedSetResultMsg(sp *serverPeer, blockHash chainhash.Hash,
 		sp.PushRejectMsg(wire.CmdNeedSet, wire.RejectInvalid, "invalid block hash", &blockHash, false)
 		return err
 	}
-	originTxs := block.Transactions()
+	txsInBlock := block.Transactions()
 	txhashMap := make(map[chainhash.Hash]*abeutil.TxAbe)
-	for i := 0; i < len(originTxs); i++ {
-		txhash := originTxs[i].Hash()
-		txhashMap[*txhash] = originTxs[i]
+	for i := 0; i < len(txsInBlock); i++ {
+		txhash := txsInBlock[i].Hash()
+		txhashMap[*txhash] = txsInBlock[i]
 	}
+
 	rtxs := make([]*wire.MsgTxAbe, len(txHashes))
-	for i, txhash := range txHashes {
-		txAbe, exist := txhashMap[txhash]
+	for i, txHash := range txHashes {
+		txAbe, exist := txhashMap[txHash]
 		if !exist {
 			sp.PushRejectMsg(wire.CmdNeedSet, wire.RejectInvalid, "invalid transaction hash", &blockHash, false)
-			return fmt.Errorf("non-existent transaction %d in block %s is requested", txhash, blockHash)
+			return fmt.Errorf("non-existent transaction %d in block %s is requested", txHash, blockHash)
 		}
 		rtxs[i] = txAbe.MsgTx()
 	}
@@ -1179,16 +1181,16 @@ func (s *server) pushBlockTxMsg(sp *serverPeer, blockHash chainhash.Hash,
 		return err
 	}
 	originTxs := block.Transactions()
-	txhashMap := make(map[chainhash.Hash]*abeutil.TxAbe)
+	txMap := make(map[chainhash.Hash]*abeutil.TxAbe)
 	for i := 0; i < len(originTxs); i++ {
 		txhash := originTxs[i].Hash()
-		txhashMap[*txhash] = originTxs[i]
+		txMap[*txhash] = originTxs[i]
 	}
 
-	txAbe, exist := txhashMap[txHash]
+	txAbe, exist := txMap[txHash]
 	if !exist {
 		sp.PushRejectMsg(wire.CmdBlockTx, wire.RejectInvalid, "invalid tx hash", &txHash, false)
-		return err
+		return fmt.Errorf("non-existent transaction %d in block %s is requested", txHash, blockHash)
 	}
 	resMsg := wire.NewMsgBlockTx(blockHash, txAbe.MsgTx())
 	sp.QueueMessageWithEncoding(resMsg, nil, encoding)
