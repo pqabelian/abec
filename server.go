@@ -969,7 +969,7 @@ func (sp *serverPeer) OnNotFound(p *peer.Peer, msg *wire.MsgNotFound) {
 	var numBlocks, numTxns uint32
 	for _, inv := range msg.InvList {
 		switch inv.Type {
-		case wire.InvTypeBlock:
+		case wire.InvTypeBlock, wire.InvTypePrunedBlock:
 			numBlocks++
 		case wire.InvTypeWitnessBlock:
 			numBlocks++

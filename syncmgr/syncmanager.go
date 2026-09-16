@@ -2121,6 +2121,9 @@ out:
 			//case *needSetMsg:
 			//	sm.handleNeedSetMsg(msg)
 
+			case *notFoundMsg:
+				sm.handleNotFoundMsg(msg)
+
 			case *invMsg:
 				sm.handleInvMsg(msg)
 
@@ -2417,6 +2420,27 @@ func (sm *SyncManager) QueueNotFound(notFound *wire.MsgNotFound, peer *peerpkg.P
 	}
 
 	sm.msgChan <- &notFoundMsg{notFound: notFound, peer: peer}
+}
+
+func (sm *SyncManager) handleNotFoundMsg(msg *notFoundMsg) {
+	state, exists := sm.peerStates[msg.peer]
+	if !exists {
+		return
+	}
+	for _, iv := range msg.notFound.InvList {
+		switch iv.Type {
+		case wire.InvTypeTx, wire.InvTypeWitnessTx:
+			if _, requested := state.requestedTxns[iv.Hash]; requested {
+				delete(state.requestedTxns, iv.Hash)
+				delete(sm.requestedTxns, iv.Hash)
+			}
+		case wire.InvTypeBlock, wire.InvTypeWitnessBlock, wire.InvTypePrunedBlock:
+			if _, requested := state.requestedBlocks[iv.Hash]; requested {
+				delete(state.requestedBlocks, iv.Hash)
+				delete(sm.requestedBlocks, iv.Hash)
+			}
+		}
+	}
 }
 
 // DonePeer informs the blockmanager that a peer has disconnected.
