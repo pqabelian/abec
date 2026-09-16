@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 func encodedMessage(t *testing.T, msg wire.Message) []byte {

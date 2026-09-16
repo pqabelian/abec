@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/chainhash"
-	peerpkg "github.com/abesuite/abec/peer"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/chainhash"
+	peerpkg "github.com/pqabelian/abec/peer"
+	"github.com/pqabelian/abec/wire"
 )
 
 const (
