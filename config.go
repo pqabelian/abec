@@ -92,6 +92,8 @@ const (
 	defaultAllowDiskCacheTx      = true
 	defaultCacheTxDirname        = "txcaches"
 	defaultCacheTxFilename       = "txcache.abe"
+
+	defaultMaxPendingResponseMiB = 512
 )
 
 var (
@@ -159,6 +161,7 @@ type config struct {
 	LogDir                 string        `long:"logdir" description:"Directory to log output."`
 	MaxOrphanTxs           int           `long:"maxorphantx" description:"Max number of orphan transactions to keep in memory"`
 	MaxPeers               int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
+	MaxPendingResponseMiB  uint64        `long:"maxpendingresponsemib" description:"Global limit in MiB for outstanding P2P requests times their response payload maxima (minimum 320)"`
 	MiningAddrs            []string      `long:"miningaddr" description:"Add the specified payment address to the list of addresses to use for generated blocks -- At least one address is required if the generate or externalgenerate option is set"`
 	MinRelayTxFee          uint64        `long:"minrelaytxfee" description:"The minimum transaction fee in Neutrino/kB to be considered a non-zero fee."`
 	DisableBanning         bool          `long:"nobanning" description:"Disable banning of misbehaving peers"`
@@ -173,7 +176,7 @@ type config struct {
 	DisableRPC             bool          `long:"norpc" description:"Disable built-in RPC server -- NOTE: The RPC server is disabled by default if no rpcuser/rpcpass or rpclimituser/rpclimitpass is specified"`
 	DisableTLS             bool          `long:"notls" description:"Disable TLS for the RPC server -- NOTE: This is only allowed if the RPC server is bound to localhost"`
 	DisableTLSGetWork      bool          `long:"notlsgetwork" description:"Disable TLS for the getwork RPC server -- NOTE: This is only allowed if the RPC server is bound to localhost"`
-	EnableGetWorkRPC       bool          `long:"enablegetwork" description:"Enable get work RPC server, this server is TLS disabled"`
+	EnableGetWorkRPC       bool          `long:"enablegetwork" description:"Enable getwork RPC server -- NOTE: Only admin users can access the resources"`
 	OnionProxy             string        `long:"onion" description:"Connect to tor hidden services via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
 	OnionProxyPass         string        `long:"onionpass" default-mask:"-" description:"Password for onion proxy server"`
 	OnionProxyUser         string        `long:"onionuser" description:"Username for onion proxy server"`
@@ -517,6 +520,7 @@ func loadConfig() (*config, []string, error) {
 		ConfigFile:             defaultConfigFile,
 		DebugLevel:             defaultLogLevel,
 		MaxPeers:               defaultMaxPeers,
+		MaxPendingResponseMiB:  defaultMaxPendingResponseMiB,
 		BanDuration:            defaultBanDuration,
 		BanThreshold:           defaultBanThreshold,
 		RPCMaxClients:          defaultMaxRPCClients,
@@ -766,6 +770,10 @@ func loadConfig() (*config, []string, error) {
 	cfg.CacheTxDir = filepath.Join(cfg.CacheTxDir, netName(activeNetParams))
 
 	cfg.tLogFilename = filepath.Join(cfg.DataDir, defaultTLogFilename)
+
+	if cfg.MaxPendingResponseMiB < wire.MaxMessagePayload/(1024*1024) || cfg.MaxPendingResponseMiB > ^uint64(0)/(1024*1024) {
+		return nil, nil, fmt.Errorf("%s: maxpendingresponsemib must be at least %d and fit in a uint64 byte count", funcName, wire.MaxMessagePayload/(1024*1024))
+	}
 
 	// Validate database type.
 	if !validDbType(cfg.DbType) {

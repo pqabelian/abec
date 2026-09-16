@@ -297,6 +297,10 @@ type Config struct {
 	Chain *blockchain.BlockChain
 
 	CommunicationCache *sync.Map
+
+	// RequestCounter is shared by all peers of a server. Nil disables the
+	// shared cap for standalone users of this package.
+	RequestCounter *wire.RequestCounter
 }
 
 // minUint32 is a helper function to return the minimum of two uint32s.
@@ -351,9 +355,10 @@ func newNetAddress(addr net.Addr, services wire.ServiceFlag) (*wire.NetAddress, 
 // when the message has been sent (or won't be sent due to things such as
 // shutdown)
 type outMsg struct {
-	msg      wire.Message
-	doneChan chan<- struct{}
-	encoding wire.MessageEncoding
+	requestsAdded bool
+	msg           wire.Message
+	doneChan      chan<- struct{}
+	encoding      wire.MessageEncoding
 }
 
 // stallControlCmd represents the command of a stall control message.
@@ -502,8 +507,11 @@ type Peer struct {
 	sendDoneQueue chan struct{}
 	outputInvChan chan *wire.InvVect
 
-	needsetResult sync.Map
-	blockTxResult sync.Map
+	// pending message
+	// getblocktx <- blocktx
+	// needset    <- nsresult
+	// getdata    <- tx / block
+	pendingRequest *wire.MessageRequests
 
 	communicationCache *sync.Map
 
@@ -904,14 +912,6 @@ func (p *Peer) IsWitnessEnabled() bool {
 	return witnessEnabled
 }
 
-func (p *Peer) StoreNeedSetResult(msg *wire.MsgNeedSetResult) {
-	p.needsetResult.Store(msg.BlockHash, msg)
-}
-func (p *Peer) StoreBlockTxResult(msg *wire.MsgBlockTx) {
-	txHash := msg.Tx.TxHash()
-	p.blockTxResult.Store(txHash, msg.Tx)
-}
-
 // PushAddrMsg sends an addr message to the connected peer using the provided
 // addresses.  This function is useful over manually sending the message via
 // QueueMessage since it automatically limits the addresses to the maximum
@@ -1054,59 +1054,6 @@ func (p *Peer) UseGetBlockTx() bool {
 
 	return useGetBlockTx
 }
-func (p *Peer) FetchMissingBlockTxs(blockHash chainhash.Hash, txHashes []chainhash.Hash) ([]*wire.MsgTxAbe, error) {
-	useGetBlockTx := p.UseGetBlockTx()
-	if !useGetBlockTx {
-		// Construct the needset request and queue it to be sent.
-		msg := wire.NewMsgNeedSet(blockHash, txHashes)
-		p.QueueMessage(msg, nil)
-	} else {
-		for _, txHash := range txHashes {
-			msg := wire.NewMsgGetBlockTx(blockHash, txHash)
-			p.QueueMessage(msg, nil)
-		}
-	}
-
-	//	todo (ABE): No need to get the reply? if the correspoding peer does not give any reply, what will happen?
-	//	todo (ABE): how to guarantee the corresponding peer think itself to be cureent?
-	timeoutTimer := time.NewTimer(time.Second * 30)
-	defer timeoutTimer.Stop()
-	txTicker := time.NewTicker(time.Second)
-	defer txTicker.Stop()
-
-	res := make([]*wire.MsgTxAbe, 0, len(txHashes))
-	for {
-		select {
-		case <-timeoutTimer.C:
-			p.Disconnect()
-			return nil, errors.New("time out")
-		case <-p.quit:
-			return nil, errors.New("peer disconnected")
-		case <-txTicker.C:
-			if !useGetBlockTx {
-				if needSetRe, ok := p.needsetResult.LoadAndDelete(blockHash); ok {
-					if needSetRe != nil {
-						if nsr, ok := needSetRe.(*wire.MsgNeedSetResult); ok {
-							return nsr.Txs, nil
-						}
-					}
-					return nil, errors.New("invalid transaction in response")
-				}
-			} else {
-				for _, txHash := range txHashes {
-					if txRes, exist := p.blockTxResult.LoadAndDelete(txHash); exist {
-						if msgTx, ok := txRes.(*wire.MsgTxAbe); ok {
-							res = append(res, msgTx)
-						}
-					}
-				}
-				if len(res) == len(txHashes) {
-					return res, nil
-				}
-			}
-		}
-	}
-}
 
 // PushRejectMsg sends a reject message for the provided command, reject code,
 // reject reason, and hash.  The hash will only be used when the command is a tx
@@ -1167,8 +1114,8 @@ func (p *Peer) handlePongMsg(msg *wire.MsgPong) {
 
 // readMessage reads the next abelian message from the peer with logging.
 func (p *Peer) readMessage(encoding wire.MessageEncoding) (wire.Message, []byte, error) {
-	n, msg, buf, err := wire.ReadMessageWithEncodingN(p.conn,
-		p.ProtocolVersion(), p.cfg.ChainParams.Net, encoding)
+	n, msg, buf, err := wire.ReadMessageWithRequestsN(p.conn,
+		p.ProtocolVersion(), p.cfg.ChainParams.Net, encoding, p.pendingRequest)
 	//if msg != nil {
 	//	fmt.Printf("receive a %s from peer:%v\n", msg.Command(), p.addr)
 	//}
@@ -1552,7 +1499,7 @@ out:
 			if p.shouldHandleReadError(err) {
 				errMsg := fmt.Sprintf("Can't read message from %s: %v", p, err)
 				if err != io.ErrUnexpectedEOF {
-					log.Errorf(errMsg)
+					log.Error(errMsg)
 				}
 
 				// Push a reject message for the malformed message and wait for
@@ -1801,37 +1748,41 @@ func (p *Peer) queueHandler() {
 	// passed to outHandler.
 	waiting := false
 
-	// To avoid duplication below.
-	queuePacket := func(msg outMsg, list *list.List, waiting bool) bool {
-		if !waiting { // no waiting
-			p.sendQueue <- msg
-		} else {
-			list.PushBack(msg)
-		}
-		// we are always waiting now.
-		return true
-	}
 out:
 	for {
+		var requestsChanged <-chan struct{}
+		if !waiting {
+			requestsChanged = p.cfg.RequestCounter.Changed()
+			// A blocked download must not block pong, reject, or responses to
+			// the remote peer's requests. Those need no response reservation.
+			for next := pendingMsgs.Front(); next != nil; next = next.Next() {
+				msg := next.Value.(outMsg)
+				admitted, remainder := p.pendingRequest.ReserveNext(msg.msg)
+				if admitted == nil {
+					continue
+				}
+				if remainder == nil {
+					pendingMsgs.Remove(next)
+				} else {
+					next.Value = outMsg{msg: remainder, encoding: msg.encoding, doneChan: msg.doneChan}
+					msg.doneChan = nil // Signal completion only after the last fragment.
+				}
+				msg.msg, msg.requestsAdded = admitted, true
+				p.sendQueue <- msg
+				waiting = true
+				requestsChanged = nil
+				break
+			}
+		}
 		select {
 		case msg := <-p.outputQueue:
-			waiting = queuePacket(msg, pendingMsgs, waiting)
+			pendingMsgs.PushBack(msg)
 
-		// This channel is notified when a message has been sent across
-		// the network socket.
 		case <-p.sendDoneQueue:
-			// No longer waiting if there are no more messages
-			// in the pending messages queue.
-			next := pendingMsgs.Front()
-			if next == nil {
-				waiting = false
-				continue
-			}
+			waiting = false
 
-			// Notify the outHandler about the next item to
-			// asynchronously send.
-			val := pendingMsgs.Remove(next)
-			p.sendQueue <- val.(outMsg)
+		case <-requestsChanged:
+			// Retry queued requests after another connection returns capacity.
 
 		case iv := <-p.outputInvChan:
 			// No handshake?  They'll find out soon enough.
@@ -1845,8 +1796,7 @@ out:
 
 					invMsg := wire.NewMsgInvSizeHint(1)
 					invMsg.AddInvVect(iv)
-					waiting = queuePacket(outMsg{msg: invMsg},
-						pendingMsgs, waiting)
+					pendingMsgs.PushBack(outMsg{msg: invMsg})
 				} else {
 					invSendQueue.PushBack(iv)
 				}
@@ -1876,9 +1826,7 @@ out:
 
 				invMsg.AddInvVect(iv)
 				if len(invMsg.InvList) >= maxInvTrickleSize { // if the number of invVect no less than the max size
-					waiting = queuePacket(
-						outMsg{msg: invMsg},
-						pendingMsgs, waiting)
+					pendingMsgs.PushBack(outMsg{msg: invMsg})
 					invMsg = wire.NewMsgInvSizeHint(uint(invSendQueue.Len()))
 				}
 
@@ -1887,8 +1835,7 @@ out:
 				p.AddKnownInventory(iv)
 			}
 			if len(invMsg.InvList) > 0 { // if the number of invVect more than the max size
-				waiting = queuePacket(outMsg{msg: invMsg},
-					pendingMsgs, waiting)
+				pendingMsgs.PushBack(outMsg{msg: invMsg})
 			}
 
 		case <-p.quit:
@@ -1996,6 +1943,7 @@ out:
 				}
 				log.Infof("Sending %v%s to %s", "getdata",
 					summary, p)
+
 			case *wire.MsgBlockAbe:
 				// Debug summary of message.
 				summary := messageSummary(msg.msg.(*wire.MsgBlockAbe))
@@ -2006,6 +1954,15 @@ out:
 					summary, p)
 			}
 
+			if !msg.requestsAdded && !p.pendingRequest.Add(msg.msg) {
+				// Normal sends are admitted by queueHandler. Reaching here
+				// means the connection was closed before it could register.
+				p.Disconnect()
+				if msg.doneChan != nil {
+					msg.doneChan <- struct{}{}
+				}
+				continue
+			}
 			p.stallControl <- stallControlMsg{sccSendMessage, msg.msg}
 
 			err := p.writeMessage(msg.msg, msg.encoding)
@@ -2169,6 +2126,7 @@ func (p *Peer) Disconnect() {
 	if atomic.LoadInt32(&p.connected) != 0 {
 		p.conn.Close()
 	}
+	p.pendingRequest.Close()
 	close(p.quit)
 }
 
@@ -2545,11 +2503,10 @@ func newPeerBase(origCfg *Config, inbound bool) *Peer {
 		inbound:      inbound,
 		wireEncoding: wire.BaseEncoding,
 		//knownInventory:  newMruInventoryMap(maxKnownInventory),
-		knownInventory: lru.NewCache(maxKnownInventory),
-		stallControl:   make(chan stallControlMsg, 1), // nonblocking sync
-		outputQueue:    make(chan outMsg, outputBufferSize),
-		sendQueue:      make(chan outMsg, 1), // nonblocking sync
-		//needsetResult:   ,
+		knownInventory:     lru.NewCache(maxKnownInventory),
+		stallControl:       make(chan stallControlMsg, 1), // nonblocking sync
+		outputQueue:        make(chan outMsg, outputBufferSize),
+		sendQueue:          make(chan outMsg, 1),   // nonblocking sync
 		sendDoneQueue:      make(chan struct{}, 1), // nonblocking sync
 		outputInvChan:      make(chan *wire.InvVect, outputBufferSize),
 		inQuit:             make(chan struct{}),
@@ -2560,6 +2517,7 @@ func newPeerBase(origCfg *Config, inbound bool) *Peer {
 		services:           cfg.Services,
 		protocolVersion:    cfg.ProtocolVersion,
 		communicationCache: cfg.CommunicationCache,
+		pendingRequest:     wire.NewMessageRequests(cfg.RequestCounter),
 	}
 	return &p
 }
