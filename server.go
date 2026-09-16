@@ -542,17 +542,8 @@ func (sp *serverPeer) OnPrunedBlock(p *peer.Peer, msg *wire.MsgPrunedBlock, buf 
 	iv := wire.NewInvVect(wire.InvTypePrunedBlock, &blockHash)
 	sp.AddKnownInventory(iv)
 
-	// Queue the block up to be handled by the block
-	// manager and intentionally block further receives
-	// until the block is fully processed and known
-	// good or bad.  This helps prevent a malicious peer
-	// from queuing up a bunch of bad blocks before
-	// disconnecting (or being disconnected) and wasting
-	// memory.  Additionally, this behavior is depended on
-	// by at least the block acceptance test tool as the
-	// reference implementation processes blocks in the same
-	// thread and therefore blocks further messages until
-	// the block has been fully processed.
+	// Leave the input handler free to receive supplemental transactions
+	// while the sync manager reconstructs the block.
 	sp.server.syncManager.QueuePrunedBlock(prunedBlock, sp.Peer, nil)
 }
 
@@ -567,36 +558,7 @@ func (sp *serverPeer) OnNeedSet(_ *peer.Peer, msg *wire.MsgNeedSet, buf []byte) 
 }
 
 func (sp *serverPeer) OnNeedSetResult(p *peer.Peer, msg *wire.MsgNeedSetResult, buf []byte) {
-	peerExist, reqExist := sp.server.syncManager.ExistRequestedNeedSetInPeerStates(p, msg.BlockHash)
-	if !peerExist {
-		peerLog.Warnf("Received pruned block message from unknown peer %s", p)
-		return
-	}
-
-	// If we didn't ask for this needset then the peer is misbehaving.
-	if !reqExist {
-		// Disconnect with the misbehaving peer
-		peerLog.Warnf("Got unrequested needset %v from %s -- "+
-			"disconnecting", msg.BlockHash, p.Addr())
-		p.Disconnect()
-		return
-	}
-
-	defer func() {
-		p.StoreNeedSetResult(msg)
-		sp.server.syncManager.RemoveRequestedNeedSetInPeerStates(p, msg.BlockHash)
-	}()
-
-	// check witness in response
-	for i := 0; i < len(msg.Txs); i++ {
-		if !msg.Txs[i].HasTxWitness() {
-			peerLog.Warnf("Got needset %v from %s, but some transaction in response does not has witness -- "+
-				"disconnecting", msg.BlockHash, p.Addr())
-			p.Disconnect()
-			return
-		}
-	}
-
+	sp.server.syncManager.QueueNeedSetResult(msg, p)
 }
 
 func (sp *serverPeer) OnGetBlockTx(_ *peer.Peer, msg *wire.MsgGetBlockTx, buf []byte) {
@@ -610,31 +572,7 @@ func (sp *serverPeer) OnGetBlockTx(_ *peer.Peer, msg *wire.MsgGetBlockTx, buf []
 }
 
 func (sp *serverPeer) OnBlockTx(p *peer.Peer, msg *wire.MsgBlockTx, buf []byte) {
-	txHash := msg.Tx.TxHash()
-	peerExist, reqExist := sp.server.syncManager.ExistRequestedBlockTxInPeerStates(p, msg.BlockHash, txHash)
-	if !peerExist {
-		peerLog.Warnf("Received pruned block message from unknown peer %s", p)
-		return
-	}
-
-	// If we didn't ask for this needset then the peer is misbehaving.
-	if !reqExist {
-		// Disconnect with the misbehaving peer
-		peerLog.Warnf("Got unrequested getblocktx %v from %s -- "+
-			"disconnecting", msg.BlockHash, p.Addr())
-		p.Disconnect()
-		return
-	}
-
-	// check witness in response
-	if !msg.Tx.HasTxWitness() {
-		peerLog.Warnf("Got blocktx %v from %s, but some transaction in response does not has witness -- "+
-			"disconnecting", msg.BlockHash, p.Addr())
-		p.Disconnect()
-		return
-	}
-	p.StoreBlockTxResult(msg)
-	sp.server.syncManager.RemoveRequestedBlockTxInPeerStates(p, msg.BlockHash, txHash)
+	sp.server.syncManager.QueueBlockTx(msg, p)
 }
 
 // OnInv is invoked when a peer receives an inv message and is

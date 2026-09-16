@@ -502,9 +502,6 @@ type Peer struct {
 	sendDoneQueue chan struct{}
 	outputInvChan chan *wire.InvVect
 
-	needsetResult sync.Map
-	blockTxResult sync.Map
-
 	// pending message
 	// getblocktx <- blocktx
 	// needset    <- nsresult
@@ -910,14 +907,6 @@ func (p *Peer) IsWitnessEnabled() bool {
 	return witnessEnabled
 }
 
-func (p *Peer) StoreNeedSetResult(msg *wire.MsgNeedSetResult) {
-	p.needsetResult.Store(msg.BlockHash, msg)
-}
-func (p *Peer) StoreBlockTxResult(msg *wire.MsgBlockTx) {
-	txHash := msg.Tx.TxHash()
-	p.blockTxResult.Store(txHash, msg.Tx)
-}
-
 // PushAddrMsg sends an addr message to the connected peer using the provided
 // addresses.  This function is useful over manually sending the message via
 // QueueMessage since it automatically limits the addresses to the maximum
@@ -1059,59 +1048,6 @@ func (p *Peer) UseGetBlockTx() bool {
 	}
 
 	return useGetBlockTx
-}
-func (p *Peer) FetchMissingBlockTxs(blockHash chainhash.Hash, txHashes []chainhash.Hash) ([]*wire.MsgTxAbe, error) {
-	useGetBlockTx := p.UseGetBlockTx()
-	if !useGetBlockTx {
-		// Construct the needset request and queue it to be sent.
-		msg := wire.NewMsgNeedSet(blockHash, txHashes)
-		p.QueueMessage(msg, nil)
-	} else {
-		for _, txHash := range txHashes {
-			msg := wire.NewMsgGetBlockTx(blockHash, txHash)
-			p.QueueMessage(msg, nil)
-		}
-	}
-
-	//	todo (ABE): No need to get the reply? if the correspoding peer does not give any reply, what will happen?
-	//	todo (ABE): how to guarantee the corresponding peer think itself to be cureent?
-	timeoutTimer := time.NewTimer(time.Second * 30)
-	defer timeoutTimer.Stop()
-	txTicker := time.NewTicker(time.Second)
-	defer txTicker.Stop()
-
-	res := make([]*wire.MsgTxAbe, 0, len(txHashes))
-	for {
-		select {
-		case <-timeoutTimer.C:
-			p.Disconnect()
-			return nil, errors.New("time out")
-		case <-p.quit:
-			return nil, errors.New("peer disconnected")
-		case <-txTicker.C:
-			if !useGetBlockTx {
-				if needSetRe, ok := p.needsetResult.LoadAndDelete(blockHash); ok {
-					if needSetRe != nil {
-						if nsr, ok := needSetRe.(*wire.MsgNeedSetResult); ok {
-							return nsr.Txs, nil
-						}
-					}
-					return nil, errors.New("invalid transaction in response")
-				}
-			} else {
-				for _, txHash := range txHashes {
-					if txRes, exist := p.blockTxResult.LoadAndDelete(txHash); exist {
-						if msgTx, ok := txRes.(*wire.MsgTxAbe); ok {
-							res = append(res, msgTx)
-						}
-					}
-				}
-				if len(res) == len(txHashes) {
-					return res, nil
-				}
-			}
-		}
-	}
 }
 
 // PushRejectMsg sends a reject message for the provided command, reject code,
@@ -2002,6 +1938,7 @@ out:
 				}
 				log.Infof("Sending %v%s to %s", "getdata",
 					summary, p)
+
 			case *wire.MsgBlockAbe:
 				// Debug summary of message.
 				summary := messageSummary(msg.msg.(*wire.MsgBlockAbe))
@@ -2552,11 +2489,10 @@ func newPeerBase(origCfg *Config, inbound bool) *Peer {
 		inbound:      inbound,
 		wireEncoding: wire.BaseEncoding,
 		//knownInventory:  newMruInventoryMap(maxKnownInventory),
-		knownInventory: lru.NewCache(maxKnownInventory),
-		stallControl:   make(chan stallControlMsg, 1), // nonblocking sync
-		outputQueue:    make(chan outMsg, outputBufferSize),
-		sendQueue:      make(chan outMsg, 1), // nonblocking sync
-		//needsetResult:   ,
+		knownInventory:     lru.NewCache(maxKnownInventory),
+		stallControl:       make(chan stallControlMsg, 1), // nonblocking sync
+		outputQueue:        make(chan outMsg, outputBufferSize),
+		sendQueue:          make(chan outMsg, 1),   // nonblocking sync
 		sendDoneQueue:      make(chan struct{}, 1), // nonblocking sync
 		outputInvChan:      make(chan *wire.InvVect, outputBufferSize),
 		inQuit:             make(chan struct{}),
