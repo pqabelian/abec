@@ -231,6 +231,7 @@ type server struct {
 	services             wire.ServiceFlag
 
 	communicationCache sync.Map
+	requestCounter     *wire.RequestCounter
 
 	// The following fields are used for optional indexes.  They will be nil
 	// if the associated index is not enabled.  These fields are set during
@@ -1889,6 +1890,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 		TrickleInterval:    cfg.TrickleInterval,
 		Chain:              sp.server.chain,
 		CommunicationCache: &sp.server.communicationCache,
+		RequestCounter:     sp.server.requestCounter,
 	}
 }
 
@@ -2566,6 +2568,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	}
 
 	s := server{
+		requestCounter:       wire.NewRequestCounter(cfg.MaxPendingResponseMiB * 1024 * 1024),
 		chainParams:          chainParams,
 		addrManager:          amgr,
 		newPeers:             make(chan *serverPeer, cfg.MaxPeers),
