@@ -27,12 +27,13 @@ const MaxMessagePayload = 320 * 1024 * 1024 // 256MB
 
 // Commands used in bitcoin message headers which describe the type of message.
 const (
-	CmdVersion       = "version"
-	CmdVerAck        = "verack"
-	CmdGetAddr       = "getaddr"
-	CmdAddr          = "addr"
-	CmdGetBlocks     = "getblocks"
-	CmdInv           = "inv"
+	CmdVersion   = "version"
+	CmdVerAck    = "verack"
+	CmdGetAddr   = "getaddr"
+	CmdAddr      = "addr"
+	CmdGetBlocks = "getblocks"
+	CmdInv       = "inv"
+
 	CmdNeedSet       = "needset"
 	CmdNeedSetResult = "nsresult"
 
@@ -377,6 +378,14 @@ func WriteMessageWithEncodingN(w io.Writer, msg Message, pver uint32,
 func ReadMessageWithEncodingN(r io.Reader, pver uint32, btcnet AbelianNet,
 	enc MessageEncoding) (int, Message, []byte, error) {
 
+	return ReadMessageWithRequestsN(r, pver, btcnet, enc, nil)
+}
+
+// ReadMessageWithRequestsN is ReadMessageWithEncodingN with a concurrency-safe
+// request tracker. A nil tracker disables request tracking, not wire validation.
+func ReadMessageWithRequestsN(r io.Reader, pver uint32, btcnet AbelianNet,
+	enc MessageEncoding, requests *MessageRequests) (int, Message, []byte, error) {
+
 	totalBytes := 0
 	n, hdr, err := readMessageHeader(r)
 	totalBytes += n
@@ -407,6 +416,10 @@ func ReadMessageWithEncodingN(r io.Reader, pver uint32, btcnet AbelianNet,
 		discardInput(r, hdr.length)
 		str := fmt.Sprintf("invalid command %v", []byte(command))
 		return totalBytes, nil, nil, messageError("ReadMessage", str)
+	}
+
+	if err := requests.consume(command); err != nil {
+		return totalBytes, nil, nil, err
 	}
 
 	// Create struct of appropriate message type based on the command.
@@ -453,6 +466,10 @@ func ReadMessageWithEncodingN(r io.Reader, pver uint32, btcnet AbelianNet,
 	err = msg.BtcDecode(pr, pver, enc)
 	if err != nil {
 		return totalBytes, nil, nil, err
+	}
+
+	if notFound, ok := msg.(*MsgNotFound); ok {
+		requests.notFound(notFound)
 	}
 
 	return totalBytes, msg, payload, nil

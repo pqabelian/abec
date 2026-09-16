@@ -505,6 +505,12 @@ type Peer struct {
 	needsetResult sync.Map
 	blockTxResult sync.Map
 
+	// pending message
+	// getblocktx <- blocktx
+	// needset    <- nsresult
+	// getdata    <- tx / block
+	pendingRequest wire.MessageRequests
+
 	communicationCache *sync.Map
 
 	inQuit    chan struct{}
@@ -1167,8 +1173,8 @@ func (p *Peer) handlePongMsg(msg *wire.MsgPong) {
 
 // readMessage reads the next abelian message from the peer with logging.
 func (p *Peer) readMessage(encoding wire.MessageEncoding) (wire.Message, []byte, error) {
-	n, msg, buf, err := wire.ReadMessageWithEncodingN(p.conn,
-		p.ProtocolVersion(), p.cfg.ChainParams.Net, encoding)
+	n, msg, buf, err := wire.ReadMessageWithRequestsN(p.conn,
+		p.ProtocolVersion(), p.cfg.ChainParams.Net, encoding, &p.pendingRequest)
 	//if msg != nil {
 	//	fmt.Printf("receive a %s from peer:%v\n", msg.Command(), p.addr)
 	//}
@@ -1552,7 +1558,7 @@ out:
 			if p.shouldHandleReadError(err) {
 				errMsg := fmt.Sprintf("Can't read message from %s: %v", p, err)
 				if err != io.ErrUnexpectedEOF {
-					log.Errorf(errMsg)
+					log.Error(errMsg)
 				}
 
 				// Push a reject message for the malformed message and wait for
@@ -2006,6 +2012,7 @@ out:
 					summary, p)
 			}
 
+			p.pendingRequest.Add(msg.msg)
 			p.stallControl <- stallControlMsg{sccSendMessage, msg.msg}
 
 			err := p.writeMessage(msg.msg, msg.encoding)
