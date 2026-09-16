@@ -174,7 +174,7 @@ type config struct {
 	DisableRPC             bool          `long:"norpc" description:"Disable built-in RPC server -- NOTE: The RPC server is disabled by default if no rpcuser/rpcpass or rpclimituser/rpclimitpass is specified"`
 	DisableTLS             bool          `long:"notls" description:"Disable TLS for the RPC server -- NOTE: This is only allowed if the RPC server is bound to localhost"`
 	DisableTLSGetWork      bool          `long:"notlsgetwork" description:"Disable TLS for the getwork RPC server -- NOTE: This is only allowed if the RPC server is bound to localhost"`
-	EnableGetWorkRPC       bool          `long:"enablegetwork" description:"Enable get work RPC server, this server is TLS disabled"`
+	EnableGetWorkRPC       bool          `long:"enablegetwork" description:"Enable getwork RPC server -- NOTE: Only admin users can access the resources"`
 	OnionProxy             string        `long:"onion" description:"Connect to tor hidden services via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
 	OnionProxyPass         string        `long:"onionpass" default-mask:"-" description:"Password for onion proxy server"`
 	OnionProxyUser         string        `long:"onionuser" description:"Username for onion proxy server"`
