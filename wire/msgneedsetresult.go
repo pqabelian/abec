@@ -30,7 +30,7 @@ func (msg *MsgNeedSetResult) BtcDecode(r io.Reader, pver uint32, enc MessageEnco
 		return messageError("MsgInv.BtcDecode", str)
 	}
 
-	if err := checkDecodeSize(r, count, minTxAbePayload+1); err != nil {
+	if err := checkDecodeSize(r, count, MinTxAbePayload+1); err != nil {
 		return err
 	}
 

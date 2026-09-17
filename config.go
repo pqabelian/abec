@@ -95,6 +95,7 @@ const (
 	defaultCacheTxFilename       = "txcache.abe"
 
 	defaultMaxPendingResponseMiB = 512
+	defaultMaxResidentPayloadMiB = 768
 )
 
 var (
@@ -163,6 +164,7 @@ type config struct {
 	MaxOrphanTxs           int           `long:"maxorphantx" description:"Max number of orphan transactions to keep in memory"`
 	MaxPeers               int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
 	MaxPendingResponseMiB  uint64        `long:"maxpendingresponsemib" description:"Global limit in MiB for P2P response payload maxima, including direct tx reads (minimum 320)"`
+	MaxResidentPayloadMiB  uint64        `long:"maxresidentpayloadmib" description:"Global limit in MiB for held P2P payloads and data service, including 352 MiB reserved for supplemental replies and queued requests (minimum 768; not RSS)"`
 	MiningAddrs            []string      `long:"miningaddr" description:"Add the specified payment address to the list of addresses to use for generated blocks -- At least one address is required if the generate or externalgenerate option is set"`
 	MinRelayTxFee          uint64        `long:"minrelaytxfee" description:"The minimum transaction fee in Neutrino/kB to be considered a non-zero fee."`
 	DisableBanning         bool          `long:"nobanning" description:"Disable banning of misbehaving peers"`
@@ -522,6 +524,7 @@ func loadConfig() (*config, []string, error) {
 		DebugLevel:             defaultLogLevel,
 		MaxPeers:               defaultMaxPeers,
 		MaxPendingResponseMiB:  defaultMaxPendingResponseMiB,
+		MaxResidentPayloadMiB:  defaultMaxResidentPayloadMiB,
 		BanDuration:            defaultBanDuration,
 		BanThreshold:           defaultBanThreshold,
 		RPCMaxClients:          defaultMaxRPCClients,
@@ -774,6 +777,9 @@ func loadConfig() (*config, []string, error) {
 
 	if cfg.MaxPendingResponseMiB < wire.MaxMessagePayload/(1024*1024) || cfg.MaxPendingResponseMiB > ^uint64(0)/(1024*1024) {
 		return nil, nil, fmt.Errorf("%s: maxpendingresponsemib must be at least %d and fit in a uint64 byte count", funcName, wire.MaxMessagePayload/(1024*1024))
+	}
+	if cfg.MaxResidentPayloadMiB < defaultMaxResidentPayloadMiB || cfg.MaxResidentPayloadMiB > ^uint64(0)/(1024*1024) {
+		return nil, nil, fmt.Errorf("%s: maxresidentpayloadmib must be at least %d and fit in a uint64 byte count", funcName, defaultMaxResidentPayloadMiB)
 	}
 
 	// Validate database type.

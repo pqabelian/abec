@@ -161,7 +161,7 @@ func (msg *MsgBlockAbe) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding)
 		return messageError("MsgBlock.BtcDecode", str)
 	}
 
-	if err := checkDecodeSize(r, txCount, minTxAbePayload+chainhash.HashSize); err != nil {
+	if err := checkDecodeSize(r, txCount, MinTxAbePayload+chainhash.HashSize); err != nil {
 		return err
 	}
 	msg.Transactions = make([]*MsgTxAbe, 0, txCount)
@@ -397,7 +397,7 @@ func (msg *MsgBlockAbe) DeserializeTxLoc(r *bytes.Buffer) ([]TxAbeLoc, error) {
 
 	// Deserialize each transaction while keeping track of its location
 	// within the byte stream.
-	if err := checkDecodeSize(r, txCount, minTxAbePayload); err != nil {
+	if err := checkDecodeSize(r, txCount, MinTxAbePayload); err != nil {
 		return nil, err
 	}
 	msg.Transactions = make([]*MsgTxAbe, 0, txCount)

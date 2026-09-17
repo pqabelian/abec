@@ -232,6 +232,7 @@ type server struct {
 
 	communicationCache sync.Map
 	requestCounter     *wire.RequestCounter
+	residentBudget     *wire.PayloadBudget
 
 	// The following fields are used for optional indexes.  They will be nil
 	// if the associated index is not enabled.  These fields are set during
@@ -537,7 +538,7 @@ func (sp *serverPeer) OnPrunedBlock(p *peer.Peer, msg *wire.MsgPrunedBlock, buf 
 	// Convert the raw MsgBlock to a abeutil.Block which provides some
 	// convenience methods and things such as hash caching.
 	//block := abeutil.NewBlockFromBlockAndBytesAbe(msg, buf) // TODO(abe): the height of block is unknown
-	prunedBlock := abeutil.NewPrunedBlockFromPrunedBlockAndBytesAbe(msg, buf)
+	prunedBlock := abeutil.NewPrunedBlockFromPrunedBlockAndBytesAbe(msg, nil)
 	blockHash := msg.BlockHash()
 	// Add the block to the known inventory for the peer.
 	iv := wire.NewInvVect(wire.InvTypePrunedBlock, &blockHash)
@@ -545,10 +546,15 @@ func (sp *serverPeer) OnPrunedBlock(p *peer.Peer, msg *wire.MsgPrunedBlock, buf 
 
 	// Leave the input handler free to receive supplemental transactions
 	// while the sync manager reconstructs the block.
-	sp.server.syncManager.QueuePrunedBlock(prunedBlock, sp.Peer, nil)
+	<-sp.server.syncManager.QueuePrunedBlock(prunedBlock, sp.Peer, nil)
 }
 
 func (sp *serverPeer) OnNeedSet(_ *peer.Peer, msg *wire.MsgNeedSet, buf []byte) {
+	reservation, admitted := sp.reserveDataResponse(wire.MaxMessagePayload)
+	if !admitted {
+		return
+	}
+	defer reservation.Release()
 	// Convert the raw MsgBlock to a abeutil.Block which provides some
 	// convenience methods and things such as hash caching.
 	err := sp.server.pushNeedSetResultMsg(sp, msg.BlockHash, msg.Hashes, wire.WitnessEncoding)
@@ -559,10 +565,15 @@ func (sp *serverPeer) OnNeedSet(_ *peer.Peer, msg *wire.MsgNeedSet, buf []byte) 
 }
 
 func (sp *serverPeer) OnNeedSetResult(p *peer.Peer, msg *wire.MsgNeedSetResult, buf []byte) {
-	sp.server.syncManager.QueueNeedSetResult(msg, p)
+	<-sp.server.syncManager.QueueNeedSetResult(msg, p)
 }
 
 func (sp *serverPeer) OnGetBlockTx(_ *peer.Peer, msg *wire.MsgGetBlockTx, buf []byte) {
+	reservation, admitted := sp.reserveDataResponse(wire.MaxBlockPayloadAbe)
+	if !admitted {
+		return
+	}
+	defer reservation.Release()
 	// Convert the raw MsgBlock to a abeutil.Block which provides some
 	// convenience methods and things such as hash caching.
 	err := sp.server.pushBlockTxMsg(sp, msg.BlockHash, msg.TxHash, wire.WitnessEncoding)
@@ -573,7 +584,7 @@ func (sp *serverPeer) OnGetBlockTx(_ *peer.Peer, msg *wire.MsgGetBlockTx, buf []
 }
 
 func (sp *serverPeer) OnBlockTx(p *peer.Peer, msg *wire.MsgBlockTx, buf []byte) {
-	sp.server.syncManager.QueueBlockTx(msg, p)
+	<-sp.server.syncManager.QueueBlockTx(msg, p)
 }
 
 // OnInv is invoked when a peer receives an inv message and is
@@ -589,7 +600,7 @@ func (sp *serverPeer) OnInv(p *peer.Peer, msg *wire.MsgInv) {
 
 	if !cfg.BlocksOnly {
 		if len(msg.InvList) > 0 {
-			sp.server.syncManager.QueueInv(msg, sp.Peer)
+			<-sp.server.syncManager.QueueInv(msg, sp.Peer)
 		}
 		return
 	}
@@ -615,20 +626,41 @@ func (sp *serverPeer) OnInv(p *peer.Peer, msg *wire.MsgInv) {
 	}
 
 	if len(newInv.InvList) > 0 {
-		sp.server.syncManager.QueueInv(newInv, sp.Peer)
+		<-sp.server.syncManager.QueueInv(newInv, sp.Peer)
 	}
 }
 
 // OnHeaders is invoked when a peer receives a headers
 // message.  The message is passed down to the sync manager.
 func (sp *serverPeer) OnHeaders(_ *peer.Peer, msg *wire.MsgHeaders) {
-	sp.server.syncManager.QueueHeaders(msg, sp.Peer)
+	<-sp.server.syncManager.QueueHeaders(msg, sp.Peer)
+}
+
+// Reserve before fetching a block: even a single blocktx response loads the
+// entire source block. Saturation rejects new work without blaming the peer.
+func (sp *serverPeer) reserveDataResponse(size uint64) (*wire.PayloadReservation, bool) {
+	// Stop new work as soon as the connection or server shuts down.
+	select {
+	case <-sp.Done():
+		return nil, false
+	case <-sp.server.quit:
+		return nil, false
+	default:
+	}
+	reservation, admitted := sp.server.residentBudget.TryReserve(max(size, wire.MaxBlockPayloadAbe), false)
+	if !admitted {
+		peerLog.Debugf("Closing peer %s: local data service capacity exhausted", sp)
+		sp.Disconnect()
+	}
+	return reservation, admitted
 }
 
 // OnGetData is invoked when a peer receives a getdata message and
 // is used to deliver block and transaction information.
 func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
-	numAdded := 0
+	if len(msg.InvList) == 0 {
+		return
+	}
 	notFound := wire.NewMsgNotFound()
 
 	length := len(msg.InvList)
@@ -643,40 +675,34 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 		return
 	}
 
-	// We wait on this wait channel periodically to prevent queuing
-	// far more data than we can send in a reasonable time, wasting memory.
-	// The waiting occurs after the database fetch for the next one to
-	// provide a little pipelining.
-	var waitChan chan struct{}
-	doneChan := make(chan struct{}, 1)
-
+	// Memory-first service: finish each response before fetching the next
+	// block. The reservation also covers the source block and encoding work.
 	for i, iv := range msg.InvList {
-		var c chan struct{}
-		// If this will be the last message we send.
-		if i == length-1 && len(notFound.InvList) == 0 {
-			c = doneChan
-		} else if (i+1)%3 == 0 {
-			// Buffered so as to not make the send goroutine block.
-			c = make(chan struct{}, 1)
+		reservation, admitted := sp.reserveDataResponse(wire.MaxBlockPayloadAbe)
+		if !admitted {
+			return
 		}
+		c := make(chan struct{}, 1)
 		var err error
 		switch iv.Type {
 		case wire.InvTypeWitnessTx:
-			err = sp.server.pushTxMsg(sp, &iv.Hash, c, waitChan, wire.WitnessEncoding)
+			err = sp.server.pushTxMsg(sp, &iv.Hash, c, wire.WitnessEncoding)
 		case wire.InvTypeTx:
-			err = sp.server.pushTxMsg(sp, &iv.Hash, c, waitChan, wire.BaseEncoding)
+			err = sp.server.pushTxMsg(sp, &iv.Hash, c, wire.BaseEncoding)
 		case wire.InvTypeWitnessBlock:
-			err = sp.server.pushBlockMsgAbe(sp, &iv.Hash, c, waitChan, wire.WitnessEncoding)
+			err = sp.server.pushBlockMsgAbe(sp, &iv.Hash, c, wire.WitnessEncoding)
 		case wire.InvTypeBlock:
-			err = sp.server.pushBlockMsgAbe(sp, &iv.Hash, c, waitChan, wire.BaseEncoding)
+			err = sp.server.pushBlockMsgAbe(sp, &iv.Hash, c, wire.BaseEncoding)
 		case wire.InvTypePrunedBlock:
-			err = sp.server.pushPrunedBlockMsg(sp, &iv.Hash, c, waitChan, wire.WitnessEncoding)
+			err = sp.server.pushPrunedBlockMsg(sp, &iv.Hash, c, wire.WitnessEncoding)
 		default:
+			reservation.Release()
 			peerLog.Warnf("Unknown type in inventory request %d",
 				iv.Type)
 			continue
 		}
 		if err != nil {
+			reservation.Release()
 			notFound.AddInvVect(iv)
 			// deny all subsequent requests
 			if iv.Type == wire.InvTypeWitnessBlock {
@@ -686,29 +712,15 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 				break
 			}
 
-			// When there is a failure fetching the final entry
-			// and the done channel was sent in due to there
-			// being no outstanding not found inventory, consume
-			// it here because there is now not found inventory
-			// that will use the channel momentarily.
-			if i == len(msg.InvList)-1 && c != nil {
-				<-c
-			}
+			continue
 		}
-		numAdded++
-		waitChan = c
+		<-c
+		reservation.Release()
 	}
 	if len(notFound.InvList) != 0 {
-		sp.QueueMessage(notFound, doneChan)
-	}
-
-	// Wait for messages to be sent. We can send quite a lot of data at this
-	// point and this will keep the peer busy for a decent amount of time.
-	// We don't process anything else by them in this time so that we
-	// have an idea of when we should hear back from them - else the idle
-	// timeout could fire when we were only half done sending the blocks.
-	if numAdded > 0 {
-		<-doneChan
+		done := make(chan struct{}, 1)
+		sp.QueueMessage(notFound, done)
+		<-done
 	}
 }
 
@@ -941,7 +953,7 @@ func (sp *serverPeer) OnNotFound(p *peer.Peer, msg *wire.MsgNotFound) {
 		}
 	}
 
-	sp.server.syncManager.QueueNotFound(msg, p)
+	<-sp.server.syncManager.QueueNotFound(msg, p)
 }
 
 // randomUint16Number returns a random uint16 in a specified input range.  Note
@@ -1031,7 +1043,7 @@ func (s *server) TransactionConfirmed(tx *abeutil.TxAbe) {
 // pushTxMsg sends a tx message for the provided transaction hash to the
 // connected peer.  An error is returned if the transaction hash is not known.
 func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
-	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
+	encoding wire.MessageEncoding) error {
 
 	var msg wire.Message
 	msgCacheKey := fmt.Sprintf("tx_%s_%d", hash, encoding)
@@ -1068,11 +1080,6 @@ func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<-
 		msg = wrappedTxMsg
 	}
 
-	// Once we have fetched data wait for any previous operation to finish.
-	if waitChan != nil {
-		<-waitChan
-	}
-
 	sp.QueueMessageWithEncoding(msg, doneChan, encoding)
 
 	return nil
@@ -1104,7 +1111,9 @@ func (s *server) pushNeedSetResultMsg(sp *serverPeer, blockHash chainhash.Hash,
 	}
 	resMsg := wire.NewMsgNeedSetResult(blockHash, rtxs)
 
-	sp.QueueMessageWithEncoding(resMsg, nil, encoding)
+	done := make(chan struct{}, 1)
+	sp.QueueMessageWithEncoding(resMsg, done, encoding)
+	<-done
 	//sp.QueueMessageWithEncoding(block.MsgBlock(), doneChan, encoding)
 	//sp.PushRejectMsg(wire.CmdNeedSet, wire.RejectInvalid, "invalid block hash", &blockHash, false)
 
@@ -1132,7 +1141,9 @@ func (s *server) pushBlockTxMsg(sp *serverPeer, blockHash chainhash.Hash,
 		return fmt.Errorf("non-existent transaction %d in block %s is requested", txHash, blockHash)
 	}
 	resMsg := wire.NewMsgBlockTx(blockHash, txAbe.MsgTx())
-	sp.QueueMessageWithEncoding(resMsg, nil, encoding)
+	done := make(chan struct{}, 1)
+	sp.QueueMessageWithEncoding(resMsg, done, encoding)
+	<-done
 	//sp.QueueMessageWithEncoding(block.MsgBlock(), doneChan, encoding)
 	//sp.PushRejectMsg(wire.CmdNeedSet, wire.RejectInvalid, "invalid block hash", &blockHash, false)
 
@@ -1214,7 +1225,7 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan cha
 
 // server.cache wire.Message + []byte
 func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
-	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
+	encoding wire.MessageEncoding) error {
 	var msg wire.Message
 	msgCacheKey := fmt.Sprintf("block_%s_%d", hash, encoding)
 	value, ok := s.communicationCache.Load(msgCacheKey)
@@ -1276,10 +1287,6 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 
 		if encoding == wire.WitnessEncoding && !msgBlock.HasWitness() {
 			peerLog.Debugf("Peer %v request witness block %v but we do not have witness", sp, hash.String())
-			// Once we have fetched data wait for any previous operation to finish.
-			if waitChan != nil {
-				<-waitChan
-			}
 			return errors.New("witness block not found")
 		}
 
@@ -1287,11 +1294,6 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 		s.communicationCache.Store(msgCacheKey, wrappedBlockMsg)
 		wrappedBlockMsg.Use()
 		msg = wrappedBlockMsg
-	}
-
-	// Once we have fetched data wait for any previous operation to finish.
-	if waitChan != nil {
-		<-waitChan
 	}
 
 	// We only send the channel for this message if we aren't sending
@@ -1326,7 +1328,7 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 }
 
 func (s *server) pushPrunedBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
-	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
+	encoding wire.MessageEncoding) error {
 
 	// Fetch the raw block bytes from the database.
 	var blockBytes []byte
@@ -1387,11 +1389,6 @@ func (s *server) pushPrunedBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneCh
 		return err
 	}
 
-	// Once we have fetched data wait for any previous operation to finish.
-	if waitChan != nil {
-		<-waitChan
-	}
-
 	// We only send the channel for this message if we aren't sending
 	// an inv straight after.
 	//	todo(ABE): ?
@@ -1406,6 +1403,13 @@ func (s *server) pushPrunedBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneCh
 	}
 	//	todo (ABE): as the block is fetched from database, the witness may not be included. If so, regardless of encoding, no witness is provided.
 	sp.QueueMessageWithEncoding(msgPrunedBlock, dc, encoding)
+	if sendInv {
+		best := sp.server.chain.BestSnapshot()
+		invMsg := wire.NewMsgInvSizeHint(1)
+		invMsg.AddInvVect(wire.NewInvVect(wire.InvTypeWitnessBlock, &best.Hash))
+		sp.QueueMessage(invMsg, doneChan)
+		sp.continueHash = nil
+	}
 
 	return nil
 }
@@ -1891,6 +1895,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 		Chain:              sp.server.chain,
 		CommunicationCache: &sp.server.communicationCache,
 		RequestCounter:     sp.server.requestCounter,
+		PayloadBudget:      sp.server.residentBudget,
 	}
 }
 
@@ -2569,6 +2574,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 
 	s := server{
 		requestCounter:       wire.NewRequestCounter(cfg.MaxPendingResponseMiB * 1024 * 1024),
+		residentBudget:       wire.NewPayloadBudget(cfg.MaxResidentPayloadMiB*1024*1024, wire.MaxMessagePayload+wire.MaxQueuedPayload),
 		chainParams:          chainParams,
 		addrManager:          amgr,
 		newPeers:             make(chan *serverPeer, cfg.MaxPeers),

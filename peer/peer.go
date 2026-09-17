@@ -1,7 +1,6 @@
 package peer
 
 import (
-	"bytes"
 	"container/list"
 	"errors"
 	"fmt"
@@ -19,7 +18,6 @@ import (
 	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 	"github.com/abesuite/go-socks/socks"
-	"github.com/abesuite/go-spew/spew"
 	"github.com/decred/dcrd/lru"
 	"golang.org/x/mod/semver"
 )
@@ -57,6 +55,10 @@ const (
 
 	// idleTimeout is the duration of inactivity before we time out a peer.
 	idleTimeout = 5 * time.Minute
+
+	// Bound a complete write, including a peer that stops reading. Use the
+	// same allowance as receiving a complete large message.
+	writeTimeout = idleTimeout
 
 	// stallTickInterval is the interval of time between each check for
 	// stalled peers.
@@ -301,6 +303,9 @@ type Config struct {
 	// RequestCounter is shared by all peers of a server. Nil disables the
 	// shared cap for standalone users of this package.
 	RequestCounter *wire.RequestCounter
+	// PayloadBudget is held through the message listener, including its queue
+	// wait. Listeners retaining data beyond return must bound it separately.
+	PayloadBudget *wire.PayloadBudget
 }
 
 // minUint32 is a helper function to return the minimum of two uint32s.
@@ -359,6 +364,7 @@ type outMsg struct {
 	msg           wire.Message
 	doneChan      chan<- struct{}
 	encoding      wire.MessageEncoding
+	reservation   *wire.PayloadReservation
 }
 
 // stallControlCmd represents the command of a stall control message.
@@ -383,8 +389,8 @@ const (
 // stallControlMsg is used to signal the stall handler about specific events
 // so it can properly detect and handle stalled remote peers.
 type stallControlMsg struct {
-	command stallControlCmd
-	message wire.Message
+	command    stallControlCmd
+	msgCommand string
 }
 
 // StatsSnap is a snapshot of peer stats at a point in time.
@@ -479,6 +485,7 @@ type Peer struct {
 
 	//	knownInventory     *mruInventoryMap
 	knownInventory     lru.Cache
+	queueMtx           sync.RWMutex
 	prevGetBlocksMtx   sync.Mutex
 	prevGetBlocksBegin *chainhash.Hash
 	prevGetBlocksStop  *chainhash.Hash
@@ -568,6 +575,11 @@ func (p *Peer) UpdateAnnouncedHeight(newHeight int32) {
 func (p *Peer) UpdateLastAnnouncedBlock(blkHash *chainhash.Hash) {
 	log.Tracef("Updating last blk for peer %v, %v", p.addr, blkHash)
 
+	// Do not retain the decoded inventory array through an element pointer.
+	if blkHash != nil {
+		hash := *blkHash
+		blkHash = &hash
+	}
 	p.statsMtx.Lock()
 	p.lastAnnouncedBlock = blkHash
 	p.statsMtx.Unlock()
@@ -578,7 +590,8 @@ func (p *Peer) UpdateLastAnnouncedBlock(blkHash *chainhash.Hash) {
 //
 // This function is safe for concurrent access.
 func (p *Peer) AddKnownInventory(invVect *wire.InvVect) {
-	p.knownInventory.Add(invVect)
+	// Value keys avoid retaining a decoded inventory backing array.
+	p.knownInventory.Add(*invVect)
 }
 
 // StatsSnapshot returns a snapshot of the current peer flags and statistics.
@@ -1114,8 +1127,14 @@ func (p *Peer) handlePongMsg(msg *wire.MsgPong) {
 
 // readMessage reads the next abelian message from the peer with logging.
 func (p *Peer) readMessage(encoding wire.MessageEncoding) (wire.Message, []byte, error) {
-	n, msg, buf, err := wire.ReadMessageWithRequestsN(p.conn,
-		p.ProtocolVersion(), p.cfg.ChainParams.Net, encoding, p.pendingRequest)
+	msg, buf, reservation, err := p.readMessageWithBudget(encoding)
+	reservation.Release()
+	return msg, buf, err
+}
+
+func (p *Peer) readMessageWithBudget(encoding wire.MessageEncoding) (wire.Message, []byte, *wire.PayloadReservation, error) {
+	n, msg, buf, reservation, err := wire.ReadMessageWithBudgetN(p.conn,
+		p.ProtocolVersion(), p.cfg.ChainParams.Net, encoding, p.pendingRequest, p.cfg.PayloadBudget)
 	//if msg != nil {
 	//	fmt.Printf("receive a %s from peer:%v\n", msg.Command(), p.addr)
 	//}
@@ -1127,7 +1146,7 @@ func (p *Peer) readMessage(encoding wire.MessageEncoding) (wire.Message, []byte,
 		//fmt.Printf("peer later %v\n",p)
 	}
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Use closures to log expensive operations so they are only run when
@@ -1141,14 +1160,9 @@ func (p *Peer) readMessage(encoding wire.MessageEncoding) (wire.Message, []byte,
 		return fmt.Sprintf("Received %v%s from %s",
 			msg.Command(), summary, p)
 	}))
-	log.Tracef("%v", newLogClosure(func() string {
-		return spew.Sdump(msg)
-	}))
-	log.Tracef("%v", newLogClosure(func() string {
-		return spew.Sdump(buf)
-	}))
+	log.Tracef("Received %s payload: %d bytes", msg.Command(), len(buf))
 
-	return msg, buf, nil
+	return msg, buf, reservation, nil
 }
 
 // writeMessage sends a abelian message to the peer with logging.
@@ -1180,20 +1194,11 @@ func (p *Peer) writeMessage(msg wire.Message, enc wire.MessageEncoding) error {
 		return fmt.Sprintf("Sending %v%s to %s", msg.Command(),
 			summary, p)
 	}))
-	log.Tracef("%v", newLogClosure(func() string {
-		return spew.Sdump(msg)
-	}))
-	log.Tracef("%v", newLogClosure(func() string {
-		var buf bytes.Buffer
-		_, err := wire.WriteMessageWithEncodingN(&buf, msg, p.ProtocolVersion(),
-			p.cfg.ChainParams.Net, enc)
-		if err != nil {
-			return err.Error()
-		}
-		return spew.Sdump(buf.Bytes())
-	}))
 
 	// Write the message to the peer.
+	if err := p.conn.SetWriteDeadline(time.Now().Add(writeTimeout)); err != nil {
+		return fmt.Errorf("set peer write deadline: %w", err)
+	}
 	n, err := wire.WriteMessageWithEncodingN(p.conn, msg,
 		p.ProtocolVersion(), p.cfg.ChainParams.Net, enc)
 	//fmt.Printf("send a %s to peer:%v\n", msg.Command(), p.addr)
@@ -1353,13 +1358,13 @@ out:
 			case sccSendMessage:
 				// Add a deadline for the expected response
 				// message if needed.
-				p.maybeAddDeadline(pendingResponses, msg.message.Command())
-				if msg.message.Command() == wire.CmdGetData {
+				p.maybeAddDeadline(pendingResponses, msg.msgCommand)
+				if msg.msgCommand == wire.CmdGetData {
 					completedData = p.updateGetDataDeadline(pendingResponses, completedData)
 				}
 
 			case sccReceiveMessage:
-				switch msgCmd := msg.message.Command(); msgCmd {
+				switch msgCmd := msg.msgCommand; msgCmd {
 				case wire.CmdBlock, wire.CmdPrunedBlock, wire.CmdTx, wire.CmdNotFound:
 					completedData = p.updateGetDataDeadline(pendingResponses, completedData)
 				default:
@@ -1467,6 +1472,8 @@ cleanup:
 // inHandler handles all incoming messages for the peer.  It must be run as a
 // goroutine.
 func (p *Peer) inHandler() {
+	var reservation *wire.PayloadReservation
+	defer func() { reservation.Release() }()
 	// The timer is stopped when a new message is received and reset after it
 	// is processed.
 	idleTimer := time.AfterFunc(idleTimeout, func() {
@@ -1479,10 +1486,11 @@ out:
 		// Read a message and stop the idle timer as soon as the read
 		// is done.  The timer is reset below for the next iteration if
 		// needed.
-		rmsg, buf, err := p.readMessage(p.wireEncoding)
+		rmsg, buf, held, err := p.readMessageWithBudget(p.wireEncoding)
+		reservation = held
 		idleTimer.Stop()
 		if err != nil {
-			if errors.Is(err, wire.ErrResponseLimit) {
+			if errors.Is(err, wire.ErrResponseLimit) || errors.Is(err, wire.ErrPayloadLimit) {
 				// Local congestion is not a malformed message. Close without
 				// waiting to send a protocol rejection to a valid relay peer.
 				log.Debugf("Closing peer %s: %v", p, err)
@@ -1519,10 +1527,10 @@ out:
 			break out
 		}
 		atomic.StoreInt64(&p.lastRecv, time.Now().Unix())
-		p.stallControl <- stallControlMsg{sccReceiveMessage, rmsg}
+		p.stallControl <- stallControlMsg{sccReceiveMessage, rmsg.Command()}
 
 		// Handle each supported message type.
-		p.stallControl <- stallControlMsg{sccHandlerStart, rmsg}
+		p.stallControl <- stallControlMsg{sccHandlerStart, ""}
 		switch msg := rmsg.(type) {
 		case *wire.MsgVersion:
 			// Limit to one version message per peer.
@@ -1717,7 +1725,9 @@ out:
 			log.Debugf("Received unhandled message of type %v "+
 				"from %v", rmsg.Command(), p)
 		}
-		p.stallControl <- stallControlMsg{sccHandlerDone, rmsg}
+		p.stallControl <- stallControlMsg{sccHandlerDone, ""}
+		reservation.Release()
+		reservation = nil
 
 		// A message was received so reset the idle timer.
 		idleTimer.Reset(idleTimeout)
@@ -1740,6 +1750,15 @@ out:
 func (p *Peer) queueHandler() {
 	pendingMsgs := list.New()
 	invSendQueue := list.New()
+	queueInventory := func(msg *wire.MsgInv) bool {
+		reservation, admitted := p.reserveQueuedMessage(msg)
+		if !admitted {
+			p.Disconnect()
+			return false
+		}
+		pendingMsgs.PushBack(outMsg{msg: msg, reservation: reservation})
+		return true
+	}
 	trickleTicker := time.NewTicker(p.cfg.TrickleInterval)
 	defer trickleTicker.Stop()
 
@@ -1754,6 +1773,10 @@ func (p *Peer) queueHandler() {
 
 out:
 	for {
+		if pendingMsgs.Len() > outputBufferSize || invSendQueue.Len() > wire.MaxInvPerMsg {
+			p.Disconnect()
+			break out
+		}
 		var requestsChanged <-chan struct{}
 		if !waiting {
 			requestsChanged = p.cfg.RequestCounter.Changed()
@@ -1768,8 +1791,9 @@ out:
 				if remainder == nil {
 					pendingMsgs.Remove(next)
 				} else {
-					next.Value = outMsg{msg: remainder, encoding: msg.encoding, doneChan: msg.doneChan}
+					next.Value = outMsg{msg: remainder, encoding: msg.encoding, doneChan: msg.doneChan, reservation: msg.reservation}
 					msg.doneChan = nil // Signal completion only after the last fragment.
+					msg.reservation = nil
 				}
 				msg.msg, msg.requestsAdded = admitted, true
 				p.sendQueue <- msg
@@ -1800,7 +1824,9 @@ out:
 
 					invMsg := wire.NewMsgInvSizeHint(1)
 					invMsg.AddInvVect(iv)
-					pendingMsgs.PushBack(outMsg{msg: invMsg})
+					if !queueInventory(invMsg) {
+						break out
+					}
 				} else {
 					invSendQueue.PushBack(iv)
 				}
@@ -1817,21 +1843,23 @@ out:
 
 			// Create and send as many inv messages as needed to
 			// drain the inventory send queue.
-			invMsg := wire.NewMsgInvSizeHint(uint(invSendQueue.Len()))
+			invMsg := wire.NewMsgInvSizeHint(uint(min(invSendQueue.Len(), maxInvTrickleSize)))
 			for e := invSendQueue.Front(); e != nil; e = invSendQueue.Front() {
 				iv := invSendQueue.Remove(e).(*wire.InvVect)
 
 				// Don't send inventory that became known after
 				// the initial check.
 				//if p.knownInventory.Exists(iv) {
-				if p.knownInventory.Contains(iv) {
+				if p.knownInventory.Contains(*iv) {
 					continue
 				}
 
 				invMsg.AddInvVect(iv)
 				if len(invMsg.InvList) >= maxInvTrickleSize { // if the number of invVect no less than the max size
-					pendingMsgs.PushBack(outMsg{msg: invMsg})
-					invMsg = wire.NewMsgInvSizeHint(uint(invSendQueue.Len()))
+					if !queueInventory(invMsg) {
+						break out
+					}
+					invMsg = wire.NewMsgInvSizeHint(uint(min(invSendQueue.Len(), maxInvTrickleSize)))
 				}
 
 				// Add the inventory that is being relayed to
@@ -1839,7 +1867,9 @@ out:
 				p.AddKnownInventory(iv)
 			}
 			if len(invMsg.InvList) > 0 { // if the number of invVect more than the max size
-				pendingMsgs.PushBack(outMsg{msg: invMsg})
+				if !queueInventory(invMsg) {
+					break out
+				}
 			}
 
 		case <-p.quit:
@@ -1847,11 +1877,15 @@ out:
 		}
 	}
 
+	// Exclude senders that raced with disconnect before draining ownership.
+	p.queueMtx.Lock()
+	defer p.queueMtx.Unlock()
 	// Drain any wait channels before we go away so we don't leave something
 	// waiting for us.
 	for e := pendingMsgs.Front(); e != nil; e = pendingMsgs.Front() {
 		val := pendingMsgs.Remove(e)
 		msg := val.(outMsg)
+		msg.reservation.Release()
 		if msg.doneChan != nil {
 			msg.doneChan <- struct{}{}
 		}
@@ -1867,6 +1901,7 @@ cleanup:
 	for {
 		select {
 		case msg := <-p.outputQueue:
+			msg.reservation.Release()
 			if msg.doneChan != nil {
 				msg.doneChan <- struct{}{}
 			}
@@ -1962,14 +1997,16 @@ out:
 				// Normal sends are admitted by queueHandler. Reaching here
 				// means the connection was closed before it could register.
 				p.Disconnect()
+				msg.reservation.Release()
 				if msg.doneChan != nil {
 					msg.doneChan <- struct{}{}
 				}
 				continue
 			}
-			p.stallControl <- stallControlMsg{sccSendMessage, msg.msg}
+			p.stallControl <- stallControlMsg{sccSendMessage, msg.msg.Command()}
 
 			err := p.writeMessage(msg.msg, msg.encoding)
+			msg.reservation.Release()
 			if err != nil {
 				p.Disconnect()
 				if p.shouldLogWriteError(err) {
@@ -2007,6 +2044,7 @@ cleanup:
 	for {
 		select {
 		case msg := <-p.sendQueue:
+			msg.reservation.Release()
 			if msg.doneChan != nil {
 				msg.doneChan <- struct{}{}
 			}
@@ -2065,26 +2103,32 @@ func (p *Peer) QueueMessage(msg wire.Message, doneChan chan<- struct{}) {
 // This function is safe for concurrent access.
 func (p *Peer) QueueMessageWithEncoding(msg wire.Message, doneChan chan<- struct{},
 	encoding wire.MessageEncoding) {
-
-	// Avoid risk of deadlock if goroutine already exited.  The goroutine
-	// we will be sending to hangs around until it knows for a fact that
-	// it is marked as disconnected and *then* it drains the channels.
-	if !p.Connected() {
-		if doneChan != nil {
-			go func() {
-				doneChan <- struct{}{}
-			}()
-		}
-		if wrappedMsg, ok := msg.(*wire.WrappedMessage); ok {
-			wrappedMsg.Done()
-			if wrappedMsg.CanDelete() {
-				p.communicationCache.Delete(wire.WrapMsgKey(wrappedMsg.Message, wrappedMsg.Encoding()))
-				log.Debugf("Delete wrapped message with key %s", wire.WrapMsgKey(wrappedMsg.Message, wrappedMsg.Encoding()))
+	p.queueMtx.RLock()
+	defer p.queueMtx.RUnlock()
+	var reservation *wire.PayloadReservation
+	if p.Connected() {
+		var admitted bool
+		reservation, admitted = p.reserveQueuedMessage(msg)
+		if admitted {
+			select {
+			case p.outputQueue <- outMsg{msg: msg, encoding: encoding, doneChan: doneChan, reservation: reservation}:
+				return
+			case <-p.quit:
 			}
+		} else {
+			p.Disconnect()
 		}
-		return
 	}
-	p.outputQueue <- outMsg{msg: msg, encoding: encoding, doneChan: doneChan}
+	reservation.Release()
+	if doneChan != nil {
+		go func() { doneChan <- struct{}{} }()
+	}
+	if wrapped, ok := msg.(*wire.WrappedMessage); ok {
+		wrapped.Done()
+		if wrapped.CanDelete() {
+			p.communicationCache.Delete(wire.WrapMsgKey(wrapped.Message, wrapped.Encoding()))
+		}
+	}
 }
 
 // QueueInventory adds the passed inventory to the inventory send queue which
@@ -2093,10 +2137,12 @@ func (p *Peer) QueueMessageWithEncoding(msg wire.Message, doneChan chan<- struct
 //
 // This function is safe for concurrent access.
 func (p *Peer) QueueInventory(invVect *wire.InvVect) {
+	p.queueMtx.RLock()
+	defer p.queueMtx.RUnlock()
 	// Don't add the inventory to the send queue if the peer is already
 	// known to have it.
 	//if p.knownInventory.Exists(invVect) {
-	if p.knownInventory.Contains(invVect) {
+	if p.knownInventory.Contains(*invVect) {
 		return
 	}
 
@@ -2107,7 +2153,10 @@ func (p *Peer) QueueInventory(invVect *wire.InvVect) {
 		return
 	}
 
-	p.outputInvChan <- invVect
+	select {
+	case p.outputInvChan <- invVect:
+	case <-p.quit:
+	}
 }
 
 // Connected returns whether or not the peer is currently connected.
@@ -2139,7 +2188,8 @@ func (p *Peer) Disconnect() {
 // acceptable then return an error.
 func (p *Peer) readRemoteVersionMsg() error {
 	// Read their version message.
-	remoteMsg, _, err := p.readMessage(wire.LatestEncoding)
+	remoteMsg, _, reservation, err := p.readMessageWithBudget(wire.LatestEncoding)
+	defer reservation.Release()
 	if err != nil {
 		return err
 	}
@@ -2247,7 +2297,8 @@ func (p *Peer) readRemoteVersionMsg() error {
 // connection.
 func (p *Peer) readRemoteVerAckMsg() error {
 	// Read the next message from the wire.
-	remoteMsg, _, err := p.readMessage(wire.LatestEncoding)
+	remoteMsg, _, reservation, err := p.readMessageWithBudget(wire.LatestEncoding)
+	defer reservation.Release()
 	if err != nil {
 		return err
 	}
@@ -2480,6 +2531,12 @@ func (p *Peer) AssociateConnection(conn net.Conn) {
 // Disconnect.
 func (p *Peer) WaitForDisconnect() {
 	<-p.quit
+}
+
+// Done is closed when the peer disconnects. Background cleanup may still be
+// running; callers can use this signal to cancel work tied to the connection.
+func (p *Peer) Done() <-chan struct{} {
+	return p.quit
 }
 
 // newPeerBase returns a new base abelian peer based on the inbound flag.  This

@@ -409,12 +409,21 @@ func ReadMessageWithEncodingN(r io.Reader, pver uint32, btcnet AbelianNet,
 // request tracker. A nil tracker disables request tracking, not wire validation.
 func ReadMessageWithRequestsN(r io.Reader, pver uint32, btcnet AbelianNet,
 	enc MessageEncoding, requests *MessageRequests) (int, Message, []byte, error) {
+	n, msg, payload, _, err := ReadMessageWithBudgetN(r, pver, btcnet, enc, requests, nil)
+	return n, msg, payload, err
+}
+
+// ReadMessageWithBudgetN extends ReadMessageWithRequestsN with a reservation
+// acquired before payload allocation. On success the caller must release it
+// only after processing or discarding the message and raw payload.
+func ReadMessageWithBudgetN(r io.Reader, pver uint32, btcnet AbelianNet,
+	enc MessageEncoding, requests *MessageRequests, budget *PayloadBudget) (int, Message, []byte, *PayloadReservation, error) {
 
 	totalBytes := 0
 	n, hdr, err := readMessageHeader(r)
 	totalBytes += n
 	if err != nil {
-		return totalBytes, nil, nil, err
+		return totalBytes, nil, nil, nil, err
 	}
 
 	// Enforce maximum message payload.
@@ -422,7 +431,7 @@ func ReadMessageWithRequestsN(r io.Reader, pver uint32, btcnet AbelianNet,
 		str := fmt.Sprintf("message payload is too large - header "+
 			"indicates %d bytes, but max message payload is %d "+
 			"bytes.", hdr.length, MaxMessagePayload)
-		return totalBytes, nil, nil, messageError("ReadMessage", str)
+		return totalBytes, nil, nil, nil, messageError("ReadMessage", str)
 
 	}
 
@@ -430,7 +439,7 @@ func ReadMessageWithRequestsN(r io.Reader, pver uint32, btcnet AbelianNet,
 	if hdr.magic != btcnet {
 		discardInput(r, hdr.length)
 		str := fmt.Sprintf("message from other network [%v]", hdr.magic)
-		return totalBytes, nil, nil, messageError("ReadMessage", str)
+		return totalBytes, nil, nil, nil, messageError("ReadMessage", str)
 	}
 
 	// Check for malformed commands.
@@ -439,12 +448,12 @@ func ReadMessageWithRequestsN(r io.Reader, pver uint32, btcnet AbelianNet,
 	if !utf8.ValidString(command) {
 		discardInput(r, hdr.length)
 		str := fmt.Sprintf("invalid command %v", []byte(command))
-		return totalBytes, nil, nil, messageError("ReadMessage", str)
+		return totalBytes, nil, nil, nil, messageError("ReadMessage", str)
 	}
 
 	relayLimit, err := requests.begin(command)
 	if err != nil {
-		return totalBytes, nil, nil, err
+		return totalBytes, nil, nil, nil, err
 	}
 	defer requests.end(relayLimit)
 
@@ -452,7 +461,7 @@ func ReadMessageWithRequestsN(r io.Reader, pver uint32, btcnet AbelianNet,
 	msg, err := makeEmptyMessage(command)
 	if err != nil {
 		discardInput(r, hdr.length)
-		return totalBytes, nil, nil, messageError("ReadMessage",
+		return totalBytes, nil, nil, nil, messageError("ReadMessage",
 			err.Error())
 	}
 
@@ -465,14 +474,25 @@ func ReadMessageWithRequestsN(r io.Reader, pver uint32, btcnet AbelianNet,
 		str := fmt.Sprintf("payload exceeds max length - header "+
 			"indicates %v bytes, but max payload size for "+
 			"messages of type [%v] is %v.", hdr.length, command, mpl)
-		return totalBytes, nil, nil, messageError("ReadMessage", str)
+		return totalBytes, nil, nil, nil, messageError("ReadMessage", str)
 	}
+
+	reservation, admitted := budget.TryReserve(uint64(mpl), command == CmdBlockTx || command == CmdNeedSetResult)
+	if !admitted {
+		return totalBytes, nil, nil, nil, ErrPayloadLimit
+	}
+	success := false
+	defer func() {
+		if !success {
+			reservation.Release()
+		}
+	}()
 
 	// Read payload without allocating a large buffer solely from its header.
 	payload, err := readPayload(r, hdr.length)
 	totalBytes += len(payload)
 	if err != nil {
-		return totalBytes, nil, nil, err
+		return totalBytes, nil, nil, nil, err
 	}
 
 	// Test checksum.
@@ -482,7 +502,7 @@ func ReadMessageWithRequestsN(r io.Reader, pver uint32, btcnet AbelianNet,
 		str := fmt.Sprintf("payload checksum failed - header "+
 			"indicates %v, but actual checksum is %v.",
 			hdr.checksum, checksum)
-		return totalBytes, nil, nil, messageError("ReadMessage", str)
+		return totalBytes, nil, nil, nil, messageError("ReadMessage", str)
 	}
 
 	// Unmarshal message.  NOTE: This must be a *bytes.Buffer since the
@@ -490,14 +510,15 @@ func ReadMessageWithRequestsN(r io.Reader, pver uint32, btcnet AbelianNet,
 	pr := bytes.NewBuffer(payload)
 	err = msg.BtcDecode(pr, pver, enc)
 	if err != nil {
-		return totalBytes, nil, nil, err
+		return totalBytes, nil, nil, nil, err
 	}
 
 	if err := requests.complete(msg); err != nil {
-		return totalBytes, nil, nil, err
+		return totalBytes, nil, nil, nil, err
 	}
 
-	return totalBytes, msg, payload, nil
+	success = true
+	return totalBytes, msg, payload, reservation, nil
 }
 
 // readPayload preserves ReadFull's byte count and error semantics. Allocate at

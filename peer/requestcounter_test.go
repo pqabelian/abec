@@ -17,9 +17,13 @@ import (
 // Tests can also write responses back through remote; those tests must start
 // the Peer's inHandler to receive them.
 func counterMessagePeer(t *testing.T, counter *wire.RequestCounter) (*Peer, net.Conn) {
+	return budgetMessagePeer(t, counter, nil)
+}
+
+func budgetMessagePeer(t *testing.T, counter *wire.RequestCounter, budget *wire.PayloadBudget) (*Peer, net.Conn) {
 	t.Helper()
 	local, remote := net.Pipe()
-	p := newPeerBase(&Config{ChainParams: &chaincfg.MainNetParams, RequestCounter: counter}, false)
+	p := newPeerBase(&Config{ChainParams: &chaincfg.MainNetParams, RequestCounter: counter, PayloadBudget: budget}, false)
 	p.conn = local
 	atomic.StoreInt32(&p.connected, 1)
 	p.stallControl = make(chan stallControlMsg, 128)

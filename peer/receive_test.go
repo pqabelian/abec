@@ -48,3 +48,31 @@ func TestPartialPayloadDoesNotExtendReceiveDeadline(t *testing.T) {
 		}
 	})
 }
+
+func TestBlockedWriteExpires(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		counter := wire.NewRequestCounter(512 * 1024 * 1024)
+		p, remote := counterMessagePeer(t, counter)
+		if err := remote.SetDeadline(time.Time{}); err != nil {
+			t.Fatal(err)
+		}
+		done := make(chan struct{}, 1)
+		p.QueueMessage(requestTransactions(1), done)
+		synctest.Wait() // The remote never reads the request.
+		time.Sleep(idleTimeout)
+		synctest.Wait()
+		select {
+		case <-p.outQuit:
+		default:
+			t.Fatal("blocked write survived its whole-message deadline")
+		}
+		select {
+		case <-done:
+		default:
+			t.Fatal("write timeout did not release the sender")
+		}
+		if count, size := counter.Usage(); count != 0 || size != 0 {
+			t.Fatalf("write timeout retained request credit: %d, %d", count, size)
+		}
+	})
+}

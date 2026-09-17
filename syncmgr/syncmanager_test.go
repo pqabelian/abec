@@ -94,8 +94,12 @@ func TestPrunedBlockDoesNotBlockSync(t *testing.T) {
 	sm.rejectedTxns[txHash] = struct{}{} // Exercise ordinary tx dispatch without consensus setup.
 	sm.Start()
 	blockDone := make(chan struct{}, 1)
-	sm.QueuePrunedBlock(block, p, blockDone)
-	syncHandlerBarrier(t, sm)
+	admitted := sm.QueuePrunedBlock(block, p, blockDone)
+	select {
+	case <-admitted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("pruned admission waited for supplemental responses")
+	}
 	select {
 	case <-blockDone:
 		t.Fatal("incomplete pruned block was marked processed")
@@ -115,7 +119,7 @@ func TestPrunedBlockDoesNotBlockSync(t *testing.T) {
 	// Shutdown must cancel reconstruction and stop its timer without waiting
 	// for the remote peer or the 30-second network timeout.
 	sm.Stop()
-	if len(state.pendingPrunedBlocks) != 0 {
+	if sm.pendingPrunedBlock != nil {
 		t.Fatal("shutdown retained pending reconstruction")
 	}
 }
@@ -127,6 +131,7 @@ func TestPrunedBlockResponseValidationAndTimeout(t *testing.T) {
 	tx.TxWitness = []byte{1}
 	txHash, blockHash := tx.TxHash(), chainhash.Hash{1}
 	pending := &pendingPrunedBlock{
+		hash:         blockHash,
 		msg:          &prunedBlockMsg{peer: p},
 		transactions: make(map[chainhash.Hash]*wire.MsgTxAbe),
 		missing:      map[chainhash.Hash]struct{}{txHash: {}},
@@ -137,15 +142,15 @@ func TestPrunedBlockResponseValidationAndTimeout(t *testing.T) {
 	if !addPrunedBlockTx(pending, tx) || addPrunedBlockTx(pending, tx) {
 		t.Fatal("requested transaction must be accepted exactly once")
 	}
-	state.pendingPrunedBlocks[blockHash] = pending
+	sm.pendingPrunedBlock = pending
 	state.requestedBlocks[blockHash] = struct{}{}
 	sm.requestedBlocks[blockHash] = struct{}{}
 	sm.handlePrunedBlockTimeoutMsg(&prunedBlockTimeoutMsg{p, blockHash, &pendingPrunedBlock{}})
-	if len(state.pendingPrunedBlocks) != 1 {
+	if sm.pendingPrunedBlock != pending {
 		t.Fatal("stale timeout removed a newer request")
 	}
 	sm.handlePrunedBlockTimeoutMsg(&prunedBlockTimeoutMsg{p, blockHash, pending})
-	if len(state.pendingPrunedBlocks) != 0 || len(state.requestedBlocks) != 0 || len(sm.requestedBlocks) != 0 {
+	if sm.pendingPrunedBlock != nil || len(state.requestedBlocks) != 0 || len(sm.requestedBlocks) != 0 {
 		t.Fatal("timeout failed to release request state")
 	}
 }
@@ -164,7 +169,7 @@ func TestPrunedBlockDeadlineCoversUnsentRequests(t *testing.T) {
 	done := make(chan struct{}, 1)
 	// This peer has no connection or output handler: no request can be sent.
 	sm.handlePrunedBlockMsgAbe(&prunedBlockMsg{block: block, peer: p, reply: done})
-	pending := state.pendingPrunedBlocks[hash]
+	pending := sm.pendingPrunedBlock
 	if pending == nil || pending.timer == nil {
 		t.Fatal("unsent reconstruction has no overall deadline")
 	}
@@ -185,7 +190,7 @@ func TestPrunedBlockDeadlineCoversUnsentRequests(t *testing.T) {
 	default:
 		t.Fatal("deadline did not notify reconstruction completion")
 	}
-	if len(state.pendingPrunedBlocks) != 0 || len(state.requestedBlocks) != 0 || len(sm.requestedBlocks) != 0 {
+	if sm.pendingPrunedBlock != nil || len(state.requestedBlocks) != 0 || len(sm.requestedBlocks) != 0 {
 		t.Fatal("deadline retained request state")
 	}
 	if pending.msg != nil || pending.transactions != nil || pending.missing != nil {
@@ -195,10 +200,10 @@ func TestPrunedBlockDeadlineCoversUnsentRequests(t *testing.T) {
 
 func TestPrunedBlockSupplementalWindow(t *testing.T) {
 	sm, p := testSyncManager(t)
-	state := sm.peerStates[p]
 	msg := &wire.MsgPrunedBlock{Header: chaincfg.MainNetParams.GenesisBlock.Header}
 	block := abeutil.NewPrunedBlockFromPrunedBlockAndBytesAbe(msg, nil)
 	pending := &pendingPrunedBlock{
+		hash:          *block.Hash(),
 		msg:           &prunedBlockMsg{block: block, peer: p},
 		transactions:  make(map[chainhash.Hash]*wire.MsgTxAbe),
 		missing:       make(map[chainhash.Hash]struct{}),
@@ -215,7 +220,7 @@ func TestPrunedBlockSupplementalWindow(t *testing.T) {
 		pending.missing[hash] = struct{}{}
 		pending.unrequested = append(pending.unrequested, hash)
 	}
-	state.pendingPrunedBlocks[*block.Hash()] = pending
+	sm.pendingPrunedBlock = pending
 	sm.requestPrunedBlockTxs(pending)
 	if pending.inFlight != maxPendingBlockTxRequests || len(pending.unrequested) != maxPendingBlockTxRequests {
 		t.Fatal("all missing transactions were queued instead of a bounded window")
@@ -224,7 +229,7 @@ func TestPrunedBlockSupplementalWindow(t *testing.T) {
 	if pending.inFlight != maxPendingBlockTxRequests || len(pending.unrequested) != maxPendingBlockTxRequests-1 {
 		t.Fatal("response did not replenish exactly one request")
 	}
-	sm.finishPrunedBlockRequest(state, *block.Hash())
+	sm.finishPrunedBlockRequest(p, *block.Hash())
 	if pending.unrequested != nil {
 		t.Fatal("cleanup retained the unsent transaction queue")
 	}
@@ -317,9 +322,9 @@ func TestSupplementalResponsesCompleteBlock(t *testing.T) {
 			state.requestedBlocks[hash], sm.requestedBlocks[hash] = struct{}{}, struct{}{}
 			done := make(chan struct{}, 1)
 			sm.handlePrunedBlockMsgAbe(&prunedBlockMsg{block: block, peer: p, reply: done})
-			state.pendingPrunedBlocks[hash].useGetBlockTx = singleTx
+			sm.pendingPrunedBlock.useGetBlockTx = singleTx
 			if singleTx {
-				state.pendingPrunedBlocks[hash].inFlight = 2
+				sm.pendingPrunedBlock.inFlight = 2
 			}
 			sm.Start()
 			defer sm.Stop()
@@ -342,7 +347,7 @@ func TestSupplementalResponsesCompleteBlock(t *testing.T) {
 				t.Fatal("supplemental responses did not complete reconstruction")
 			}
 			sm.Stop()
-			if len(state.pendingPrunedBlocks) != 0 || len(state.requestedBlocks) != 0 || len(sm.requestedBlocks) != 0 {
+			if sm.pendingPrunedBlock != nil || len(state.requestedBlocks) != 0 || len(sm.requestedBlocks) != 0 {
 				t.Fatal("completed reconstruction retained request state")
 			}
 		})
