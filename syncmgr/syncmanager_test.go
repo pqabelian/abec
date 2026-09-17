@@ -2,16 +2,13 @@ package syncmgr
 
 import (
 	"bytes"
-	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/blockchain"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/database"
 	_ "github.com/abesuite/abec/database/ffldb"
 	"github.com/abesuite/abec/mempool"
 	peerpkg "github.com/abesuite/abec/peer"
@@ -82,11 +79,7 @@ func TestPrunedBlockDoesNotBlockSync(t *testing.T) {
 	tx := wire.NewMsgTxAbe(wire.TxVersion_Height_0)
 	tx.TxWitness = []byte{1}
 	txHash := tx.TxHash()
-	msg := &wire.MsgPrunedBlock{
-		Header:            chaincfg.MainNetParams.GenesisBlock.Header,
-		CoinbaseTx:        chaincfg.MainNetParams.GenesisBlock.Transactions[0],
-		TransactionHashes: []chainhash.Hash{txHash},
-	}
+	msg := testPrunedBlock(t, sm, tx)
 	block := abeutil.NewPrunedBlockFromPrunedBlockAndBytesAbe(msg, nil)
 	state := sm.peerStates[p]
 	state.requestedBlocks[*block.Hash()] = struct{}{}
@@ -134,7 +127,7 @@ func TestPrunedBlockResponseValidationAndTimeout(t *testing.T) {
 		hash:         blockHash,
 		msg:          &prunedBlockMsg{peer: p},
 		transactions: make(map[chainhash.Hash]*wire.MsgTxAbe),
-		missing:      map[chainhash.Hash]struct{}{txHash: {}},
+		missing:      map[chainhash.Hash]chainhash.Hash{txHash: *tx.TxWitnessHash()},
 	}
 	if addPrunedBlockTx(pending, wire.NewMsgTxAbe(wire.TxVersion_Height_0)) {
 		t.Fatal("accepted a transaction without witness")
@@ -158,11 +151,9 @@ func TestPrunedBlockResponseValidationAndTimeout(t *testing.T) {
 func TestPrunedBlockDeadlineCoversUnsentRequests(t *testing.T) {
 	sm, p := testSyncManager(t)
 	state := sm.peerStates[p]
-	msg := &wire.MsgPrunedBlock{
-		Header:            chaincfg.MainNetParams.GenesisBlock.Header,
-		CoinbaseTx:        chaincfg.MainNetParams.GenesisBlock.Transactions[0],
-		TransactionHashes: []chainhash.Hash{{1}},
-	}
+	tx := wire.NewMsgTxAbe(wire.TxVersion_Height_0)
+	tx.TxWitness = []byte{1}
+	msg := testPrunedBlock(t, sm, tx)
 	block := abeutil.NewPrunedBlockFromPrunedBlockAndBytesAbe(msg, nil)
 	hash := *block.Hash()
 	state.requestedBlocks[hash], sm.requestedBlocks[hash] = struct{}{}, struct{}{}
@@ -206,7 +197,7 @@ func TestPrunedBlockSupplementalWindow(t *testing.T) {
 		hash:          *block.Hash(),
 		msg:           &prunedBlockMsg{block: block, peer: p},
 		transactions:  make(map[chainhash.Hash]*wire.MsgTxAbe),
-		missing:       make(map[chainhash.Hash]struct{}),
+		missing:       make(map[chainhash.Hash]chainhash.Hash),
 		useGetBlockTx: true,
 	}
 	var first *wire.MsgTxAbe
@@ -217,7 +208,7 @@ func TestPrunedBlockSupplementalWindow(t *testing.T) {
 			first = tx
 		}
 		hash := tx.TxHash()
-		pending.missing[hash] = struct{}{}
+		pending.missing[hash] = *tx.TxWitnessHash()
 		pending.unrequested = append(pending.unrequested, hash)
 	}
 	sm.pendingPrunedBlock = pending
@@ -290,38 +281,22 @@ func TestSupplementalResponsesCompleteBlock(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			sm, p := testSyncManager(t)
-			dir := t.TempDir()
-			db, err := database.Create("ffldb", filepath.Join(dir, "blocks"), wire.MainNet, wire.FullNode, filepath.Join(dir, "temporary.log"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer db.Close()
-			sm.chain, err = blockchain.New(&blockchain.Config{
-				DB: db, ChainParams: &chaincfg.MainNetParams, NodeType: wire.FullNode,
-				TimeSource: blockchain.NewMedianTime(),
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			coinbase := *chaincfg.MainNetParams.GenesisBlock.Transactions[0]
-			coinbase.TxWitness = []byte{1}
 			tx1 := wire.NewMsgTxAbe(wire.TxVersion_Height_0)
 			tx1.TxWitness = []byte{2}
 			tx2 := wire.NewMsgTxAbe(wire.TxVersion_Height_0)
 			tx2.TxMemo, tx2.TxWitness = []byte{3}, []byte{4}
-			// The existing genesis header makes chain processing return the
-			// deterministic duplicate-block result, without PoW or mining.
-			msg := &wire.MsgPrunedBlock{
-				Header: chaincfg.MainNetParams.GenesisBlock.Header, CoinbaseTx: &coinbase,
-				TransactionHashes: []chainhash.Hash{tx1.TxHash(), tx2.TxHash()},
-				WitnessHashs:      []chainhash.Hash{*tx1.TxWitnessHash(), *tx2.TxWitnessHash()},
-			}
+			// The header is valid; full validation later rejects these empty
+			// transaction bodies after the supplemental responses arrive.
+			msg := testPrunedBlock(t, sm, tx1, tx2)
 			block := abeutil.NewPrunedBlockFromPrunedBlockAndBytesAbe(msg, nil)
 			hash := *block.Hash()
 			state := sm.peerStates[p]
 			state.requestedBlocks[hash], sm.requestedBlocks[hash] = struct{}{}, struct{}{}
 			done := make(chan struct{}, 1)
 			sm.handlePrunedBlockMsgAbe(&prunedBlockMsg{block: block, peer: p, reply: done})
+			if sm.pendingPrunedBlock == nil {
+				t.Fatal("valid header did not start supplemental reconstruction")
+			}
 			sm.pendingPrunedBlock.useGetBlockTx = singleTx
 			if singleTx {
 				sm.pendingPrunedBlock.inFlight = 2

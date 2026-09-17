@@ -9,7 +9,6 @@ import (
 
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
-	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	peerpkg "github.com/abesuite/abec/peer"
 	"github.com/abesuite/abec/wire"
@@ -40,7 +39,7 @@ func TestPrunedBlockIncrementalSize(t *testing.T) {
 	for _, full := range []bool{false, true} {
 		pending := &pendingPrunedBlock{
 			transactions: make(map[chainhash.Hash]*wire.MsgTxAbe),
-			missing:      map[chainhash.Hash]struct{}{hash: {}},
+			missing:      map[chainhash.Hash]chainhash.Hash{hash: *tx.TxWitnessHash()},
 		}
 		if full {
 			pending.fullSize = wire.MaxBlockPayloadAbe - uint64(tx.SerializeSizeFull()) + 1
@@ -63,12 +62,10 @@ func TestPrunedBlockIncrementalSize(t *testing.T) {
 
 func TestPrunedBlockPreparationAndGlobalSlot(t *testing.T) {
 	sm, p := testSyncManager(t)
-	coinbase := *chaincfg.MainNetParams.GenesisBlock.Transactions[0]
-	coinbase.TxWitness = []byte{1}
 	tx := wire.NewMsgTxAbe(wire.TxVersion_Height_0)
 	tx.TxWitness = []byte{2}
 	hash := tx.TxHash()
-	pruned := &wire.MsgPrunedBlock{Header: chaincfg.MainNetParams.GenesisBlock.Header, CoinbaseTx: &coinbase, TransactionHashes: []chainhash.Hash{hash}}
+	pruned := testPrunedBlock(t, sm, tx)
 	msg := &prunedBlockMsg{block: abeutil.NewPrunedBlockFromPrunedBlockAndBytesAbe(pruned, nil), peer: p}
 	pending, err := sm.preparePrunedBlock(msg)
 	if err != nil || !addPrunedBlockTx(pending, tx) {
@@ -78,7 +75,7 @@ func TestPrunedBlockPreparationAndGlobalSlot(t *testing.T) {
 	if err != nil || pending.fullSize != uint64(restored.MsgBlock().SerializeSize()) || pending.baseSize != uint64(restored.MsgBlock().SerializeSizeStripped()) {
 		t.Fatalf("incremental size disagrees with block serialization: %v", err)
 	}
-	for _, hashes := range [][]chainhash.Hash{{hash, hash}, {coinbase.TxHash()}} {
+	for _, hashes := range [][]chainhash.Hash{{hash, hash}, {pruned.CoinbaseTx.TxHash()}} {
 		invalid := *pruned
 		invalid.TransactionHashes = hashes
 		if _, err := sm.preparePrunedBlock(&prunedBlockMsg{block: abeutil.NewPrunedBlockFromPrunedBlockAndBytesAbe(&invalid, nil), peer: p}); err == nil {
@@ -216,7 +213,7 @@ func TestNeedSetContentsValidatedDuringQueuedProcessing(t *testing.T) {
 			hash := chainhash.Hash{1}
 			pending := &pendingPrunedBlock{
 				hash: hash, msg: &prunedBlockMsg{peer: p},
-				missing:      map[chainhash.Hash]struct{}{tx1.TxHash(): {}, tx2.TxHash(): {}},
+				missing:      map[chainhash.Hash]chainhash.Hash{tx1.TxHash(): *tx1.TxWitnessHash(), tx2.TxHash(): *tx2.TxWitnessHash()},
 				transactions: make(map[chainhash.Hash]*wire.MsgTxAbe),
 			}
 			sm.pendingPrunedBlock = pending

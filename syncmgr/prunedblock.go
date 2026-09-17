@@ -6,6 +6,7 @@ import (
 
 	"github.com/abesuite/abec/abeutil"
 	"github.com/abesuite/abec/blockchain"
+	"github.com/abesuite/abec/blockchain/ruleerror"
 	"github.com/abesuite/abec/chaincfg"
 	"github.com/abesuite/abec/chainhash"
 	peerpkg "github.com/abesuite/abec/peer"
@@ -24,7 +25,7 @@ type pendingPrunedBlock struct {
 	hash          chainhash.Hash
 	msg           *prunedBlockMsg
 	transactions  map[chainhash.Hash]*wire.MsgTxAbe
-	missing       map[chainhash.Hash]struct{}
+	missing       map[chainhash.Hash]chainhash.Hash // Transaction hash -> committed witness hash.
 	useGetBlockTx bool
 	unrequested   []chainhash.Hash
 	inFlight      int // Queued or sent getblocktx requests, awaiting responses.
@@ -94,6 +95,15 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(msg *prunedBlockMsg) {
 
 	pending, err := sm.preparePrunedBlock(msg)
 	if err != nil {
+		if ruleErr, ok := err.(ruleerror.RuleError); ok && ruleErr.ErrorCode == ruleerror.ErrPreviousBlockUnknown {
+			// Out-of-order blocks are legitimate. Let the ordinary block path
+			// handle the orphan without starting supplemental requests.
+			getData := wire.NewMsgGetData()
+			getData.AddInvVect(wire.NewInvVect(wire.InvTypeWitnessBlock, &hash))
+			msg.peer.QueueMessage(getData, nil)
+			sm.notifyPrunedBlockProcessed(msg)
+			return
+		}
 		log.Warnf("Cannot reconstruct pruned block %v from %v: %v", hash, msg.peer, err)
 		delete(state.requestedBlocks, hash)
 		delete(sm.requestedBlocks, hash)
@@ -142,7 +152,7 @@ func (sm *SyncManager) preparePrunedBlock(msg *prunedBlockMsg) (*pendingPrunedBl
 		hash:          *msg.block.Hash(),
 		msg:           msg,
 		transactions:  make(map[chainhash.Hash]*wire.MsgTxAbe),
-		missing:       make(map[chainhash.Hash]struct{}),
+		missing:       make(map[chainhash.Hash]chainhash.Hash),
 		useGetBlockTx: msg.peer.UseGetBlockTx(),
 		baseSize:      headerSize + uint64(block.CoinbaseTx.SerializeSize()),
 		fullSize:      headerSize + uint64(block.CoinbaseTx.SerializeSizeFull()),
@@ -155,10 +165,15 @@ func (sm *SyncManager) preparePrunedBlock(msg *prunedBlockMsg) (*pendingPrunedBl
 		if _, duplicate := pending.missing[hash]; duplicate || hash == coinbaseHash {
 			return nil, fmt.Errorf("duplicate transaction hash")
 		}
-		pending.missing[hash] = struct{}{}
+		pending.missing[hash] = chainhash.Hash{}
 	}
-	for _, txHash := range block.TransactionHashes {
-		if tx, err := sm.txMemPool.FetchTransaction(&txHash); err == nil && tx.MsgTx().HasTxWitness() {
+	if err := sm.chain.CheckPrunedBlock(block, sm.powConsensus); err != nil {
+		return nil, err
+	}
+	for i, txHash := range block.TransactionHashes {
+		pending.missing[txHash] = block.WitnessHashs[i]
+		if tx, err := sm.txMemPool.FetchTransaction(&txHash); err == nil && tx.MsgTx().HasTxWitness() &&
+			*tx.MsgTx().TxWitnessHash() == block.WitnessHashs[i] {
 			if !addPrunedBlockTx(pending, tx.MsgTx()) {
 				return nil, fmt.Errorf("mempool transaction exceeds block size limit")
 			}
@@ -258,7 +273,8 @@ func addPrunedBlockTx(pending *pendingPrunedBlock, tx *wire.MsgTxAbe) bool {
 		return false
 	}
 	hash := tx.TxHash()
-	if _, requested := pending.missing[hash]; !requested {
+	witnessHash, requested := pending.missing[hash]
+	if !requested || *tx.TxWitnessHash() != witnessHash {
 		return false
 	}
 	baseSize, fullSize := uint64(tx.SerializeSize()), uint64(tx.SerializeSizeFull())
