@@ -44,22 +44,35 @@ func (msg *MsgNeedSet) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) 
 		}
 	}
 
+	return msg.checkDuplicateHashes("MsgNeedSet.BtcDecode")
+}
+
+func (msg *MsgNeedSet) checkDuplicateHashes(op string) error {
+	seen := make(map[chainhash.Hash]struct{}, len(msg.Hashes))
+	for _, hash := range msg.Hashes {
+		if _, exists := seen[hash]; exists {
+			return messageError(op, "duplicate transaction hash in needset")
+		}
+		seen[hash] = struct{}{}
+	}
 	return nil
 }
 
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgNeedSet) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
-	_, err := w.Write(msg.BlockHash[:])
-	if err != nil {
-		return err
-	}
-
 	// Limit to max inventory vectors per message.
 	count := len(msg.Hashes)
 	if count > MaxInvPerMsg {
 		str := fmt.Sprintf("too many invvect in message [%v]", count)
 		return messageError("MsgInv.BtcEncode", str)
+	}
+	if err := msg.checkDuplicateHashes("MsgNeedSet.BtcEncode"); err != nil {
+		return err
+	}
+	_, err := w.Write(msg.BlockHash[:])
+	if err != nil {
+		return err
 	}
 
 	err = WriteVarInt(w, pver, uint64(count))
