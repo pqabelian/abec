@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 )
 
@@ -19,7 +18,6 @@ func encodedMessage(t *testing.T, msg wire.Message) []byte {
 }
 
 func TestMessageRequestCredits(t *testing.T) {
-	tx := wire.NewMsgTxAbe(wire.TxVersion_Height_0)
 	cases := []struct {
 		name    string
 		invType wire.InvType
@@ -28,8 +26,6 @@ func TestMessageRequestCredits(t *testing.T) {
 		{"headers", wire.InvTypeError, wire.NewMsgHeaders()},
 		{"base-block", wire.InvTypeBlock, chaincfg.MainNetParams.GenesisBlock},
 		{"witness-block", wire.InvTypeWitnessBlock, chaincfg.MainNetParams.GenesisBlock},
-		{"base-tx", wire.InvTypeTx, tx},
-		{"witness-tx", wire.InvTypeWitnessTx, tx},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -38,7 +34,8 @@ func TestMessageRequestCredits(t *testing.T) {
 			var request wire.Message = wire.NewMsgGetHeaders()
 			if tc.invType != wire.InvTypeError {
 				getData := wire.NewMsgGetData()
-				getData.AddInvVect(wire.NewInvVect(tc.invType, &chainhash.Hash{}))
+				hash := chaincfg.MainNetParams.GenesisBlock.BlockHash()
+				getData.AddInvVect(wire.NewInvVect(tc.invType, &hash))
 				request = getData
 			}
 			// One request permits exactly one response, across repeated cycles.
@@ -54,29 +51,6 @@ func TestMessageRequestCredits(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestNotFoundConsumesMessageRequest(t *testing.T) {
-	var requests wire.MessageRequests
-	iv := wire.NewInvVect(wire.InvTypeWitnessTx, &chainhash.Hash{1})
-	getData := wire.NewMsgGetData()
-	getData.AddInvVect(iv)
-	requests.Add(getData)
-	notFound := wire.NewMsgNotFound()
-	notFound.AddInvVect(iv)
-	for i := 0; i < 2; i++ {
-		if _, _, _, err := wire.ReadMessageWithRequestsN(bytes.NewReader(encodedMessage(t, notFound)), wire.ProtocolVersion, wire.MainNet, wire.BaseEncoding, &requests); err != nil {
-			t.Fatal(err)
-		}
-	}
-	data := encodedMessage(t, wire.NewMsgTxAbe(wire.TxVersion_Height_0))
-	if _, _, _, err := wire.ReadMessageWithRequestsN(bytes.NewReader(data), wire.ProtocolVersion, wire.MainNet, wire.BaseEncoding, &requests); err == nil {
-		t.Fatal("notfound left a response credit behind")
-	}
-	requests.Add(getData)
-	if _, _, _, err := wire.ReadMessageWithRequestsN(bytes.NewReader(data), wire.ProtocolVersion, wire.MainNet, wire.BaseEncoding, &requests); err != nil {
-		t.Fatalf("repeated notfound caused a negative credit: %v", err)
 	}
 }
 

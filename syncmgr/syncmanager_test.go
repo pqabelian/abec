@@ -1,6 +1,7 @@
 package syncmgr
 
 import (
+	"bytes"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -290,5 +291,41 @@ func TestSupplementalResponsesCompleteBlock(t *testing.T) {
 				t.Fatal("completed reconstruction retained request state")
 			}
 		})
+	}
+}
+
+func TestUnrequestedNotFoundPreservesQueuedBlock(t *testing.T) {
+	sm, p := testSyncManager(t)
+	state := sm.peerStates[p]
+	sent, queued := chainhash.Hash{1}, chainhash.Hash{2}
+	for _, hash := range []chainhash.Hash{sent, queued} {
+		state.requestedBlocks[hash], sm.requestedBlocks[hash] = struct{}{}, struct{}{}
+	}
+	requests := wire.NewMessageRequests(nil)
+	defer requests.Close()
+	gd := wire.NewMsgGetData()
+	gd.AddInvVect(wire.NewInvVect(wire.InvTypeWitnessBlock, &sent))
+	requests.Add(gd) // The second block has not passed the peer's quota yet.
+	nf := wire.NewMsgNotFound()
+	nf.AddInvVect(gd.InvList[0])
+	nf.AddInvVect(gd.InvList[0])
+	nf.AddInvVect(wire.NewInvVect(wire.InvTypeWitnessBlock, &queued))
+	var b bytes.Buffer
+	if err := wire.WriteMessage(&b, nf, wire.ProtocolVersion, wire.MainNet); err != nil {
+		t.Fatal(err)
+	}
+	_, decoded, _, err := wire.ReadMessageWithRequestsN(&b, wire.ProtocolVersion, wire.MainNet, wire.BaseEncoding, requests)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sm.handleNotFoundMsg(&notFoundMsg{notFound: decoded.(*wire.MsgNotFound), peer: p})
+	if _, ok := state.requestedBlocks[sent]; ok {
+		t.Fatal("matching notfound did not cancel the sent request")
+	}
+	if _, ok := state.requestedBlocks[queued]; !ok {
+		t.Fatal("unrequested notfound canceled inventory still waiting for quota")
+	}
+	if _, ok := sm.requestedBlocks[queued]; !ok {
+		t.Fatal("unrequested notfound canceled the global sync request")
 	}
 }

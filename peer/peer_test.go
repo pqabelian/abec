@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 )
 
@@ -61,7 +60,8 @@ func TestConcurrentRequestsAndResponses(t *testing.T) {
 	p := testMessagePeer(t, bytes.Repeat(b.Bytes(), n))
 	// Outstanding pipelined requests make every response below solicited.
 	gd := wire.NewMsgGetData()
-	gd.AddInvVect(wire.NewInvVect(wire.InvTypeWitnessTx, &chainhash.Hash{}))
+	hash := tx.TxHash()
+	gd.AddInvVect(wire.NewInvVect(wire.InvTypeWitnessTx, &hash))
 	for i := 0; i < n; i++ {
 		p.pendingRequest.Add(gd)
 	}

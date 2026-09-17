@@ -1297,14 +1297,6 @@ func (p *Peer) maybeAddDeadline(pendingResponses map[string]time.Time, msgCmd st
 		// Expects an inv message.
 		pendingResponses[wire.CmdInv] = deadline
 
-	case wire.CmdGetData:
-		// Expects a block, merkleblock, tx, or notfound message.
-		pendingResponses[wire.CmdBlock] = deadline
-		// TODO(ABE): ABE does not support filter.
-		//		pendingResponses[wire.CmdMerkleBlock] = deadline
-		pendingResponses[wire.CmdTx] = deadline
-		pendingResponses[wire.CmdNotFound] = deadline
-
 	case wire.CmdGetHeaders:
 		// Expects a headers message.  Use a longer deadline since it
 		// can take a while for the remote peer to load all of the
@@ -1312,6 +1304,19 @@ func (p *Peer) maybeAddDeadline(pendingResponses map[string]time.Time, msgCmd st
 		deadline = time.Now().Add(stallResponseTimeout * 3)
 		pendingResponses[wire.CmdHeaders] = deadline
 	}
+}
+
+// updateGetDataDeadline keeps the batch deadline until all requested inventory
+// arrives. Only matched responses extend it; sending more requests, unrelated
+// transactions, and duplicate/unknown notfound entries are not progress.
+func (p *Peer) updateGetDataDeadline(pendingResponses map[string]time.Time, completed uint64) uint64 {
+	pending, current := p.pendingRequest.GetDataStatus()
+	if pending == 0 {
+		delete(pendingResponses, wire.CmdGetData)
+	} else if _, exists := pendingResponses[wire.CmdGetData]; !exists || current != completed {
+		pendingResponses[wire.CmdGetData] = time.Now().Add(stallResponseTimeout)
+	}
+	return current
 }
 
 // stallHandler handles stall detection for the peer.  This entails keeping
@@ -1329,6 +1334,7 @@ func (p *Peer) stallHandler() {
 
 	// pendingResponses tracks the expected response deadline times.
 	pendingResponses := make(map[string]time.Time)
+	var completedData uint64
 
 	// stallTicker is used to periodically check pending responses that have
 	// exceeded the expected deadline and disconnect the peer due to
@@ -1347,31 +1353,15 @@ out:
 			case sccSendMessage:
 				// Add a deadline for the expected response
 				// message if needed.
-				p.maybeAddDeadline(pendingResponses,
-					msg.message.Command())
+				p.maybeAddDeadline(pendingResponses, msg.message.Command())
+				if msg.message.Command() == wire.CmdGetData {
+					completedData = p.updateGetDataDeadline(pendingResponses, completedData)
+				}
 
 			case sccReceiveMessage:
-				// Remove received messages from the expected
-				// response map.  Since certain commands expect
-				// one of a group of responses, remove
-				// everything in the expected group accordingly.
 				switch msgCmd := msg.message.Command(); msgCmd {
-				case wire.CmdBlock:
-					fallthrough
-					// TODO(ABE): ABE does not support filter.
-				//case wire.CmdMerkleBlock:
-				//	fallthrough
-				case wire.CmdPrunedBlock:
-					fallthrough
-				case wire.CmdTx:
-					fallthrough
-				case wire.CmdNotFound:
-					delete(pendingResponses, wire.CmdBlock)
-					delete(pendingResponses, wire.CmdPrunedBlock)
-					//delete(pendingResponses, wire.CmdMerkleBlock)
-					delete(pendingResponses, wire.CmdTx)
-					delete(pendingResponses, wire.CmdNotFound)
-
+				case wire.CmdBlock, wire.CmdPrunedBlock, wire.CmdTx, wire.CmdNotFound:
+					completedData = p.updateGetDataDeadline(pendingResponses, completedData)
 				default:
 					delete(pendingResponses, msgCmd)
 				}
@@ -1409,10 +1399,18 @@ out:
 			}
 
 		case <-stallTicker.C:
+			// Bound each admitted request's lifetime independently of progress
+			// on other requests or time spent in local callbacks. This releases
+			// shared capacity without treating local overload as misconduct.
+			now := time.Now()
+			if p.pendingRequest.Expired(now.Add(-idleTimeout)) {
+				log.Infof("Peer %s exceeded an outstanding request's maximum lifetime -- disconnecting", p)
+				p.Disconnect()
+			}
+
 			// Calculate the offset to apply to the deadline based
 			// on how long the handlers have taken to execute since
 			// the last tick.
-			now := time.Now()
 			offset := deadlineOffset
 			if handlerActive {
 				offset += now.Sub(handlersStartTime)
@@ -1484,6 +1482,12 @@ out:
 		rmsg, buf, err := p.readMessage(p.wireEncoding)
 		idleTimer.Stop()
 		if err != nil {
+			if errors.Is(err, wire.ErrResponseLimit) {
+				// Local congestion is not a malformed message. Close without
+				// waiting to send a protocol rejection to a valid relay peer.
+				log.Debugf("Closing peer %s: %v", p, err)
+				break out
+			}
 			// In order to allow regression tests with malformed messages, don't
 			// disconnect the peer when we're in regression test mode and the
 			// error is one of the allowed errors.

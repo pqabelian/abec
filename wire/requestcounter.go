@@ -1,8 +1,16 @@
 package wire
 
-import "sync"
+import (
+	"errors"
+	"sync"
+)
+
+// ErrResponseLimit indicates local receive capacity exhaustion, not a malformed
+// message or peer misbehavior.
+var ErrResponseLimit = errors.New("no capacity for relayed tx")
 
 // RequestCounter limits outstanding data requests across all server connections.
+// Directly relayed transactions without a pending request are charged while read.
 // Admission uses count by response type multiplied by its protocol payload
 // maximum. It does not track actual payload sizes or downstream processing.
 type RequestCounter struct {

@@ -25,7 +25,9 @@ func TestSharedRequestCounterLifetime(t *testing.T) {
 	const limit = 512 * 1024 * 1024
 	counter := wire.NewRequestCounter(limit)
 	a, b := wire.NewMessageRequests(counter), wire.NewMessageRequests(counter)
-	if !a.Add(dataRequest(wire.InvTypeWitnessBlock, 2)) || b.Add(dataRequest(wire.InvTypeTx, 1)) {
+	blocks := dataRequest(wire.InvTypeWitnessBlock, 2)
+	blocks.InvList[0].Hash = chaincfg.MainNetParams.GenesisBlock.BlockHash()
+	if !a.Add(blocks) || b.Add(dataRequest(wire.InvTypeTx, 1)) {
 		t.Fatal("connections did not share the global limit")
 	}
 	if count, size := counter.Usage(); count != 2 || size != limit {
@@ -142,7 +144,7 @@ func TestRequestCounterReadErrors(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			counter := wire.NewRequestCounter(uint64((&wire.MsgTxAbe{}).MaxPayloadLength(wire.ProtocolVersion)))
 			r := wire.NewMessageRequests(counter)
-			r.Add(dataRequest(wire.InvTypeTx, 1))
+			r.Add(transactionRequest(wire.NewMsgTxAbe(wire.TxVersion_Height_0)))
 			reader := bytes.NewReader(input)
 			n, _, _, err := wire.ReadMessageWithRequestsN(reader, wire.ProtocolVersion, wire.MainNet, wire.BaseEncoding, r)
 			if err == nil {
@@ -151,11 +153,18 @@ func TestRequestCounterReadErrors(t *testing.T) {
 			if name == "oversized" && n != wire.MessageHeaderSize {
 				t.Fatal("oversized payload was read before rejection")
 			}
+			r.Close() // The connection owner closes the tracker after a read failure.
 			if count, size := counter.Usage(); count != 0 || size != 0 {
 				t.Fatalf("read error leaked counts: %d, %d", count, size)
 			}
 		})
 	}
+}
+
+func transactionRequest(tx *wire.MsgTxAbe) *wire.MsgGetData {
+	request := dataRequest(wire.InvTypeTx, 1)
+	request.InvList[0].Hash = tx.TxHash()
+	return request
 }
 
 func TestRequestCounterConcurrentConnections(t *testing.T) {
@@ -170,7 +179,7 @@ func TestRequestCounterConcurrentConnections(t *testing.T) {
 			r := wire.NewMessageRequests(counter)
 			defer r.Close()
 			for j := 0; j < 50; j++ {
-				if !r.Add(dataRequest(wire.InvTypeTx, 1)) {
+				if !r.Add(transactionRequest(wire.NewMsgTxAbe(wire.TxVersion_Height_0))) {
 					t.Error("capacity for 16 simultaneous transactions was exceeded")
 					return
 				}
@@ -195,20 +204,23 @@ type pausedPayload struct {
 	io.Reader
 	started chan struct{}
 	resume  chan struct{}
+	once    sync.Once
 }
 
 func (p *pausedPayload) Read(b []byte) (int, error) {
-	close(p.started)
-	<-p.resume
+	p.once.Do(func() {
+		close(p.started)
+		<-p.resume
+	})
 	return p.Reader.Read(b)
 }
 
 func TestReadingResponseRemainsCountedAcrossDisconnect(t *testing.T) {
 	counter := wire.NewRequestCounter(uint64((&wire.MsgTxAbe{}).MaxPayloadLength(wire.ProtocolVersion)))
 	r := wire.NewMessageRequests(counter)
-	r.Add(dataRequest(wire.InvTypeTx, 1))
+	r.Add(transactionRequest(wire.NewMsgTxAbe(wire.TxVersion_Height_0)))
 	data := encodedMessage(t, wire.NewMsgTxAbe(wire.TxVersion_Height_0))
-	payload := &pausedPayload{bytes.NewReader(data[wire.MessageHeaderSize:]), make(chan struct{}), make(chan struct{})}
+	payload := &pausedPayload{bytes.NewReader(data[wire.MessageHeaderSize:]), make(chan struct{}), make(chan struct{}), sync.Once{}}
 	done := make(chan error, 1)
 	go func() {
 		_, _, _, err := wire.ReadMessageWithRequestsN(io.MultiReader(bytes.NewReader(data[:wire.MessageHeaderSize]), payload), wire.ProtocolVersion, wire.MainNet, wire.BaseEncoding, r)
@@ -227,5 +239,56 @@ func TestReadingResponseRemainsCountedAcrossDisconnect(t *testing.T) {
 	}
 	if count, size := counter.Usage(); count != 0 || size != 0 {
 		t.Fatalf("reader completion leaked or underflowed counts: %d, %d", count, size)
+	}
+}
+
+func TestUnsolicitedTxReadIsCounted(t *testing.T) {
+	valid := encodedMessage(t, wire.NewMsgTxAbe(wire.TxVersion_Height_0))
+	badChecksum := append([]byte(nil), valid...)
+	badChecksum[len(badChecksum)-1] ^= 1
+	for name, data := range map[string][]byte{"valid": valid, "checksum": badChecksum, "truncated": valid[:len(valid)-1]} {
+		t.Run(name, func(t *testing.T) {
+			limit := uint64((&wire.MsgTxAbe{}).MaxPayloadLength(wire.ProtocolVersion))
+			counter := wire.NewRequestCounter(limit)
+			r := wire.NewMessageRequests(counter)
+			payload := &pausedPayload{bytes.NewReader(data[wire.MessageHeaderSize:]), make(chan struct{}), make(chan struct{}), sync.Once{}}
+			done := make(chan error, 1)
+			go func() {
+				_, _, _, err := wire.ReadMessageWithRequestsN(io.MultiReader(bytes.NewReader(data[:wire.MessageHeaderSize]), payload), wire.ProtocolVersion, wire.MainNet, wire.BaseEncoding, r)
+				done <- err
+			}()
+			<-payload.started
+			r.Close()
+			count, size := counter.Usage()
+			close(payload.resume)
+			err := <-done
+			if (name == "valid") != (err == nil) {
+				t.Fatalf("unexpected relay decode result: %v", err)
+			}
+			if count != 1 || size != limit {
+				t.Fatalf("direct relay read was uncounted: %d, %d", count, size)
+			}
+			if count, size := counter.Usage(); count != 0 || size != 0 {
+				t.Fatalf("direct relay read leaked credits: %d, %d", count, size)
+			}
+		})
+	}
+}
+
+func TestUnsolicitedTxRespectsFullCounter(t *testing.T) {
+	counter := wire.NewRequestCounter(uint64((&wire.MsgTxAbe{}).MaxPayloadLength(wire.ProtocolVersion)))
+	holder := wire.NewMessageRequests(counter)
+	holder.Add(dataRequest(wire.InvTypeTx, 1))
+	defer holder.Close()
+	r := wire.NewMessageRequests(counter)
+	defer r.Close()
+	data := encodedMessage(t, wire.NewMsgTxAbe(wire.TxVersion_Height_0))
+	reader := bytes.NewReader(data)
+	n, _, _, err := wire.ReadMessageWithRequestsN(reader, wire.ProtocolVersion, wire.MainNet, wire.BaseEncoding, r)
+	if err != wire.ErrResponseLimit || n != wire.MessageHeaderSize || reader.Len() != len(data)-wire.MessageHeaderSize {
+		t.Fatalf("full counter did not reject direct tx before payload allocation: n=%d err=%v", n, err)
+	}
+	if count, _ := counter.Usage(); count != 1 {
+		t.Fatal("rejected relay changed another connection's count")
 	}
 }

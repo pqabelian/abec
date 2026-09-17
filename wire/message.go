@@ -418,13 +418,11 @@ func ReadMessageWithRequestsN(r io.Reader, pver uint32, btcnet AbelianNet,
 		return totalBytes, nil, nil, messageError("ReadMessage", str)
 	}
 
-	payloadLimit, err := requests.consume(command)
+	relayLimit, err := requests.begin(command)
 	if err != nil {
 		return totalBytes, nil, nil, err
 	}
-	if payloadLimit != 0 {
-		defer requests.counter.release(1, payloadLimit)
-	}
+	defer requests.end(relayLimit)
 
 	// Create struct of appropriate message type based on the command.
 	msg, err := makeEmptyMessage(command)
@@ -472,8 +470,8 @@ func ReadMessageWithRequestsN(r io.Reader, pver uint32, btcnet AbelianNet,
 		return totalBytes, nil, nil, err
 	}
 
-	if notFound, ok := msg.(*MsgNotFound); ok {
-		requests.notFound(notFound)
+	if err := requests.complete(msg); err != nil {
+		return totalBytes, nil, nil, err
 	}
 
 	return totalBytes, msg, payload, nil

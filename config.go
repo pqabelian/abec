@@ -162,7 +162,7 @@ type config struct {
 	LogDir                 string        `long:"logdir" description:"Directory to log output."`
 	MaxOrphanTxs           int           `long:"maxorphantx" description:"Max number of orphan transactions to keep in memory"`
 	MaxPeers               int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
-	MaxPendingResponseMiB  uint64        `long:"maxpendingresponsemib" description:"Global limit in MiB for outstanding P2P requests times their response payload maxima (minimum 320)"`
+	MaxPendingResponseMiB  uint64        `long:"maxpendingresponsemib" description:"Global limit in MiB for P2P response payload maxima, including direct tx reads (minimum 320)"`
 	MiningAddrs            []string      `long:"miningaddr" description:"Add the specified payment address to the list of addresses to use for generated blocks -- At least one address is required if the generate or externalgenerate option is set"`
 	MinRelayTxFee          uint64        `long:"minrelaytxfee" description:"The minimum transaction fee in Neutrino/kB to be considered a non-zero fee."`
 	DisableBanning         bool          `long:"nobanning" description:"Disable banning of misbehaving peers"`
