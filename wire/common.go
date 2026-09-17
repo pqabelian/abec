@@ -1,11 +1,13 @@
 package wire
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/abesuite/abec/chainhash"
@@ -599,6 +601,32 @@ func VarIntSerializeSize(val uint64) int {
 	return 9
 }
 
+// checkDecodeSize rejects counts that cannot fit in the remaining input before
+// allocating their backing storage. Network messages are decoded from complete
+// payload buffers. Only readers with a known total remaining length are checked;
+// a streaming reader may still supply more data. minSize must be positive.
+func checkDecodeSize(r io.Reader, count, minSize uint64) error {
+	var remaining int
+	switch r := r.(type) {
+	case *bytes.Buffer:
+		remaining = r.Len()
+	case *bytes.Reader:
+		remaining = r.Len()
+	case *strings.Reader:
+		remaining = r.Len()
+	default:
+		return nil
+	}
+	// Divide instead of multiplying the untrusted count to avoid overflow.
+	if count > uint64(remaining)/minSize {
+		if remaining == 0 {
+			return io.EOF
+		}
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+
 // ReadVarString reads a variable length string from r and returns it as a Go
 // string.  A variable length string is encoded as a variable length integer
 // containing the length of the string followed by the bytes that represent the
@@ -620,6 +648,9 @@ func ReadVarString(r io.Reader, pver uint32) (string, error) {
 		return "", messageError("ReadVarString", str)
 	}
 
+	if err := checkDecodeSize(r, count, 1); err != nil {
+		return "", err
+	}
 	buf := make([]byte, count)
 	_, err = io.ReadFull(r, buf)
 	if err != nil {
@@ -664,6 +695,9 @@ func ReadVarBytes(r io.Reader, pver uint32, maxAllowed uint32,
 		return nil, messageError("ReadVarBytes", str)
 	}
 
+	if err := checkDecodeSize(r, count, 1); err != nil {
+		return nil, err
+	}
 	b := make([]byte, count)
 	_, err = io.ReadFull(r, b)
 	if err != nil {

@@ -66,6 +66,10 @@ func (msg *MsgAddr) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) err
 		return messageError("MsgAddr.BtcDecode", str)
 	}
 
+	// Each timestamped address occupies 30 bytes on the wire.
+	if err := checkDecodeSize(r, count, 30); err != nil {
+		return err
+	}
 	addrList := make([]NetAddress, count)
 	msg.AddrList = make([]*NetAddress, 0, count)
 	for i := uint64(0); i < count; i++ {

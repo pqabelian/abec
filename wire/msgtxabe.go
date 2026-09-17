@@ -25,6 +25,11 @@ const (
 	defaultTxInputAlloc  = 2
 	defaultTxOutputAlloc = 2
 
+	// Minimum base encoding accepted by BtcDecode: version (4), input and
+	// output counts (1 each), fee (1), and memo length (1). Consensus checks
+	// impose additional requirements; this bound also permits empty wire txs.
+	minTxAbePayload = 8
+
 	// minTxPayload is the minimum payload size for a (transfer) transaction.  Note
 	// that any realistically usable transaction must have at least one
 	// input or output, but that is a rule enforced at a higher layer, so

@@ -2,9 +2,12 @@ package wire_test
 
 import (
 	"bytes"
+	"encoding/binary"
+	"io"
 	"testing"
 
 	"github.com/abesuite/abec/chaincfg"
+	"github.com/abesuite/abec/chainhash"
 	"github.com/abesuite/abec/wire"
 )
 
@@ -72,5 +75,70 @@ func TestReadMessageRoundTrip(t *testing.T) {
 				t.Fatal("stateless reader accepted a corrupted checksum")
 			}
 		})
+	}
+}
+
+// Observe the first payload read without supplying a potentially huge body.
+type headerOnlyPayloadProbe struct {
+	*bytes.Reader
+	window int
+}
+
+func (r *headerOnlyPayloadProbe) Read(p []byte) (int, error) {
+	if r.Reader.Len() != 0 {
+		return r.Reader.Read(p)
+	}
+	r.window = len(p)
+	return 0, io.EOF
+}
+
+func TestLargeDeclaredResponseDoesNotPreallocatePayload(t *testing.T) {
+	counter := wire.NewRequestCounter(512 * 1024 * 1024)
+	requests := wire.NewMessageRequests(counter)
+	defer requests.Close()
+	hash := chainhash.Hash{1}
+	requests.Add(wire.NewMsgNeedSet(hash, []chainhash.Hash{{2}}))
+	data := encodedMessage(t, wire.NewMsgNeedSetResult(hash, nil))
+	header := append([]byte(nil), data[:wire.MessageHeaderSize]...)
+	binary.LittleEndian.PutUint32(header[16:20], wire.MaxMessagePayload)
+	r := &headerOnlyPayloadProbe{Reader: bytes.NewReader(header)}
+	n, msg, payload, err := wire.ReadMessageWithRequestsN(r, wire.ProtocolVersion, wire.MainNet, wire.BaseEncoding, requests)
+	if err != io.EOF || n != wire.MessageHeaderSize || msg != nil || payload != nil {
+		t.Fatalf("changed header-only read result: n=%d msg=%T payload=%d err=%v", n, msg, len(payload), err)
+	}
+	if r.window == 0 || r.window > 64*1024 {
+		t.Fatalf("large payload allocated before its body arrived: read window=%d", r.window)
+	}
+	requests.Close()
+	if count, size := counter.Usage(); count != 0 || size != 0 {
+		t.Fatalf("failed response leaked credit: %d, %d", count, size)
+	}
+}
+
+func TestLargeMessageRoundTripAndNextFrame(t *testing.T) {
+	tx := wire.NewMsgTxAbe(wire.TxVersion_Height_0)
+	tx.TxWitness = bytes.Repeat([]byte{1}, 256*1024)
+	var frame bytes.Buffer
+	if _, err := wire.WriteMessageWithEncodingN(&frame, tx, wire.ProtocolVersion, wire.MainNet, wire.WitnessEncoding); err != nil {
+		t.Fatal(err)
+	}
+	for _, corrupt := range []bool{false, true} {
+		data := append([]byte(nil), frame.Bytes()...)
+		if corrupt {
+			data[len(data)-1] ^= 1
+		}
+		data = append(data, encodedMessage(t, wire.NewMsgPing(7))...)
+		r := bytes.NewReader(data)
+		n, msg, raw, err := wire.ReadMessageWithEncodingN(r, wire.ProtocolVersion, wire.MainNet, wire.WitnessEncoding)
+		if (err != nil) != corrupt || n != frame.Len() {
+			t.Fatalf("incorrect checksum or byte count: corrupt=%v n=%d err=%v", corrupt, n, err)
+		}
+		if !corrupt && (msg.(*wire.MsgTxAbe).TxHash() != tx.TxHash() || !bytes.Equal(raw, frame.Bytes()[wire.MessageHeaderSize:])) {
+			t.Fatal("large response changed decoded identity or raw payload")
+		}
+		next, _, err := wire.ReadMessage(r, wire.ProtocolVersion, wire.MainNet)
+		if err != nil || next.(*wire.MsgPing).Nonce != 7 {
+			t.Fatalf("read consumed the next frame: %v", err)
+		}
 	}
 }

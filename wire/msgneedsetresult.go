@@ -30,6 +30,10 @@ func (msg *MsgNeedSetResult) BtcDecode(r io.Reader, pver uint32, enc MessageEnco
 		return messageError("MsgInv.BtcDecode", str)
 	}
 
+	if err := checkDecodeSize(r, count, minTxAbePayload+1); err != nil {
+		return err
+	}
+
 	// Create a contiguous slice of inventory vectors to deserialize into in
 	// order to reduce the number of allocations.
 	msg.Txs = make([]*MsgTxAbe, count)

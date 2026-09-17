@@ -444,10 +444,9 @@ func ReadMessageWithRequestsN(r io.Reader, pver uint32, btcnet AbelianNet,
 		return totalBytes, nil, nil, messageError("ReadMessage", str)
 	}
 
-	// Read payload.
-	payload := make([]byte, hdr.length)
-	n, err = io.ReadFull(r, payload)
-	totalBytes += n
+	// Read payload without allocating a large buffer solely from its header.
+	payload, err := readPayload(r, hdr.length)
+	totalBytes += len(payload)
 	if err != nil {
 		return totalBytes, nil, nil, err
 	}
@@ -475,6 +474,40 @@ func ReadMessageWithRequestsN(r io.Reader, pver uint32, btcnet AbelianNet,
 	}
 
 	return totalBytes, msg, payload, nil
+}
+
+// readPayload preserves ReadFull's byte count and error semantics. Allocate at
+// most 64 KiB up front, then grow only after the previous buffer has filled.
+func readPayload(r io.Reader, size uint32) ([]byte, error) {
+	payload := make([]byte, min(size, 64*1024))
+	n := 0
+	for n < int(size) {
+		if n == len(payload) {
+			// Cap capacity at the frame length and avoid ReadAll's final
+			// whole-payload copy. Growth still briefly holds old and new buffers.
+			nextSize := min(size, uint32(len(payload))*2)
+			// Include a small final tail now instead of copying the entire
+			// buffer once more for a few bytes (for example, a blocktx hash).
+			if size-nextSize <= 64*1024 {
+				nextSize = size
+			}
+			grown := make([]byte, nextSize)
+			copy(grown, payload)
+			payload = grown
+		}
+		read, err := r.Read(payload[n:])
+		n += read
+		if n == int(size) {
+			return payload, nil
+		}
+		if err != nil {
+			if err == io.EOF && n > 0 {
+				err = io.ErrUnexpectedEOF
+			}
+			return payload[:n], err
+		}
+	}
+	return payload, nil
 }
 
 // ReadMessageN reads, validates, and parses the next bitcoin Message from r for
