@@ -12,7 +12,10 @@ import (
 )
 
 const (
+	// The deadline covers both local request queuing and remote responses.
 	missingBlockTxTimeout = 30 * time.Second
+	// Bound supplemental messages in the peer queue for each reconstruction.
+	maxPendingBlockTxRequests = 16
 	// Bound the blocks retained while waiting for supplemental transactions.
 	// Additional blocks are requested in full and use the normal block path.
 	maxPendingPrunedBlocksPerPeer = 10
@@ -24,6 +27,8 @@ type pendingPrunedBlock struct {
 	transactions  map[chainhash.Hash]*wire.MsgTxAbe
 	missing       map[chainhash.Hash]struct{}
 	useGetBlockTx bool
+	unrequested   []chainhash.Hash
+	inFlight      int // Queued or sent getblocktx requests, awaiting responses.
 	timer         *time.Timer
 }
 
@@ -41,23 +46,6 @@ type prunedBlockTimeoutMsg struct {
 	peer    *peerpkg.Peer
 	hash    chainhash.Hash
 	pending *pendingPrunedBlock
-}
-
-// The send completion is delivered to blockHandler so it remains the sole
-// owner of reconstruction timers.
-type prunedBlockRequestSentMsg prunedBlockTimeoutMsg
-
-func (sm *SyncManager) handlePrunedBlockRequestSentMsg(msg *prunedBlockRequestSentMsg) {
-	state, exists := sm.peerStates[msg.peer]
-	if !exists || state.pendingPrunedBlocks[msg.hash] != msg.pending {
-		return
-	}
-	msg.pending.timer = time.AfterFunc(missingBlockTxTimeout, func() {
-		select {
-		case sm.msgChan <- (*prunedBlockTimeoutMsg)(msg):
-		case <-sm.quit:
-		}
-	})
 }
 
 func (sm *SyncManager) notifyPrunedBlockProcessed(msg *prunedBlockMsg) {
@@ -118,36 +106,30 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(msg *prunedBlockMsg) {
 		return
 	}
 
-	sent := make(chan struct{}, 1)
-	if pending.useGetBlockTx {
-		for i, txHash := range missing {
-			var done chan struct{}
-			if i == len(missing)-1 {
-				done = sent
-			}
-			msg.peer.QueueMessage(wire.NewMsgGetBlockTx(hash, txHash), done)
-		}
-	} else {
-		msg.peer.QueueMessage(wire.NewMsgNeedSet(hash, missing), sent)
-	}
 	peer := msg.peer
-	go func() {
-		// Wait for the final request's send notification before starting the
-		// response timeout. Shutdown must also unblock this wait if the request
-		// is still queued or its network write has not finished.
+	pending.timer = time.AfterFunc(missingBlockTxTimeout, func() {
 		select {
-		case <-sent:
-		case <-sm.quit:
-			return
-		}
-		// Only after that notification, ask blockHandler to start the timer.
-		// Sending to a full msgChan can block independently, so this second
-		// wait must also allow shutdown to cancel it.
-		select {
-		case sm.msgChan <- &prunedBlockRequestSentMsg{peer, hash, pending}:
+		case sm.msgChan <- &prunedBlockTimeoutMsg{peer, hash, pending}:
 		case <-sm.quit:
 		}
-	}()
+	})
+	if pending.useGetBlockTx {
+		pending.unrequested = missing
+		sm.requestPrunedBlockTxs(pending)
+	} else {
+		peer.QueueMessage(wire.NewMsgNeedSet(hash, missing), nil)
+	}
+}
+
+// Keep only a bounded window in the peer queue, replenished by responses.
+// The overall deadline also expires when none of this window can be sent.
+func (sm *SyncManager) requestPrunedBlockTxs(pending *pendingPrunedBlock) {
+	for pending.inFlight < maxPendingBlockTxRequests && len(pending.unrequested) > 0 {
+		txHash := pending.unrequested[0]
+		pending.unrequested = pending.unrequested[1:]
+		pending.inFlight++
+		pending.msg.peer.QueueMessage(wire.NewMsgGetBlockTx(*pending.msg.block.Hash(), txHash), nil)
+	}
 }
 
 func (sm *SyncManager) finishPrunedBlockRequest(state *peerSyncState, hash chainhash.Hash) {
@@ -160,6 +142,10 @@ func (sm *SyncManager) finishPrunedBlockRequest(state *peerSyncState, hash chain
 		pending.timer.Stop()
 	}
 	sm.notifyPrunedBlockProcessed(pending.msg)
+	// A timer callback may already be queued. Leave only its identity token,
+	// so it cannot keep the block and transactions alive after cleanup.
+	pending.msg, pending.transactions, pending.missing = nil, nil, nil
+	pending.unrequested = nil
 }
 
 func (sm *SyncManager) handlePrunedBlockTimeoutMsg(msg *prunedBlockTimeoutMsg) {
@@ -167,7 +153,9 @@ func (sm *SyncManager) handlePrunedBlockTimeoutMsg(msg *prunedBlockTimeoutMsg) {
 	if !exists || state.pendingPrunedBlocks[msg.hash] != msg.pending {
 		return
 	}
-	log.Warnf("Timed out fetching transactions for block %v from %v", msg.hash, msg.peer)
+	log.Infof("Pruned block reconstruction deadline expired for %v with peer %v", msg.hash, msg.peer)
+	// Local quota pressure can also cause expiry. Reset the connection to
+	// discard unsent requests and credits; this is not a misbehavior penalty.
 	sm.finishPrunedBlockRequest(state, msg.hash)
 	delete(state.requestedBlocks, msg.hash)
 	delete(sm.requestedBlocks, msg.hash)
@@ -206,8 +194,11 @@ func (sm *SyncManager) handleBlockTxMsg(msg *blockTxMsg) {
 		msg.peer.Disconnect()
 		return
 	}
+	pending.inFlight--
 	if len(pending.missing) == 0 {
 		sm.completePrunedBlock(state, msg.result.BlockHash)
+	} else {
+		sm.requestPrunedBlockTxs(pending)
 	}
 }
 

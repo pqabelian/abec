@@ -1688,9 +1688,6 @@ out:
 			case *blockTxMsg:
 				sm.handleBlockTxMsg(msg)
 
-			case *prunedBlockRequestSentMsg:
-				sm.handlePrunedBlockRequestSentMsg(msg)
-
 			case *prunedBlockTimeoutMsg:
 				sm.handlePrunedBlockTimeoutMsg(msg)
 
