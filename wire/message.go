@@ -279,6 +279,38 @@ func WriteMessage(w io.Writer, msg Message, pver uint32, btcnet AbelianNet) erro
 	return err
 }
 
+// payloadBuffer refuses writes that would exceed the encoded payload limit.
+// Keep the buffer named so methods such as WriteString cannot bypass Write.
+type payloadBuffer struct {
+	buf   bytes.Buffer
+	limit int
+	err   error
+}
+
+func (b *payloadBuffer) Write(p []byte) (int, error) {
+	if b.err != nil {
+		return 0, b.err
+	}
+	if len(p) > b.limit-b.buf.Len() {
+		b.err = messageError("WriteMessage", fmt.Sprintf("message payload exceeds maximum size of %d bytes", b.limit))
+		return 0, b.err
+	}
+	return b.buf.Write(p)
+}
+
+// encodeMessagePayload is shared by ordinary sends and cached broadcasts.
+// No partial payload is published, including when an encoder ignores Write's error.
+func encodeMessagePayload(msg Message, pver uint32, encoding MessageEncoding) ([]byte, error) {
+	b := payloadBuffer{limit: int(min(MaxMessagePayload, msg.MaxPayloadLength(pver)))}
+	if err := msg.BtcEncode(&b, pver, encoding); err != nil {
+		return nil, err
+	}
+	if b.err != nil {
+		return nil, b.err
+	}
+	return b.buf.Bytes(), nil
+}
+
 // WriteMessageWithEncodingN writes a bitcoin Message to w including the
 // necessary header information and returns the number of bytes written.
 // This function is the same as WriteMessageN except it also allows the caller
@@ -286,18 +318,6 @@ func WriteMessage(w io.Writer, msg Message, pver uint32, btcnet AbelianNet) erro
 // messages.
 func WriteMessageWithEncodingN(w io.Writer, msg Message, pver uint32,
 	btcnet AbelianNet, encoding MessageEncoding) (int, error) {
-	wrapped := false
-	var payload []byte
-	var lenp int
-	if wrappedMsg, ok := msg.(*WrappedMessage); ok {
-		wrapped = true
-		if !wrappedMsg.Cached() {
-			wrappedMsg.Cache(pver, encoding)
-		}
-		payload = wrappedMsg.Bytes()
-		lenp = len(payload)
-	}
-
 	totalBytes := 0
 
 	// Enforce max command size.
@@ -310,16 +330,20 @@ func WriteMessageWithEncodingN(w io.Writer, msg Message, pver uint32,
 	}
 	copy(command[:], []byte(cmd))
 
-	if !wrapped {
-		// Encode the message payload.
-		var bw bytes.Buffer
-		err := msg.BtcEncode(&bw, pver, encoding)
+	var payload []byte
+	if wrappedMsg, ok := msg.(*WrappedMessage); ok {
+		if err := wrappedMsg.Cache(pver, encoding); err != nil {
+			return totalBytes, err
+		}
+		payload = wrappedMsg.Bytes()
+	} else {
+		var err error
+		payload, err = encodeMessagePayload(msg, pver, encoding)
 		if err != nil {
 			return totalBytes, err
 		}
-		payload = bw.Bytes()
-		lenp = len(payload)
 	}
+	lenp := len(payload)
 
 	// Enforce maximum overall message payload.
 	if lenp > MaxMessagePayload {
