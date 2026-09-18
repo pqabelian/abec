@@ -24,8 +24,7 @@ func TestNotFoundMatchesInventoryIdentity(t *testing.T) {
 	txA, txB := wire.NewMsgTxAbe(wire.TxVersion_Height_0), wire.NewMsgTxAbe(wire.TxVersion_Height_0)
 	txA.TxMemo, txB.TxMemo = []byte{1}, []byte{2}
 	a, b := txA.TxHash(), txB.TxHash()
-	counter := wire.NewRequestCounter(512 * 1024 * 1024)
-	requests := wire.NewMessageRequests(counter)
+	requests := wire.NewMessageRequests()
 	defer requests.Close()
 	gd := wire.NewMsgGetData()
 	gd.AddInvVect(wire.NewInvVect(wire.InvTypeWitnessTx, &a))
@@ -41,7 +40,7 @@ func TestNotFoundMatchesInventoryIdentity(t *testing.T) {
 		if err := readTrackedResponse(t, requests, nf); err != nil {
 			t.Fatal(err)
 		}
-		if count, _ := counter.Usage(); count != 2 {
+		if count, _ := requests.GetDataStatus(); count != 2 {
 			t.Fatal("unrequested notfound consumed another request")
 		}
 	}
@@ -52,15 +51,15 @@ func TestNotFoundMatchesInventoryIdentity(t *testing.T) {
 		if err := readTrackedResponse(t, requests, nf); err != nil {
 			t.Fatal(err)
 		}
-		if count, _ := counter.Usage(); count != 1 {
-			t.Fatal("duplicate notfound consumed B's credit")
+		if count, _ := requests.GetDataStatus(); count != 1 {
+			t.Fatal("duplicate notfound consumed B's request")
 		}
 	}
 	if err := readTrackedResponse(t, requests, txB); err != nil {
 		t.Fatalf("requested B was rejected after duplicate notfound(A): %v", err)
 	}
-	if count, size := counter.Usage(); count != 0 || size != 0 {
-		t.Fatalf("matched response leaked credits: %d, %d", count, size)
+	if count, _ := requests.GetDataStatus(); count != 0 {
+		t.Fatalf("matched response left %d requests", count)
 	}
 }
 
@@ -110,13 +109,11 @@ func TestResponseMatchesRequestIdentity(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			counter := wire.NewRequestCounter(512 * 1024 * 1024)
-			requests := wire.NewMessageRequests(counter)
+			requests := wire.NewMessageRequests()
 			defer requests.Close()
 			if !requests.Add(tc.request) {
 				t.Fatal("request was not admitted")
 			}
-			_, before := counter.Usage()
 			for _, wrong := range tc.wrong {
 				err := readTrackedResponse(t, requests, wrong)
 				// Direct tx relay may be allowed, but must never satisfy a
@@ -127,15 +124,15 @@ func TestResponseMatchesRequestIdentity(t *testing.T) {
 				if wrong.Command() != wire.CmdTx && err == nil {
 					t.Fatal("wrong response identity was accepted")
 				}
-				if count, size := counter.Usage(); count != 1 || size != before {
-					t.Fatal("wrong response consumed an unrelated credit")
+				if !requests.Expired(time.Now()) {
+					t.Fatal("wrong response consumed an unrelated request")
 				}
 			}
 			if err := readTrackedResponse(t, requests, tc.valid); err != nil {
 				t.Fatalf("matching response rejected: %v", err)
 			}
-			if count, size := counter.Usage(); count != 0 || size != 0 {
-				t.Fatalf("matching response leaked credit: %d, %d", count, size)
+			if requests.Expired(time.Now()) {
+				t.Fatal("matching response left a pending request")
 			}
 		})
 	}
@@ -144,8 +141,7 @@ func TestResponseMatchesRequestIdentity(t *testing.T) {
 func TestInvalidNotFoundTypeIsRejectedBeforeAccounting(t *testing.T) {
 	for _, typ := range []wire.InvType{wire.InvTypeError, wire.InvTypeFilteredBlock, wire.InvType(0xffffffff)} {
 		t.Run(typ.String(), func(t *testing.T) {
-			counter := wire.NewRequestCounter(512 * 1024 * 1024)
-			requests := wire.NewMessageRequests(counter)
+			requests := wire.NewMessageRequests()
 			defer requests.Close()
 			gd := dataRequest(wire.InvTypeTx, 1)
 			requests.Add(gd)
@@ -155,7 +151,7 @@ func TestInvalidNotFoundTypeIsRejectedBeforeAccounting(t *testing.T) {
 			if err := readTrackedResponse(t, requests, nf); err == nil {
 				t.Fatal("filtering hid an invalid inventory type from rejection")
 			}
-			if count, _ := counter.Usage(); count != 1 {
+			if count, _ := requests.GetDataStatus(); count != 1 {
 				t.Fatal("invalid notfound partially consumed a valid request")
 			}
 		})

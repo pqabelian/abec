@@ -336,11 +336,11 @@ func TestUnrequestedNotFoundPreservesQueuedBlock(t *testing.T) {
 	for _, hash := range []chainhash.Hash{sent, queued} {
 		state.requestedBlocks[hash], sm.requestedBlocks[hash] = struct{}{}, struct{}{}
 	}
-	requests := wire.NewMessageRequests(nil)
+	requests := wire.NewMessageRequests()
 	defer requests.Close()
 	gd := wire.NewMsgGetData()
 	gd.AddInvVect(wire.NewInvVect(wire.InvTypeWitnessBlock, &sent))
-	requests.Add(gd) // The second block has not passed the peer's quota yet.
+	requests.Add(gd) // The second block is still queued and has not been sent.
 	nf := wire.NewMsgNotFound()
 	nf.AddInvVect(gd.InvList[0])
 	nf.AddInvVect(gd.InvList[0])

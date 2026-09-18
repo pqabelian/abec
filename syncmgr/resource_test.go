@@ -116,7 +116,7 @@ func TestPrunedBlockPreparationAndGlobalSlot(t *testing.T) {
 	}
 }
 
-func TestQueueReceiptRetainsBudgetUntilShutdownDrain(t *testing.T) {
+func TestQueueReceiptWaitsUntilShutdownDrain(t *testing.T) {
 	for _, started := range []bool{false, true} {
 		synctest.Test(t, func(t *testing.T) {
 			sm, p := testSyncManager(t)
@@ -124,8 +124,6 @@ func TestQueueReceiptRetainsBudgetUntilShutdownDrain(t *testing.T) {
 				sm.Start()
 				sm.Pause()
 			}
-			budget := wire.NewPayloadBudget(64, 0)
-			held, _ := budget.TryReserve(32, false)
 			for i := 1; i < cap(sm.msgChan); i++ {
 				sm.QueueBlockTx(wire.NewMsgBlockTx(chainhash.Hash{}, nil), p)
 			}
@@ -135,25 +133,24 @@ func TestQueueReceiptRetainsBudgetUntilShutdownDrain(t *testing.T) {
 			finished := make(chan struct{})
 			go func() {
 				<-receipt
-				held.Release()
 				close(finished)
 			}()
-			blocked, _ := budget.TryReserve(16, false)
 			blockedDone := make(chan struct{})
 			go func() {
 				<-sm.QueueBlockTx(wire.NewMsgBlockTx(chainhash.Hash{}, nil), p)
-				blocked.Release()
 				close(blockedDone)
 			}()
 			synctest.Wait()
-			if budget.Usage() != 48 {
-				t.Fatal("queue wait returned while buffered messages still owned data")
+			select {
+			case <-finished:
+				t.Fatal("queue receipt returned before processing or shutdown")
+			default:
 			}
 			sm.Stop()
 			<-blockedDone
 			synctest.Wait()
-			if budget.Usage() != 0 || len(sm.msgChan) != 0 {
-				t.Fatal("shutdown left queued data or its reservation")
+			if len(sm.msgChan) != 0 {
+				t.Fatal("shutdown left queued data")
 			}
 			select {
 			case <-finished:
@@ -218,7 +215,7 @@ func TestNeedSetContentsValidatedDuringQueuedProcessing(t *testing.T) {
 			}
 			sm.pendingPrunedBlock = pending
 			sm.peerStates[p].requestedBlocks[hash], sm.requestedBlocks[hash] = struct{}{}, struct{}{}
-			requests := wire.NewMessageRequests(wire.NewRequestCounter(512 * 1024 * 1024))
+			requests := wire.NewMessageRequests()
 			defer requests.Close()
 			if !requests.Add(wire.NewMsgNeedSet(hash, []chainhash.Hash{tx1.TxHash(), tx2.TxHash()})) {
 				t.Fatal("needset request was not admitted")
@@ -227,22 +224,18 @@ func TestNeedSetContentsValidatedDuringQueuedProcessing(t *testing.T) {
 			if _, err := wire.WriteMessageWithEncodingN(&frame, wire.NewMsgNeedSetResult(hash, tc.txs), wire.ProtocolVersion, wire.MainNet, wire.WitnessEncoding); err != nil {
 				t.Fatal(err)
 			}
-			budget := wire.NewPayloadBudget(wire.MaxMessagePayload, 0)
-			_, decoded, _, held, err := wire.ReadMessageWithBudgetN(&frame, wire.ProtocolVersion, wire.MainNet, wire.WitnessEncoding, requests, budget)
+			_, decoded, _, err := wire.ReadMessageWithRequestsN(&frame, wire.ProtocolVersion, wire.MainNet, wire.WitnessEncoding, requests)
 			if err != nil {
 				t.Fatalf("matching response did not reach reconstruction validation: %v", err)
 			}
 			receipt := sm.QueueNeedSetResult(decoded.(*wire.MsgNeedSetResult), p)
 			released := make(chan struct{})
-			go func() { <-receipt; held.Release(); close(released) }()
-			if budget.Usage() != wire.MaxMessagePayload {
-				t.Fatal("response released resident capacity before content validation")
-			}
+			go func() { <-receipt; close(released) }()
 			sm.Start()
 			<-released
 			sm.Stop()
-			if sm.pendingPrunedBlock != nil || len(sm.requestedBlocks) != 0 || pending.transactions != nil || budget.Usage() != 0 {
-				t.Fatal("invalid contents retained reconstruction data or capacity")
+			if sm.pendingPrunedBlock != nil || len(sm.requestedBlocks) != 0 || pending.transactions != nil {
+				t.Fatal("invalid contents retained reconstruction data")
 			}
 		})
 	}

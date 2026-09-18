@@ -231,8 +231,6 @@ type server struct {
 	services             wire.ServiceFlag
 
 	communicationCache sync.Map
-	requestCounter     *wire.RequestCounter
-	residentBudget     *wire.PayloadBudget
 
 	// The following fields are used for optional indexes.  They will be nil
 	// if the associated index is not enabled.  These fields are set during
@@ -550,11 +548,9 @@ func (sp *serverPeer) OnPrunedBlock(p *peer.Peer, msg *wire.MsgPrunedBlock, buf 
 }
 
 func (sp *serverPeer) OnNeedSet(_ *peer.Peer, msg *wire.MsgNeedSet, buf []byte) {
-	reservation, admitted := sp.reserveDataResponse(wire.MaxMessagePayload)
-	if !admitted {
+	if !sp.canServeData() {
 		return
 	}
-	defer reservation.Release()
 	// Convert the raw MsgBlock to a abeutil.Block which provides some
 	// convenience methods and things such as hash caching.
 	err := sp.server.pushNeedSetResultMsg(sp, msg.BlockHash, msg.Hashes, wire.WitnessEncoding)
@@ -569,11 +565,9 @@ func (sp *serverPeer) OnNeedSetResult(p *peer.Peer, msg *wire.MsgNeedSetResult, 
 }
 
 func (sp *serverPeer) OnGetBlockTx(_ *peer.Peer, msg *wire.MsgGetBlockTx, buf []byte) {
-	reservation, admitted := sp.reserveDataResponse(wire.MaxBlockPayloadAbe)
-	if !admitted {
+	if !sp.canServeData() {
 		return
 	}
-	defer reservation.Release()
 	// Convert the raw MsgBlock to a abeutil.Block which provides some
 	// convenience methods and things such as hash caching.
 	err := sp.server.pushBlockTxMsg(sp, msg.BlockHash, msg.TxHash, wire.WitnessEncoding)
@@ -636,23 +630,16 @@ func (sp *serverPeer) OnHeaders(_ *peer.Peer, msg *wire.MsgHeaders) {
 	<-sp.server.syncManager.QueueHeaders(msg, sp.Peer)
 }
 
-// Reserve before fetching a block: even a single blocktx response loads the
-// entire source block. Saturation rejects new work without blaming the peer.
-func (sp *serverPeer) reserveDataResponse(size uint64) (*wire.PayloadReservation, bool) {
-	// Stop new work as soon as the connection or server shuts down.
+// canServeData stops new database work once the connection or server shuts down.
+func (sp *serverPeer) canServeData() bool {
 	select {
 	case <-sp.Done():
-		return nil, false
+		return false
 	case <-sp.server.quit:
-		return nil, false
+		return false
 	default:
+		return true
 	}
-	reservation, admitted := sp.server.residentBudget.TryReserve(max(size, wire.MaxBlockPayloadAbe), false)
-	if !admitted {
-		peerLog.Debugf("Closing peer %s: local data service capacity exhausted", sp)
-		sp.Disconnect()
-	}
-	return reservation, admitted
 }
 
 // OnGetData is invoked when a peer receives a getdata message and
@@ -675,11 +662,9 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 		return
 	}
 
-	// Memory-first service: finish each response before fetching the next
-	// block. The reservation also covers the source block and encoding work.
+	// Finish each response before fetching the next block.
 	for i, iv := range msg.InvList {
-		reservation, admitted := sp.reserveDataResponse(wire.MaxBlockPayloadAbe)
-		if !admitted {
+		if !sp.canServeData() {
 			return
 		}
 		c := make(chan struct{}, 1)
@@ -696,13 +681,11 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 		case wire.InvTypePrunedBlock:
 			err = sp.server.pushPrunedBlockMsg(sp, &iv.Hash, c, wire.WitnessEncoding)
 		default:
-			reservation.Release()
 			peerLog.Warnf("Unknown type in inventory request %d",
 				iv.Type)
 			continue
 		}
 		if err != nil {
-			reservation.Release()
 			notFound.AddInvVect(iv)
 			// deny all subsequent requests
 			if iv.Type == wire.InvTypeWitnessBlock {
@@ -715,7 +698,6 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 			continue
 		}
 		<-c
-		reservation.Release()
 	}
 	if len(notFound.InvList) != 0 {
 		done := make(chan struct{}, 1)
@@ -1894,8 +1876,6 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 		TrickleInterval:    cfg.TrickleInterval,
 		Chain:              sp.server.chain,
 		CommunicationCache: &sp.server.communicationCache,
-		RequestCounter:     sp.server.requestCounter,
-		PayloadBudget:      sp.server.residentBudget,
 	}
 }
 
@@ -2573,8 +2553,6 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	}
 
 	s := server{
-		requestCounter:       wire.NewRequestCounter(cfg.MaxPendingResponseMiB * 1024 * 1024),
-		residentBudget:       wire.NewPayloadBudget(cfg.MaxResidentPayloadMiB*1024*1024, wire.MaxMessagePayload+wire.MaxQueuedPayload),
 		chainParams:          chainParams,
 		addrManager:          amgr,
 		newPeers:             make(chan *serverPeer, cfg.MaxPeers),

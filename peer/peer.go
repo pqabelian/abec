@@ -299,13 +299,6 @@ type Config struct {
 	Chain *blockchain.BlockChain
 
 	CommunicationCache *sync.Map
-
-	// RequestCounter is shared by all peers of a server. Nil disables the
-	// shared cap for standalone users of this package.
-	RequestCounter *wire.RequestCounter
-	// PayloadBudget is held through the message listener, including its queue
-	// wait. Listeners retaining data beyond return must bound it separately.
-	PayloadBudget *wire.PayloadBudget
 }
 
 // minUint32 is a helper function to return the minimum of two uint32s.
@@ -360,11 +353,9 @@ func newNetAddress(addr net.Addr, services wire.ServiceFlag) (*wire.NetAddress, 
 // when the message has been sent (or won't be sent due to things such as
 // shutdown)
 type outMsg struct {
-	requestsAdded bool
-	msg           wire.Message
-	doneChan      chan<- struct{}
-	encoding      wire.MessageEncoding
-	reservation   *wire.PayloadReservation
+	msg      wire.Message
+	doneChan chan<- struct{}
+	encoding wire.MessageEncoding
 }
 
 // stallControlCmd represents the command of a stall control message.
@@ -1127,14 +1118,8 @@ func (p *Peer) handlePongMsg(msg *wire.MsgPong) {
 
 // readMessage reads the next abelian message from the peer with logging.
 func (p *Peer) readMessage(encoding wire.MessageEncoding) (wire.Message, []byte, error) {
-	msg, buf, reservation, err := p.readMessageWithBudget(encoding)
-	reservation.Release()
-	return msg, buf, err
-}
-
-func (p *Peer) readMessageWithBudget(encoding wire.MessageEncoding) (wire.Message, []byte, *wire.PayloadReservation, error) {
-	n, msg, buf, reservation, err := wire.ReadMessageWithBudgetN(p.conn,
-		p.ProtocolVersion(), p.cfg.ChainParams.Net, encoding, p.pendingRequest, p.cfg.PayloadBudget)
+	n, msg, buf, err := wire.ReadMessageWithRequestsN(p.conn,
+		p.ProtocolVersion(), p.cfg.ChainParams.Net, encoding, p.pendingRequest)
 	//if msg != nil {
 	//	fmt.Printf("receive a %s from peer:%v\n", msg.Command(), p.addr)
 	//}
@@ -1146,7 +1131,7 @@ func (p *Peer) readMessageWithBudget(encoding wire.MessageEncoding) (wire.Messag
 		//fmt.Printf("peer later %v\n",p)
 	}
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	// Use closures to log expensive operations so they are only run when
@@ -1162,7 +1147,7 @@ func (p *Peer) readMessageWithBudget(encoding wire.MessageEncoding) (wire.Messag
 	}))
 	log.Tracef("Received %s payload: %d bytes", msg.Command(), len(buf))
 
-	return msg, buf, reservation, nil
+	return msg, buf, nil
 }
 
 // writeMessage sends a abelian message to the peer with logging.
@@ -1404,9 +1389,8 @@ out:
 			}
 
 		case <-stallTicker.C:
-			// Bound each admitted request's lifetime independently of progress
-			// on other requests or time spent in local callbacks. This releases
-			// shared capacity without treating local overload as misconduct.
+			// Bound each sent request's lifetime independently of progress
+			// on other requests or time spent in local callbacks.
 			now := time.Now()
 			if p.pendingRequest.Expired(now.Add(-idleTimeout)) {
 				log.Infof("Peer %s exceeded an outstanding request's maximum lifetime -- disconnecting", p)
@@ -1472,8 +1456,6 @@ cleanup:
 // inHandler handles all incoming messages for the peer.  It must be run as a
 // goroutine.
 func (p *Peer) inHandler() {
-	var reservation *wire.PayloadReservation
-	defer func() { reservation.Release() }()
 	// The timer is stopped when a new message is received and reset after it
 	// is processed.
 	idleTimer := time.AfterFunc(idleTimeout, func() {
@@ -1486,16 +1468,9 @@ out:
 		// Read a message and stop the idle timer as soon as the read
 		// is done.  The timer is reset below for the next iteration if
 		// needed.
-		rmsg, buf, held, err := p.readMessageWithBudget(p.wireEncoding)
-		reservation = held
+		rmsg, buf, err := p.readMessage(p.wireEncoding)
 		idleTimer.Stop()
 		if err != nil {
-			if errors.Is(err, wire.ErrResponseLimit) || errors.Is(err, wire.ErrPayloadLimit) {
-				// Local congestion is not a malformed message. Close without
-				// waiting to send a protocol rejection to a valid relay peer.
-				log.Debugf("Closing peer %s: %v", p, err)
-				break out
-			}
 			// In order to allow regression tests with malformed messages, don't
 			// disconnect the peer when we're in regression test mode and the
 			// error is one of the allowed errors.
@@ -1726,8 +1701,6 @@ out:
 				"from %v", rmsg.Command(), p)
 		}
 		p.stallControl <- stallControlMsg{sccHandlerDone, ""}
-		reservation.Release()
-		reservation = nil
 
 		// A message was received so reset the idle timer.
 		idleTimer.Reset(idleTimeout)
@@ -1750,15 +1723,6 @@ out:
 func (p *Peer) queueHandler() {
 	pendingMsgs := list.New()
 	invSendQueue := list.New()
-	queueInventory := func(msg *wire.MsgInv) bool {
-		reservation, admitted := p.reserveQueuedMessage(msg)
-		if !admitted {
-			p.Disconnect()
-			return false
-		}
-		pendingMsgs.PushBack(outMsg{msg: msg, reservation: reservation})
-		return true
-	}
 	trickleTicker := time.NewTicker(p.cfg.TrickleInterval)
 	defer trickleTicker.Stop()
 
@@ -1777,30 +1741,10 @@ out:
 			p.Disconnect()
 			break out
 		}
-		var requestsChanged <-chan struct{}
-		if !waiting {
-			requestsChanged = p.cfg.RequestCounter.Changed()
-			// A blocked download must not block pong, reject, or responses to
-			// the remote peer's requests. Those need no response reservation.
-			for next := pendingMsgs.Front(); next != nil; next = next.Next() {
-				msg := next.Value.(outMsg)
-				admitted, remainder := p.pendingRequest.ReserveNext(msg.msg)
-				if admitted == nil {
-					continue
-				}
-				if remainder == nil {
-					pendingMsgs.Remove(next)
-				} else {
-					next.Value = outMsg{msg: remainder, encoding: msg.encoding, doneChan: msg.doneChan, reservation: msg.reservation}
-					msg.doneChan = nil // Signal completion only after the last fragment.
-					msg.reservation = nil
-				}
-				msg.msg, msg.requestsAdded = admitted, true
-				p.sendQueue <- msg
-				waiting = true
-				requestsChanged = nil
-				break
-			}
+		if !waiting && pendingMsgs.Len() > 0 {
+			next := pendingMsgs.Front()
+			p.sendQueue <- pendingMsgs.Remove(next).(outMsg)
+			waiting = true
 		}
 		select {
 		case msg := <-p.outputQueue:
@@ -1808,9 +1752,6 @@ out:
 
 		case <-p.sendDoneQueue:
 			waiting = false
-
-		case <-requestsChanged:
-			// Retry queued requests after another connection returns capacity.
 
 		case iv := <-p.outputInvChan:
 			// No handshake?  They'll find out soon enough.
@@ -1824,9 +1765,7 @@ out:
 
 					invMsg := wire.NewMsgInvSizeHint(1)
 					invMsg.AddInvVect(iv)
-					if !queueInventory(invMsg) {
-						break out
-					}
+					pendingMsgs.PushBack(outMsg{msg: invMsg})
 				} else {
 					invSendQueue.PushBack(iv)
 				}
@@ -1856,9 +1795,7 @@ out:
 
 				invMsg.AddInvVect(iv)
 				if len(invMsg.InvList) >= maxInvTrickleSize { // if the number of invVect no less than the max size
-					if !queueInventory(invMsg) {
-						break out
-					}
+					pendingMsgs.PushBack(outMsg{msg: invMsg})
 					invMsg = wire.NewMsgInvSizeHint(uint(min(invSendQueue.Len(), maxInvTrickleSize)))
 				}
 
@@ -1867,9 +1804,7 @@ out:
 				p.AddKnownInventory(iv)
 			}
 			if len(invMsg.InvList) > 0 { // if the number of invVect more than the max size
-				if !queueInventory(invMsg) {
-					break out
-				}
+				pendingMsgs.PushBack(outMsg{msg: invMsg})
 			}
 
 		case <-p.quit:
@@ -1885,7 +1820,6 @@ out:
 	for e := pendingMsgs.Front(); e != nil; e = pendingMsgs.Front() {
 		val := pendingMsgs.Remove(e)
 		msg := val.(outMsg)
-		msg.reservation.Release()
 		if msg.doneChan != nil {
 			msg.doneChan <- struct{}{}
 		}
@@ -1901,7 +1835,6 @@ cleanup:
 	for {
 		select {
 		case msg := <-p.outputQueue:
-			msg.reservation.Release()
 			if msg.doneChan != nil {
 				msg.doneChan <- struct{}{}
 			}
@@ -1993,11 +1926,9 @@ out:
 					summary, p)
 			}
 
-			if !msg.requestsAdded && !p.pendingRequest.Add(msg.msg) {
-				// Normal sends are admitted by queueHandler. Reaching here
-				// means the connection was closed before it could register.
+			if !p.pendingRequest.Add(msg.msg) {
+				// Do not send after the connection's request tracker is closed.
 				p.Disconnect()
-				msg.reservation.Release()
 				if msg.doneChan != nil {
 					msg.doneChan <- struct{}{}
 				}
@@ -2006,7 +1937,6 @@ out:
 			p.stallControl <- stallControlMsg{sccSendMessage, msg.msg.Command()}
 
 			err := p.writeMessage(msg.msg, msg.encoding)
-			msg.reservation.Release()
 			if err != nil {
 				p.Disconnect()
 				if p.shouldLogWriteError(err) {
@@ -2044,7 +1974,6 @@ cleanup:
 	for {
 		select {
 		case msg := <-p.sendQueue:
-			msg.reservation.Release()
 			if msg.doneChan != nil {
 				msg.doneChan <- struct{}{}
 			}
@@ -2105,21 +2034,13 @@ func (p *Peer) QueueMessageWithEncoding(msg wire.Message, doneChan chan<- struct
 	encoding wire.MessageEncoding) {
 	p.queueMtx.RLock()
 	defer p.queueMtx.RUnlock()
-	var reservation *wire.PayloadReservation
 	if p.Connected() {
-		var admitted bool
-		reservation, admitted = p.reserveQueuedMessage(msg)
-		if admitted {
-			select {
-			case p.outputQueue <- outMsg{msg: msg, encoding: encoding, doneChan: doneChan, reservation: reservation}:
-				return
-			case <-p.quit:
-			}
-		} else {
-			p.Disconnect()
+		select {
+		case p.outputQueue <- outMsg{msg: msg, encoding: encoding, doneChan: doneChan}:
+			return
+		case <-p.quit:
 		}
 	}
-	reservation.Release()
 	if doneChan != nil {
 		go func() { doneChan <- struct{}{} }()
 	}
@@ -2188,8 +2109,7 @@ func (p *Peer) Disconnect() {
 // acceptable then return an error.
 func (p *Peer) readRemoteVersionMsg() error {
 	// Read their version message.
-	remoteMsg, _, reservation, err := p.readMessageWithBudget(wire.LatestEncoding)
-	defer reservation.Release()
+	remoteMsg, _, err := p.readMessage(wire.LatestEncoding)
 	if err != nil {
 		return err
 	}
@@ -2297,8 +2217,7 @@ func (p *Peer) readRemoteVersionMsg() error {
 // connection.
 func (p *Peer) readRemoteVerAckMsg() error {
 	// Read the next message from the wire.
-	remoteMsg, _, reservation, err := p.readMessageWithBudget(wire.LatestEncoding)
-	defer reservation.Release()
+	remoteMsg, _, err := p.readMessage(wire.LatestEncoding)
 	if err != nil {
 		return err
 	}
@@ -2578,7 +2497,7 @@ func newPeerBase(origCfg *Config, inbound bool) *Peer {
 		services:           cfg.Services,
 		protocolVersion:    cfg.ProtocolVersion,
 		communicationCache: cfg.CommunicationCache,
-		pendingRequest:     wire.NewMessageRequests(cfg.RequestCounter),
+		pendingRequest:     wire.NewMessageRequests(),
 	}
 	return &p
 }

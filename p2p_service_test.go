@@ -25,30 +25,24 @@ func quietP2PTestLogs(t *testing.T) {
 	}
 }
 
-func TestDataServiceAdmissionPrecedesDatabaseAccess(t *testing.T) {
+func TestDataServiceStopsBeforeDatabaseAccess(t *testing.T) {
 	quietP2PTestLogs(t)
 	previousConfig := cfg
 	cfg = &config{DisableBanning: true}
 	t.Cleanup(func() { cfg = previousConfig })
-	for _, stopped := range []string{"capacity", "peer", "server"} {
+	for _, stopped := range []string{"peer", "server"} {
 		for _, command := range []string{wire.CmdNeedSet, wire.CmdGetBlockTx, wire.CmdGetData} {
 			t.Run(stopped+"/"+command, func(t *testing.T) {
-				budget := wire.NewPayloadBudget(768*1024*1024, wire.MaxMessagePayload+wire.MaxQueuedPayload)
 				p := peer.NewInboundPeer(&peer.Config{})
 				defer p.Disconnect()
 				// A database/chain access would panic: admission must be checked first.
-				sp := &serverPeer{Peer: p, server: &server{residentBudget: budget, quit: make(chan struct{})}, quit: make(chan struct{})}
-				var held *wire.PayloadReservation
+				sp := &serverPeer{Peer: p, server: &server{quit: make(chan struct{})}, quit: make(chan struct{})}
 				switch stopped {
-				case "capacity":
-					held, _ = budget.TryReserve(416*1024*1024, false)
 				case "peer":
 					p.Disconnect() // Wrapper cleanup and sp.quit remain pending.
 				case "server":
 					close(sp.server.quit)
 				}
-				defer held.Release()
-				before := budget.Usage()
 				switch command {
 				case wire.CmdNeedSet:
 					sp.OnNeedSet(p, wire.NewMsgNeedSet(chainhash.Hash{}, nil), nil)
@@ -59,15 +53,12 @@ func TestDataServiceAdmissionPrecedesDatabaseAccess(t *testing.T) {
 					msg.AddInvVect(wire.NewInvVect(wire.InvTypeBlock, &chainhash.Hash{}))
 					sp.OnGetData(p, msg)
 				}
-				if budget.Usage() != before {
-					t.Fatal("rejected service changed another task's reservation")
-				}
 			})
 		}
 	}
 }
 
-func TestDataServiceReleasesAfterFetchFailureOrDiscardedSend(t *testing.T) {
+func TestDataServiceFetchFailureAndDiscardedSend(t *testing.T) {
 	quietP2PTestLogs(t)
 	previousConfig := cfg
 	cfg = &config{DisableBanning: true}
@@ -82,15 +73,11 @@ func TestDataServiceReleasesAfterFetchFailureOrDiscardedSend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	budget := wire.NewPayloadBudget(768*1024*1024, wire.MaxMessagePayload+wire.MaxQueuedPayload)
-	s := &server{chain: chain, db: db, residentBudget: budget}
+	s := &server{chain: chain, db: db}
 	p := peer.NewInboundPeer(&peer.Config{CommunicationCache: &s.communicationCache})
 	defer p.Disconnect()
 	sp := &serverPeer{Peer: p, server: s}
 	sp.OnNeedSet(p, wire.NewMsgNeedSet(chainhash.Hash{99}, nil), nil)
-	if budget.Usage() != 0 {
-		t.Fatal("failed database lookup leaked service capacity")
-	}
 	genesis := chaincfg.MainNetParams.GenesisBlock
 	if err := sp.server.pushNeedSetResultMsg(sp, genesis.BlockHash(), nil, wire.WitnessEncoding); err != nil {
 		t.Fatalf("valid needset did not reach the send path: %v", err)
@@ -120,9 +107,6 @@ func TestDataServiceReleasesAfterFetchFailureOrDiscardedSend(t *testing.T) {
 		genesisHash := genesis.BlockHash()
 		msg.AddInvVect(wire.NewInvVect(inventoryType, &genesisHash))
 		sp.OnGetData(p, msg)
-	}
-	if budget.Usage() != 0 {
-		t.Fatal("discarded response did not return service capacity")
 	}
 	s.communicationCache.Range(func(key, value interface{}) bool {
 		t.Errorf("discarded response retained a cache entry: %v", key)

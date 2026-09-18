@@ -20,7 +20,7 @@ func encodedMessage(t *testing.T, msg wire.Message) []byte {
 	return b.Bytes()
 }
 
-func TestMessageRequestCredits(t *testing.T) {
+func TestMessageRequestsRequirePendingResponse(t *testing.T) {
 	cases := []struct {
 		name    string
 		invType wire.InvType
@@ -93,14 +93,14 @@ func (r *headerOnlyPayloadProbe) Read(p []byte) (int, error) {
 }
 
 func TestLargeDeclaredResponseDoesNotPreallocatePayload(t *testing.T) {
-	counter := wire.NewRequestCounter(512 * 1024 * 1024)
-	requests := wire.NewMessageRequests(counter)
+	requests := wire.NewMessageRequests()
 	defer requests.Close()
 	hash := chainhash.Hash{1}
-	requests.Add(wire.NewMsgNeedSet(hash, []chainhash.Hash{{2}}))
-	data := encodedMessage(t, wire.NewMsgNeedSetResult(hash, nil))
+	tx := wire.NewMsgTxAbe(wire.TxVersion_Height_0)
+	requests.Add(wire.NewMsgGetBlockTx(hash, tx.TxHash()))
+	data := encodedMessage(t, wire.NewMsgBlockTx(hash, tx))
 	header := append([]byte(nil), data[:wire.MessageHeaderSize]...)
-	binary.LittleEndian.PutUint32(header[16:20], wire.MaxMessagePayload)
+	binary.LittleEndian.PutUint32(header[16:20], (&wire.MsgBlockTx{}).MaxPayloadLength(wire.ProtocolVersion))
 	r := &headerOnlyPayloadProbe{Reader: bytes.NewReader(header)}
 	n, msg, payload, err := wire.ReadMessageWithRequestsN(r, wire.ProtocolVersion, wire.MainNet, wire.BaseEncoding, requests)
 	if err != io.EOF || n != wire.MessageHeaderSize || msg != nil || payload != nil {
@@ -110,9 +110,6 @@ func TestLargeDeclaredResponseDoesNotPreallocatePayload(t *testing.T) {
 		t.Fatalf("large payload allocated before its body arrived: read window=%d", r.window)
 	}
 	requests.Close()
-	if count, size := counter.Usage(); count != 0 || size != 0 {
-		t.Fatalf("failed response leaked credit: %d, %d", count, size)
-	}
 }
 
 func TestLargeMessageRoundTripAndNextFrame(t *testing.T) {

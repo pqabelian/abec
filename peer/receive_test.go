@@ -12,8 +12,7 @@ import (
 
 func TestPartialPayloadDoesNotExtendReceiveDeadline(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		counter := wire.NewRequestCounter(512 * 1024 * 1024)
-		p, remote := counterMessagePeer(t, counter)
+		p, remote := connectedMessagePeer(t)
 		// The test helper's short I/O deadline must not mask the real peer
 		// timer. Virtual time lets us test its production duration directly.
 		if err := remote.SetDeadline(time.Time{}); err != nil {
@@ -43,16 +42,15 @@ func TestPartialPayloadDoesNotExtendReceiveDeadline(t *testing.T) {
 		default:
 			t.Fatal("partial bytes postponed the absolute receive deadline")
 		}
-		if count, size := counter.Usage(); count != 0 || size != 0 {
-			t.Fatalf("timed-out progressive read retained credit: %d, %d", count, size)
+		if p.pendingRequest.Expired(time.Now()) {
+			t.Fatal("disconnected peer retained pending requests")
 		}
 	})
 }
 
 func TestBlockedWriteExpires(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		counter := wire.NewRequestCounter(512 * 1024 * 1024)
-		p, remote := counterMessagePeer(t, counter)
+		p, remote := connectedMessagePeer(t)
 		if err := remote.SetDeadline(time.Time{}); err != nil {
 			t.Fatal(err)
 		}
@@ -71,8 +69,8 @@ func TestBlockedWriteExpires(t *testing.T) {
 		default:
 			t.Fatal("write timeout did not release the sender")
 		}
-		if count, size := counter.Usage(); count != 0 || size != 0 {
-			t.Fatalf("write timeout retained request credit: %d, %d", count, size)
+		if p.pendingRequest.Expired(time.Now()) {
+			t.Fatal("disconnected peer retained pending requests")
 		}
 	})
 }

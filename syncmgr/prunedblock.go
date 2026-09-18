@@ -217,8 +217,7 @@ func (sm *SyncManager) handlePrunedBlockTimeoutMsg(msg *prunedBlockTimeoutMsg) {
 		return
 	}
 	log.Infof("Pruned block reconstruction deadline expired for %v with peer %v", msg.hash, msg.peer)
-	// Local quota pressure can also cause expiry. Reset the connection to
-	// discard unsent requests and credits; this is not a misbehavior penalty.
+	// Reset the connection to discard queued and pending supplemental requests.
 	sm.finishPrunedBlockRequest(msg.peer, msg.hash)
 	delete(state.requestedBlocks, msg.hash)
 	delete(sm.requestedBlocks, msg.hash)
