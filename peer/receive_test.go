@@ -7,7 +7,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/wire"
 )
 
 func TestPartialPayloadDoesNotExtendReceiveDeadline(t *testing.T) {

@@ -1,6 +1,6 @@
 package peer
 
-import "github.com/abesuite/abec/wire"
+import "github.com/pqabelian/abec/wire"
 
 // Data responses are already covered by the server's service reservation.
 // Charge retained request/announcement metadata by size, so one-vector invs do

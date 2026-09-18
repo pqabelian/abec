@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 func readTrackedResponse(t *testing.T, requests *wire.MessageRequests, msg wire.Message) error {

@@ -3,11 +3,11 @@ package blockchain
 import (
 	"fmt"
 
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/blockchain/consensus"
-	"github.com/abesuite/abec/blockchain/ruleerror"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/blockchain/consensus"
+	"github.com/pqabelian/abec/blockchain/ruleerror"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 // CheckPrunedBlock verifies eligibility for supplemental downloads. It does not

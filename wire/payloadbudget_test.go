@@ -6,8 +6,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 func TestPayloadBudgetPreservesSupplementalCapacity(t *testing.T) {

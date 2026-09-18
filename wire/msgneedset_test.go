@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/abesuite/abec/chainhash"
+	"github.com/pqabelian/abec/chainhash"
 )
 
 func TestNeedSetDuplicateHashes(t *testing.T) {

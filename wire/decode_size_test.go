@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/abesuite/abec/chainhash"
+	"github.com/pqabelian/abec/chainhash"
 )
 
 func TestDecodeCollectionShortBody(t *testing.T) {

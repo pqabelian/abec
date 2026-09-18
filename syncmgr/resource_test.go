@@ -7,11 +7,11 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/abesuite/abec/abeutil"
-	"github.com/abesuite/abec/blockchain"
-	"github.com/abesuite/abec/chainhash"
-	peerpkg "github.com/abesuite/abec/peer"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/blockchain"
+	"github.com/pqabelian/abec/chainhash"
+	peerpkg "github.com/pqabelian/abec/peer"
+	"github.com/pqabelian/abec/wire"
 )
 
 func TestConcurrentStartStopCompletesCleanup(t *testing.T) {
