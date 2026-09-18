@@ -9,9 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pqabelian/abec/chaincfg"
-	"github.com/pqabelian/abec/chainhash"
-	"github.com/pqabelian/abec/wire"
+	"github.com/abesuite/abec/chaincfg"
+	"github.com/abesuite/abec/wire"
 )
 
 type testConn struct{ io.Reader }
@@ -61,7 +60,8 @@ func TestConcurrentRequestsAndResponses(t *testing.T) {
 	p := testMessagePeer(t, bytes.Repeat(b.Bytes(), n))
 	// Outstanding pipelined requests make every response below solicited.
 	gd := wire.NewMsgGetData()
-	gd.AddInvVect(wire.NewInvVect(wire.InvTypeWitnessTx, &chainhash.Hash{}))
+	hash := tx.TxHash()
+	gd.AddInvVect(wire.NewInvVect(wire.InvTypeWitnessTx, &hash))
 	for i := 0; i < n; i++ {
 		p.pendingRequest.Add(gd)
 	}

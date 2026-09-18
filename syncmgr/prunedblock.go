@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/pqabelian/abec/abeutil"
+	"github.com/pqabelian/abec/blockchain"
+	"github.com/pqabelian/abec/blockchain/ruleerror"
 	"github.com/pqabelian/abec/chaincfg"
 	"github.com/pqabelian/abec/chainhash"
 	peerpkg "github.com/pqabelian/abec/peer"
@@ -12,19 +14,24 @@ import (
 )
 
 const (
+	// The deadline covers both local request queuing and remote responses.
 	missingBlockTxTimeout = 30 * time.Second
-	// Bound the blocks retained while waiting for supplemental transactions.
-	// Additional blocks are requested in full and use the normal block path.
-	maxPendingPrunedBlocksPerPeer = 10
+	// Bound supplemental messages in the peer queue for each reconstruction.
+	maxPendingBlockTxRequests = 16
 )
 
 // All reconstruction state belongs to blockHandler, including timer cleanup.
 type pendingPrunedBlock struct {
+	hash          chainhash.Hash
 	msg           *prunedBlockMsg
 	transactions  map[chainhash.Hash]*wire.MsgTxAbe
-	missing       map[chainhash.Hash]struct{}
+	missing       map[chainhash.Hash]chainhash.Hash // Transaction hash -> committed witness hash.
 	useGetBlockTx bool
+	unrequested   []chainhash.Hash
+	inFlight      int // Queued or sent getblocktx requests, awaiting responses.
 	timer         *time.Timer
+	baseSize      uint64
+	fullSize      uint64
 }
 
 type needSetResultMsg struct {
@@ -43,25 +50,14 @@ type prunedBlockTimeoutMsg struct {
 	pending *pendingPrunedBlock
 }
 
-// The send completion is delivered to blockHandler so it remains the sole
-// owner of reconstruction timers.
-type prunedBlockRequestSentMsg prunedBlockTimeoutMsg
-
-func (sm *SyncManager) handlePrunedBlockRequestSentMsg(msg *prunedBlockRequestSentMsg) {
-	state, exists := sm.peerStates[msg.peer]
-	if !exists || state.pendingPrunedBlocks[msg.hash] != msg.pending {
-		return
-	}
-	msg.pending.timer = time.AfterFunc(missingBlockTxTimeout, func() {
-		select {
-		case sm.msgChan <- (*prunedBlockTimeoutMsg)(msg):
-		case <-sm.quit:
-		}
-	})
-}
-
 func (sm *SyncManager) notifyPrunedBlockProcessed(msg *prunedBlockMsg) {
 	if msg.reply != nil {
+		// Deliver buffered completion even when shutdown is already ready.
+		select {
+		case msg.reply <- struct{}{}:
+			return
+		default:
+		}
 		select {
 		case msg.reply <- struct{}{}:
 		case <-sm.quit:
@@ -83,13 +79,13 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(msg *prunedBlockMsg) {
 		sm.notifyPrunedBlockProcessed(msg)
 		return
 	}
-	if _, exists := state.pendingPrunedBlocks[hash]; exists {
+	if sm.pendingPrunedBlockFor(msg.peer, hash) != nil {
 		log.Warnf("Received duplicate pruned block %v from %v", hash, msg.peer)
 		msg.peer.Disconnect()
 		sm.notifyPrunedBlockProcessed(msg)
 		return
 	}
-	if len(state.pendingPrunedBlocks) >= maxPendingPrunedBlocksPerPeer {
+	if sm.pendingPrunedBlock != nil {
 		getData := wire.NewMsgGetData()
 		getData.AddInvVect(wire.NewInvVect(wire.InvTypeWitnessBlock, &hash))
 		msg.peer.QueueMessage(getData, nil)
@@ -97,78 +93,133 @@ func (sm *SyncManager) handlePrunedBlockMsgAbe(msg *prunedBlockMsg) {
 		return
 	}
 
-	pending := &pendingPrunedBlock{
-		msg:           msg,
-		transactions:  make(map[chainhash.Hash]*wire.MsgTxAbe),
-		missing:       make(map[chainhash.Hash]struct{}),
-		useGetBlockTx: msg.peer.UseGetBlockTx(),
-	}
-	var missing []chainhash.Hash
-	for _, txHash := range msg.block.MsgPrunedBlock().TransactionHashes {
-		if tx, err := sm.txMemPool.FetchTransaction(&txHash); err == nil && tx.MsgTx().HasTxWitness() {
-			pending.transactions[txHash] = tx.MsgTx()
-		} else if _, requested := pending.missing[txHash]; !requested {
-			pending.missing[txHash] = struct{}{}
-			missing = append(missing, txHash)
+	pending, err := sm.preparePrunedBlock(msg)
+	if err != nil {
+		if ruleErr, ok := err.(ruleerror.RuleError); ok && ruleErr.ErrorCode == ruleerror.ErrPreviousBlockUnknown {
+			// Out-of-order blocks are legitimate. Let the ordinary block path
+			// handle the orphan without starting supplemental requests.
+			getData := wire.NewMsgGetData()
+			getData.AddInvVect(wire.NewInvVect(wire.InvTypeWitnessBlock, &hash))
+			msg.peer.QueueMessage(getData, nil)
+			sm.notifyPrunedBlockProcessed(msg)
+			return
 		}
+		log.Warnf("Cannot reconstruct pruned block %v from %v: %v", hash, msg.peer, err)
+		delete(state.requestedBlocks, hash)
+		delete(sm.requestedBlocks, hash)
+		sm.notifyPrunedBlockProcessed(msg)
+		msg.peer.Disconnect()
+		return
 	}
-	state.pendingPrunedBlocks[hash] = pending
-	if len(missing) == 0 {
+	sm.pendingPrunedBlock = pending
+	if len(pending.missing) == 0 {
 		sm.completePrunedBlock(state, hash)
 		return
 	}
 
-	sent := make(chan struct{}, 1)
-	if pending.useGetBlockTx {
-		for i, txHash := range missing {
-			var done chan struct{}
-			if i == len(missing)-1 {
-				done = sent
-			}
-			msg.peer.QueueMessage(wire.NewMsgGetBlockTx(hash, txHash), done)
-		}
-	} else {
-		msg.peer.QueueMessage(wire.NewMsgNeedSet(hash, missing), sent)
-	}
 	peer := msg.peer
-	go func() {
-		// Wait for the final request's send notification before starting the
-		// response timeout. Shutdown must also unblock this wait if the request
-		// is still queued or its network write has not finished.
-		select {
-		case <-sent:
-		case <-sm.quit:
-			return
-		}
-		// Only after that notification, ask blockHandler to start the timer.
-		// Sending to a full msgChan can block independently, so this second
-		// wait must also allow shutdown to cancel it.
-		select {
-		case sm.msgChan <- &prunedBlockRequestSentMsg{peer, hash, pending}:
-		case <-sm.quit:
-		}
-	}()
+	pending.timer = time.AfterFunc(missingBlockTxTimeout, func() {
+		sm.enqueueMessage(&prunedBlockTimeoutMsg{peer, hash, pending})
+	})
+	if pending.useGetBlockTx {
+		sm.requestPrunedBlockTxs(pending)
+	} else {
+		peer.QueueMessage(wire.NewMsgNeedSet(hash, pending.unrequested), nil)
+	}
 }
 
-func (sm *SyncManager) finishPrunedBlockRequest(state *peerSyncState, hash chainhash.Hash) {
-	pending, exists := state.pendingPrunedBlocks[hash]
-	if !exists {
+func (sm *SyncManager) pendingPrunedBlockFor(peer *peerpkg.Peer, hash chainhash.Hash) *pendingPrunedBlock {
+	pending := sm.pendingPrunedBlock
+	if pending != nil && pending.msg.peer == peer && pending.hash == hash {
+		return pending
+	}
+	return nil
+}
+
+// preparePrunedBlock uses the same size accounting as MsgBlockAbe.SerializeSize
+// and SerializeSizeStripped. Missing transactions also bound metadata growth.
+func (sm *SyncManager) preparePrunedBlock(msg *prunedBlockMsg) (*pendingPrunedBlock, error) {
+	block := msg.block.MsgPrunedBlock()
+	if block.CoinbaseTx == nil {
+		return nil, fmt.Errorf("missing coinbase transaction")
+	}
+	count := uint64(len(block.TransactionHashes)) + 1
+	headerSize := uint64(block.Header.SerializeSize() + wire.VarIntSerializeSize(count))
+	if count > (blockchain.MaxBlockBaseSizeMLPAUT-headerSize)/wire.MinTxAbePayload {
+		return nil, fmt.Errorf("too many transactions for a block")
+	}
+	pending := &pendingPrunedBlock{
+		hash:          *msg.block.Hash(),
+		msg:           msg,
+		transactions:  make(map[chainhash.Hash]*wire.MsgTxAbe),
+		missing:       make(map[chainhash.Hash]chainhash.Hash),
+		useGetBlockTx: msg.peer.UseGetBlockTx(),
+		baseSize:      headerSize + uint64(block.CoinbaseTx.SerializeSize()),
+		fullSize:      headerSize + uint64(block.CoinbaseTx.SerializeSizeFull()),
+	}
+	if pending.baseSize > blockchain.MaxBlockBaseSizeMLPAUT || pending.fullSize > wire.MaxBlockPayloadAbe {
+		return nil, fmt.Errorf("coinbase exceeds block size limit")
+	}
+	coinbaseHash := block.CoinbaseTx.TxHash()
+	for _, hash := range block.TransactionHashes {
+		if _, duplicate := pending.missing[hash]; duplicate || hash == coinbaseHash {
+			return nil, fmt.Errorf("duplicate transaction hash")
+		}
+		pending.missing[hash] = chainhash.Hash{}
+	}
+	if err := sm.chain.CheckPrunedBlock(block, sm.powConsensus); err != nil {
+		return nil, err
+	}
+	for i, txHash := range block.TransactionHashes {
+		pending.missing[txHash] = block.WitnessHashs[i]
+		if tx, err := sm.txMemPool.FetchTransaction(&txHash); err == nil && tx.MsgTx().HasTxWitness() &&
+			*tx.MsgTx().TxWitnessHash() == block.WitnessHashs[i] {
+			if !addPrunedBlockTx(pending, tx.MsgTx()) {
+				return nil, fmt.Errorf("mempool transaction exceeds block size limit")
+			}
+		} else {
+			pending.unrequested = append(pending.unrequested, txHash)
+		}
+	}
+	return pending, nil
+}
+
+// Keep only a bounded window in the peer queue, replenished by responses.
+// The overall deadline also expires when none of this window can be sent.
+func (sm *SyncManager) requestPrunedBlockTxs(pending *pendingPrunedBlock) {
+	for pending.inFlight < maxPendingBlockTxRequests && len(pending.unrequested) > 0 {
+		txHash := pending.unrequested[0]
+		pending.unrequested = pending.unrequested[1:]
+		pending.inFlight++
+		pending.msg.peer.QueueMessage(wire.NewMsgGetBlockTx(pending.hash, txHash), nil)
+	}
+}
+
+func (sm *SyncManager) finishPrunedBlockRequest(peer *peerpkg.Peer, hash chainhash.Hash) {
+	pending := sm.pendingPrunedBlockFor(peer, hash)
+	if pending == nil {
 		return
 	}
-	delete(state.pendingPrunedBlocks, hash)
+	sm.pendingPrunedBlock = nil
 	if pending.timer != nil {
 		pending.timer.Stop()
 	}
 	sm.notifyPrunedBlockProcessed(pending.msg)
+	// A timer callback may already be queued. Leave only its identity token,
+	// so it cannot keep the block and transactions alive after cleanup.
+	pending.msg, pending.transactions, pending.missing = nil, nil, nil
+	pending.unrequested = nil
 }
 
 func (sm *SyncManager) handlePrunedBlockTimeoutMsg(msg *prunedBlockTimeoutMsg) {
 	state, exists := sm.peerStates[msg.peer]
-	if !exists || state.pendingPrunedBlocks[msg.hash] != msg.pending {
+	if !exists || sm.pendingPrunedBlock != msg.pending {
 		return
 	}
-	log.Warnf("Timed out fetching transactions for block %v from %v", msg.hash, msg.peer)
-	sm.finishPrunedBlockRequest(state, msg.hash)
+	log.Infof("Pruned block reconstruction deadline expired for %v with peer %v", msg.hash, msg.peer)
+	// Local quota pressure can also cause expiry. Reset the connection to
+	// discard unsent requests and credits; this is not a misbehavior penalty.
+	sm.finishPrunedBlockRequest(msg.peer, msg.hash)
 	delete(state.requestedBlocks, msg.hash)
 	delete(sm.requestedBlocks, msg.hash)
 	msg.peer.Disconnect()
@@ -179,15 +230,17 @@ func (sm *SyncManager) handleNeedSetResultMsg(msg *needSetResultMsg) {
 	if !exists {
 		return
 	}
-	pending := state.pendingPrunedBlocks[msg.result.BlockHash]
+	pending := sm.pendingPrunedBlockFor(msg.peer, msg.result.BlockHash)
 	if pending == nil || pending.useGetBlockTx || len(msg.result.Txs) != len(pending.missing) {
 		log.Warnf("Received unexpected needset response for block %v from %v", msg.result.BlockHash, msg.peer)
+		sm.clearRequestedState(msg.peer, state)
 		msg.peer.Disconnect()
 		return
 	}
 	for _, tx := range msg.result.Txs {
 		if !addPrunedBlockTx(pending, tx) {
 			log.Warnf("Received invalid needset transaction for block %v from %v", msg.result.BlockHash, msg.peer)
+			sm.clearRequestedState(msg.peer, state)
 			msg.peer.Disconnect()
 			return
 		}
@@ -200,14 +253,18 @@ func (sm *SyncManager) handleBlockTxMsg(msg *blockTxMsg) {
 	if !exists {
 		return
 	}
-	pending := state.pendingPrunedBlocks[msg.result.BlockHash]
+	pending := sm.pendingPrunedBlockFor(msg.peer, msg.result.BlockHash)
 	if pending == nil || !pending.useGetBlockTx || !addPrunedBlockTx(pending, msg.result.Tx) {
 		log.Warnf("Received unexpected or invalid blocktx for block %v from %v", msg.result.BlockHash, msg.peer)
+		sm.clearRequestedState(msg.peer, state)
 		msg.peer.Disconnect()
 		return
 	}
+	pending.inFlight--
 	if len(pending.missing) == 0 {
 		sm.completePrunedBlock(state, msg.result.BlockHash)
+	} else {
+		sm.requestPrunedBlockTxs(pending)
 	}
 }
 
@@ -216,9 +273,17 @@ func addPrunedBlockTx(pending *pendingPrunedBlock, tx *wire.MsgTxAbe) bool {
 		return false
 	}
 	hash := tx.TxHash()
-	if _, requested := pending.missing[hash]; !requested {
+	witnessHash, requested := pending.missing[hash]
+	if !requested || *tx.TxWitnessHash() != witnessHash {
 		return false
 	}
+	baseSize, fullSize := uint64(tx.SerializeSize()), uint64(tx.SerializeSizeFull())
+	if baseSize > blockchain.MaxBlockBaseSizeMLPAUT-pending.baseSize ||
+		fullSize > wire.MaxBlockPayloadAbe-pending.fullSize {
+		return false
+	}
+	pending.baseSize += baseSize
+	pending.fullSize += fullSize
 	pending.transactions[hash] = tx
 	delete(pending.missing, hash)
 	return true
@@ -245,8 +310,8 @@ func restorePrunedBlock(msg *wire.MsgPrunedBlock, transactions map[chainhash.Has
 }
 
 func (sm *SyncManager) completePrunedBlock(state *peerSyncState, hash chainhash.Hash) {
-	pending := state.pendingPrunedBlocks[hash]
-	defer sm.finishPrunedBlockRequest(state, hash)
+	pending := sm.pendingPrunedBlock
+	defer sm.finishPrunedBlockRequest(pending.msg.peer, hash)
 	block, err := restorePrunedBlock(pending.msg.block.MsgPrunedBlock(), pending.transactions)
 	if err != nil {
 		log.Warnf("Cannot restore block %v from %v: %v", hash, pending.msg.peer, err)
@@ -261,17 +326,11 @@ func (sm *SyncManager) completePrunedBlock(state *peerSyncState, hash chainhash.
 
 // QueueNeedSetResult delivers a supplemental transaction response to the owner
 // of the reconstruction state. Input handlers never access peerStates directly.
-func (sm *SyncManager) QueueNeedSetResult(result *wire.MsgNeedSetResult, peer *peerpkg.Peer) {
-	select {
-	case sm.msgChan <- &needSetResultMsg{result: result, peer: peer}:
-	case <-sm.quit:
-	}
+func (sm *SyncManager) QueueNeedSetResult(result *wire.MsgNeedSetResult, peer *peerpkg.Peer) <-chan struct{} {
+	return sm.queueMessage(&needSetResultMsg{result: result, peer: peer})
 }
 
 // QueueBlockTx delivers a single supplemental transaction to blockHandler.
-func (sm *SyncManager) QueueBlockTx(result *wire.MsgBlockTx, peer *peerpkg.Peer) {
-	select {
-	case sm.msgChan <- &blockTxMsg{result: result, peer: peer}:
-	case <-sm.quit:
-	}
+func (sm *SyncManager) QueueBlockTx(result *wire.MsgBlockTx, peer *peerpkg.Peer) <-chan struct{} {
+	return sm.queueMessage(&blockTxMsg{result: result, peer: peer})
 }
