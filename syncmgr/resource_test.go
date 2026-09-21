@@ -1,7 +1,6 @@
 package syncmgr
 
 import (
-	"bytes"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -104,7 +103,6 @@ func TestPrunedBlockPreparationAndGlobalSlot(t *testing.T) {
 		t.Fatal("fallback retained the rejected pruned message")
 	}
 	owner := sm.pendingPrunedBlock
-	sm.handleNeedSetResultMsg(&needSetResultMsg{result: wire.NewMsgNeedSetResult(blockHash, nil), peer: other})
 	sm.handleBlockTxMsg(&blockTxMsg{result: wire.NewMsgBlockTx(blockHash, nil), peer: other})
 	sm.handleDonePeerMsg(other)
 	if sm.pendingPrunedBlock != owner || len(owner.missing) != 1 {
@@ -189,54 +187,30 @@ func TestQueueReceiptDoesNotWaitForLaterMessages(t *testing.T) {
 	})
 }
 
-func TestNeedSetContentsValidatedDuringQueuedProcessing(t *testing.T) {
-	tx1, tx2, other := wire.NewMsgTxAbe(wire.TxVersion_Height_0), wire.NewMsgTxAbe(wire.TxVersion_Height_0), wire.NewMsgTxAbe(wire.TxVersion_Height_0)
-	tx1.TxMemo, tx2.TxMemo, other.TxMemo = []byte{1}, []byte{2}, []byte{3}
-	tx1.TxWitness, tx2.TxWitness, other.TxWitness = []byte{1}, []byte{2}, []byte{3}
-	noWitness := *tx1
+func TestInvalidBlockTxContentsClearReconstruction(t *testing.T) {
+	tx := wire.NewMsgTxAbe(wire.TxVersion_Height_0)
+	tx.TxWitness = []byte{1}
+	noWitness := *tx
 	noWitness.TxWitness = nil
-	for _, tc := range []struct {
-		name string
-		txs  []*wire.MsgTxAbe
-	}{
-		{"missing", []*wire.MsgTxAbe{tx1}},
-		{"duplicate", []*wire.MsgTxAbe{tx1, tx1}},
-		{"unexpected", []*wire.MsgTxAbe{tx1, other}},
-		{"extra", []*wire.MsgTxAbe{tx1, tx2, other}},
-		{"missing witness", []*wire.MsgTxAbe{&noWitness, tx2}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			sm, p := testSyncManager(t)
-			hash := chainhash.Hash{1}
-			pending := &pendingPrunedBlock{
-				hash: hash, msg: &prunedBlockMsg{peer: p},
-				missing:      map[chainhash.Hash]chainhash.Hash{tx1.TxHash(): *tx1.TxWitnessHash(), tx2.TxHash(): *tx2.TxWitnessHash()},
-				transactions: make(map[chainhash.Hash]*wire.MsgTxAbe),
-			}
-			sm.pendingPrunedBlock = pending
-			sm.peerStates[p].requestedBlocks[hash], sm.requestedBlocks[hash] = struct{}{}, struct{}{}
-			requests := wire.NewMessageRequests()
-			defer requests.Close()
-			if !requests.Add(wire.NewMsgNeedSet(hash, []chainhash.Hash{tx1.TxHash(), tx2.TxHash()})) {
-				t.Fatal("needset request was not admitted")
-			}
-			var frame bytes.Buffer
-			if _, err := wire.WriteMessageWithEncodingN(&frame, wire.NewMsgNeedSetResult(hash, tc.txs), wire.ProtocolVersion, wire.MainNet, wire.WitnessEncoding); err != nil {
-				t.Fatal(err)
-			}
-			_, decoded, _, err := wire.ReadMessageWithRequestsN(&frame, wire.ProtocolVersion, wire.MainNet, wire.WitnessEncoding, requests)
-			if err != nil {
-				t.Fatalf("matching response did not reach reconstruction validation: %v", err)
-			}
-			receipt := sm.QueueNeedSetResult(decoded.(*wire.MsgNeedSetResult), p)
-			released := make(chan struct{})
-			go func() { <-receipt; close(released) }()
-			sm.Start()
-			<-released
-			sm.Stop()
-			if sm.pendingPrunedBlock != nil || len(sm.requestedBlocks) != 0 || pending.transactions != nil {
-				t.Fatal("invalid contents retained reconstruction data")
-			}
-		})
+	unexpected := wire.NewMsgTxAbe(wire.TxVersion_Height_0)
+	unexpected.TxMemo, unexpected.TxWitness = []byte{2}, []byte{3}
+	for _, bad := range []*wire.MsgTxAbe{nil, &noWitness, unexpected} {
+		sm, p := testSyncManager(t)
+		hash := chainhash.Hash{1}
+		pending := &pendingPrunedBlock{
+			hash: hash, msg: &prunedBlockMsg{peer: p},
+			missing:      map[chainhash.Hash]chainhash.Hash{tx.TxHash(): *tx.TxWitnessHash()},
+			transactions: make(map[chainhash.Hash]*wire.MsgTxAbe),
+			inFlight:     1,
+		}
+		sm.pendingPrunedBlock = pending
+		sm.peerStates[p].requestedBlocks[hash], sm.requestedBlocks[hash] = struct{}{}, struct{}{}
+		receipt := sm.QueueBlockTx(wire.NewMsgBlockTx(hash, bad), p)
+		sm.Start()
+		<-receipt
+		sm.Stop()
+		if sm.pendingPrunedBlock != nil || len(sm.requestedBlocks) != 0 || pending.transactions != nil {
+			t.Fatal("invalid blocktx retained reconstruction data")
+		}
 	}
 }

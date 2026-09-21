@@ -78,7 +78,7 @@ func TestPrunedMerkleCommitmentMatchesFullBlock(t *testing.T) {
 	}
 }
 
-func TestPrunedBlockEligibilityBeforeProofOfWork(t *testing.T) {
+func TestPrunedBlockEligibility(t *testing.T) {
 	params := chaincfg.RegressionNetParams
 	b := &BlockChain{chainParams: &params, timeSource: NewMedianTime(), blocksPerRetarget: 4000}
 	b.index = newBlockIndex(nil, &params)
@@ -111,7 +111,6 @@ func TestPrunedBlockEligibilityBeforeProofOfWork(t *testing.T) {
 			m.Header.Timestamp = time.Now().Truncate(time.Second).Add((MaxTimeOffsetSeconds + 1) * time.Second)
 		}, ruleerror.ErrTimeTooNew},
 		{"untrusted epoch", func(m *wire.MsgPrunedBlock) { m.Header.Version = wire.BlockVersionEthashPow; m.Header.Height = 1 << 30 }, ruleerror.ErrMismatchedBlockHeightAndVersion},
-		{"wrong commitment", func(m *wire.MsgPrunedBlock) { m.Header.MerkleRoot[0] ^= 1 }, ruleerror.ErrBadMerkleRoot},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			candidate := *msg
@@ -123,6 +122,19 @@ func TestPrunedBlockEligibilityBeforeProofOfWork(t *testing.T) {
 			}
 		})
 	}
+	t.Run("wrong commitment", func(t *testing.T) {
+		candidate := *msg
+		candidate.Header.MerkleRoot[0] ^= 1
+		// Merkle validation follows PoW. Re-mine the changed header so the
+		// test reaches the commitment check with a real consensus engine.
+		for pow.VerifySeal(&candidate.Header, target, nil) != nil {
+			candidate.Header.Nonce++
+		}
+		err := b.CheckPrunedBlock(&candidate, pow)
+		if ruleErr, ok := err.(ruleerror.RuleError); !ok || ruleErr.ErrorCode != ruleerror.ErrBadMerkleRoot {
+			t.Fatalf("got %v, want rule error %v", err, ruleerror.ErrBadMerkleRoot)
+		}
+	})
 	bad := *msg
 	for pow.VerifySeal(&bad.Header, target, nil) == nil {
 		bad.Header.Nonce++

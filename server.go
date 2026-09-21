@@ -560,10 +560,6 @@ func (sp *serverPeer) OnNeedSet(_ *peer.Peer, msg *wire.MsgNeedSet, buf []byte) 
 	}
 }
 
-func (sp *serverPeer) OnNeedSetResult(p *peer.Peer, msg *wire.MsgNeedSetResult, buf []byte) {
-	<-sp.server.syncManager.QueueNeedSetResult(msg, p)
-}
-
 func (sp *serverPeer) OnGetBlockTx(_ *peer.Peer, msg *wire.MsgGetBlockTx, buf []byte) {
 	if !sp.canServeData() {
 		return
@@ -1836,20 +1832,19 @@ func disconnectPeer(peerList map[int32]*serverPeer, compareFunc func(*serverPeer
 func newPeerConfig(sp *serverPeer) *peer.Config {
 	return &peer.Config{
 		Listeners: peer.MessageListeners{
-			OnVersion:       sp.OnVersion,
-			OnVerAck:        sp.OnVerAck,
-			OnTx:            sp.OnTx,
-			OnBlock:         sp.OnBlock,
-			OnPrunedBlock:   sp.OnPrunedBlock,
-			OnNeedSet:       sp.OnNeedSet,
-			OnNeedSetResult: sp.OnNeedSetResult,
-			OnGetBlockTx:    sp.OnGetBlockTx,
-			OnBlockTx:       sp.OnBlockTx,
-			OnInv:           sp.OnInv,
-			OnHeaders:       sp.OnHeaders,
-			OnGetData:       sp.OnGetData,
-			OnGetBlocks:     sp.OnGetBlocks,
-			OnGetHeaders:    sp.OnGetHeaders,
+			OnVersion:     sp.OnVersion,
+			OnVerAck:      sp.OnVerAck,
+			OnTx:          sp.OnTx,
+			OnBlock:       sp.OnBlock,
+			OnPrunedBlock: sp.OnPrunedBlock,
+			OnNeedSet:     sp.OnNeedSet,
+			OnGetBlockTx:  sp.OnGetBlockTx,
+			OnBlockTx:     sp.OnBlockTx,
+			OnInv:         sp.OnInv,
+			OnHeaders:     sp.OnHeaders,
+			OnGetData:     sp.OnGetData,
+			OnGetBlocks:   sp.OnGetBlocks,
+			OnGetHeaders:  sp.OnGetHeaders,
 			//OnFeeFilter:     sp.OnFeeFilter,
 			OnGetAddr:  sp.OnGetAddr,
 			OnAddr:     sp.OnAddr,

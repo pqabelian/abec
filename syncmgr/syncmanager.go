@@ -201,7 +201,7 @@ type SyncManager struct {
 	quit           chan struct{}
 
 	// These fields should only be accessed from the blockHandler thread
-	// One reconstruction is retained globally, separate from receive capacity.
+	// Only one pruned block may be reconstructed across all peers.
 	pendingPrunedBlock *pendingPrunedBlock
 	rejectedTxns       map[chainhash.Hash]struct{}
 	requestedTxns      map[chainhash.Hash]struct{}
@@ -1614,6 +1614,9 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 				}
 				sm.requestedBlocks[iv.Hash] = struct{}{}
 				state.requestedBlocks[iv.Hash] = struct{}{}
+				if !peer.UseGetBlockTx() || sm.pendingPrunedBlock != nil {
+					iv.Type = wire.InvTypeWitnessBlock
+				}
 				gdmsg.AddInvVect(iv)
 				numRequested++
 			}
@@ -1705,9 +1708,6 @@ out:
 
 			case *prunedBlockMsg:
 				sm.handlePrunedBlockMsgAbe(msg)
-
-			case *needSetResultMsg:
-				sm.handleNeedSetResultMsg(msg)
 
 			case *blockTxMsg:
 				sm.handleBlockTxMsg(msg)

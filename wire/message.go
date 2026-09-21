@@ -417,6 +417,11 @@ func ReadMessageWithRequestsN(r io.Reader, pver uint32, btcnet AbelianNet,
 		return totalBytes, nil, nil, err
 	}
 
+	// Incoming responses must correspond to a request we actually sent.
+	if err := requests.begin(hdr.command); err != nil {
+		return totalBytes, nil, nil, err
+	}
+
 	// Enforce maximum message payload.
 	if hdr.length > MaxMessagePayload {
 		str := fmt.Sprintf("message payload is too large - header "+
@@ -440,10 +445,6 @@ func ReadMessageWithRequestsN(r io.Reader, pver uint32, btcnet AbelianNet,
 		discardInput(r, hdr.length)
 		str := fmt.Sprintf("invalid command %v", []byte(command))
 		return totalBytes, nil, nil, messageError("ReadMessage", str)
-	}
-
-	if err := requests.begin(command); err != nil {
-		return totalBytes, nil, nil, err
 	}
 
 	// Create struct of appropriate message type based on the command.

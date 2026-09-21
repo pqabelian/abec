@@ -83,9 +83,6 @@ func TestResponseMatchesRequestIdentity(t *testing.T) {
 		{"blocktx", wire.NewMsgGetBlockTx(blockHash, txA.TxHash()), wire.NewMsgBlockTx(blockHash, txA), []wire.Message{
 			wire.NewMsgBlockTx(otherHash, txA), wire.NewMsgBlockTx(blockHash, txB),
 		}},
-		{"needset", wire.NewMsgNeedSet(blockHash, []chainhash.Hash{txA.TxHash(), txB.TxHash()}), wire.NewMsgNeedSetResult(blockHash, []*wire.MsgTxAbe{txB, txA}), []wire.Message{
-			wire.NewMsgNeedSetResult(otherHash, []*wire.MsgTxAbe{txA, txB}),
-		}},
 	}
 	for _, tc := range []struct {
 		typ          wire.InvType

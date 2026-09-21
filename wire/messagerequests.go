@@ -1,14 +1,14 @@
 package wire
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/abesuite/abec/chainhash"
 )
 
-// requestedResponse records the response identity. A needset response is tied
-// to its block; reconstruction owns transaction-set and witness validation.
+// requestedResponse records the identity of an expected response.
 type requestedResponse struct {
 	hash   chainhash.Hash
 	txHash chainhash.Hash
@@ -30,11 +30,12 @@ func NewMessageRequests() *MessageRequests {
 }
 
 // Add registers a local request before it is written. Outgoing responses and
-// other messages create no pending request. False means the tracker is closed.
+// other messages create no pending request. False means the tracker is closed
+// or the message tries to initiate a retired legacy needset request.
 func (r *MessageRequests) Add(msg Message) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.closed {
+	if r.closed || msg.Command() == CmdNeedSet {
 		return false
 	}
 	pending := make(map[string][]requestedResponse)
@@ -50,8 +51,6 @@ func (r *MessageRequests) Add(msg Message) bool {
 		pending[CmdGetHeaders] = []requestedResponse{{}}
 	case *MsgGetBlockTx:
 		pending[CmdGetBlockTx] = []requestedResponse{{hash: msg.BlockHash, txHash: msg.TxHash}}
-	case *MsgNeedSet:
-		pending[CmdNeedSet] = []requestedResponse{{hash: msg.BlockHash}}
 	}
 	if len(pending) == 0 {
 		return true
@@ -82,6 +81,8 @@ func responseRequestKeys(command string) []string {
 	case CmdBlockTx:
 		return []string{CmdGetBlockTx}
 	case CmdNeedSetResult:
+		// Add never accepts needset requests, so legacy results always lack
+		// a pending entry and are rejected before their payload is read.
 		return []string{CmdNeedSet}
 	}
 	return nil
@@ -108,7 +109,7 @@ func (r *MessageRequests) begin(command string) error {
 			return nil
 		}
 	}
-	return messageError("ReadMessage", "unexpected message "+command)
+	return fmt.Errorf("%w: %s", ErrUnrequestedResponse, command)
 }
 
 // complete removes a pending request only for an exact decoded response identity.

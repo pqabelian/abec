@@ -505,9 +505,8 @@ type Peer struct {
 	sendDoneQueue chan struct{}
 	outputInvChan chan *wire.InvVect
 
-	// pending message
+	// Pending responses to local requests.
 	// getblocktx <- blocktx
-	// needset    <- nsresult
 	// getdata    <- tx / block
 	pendingRequest *wire.MessageRequests
 
@@ -1046,17 +1045,18 @@ func (p *Peer) PushGetHeadersMsg(locator blockchain.BlockLocator, stopHash *chai
 	return nil
 }
 
+// UseGetBlockTx reports whether the remote peer is newer than the legacy
+// abec 3.1.0 release and supports single transaction block supplements.
 func (p *Peer) UseGetBlockTx() bool {
-	useGetBlockTx := false
-	uas := strings.Split(p.UserAgent(), "/")
-	for _, ua := range uas {
+	for _, ua := range strings.Split(p.UserAgent(), "/") {
 		version, found := strings.CutPrefix(ua, "abec:")
-		if found && semver.Compare("v"+version, "v3.1.0") > 0 {
-			useGetBlockTx = true
+		version, _, _ = strings.Cut(version, "(") // Optional user-agent comments.
+		version = "v" + version
+		if found && semver.IsValid(version) && semver.Compare(version, "v3.1.0") > 0 {
+			return true
 		}
 	}
-
-	return useGetBlockTx
+	return false
 }
 
 // PushRejectMsg sends a reject message for the provided command, reject code,
@@ -1471,6 +1471,12 @@ out:
 		rmsg, buf, err := p.readMessage(p.wireEncoding)
 		idleTimer.Stop()
 		if err != nil {
+			if errors.Is(err, wire.ErrUnrequestedResponse) {
+				// The body is unread. Close immediately instead of treating it
+				// as another frame or waiting for the peer to read a rejection.
+				log.Debugf("Closing peer %s: %v", p, err)
+				break out
+			}
 			// In order to allow regression tests with malformed messages, don't
 			// disconnect the peer when we're in regression test mode and the
 			// error is one of the allowed errors.
@@ -1927,7 +1933,7 @@ out:
 			}
 
 			if !p.pendingRequest.Add(msg.msg) {
-				// Do not send after the connection's request tracker is closed.
+				// Do not send after close or initiate an unsupported request.
 				p.Disconnect()
 				if msg.doneChan != nil {
 					msg.doneChan <- struct{}{}
@@ -2034,7 +2040,9 @@ func (p *Peer) QueueMessageWithEncoding(msg wire.Message, doneChan chan<- struct
 	encoding wire.MessageEncoding) {
 	p.queueMtx.RLock()
 	defer p.queueMtx.RUnlock()
-	if p.Connected() {
+	// Legacy needset is serve-only: respond to remote requests, but never
+	// initiate one ourselves. Discarded requests still notify their sender.
+	if p.Connected() && msg.Command() != wire.CmdNeedSet {
 		select {
 		case p.outputQueue <- outMsg{msg: msg, encoding: encoding, doneChan: doneChan}:
 			return

@@ -25,6 +25,19 @@ func quietP2PTestLogs(t *testing.T) {
 	}
 }
 
+func TestLegacyNeedSetServingHandlers(t *testing.T) {
+	previousConfig := cfg
+	cfg = &config{}
+	t.Cleanup(func() { cfg = previousConfig })
+	listeners := newPeerConfig(&serverPeer{server: &server{}}).Listeners
+	if listeners.OnNeedSet == nil || listeners.OnNeedSetResult != nil {
+		t.Fatal("legacy protocol must serve needset but never process nsresult")
+	}
+	if listeners.OnGetBlockTx == nil || listeners.OnBlockTx == nil || listeners.OnGetData == nil {
+		t.Fatal("current block transfer handlers are missing")
+	}
+}
+
 func TestDataServiceStopsBeforeDatabaseAccess(t *testing.T) {
 	quietP2PTestLogs(t)
 	previousConfig := cfg

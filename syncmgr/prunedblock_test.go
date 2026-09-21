@@ -124,42 +124,32 @@ func TestInvalidCoinbaseDoesNotStartSupplementalDownload(t *testing.T) {
 }
 
 func TestSupplementalWitnessMismatchStopsReconstruction(t *testing.T) {
-	for _, singleTx := range []bool{false, true} {
-		sm, p := testSyncManager(t)
-		txs := make([]*wire.MsgTxAbe, maxPendingBlockTxRequests+1)
-		for i := range txs {
-			txs[i] = wire.NewMsgTxAbe(wire.TxVersion_Height_0)
-			txs[i].TxMemo, txs[i].TxWitness = []byte{byte(i)}, []byte{1}
-		}
-		msg := testPrunedBlock(t, sm, txs...)
-		block := abeutil.NewPrunedBlockFromPrunedBlockAndBytesAbe(msg, nil)
-		hash := *block.Hash()
-		state := sm.peerStates[p]
-		state.requestedBlocks[hash], sm.requestedBlocks[hash] = struct{}{}, struct{}{}
-		sm.handlePrunedBlockMsgAbe(&prunedBlockMsg{block: block, peer: p})
-		pending := sm.pendingPrunedBlock
-		if pending == nil {
-			t.Fatal("valid commitment did not start reconstruction")
-		}
-		pending.useGetBlockTx = singleTx
-		bad := *txs[0]
-		bad.TxWitness = []byte{99} // Same tx identity, different committed witness.
-		if singleTx {
-			pending.inFlight = maxPendingBlockTxRequests
-			pending.unrequested = msg.TransactionHashes[maxPendingBlockTxRequests:]
-			sm.handleBlockTxMsg(&blockTxMsg{result: wire.NewMsgBlockTx(hash, &bad), peer: p})
-		} else {
-			txs[0] = &bad
-			sm.handleNeedSetResultMsg(&needSetResultMsg{result: wire.NewMsgNeedSetResult(hash, txs), peer: p})
-		}
-		if sm.pendingPrunedBlock != nil || len(sm.requestedBlocks) != 0 || pending.unrequested != nil {
-			t.Fatal("wrong witness replenished requests or retained reconstruction")
-		}
-		select {
-		case <-p.Done():
-		default:
-			t.Fatal("wrong witness reached full-block validation instead of immediate rejection")
-		}
-		sm.Stop()
+	sm, p := testSyncManager(t)
+	txs := make([]*wire.MsgTxAbe, maxPendingBlockTxRequests+1)
+	for i := range txs {
+		txs[i] = wire.NewMsgTxAbe(wire.TxVersion_Height_0)
+		txs[i].TxMemo, txs[i].TxWitness = []byte{byte(i)}, []byte{1}
 	}
+	msg := testPrunedBlock(t, sm, txs...)
+	block := abeutil.NewPrunedBlockFromPrunedBlockAndBytesAbe(msg, nil)
+	hash := *block.Hash()
+	state := sm.peerStates[p]
+	state.requestedBlocks[hash], sm.requestedBlocks[hash] = struct{}{}, struct{}{}
+	sm.handlePrunedBlockMsgAbe(&prunedBlockMsg{block: block, peer: p})
+	pending := sm.pendingPrunedBlock
+	if pending == nil {
+		t.Fatal("valid commitment did not start reconstruction")
+	}
+	bad := *txs[0]
+	bad.TxWitness = []byte{99} // Same tx identity, different committed witness.
+	sm.handleBlockTxMsg(&blockTxMsg{result: wire.NewMsgBlockTx(hash, &bad), peer: p})
+	if sm.pendingPrunedBlock != nil || len(sm.requestedBlocks) != 0 || pending.unrequested != nil {
+		t.Fatal("wrong witness replenished requests or retained reconstruction")
+	}
+	select {
+	case <-p.Done():
+	default:
+		t.Fatal("wrong witness reached full-block validation instead of immediate rejection")
+	}
+	sm.Stop()
 }
