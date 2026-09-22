@@ -763,7 +763,7 @@ func (spentAutInstance *SpentAutInstance) SanityCheck() error {
 		// spentAutInstance.After.ActiveRootTokenSet should be a subset of spentAutInstance.Before.ActiveRootTokenSet
 		for _, rootTokenOp := range spentAutInstance.After.ActiveRootTokenSet {
 			if _, ok := spentAutInstance.Before.ActiveRootTokenSet[rootTokenOp.String()]; !ok {
-				return fmt.Errorf("AutScriptTypeMint: AutInsatnce %s, rootToken %s is in spentAutInstance.After.ActiveRootTokenSet but not in spentAutInstance.Before.ActiveRootTokenSet has commond %s",
+				return fmt.Errorf("AutScriptTypeMint: AutInsatnce %s, rootToken %s is in spentAutInstance.After.ActiveRootTokenSet but not in spentAutInstance.Before.ActiveRootTokenSet",
 					spentAutInstance.spendingScriptType.String(), rootTokenOp.String())
 			}
 		}
@@ -1253,8 +1253,8 @@ func (spentAutTokenList *SpentAutTokenList) ScriptMatchCheck(extAutScript *ctaut
 
 	for i, scriptInputOutPoint := range extAutScript.ConsumedHostOutpoints() {
 		if !spentAutTokens[i].HostOutPoint.IsEqual(scriptInputOutPoint) {
-			return fmt.Errorf("the HostOutPoint (%s) of spentAutTokenList.SpentAutTokens[%d] is differnet from extAutScript.ConsumedHostOutpoints[%d]",
-				spentAutTokens[i].HostOutPoint.String(), i, scriptInputOutPoint.String())
+			return fmt.Errorf("the HostOutPoint (%s) of spentAutTokenList.SpentAutTokens[%d] is different from extAutScript.ConsumedHostOutpoints[%d] (%s)",
+				spentAutTokens[i].HostOutPoint.String(), i, i, scriptInputOutPoint.String())
 		}
 	}
 

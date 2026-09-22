@@ -194,11 +194,10 @@ func TestPrunedBlockSupplementalWindow(t *testing.T) {
 	msg := &wire.MsgPrunedBlock{Header: chaincfg.MainNetParams.GenesisBlock.Header}
 	block := abeutil.NewPrunedBlockFromPrunedBlockAndBytesAbe(msg, nil)
 	pending := &pendingPrunedBlock{
-		hash:          *block.Hash(),
-		msg:           &prunedBlockMsg{block: block, peer: p},
-		transactions:  make(map[chainhash.Hash]*wire.MsgTxAbe),
-		missing:       make(map[chainhash.Hash]chainhash.Hash),
-		useGetBlockTx: true,
+		hash:         *block.Hash(),
+		msg:          &prunedBlockMsg{block: block, peer: p},
+		transactions: make(map[chainhash.Hash]*wire.MsgTxAbe),
+		missing:      make(map[chainhash.Hash]chainhash.Hash),
 	}
 	var first *wire.MsgTxAbe
 	for i := 0; i < 2*maxPendingBlockTxRequests; i++ {
@@ -266,7 +265,6 @@ func TestConcurrentPeerLifecycleAndSupplementalResponses(t *testing.T) {
 		defer wg.Done()
 		for i := 0; i < 100; i++ {
 			sm.QueueBlockTx(wire.NewMsgBlockTx(chainhash.Hash{}, nil), p)
-			sm.QueueNeedSetResult(wire.NewMsgNeedSetResult(chainhash.Hash{}, nil), p)
 		}
 	}()
 	wg.Wait()
@@ -274,58 +272,41 @@ func TestConcurrentPeerLifecycleAndSupplementalResponses(t *testing.T) {
 }
 
 func TestSupplementalResponsesCompleteBlock(t *testing.T) {
-	for _, singleTx := range []bool{false, true} {
-		name := "needset"
-		if singleTx {
-			name = "blocktx"
-		}
-		t.Run(name, func(t *testing.T) {
-			sm, p := testSyncManager(t)
-			tx1 := wire.NewMsgTxAbe(wire.TxVersion_Height_0)
-			tx1.TxWitness = []byte{2}
-			tx2 := wire.NewMsgTxAbe(wire.TxVersion_Height_0)
-			tx2.TxMemo, tx2.TxWitness = []byte{3}, []byte{4}
-			// The header is valid; full validation later rejects these empty
-			// transaction bodies after the supplemental responses arrive.
-			msg := testPrunedBlock(t, sm, tx1, tx2)
-			block := abeutil.NewPrunedBlockFromPrunedBlockAndBytesAbe(msg, nil)
-			hash := *block.Hash()
-			state := sm.peerStates[p]
-			state.requestedBlocks[hash], sm.requestedBlocks[hash] = struct{}{}, struct{}{}
-			done := make(chan struct{}, 1)
-			sm.handlePrunedBlockMsgAbe(&prunedBlockMsg{block: block, peer: p, reply: done})
-			if sm.pendingPrunedBlock == nil {
-				t.Fatal("valid header did not start supplemental reconstruction")
-			}
-			sm.pendingPrunedBlock.useGetBlockTx = singleTx
-			if singleTx {
-				sm.pendingPrunedBlock.inFlight = 2
-			}
-			sm.Start()
-			defer sm.Stop()
-			if singleTx {
-				// Responses may arrive in a different order from the block.
-				sm.QueueBlockTx(wire.NewMsgBlockTx(hash, tx2), p)
-				syncHandlerBarrier(t, sm)
-				select {
-				case <-done:
-					t.Fatal("partial response completed the block")
-				default:
-				}
-				sm.QueueBlockTx(wire.NewMsgBlockTx(hash, tx1), p)
-			} else {
-				sm.QueueNeedSetResult(wire.NewMsgNeedSetResult(hash, []*wire.MsgTxAbe{tx2, tx1}), p)
-			}
-			select {
-			case <-done:
-			case <-time.After(2 * time.Second):
-				t.Fatal("supplemental responses did not complete reconstruction")
-			}
-			sm.Stop()
-			if sm.pendingPrunedBlock != nil || len(state.requestedBlocks) != 0 || len(sm.requestedBlocks) != 0 {
-				t.Fatal("completed reconstruction retained request state")
-			}
-		})
+	sm, p := testSyncManager(t)
+	tx1 := wire.NewMsgTxAbe(wire.TxVersion_Height_0)
+	tx1.TxWitness = []byte{2}
+	tx2 := wire.NewMsgTxAbe(wire.TxVersion_Height_0)
+	tx2.TxMemo, tx2.TxWitness = []byte{3}, []byte{4}
+	// The header is valid; full validation later rejects these empty bodies.
+	msg := testPrunedBlock(t, sm, tx1, tx2)
+	block := abeutil.NewPrunedBlockFromPrunedBlockAndBytesAbe(msg, nil)
+	hash := *block.Hash()
+	state := sm.peerStates[p]
+	state.requestedBlocks[hash], sm.requestedBlocks[hash] = struct{}{}, struct{}{}
+	done := make(chan struct{}, 1)
+	sm.handlePrunedBlockMsgAbe(&prunedBlockMsg{block: block, peer: p, reply: done})
+	if sm.pendingPrunedBlock == nil || sm.pendingPrunedBlock.inFlight != 2 {
+		t.Fatal("valid header did not start single-transaction supplements")
+	}
+	sm.Start()
+	defer sm.Stop()
+	// Responses may arrive in a different order from the block.
+	sm.QueueBlockTx(wire.NewMsgBlockTx(hash, tx2), p)
+	syncHandlerBarrier(t, sm)
+	select {
+	case <-done:
+		t.Fatal("partial response completed the block")
+	default:
+	}
+	sm.QueueBlockTx(wire.NewMsgBlockTx(hash, tx1), p)
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("supplemental responses did not complete reconstruction")
+	}
+	sm.Stop()
+	if sm.pendingPrunedBlock != nil || len(state.requestedBlocks) != 0 || len(sm.requestedBlocks) != 0 {
+		t.Fatal("completed reconstruction retained request state")
 	}
 }
 
@@ -336,11 +317,11 @@ func TestUnrequestedNotFoundPreservesQueuedBlock(t *testing.T) {
 	for _, hash := range []chainhash.Hash{sent, queued} {
 		state.requestedBlocks[hash], sm.requestedBlocks[hash] = struct{}{}, struct{}{}
 	}
-	requests := wire.NewMessageRequests(nil)
+	requests := wire.NewMessageRequests()
 	defer requests.Close()
 	gd := wire.NewMsgGetData()
 	gd.AddInvVect(wire.NewInvVect(wire.InvTypeWitnessBlock, &sent))
-	requests.Add(gd) // The second block has not passed the peer's quota yet.
+	requests.Add(gd) // The second block is still queued and has not been sent.
 	nf := wire.NewMsgNotFound()
 	nf.AddInvVect(gd.InvList[0])
 	nf.AddInvVect(gd.InvList[0])

@@ -1,43 +1,48 @@
 package wire
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/pqabelian/abec/chainhash"
 )
 
-// requestedResponse records the response identity. A needset response is tied
-// to its block; reconstruction owns transaction-set and witness validation.
+// requestedResponse records the identity of an expected response.
 type requestedResponse struct {
-	hash       chainhash.Hash
-	txHash     chainhash.Hash
-	admittedAt time.Time
+	hash   chainhash.Hash
+	txHash chainhash.Hash
+	sentAt time.Time
 }
 
-// MessageRequests tracks responses expected from one peer. Its methods are safe
-// for concurrent use. The zero value tracks requests without a global limit.
+// MessageRequests tracks responses to local requests sent to one peer. It does
+// not govern requests received from that peer. Its zero value is ready to use,
+// and its methods are safe for concurrent use.
 type MessageRequests struct {
 	mu            sync.Mutex
 	pending       map[string][]requestedResponse
-	counter       *RequestCounter
-	reading       int
 	completedData uint64 // Matched getdata responses, excluding direct tx relay.
 	closed        bool
 }
 
-func NewMessageRequests(counter *RequestCounter) *MessageRequests {
-	return &MessageRequests{counter: counter}
+func NewMessageRequests() *MessageRequests {
+	return &MessageRequests{}
 }
 
-// Add registers a complete request before it is written. False means no credit
-// was added: the peer is closed or the shared counter cannot admit the request.
+// Add registers a local request before it is written. Outgoing responses and
+// other messages create no pending request. False means the tracker is closed
+// or the message tries to initiate a retired legacy needset request.
 func (r *MessageRequests) Add(msg Message) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.closed || msg.Command() == CmdNeedSet {
+		return false
+	}
 	pending := make(map[string][]requestedResponse)
 	switch msg := msg.(type) {
 	case *MsgGetData:
 		for _, iv := range msg.InvList {
-			if responsePayloadLimit(iv.Type.String()) != 0 {
+			if isGetDataRequest(iv.Type.String()) {
 				key := iv.Type.String()
 				pending[key] = append(pending[key], requestedResponse{hash: iv.Hash})
 			}
@@ -46,19 +51,9 @@ func (r *MessageRequests) Add(msg Message) bool {
 		pending[CmdGetHeaders] = []requestedResponse{{}}
 	case *MsgGetBlockTx:
 		pending[CmdGetBlockTx] = []requestedResponse{{hash: msg.BlockHash, txHash: msg.TxHash}}
-	case *MsgNeedSet:
-		pending[CmdNeedSet] = []requestedResponse{{hash: msg.BlockHash}}
 	}
-	var count, payloadBytes uint64
-	for key, requests := range pending {
-		count += uint64(len(requests))
-		payloadBytes += uint64(len(requests)) * responsePayloadLimit(key)
-	}
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.closed || !r.counter.reserve(count, payloadBytes) {
-		return false
+	if len(pending) == 0 {
+		return true
 	}
 	if r.pending == nil {
 		r.pending = make(map[string][]requestedResponse)
@@ -66,52 +61,11 @@ func (r *MessageRequests) Add(msg Message) bool {
 	now := time.Now()
 	for key, requests := range pending {
 		for i := range requests {
-			requests[i].admittedAt = now
+			requests[i].sentAt = now
 		}
 		r.pending[key] = append(r.pending[key], requests...)
 	}
 	return true
-}
-
-// ReserveNext admits as much of a getdata batch as fits. Other requests are
-// atomic. It returns the message to send and an optional unsent remainder.
-// A nil first result means capacity is unavailable; no request was registered.
-func (r *MessageRequests) ReserveNext(msg Message) (Message, Message) {
-	gd, ok := msg.(*MsgGetData)
-	if !ok || len(gd.InvList) == 0 {
-		if r.Add(msg) {
-			return msg, nil
-		}
-		return nil, msg
-	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.closed {
-		return nil, msg
-	}
-	if r.pending == nil {
-		r.pending = make(map[string][]requestedResponse)
-	}
-	now := time.Now()
-	n := 0
-	for _, iv := range gd.InvList {
-		key := iv.Type.String()
-		payloadLimit := responsePayloadLimit(key)
-		if payloadLimit != 0 {
-			if !r.counter.reserve(1, payloadLimit) {
-				break
-			}
-			r.pending[key] = append(r.pending[key], requestedResponse{hash: iv.Hash, admittedAt: now})
-		}
-		n++
-	}
-	if n == 0 {
-		return nil, msg
-	}
-	if n == len(gd.InvList) {
-		return msg, nil
-	}
-	return &MsgGetData{InvList: gd.InvList[:n]}, &MsgGetData{InvList: gd.InvList[n:]}
 }
 
 func responseRequestKeys(command string) []string {
@@ -127,45 +81,38 @@ func responseRequestKeys(command string) []string {
 	case CmdBlockTx:
 		return []string{CmdGetBlockTx}
 	case CmdNeedSetResult:
+		// Add never accepts needset requests, so legacy results always lack
+		// a pending entry and are rejected before their payload is read.
 		return []string{CmdNeedSet}
 	}
 	return nil
 }
 
-// begin validates the message type before allocation without consuming an
-// unidentified request. The peer has one reader; Close waits for it to finish.
-func (r *MessageRequests) begin(command string) (uint64, error) {
+// begin checks that an incoming response has a pending local request before
+// reading its payload. Incoming requests and direct transaction relay are not
+// responses to local requests and do not require a pending entry.
+func (r *MessageRequests) begin(command string) error {
 	if r == nil {
-		return 0, nil
+		return nil
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.closed {
-		return 0, messageError("ReadMessage", "request tracker closed")
+		return messageError("ReadMessage", "request tracker closed")
 	}
 	keys := responseRequestKeys(command)
-	allowed := len(keys) == 0
+	if len(keys) == 0 || command == CmdTx {
+		return nil
+	}
 	for _, key := range keys {
-		allowed = allowed || len(r.pending[key]) > 0
-	}
-	var relayLimit uint64
-	if !allowed && command == CmdTx {
-		// Direct transaction relay is supported. Without an expected tx
-		// response to cover the read, acquire a temporary protocol-max charge.
-		relayLimit = responsePayloadLimit(InvTypeTx.String())
-		if !r.counter.reserve(1, relayLimit) {
-			return 0, ErrResponseLimit
+		if len(r.pending[key]) > 0 {
+			return nil
 		}
-		allowed = true
 	}
-	if !allowed {
-		return 0, messageError("ReadMessage", "unexpected message "+command)
-	}
-	r.reading++
-	return relayLimit, nil
+	return fmt.Errorf("%w: %s", ErrUnrequestedResponse, command)
 }
 
-// complete returns credit only for an exact decoded response identity.
+// complete removes a pending request only for an exact decoded response identity.
 func (r *MessageRequests) complete(msg Message) error {
 	if r == nil {
 		return nil
@@ -196,8 +143,8 @@ func (r *MessageRequests) complete(msg Message) error {
 		return nil
 	}
 	if msg.Command() == CmdTx {
-		// An independently relayed transaction cannot spend another hash's
-		// credit, but still follows the normal transaction validation path.
+		// An independently relayed transaction cannot complete another hash's
+		// request, but still follows the normal transaction validation path.
 		return nil
 	}
 	return messageError("ReadMessage", "unrequested response "+msg.Command())
@@ -206,16 +153,15 @@ func (r *MessageRequests) complete(msg Message) error {
 // oldestMatch requires r.mu. Identical or base/witness-equivalent responses
 // complete the oldest matching request so duplicates cannot cause early expiry.
 func (r *MessageRequests) oldestMatch(keys []string, hash, txHash chainhash.Hash) (string, int) {
-	// ponytail: scan the admitted window; use a hash index if large configured
-	// windows make matching costly. The default admits at most 16 tx requests.
+	// Match the oldest request across equivalent base/witness response types.
 	var matchedKey string
 	index := -1
 	var oldest time.Time
 	for _, key := range keys {
 		for i, request := range r.pending[key] {
 			if request.hash == hash && request.txHash == txHash &&
-				(index < 0 || request.admittedAt.Before(oldest)) {
-				matchedKey, index, oldest = key, i, request.admittedAt
+				(index < 0 || request.sentAt.Before(oldest)) {
+				matchedKey, index, oldest = key, i, request.sentAt
 			}
 		}
 	}
@@ -234,7 +180,6 @@ func (r *MessageRequests) remove(key string, i int) {
 	} else {
 		r.pending[key] = requests[:last]
 	}
-	r.counter.release(1, responsePayloadLimit(key))
 	if isGetDataRequest(key) {
 		r.completedData++
 	}
@@ -262,14 +207,14 @@ func (r *MessageRequests) GetDataStatus() (pending int, completed uint64) {
 	return pending, r.completedData
 }
 
-// Expired reports whether any admitted request has reached the age cutoff.
-// Other responses and requests still waiting for credit cannot change its age.
+// Expired reports whether any sent request has reached the age cutoff.
+// Other responses cannot change its age.
 func (r *MessageRequests) Expired(cutoff time.Time) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for _, requests := range r.pending {
 		for _, request := range requests {
-			if !request.admittedAt.After(cutoff) {
+			if !request.sentAt.After(cutoff) {
 				return true
 			}
 		}
@@ -302,23 +247,7 @@ func (r *MessageRequests) notFound(msg *MsgNotFound) error {
 	return nil
 }
 
-func (r *MessageRequests) end(relayLimit uint64) {
-	if r == nil {
-		return
-	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if relayLimit != 0 {
-		r.counter.release(1, relayLimit)
-	}
-	r.reading--
-	if r.closed && r.reading == 0 {
-		r.releaseAll()
-	}
-}
-
-// Close returns unanswered requests once any active read has exited. Read
-// failures leave identities intact until the connection owner calls Close.
+// Close discards unanswered requests and prevents further registration.
 func (r *MessageRequests) Close() {
 	if r == nil {
 		return
@@ -326,18 +255,5 @@ func (r *MessageRequests) Close() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.closed = true
-	if r.reading == 0 {
-		r.releaseAll()
-	}
-}
-
-// releaseAll requires r.mu.
-func (r *MessageRequests) releaseAll() {
-	var count, payloadBytes uint64
-	for key, requests := range r.pending {
-		count += uint64(len(requests))
-		payloadBytes += uint64(len(requests)) * responsePayloadLimit(key)
-	}
 	clear(r.pending)
-	r.counter.release(count, payloadBytes)
 }

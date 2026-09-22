@@ -78,8 +78,7 @@ func TestGetDataDeadlineRequiresMatchedProgress(t *testing.T) {
 
 func TestMatchingProgressCannotKeepOldRequestAlive(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		counter := wire.NewRequestCounter(512 * 1024 * 1024)
-		p, remote := counterMessagePeer(t, counter)
+		p, remote := connectedMessagePeer(t)
 		if err := remote.SetDeadline(time.Time{}); err != nil {
 			t.Fatal(err)
 		}
@@ -88,13 +87,13 @@ func TestMatchingProgressCannotKeepOldRequestAlive(t *testing.T) {
 		go func() { p.stallHandler(); close(stallDone) }()
 		t.Cleanup(func() { p.Disconnect(); <-p.inQuit; <-stallDone })
 		p.QueueMessage(requestTransactions(1), nil)
-		expectCounterMessage(t, remote, wire.CmdGetData) // Never answer this one.
+		expectPeerMessage(t, remote, wire.CmdGetData) // Never answer this one.
 		for i := 1; i < int(idleTimeout/stallTickInterval); i++ {
 			time.Sleep(stallTickInterval)
 			request := wire.NewMsgGetData()
 			request.AddInvVect(wire.NewInvVect(wire.InvTypeTx, &chainhash.Hash{byte(i)}))
 			p.QueueMessage(request, nil)
-			expectCounterMessage(t, remote, wire.CmdGetData)
+			expectPeerMessage(t, remote, wire.CmdGetData)
 			nf := wire.NewMsgNotFound()
 			nf.AddInvVect(request.InvList[0])
 			if err := wire.WriteMessage(remote, nf, wire.ProtocolVersion, wire.MainNet); err != nil {
@@ -109,8 +108,8 @@ func TestMatchingProgressCannotKeepOldRequestAlive(t *testing.T) {
 		default:
 			t.Fatal("responses to newer requests postponed the oldest request indefinitely")
 		}
-		if count, size := counter.Usage(); count != 0 || size != 0 {
-			t.Fatalf("expiry retained global request credit: %d, %d", count, size)
+		if p.pendingRequest.Expired(time.Now()) {
+			t.Fatal("expiry retained pending requests")
 		}
 	})
 }
