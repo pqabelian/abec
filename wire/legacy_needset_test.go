@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 func TestLegacyNeedSetIsServeOnly(t *testing.T) {

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 func dataRequest(typ wire.InvType, count int) *wire.MsgGetData {

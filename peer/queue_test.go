@@ -5,8 +5,8 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 func TestKnownInventoryUsesValueKeys(t *testing.T) {

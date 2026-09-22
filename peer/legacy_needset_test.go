@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/abesuite/abec/chaincfg"
-	"github.com/abesuite/abec/chainhash"
-	"github.com/abesuite/abec/wire"
+	"github.com/pqabelian/abec/chaincfg"
+	"github.com/pqabelian/abec/chainhash"
+	"github.com/pqabelian/abec/wire"
 )
 
 func TestUseGetBlockTxVersion(t *testing.T) {
