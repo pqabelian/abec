@@ -4,7 +4,6 @@ go 1.26.0
 
 require (
 	github.com/abesuite/go-socks v0.0.0-20170105172521-4720035b7bfd
-	github.com/abesuite/go-spew v1.1.1
 	github.com/aead/siphash v1.0.1
 	github.com/decred/dcrd/lru v1.0.0
 	github.com/edsrzf/mmap-go v1.2.0

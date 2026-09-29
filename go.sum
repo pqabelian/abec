@@ -1,7 +1,5 @@
 github.com/abesuite/go-socks v0.0.0-20170105172521-4720035b7bfd h1:BNI2MkhhtofxM0sTP8WmdcT4chaAKZOsyhspB58DSrM=
 github.com/abesuite/go-socks v0.0.0-20170105172521-4720035b7bfd/go.mod h1:eo8+6JwPaqdnrzzGmGXEH3nOYknOkk8GtuXw7Bo+f08=
-github.com/abesuite/go-spew v1.1.1 h1:8v1IQu/pRuElOpgwrBLmtxsSTEEK+fCBBOw4VYE9fx8=
-github.com/abesuite/go-spew v1.1.1/go.mod h1:hLFuB0AyzUx1yB66EbNZcsinwdgIV6/WUECUEhEy3M8=
 github.com/aead/siphash v1.0.1 h1:FwHfE/T45KPKYuuSAKyyvE+oPWcaQ+CUmFW0bPlM+kg=
 github.com/aead/siphash v1.0.1/go.mod h1:Nywa3cDsYNNK3gaciGTWPwHt0wlpNV15vwmswBAUSII=
 github.com/cryptosuite/kyber-go v0.0.2-beta h1:dC77sRR2EgjWVDIfRuKI5ZhYUNUAQiHEOFX4qnK5bws=
@@ -51,14 +49,8 @@ github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRI
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c h1:ncq/mPwQF4JjgDlrVEn3C11VoGHZN7m8qihwgMEtzYw=
 github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c/go.mod h1:OmDBASR4679mdNQnz2pUhc2G8CO2JrUAVFDRBDP/hJE=
-github.com/pqabelian/pqringct v0.0.0-20260914061053-72ded1bc38de h1:6p6ryo26lDpTgx1poyRkzX/tYK33JNvkTOMeBNPKyx8=
-github.com/pqabelian/pqringct v0.0.0-20260914061053-72ded1bc38de/go.mod h1:+WellsF92RFs+FVXEOAfKxFOrB/eV2PRDi/tVh68MzQ=
-github.com/pqabelian/pqringct v0.0.0-20260914090259-615d67c71bc4 h1:3SScdx7oyuJXiTe5xeNTyQpaMV9IQVBxqahAjgkRFQw=
-github.com/pqabelian/pqringct v0.0.0-20260914090259-615d67c71bc4/go.mod h1:+WellsF92RFs+FVXEOAfKxFOrB/eV2PRDi/tVh68MzQ=
 github.com/pqabelian/pqringct v0.0.0-20260915093516-6b50482b26a5 h1:N8zKkekV+dPcc/rtbFT83RLM53BgFOB7GCRT9Phe5aI=
 github.com/pqabelian/pqringct v0.0.0-20260915093516-6b50482b26a5/go.mod h1:+WellsF92RFs+FVXEOAfKxFOrB/eV2PRDi/tVh68MzQ=
-github.com/pqabelian/pqringctx v0.0.0-20260914052803-b5517c868411 h1:V9kDLX/MfCs8yov0Lw+Jk1lk4d8EGRHOxcIr2OtLwRs=
-github.com/pqabelian/pqringctx v0.0.0-20260914052803-b5517c868411/go.mod h1:7eA2mzIIbxe69ewB6sBfLrSXAU8bEqw5CzLqvIcF2Vc=
 github.com/pqabelian/pqringctx v0.0.0-20260915093609-d526987fdaa5 h1:2ruNuR3+eG0uHoWhl+gaKXUfQMwTGo/KXqBYBE9kdmw=
 github.com/pqabelian/pqringctx v0.0.0-20260915093609-d526987fdaa5/go.mod h1:7eA2mzIIbxe69ewB6sBfLrSXAU8bEqw5CzLqvIcF2Vc=
 github.com/shirou/gopsutil/v3 v3.23.7 h1:C+fHO8hfIppoJ1WdsVm1RoI0RwXoNdfTK7yWXV0wVj4=
