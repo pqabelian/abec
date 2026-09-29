@@ -53,6 +53,10 @@ func (msg *MsgInv) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) erro
 		return messageError("MsgInv.BtcDecode", str)
 	}
 
+	if err := checkDecodeSize(r, count, maxInvVectPayload); err != nil {
+		return err
+	}
+
 	// Create a contiguous slice of inventory vectors to deserialize into in
 	// order to reduce the number of allocations.
 	invList := make([]InvVect, count)

@@ -45,6 +45,10 @@ func (msg *MsgHeaders) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) 
 		return messageError("MsgHeaders.BtcDecode", str)
 	}
 
+	if err := checkDecodeSize(r, count, blockHeaderSizeInit+1); err != nil {
+		return err
+	}
+
 	// Create a contiguous slice of headers to deserialize into in order to
 	// reduce the number of allocations.
 	headers := make([]BlockHeader, count)

@@ -536,67 +536,45 @@ func (sp *serverPeer) OnPrunedBlock(p *peer.Peer, msg *wire.MsgPrunedBlock, buf 
 	// Convert the raw MsgBlock to a abeutil.Block which provides some
 	// convenience methods and things such as hash caching.
 	//block := abeutil.NewBlockFromBlockAndBytesAbe(msg, buf) // TODO(abe): the height of block is unknown
-	prunedBlock := abeutil.NewPrunedBlockFromPrunedBlockAndBytesAbe(msg, buf)
+	prunedBlock := abeutil.NewPrunedBlockFromPrunedBlockAndBytesAbe(msg, nil)
 	blockHash := msg.BlockHash()
 	// Add the block to the known inventory for the peer.
 	iv := wire.NewInvVect(wire.InvTypePrunedBlock, &blockHash)
 	sp.AddKnownInventory(iv)
 
-	// Queue the block up to be handled by the block
-	// manager and intentionally block further receives
-	// until the block is fully processed and known
-	// good or bad.  This helps prevent a malicious peer
-	// from queuing up a bunch of bad blocks before
-	// disconnecting (or being disconnected) and wasting
-	// memory.  Additionally, this behavior is depended on
-	// by at least the block acceptance test tool as the
-	// reference implementation processes blocks in the same
-	// thread and therefore blocks further messages until
-	// the block has been fully processed.
-	sp.server.syncManager.QueuePrunedBlock(prunedBlock, sp.Peer, nil)
+	// Leave the input handler free to receive supplemental transactions
+	// while the sync manager reconstructs the block.
+	<-sp.server.syncManager.QueuePrunedBlock(prunedBlock, sp.Peer, nil)
 }
 
 func (sp *serverPeer) OnNeedSet(_ *peer.Peer, msg *wire.MsgNeedSet, buf []byte) {
+	if !sp.canServeData() {
+		return
+	}
 	// Convert the raw MsgBlock to a abeutil.Block which provides some
 	// convenience methods and things such as hash caching.
 	err := sp.server.pushNeedSetResultMsg(sp, msg.BlockHash, msg.Hashes, wire.WitnessEncoding)
 	if err != nil {
-		// do nothing
+		peerLog.Errorf("Get error during processing needset message: %s", err)
+		return
 	}
 }
 
-func (sp *serverPeer) OnNeedSetResult(p *peer.Peer, msg *wire.MsgNeedSetResult, buf []byte) {
-	peerExist, reqExist := sp.server.syncManager.ExistRequestedNeedSetInPeerStates(p, msg.BlockHash)
-	if !peerExist {
-		peerLog.Warnf("Received pruned block message from unknown peer %s", p)
+func (sp *serverPeer) OnGetBlockTx(_ *peer.Peer, msg *wire.MsgGetBlockTx, buf []byte) {
+	if !sp.canServeData() {
 		return
 	}
-
-	// If we didn't ask for this needset then the peer is misbehaving.
-	if !reqExist {
-		// Disconnect with the misbehaving peer
-		peerLog.Warnf("Got unrequested needset %v from %s -- "+
-			"disconnecting", msg.BlockHash, p.Addr())
-		p.Disconnect()
+	// Convert the raw MsgBlock to a abeutil.Block which provides some
+	// convenience methods and things such as hash caching.
+	err := sp.server.pushBlockTxMsg(sp, msg.BlockHash, msg.TxHash, wire.WitnessEncoding)
+	if err != nil {
+		peerLog.Errorf("Get error during processing getblocktx message: %s", err)
 		return
 	}
+}
 
-	defer func() {
-		p.StoreNeedSetResult(msg)
-		sp.server.syncManager.RemoveRequestedNeedSetInPeerStates(p, msg.BlockHash)
-	}()
-
-	// check witness in response
-	for i := 0; i < len(msg.Txs); i++ {
-		if !msg.Txs[i].HasTxWitness() {
-			peerLog.Warnf("Got needset %v from %s, but some transaction in response does not has witness -- "+
-				"disconnecting", msg.BlockHash, p.Addr())
-			p.Disconnect()
-			p.StoreNeedSetResult(nil)
-			return
-		}
-	}
-
+func (sp *serverPeer) OnBlockTx(p *peer.Peer, msg *wire.MsgBlockTx, buf []byte) {
+	<-sp.server.syncManager.QueueBlockTx(msg, p)
 }
 
 // OnInv is invoked when a peer receives an inv message and is
@@ -612,7 +590,7 @@ func (sp *serverPeer) OnInv(p *peer.Peer, msg *wire.MsgInv) {
 
 	if !cfg.BlocksOnly {
 		if len(msg.InvList) > 0 {
-			sp.server.syncManager.QueueInv(msg, sp.Peer)
+			<-sp.server.syncManager.QueueInv(msg, sp.Peer)
 		}
 		return
 	}
@@ -638,20 +616,34 @@ func (sp *serverPeer) OnInv(p *peer.Peer, msg *wire.MsgInv) {
 	}
 
 	if len(newInv.InvList) > 0 {
-		sp.server.syncManager.QueueInv(newInv, sp.Peer)
+		<-sp.server.syncManager.QueueInv(newInv, sp.Peer)
 	}
 }
 
 // OnHeaders is invoked when a peer receives a headers
 // message.  The message is passed down to the sync manager.
 func (sp *serverPeer) OnHeaders(_ *peer.Peer, msg *wire.MsgHeaders) {
-	sp.server.syncManager.QueueHeaders(msg, sp.Peer)
+	<-sp.server.syncManager.QueueHeaders(msg, sp.Peer)
+}
+
+// canServeData stops new database work once the connection or server shuts down.
+func (sp *serverPeer) canServeData() bool {
+	select {
+	case <-sp.Done():
+		return false
+	case <-sp.server.quit:
+		return false
+	default:
+		return true
+	}
 }
 
 // OnGetData is invoked when a peer receives a getdata message and
 // is used to deliver block and transaction information.
 func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
-	numAdded := 0
+	if len(msg.InvList) == 0 {
+		return
+	}
 	notFound := wire.NewMsgNotFound()
 
 	length := len(msg.InvList)
@@ -666,34 +658,24 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 		return
 	}
 
-	// We wait on this wait channel periodically to prevent queuing
-	// far more data than we can send in a reasonable time, wasting memory.
-	// The waiting occurs after the database fetch for the next one to
-	// provide a little pipelining.
-	var waitChan chan struct{}
-	doneChan := make(chan struct{}, 1)
-
+	// Finish each response before fetching the next block.
 	for i, iv := range msg.InvList {
-		var c chan struct{}
-		// If this will be the last message we send.
-		if i == length-1 && len(notFound.InvList) == 0 {
-			c = doneChan
-		} else if (i+1)%3 == 0 {
-			// Buffered so as to not make the send goroutine block.
-			c = make(chan struct{}, 1)
+		if !sp.canServeData() {
+			return
 		}
+		c := make(chan struct{}, 1)
 		var err error
 		switch iv.Type {
 		case wire.InvTypeWitnessTx:
-			err = sp.server.pushTxMsg(sp, &iv.Hash, c, waitChan, wire.WitnessEncoding)
+			err = sp.server.pushTxMsg(sp, &iv.Hash, c, wire.WitnessEncoding)
 		case wire.InvTypeTx:
-			err = sp.server.pushTxMsg(sp, &iv.Hash, c, waitChan, wire.BaseEncoding)
+			err = sp.server.pushTxMsg(sp, &iv.Hash, c, wire.BaseEncoding)
 		case wire.InvTypeWitnessBlock:
-			err = sp.server.pushBlockMsgAbe(sp, &iv.Hash, c, waitChan, wire.WitnessEncoding)
+			err = sp.server.pushBlockMsgAbe(sp, &iv.Hash, c, wire.WitnessEncoding)
 		case wire.InvTypeBlock:
-			err = sp.server.pushBlockMsgAbe(sp, &iv.Hash, c, waitChan, wire.BaseEncoding)
+			err = sp.server.pushBlockMsgAbe(sp, &iv.Hash, c, wire.BaseEncoding)
 		case wire.InvTypePrunedBlock:
-			err = sp.server.pushPrunedBlockMsg(sp, &iv.Hash, c, waitChan, wire.WitnessEncoding)
+			err = sp.server.pushPrunedBlockMsg(sp, &iv.Hash, c, wire.WitnessEncoding)
 		default:
 			peerLog.Warnf("Unknown type in inventory request %d",
 				iv.Type)
@@ -709,29 +691,14 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 				break
 			}
 
-			// When there is a failure fetching the final entry
-			// and the done channel was sent in due to there
-			// being no outstanding not found inventory, consume
-			// it here because there is now not found inventory
-			// that will use the channel momentarily.
-			if i == len(msg.InvList)-1 && c != nil {
-				<-c
-			}
+			continue
 		}
-		numAdded++
-		waitChan = c
+		<-c
 	}
 	if len(notFound.InvList) != 0 {
-		sp.QueueMessage(notFound, doneChan)
-	}
-
-	// Wait for messages to be sent. We can send quite a lot of data at this
-	// point and this will keep the peer busy for a decent amount of time.
-	// We don't process anything else by them in this time so that we
-	// have an idea of when we should hear back from them - else the idle
-	// timeout could fire when we were only half done sending the blocks.
-	if numAdded > 0 {
-		<-doneChan
+		done := make(chan struct{}, 1)
+		sp.QueueMessage(notFound, done)
+		<-done
 	}
 }
 
@@ -817,17 +784,17 @@ func (sp *serverPeer) OnGetHeaders(_ *peer.Peer, msg *wire.MsgGetHeaders) {
 // is used by remote peers to request that no transactions which have a fee rate
 // lower than provided value are inventoried to them.  The peer will be
 // disconnected if an invalid fee filter value is provided.
-func (sp *serverPeer) OnFeeFilter(_ *peer.Peer, msg *wire.MsgFeeFilter) {
-	// Check that the passed minimum fee is a valid amount.
-	if msg.MinFee < 0 || msg.MinFee > int64(abeutil.MaxNeutrino) {
-		peerLog.Debugf("Peer %v sent an invalid feefilter '%v' -- "+
-			"disconnecting", sp, abeutil.Amount(msg.MinFee))
-		sp.Disconnect()
-		return
-	}
-
-	atomic.StoreInt64(&sp.feeFilter, msg.MinFee)
-}
+//func (sp *serverPeer) OnFeeFilter(_ *peer.Peer, msg *wire.MsgFeeFilter) {
+//	// Check that the passed minimum fee is a valid amount.
+//	if msg.MinFee < 0 || msg.MinFee > int64(abeutil.MaxNeutrino) {
+//		peerLog.Debugf("Peer %v sent an invalid feefilter '%v' -- "+
+//			"disconnecting", sp, abeutil.Amount(msg.MinFee))
+//		sp.Disconnect()
+//		return
+//	}
+//
+//	atomic.StoreInt64(&sp.feeFilter, msg.MinFee)
+//}
 
 // OnGetAddr is invoked when a peer receives a getaddr Abelian message
 // and is used to provide the peer with known addresses from the address
@@ -931,7 +898,7 @@ func (sp *serverPeer) OnNotFound(p *peer.Peer, msg *wire.MsgNotFound) {
 	var numBlocks, numTxns uint32
 	for _, inv := range msg.InvList {
 		switch inv.Type {
-		case wire.InvTypeBlock:
+		case wire.InvTypeBlock, wire.InvTypePrunedBlock:
 			numBlocks++
 		case wire.InvTypeWitnessBlock:
 			numBlocks++
@@ -964,7 +931,7 @@ func (sp *serverPeer) OnNotFound(p *peer.Peer, msg *wire.MsgNotFound) {
 		}
 	}
 
-	sp.server.syncManager.QueueNotFound(msg, p)
+	<-sp.server.syncManager.QueueNotFound(msg, p)
 }
 
 // randomUint16Number returns a random uint16 in a specified input range.  Note
@@ -1054,7 +1021,7 @@ func (s *server) TransactionConfirmed(tx *abeutil.TxAbe) {
 // pushTxMsg sends a tx message for the provided transaction hash to the
 // connected peer.  An error is returned if the transaction hash is not known.
 func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
-	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
+	encoding wire.MessageEncoding) error {
 
 	var msg wire.Message
 	msgCacheKey := fmt.Sprintf("tx_%s_%d", hash, encoding)
@@ -1091,11 +1058,6 @@ func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<-
 		msg = wrappedTxMsg
 	}
 
-	// Once we have fetched data wait for any previous operation to finish.
-	if waitChan != nil {
-		<-waitChan
-	}
-
 	sp.QueueMessageWithEncoding(msg, doneChan, encoding)
 
 	return nil
@@ -1109,19 +1071,57 @@ func (s *server) pushNeedSetResultMsg(sp *serverPeer, blockHash chainhash.Hash,
 		sp.PushRejectMsg(wire.CmdNeedSet, wire.RejectInvalid, "invalid block hash", &blockHash, false)
 		return err
 	}
-	originTxs := block.Transactions()
+	txsInBlock := block.Transactions()
 	txhashMap := make(map[chainhash.Hash]*abeutil.TxAbe)
-	for i := 0; i < len(originTxs); i++ {
-		txhash := originTxs[i].Hash()
-		txhashMap[*txhash] = originTxs[i]
+	for i := 0; i < len(txsInBlock); i++ {
+		txhash := txsInBlock[i].Hash()
+		txhashMap[*txhash] = txsInBlock[i]
 	}
+
 	rtxs := make([]*wire.MsgTxAbe, len(txHashes))
-	for i, txhash := range txHashes {
-		rtxs[i] = txhashMap[txhash].MsgTx()
+	for i, txHash := range txHashes {
+		txAbe, exist := txhashMap[txHash]
+		if !exist {
+			sp.PushRejectMsg(wire.CmdNeedSet, wire.RejectInvalid, "invalid transaction hash", &blockHash, false)
+			return fmt.Errorf("non-existent transaction %d in block %s is requested", txHash, blockHash)
+		}
+		rtxs[i] = txAbe.MsgTx()
 	}
 	resMsg := wire.NewMsgNeedSetResult(blockHash, rtxs)
 
-	sp.QueueMessageWithEncoding(resMsg, nil, encoding)
+	done := make(chan struct{}, 1)
+	sp.QueueMessageWithEncoding(resMsg, done, encoding)
+	<-done
+	//sp.QueueMessageWithEncoding(block.MsgBlock(), doneChan, encoding)
+	//sp.PushRejectMsg(wire.CmdNeedSet, wire.RejectInvalid, "invalid block hash", &blockHash, false)
+
+	return nil
+}
+
+func (s *server) pushBlockTxMsg(sp *serverPeer, blockHash chainhash.Hash,
+	txHash chainhash.Hash, encoding wire.MessageEncoding) error {
+
+	block, err := sp.server.chain.BlockByHashAbe(&blockHash)
+	if err != nil {
+		sp.PushRejectMsg(wire.CmdBlockTx, wire.RejectInvalid, "invalid block hash", &blockHash, false)
+		return err
+	}
+	originTxs := block.Transactions()
+	txMap := make(map[chainhash.Hash]*abeutil.TxAbe)
+	for i := 0; i < len(originTxs); i++ {
+		txhash := originTxs[i].Hash()
+		txMap[*txhash] = originTxs[i]
+	}
+
+	txAbe, exist := txMap[txHash]
+	if !exist {
+		sp.PushRejectMsg(wire.CmdBlockTx, wire.RejectInvalid, "invalid tx hash", &txHash, false)
+		return fmt.Errorf("non-existent transaction %d in block %s is requested", txHash, blockHash)
+	}
+	resMsg := wire.NewMsgBlockTx(blockHash, txAbe.MsgTx())
+	done := make(chan struct{}, 1)
+	sp.QueueMessageWithEncoding(resMsg, done, encoding)
+	<-done
 	//sp.QueueMessageWithEncoding(block.MsgBlock(), doneChan, encoding)
 	//sp.PushRejectMsg(wire.CmdNeedSet, wire.RejectInvalid, "invalid block hash", &blockHash, false)
 
@@ -1203,7 +1203,7 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan cha
 
 // server.cache wire.Message + []byte
 func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
-	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
+	encoding wire.MessageEncoding) error {
 	var msg wire.Message
 	msgCacheKey := fmt.Sprintf("block_%s_%d", hash, encoding)
 	value, ok := s.communicationCache.Load(msgCacheKey)
@@ -1265,10 +1265,6 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 
 		if encoding == wire.WitnessEncoding && !msgBlock.HasWitness() {
 			peerLog.Debugf("Peer %v request witness block %v but we do not have witness", sp, hash.String())
-			// Once we have fetched data wait for any previous operation to finish.
-			if waitChan != nil {
-				<-waitChan
-			}
 			return errors.New("witness block not found")
 		}
 
@@ -1276,11 +1272,6 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 		s.communicationCache.Store(msgCacheKey, wrappedBlockMsg)
 		wrappedBlockMsg.Use()
 		msg = wrappedBlockMsg
-	}
-
-	// Once we have fetched data wait for any previous operation to finish.
-	if waitChan != nil {
-		<-waitChan
 	}
 
 	// We only send the channel for this message if we aren't sending
@@ -1315,7 +1306,7 @@ func (s *server) pushBlockMsgAbe(sp *serverPeer, hash *chainhash.Hash, doneChan 
 }
 
 func (s *server) pushPrunedBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
-	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
+	encoding wire.MessageEncoding) error {
 
 	// Fetch the raw block bytes from the database.
 	var blockBytes []byte
@@ -1376,11 +1367,6 @@ func (s *server) pushPrunedBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneCh
 		return err
 	}
 
-	// Once we have fetched data wait for any previous operation to finish.
-	if waitChan != nil {
-		<-waitChan
-	}
-
 	// We only send the channel for this message if we aren't sending
 	// an inv straight after.
 	//	todo(ABE): ?
@@ -1395,6 +1381,13 @@ func (s *server) pushPrunedBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneCh
 	}
 	//	todo (ABE): as the block is fetched from database, the witness may not be included. If so, regardless of encoding, no witness is provided.
 	sp.QueueMessageWithEncoding(msgPrunedBlock, dc, encoding)
+	if sendInv {
+		best := sp.server.chain.BestSnapshot()
+		invMsg := wire.NewMsgInvSizeHint(1)
+		invMsg.AddInvVect(wire.NewInvVect(wire.InvTypeWitnessBlock, &best.Hash))
+		sp.QueueMessage(invMsg, doneChan)
+		sp.continueHash = nil
+	}
 
 	return nil
 }
@@ -1839,30 +1832,31 @@ func disconnectPeer(peerList map[int32]*serverPeer, compareFunc func(*serverPeer
 func newPeerConfig(sp *serverPeer) *peer.Config {
 	return &peer.Config{
 		Listeners: peer.MessageListeners{
-			OnVersion:       sp.OnVersion,
-			OnVerAck:        sp.OnVerAck,
-			OnTx:            sp.OnTx,
-			OnBlock:         sp.OnBlock,
-			OnPrunedBlock:   sp.OnPrunedBlock,
-			OnNeedSet:       sp.OnNeedSet,
-			OnNeedSetResult: sp.OnNeedSetResult,
-			OnInv:           sp.OnInv,
-			OnHeaders:       sp.OnHeaders,
-			OnGetData:       sp.OnGetData,
-			OnGetBlocks:     sp.OnGetBlocks,
-			OnGetHeaders:    sp.OnGetHeaders,
-			OnFeeFilter:     sp.OnFeeFilter,
-			OnGetAddr:       sp.OnGetAddr,
-			OnAddr:          sp.OnAddr,
-			OnRead:          sp.OnRead,
-			OnWrite:         sp.OnWrite,
-			OnNotFound:      sp.OnNotFound,
+			OnVersion:     sp.OnVersion,
+			OnVerAck:      sp.OnVerAck,
+			OnTx:          sp.OnTx,
+			OnBlock:       sp.OnBlock,
+			OnPrunedBlock: sp.OnPrunedBlock,
+			OnNeedSet:     sp.OnNeedSet,
+			OnGetBlockTx:  sp.OnGetBlockTx,
+			OnBlockTx:     sp.OnBlockTx,
+			OnInv:         sp.OnInv,
+			OnHeaders:     sp.OnHeaders,
+			OnGetData:     sp.OnGetData,
+			OnGetBlocks:   sp.OnGetBlocks,
+			OnGetHeaders:  sp.OnGetHeaders,
+			//OnFeeFilter:     sp.OnFeeFilter,
+			OnGetAddr:  sp.OnGetAddr,
+			OnAddr:     sp.OnAddr,
+			OnRead:     sp.OnRead,
+			OnWrite:    sp.OnWrite,
+			OnNotFound: sp.OnNotFound,
 
 			// Note: The reference client currently bans peers that send alerts
 			// not signed with its key.  We could verify against their key, but
 			// since the reference client is currently unwilling to support
 			// other implementations' alert messages, we will not relay theirs.
-			OnAlert: nil,
+			//OnAlert: nil,
 		},
 		NewestBlock:        sp.newestBlock,
 		HostToNetAddress:   sp.server.addrManager.HostToNetAddress,
@@ -2479,6 +2473,31 @@ func setupRPCListeners() ([]net.Listener, error) {
 // addresses.
 func setupRPCListenersGetWork() ([]net.Listener, error) {
 	listenFunc := net.Listen
+	if !cfg.DisableTLSGetWork {
+		// Generate the TLS cert and key file if both don't already
+		// exist.
+		if !fileExists(cfg.RPCKeyGetWork) && !fileExists(cfg.RPCCertGetWork) {
+			err := genCertPair(cfg.RPCCertGetWork, cfg.RPCKeyGetWork)
+			if err != nil {
+				return nil, err
+			}
+		}
+		keypair, err := tls.LoadX509KeyPair(cfg.RPCCertGetWork, cfg.RPCKeyGetWork)
+		if err != nil {
+			return nil, err
+		}
+
+		tlsConfig := tls.Config{
+			Certificates: []tls.Certificate{keypair},
+			MinVersion:   tls.VersionTLS12,
+		}
+
+		// Change the standard net.Listen function to the tls one.
+		listenFunc = func(net string, laddr string) (net.Listener, error) {
+			return tls.Listen(net, laddr, &tlsConfig)
+		}
+	}
+
 	netAddrs, err := parseListeners(cfg.RPCListenersGetWork)
 	if err != nil {
 		return nil, err

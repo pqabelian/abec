@@ -100,6 +100,9 @@ Application Options:
       --notls                 Disable TLS for the RPC server -- NOTE: This is
                               only allowed if the RPC server is bound to
                               localhost
+      --notlsgetwork          Disable TLS for the getwork RPC server -- NOTE: This is
+                              only allowed if the RPC server is bound to
+                              localhost
       --onion=                Connect to tor hidden services via SOCKS5 proxy
                               (eg. 127.0.0.1:9050)
       --onionpass=            Password for onion proxy server
@@ -116,6 +119,8 @@ Application Options:
                               default settings for the active network.
       --rpccert=              File containing the certificate file
       --rpckey=               File containing the certificate key
+      --rpccertgetwork=       File containing the certificate file for getwork protocol
+      --rpckeygetwork=        File containing the certificate key for getwork protocol
       --rpclimitpass=         Password for limited RPC connections
       --rpclimituser=         Username for limited RPC connections
       --rpclisten=            Add an interface/port to listen for RPC

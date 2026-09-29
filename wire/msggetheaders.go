@@ -62,6 +62,10 @@ func (msg *MsgGetHeaders) BtcDecode(r io.Reader, pver uint32, enc MessageEncodin
 		return messageError("MsgGetHeaders.BtcDecode", str)
 	}
 
+	if err := checkDecodeSize(r, count, chainhash.HashSize); err != nil {
+		return err
+	}
+
 	// Create a contiguous slice of hashes to deserialize into in order to
 	// reduce the number of allocations.
 	locatorHashes := make([]chainhash.Hash, count)

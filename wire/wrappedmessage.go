@@ -1,7 +1,6 @@
 package wire
 
 import (
-	"bytes"
 	"fmt"
 	"sync"
 )
@@ -14,7 +13,7 @@ type Entry interface {
 	CanDelete() bool
 	Cached() bool
 
-	Cache(pver uint32, encoding MessageEncoding)
+	Cache(pver uint32, encoding MessageEncoding) error
 	Bytes() []byte
 }
 
@@ -28,7 +27,7 @@ type WrappedMessage struct {
 
 	cacheMu sync.RWMutex
 	cached  bool
-	buf     *bytes.Buffer
+	buf     []byte
 }
 
 func (m *WrappedMessage) Encoding() MessageEncoding {
@@ -59,26 +58,30 @@ func (m *WrappedMessage) Count() int {
 }
 
 func (m *WrappedMessage) Cached() bool {
+	m.cacheMu.RLock()
+	defer m.cacheMu.RUnlock()
 	return m.cached
 }
 func (m *WrappedMessage) Bytes() []byte {
 	m.cacheMu.RLock()
 	defer m.cacheMu.RUnlock()
-	return m.buf.Bytes()
+	return m.buf
 }
-func (m *WrappedMessage) Cache(pver uint32, encoding MessageEncoding) {
-	if m.cached {
-		return
-	}
 
+// Cache publishes an immutable payload only after bounded encoding succeeds.
+func (m *WrappedMessage) Cache(pver uint32, encoding MessageEncoding) error {
 	m.cacheMu.Lock()
 	defer m.cacheMu.Unlock()
 	if m.cached {
-		return
+		return nil
 	}
-	m.buf = &bytes.Buffer{}
-	m.BtcEncode(m.buf, pver, encoding)
+	payload, err := encodeMessagePayload(m.Message, pver, encoding)
+	if err != nil {
+		return err
+	}
+	m.buf = payload
 	m.cached = true
+	return nil
 }
 
 func WrapMessage(msg Message, encoding MessageEncoding) *WrappedMessage {

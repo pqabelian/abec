@@ -1,6 +1,13 @@
 package wire
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
+
+// ErrUnrequestedResponse stops a response with no pending local request at its
+// header. The caller must close the connection without consuming the payload.
+var ErrUnrequestedResponse = errors.New("unrequested response")
 
 // MessageError describes an issue with a message.
 // An example of some potential issues are messages from the wrong bitcoin

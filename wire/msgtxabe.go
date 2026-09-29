@@ -25,6 +25,11 @@ const (
 	defaultTxInputAlloc  = 2
 	defaultTxOutputAlloc = 2
 
+	// MinTxAbePayload is the minimum base encoding: version (4), input and
+	// output counts (1 each), fee (1), and memo length (1). Consensus checks
+	// impose additional requirements; this bound also permits empty wire txs.
+	MinTxAbePayload = 8
+
 	// minTxPayload is the minimum payload size for a (transfer) transaction.  Note
 	// that any realistically usable transaction must have at least one
 	// input or output, but that is a rule enforced at a higher layer, so
@@ -883,7 +888,8 @@ func (msg *MsgTxAbe) Command() string {
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgTxAbe) MaxPayloadLength(pver uint32) uint32 {
-	return MaxBlockPayloadAbe
+	//return MaxBlockPayloadAbe
+	return 32 * 1024 * 1024
 }
 
 // todo: Is it safe to use int as the size type?

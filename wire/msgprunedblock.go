@@ -60,6 +60,9 @@ func (msg *MsgPrunedBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncodi
 		return messageError("MsgBlock.BtcDecode", str)
 	}
 
+	if err := checkDecodeSize(r, txCount, 2*chainhash.HashSize); err != nil {
+		return err
+	}
 	msg.TransactionHashes = make([]chainhash.Hash, txCount)
 	for i := uint64(0); i < txCount; i++ {
 		_, err = io.ReadFull(r, msg.TransactionHashes[i][:])

@@ -3,9 +3,10 @@ package wire
 import (
 	"bytes"
 	"fmt"
-	"github.com/pqabelian/abec/chainhash"
 	"io"
 	"unicode/utf8"
+
+	"github.com/pqabelian/abec/chainhash"
 )
 
 // MessageHeaderSize is the number of bytes in a bitcoin message header.
@@ -26,24 +27,29 @@ const MaxMessagePayload = 320 * 1024 * 1024 // 256MB
 
 // Commands used in bitcoin message headers which describe the type of message.
 const (
-	CmdVersion       = "version"
-	CmdVerAck        = "verack"
-	CmdGetAddr       = "getaddr"
-	CmdAddr          = "addr"
-	CmdGetBlocks     = "getblocks"
-	CmdInv           = "inv"
+	CmdVersion   = "version"
+	CmdVerAck    = "verack"
+	CmdGetAddr   = "getaddr"
+	CmdAddr      = "addr"
+	CmdGetBlocks = "getblocks"
+	CmdInv       = "inv"
+
 	CmdNeedSet       = "needset"
 	CmdNeedSetResult = "nsresult"
-	CmdGetData       = "getdata"
-	CmdNotFound      = "notfound"
-	CmdBlock         = "block"
-	CmdPrunedBlock   = "prunedblock"
-	CmdTx            = "tx"
-	CmdGetHeaders    = "getheaders"
-	CmdHeaders       = "headers"
-	CmdPing          = "ping"
-	CmdPong          = "pong"
-	CmdAlert         = "alert"
+
+	CmdGetBlockTx = "getblocktx"
+	CmdBlockTx    = "blocktx"
+
+	CmdGetData     = "getdata"
+	CmdNotFound    = "notfound"
+	CmdBlock       = "block"
+	CmdPrunedBlock = "prunedblock"
+	CmdTx          = "tx"
+	CmdGetHeaders  = "getheaders"
+	CmdHeaders     = "headers"
+	CmdPing        = "ping"
+	CmdPong        = "pong"
+	//CmdAlert         = "alert"
 	// TODO(ABE): ABE does not support filter.
 	//CmdMemPool    = "mempool"
 	// TODO(ABE): ABE does not support filter.
@@ -122,6 +128,10 @@ func makeEmptyMessage(command string) (Message, error) {
 
 	case CmdNeedSetResult:
 		msg = &MsgNeedSetResult{}
+	case CmdGetBlockTx:
+		msg = &MsgGetBlockTx{}
+	case CmdBlockTx:
+		msg = &MsgBlockTx{}
 
 	case CmdInv:
 		msg = &MsgInv{}
@@ -147,10 +157,10 @@ func makeEmptyMessage(command string) (Message, error) {
 	case CmdHeaders:
 		msg = &MsgHeaders{}
 
-	case CmdAlert:
-		msg = &MsgAlert{}
+	//case CmdAlert:
+	//	msg = &MsgAlert{}
 
-		// TODO(ABE): ABE does not support filter.
+	// TODO(ABE): ABE does not support filter.
 	//case CmdMemPool:
 	//	msg = &MsgMemPool{}
 
@@ -173,10 +183,10 @@ func makeEmptyMessage(command string) (Message, error) {
 	case CmdSendHeaders:
 		msg = &MsgSendHeaders{}
 
-	case CmdFeeFilter:
-		msg = &MsgFeeFilter{}
+	//case CmdFeeFilter:
+	//	msg = &MsgFeeFilter{}
 
-		// TODO(ABE): ABE does not support filter.
+	// TODO(ABE): ABE does not support filter.
 	//case CmdGetCFilters:
 	//	msg = &MsgGetCFilters{}
 	//
@@ -269,6 +279,38 @@ func WriteMessage(w io.Writer, msg Message, pver uint32, btcnet AbelianNet) erro
 	return err
 }
 
+// payloadBuffer refuses writes that would exceed the encoded payload limit.
+// Keep the buffer named so methods such as WriteString cannot bypass Write.
+type payloadBuffer struct {
+	buf   bytes.Buffer
+	limit int
+	err   error
+}
+
+func (b *payloadBuffer) Write(p []byte) (int, error) {
+	if b.err != nil {
+		return 0, b.err
+	}
+	if len(p) > b.limit-b.buf.Len() {
+		b.err = messageError("WriteMessage", fmt.Sprintf("message payload exceeds maximum size of %d bytes", b.limit))
+		return 0, b.err
+	}
+	return b.buf.Write(p)
+}
+
+// encodeMessagePayload is shared by ordinary sends and cached broadcasts.
+// No partial payload is published, including when an encoder ignores Write's error.
+func encodeMessagePayload(msg Message, pver uint32, encoding MessageEncoding) ([]byte, error) {
+	b := payloadBuffer{limit: int(min(MaxMessagePayload, msg.MaxPayloadLength(pver)))}
+	if err := msg.BtcEncode(&b, pver, encoding); err != nil {
+		return nil, err
+	}
+	if b.err != nil {
+		return nil, b.err
+	}
+	return b.buf.Bytes(), nil
+}
+
 // WriteMessageWithEncodingN writes a bitcoin Message to w including the
 // necessary header information and returns the number of bytes written.
 // This function is the same as WriteMessageN except it also allows the caller
@@ -276,18 +318,6 @@ func WriteMessage(w io.Writer, msg Message, pver uint32, btcnet AbelianNet) erro
 // messages.
 func WriteMessageWithEncodingN(w io.Writer, msg Message, pver uint32,
 	btcnet AbelianNet, encoding MessageEncoding) (int, error) {
-	wrapped := false
-	var payload []byte
-	var lenp int
-	if wrappedMsg, ok := msg.(*WrappedMessage); ok {
-		wrapped = true
-		if !wrappedMsg.Cached() {
-			wrappedMsg.Cache(pver, encoding)
-		}
-		payload = wrappedMsg.Bytes()
-		lenp = len(payload)
-	}
-
 	totalBytes := 0
 
 	// Enforce max command size.
@@ -300,16 +330,20 @@ func WriteMessageWithEncodingN(w io.Writer, msg Message, pver uint32,
 	}
 	copy(command[:], []byte(cmd))
 
-	if !wrapped {
-		// Encode the message payload.
-		var bw bytes.Buffer
-		err := msg.BtcEncode(&bw, pver, encoding)
+	var payload []byte
+	if wrappedMsg, ok := msg.(*WrappedMessage); ok {
+		if err := wrappedMsg.Cache(pver, encoding); err != nil {
+			return totalBytes, err
+		}
+		payload = wrappedMsg.Bytes()
+	} else {
+		var err error
+		payload, err = encodeMessagePayload(msg, pver, encoding)
 		if err != nil {
 			return totalBytes, err
 		}
-		payload = bw.Bytes()
-		lenp = len(payload)
 	}
+	lenp := len(payload)
 
 	// Enforce maximum overall message payload.
 	if lenp > MaxMessagePayload {
@@ -368,10 +402,23 @@ func WriteMessageWithEncodingN(w io.Writer, msg Message, pver uint32,
 func ReadMessageWithEncodingN(r io.Reader, pver uint32, btcnet AbelianNet,
 	enc MessageEncoding) (int, Message, []byte, error) {
 
+	return ReadMessageWithRequestsN(r, pver, btcnet, enc, nil)
+}
+
+// ReadMessageWithRequestsN is ReadMessageWithEncodingN with a concurrency-safe
+// request tracker. A nil tracker disables request tracking, not wire validation.
+func ReadMessageWithRequestsN(r io.Reader, pver uint32, btcnet AbelianNet,
+	enc MessageEncoding, requests *MessageRequests) (int, Message, []byte, error) {
+
 	totalBytes := 0
 	n, hdr, err := readMessageHeader(r)
 	totalBytes += n
 	if err != nil {
+		return totalBytes, nil, nil, err
+	}
+
+	// Incoming responses must correspond to a request we actually sent.
+	if err := requests.begin(hdr.command); err != nil {
 		return totalBytes, nil, nil, err
 	}
 
@@ -420,10 +467,9 @@ func ReadMessageWithEncodingN(r io.Reader, pver uint32, btcnet AbelianNet,
 		return totalBytes, nil, nil, messageError("ReadMessage", str)
 	}
 
-	// Read payload.
-	payload := make([]byte, hdr.length)
-	n, err = io.ReadFull(r, payload)
-	totalBytes += n
+	// Read payload without allocating a large buffer solely from its header.
+	payload, err := readPayload(r, hdr.length)
+	totalBytes += len(payload)
 	if err != nil {
 		return totalBytes, nil, nil, err
 	}
@@ -438,15 +484,53 @@ func ReadMessageWithEncodingN(r io.Reader, pver uint32, btcnet AbelianNet,
 		return totalBytes, nil, nil, messageError("ReadMessage", str)
 	}
 
-	// Unmarshal message.  NOTE: This must be a *bytes.Buffer since the
-	// MsgVersion BtcDecode function requires it.
+	// MsgVersion requires *bytes.Buffer to detect optional trailing fields.
 	pr := bytes.NewBuffer(payload)
 	err = msg.BtcDecode(pr, pver, enc)
 	if err != nil {
 		return totalBytes, nil, nil, err
 	}
 
+	err = requests.complete(msg)
+	if err != nil {
+		return totalBytes, nil, nil, err
+	}
+
 	return totalBytes, msg, payload, nil
+}
+
+// readPayload preserves ReadFull's byte count and error semantics. Allocate at
+// most 64 KiB up front, then grow only after the previous buffer has filled.
+func readPayload(r io.Reader, size uint32) ([]byte, error) {
+	payload := make([]byte, min(size, 64*1024))
+	n := 0
+	for n < int(size) {
+		if n == len(payload) {
+			// Cap capacity at the frame length and avoid ReadAll's final
+			// whole-payload copy. Growth still briefly holds old and new buffers.
+			nextSize := min(size, uint32(len(payload))*2)
+			// Include a small final tail now instead of copying the entire
+			// buffer once more for a few bytes (for example, a blocktx hash).
+			if size-nextSize <= 64*1024 {
+				nextSize = size
+			}
+			grown := make([]byte, nextSize)
+			copy(grown, payload)
+			payload = grown
+		}
+		read, err := r.Read(payload[n:])
+		n += read
+		if n == int(size) {
+			return payload, nil
+		}
+		if err != nil {
+			if err == io.EOF && n > 0 {
+				err = io.ErrUnexpectedEOF
+			}
+			return payload[:n], err
+		}
+	}
+	return payload, nil
 }
 
 // ReadMessageN reads, validates, and parses the next bitcoin Message from r for
